@@ -3,8 +3,11 @@
 Mistakes that Claude Code repeatedly makes.
 Review before implementation and ensure these are not repeated.
 
-Rules already documented in CONVENTIONS.md, FF.md, ARCHITECTURE.md, DOMAIN.md, or layer CLAUDE.md files are NOT repeated here.
+Rules already documented in CONVENTIONS.md, FF.md, ARCHITECTURE.md, or DOMAIN.md are NOT repeated here.
 This file contains only **recurring gotchas** that agents keep missing despite existing documentation.
+
+`siglens-core` is a pure TypeScript library — UI / React / Next.js concerns are out of scope
+and have been removed from this file.
 
 ---
 
@@ -42,67 +45,43 @@ This file contains only **recurring gotchas** that agents keep missing despite e
    ✅ const keywords = [...keywordList, value]
    ✅ const obj = { ...source, property: newValue }
 
-6. Repeating identical filtering/calculation logic across multiple useEffect/useMemo blocks
-   → Extract to useMemo (hooks) or const (regular code)
+6. Repeating identical filtering/calculation logic across multiple call sites
+   → Extract to a shared pure helper (domain/ preferred) or module-level const
 
-6.5. State/function/documentation divergence — parts of the system not synchronized when requirements change
-   → When reset() is called, all related state (useState + useMutation) must be reset together
-   → When function implementation changes, all related functions in the same module must use consistent approach
+6.5. State / function / documentation divergence — parts of the system not synchronized when requirements change
+   → When function implementation changes, all related functions in the same module must use a consistent approach
    → When prompt/instruction fields are updated, all field lists and documentation must stay synchronized
-   ❌ reset() clears useMutation data but leaves separate useState stale
    ❌ collectMdFiles uses recursion but countSkillFiles uses non-recursive readdir
    ❌ Prompt field added to first list but omitted from second list in same instruction block
-   ✅ reset() clears both useMutation and all related useState state together
    ✅ countSkillFiles reuses collectMdFiles for consistency
    ✅ All field lists synchronized when new fields are added
 
-7. Repeating identical className ternary 3+ times
-   → Extract to a helper function
+7. Tight coupling between interface props and dependent files
+   → Group related prop pairs into a single type
 
-7.5. Combining Tailwind classes with template literals or + operator instead of cn()
-   → All dynamic or conditional Tailwind className combinations must use cn() utility
-   → Never concatenate Tailwind classes with template literals, string concatenation (+ operator), or ternaries
-   → Even static className constants must use cn() when building multi-part classNames
-   ❌ className={`grid gap-2 ${condition ? 'px-4' : 'px-2'}`}
-   ❌ className={'px-4 ' + (isActive ? 'bg-primary' : '')}
-   ❌ const CARD_CLASSES = 'px-4 py-2' + ' bg-white' + ' border border-gray-200'  // + operator on strings
-   ✅ className={cn('grid gap-2', condition ? 'px-4' : 'px-2')}
-   ✅ className={cn('px-4', isActive && 'bg-primary')}
-   ✅ const CARD_CLASSES = cn('px-4 py-2', 'bg-white', 'border border-gray-200')
-   → cn() enables proper class merging, conflict detection, and IDE support
-
-8. Tight coupling between interface props and dependent files
-   → Group related prop pairs into a single type (e.g. IndicatorToggleGroup { visible, onToggle })
-
-9. Complex anonymous expressions (IIFE, multi-statement ternary)
+8. Complex anonymous expressions (IIFE, multi-statement ternary)
    → Extract to a named helper function
 
-10. Derived constants recreated on every render without memoization
-    → Wrap with useMemo for objects/maps derived from props/state
+9. Function/interface names become inaccurate after architectural changes
+   → When replacing implementations, renaming patterns, or moving code, update the names
+   ❌ fetchBars (no longer a fetch — now reads from cache)
+   ✅ loadBars (accurate to new implementation)
 
-11. Function/interface names become inaccurate after architectural changes
-    → When replacing HTTP calls with Server Actions, renaming patterns, or moving code, update the names
-    ❌ fetchBars (no longer a fetch — now a Server Action)
-    ✅ getBarsAction (accurate to new implementation)
-
-12. Using .sort() instead of .toSorted()
+10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
     ❌ arr.sort() // in-place mutation
     ✅ arr.toSorted() // returns new sorted array
 
-13. eslint-disable suppresses lint warnings instead of fixing root cause
+11. eslint-disable suppresses lint warnings instead of fixing root cause
     → Never suppress warnings with eslint-disable-next-line or inline comments
-    → Always restructure the code to fix the actual issue (e.g., exhaustive-deps warnings → fix closure captures, remove unstable references)
-    ❌ // eslint-disable-next-line react-hooks/exhaustive-deps
-    ✅ Restructure deps, use useEffectEvent, use useRef for stable references
+    → Always restructure the code to fix the actual issue
 
-14. Using let + if for conditional assignment instead of declarative const expressions
+12. Using let + if for conditional assignment instead of declarative const expressions
     → Prefer ternary/conditional expressions (const) over imperative reassignment (let)
-    → Improves code clarity and follows functional programming principles
     ❌ let result = value; if (condition) result = newValue; return result;
     ✅ const result = condition ? newValue : value; return result;
 
-15. Hardcoded literals in function names or calculations
+13. Hardcoded literals in function names or calculations
     → All magic numbers and constant values must be extracted to module-level constants
     → Function names must remain accurate when the underlying constant value changes
     ❌ function computeSecondsUntilKst17() { ... } where 17 is hardcoded; renaming breaks if constant changes
@@ -110,70 +89,35 @@ This file contains only **recurring gotchas** that agents keep missing despite e
     ✅ const CACHE_EXPIRY_HOUR_KST = 17; function computeSecondsUntilCacheExpiry() { ... }
     ✅ const PRICE_DECIMAL_FACTOR = 100; Math.round(rawPrice * PRICE_DECIMAL_FACTOR) / PRICE_DECIMAL_FACTOR
 
-21. Domain functions using imperative for-loop + push instead of higher-order functions
+14. Domain functions using imperative for-loop + push instead of higher-order functions
     → Domain functions must use map, filter, flatMap, reduce — never direct mutation with push/splice
-    → Applies to all domain/ implementations; violation of functional programming paradigm
     ❌ const result = []; for (const item of data) { result.push(transform(item)); } return result;
     ✅ const result = data.map(transform); return result;
     ❌ const lines = []; for (const rec of reconciled) { lines.push(...extractLines(rec)); } return lines;
     ✅ const lines = reconciled.flatMap(extractLines); return lines;
 
-22. Domain functions incomplete test coverage — missing unit tests entirely or covering <100% branches
-    → Every new domain function must have dedicated unit tests with 100% branch coverage
-    → Test infrastructure functions similarly; coverage checks catch missing edge cases
+15. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <100% branches
+    → Every new domain / infrastructure function must have dedicated unit tests with 100% branch coverage
     ❌ callGeminiWithKeyFallback added to infrastructure/ai/gemini.ts without src/__tests__/infrastructure/ test file
     ❌ extractReconciledActionLines added to domain/analysis/ without corresponding unit tests for 8+ cases
     ✅ src/__tests__/domain/analysis/actionRecommendation.test.ts with cases: undefined rec, missing levels, duplicates, zero values, empty result
     ✅ New infrastructure functions tested in parallel src/__tests__/infrastructure/ test file with all branches covered
 
-23. Domain functions inadequate defensive checks on financial data (division by zero, negative values, bounds)
+16. Inadequate defensive checks on financial data (division by zero, negative values, bounds)
     → Financial values require explicit guards before use — null/undefined checks insufficient
     → takeProfit, entryPrice, stoploss must be validated for sensible ranges (>0, within bounds)
     → Prevent negative R:R, invalid leverage, or meaningless outputs
     ❌ Number.isFinite(tp) only; allows tp = 0 or tp < 0 which breaks logic downstream
     ❌ const reward = tp - entryPrice; no guard for tp <= entryPrice, can yield negative R:R
     ✅ Number.isFinite(tp) && tp > 0 && tp !== entryPrice; return early if invalid
-    ✅ if (tp <= entryPrice) return ''; // meaningless result, prevent display
+    ✅ if (tp <= entryPrice) return ''; // meaningless result, prevent
 
-16. Shared constants duplicated across module boundaries without documentation
+17. Shared constants duplicated across module boundaries without documentation
     → When a module cannot import shared constants (environment constraints), duplicate with explicit JSDoc linking to the source
     → Every duplicate must reference the original constant and document the sync requirement
     ❌ worker/src/index.ts: JOB_TTL_SECONDS = 3600  // matches queue.ts but no link or comment
-    ✅ worker/src/index.ts: // Matches JOB_TTL_SECONDS in queue.ts; update both if changed
-             const JOB_TTL_SECONDS = 3600;
-    → Redis key schemas duplicated across files must include a JSDoc block documenting the schema origin and dependency chain
-
-17. Custom hooks declared after derived variables in component/hook code
-    → All hook calls must be declared before derived variables (const x = ...), handlers, or effects
-    ❌ const timeframe = computeTimeframe(); useQuery(...)
-    ✅ useQuery(...); const timeframe = computeTimeframe();
-    → Ordering: useState/useRef → useQuery/useMutation → derived variables → handlers → useEffect
-
-17.5. for loop with .push() inside useMemo, reduce, or other functional expressions
-    → Loop accumulation must use spread, map, filter, flatMap, or reduce — never direct mutation
-    ❌ useMemo(() => { for (let i = 0; i < data.length; i++) { result.push(...) } }, [])
-    ✅ useMemo(() => data.map(...).filter(...), [])
-    ✅ useMemo(() => data.reduce((acc, item) => [...acc, ...], []), [])
-    → Applies to all functional/declarative contexts, not just loops
-
-18. Non-hook utility functions defined inside hook files
-    → Pure utilities like sleep() belong in utils/ subfolders, not inside hook files
-    ❌ useAnalysis.ts: const sleep = (ms) => new Promise(...)
-    ✅ symbol-page/utils/sleep.ts
-
-19. Inline styles in JSX when Tailwind classes are available
-    → Always use Tailwind; never inline style={{ ... }} for layout or styling
-    → When dynamic values require inline styles, use CSS custom properties + Tailwind classes instead
-    → `style={{ '--custom-prop': value }} as CSSProperties` + `className="... var(--custom-prop)"` pattern
-    ❌ <ins style={{ display: 'block' }} />
-    ❌ <div style={{ backgroundColor: getColor(state) }} />  // inline color computation
-    ✅ <ins className="block" />
-    ✅ <div style={{ '--period-color': getColor(state) } as CSSProperties} className="bg-[var(--period-color)]" />
-
-20. Nested functions without explicit parameters extracted to module level
-    → When extracting a function from a parent function scope, make all parent variables explicit parameters
-    ❌ function searchAction() { function toResult(x) { ... parent var ... } }
-    ✅ function toResult(x, parentVar) { ... }; function searchAction() { toResult(..., parentVar); }
+    ✅ // Matches JOB_TTL_SECONDS in queue.ts; update both if changed
+       const JOB_TTL_SECONDS = 3600;
 ```
 
 ---
@@ -199,9 +143,8 @@ This file contains only **recurring gotchas** that agents keep missing despite e
 
 5. Inline type annotations used instead of named type aliases
    → Extract repeated or reusable type patterns to named type aliases
-   → Applies to union literals, object shapes, and field patterns used in component props or constants
-   ❌ interface Props { size?: 'sm' | 'lg'; fields: readonly { label: string; key: string }[] }
-   ✅ type ButtonSize = 'sm' | 'lg'; interface FieldDef { label: string; key: string }; interface Props { size?: ButtonSize; fields: readonly FieldDef[] }
+   ❌ interface Options { size?: 'sm' | 'lg'; fields: readonly { label: string; key: string }[] }
+   ✅ type Size = 'sm' | 'lg'; interface FieldDef { label: string; key: string }; interface Options { size?: Size; fields: readonly FieldDef[] }
 
 6. Union literals with 3+ occurrences in different files → not extracted to named type
    → Domain indicators frequently repeat trend/direction unions across result types
@@ -212,12 +155,9 @@ This file contains only **recurring gotchas** that agents keep missing despite e
 7. Using `as` type assertions instead of type guards or non-null assertion operators
    → Prefer type guards, `!` operator, or satisfies keyword over `as` casts
    → Prefer `!` operator when null is logically impossible, or narrowing guards for conditional paths
-   → `as` casts hide type safety problems; explicit guards expose intent
    ❌ const value = getValue() as number;  // hides null check
    ✅ const value = getValue()!;  // non-null assertion when null is logically impossible
    ✅ const value: number = getValue() ?? 0;  // type guard with fallback
-   ❌ atrValues[idx] as number  // null never occurs due to prior check
-   ✅ atrValues[idx]!  // non-null assertion operator
    ⚠️  Safe-cast exception: `as` is allowed when TypeScript's type system structurally widens a
       value whose runtime type is already guaranteed by the surrounding type — NOT to force-cast
       a value that could genuinely be null, undefined, number, or string at runtime.
@@ -233,73 +173,6 @@ This file contains only **recurring gotchas** that agents keep missing despite e
 
 ---
 
-## Components
-
-```
-1. External callback prop in useEffect dependency array → infinite loops
-   → Use useEffectEvent to wrap callback props
-
-2. useState lazy initializer derives value from props
-   → Initializer runs only once; use useEffect to sync when props change
-
-3. Missing aria-expanded on accordion triggers
-
-4. Unused Tailwind classes (e.g. grid classes on flex containers)
-   → Verify parent layout model before applying layout-specific classes
-
-5. Props declared but not connected to callbacks (latent bugs)
-   → If a callback prop exists, it must actually be invoked
-
-5.5. Unused, dead, or decorative props in component interfaces
-   → Props that are declared but not consumed by the component, or received but immediately discarded (_prefix pattern)
-   → Intermediate components must not pass-through props they don't directly use (Props Drilling anti-pattern)
-   → Remove unused props from interface; remove pass-through behavior in intermediate components
-   ❌ interface Props { isVisible?: boolean; onToggleVisibility?(...) }; component destructures but uses neither
-   ❌ ChartContent receives chartVisiblePatterns but passes to AnalysisPanel without AnalysisPanel consuming it
-   ✅ Remove both from interface; if AnalysisPanel needs it, pass directly from parent (or use context for cross-cutting concerns)
-
-6. Repeating identical JSX structure 2+ times
-   → Extract to a data array + .map() pattern
-
-7. DOM event listener in useEffect instead of custom hook
-   → Extract to useOnClickOutside, useEscapeKey, etc.
-
-8. Custom hook params missing optional properties present in sibling hooks
-   → All hooks in the same family must accept consistent parameter patterns
-
-9. Custom hooks in components/ without 'use client' directive
-   → Every hook file under components/ must declare 'use client' at the top
-   → Hooks are Client Components and will fail without the directive when parent is async Server Component
-
-10. setState called directly in useEffect body (react-hooks/set-state-in-effect)
-    → If the state being reset logically belongs to "mutation starts", move it to useMutation's onMutate callback
-    → onMutate fires synchronously before the mutationFn, satisfies the linter, and centralizes reset logic
-    ❌ useEffect(() => { setPollError(null); setAnalysisResult(null); mutate(...); }, [deps])
-    ✅ useMutation({ onMutate: () => { setPollError(null); setAnalysisResult(null); }, ... })
-    → For state that must reset on every mutate call site, onMutate is the single source of truth
-    → Note: useCallback does NOT help — the linter traces into useCallback bodies and still flags setState
-
-11. URL synchronization using initial props instead of current local state
-    → RSC pending states can cause initial props to be stale during concurrent updates
-    → Always derive URL from local state (useState) that reflects current user action
-    ❌ handleSectorChange() { updateUrl(initialTimeframe); }  // prop is stale during RSC pending
-    ✅ const [activeTimeframe, setActiveTimeframe] = useState(initialTimeframe); handleSectorChange() { updateUrl(activeTimeframe); }
-
-12. Internal flags affecting render state managed with useState instead of useRef
-    → Flags that do not influence JSX output should use useRef to prevent unnecessary re-renders and effect re-runs
-    → useState causes render cycles: setState → rerender → effect re-executes → immediate guard return
-    ❌ const [isPushed, setIsPushed] = useState(false); handlePush() { setIsPushed(true); }
-    ✅ const isPushedRef = useRef(false); handlePush() { isPushedRef.current = true; }
-
-13. Component props interface declared inline instead of above component function
-    → Extract inline prop type definitions to named interface declared directly above component
-    → Improves readability and allows reuse in tests or other contexts
-    ❌ export default function MyComponent({ label }: { label: string }) { ... }
-    ✅ interface MyComponentProps { label: string }; export default function MyComponent(props: MyComponentProps) { ... }
-```
-
----
-
 ## Domain Functions
 
 ```
@@ -308,17 +181,62 @@ This file contains only **recurring gotchas** that agents keep missing despite e
 
 2. Silent fallback without exposing degradation to caller
    ❌ skillsLoader.loadSkills().catch(() => [])
-   ✅ .catch(error => { console.error(...); return []; }) + skillsDegraded in response
+   ✅ .catch(error => { console.error(...); return []; }) + expose skillsDegraded on return
 
-3. Module-level constants frozen at load time instead of computed per mount
-   → Data freshness requires per-component timestamps, not frozen module-load values
-   ❌ const MODULE_LOAD_TIME = Date.now();  // SPA nav: all mounts see the same old timestamp
-   ✅ const time = useState(() => Date.now())[0];  // each mount captures its own timestamp
-
-4. Sentinel values wrapped in functions that silently break the contract
+3. Sentinel values wrapped in functions that silently break the contract
    → Sentinel values (-1, null, undefined) must propagate unchanged through call chains
    ❌ Math.max(0, sentinel ?? fallback)  // Math.max converts -1 to 0, breaking sentinel behavior
    ✅ sentinel === -1 ? -1 : Math.max(0, sentinel)  // explicit guard before wrapping
+
+4. Date.now() / process.env / fetch called from domain/
+   → domain/ must remain pure. All time / environment / I/O reads belong in infrastructure/.
+   → If a calculation genuinely needs the current time, pass it as a parameter.
+```
+
+---
+
+## Infrastructure Functions
+
+```
+1. Conditional logic branches must all update shared data consistently
+   → Background jobs and retry paths must produce same data shape as main path
+   → When caching results, all code paths must store the same fields
+   ❌ Main path: cache.set(symbol, { symbol, name, koreanName, fmpSymbol })
+      Background job: cache.set(symbol, { symbol, name, koreanName })  // fmpSymbol missing
+   ✅ Both paths: cache.set(symbol, { symbol, name, koreanName, fmpSymbol })
+
+2. Infrastructure functions must have 100% branch coverage
+   → All if/else, optional chaining (?.), nullish coalescing (??) paths tested
+   → Test edge cases like subsecond boundaries, zero values, Math.max guard behavior
+   ❌ Math.max(1, Math.floor(diffMs / 1000)) guard that converts 0→1 untested
+   ✅ Add test case: diffMs = 500ms covers the Math.max(1, 0) = 1 path
+
+3. No debug artifacts (console.log) in infrastructure files
+   → Infrastructure functions are utilities; logging belongs in higher layers
+   ❌ getBars() { console.log(...timing...); return bars; }
+   ✅ Remove logging; expose metrics via return type if needed
+
+4. Environment variable reads scattered across infrastructure/ modules
+   → Centralize each external system's env reads in a single config module
+   → e.g. infrastructure/cache/config.ts reads UPSTASH_* vars; other modules import from config
+```
+
+---
+
+## Fire-and-Forget Operations
+
+```
+1. Fire-and-forget fetch requests must have timeouts
+   → fetch() without timeout can block indefinitely on network delay
+   → Apply AbortSignal.timeout(ms) to prevent blocking
+   ❌ fetch('/cancel', { method: 'POST' })  // no timeout
+   ✅ fetch('/cancel', { method: 'POST', signal: AbortSignal.timeout(5000) })
+
+2. Fire-and-forget async calls must swallow errors
+   → Error propagation from background tasks blocks the caller
+   → Wrap in try-catch, log warning, and return normally
+   ❌ async function cancelJob() { await fetch('/cancel'); }  // throws to caller if fetch fails
+   ✅ async function cancelJob() { try { await fetch(...); } catch (e) { console.warn('Background action failed', e); } }
 ```
 
 ---
@@ -347,7 +265,7 @@ This file contains only **recurring gotchas** that agents keep missing despite e
    → When one Provider changes, apply the same change to all Providers
 
 8. Repeated identical parameter object passed to multiple function calls
-   → Extract to const (regular code) or useMemo (hooks)
+   → Extract to const at the top of the test
 
 9. Test describe text promises assertions not verified by its it() cases
 
@@ -355,126 +273,34 @@ This file contains only **recurring gotchas** that agents keep missing despite e
     → All mock/fixture objects must match the updated interface
 
 11. External dependencies in production code without corresponding test mocks
-    → When adding external packages (e.g., @vercel/functions) to infrastructure files, mock them in all corresponding test files
-    → jest.mock('@package-name', ...) must be added to every test file that tests the module with the external dependency
+    → When adding external packages to infrastructure files, mock them in all corresponding test files using Vitest's `vi.mock`
+    → `vi.mock('@package-name', ...)` must be added to every test file that tests the module with the external dependency
 
 12. Period-based indicator tests only verify sign (positive/negative) without toBeCloseTo reference values
     → Every period-based indicator test must include toBeCloseTo checks against manually-calculated expected values
     → Warming-up period constants must be imported from source, not manually redefined in tests
     → Boundary constants must account for full algorithm dependency chains (e.g. nested window calculations)
     ❌ test('trend is positive', () => expect(values[idx]).toBeGreaterThan(0))  // no actual value verification
-    ✅ test('first value matches reference', () => expect(values[minBarsIdx]).toBeCloseTo(expectedValue))  // precise reference comparison
+    ✅ test('first value matches reference', () => expect(values[minBarsIdx]).toBeCloseTo(expectedValue))
 
 13. Redefining production functions/constants locally in tests
     → Tests must import and verify production code directly; local redefinitions become tautological
     ❌ test('shouldShowAd', () => { const shouldShowAd = (x) => x.enabled; expect(shouldShowAd(mock)).toBe(true); })
     ✅ import { shouldShowAd } from '@/domain/ads'; test('shouldShowAd', () => { expect(shouldShowAd(mock)).toBe(true); })
     → Expected values from module exports must also be imported, not hardcoded
-    ❌ expect(label).toBe('STRONG'); // STRONG_LABEL imported from same module as function
-    ✅ import { SIGNAL_STRENGTH_LABEL } from '@/utils'; expect(label).toBe(SIGNAL_STRENGTH_LABEL.strong);
 
 14. Time-dependent functions in tests must be explicitly mocked
-    → Functions using Date.now(), new Date() must be mocked in test files
+    → Functions using Date.now(), new Date() must be mocked (vi.useFakeTimers / vi.setSystemTime)
     → Hard-coded expected values (e.g., TTL seconds) without mocking time sources cause flaky tests
     ❌ analyzeAction test: expect(ttl).toBe(86400); without mocking new Date()
-    ✅ jest.mock('@/infrastructure/cache/config', ...); mock Date to fixed timestamp before assertions
+    ✅ vi.setSystemTime(new Date('2024-01-01T00:00:00Z')); expect(ttl).toBe(expectedTtl);
+
+15. Reaching out to real external services inside tests
+    → Tests must never hit Upstash, Neon, AI provider endpoints, or any real network destination
+    → Replace each infrastructure interface (AnalysisCache, AiProvider, etc.) with a stub / vi.fn mock
 ```
 
 ---
-
-## Accessibility (WAI-ARIA)
-
-```
-1. Overwriting native ARIA role of semantic elements
-   → Native roles (paragraph, complementary) must not be replaced with role attributes
-   → Use <div role="note"> instead of <p role="note"> or <aside role="note">
-   → Use semantic elements without explicit role unless the role fundamentally differs
-
-2. ARIA tablist pattern incomplete (missing roving tabindex or arrow key handlers)
-   → tablist requires both roving tabindex AND arrow key navigation to be fully accessible
-   → Active tab: tabIndex={0}; Inactive tabs: tabIndex={-1}
-   → Implement onKeyDown handler for ArrowLeft/ArrowRight to move focus between tabs
-   ❌ aria-selected set but tabIndex not set; no arrow key handlers
-   ✅ tabIndex={isActive ? 0 : -1} + handleTablistKeyDown(ArrowLeft/Right)
-
-3. Missing accessible name on ARIA roles
-   → All role attributes must have either aria-label, aria-labelledby, or accessible text content
-   → tooltip: requires aria-describedby connection to trigger element
-   → note: requires aria-label with descriptive text
-   ❌ <div role="tooltip">  // no aria-describedby
-   ✅ <div role="tooltip" id="tooltip-1">; <button aria-describedby="tooltip-1">
-   ❌ <div role="note">  // no aria-label
-   ✅ <div role="note" aria-label="Additional information">
-
-4. Missing focus-visible:ring on interactive buttons
-   → All interactive buttons must have keyboard focus indicator
-   → Apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 to every button
-   ❌ <button className="px-4 py-2 bg-primary-600">Click</button>  // no focus indicator
-   ✅ <button className="px-4 py-2 bg-primary-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">Click</button>
-   → Includes: TabsPill, DropdownPortal buttons, info icons, action buttons in AnalysisPanel, IndicatorToolbar
-   → Omission violates keyboard accessibility (WCAG 2.4.7 Focus Visible)
-
-5. Interactive info icons using <span title="..."> only — not keyboard accessible
-   → Tooltips must be keyboard-accessible; title attribute ignored by keyboard users and screen readers
-   → Replace <span> with <button>, add aria-describedby + role="tooltip" pattern
-   ❌ <span title="Information">ⓘ</span>  // title-only, no keyboard access
-   ✅ <button aria-describedby="tooltip-id" className="focus-visible:ring"><span id="tooltip-id" role="tooltip">Information</span></button>
-```
-
----
-
-## UX & Rendering
-
-```
-1. Portal-based tooltips render at initial position (0,0) before calculation, causing visible flicker
-   → Add visibility: hidden state during position calculation, reveal only after positioned
-   → Use useEffect with calculated position callback to show element only when ready
-
-2. Tooltip position calculated without viewport boundary checks
-   → If trigger is near viewport edge, tooltip may overflow screen bounds
-   → Add viewport padding checks: if (aboveTop < TOOLTIP_VIEWPORT_PADDING) render below instead
-```
-
----
-
-## Lightweight Charts
-
-1. Missing chart.remove() cleanup or listener unsubscribe before chart.remove()
-   → Always call unsubscribeVisibleLogicalRangeChange before chart.remove() to prevent "Object is disposed" errors
-   → Use a ref pattern for onChartRemove callback to capture cleanup logic and guard chartRef.current in ResizeObserver
-   → When effect cleanup order is non-deterministic (chart dispose may run first), use try-catch on the unsubscribe call
-      rather than re-reading chartRef.current in cleanup (which triggers react-hooks/exhaustive-deps warnings)
-   ❌ chartRef.current?.unsubscribeCrosshairMove(handler)  // eslint-disable required, ref read in cleanup
-   ✅ try { chart.unsubscribeCrosshairMove(handler); } catch { /* already disposed */ }
-
-2. Passing domain null values directly to setData
-   → Convert to WhitespaceData({ time })
-
-3. Adding volume/RSI to the main pane
-   → Always add to a separate pane (index 1, 2, ...)
-
-4. Derived className or style objects recreated on every render without memoization
-   → Props-derived objects (inputClass, buttonClass computed from size prop) must use useMemo to prevent recreation
-   → Prevents unnecessary re-renders when object identity is compared
-
----
-
-## Next.js Build & Caching
-
-```
-1. Uncached data (Date.now(), new Date()) called in Provider constructors during prerender
-   → When cacheComponents: true is enabled, all prerendered data must be static
-   → Wrap QueryClient creation or dynamic providers in <Suspense> to defer execution to request time
-   → Do not call uncached functions in module-level code or provider constructors
-
-2. Client Component with new Date() in strict cacheComponents mode
-   → Remove 'use client' and convert to 'use cache' async functions instead
-   → Client Components cannot use Date.now() during prerender; use Cache Components for time-dependent logic
-
-3. Missing 'use cache' directive on infrastructure functions
-   → infrastructure/ functions accessed during prerender must include 'use cache' directive
-   → Explicitly marks the function as safe to cache and enables caching at build time
-```
 
 ## Documentation Sync
 
@@ -485,62 +311,14 @@ This file contains only **recurring gotchas** that agents keep missing despite e
    ❌ mean-reversion.md body uses 2×ATR but frontmatter indicators omits atr
    ✅ Frontmatter includes all body references; update AI instructions to match actual RECENT_BARS_COUNT=30
 
-2. API endpoint or parameter changes not reflected in docs/API.md
-   → When external API schema or timeframe/parameter options change, update docs/API.md reference tables
-   → Include all provider names, endpoint paths, and parameter enums in documentation
-   ❌ FMP_INTRADAY_TIMEFRAME_MAP extended to include 30min, 4hour; docs/API.md still lists only 1Min-1Hour
-   ✅ docs/API.md Timeframe table updated to include all current mappings
+2. External service usage changes not reflected in docs/API.md
+   → When env vars or endpoints change in infrastructure/, update docs/API.md the same PR
+   → Include the full list of required / optional env vars
 
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → Single-line summaries only; multi-paragraph docstrings must be condensed to one line per function
-   ❌ tooltipPosition.ts module docs reference getBoundingClientRect() after it was removed from function
-   ❌ ai-levels.ts multi-paragraph JSDoc blocks documenting design rationale instead of current signature
-   ✅ Module comment: "Calculate tooltip position from DOMRect bounds"
-   ✅ Function comment: "Transform input levels with reconciliation rules"
    → When changing function implementation, update related comments immediately
-```
-
----
-
-## Infrastructure Functions
-
-```
-1. Conditional logic branches must all update shared data consistently
-   → Background jobs and retry paths must produce same data shape as main path
-   → When caching results, all code paths must store the same fields
-   ❌ Main path: cache.set(symbol, { symbol, name, koreanName, fmpSymbol })
-      Background job: cache.set(symbol, { symbol, name, koreanName })  // fmpSymbol missing
-   ✅ Both paths: cache.set(symbol, { symbol, name, koreanName, fmpSymbol })
-
-2. Infrastructure functions must have 100% branch coverage
-   → All if/else, optional chaining (?.), nullish coalescing (??) paths tested
-   → Test edge cases like subsecond boundaries, zero values, Math.max guard behavior
-   ❌ Math.max(1, Math.floor(diffMs / 1000)) guard that converts 0→1 untested
-   ✅ Add test case: diffMs = 500ms covers the Math.max(1, 0) = 1 path
-
-3. No debug artifacts (console.log) in infrastructure files
-   → Infrastructure functions are utilities; logging belongs in higher layers
-   ❌ getBars() { console.log(...timing...); return bars; }
-   ✅ Remove logging; expose metrics via return type if needed
-```
-
----
-
-## Fire-and-Forget Operations
-
-```
-1. Fire-and-forget fetch requests must have timeouts
-   → fetch() without timeout can block indefinitely on network delay
-   → Apply AbortSignal.timeout(ms) to prevent client-side blocking
-   ❌ fetch('/cancel', { method: 'POST' })  // no timeout
-   ✅ fetch('/cancel', { method: 'POST', signal: AbortSignal.timeout(5000) })
-
-2. Fire-and-forget Server Actions must swallow errors
-   → Error propagation from background actions blocks the caller
-   → Wrap in try-catch, log warning, and return normally
-   ❌ async function cancelAction() { await fetch('/cancel'); }  // throws to caller if fetch fails
-   ✅ async function cancelAction() { try { await fetch(...); } catch (e) { console.warn('Background action failed', e); } }
 ```
 
 ---
@@ -558,22 +336,9 @@ This file contains only **recurring gotchas** that agents keep missing despite e
    ❌ !!assetInfo?.name  // when AssetInfo.name is required
    ✅ !!assetInfo  // sufficient when name is guaranteed
 
-3. useEffect dependency array missing dynamic variables or including stable refs
-   → All variables from outer scope used in useEffect body must be in deps array
-   → Stable refs and useEffectEvent-wrapped functions should not be in deps array
-   → Missing deps cause stale closures; unnecessary deps cause redundant re-runs
-   ❌ useEffect(() => { ... slot ... }, [isFullSnap])  // slot prop used but not in deps
-   ❌ useEffect(() => { ... snapToPoint ... }, [isFullSnap, snapToPoint])  // snapToPoint from useEffectEvent is stable
-   ✅ useEffect(() => { ... slot ... }, [isFullSnap, slot])  // all dynamic deps included
-   ✅ useEffect(() => { ... snapToPoint ... }, [isFullSnap])  // useEffectEvent results excluded
-
-4. Documentation examples contradict actual business logic
+3. Documentation examples contradict actual business logic
    → Skill documents must reflect actual system capabilities and conditions
    → Example scenarios must match the signal conditions they describe
-   ❌ Example shows "current price 166, support 167" to illustrate long entry when support would be broken
-   ❌ Description says "UTAD confirms buying" when UTAD actually signals distribution completion
-   ✅ Example: "current price 168, support 167" to show support holding for long entry
-   ✅ Description: "UTAD signals distribution complete; defer entry (downside risk)"
 ```
 
 ---
@@ -592,43 +357,16 @@ This file contains only **recurring gotchas** that agents keep missing despite e
    ❌ const reader = new Redis(config); const writer = new Redis(config);
    ✅ const writer = new Redis(config); const reader = !token ? writer : new Redis(altConfig);
 
-3. Implicit divergence between ref initialization and state lazy initializer
-   → useState lazy initializer and useRef initial value must share same source of truth
-   ❌ useRef(getDefaultValue()) eager call vs useState(() => getDefaultValue()) lazy call diverges if getDefaultValue() returns different results
-   ✅ If ref is overwritten before read, initialize to null; if read first, share source with useState
-
-4. Deleting code marked with TODO without updating all references
+3. Deleting code marked with TODO without updating all references
    → TODO comments indicate intentional preservation for future references
    → Removing such code breaks commented-out code that still references it; restore or update all references first
 
-5. Domain logic conditions differ between server and client
-   → When the same business rule applies in both layers, ensure identical conditions on both sides
-   → Example: if client uses `name !== ticker` guard, server `buildDisplayName` must use the same guard
-
-6. Unrelated data mixed in a single constant
+4. Unrelated data mixed in a single constant
    → Constants with different purposes/domains should be in separate modules
-   ❌ src/lib/seo.ts contains both SEO metadata (ogTitle, ogDescription) and legal disclaimers
-   ✅ Separate: src/lib/seo.ts for SEO, src/lib/legal.ts for legal constants
 
-7. Business domain constants placed in lib/ (violation of lib/CLAUDE.md scope)
-   → lib/ may contain only utility wrappers, React Query key factories, config constants, chart colors
-   → Business domain knowledge (POPULAR_TICKERS, legal disclaimers) must go to domain/ or sitemap-specific modules
-   ❌ POPULAR_TICKERS defined in src/lib/seo.ts
-   ✅ Inline at usage site (src/app/sitemap.ts) or domain-specific module
-
-8. Chart indicator color tokens applied to UI components
-   → Chart-specific tokens (chart-rsi, chart-period10, chart-bollinger, chart-period60, chart-period5) are semantic colors for indicator lines only
-   → UI components must use primary-*, secondary-*, chart-bullish, chart-bearish, or ui-warning
-   ❌ CATEGORY_STYLES = { fintech: 'chart-period10', healthcare: 'chart-rsi', ... }
-   ✅ CATEGORY_STYLES = { fintech: 'primary-500', healthcare: 'secondary-400', ... }
-
-9. Repeated literal values in the same page or component across multiple locations
+5. Repeated literal values in the same module across multiple locations
    → Extract to a named constant; prevents silent divergence when updating
    → Applies to descriptions, messages, configuration values, and metadata strings
-   ❌ generateMetadata() { ... description: 'exact same text' }; buildJsonLd() { ... description: 'exact same text' }
-   ✅ const SYMBOL_DESCRIPTION = '...'; generateMetadata() uses SYMBOL_DESCRIPTION; buildJsonLd() uses SYMBOL_DESCRIPTION
-   ❌ metadata.description uses MARKET_DESCRIPTION; openGraph.description uses separate hardcoded string
-   ✅ Both metadata.description and openGraph.description reference MARKET_DESCRIPTION constant
 ```
 
 ---
@@ -637,22 +375,16 @@ This file contains only **recurring gotchas** that agents keep missing despite e
 
 ```
 1. Type interfaces defined in implementation files instead of domain/types.ts
-   → All domain types (interfaces, unions, enums) must be centralized in domain/types.ts
+   → All shared domain types (interfaces, unions, enums) must be centralized in domain/types.ts
    → If multiple files reference the same type, move it to domain/types.ts for single source of truth
-   ❌ interface TickerCategory { id: string; name: string; } in domain/constants/popular-tickers.ts
-   ✅ export type TickerCategory = { id: string; name: string; } in domain/types.ts
+   ❌ interface Skill { ... } in domain/analysis/prompt.ts
+   ✅ export interface Skill { ... } in domain/types.ts
 
-2. Pure utility functions placed in components/ instead of proper layers
-   → Pure functions with no React dependencies must be in domain/ (business logic) or lib/ (UI utilities)
-   → Utility functions extracted from components must go to utils/ subfolders, not remain in components/
-   ❌ Pure function in components/dashboard/utils/ or inlined in SectorSignalPanel.tsx
-   ✅ Pure function in domain/signals/ or dedicated utils/ subfolder with proper layer imports
+2. Pure utility functions placed in infrastructure/ instead of domain/
+   → Pure functions with no I/O belong in domain/
+   → If a helper has no side effects and does not read env / network / filesystem, it must be in domain/
 
-3. UI presentation types or configurations with display labels defined in domain/
-   → domain/types.ts and domain/ modules must contain only pure business logic types
-   → Presentation concerns (Korean labels, CSS class names, UI-specific configurations, display enums) belong in lib/ or component-specific modules
-   ❌ SkillStat, SkillStatConfig, SKILL_STAT_CONFIG defined in domain/skills.ts with Korean display labels
-   ❌ PriceChangeDisplay, BreadcrumbItem UI types defined in domain/types.ts
-   ✅ Move presentation-specific types to lib/ (e.g., lib/skillStats.ts, lib/priceFormat.ts)
-   ✅ domain/ contains only pure calculation functions: countSkillsByType, formatPrice logic, etc.
+3. Infrastructure module reading from another infrastructure module in a way that creates implicit coupling
+   → Each infrastructure module should handle one external system
+   → Cross-module coordination belongs at the consumer level, not inside infrastructure/
 ```

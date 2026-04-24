@@ -1030,7 +1030,7 @@ interface PriceTargets {
 
 // 감지된 패턴별 개별 요약 (type='pattern' skill 결과)
 interface PatternSummary {
-    id: string;                          // 고유 ID (patternName_index 형식, React key 및 가시성 제어용)
+    id: string;                          // 고유 ID (patternName_index 형식, 중복 식별 및 가시성 제어용)
     patternName: string;                 // skill의 pattern 식별자 (예: 'double_top')
     skillName: string;                   // skill 표시 이름 (예: '이중고점')
     detected: boolean;                   // 현재 차트에서 감지 여부
@@ -1043,7 +1043,7 @@ interface PatternSummary {
 
 // 캔들 패턴별 감지 결과
 interface CandlePatternSummary {
-    id: string;            // 고유 ID (patternName_index 형식, React key용)
+    id: string;            // 고유 ID (patternName_index 형식, 중복 식별용)
     patternName: string;   // 캔들 패턴 식별자
     detected: boolean;     // 현재 차트에서 감지 여부
     trend: Trend;          // 해당 패턴이 시사하는 방향
@@ -1052,7 +1052,7 @@ interface CandlePatternSummary {
 
 // 전략 skill별 분석 결과 (type='strategy' skill)
 interface StrategyResult {
-    id: string;                 // 고유 ID (strategyName_index 형식, React key용)
+    id: string;                 // 고유 ID (strategyName_index 형식, 중복 식별용)
     strategyName: string;       // 전략 skill 표시 이름 (예: '엘리어트 파동')
     trend: Trend;               // 해당 전략 분석이 시사하는 방향
     summary: string;            // AI가 작성한 전략 요약 (markdown **label**: value 형식)
@@ -1081,21 +1081,24 @@ interface AnalysisResponse {
 }
 ```
 
-### 필드 ↔ UI 렌더링 매핑
+### 필드별 의미
 
 ```
-indicatorResults[]  → AnalysisPanel "보조지표" 섹션
-                       indicator_guide skill의 시그널 결과
-                       indicatorName으로 그룹핑 (예: "RSI Signal Guide")
+indicatorResults[]  indicator_guide skill의 시그널 결과
+                    indicatorName으로 그룹핑 (예: "RSI Signal Guide")
+                    → consumer가 "보조지표" 섹션으로 렌더링하도록 의도됨
 
-strategyResults[]   → AnalysisPanel "전략" 섹션
-                       strategy skill의 분석 결과
-                       strategyName으로 식별 (예: "엘리어트 파동")
+strategyResults[]   strategy skill의 분석 결과
+                    strategyName으로 식별 (예: "엘리어트 파동")
+                    → consumer가 "전략" 섹션으로 렌더링하도록 의도됨
 
-patternSummaries[]  → AnalysisPanel "차트 패턴" 섹션
-                       pattern skill의 차트 패턴 감지 결과
-                       skillName으로 식별 (예: "Head and Shoulders")
+patternSummaries[]  pattern skill의 차트 패턴 감지 결과
+                    skillName으로 식별 (예: "Head and Shoulders")
+                    → consumer가 "차트 패턴" 섹션으로 렌더링하도록 의도됨
 ```
+
+라이브러리는 각 필드를 평평한 데이터 구조로 반환할 뿐이며, 섹션 분리·순서 등 UI 배치는
+consumer가 결정한다.
 
 ---
 
@@ -1115,8 +1118,11 @@ patternSummaries[]  → AnalysisPanel "차트 패턴" 섹션
 
 ## 봉 개수 기준
 
+분석에 필요한 최소 봉 개수는 타임프레임에 따라 다르다. consumer가 시세 프로바이더에서
+bars를 가져올 때 아래 값을 참고로 사용한다.
+
 ```
-타임프레임별 최초 로딩 봉 개수 (RSC)
+타임프레임별 권장 최초 로딩 봉 개수
 
 1Min   → 200봉 (약 3.3시간)
 5Min   → 288봉 (약 1일)
@@ -1124,7 +1130,8 @@ patternSummaries[]  → AnalysisPanel "차트 패턴" 섹션
 1Hour  → 200봉 (약 1.2개월)
 1Day   → 500봉 (약 2년)
 
-스크롤 추가 로딩: 매번 200봉씩 prepend
+추가 로딩이 필요한 consumer(예: 무한 스크롤 UI)는 매 요청마다 200봉씩 prepend하는
+방식을 사용할 수 있다. 라이브러리는 추가 로딩 전략을 강제하지 않는다.
 ```
 
 ---
@@ -1164,89 +1171,15 @@ ema: Record<number, (number | null)[]>;
 
 ---
 
-## lib/chartColors.ts
-
-차트에서 사용하는 모든 색상 상수를 정의한다.
-UI 유틸리티 래퍼 레이어(`lib/`)에 위치한다.
+## 시간 상수
 
 ```typescript
-export const CHART_COLORS = {
-    background, grid, text,
-    bullish, bearish, neutral,
-    volumeBullish, volumeBearish,
-    period5, period10, period20, period60, period120, period200,
-    bollingerUpper, bollingerMiddle, bollingerLower, bollingerBackground,
-    macdLine, macdSignal, macdHistogramBullish, macdHistogramBearish,
-    rsiLine, rsiOverbought, rsiOversold,
-    dmiPlus, dmiMinus, dmiAdx,
-    vwap,
-} as const;
-
-export function getPeriodColor(period: number): string;
-```
-
-### time.ts
-
-```typescript
+// domain/constants/time.ts
 export const SECONDS_PER_DAY = 86400;
 ```
 
----
-
-## 차트 오버레이 훅 규칙
-
-보조지표 오버레이는 React 컴포넌트가 아닌 **커스텀 훅**으로 구현한다.
-
-### 이유
-
-오버레이는 DOM 요소를 렌더링하지 않는다.
-기존 차트 인스턴스(`IChartApi`)에 시리즈를 추가/제거하는 사이드이펙트만 수행하므로 `return null` 컴포넌트보다 훅이 적합하다.
-
-### 위치
-
-```
-src/components/chart/hooks/
-```
-
-### 훅 파라미터 패턴
-
-```typescript
-interface UseXxxOverlayParams {
-    chartRef: RefObject<IChartApi | null>;
-    bars: Bar[];
-    indicators: IndicatorResult;
-}
-```
-
-### 구현 규칙
-
-```
-- chart 소멸은 부모가 담당 → 훅에서 chart.remove() 호출 금지
-- prevChartRef로 chart 인스턴스 변경 감지 → 변경 시 시리즈 refs 초기화
-- Math.min(bars.length, data.length)로 인덱스 정합성 보장
-- null 값은 WhitespaceData({ time })으로 변환
-- 시리즈별 ON/OFF는 훅이 반환하는 toggle 함수로 제어
-```
-
-### 오버레이 목록
-
-| 훅 | pane | 설명 |
-|----|------|------|
-| `useMAOverlay` | 0 (메인) | MA 실선 (기간별 ON/OFF) |
-| `useEMAOverlay` | 0 (메인) | EMA 점선 (기간별 ON/OFF) |
-| `useBollingerOverlay` | 0 (메인) | 볼린저 밴드 (3선 + 배경) |
-| `useIchimokuOverlay` | 0 (메인) | 전환선/기준선/후행스팬/선행스팬A/선행스팬B (LineSeries 5개) + 구름대 (AreaSeries 2개) |
-| `useRSIChart` | 동적 | RSI + 과매수/과매도선 |
-| `useMACDChart` | 동적 | MACD 라인 + 시그널 + 히스토그램 |
-| `useDMIChart` | 동적 | +DI / -DI / ADX |
-| `useStochasticChart` | 동적 | %K / %D + 과매수/과매도선 |
-| `useStochRSIChart` | 동적 | K / D + 과매수(0.8)/과매도(0.2)선 |
-| `useCCIChart` | 동적 | CCI + 과매수(+100)/과매도(-100)/중앙(0)선 |
-
-> **pane 인덱스 규칙**: 메인 pane(0)에는 캔들+오버레이만 표시한다.
-> 하위 인디케이터(RSI, MACD 등)의 pane 번호는 **고정값이 아니라** 현재 활성화된 인디케이터 조합에 따라
-> `StockChart.tsx`의 `useMemo`에서 동적으로 계산된다 (`FIRST_INDICATOR_PANE_INDEX` + 활성 순서).
-> 비활성 인디케이터는 `INACTIVE_PANE_INDEX`를 부여받아 렌더링되지 않는다.
+차트 컬러 및 오버레이 렌더링 규칙은 `siglens-core`의 범위가 아니다. consumer가
+자신의 UI 코드에서 해당 설정을 정의한다.
 
 ---
 
@@ -1391,7 +1324,7 @@ infrastructure/skills/loader.ts (FileSkillsLoader)
   → 각 파일 파싱: YAML frontmatter → Skill 객체
   → Skill[] 반환
 
-app/api/analyze/route.ts (또는 app/[symbol]/page.tsx)
+consumer (web app / worker / CLI)
   → FileSkillsLoader.loadSkills() 호출
   → Skill[]를 buildAnalysisPrompt()에 전달
 

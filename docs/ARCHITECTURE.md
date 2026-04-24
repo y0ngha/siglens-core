@@ -3,7 +3,8 @@
 ## 개요
 
 Layered Architecture를 기반으로 한다.
-외부 의존성(Alpaca, AI, Skills 파일 I/O)만 인터페이스로 감싸고, 나머지는 순수 TypeScript 함수로 구성한다.
+`siglens-core`는 **순수 TypeScript 라이브러리**이며, 도메인 계산 로직과 외부 I/O 래퍼만 포함한다.
+UI, 렌더링, 프레임워크 종속 코드는 이 레파지토리에 존재하지 않는다.
 
 ---
 
@@ -11,17 +12,20 @@ Layered Architecture를 기반으로 한다.
 
 ```
 ┌─────────────────────────────────────────┐
-│              app (Next.js)              │  RSC, Route Handler
+│          infrastructure (외부)          │  AI Provider, Skills Loader,
+│                                         │  Upstash Redis, Neon DB
 ├─────────────────────────────────────────┤
-│            components (UI)             │  React Client Components
-├─────────────────────────────────────────┤
-│          infrastructure (외부)          │  Alpaca, AI Provider, Skills Loader
-├─────────────────────────────────────────┤
-│          lib (UI 유틸리티)              │  외부 패키지 래퍼 (clsx 등)
-├─────────────────────────────────────────┤
-│             domain (순수)              │  인디케이터, 캔들 패턴, 차트 패턴, 프롬프트
+│             domain (순수)              │  인디케이터, 캔들 패턴,
+│                                         │  차트 패턴, 분석 프롬프트
 └─────────────────────────────────────────┘
+                    │
+                    ▼
+              src/index.ts
+         (public entry of the package)
 ```
+
+라이브러리 consumer(Next.js 앱, Node worker, CLI 등)는 `src/index.ts`에서 재노출되는
+심볼만 사용한다. Consumer의 프레젠테이션/런타임 코드는 이 레파지토리에 포함되지 않는다.
 
 ---
 
@@ -32,29 +36,17 @@ domain         ← 외부 import 없음
                  순수 TypeScript 함수만 허용
                  technicalindicators 라이브러리도 금지
                  (계산 로직을 직접 구현)
+                 Date.now(), fetch, console.*, process.env 전부 금지
 
 infrastructure ← domain import 가능
-                 외부 API (Alpaca, Claude) 호출 담당
+                 외부 API (AI 프로바이더 등) 호출 담당
                  Skills 파일 I/O 담당
-                 Redis 캐시 관리 담당 (cache/)
+                 Upstash Redis 캐시 관리 담당 (cache/)
+                 Neon / PostgreSQL 연결 관리 담당 (db/)
                  인터페이스(types.ts)를 반드시 먼저 정의
 
-lib            ← 외부 UI 유틸리티를 wrapping하는 순수 함수 레이어
-                 domain에 넣을 수 없는 외부 패키지만 허용 (clsx, tailwind-merge 등)
-                 사이드 이펙트 없는 순수 함수 형태로만 작성
-                 React Query 키 팩토리(QUERY_KEYS) 및 설정 상수 포함
-                 domain 타입(Timeframe 등) import 허용 — 키 팩토리 타입 안전성 확보 목적
-
-app            ← infrastructure, domain, lib import 가능
-                 RSC에서 데이터 fetch 및 조합
-                 Route Handler에서 클라이언트 요청 처리
-
-components     ← domain, lib import 가능
-                 컴포넌트 파일(.tsx): infrastructure 직접 import 금지
-                 훅 파일(hooks/): infrastructure의 fetch 함수만 import 가능
-                   → useQuery/useMutation의 queryFn/mutationFn 연결 목적에 한함
-                   → 타입 import는 @/domain/types에서 수행
-                 'use client' 필수 표기
+src/index.ts   ← domain, infrastructure에서 노출할 심볼을 재-export
+                 외부 consumer가 유일하게 참조하는 진입점
 ```
 
 **위반 예시 (절대 금지)**
@@ -63,13 +55,15 @@ components     ← domain, lib import 가능
 // src/domain/indicators/rsi.ts
 import { RSI } from 'technicalindicators'; // 금지
 
-// ❌ components에서 infrastructure import
-// src/components/chart/StockChart.tsx
-import { AlpacaProvider } from '@/infrastructure/market/alpaca'; // 금지
-
 // ❌ domain에서 infrastructure import
 // src/domain/analysis/prompt.ts
 import { claudeClient } from '@/infrastructure/ai/claude'; // 금지
+
+// ❌ domain에서 side effect 사용
+// src/domain/indicators/rsi.ts
+const now = Date.now();         // 금지
+console.log(closes);            // 금지
+const key = process.env.API_KEY; // 금지
 ```
 
 **타입 배치 규칙**
@@ -80,7 +74,7 @@ import { claudeClient } from '@/infrastructure/ai/claude'; // 금지
   ✅ domain/types.ts에 정의 후 import하여 사용
 
 타입/스키마는 소속 레이어에서 정의
-  ❌ route 레이어 전용 필드(skillsDegraded)를 domain에 정의
+  ❌ infrastructure 전용 필드를 domain 타입에 정의
   ✅ Record<keyof Interface, ...>로 컴파일 타임 동기화 강제
 ```
 
@@ -97,152 +91,136 @@ import { claudeClient } from '@/infrastructure/ai/claude'; // 금지
 
 ## 폴더 구조
 
-**중요: `domain/`, `infrastructure/`, `components/`, `__tests__/`는 `src/app/` 안에 있지 않다.**
-Next.js의 `app/`은 라우팅 전용이며, 나머지 레이어는 `src/` 바로 아래에 위치한다.
-
 ```
-# tree -d -L 4 -I "node_modules|.next|public"
+# tree -d -L 3 -I "node_modules|dist"
 .
 ├── docs
-├── refs
 ├── skills
 └── src
     ├── __tests__
     │   ├── domain
     │   └── infrastructure
-    ├── app
-    │   ├── [symbol]
-    │   └── api
-    ├── components
-    │   ├── analysis
-    │   ├── chart
-    │   │   └── hooks
-    │   ├── home
-    │   ├── hooks
-    │   ├── layout
-    │   ├── search
-    │   └── symbol-page
-    │       └── hooks
     ├── domain
     │   ├── analysis
     │   ├── constants
-    │   └── indicators
+    │   ├── indicators
+    │   └── signals
     ├── infrastructure
     │   ├── ai
     │   ├── cache
+    │   ├── db
     │   ├── market
-    │   ├── skills
-    │   └── ticker
-    └── lib
+    │   └── skills
+    └── index.ts
 ```
 
-> 컴포넌트 폴더 내 커스텀 훅은 `hooks/` 서브폴더에 위치한다 (`chart/hooks/`, `symbol-page/hooks/` 등).
-> `components/hooks/`는 여러 컴포넌트 폴더에서 공통으로 사용하는 최상위 공유 훅 디렉토리다 (`useOnClickOutside` 등). 특정 기능 폴더에 한정되지 않는 범용 훅은 이곳에 위치한다.
+### src/index.ts
+
+라이브러리의 **유일한 public entry**. `domain/`과 `infrastructure/`에서
+외부 consumer에게 노출할 심볼을 재-export한다.
+
+```typescript
+// src/index.ts
+export { calculateRSI, calculateMACD, /* ... */ } from './domain/indicators';
+export { detectCandlePatterns } from './domain/analysis';
+export { buildAnalysisPrompt } from './domain/analysis/prompt';
+export { createMarketDataProvider } from './infrastructure/market';
+export { FileSkillsLoader } from './infrastructure/skills/loader';
+export type { Bar, Timeframe, IndicatorResult /* ... */ } from './domain/types';
+```
+
+Consumer는 `@y0ngha/siglens-core`에서 이 심볼만 import한다.
+Deep import(`@y0ngha/siglens-core/src/domain/...`)는 지원하지 않는다.
 
 ### domain/signals/
 
-Pure-function signal detectors for the `/market` page Panel C. Follows the same rules as `domain/indicators/`.
+Pure-function signal detectors. Follows the same rules as `domain/indicators/`:
+no external imports, pure functions only.
 
-### components/dashboard/
+### infrastructure/
 
-React components for `/market` page and the homepage's market summary card. Contains Panel B (MarketSummaryPanel family) and Panel C (SectorSignalPanel family).
+외부 시스템과의 경계를 담당한다. 각 서브디렉토리는 **하나의 외부 시스템**에만 대응하며,
+`types.ts`에 정의된 인터페이스를 구현한다.
 
-### infrastructure/dashboard/
-
-Server-side data orchestration for the dashboard:
-- `marketSummaryApi.ts` — indices/sectors/briefing fetch
-- `sectorSignalsApi.ts` — batch stock bars + indicators + signal detection + Upstash cache (TTL 1h)
+- `ai/` — AI 프로바이더 클라이언트 (Claude, Gemini)
+- `cache/` — Upstash Redis 래퍼 (TTL 기반 캐시)
+- `db/` — Neon / PostgreSQL 연결 관리
+- `market/` — 시세 프로바이더 래퍼 (consumer가 주입한 provider 추상화)
+- `skills/` — Skills 파일 로더 (filesystem → `Skill[]`)
 
 ---
 
 ## 데이터 흐름
 
-### 최초 진입
+`siglens-core`는 라이브러리이므로 "데이터 흐름"은 consumer가 라이브러리를
+호출하는 전형적인 시퀀스를 의미한다.
+
+### 분석 파이프라인 (typical consumer flow)
 
 ```
-브라우저 → /AAPL
-  → app/[symbol]/page.tsx (RSC)
-    → QueryClient (per-request, server-only) 생성
-    → queryClient.prefetchQuery(bars) → infrastructure/market/barsApi.ts → Market API
-      → domain/indicators/* → RSI, MACD, 볼린저, DMI, VWAP, MA, EMA 계산
-    → dehydrate(queryClient) → HydrationBoundary로 클라이언트에 전달
-  → SymbolPageClient (HydrationBoundary 안)
-    → useBars: hydrated 캐시에서 즉시 읽기 (불필요한 리페치 없음)
-    → useAnalysis: 마운트 시 자동 AI 분석 트리거
+Consumer (web app / worker / CLI)
+  │
+  ├─ 1. bars 데이터 수집
+  │     → infrastructure/market/<provider>.ts로 외부 시세 API 호출
+  │     → domain/indicators/* 호출하여 인디케이터 계산
+  │
+  ├─ 2. Skills 로드
+  │     → infrastructure/skills/loader.ts (FileSkillsLoader)
+  │     → skills/ 디렉토리의 .md 파일을 파싱하여 Skill[] 반환
+  │
+  ├─ 3. 프롬프트 구성
+  │     → domain/analysis/prompt.ts
+  │     → buildAnalysisPrompt(symbol, bars, indicators, skills)
+  │     → confidenceWeight < 0.5 인 Skill은 제외 (pure function)
+  │
+  ├─ 4. AI 호출
+  │     → infrastructure/ai/<provider>.ts
+  │     → 프롬프트를 AI 프로바이더에 전송
+  │
+  ├─ 5. 결과 캐시
+  │     → infrastructure/cache/redis.ts
+  │     → Upstash Redis에 TTL 기반으로 저장
+  │
+  └─ 6. 결과 반환
+        → consumer는 AI 응답을 자신의 프레젠테이션 레이어에서 처리
 ```
 
-> props 드릴링(`initialBars`, `initialAnalysis`) 방식은 사용하지 않는다. `queryClient.prefetchQuery()` + `dehydrate()` + `HydrationBoundary` 패턴으로 서버에서 클라이언트로 초기 데이터를 주입한다.
-
-### 타임프레임 전환
-
-```
-사용자 클릭 → 클라이언트 상태 변경 (URL 변경 없음)
-  → useBars 훅 → infrastructure/market/getBarsAction.ts (Server Action)
-    → infrastructure/market/barsApi.ts → infrastructure/market/alpaca.ts → Alpaca API
-    → domain/indicators/* → 인디케이터 재계산
-  → 차트 데이터만 교체
-```
-
-> `getBarsAction`은 `infrastructure` 레이어에 위치한 Server Action으로, bars 데이터와 인디케이터를 함께 반환한다. 인디케이터 계산은 `infrastructure/market/barsApi.ts`에서 domain을 직접 호출한다. `infrastructure → domain` import 방향은 의존성 규칙상 허용된다.
-
-### AI 재분석
-
-```
-재분석 버튼 클릭 (또는 자동 트리거)
-  → useAnalysis 훅 → infrastructure/market/submitAnalysisAction.ts (Server Action)
-    → infrastructure/cache/redis.ts → 캐시 조회 (캐시 히트 시 즉시 반환)
-    → infrastructure/market/barsApi.ts → fetchBarsWithIndicators (서버 재구성)
-      ↳ 'use cache' cacheLife('minutes') 캐시 히트 시 추가 API 호출 없음
-      ↳ 캐시 미스 시 → FMP/Alpaca API 1회 호출 → domain/indicators/* 재계산
-    → infrastructure/skills/loader.ts → Skills 파일 로드
-    → domain/analysis/prompt.ts → 프롬프트 구성
-    → Cloud Run worker (fire-and-forget via waitUntil)
-  → useAnalysis 훅 → submitAnalysisAction → pollAnalysisAction (10초 간격 polling)
-    → Redis에서 완료된 분석 결과 반환
-  → AnalysisPanel 업데이트
-```
-
-> 클라이언트는 `{symbol, timeframe}` 프리미티브만 Server Action에 전달한다. bars/indicators 전체 페이로드를 전송하지 않으므로 Next.js 1MB 바디 제한을 초과하지 않는다.
+`siglens-core`는 6단계 중 **1~5의 pure/infra 로직만** 소유한다.
+consumer는 6단계(렌더링, 사용자 인터랙션)를 자유롭게 구현한다.
 
 ---
 
-## Next.js 특이사항
+## 외부 I/O 원칙
 
-### middleware.ts 삭제 (Next.js 16 변경사항)
+`infrastructure/` 레이어는 다음 원칙을 따른다.
 
-Next.js 16부터 `middleware.ts` 대신 `proxy.ts`를 사용한다.
-현재 프로젝트에서 proxy 설정이 필요하면 `proxy.ts`로 작성한다.
+### 1. 인터페이스를 먼저 정의한다
 
-### 캐싱 전략
-
-**Next.js fetch 캐싱 (정적 데이터)**
-```typescript
-// RSC에서 fetch 캐싱
-const data = await fetch(url, {
-    next: { revalidate: 60 }, // 60초 캐시
-});
-```
-
-**`'use cache'` 캐싱 (bars + indicators)**
-- `fetchBarsWithIndicators`는 `'use cache'` + `cacheLife('minutes')` + `cacheTag(\`bars:{symbol}:{timeframe}\`)` 적용.
-- 캐시 키: `(symbol, timeframe, fromDay)` — `fromDay`는 UTC 날짜 단위(`YYYY-MM-DD`)로 절삭되어 하루 내 안정적.
-- 동일 `(symbol, timeframe)` 요청이 RSC 렌더·타임프레임 변경·Server Action 내부에서 연달아 발생해도 캐시 히트 → FMP/Alpaca 추가 호출 없음.
-
-**Upstash Redis 캐싱 (AI 분석 결과)**
-- AI 분석 결과는 타임프레임별 TTL로 Upstash Redis에 캐싱한다.
-- 캐시 키: `analysis:{symbol}:{timeframe}` (예: `analysis:AAPL:1Day`)
-- 타임프레임별 TTL: 1Min=300s, 5Min=900s, 15Min=1800s, 1Hour=3600s, 1Day=86400s
-- 환경변수(`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) 미설정 시 캐시 없이 정상 동작 (graceful degradation)
-- 구현: `infrastructure/cache/` (`types.ts`, `config.ts`, `redis.ts`)
-
-### 'use cache' 지시어 (Next.js 16)
-
-Next.js 16의 명시적 캐싱 모델을 활용한다.
+모든 infrastructure 모듈은 `types.ts`에 인터페이스를 먼저 정의하고
+구현체가 해당 인터페이스를 만족하도록 한다.
 
 ```typescript
-// 함수 단위 캐싱
-async function fetchBars(symbol: string, timeframe: string) {
-    'use cache';
-    // ...
+// infrastructure/cache/types.ts
+export interface AnalysisCache {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string, ttlSeconds: number): Promise<void>;
 }
+
+// infrastructure/cache/redis.ts
+export class UpstashAnalysisCache implements AnalysisCache { ... }
 ```
+
+### 2. Graceful Degradation
+
+외부 시스템 연결 실패 시 라이브러리 전체가 깨지면 안 된다.
+환경변수 누락·네트워크 오류 등은 캐시 없이 정상 동작(cache miss)으로 처리한다.
+
+### 3. 환경변수는 infrastructure에서만 읽는다
+
+`process.env.*` 접근은 infrastructure 모듈 내부에서만 허용된다.
+domain은 환경에 의존하지 않는다.
+
+### 4. 테스트에서는 인터페이스를 mock한다
+
+외부 시스템(Neon, Upstash, AI API)을 실제로 호출하는 테스트는 작성하지 않는다.
+`AnalysisCache` 같은 인터페이스를 stub 구현으로 교체하여 단위 테스트한다.

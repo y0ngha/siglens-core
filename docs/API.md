@@ -1,379 +1,196 @@
-# API
+# External Services
 
-## Alpaca Market Data API
+`siglens-core`가 직접 호출하는 외부 서비스 목록이다. 모든 호출은 `infrastructure/`
+레이어 내부에서만 발생하며, 각 서비스는 `types.ts`의 인터페이스를 통해 추상화된다.
 
-공식 문서: https://docs.alpaca.markets/reference/stockbars
-
-Base URL: `https://data.alpaca.markets/v2`
-
-### 인증
-
-```
-Header: APCA-API-KEY-ID: {API_KEY}
-Header: APCA-API-SECRET-KEY: {API_SECRET}
-```
-
-환경변수:
-```
-ALPACA_API_KEY=
-ALPACA_API_SECRET=
-```
-
-### 플랜 제한 (Free Tier)
-
-```
-거래소:   IEX만 (전체 거래소 대비 거래량 약 28~30% 낮음)
-지연:     15분
-API 호출: 200회/분
-데이터:   7년+ 히스토리컬
-```
-
----
-
-## 사용하는 엔드포인트
-
-### 1. Historical Bars (단일 심볼)
-
-```
-GET /v2/stocks/{symbol}/bars
-```
-
-**공식 문서**: https://docs.alpaca.markets/reference/stockbarsingle-1
-
-**Query Parameters**
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| timeframe | string | ✅ | `{multiplier}{unit}` 형식 (예: 1Min, 5Min, 15Min, 30Min, 1Hour, 4Hour, 1Day). unit: Min, Hour, Day, Week, Month |
-| start | string | - | ISO 8601 (예: 2024-01-15T09:30:00Z) |
-| end | string | - | ISO 8601 |
-| limit | number | - | 최대 10000, 기본 1000 |
-| feed | string | - | iex (Free Tier 고정) |
-| sort | string | - | asc (기본) |
-
-**Request 예시**
-
-```
-GET /v2/stocks/AAPL/bars?timeframe=5Min&limit=200&feed=iex&sort=asc
-```
-
-**Response**
-
-```typescript
-interface AlpacaBarsResponse {
-    bars: AlpacaBar[];
-    symbol: string;
-    next_page_token: string | null;
-}
-
-interface AlpacaBar {
-    t: string;    // ISO 8601 timestamp
-    o: number;    // open
-    h: number;    // high
-    l: number;    // low
-    c: number;    // close
-    v: number;    // volume
-    vw: number;   // VWAP (Alpaca 제공)
-    n: number;    // 체결 건수
-}
-```
-
-**주의사항**
-- `next_page_token`이 null이 아니면 페이지네이션 필요
-- Free Tier는 `feed=iex` 고정 (생략 시도 가능하나 명시 권장)
-- 거래량(`v`)은 IEX 기준이므로 전체 시장 대비 낮음
-
----
-
-### 2. Latest Bar (단일 심볼)
-
-```
-GET /v2/stocks/{symbol}/bars/latest
-```
-
-**공식 문서**: https://docs.alpaca.markets/reference/stocklatestbarsingle-1
-
-현재가 확인 또는 실시간 업데이트 시 사용.
-
-**Response**
-
-```typescript
-interface AlpacaLatestBarResponse {
-    bar: AlpacaBar;
-    symbol: string;
-}
-```
-
----
-
-### 3. Snapshot (단일 심볼)
-
-```
-GET /v2/stocks/{symbol}/snapshot
-```
-
-**공식 문서**: https://docs.alpaca.markets/reference/stocksnapshotsingle
-
-현재가, 당일 봉, 전일 봉을 한 번에 조회.
-
-**Response**
-
-```typescript
-interface AlpacaSnapshotResponse {
-    latestTrade: AlpacaTrade;
-    latestQuote: AlpacaQuote;
-    minuteBar: AlpacaBar;
-    dailyBar: AlpacaBar;
-    prevDailyBar: AlpacaBar;
-}
-```
-
----
-
----
-
-## FMP (Financial Modeling Prep) Market Data API
-
-공식 문서: https://site.financialmodelingprep.com/developer/docs
-
-Base URL: `https://financialmodelingprep.com/stable`
-
-### 인증
-
-```
-Query Parameter: apikey={FMP_API_KEY}
-```
-
-환경변수:
-```
-FMP_API_KEY=
-```
-
-### 플랜 제한 (Free Tier)
-
-```
-지연:     15분
-데이터:   히스토리컬 OHLCV
-```
-
----
-
-## FMP 사용 엔드포인트
-
-### 1. Historical Chart (Intraday: 5Min ~ 4Hour)
-
-```
-GET /stable/historical-chart/{timeframe}?symbol={symbol}&apikey={key}
-```
-
-**Timeframe 매핑**
-
-| Siglens Timeframe | FMP Timeframe |
-|---|---|
-| 5Min | 5min |
-| 15Min | 15min |
-| 30Min | 30min |
-| 1Hour | 1hour |
-| 4Hour | 4hour |
-
-**Query Parameters**
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| symbol | string | ✅ | 종목 심볼 (path가 아닌 query param) |
-| apikey | string | ✅ | FMP API 키 |
-| from | string | - | YYYY-MM-DD 형식 시작일 |
-| to | string | - | YYYY-MM-DD 형식 종료일 |
-
-**Request 예시**
-
-```
-GET /stable/historical-chart/1min?symbol=AAPL&apikey={key}&from=2024-01-01&to=2024-01-15
-```
-
-**Response**
-
-```typescript
-interface FmpBar {
-    date: string;    // "2024-01-15 09:30:00" (UTC, timezone 정보 없음)
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-}
-
-// 응답: FmpBar[] (newest-first 정렬 → ascending으로 reverse 필요)
-```
-
-**주의사항**
-- 응답은 newest-first 정렬 → `toReversed()` 하여 ascending order 반환
-- `date` 필드는 timezone 정보 없음 → UTC로 간주 (`+ ' UTC'` 파싱)
-- `vwap` 필드 없음 (Alpaca 전용)
-- `before` 파라미터 → `to` 쿼리 파라미터로 변환 (ISO string → "YYYY-MM-DD")
-
----
-
-### 2. Historical Price EOD Full (Daily: 1Day)
-
-```
-GET /stable/historical-price-eod/full?symbol={symbol}&apikey={key}
-```
-
-**Query Parameters**
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| symbol | string | ✅ | 종목 심볼 |
-| apikey | string | ✅ | FMP API 키 |
-| from | string | - | YYYY-MM-DD 형식 시작일 |
-| to | string | - | YYYY-MM-DD 형식 종료일 |
-
-**Request 예시**
-
-```
-GET /stable/historical-price-eod/full?symbol=AAPL&apikey={key}&from=2023-01-01&to=2024-01-15
-```
-
-**Response**
-
-```typescript
-interface FmpDailyBar {
-    date: string;    // "2025-02-04" (YYYY-MM-DD)
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-}
-
-// 응답: FmpDailyBar[] (newest-first 정렬 → ascending으로 reverse 필요)
-```
-
-**주의사항**
-- Daily 전용 엔드포인트 — intraday(`historical-chart`) 와는 별도
-- `date` 필드는 `YYYY-MM-DD` 형식 (시간 없음)
-- 응답은 newest-first 정렬 → `toReversed()` 하여 ascending order 반환
-
----
-
-### 3. Quote (당일 실시간 시세)
-
-```
-GET /stable/quote?symbol={symbol}&apikey={key}
-```
-
-당일 거래 중 실시간 시세를 조회. EOD 엔드포인트가 당일 데이터를 포함하지 않는 장중에 호출하여 일봉 데이터에 append한다.
-
-**Query Parameters**
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| symbol | string | ✅ | 종목 심볼 |
-| apikey | string | ✅ | FMP API 키 |
-
-**Response**
-
-```typescript
-interface FmpQuote {
-    price: number;    // 현재가 (당일 bar의 close로 사용)
-    open: number;     // 당일 시가
-    dayHigh: number;  // 당일 고가
-    dayLow: number;   // 당일 저가
-    volume: number;   // 당일 거래량
-    timestamp: number; // Unix timestamp (초 단위)
-}
-
-// 응답: FmpQuote[] (배열 형태, 단일 심볼이므로 [0]만 사용)
-```
-
-**주의사항**
-- 장 마감 후 EOD 엔드포인트가 업데이트되면 당일 데이터가 중복될 수 있으므로, 마지막 EOD 봉의 time과 비교하여 중복 시 append 생략
-- 실패(non-ok, 빈 배열, 네트워크 오류) 시 EOD 데이터만으로 graceful degradation
-
----
-
-## Market Data Provider 선택
-
-```bash
-# MARKET_DATA_PROVIDER 환경변수로 provider 선택
-# 미설정 또는 unknown 값이면 기본값 fmp 사용
-MARKET_DATA_PROVIDER=fmp     # fmp | alpaca (기본값: fmp)
-```
-
-`createMarketDataProvider()` 팩토리 함수가 환경변수를 읽어 적절한 Provider 인스턴스를 반환한다.
+호출자(consumer)가 직접 사용하는 외부 API(FMP, Alpaca 등 시세 프로바이더)는
+`siglens-core`의 범위가 아니다. 시세 프로바이더가 필요하면 consumer가 구현한 뒤
+`infrastructure/market/`의 `MarketDataProvider` 인터페이스에 주입한다.
 
 ---
 
 ## 환경변수 전체 목록
 
 ```bash
-# Market Data Provider (선택 — 기본값: fmp)
-MARKET_DATA_PROVIDER=        # fmp | alpaca
-
-# FMP API (MARKET_DATA_PROVIDER=fmp 시 필수)
-FMP_API_KEY=
-
-# Alpaca API (MARKET_DATA_PROVIDER=alpaca 시 필수)
-ALPACA_API_KEY=
-ALPACA_API_SECRET=
-
 # AI Provider (필수)
-AI_PROVIDER=claude          # claude | gemini (기본값: claude)
-ANTHROPIC_API_KEY=          # claude 사용 시 필수
-GEMINI_API_KEY=             # gemini 사용 시 필수
+AI_PROVIDER=claude                  # claude | gemini (기본값: claude)
+ANTHROPIC_API_KEY=                  # AI_PROVIDER=claude 시 필수
+GEMINI_API_KEY=                     # AI_PROVIDER=gemini 시 필수
 
 # Upstash Redis (선택 — 미설정 시 캐시 없이 동작)
 UPSTASH_REDIS_REST_URL=             # Upstash Redis REST URL
 UPSTASH_REDIS_REST_TOKEN=           # master 토큰 (읽기/쓰기)
-UPSTASH_REDIS_REST_READONLY_TOKEN=  # readonly 토큰 (읽기 전용, 없으면 master 토큰 사용)
+UPSTASH_REDIS_REST_READONLY_TOKEN=  # readonly 토큰 (없으면 master 사용)
+
+# Neon / PostgreSQL (선택 — DB 레이어가 필요한 호출자에만)
+DATABASE_URL=                       # postgres://user:pass@host/db?sslmode=require
 ```
 
-`.env.local`에 작성. 절대 커밋하지 않는다.
+환경변수는 **infrastructure 레이어 내부에서만 읽는다.** domain은 환경에 의존하지 않는다.
+소비 프로젝트는 자신의 `.env`에 위 값을 설정해 주입한다. `siglens-core` 레파지토리의
+테스트 실행 시에는 더미 값을 사용하며 실제 외부 호출을 하지 않는다.
 
 ---
 
-## FMP (Financial Modeling Prep) API
+## 1. AI Providers
 
-### 티커 심볼 검색
+### Claude (Anthropic)
 
-```
-GET https://financialmodelingprep.com/stable/search-symbol?query={query}&limit=20&apikey={FMP_API_KEY}
-```
-
-### 회사명 검색
+공식 문서: https://docs.anthropic.com/en/api
 
 ```
-GET https://financialmodelingprep.com/stable/search-name?query={query}&limit=20&apikey={FMP_API_KEY}
+Base URL: https://api.anthropic.com
+Endpoint: POST /v1/messages
 ```
 
-### 응답 타입
+**인증**
+```
+Header: x-api-key: {ANTHROPIC_API_KEY}
+Header: anthropic-version: 2023-06-01
+```
+
+**Request 요약**
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| model | string | 모델 ID (예: `claude-opus-4-7`, `claude-sonnet-4-6`) |
+| max_tokens | number | 응답 토큰 상한 |
+| messages | array | `{ role, content }` 배열 |
+| system | string | 시스템 프롬프트 (옵션) |
+
+**구현 위치**: `infrastructure/ai/claude.ts`
+
+### Gemini (Google)
+
+공식 문서: https://ai.google.dev/api
+
+```
+Base URL: https://generativelanguage.googleapis.com/v1beta
+Endpoint: POST /models/{model}:generateContent
+```
+
+**인증**
+```
+Query parameter: key={GEMINI_API_KEY}
+```
+
+**구현 위치**: `infrastructure/ai/gemini.ts`
+
+### AI Provider 선택
+
+```bash
+# AI_PROVIDER 환경변수로 provider 선택
+# 미설정 또는 unknown 값이면 기본값 claude 사용
+AI_PROVIDER=claude   # claude | gemini
+```
+
+`createAiProvider()` 팩토리 함수가 환경변수를 읽어 적절한 Provider 인스턴스를 반환한다.
+반환 타입은 `infrastructure/ai/types.ts`의 `AiProvider` 인터페이스로 통일되어 있으며,
+도메인 호출자는 구체 프로바이더를 인지하지 않는다.
+
+---
+
+## 2. Upstash Redis (분석 결과 캐시)
+
+공식 문서: https://upstash.com/docs/redis/features/restapi
+
+```
+Base URL: {UPSTASH_REDIS_REST_URL}
+```
+
+### 인증
+
+```
+Header: Authorization: Bearer {UPSTASH_REDIS_REST_TOKEN}
+```
+
+읽기 전용 작업에는 `UPSTASH_REDIS_REST_READONLY_TOKEN`을 사용하고,
+미설정 시 master 토큰으로 fallback한다.
+
+### 사용 패턴
+
+AI 분석 결과는 심볼·타임프레임별 TTL로 캐싱한다.
+
+- 캐시 키 예시: `analysis:{symbol}:{timeframe}` (예: `analysis:AAPL:1Day`)
+- TTL은 타임프레임에 따라 결정한다 (`infrastructure/cache/config.ts`에서 정의)
+- 환경변수 미설정 시 캐시 없이 정상 동작(graceful degradation)
+
+### 구현 위치
+
+```
+infrastructure/cache/
+├── types.ts     ← AnalysisCache 인터페이스
+├── config.ts    ← 캐시 키 / TTL 상수
+└── redis.ts     ← Upstash 구현체
+```
+
+`AnalysisCache`를 in-memory stub으로 대체하면 단위 테스트에서 외부 호출 없이 검증할 수 있다.
+
+---
+
+## 3. Neon / PostgreSQL
+
+공식 문서: https://neon.tech/docs
+
+```
+Connection string: postgres://{user}:{password}@{host}/{db}?sslmode=require
+```
+
+### 인증
+
+`DATABASE_URL` 환경변수에 connection string을 주입한다.
+Neon 이외의 Postgres (로컬, RDS 등)도 동일 인터페이스로 사용 가능하다.
+
+### 사용 패턴
+
+- **지속 저장이 필요한 데이터**에만 사용한다 (분석 이력, 사용자 메타데이터 등).
+- 단순 캐시 용도는 Redis를 사용한다 (PostgreSQL ≠ 캐시).
+- 연결은 라이브러리 모듈 레벨에서 재사용한다. 호출 단위 connection 생성을 피한다.
+- 쿼리는 파라미터 바인딩을 사용하고, 문자열 연결로 SQL을 조립하지 않는다.
+
+### 구현 위치
+
+```
+infrastructure/db/
+├── types.ts     ← 저장소 인터페이스 (Repository 단위)
+├── client.ts    ← Postgres 클라이언트 초기화
+└── <entity>.ts  ← 각 엔티티 저장소 구현
+```
+
+인터페이스를 먼저 정의하고 구현체가 이를 만족하도록 한다.
+테스트는 저장소 인터페이스를 stub 구현으로 교체해 수행한다.
+
+---
+
+## 4. Filesystem (Skills)
+
+외부 네트워크 서비스는 아니지만 I/O를 수반하므로 동일 규칙이 적용된다.
+
+- 위치: 프로젝트 루트의 `/skills/**/*.md`
+- 담당: `infrastructure/skills/loader.ts` (`FileSkillsLoader`)
+- 파일 포맷과 frontmatter 스펙은 `docs/DOMAIN.md`의 Skills 섹션을 참조한다.
+
+domain은 filesystem을 직접 읽지 않는다. consumer가 `FileSkillsLoader.loadSkills()`를
+호출한 결과(`Skill[]`)를 domain 함수에 주입한다.
+
+---
+
+## 외부 호출자(Consumer)가 담당하는 부분
+
+다음 외부 API는 **`siglens-core` 내부에서 호출하지 않는다.** 필요 시 consumer가
+구현하여 `MarketDataProvider` 인터페이스로 주입한다.
+
+- FMP (Financial Modeling Prep)
+- Alpaca Market Data
+- 기타 시세 프로바이더
+
+`infrastructure/market/types.ts`에 `MarketDataProvider` 인터페이스가 정의되어 있으며,
+라이브러리 자체는 인터페이스 구현 유무에 의존하지 않는다.
 
 ```typescript
-interface FmpSearchResult {
-    symbol: string;
-    name: string;
-    currency: string;
-    exchangeFullName: string;
-    exchange: string;
+// infrastructure/market/types.ts
+export interface MarketDataProvider {
+    fetchBars(symbol: string, timeframe: Timeframe): Promise<Bar[]>;
+    fetchLatestBar(symbol: string): Promise<Bar | null>;
 }
-```
-
-### 환경변수
-
-```
-FMP_API_KEY=    # 필수. 없으면 검색 결과 빈 배열 반환
-```
-
----
-
-## Gemini Translation API
-
-한국어 이름 매핑이 없는 종목을 waitUntil으로 번역.
-
-### 환경변수
-
-```
-TRANSLATE_API_KEY=              # 필수. 없으면 번역 비활성화
-TRANSLATE_MODEL=gemini-2.5-flash  # 기본값
 ```

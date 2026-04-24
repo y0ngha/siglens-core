@@ -27,7 +27,7 @@ Never ask the user "shall I proceed?" between steps — route automatically.
 #### 1-1. Repository
 
 ```
-REPO=y0ngha/siglens
+REPO=y0ngha/siglens-core
 ```
 
 Use this value directly in all `gh` commands.
@@ -39,10 +39,8 @@ Always read (targeted):
 
 | Modified layer | MISTAKES.md sections to read |
 |---|---|
-| domain/ | Coding Paradigm, TypeScript, Domain Functions, Pure Function Contracts |
-| infrastructure/ | Coding Paradigm, TypeScript |
-| components/ | Coding Paradigm, Components, Design & Cohesion |
-| components/chart/ | (above) + Lightweight Charts |
+| domain/ | Coding Paradigm, TypeScript, Domain Functions |
+| infrastructure/ | Coding Paradigm, TypeScript, Infrastructure Functions |
 | \_\_tests\_\_/ | Tests |
 
 Multiple layers → read the union of their sections.
@@ -50,7 +48,6 @@ Multiple layers → read the union of their sections.
 Additional documents by scope:
 - domain/ related → `docs/DOMAIN.md` + `docs/ARCHITECTURE.md`
 - infrastructure/ → `docs/API.md` + `docs/ARCHITECTURE.md`
-- components/ → `docs/DESIGN.md` + `docs/ARCHITECTURE.md`
 - Layer structure check needed → `docs/ARCHITECTURE.md`
 
 Read existing similar implementations first for pattern recognition:
@@ -63,13 +60,13 @@ Read existing similar implementations first for pattern recognition:
 #### 1-3. Understand the Issue
 
 ```bash
-gh issue view {number} --repo y0ngha/siglens
+gh issue view {number} --repo y0ngha/siglens-core
 ```
 
 **If the issue cannot be found, stop and report to user.**
 
 Verify:
-- Implementation scope: which layers are touched (domain, infrastructure, app, components)
+- Implementation scope: which layers are touched (domain, infrastructure)
 - File paths to create or modify
 - Function signatures and feature specifications
 - Reference docs: read only items checked (`[x]`) in the issue body
@@ -78,7 +75,7 @@ Verify:
 #### 1-4. Create Branch
 
 ```bash
-git checkout master && git pull origin master
+git checkout main && git pull origin main
 git checkout -b {type}/{issue number}/{one-line summary}
 ```
 
@@ -97,40 +94,39 @@ Branch naming: `feat/2/도메인-공통-타입-정의`, `refactor/32/candlestick
 
 **Domain Layer Checklist** — verify after implementation:
 - [ ] No external library imports (technicalindicators, lodash, etc. are all prohibited)
-- [ ] Pure functions only (no fetch, console.log, Date.now())
+- [ ] Pure functions only (no fetch, console.log, Date.now(), process.env)
 - [ ] Return types must be explicitly declared
-- [ ] Initial period values must be null (never 0 or NaN — 0 renders as invalid data in charts)
+- [ ] Initial period values must be null (never 0 or NaN)
 - [ ] No for/while loops → use map, filter, reduce, flatMap
+  (exceptions: sliding windows, pointer-convergence — see CONVENTIONS.md)
 - [ ] Maintain immutability (no bars.push → use [...bars, newBar])
 - [ ] Use path aliases (@/domain/... format)
 - [ ] No hardcoded literals → extract to constants (domain/indicators/constants.ts)
 
-**Component Layer Checklist** — verify after implementation:
-- [ ] Hook declaration order: useState → useRef → useQuery/useMutation → derived (useMemo/const) → handlers → useLayoutEffect → useEffect → return
-- [ ] Props interface directly above component function
-- [ ] 'use client' only when hooks, handlers, or browser APIs are used
-- [ ] No infrastructure imports in .tsx files (hooks/ may import fetch functions only)
-- [ ] No lightweight-charts imports outside components/chart/
+**Infrastructure Layer Checklist** — verify after implementation:
+- [ ] No reverse imports (domain → infrastructure is prohibited)
+- [ ] Type imports from @/domain/types only
+- [ ] process.env access is confined to this layer
+- [ ] External dependencies are wrapped behind an interface in `types.ts`
+- [ ] No console.log or debug artifacts
+- [ ] Graceful degradation on missing env vars / network failure
+- [ ] All conditional branches have dedicated test cases
 
 **Test Layer Checklist** — verify after implementation:
 - [ ] Test file exists for every new domain/infrastructure file
-- [ ] 100% branch coverage for infrastructure (all ?., ??, if/else paths)
+- [ ] 100% branch coverage (domain and infrastructure)
 - [ ] describe/it text is human-readable, not code expressions
 - [ ] Period-based indicators include all 5 required test cases
 - [ ] No if-guarded assertions (unconditional expect only)
-
-**Infrastructure Layer Checklist** — verify after implementation:
-- [ ] No reverse imports (infrastructure → app or domain → infrastructure)
-- [ ] Type imports from @/domain/types only
-- [ ] No console.log or debug artifacts
-- [ ] All conditional branches have dedicated test cases
+- [ ] External services are stubbed via `vi.mock` / interface stubs (no real Upstash/Neon/AI calls)
+- [ ] Time-dependent code uses `vi.setSystemTime` — no raw `Date.now()` assertions
 
 Only check the checklists for file types you actually modified or created.
 
 **Test writing** — file locations:
 ```
 src/__tests__/domain/indicators/rsi.test.ts
-src/__tests__/infrastructure/market/alpaca.test.ts
+src/__tests__/infrastructure/cache/redis.test.ts
 ```
 
 Required test cases for period-based indicators:
@@ -140,7 +136,9 @@ Required test cases for period-based indicators:
 - Valid value range → non-null numbers after the period-th index
 - Calculation accuracy → first computed value matches specification
 
-When creating new files under `domain/indicators/`, add export to `src/domain/indicators/index.ts`.
+When creating new files under `domain/indicators/`, add the export to
+`src/domain/indicators/index.ts` and ensure it is re-exported from `src/index.ts`
+if part of the public surface.
 
 **Documentation updates** — if the change falls into:
 
@@ -148,7 +146,7 @@ When creating new files under `domain/indicators/`, add export to `src/domain/in
 |---|---|
 | New type or interface added | `docs/DOMAIN.md` |
 | New indicator implemented | `docs/DOMAIN.md` |
-| External API usage changed | `docs/API.md` |
+| External service usage changed | `docs/API.md` |
 | Layer structure or folder layout changed | `docs/ARCHITECTURE.md` |
 | New coding convention established | `docs/CONVENTIONS.md` |
 
@@ -159,11 +157,9 @@ For each modified file, verify every rule in the matching section(s):
 
 | File type | Sections to verify |
 |---|---|
-| .tsx (component) | Components, Coding Paradigm |
 | .ts (domain/) | Domain Functions, TypeScript, Coding Paradigm |
-| .ts (infrastructure/) | TypeScript, Coding Paradigm |
+| .ts (infrastructure/) | Infrastructure Functions, TypeScript, Coding Paradigm |
 | .test.ts | Tests |
-| .tsx (chart/) | Components, Lightweight Charts |
 
 **Procedure:**
 1. List all files you modified or created.
@@ -179,21 +175,20 @@ matching the files you actually touched.
 Run in order. Each must pass before proceeding to the next.
 
 ```bash
-# Always run — catch style and format issues first
+# Always run
 yarn lint
-yarn lint:style
 yarn format 2>&1 | grep -v "unchanged"
 ```
 
 ```bash
-# Run only if .ts or .tsx files were modified
-# Use --passWithNoTests to avoid failure when no matching test files exist
-git diff --name-only HEAD | grep -E '\.(ts|tsx)$' | xargs -I{} \
-  yarn test --testPathPattern={} --passWithNoTests 2>&1 | tail -30
+# Run only if .ts files were modified
+# Vitest picks up tests matching changed files via --changed or explicit path
+yarn test --run
 ```
 
 ```bash
-# Always run last — confirms the full build is clean
+# Always run — confirms the build emits dist/ cleanly
+yarn typecheck
 yarn build 2>&1 | tail -20
 ```
 
@@ -219,11 +214,11 @@ status: loop_limit_reached → stop, report to user
 
 1. Fix both `required` and `recommended` findings directly.
 2. **Post-fix Self-Review**: For each file modified during this fix round:
-   a. Run the matching checklist from Step 1-5 (Domain/Component/Test/Infrastructure).
+   a. Run the matching checklist from Step 1-5 (Domain / Infrastructure / Test).
    b. Re-read the matching MISTAKES.md sections and verify no new violations
       were introduced by the fix.
-   c. When fixing a pattern violation (e.g. hook order), verify the entire
-      file for the same pattern — not just the specific line mentioned in the finding.
+   c. When fixing a pattern violation, verify the entire file for the same pattern —
+      not just the specific line mentioned in the finding.
 3. Re-run validation (Step 1-7).
 4. Record to fix-log (Step 2b).
 

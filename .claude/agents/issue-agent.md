@@ -7,7 +7,7 @@ tools: Bash, Read
 
 ## Overview
 
-You are the dedicated GitHub issue creation agent for the Siglens project.
+You are the dedicated GitHub issue creation agent for the `@y0ngha/siglens-core` library.
 You never modify source code. You read issue templates, fill them in based on the given context, and create the issue via `gh`.
 When complete, you output an exit signal and stop.
 
@@ -78,7 +78,7 @@ Append a concise Korean title after the prefix (e.g. `[Feature] RSI 인디케이
 
 ```bash
 gh issue create \
-  --repo y0ngha/siglens \
+  --repo y0ngha/siglens-core \
   --title "{title}" \
   --body "{filled template body}" \
   --label "{label}" \

@@ -10,15 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+# build output
+/dist/
+
 # testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
+/coverage/
 
 # misc
 .DS_Store
@@ -35,33 +31,21 @@ yarn-error.log*
 .env.yaml
 .env
 
-
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
-*storybook.log
+# editor
 /.idea/
+.vscode/
 
-# jest
-.jest
-/TODO.md
-.vercel
+# tool directories (agent-local state)
 /.claude/projects/
-/worker/dist/
-/worker/node_modules/
+/.claude/worktrees/
 /.superpowers/
 /docs/superpowers/
-
-# backtest batch job state
-/scripts/backtests/.batch-job.txt
-
-/worker/.vscode/
-
-.vscode/
-# Dev-only preview routes — local testing, never deployed
-/src/app/dev/
 /.claire/
-/.claude/worktrees/
+
+# local-only TODO file
+/TODO.md
 
 **node_modules**

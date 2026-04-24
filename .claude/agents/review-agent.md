@@ -8,7 +8,7 @@ tools: Read, Glob, Grep, Bash
 
 ## Overview
 
-You are the dedicated code review agent for the Siglens project.
+You are the dedicated code review agent for the `@y0ngha/siglens-core` library.
 You never modify code. You inspect the diff, return findings, and emit an exit signal.
 Routing to the next agent is handled by the main orchestrator — not by you.
 
@@ -41,7 +41,7 @@ The orchestrator passes the round number in the prompt. Check which round applie
 **Round 1 — Full review:**
 
 ```bash
-git diff master --name-only
+git diff main --name-only
 ```
 
 Read each file using the Read tool. Do this for every file in the list.
@@ -49,7 +49,7 @@ Read each file using the Read tool. Do this for every file in the list.
 **Round 2+ — Incremental review:**
 
 The orchestrator provides an explicit `modified_files` list in the prompt.
-Read **only** the files in that list. Do not run `git diff master --name-only` again.
+Read **only** the files in that list. Do not run `git diff main --name-only` again.
 
 If a finding from the previous round references a file not in `modified_files`,
 the file was not changed — skip re-reviewing it.
@@ -57,12 +57,12 @@ the file was not changed — skip re-reviewing it.
 **Common rules for all rounds:**
 
 ```
-❌ Never run: git diff master (without --name-only)
-❌ Never run: git diff master -- {file}
+❌ Never run: git diff main (without --name-only)
+❌ Never run: git diff main -- {file}
 ❌ Never use diff output as a substitute for actual file content
 ```
 
-`git diff` full output reflects what changed relative to master, not the current state of the file. Stale hunks from earlier commits will cause you to review code that no longer exists. Always read the live file content.
+`git diff` full output reflects what changed relative to main, not the current state of the file. Stale hunks from earlier commits will cause you to review code that no longer exists. Always read the live file content.
 
 ### Excluded Directories
 
@@ -70,12 +70,11 @@ Never read files under these directories — even if they appear in the file lis
 
 ```
 /docs/**
-/refs/**
-/public/**
 /.github/**
 /.yarn/**
 /.agents/**
 /.claude/**
+/dist/**
 ```
 
 Files and directories listed in `.gitignore` are also excluded.
@@ -97,8 +96,7 @@ Additionally, based on changed file locations:
 | Condition | Also read |
 |---|---|
 | `src/domain/` changed (excluding `__tests__/` only changes) | `docs/DOMAIN.md` |
-| `src/components/*.tsx` changed | `docs/DESIGN.md` |
-| `src/infrastructure/ai/` or `src/infrastructure/market/` changed | `docs/API.md` |
+| `src/infrastructure/` changed | `docs/API.md` |
 | Only `src/__tests__/` files changed, no source files | Skip all conditional docs |
 
 **Round 2+ note:** On round 2+, "changed file locations" refers to the `modified_files` list provided by the orchestrator, not the full diff.
@@ -107,31 +105,34 @@ Additionally, based on changed file locations:
 
 ## Review Procedure
 
-### Step 1. Siglens Rule Check (Checklist)
+### Step 1. siglens-core Rule Check (Checklist)
 
 Evaluate each item silently. Do not output results — violations go into findings only.
 
 **Layer Dependencies**
 - [ ] domain/: no external library imports (technicalindicators, lodash, etc.)
-- [ ] components/: no direct imports from infrastructure (AlpacaProvider, claudeClient, etc.)
-- [ ] Lightweight Charts is not imported outside components/chart/
+- [ ] domain/: no imports from infrastructure/
+- [ ] infrastructure/: each module owns a single external system; no transitive coupling
+- [ ] src/index.ts: only re-exports from domain/ and infrastructure/
 
 **Domain Rules**
 - [ ] Indicator initial period values are null (no 0 or NaN)
-- [ ] Domain functions are pure (no fetch, console.log, Date.now())
+- [ ] Domain functions are pure (no fetch, console.log, Date.now(), process.env)
 - [ ] Domain functions have explicit return types
 - [ ] IndicatorResult fields are added only after calculation functions are implemented (no hardcoded empty arrays)
 - [ ] MA/EMA uses Record<number, (number | null)[]> structure
 
-**Components**
-- [ ] 'use client' declared when useState/useEffect is used
-- [ ] Named exports (only page/layout use default export)
-- [ ] Timeframe is managed as client state only (no URL query parameters)
+**Infrastructure**
+- [ ] Every external system is wrapped behind an interface in `types.ts`
+- [ ] process.env access is confined to infrastructure/
+- [ ] Graceful degradation on missing env vars / network failure
+- [ ] No debug artifacts (console.log)
 
 **Tests**
-- [ ] Corresponding test file exists for domain/ and infrastructure/ files
-- [ ] Initial null range test case is included
-- [ ] Test structure: describe → describe(context) → it
+- [ ] Corresponding test file exists for every domain/ and infrastructure/ file
+- [ ] Initial null range test case is included (period-based indicators)
+- [ ] Vitest APIs used (`describe/it/expect`, `vi.mock`, `vi.setSystemTime`)
+- [ ] External services stubbed (no real Upstash/Neon/AI calls)
 
 ---
 

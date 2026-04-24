@@ -7,7 +7,7 @@ tools: Bash, Read
 
 ## Overview
 
-You are the dedicated Git operations agent for the Siglens project.
+You are the dedicated Git operations agent for the `@y0ngha/siglens-core` library.
 You never modify code. You handle commits, pushes, PR creation, and PR comment writing only.
 When complete, you output an exit signal and stop.
 
@@ -77,7 +77,7 @@ Commit message format: `{type}: {변경 내용}` — Korean allowed, no trailing
 
 ```bash
 git status
-git diff --stat master
+git diff --stat main
 ```
 
 Use `git diff --stat` output only to identify which files changed.
@@ -118,7 +118,7 @@ cat .github/PULL_REQUEST_TEMPLATE.md
 gh pr create \
   --title "{type}: {이슈 제목}" \
   --body "{filled template body}" \
-  --base master
+  --base main
 ```
 
 ---
@@ -128,7 +128,7 @@ gh pr create \
 ### 1. Check Out Head Branch
 
 ```bash
-gh pr view {PR number} --json headRefName --repo y0ngha/siglens | jq -r '.headRefName'
+gh pr view {PR number} --json headRefName --repo y0ngha/siglens-core | jq -r '.headRefName'
 git fetch origin '{head branch name}'
 git checkout '{head branch name}'
 ```
@@ -159,7 +159,7 @@ Do not open a new PR. Push to the existing PR branch only.
 ### 4. Post PR Completion Comment
 
 ```bash
-gh pr comment {PR number} --repo y0ngha/siglens --body "{수정 요약}"
+gh pr comment {PR number} --repo y0ngha/siglens-core --body "{수정 요약}"
 ```
 
 Comment format:

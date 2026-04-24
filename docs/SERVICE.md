@@ -1,92 +1,115 @@
 # Service Overview
 
-U.S. stock AI analysis platform.
-Provides chart rendering, indicator calculations, and AI-powered comprehensive analysis.
-No order/trade functionality. Analysis only.
+`@y0ngha/siglens-core` is the **pure TypeScript core library** behind Siglens —
+a U.S. stock AI analysis platform. It contains the technical analysis domain
+(indicators, candle patterns, chart patterns, analysis prompt builder) plus the
+thin infrastructure wrappers needed to feed those functions.
+
+This package has no UI. Presentation (charts, pages, components) lives in separate
+consumer projects that depend on this library.
 
 ---
 
 ## Why This Exists
 
-Technical analysis is hard to learn and exhausting to perform.
-Moving averages, golden/dead crosses, MACD, RSI, Bollinger Bands, DMI — multiple indicators
-must be read simultaneously, and each indicator's settings change depending on the timeframe
-(daily, minute-level). On top of that, chart patterns (head and shoulders, wedges, double tops, etc.)
-must also be identified — making the barrier to entry high and the process time-consuming.
-
-Siglens automates this entire process with AI.
-
-## Core Value
+The Siglens platform originally shipped as a single Next.js app. Splitting the
+analysis core into its own npm package gives us:
 
 ```
-AI handles complex technical analysis automatically.
-→ The user only needs to enter a ticker symbol.
+- One source of truth for indicator math and candle/pattern rules
+- A testable, framework-free core (100% branch coverage on domain + infrastructure)
+- Free choice of front-end or runtime (Next.js app, Node worker, CLI, Cloud Run, etc.)
+  without duplicating domain logic
 ```
 
-## Target Users
+## What This Library Provides
 
 ```
-Investors interested in technical analysis but fatigued by manually configuring
-and interpreting each indicator.
+domain/         Pure calculations
+                  - Indicators (RSI, MACD, Bollinger, DMI, Stochastic, VWAP, MA/EMA, etc.)
+                  - Candle pattern detection (single + multi)
+                  - Analysis prompt construction for AI providers
+                  - Shared types and market constants
 
-Beginners who have started investing but find chart analysis difficult.
-
-Investors who want a single, consolidated interpretation of multiple indicators.
+infrastructure/ I/O wrappers
+                  - AI provider clients (Claude, Gemini)
+                  - Skills loader (reads markdown skill files)
+                  - Cache (Upstash Redis)
+                  - Database (Neon / PostgreSQL)
 ```
 
-## Core UX
+## What This Library Does NOT Provide
 
 ```
-1. Enter a ticker symbol (e.g. AAPL)
-2. Chart + indicators render automatically
-3. AI comprehensive analysis report generated automatically
-   - Indicator interpretation (RSI overbought/oversold, MACD cross, etc.)
-   - Candle pattern detection (15 types of single candles + 30 types of multi candles)
-   - Pattern detection via Skills (head and shoulders, wedge, etc.)
-   - Support/resistance levels
-   - Overall market direction (bullish / bearish / neutral)
-4. Timeframe switching (1-minute to daily)
-5. On-demand AI re-analysis
-```
-
-## What This Does NOT Provide
-
-```
+❌ UI components, chart rendering, or styling
 ❌ Order / trade execution
-❌ Real-time data (15-minute delay)
+❌ Real-time data feeds
 ❌ Investment advice or buy/sell recommendations
 ```
+
+---
+
+## Consumers
+
+```
+Any project that needs Siglens' analysis capabilities.
+Typical consumers are:
+
+- A Next.js web app that renders charts and shows AI analysis
+- A Node worker that runs scheduled AI re-analysis jobs
+- A CLI that runs one-shot analyses from a terminal
+```
+
+Consumers import from the package's public entry:
+
+```typescript
+import {
+    calculateRSI,
+    detectCandlePatterns,
+    buildAnalysisPrompt,
+    createMarketDataProvider,
+} from '@y0ngha/siglens-core';
+```
+
+The library targets **Node.js runtime**; it does not depend on DOM or React.
 
 ---
 
 ## Tech Stack
 
 ```
-Next.js     16.2  (App Router + Turbopack)
-React       19.2
 TypeScript  latest
-Node.js     25.2.1
+Node.js     25.x
 yarn        4.12.0
 ```
 
 ```
-Charts      lightweight-charts
-Styles      Tailwind CSS
-Linting     ESLint + Stylelint + Prettier
-Tests       Jest (domain and infrastructure only — no UI tests)
+Linting     ESLint + Prettier
+Tests       Vitest (domain + infrastructure — 100% branch coverage required)
+Build       tsc → dist/
+```
+
+No bundler, no dev server. The package exposes `dist/index.js` and `dist/index.d.ts`
+as declared in `package.json`:
+
+```
+"main":  "dist/index.js",
+"types": "dist/index.d.ts",
+"files": ["dist"]
 ```
 
 ---
 
 ## Skills System
 
-Siglens extends its analysis capabilities through `.md` files inside `/skills/` and its subdirectories.
-New analysis techniques are applied simply by adding a Markdown file — no code changes required.
+Siglens extends its analysis capabilities through `.md` files inside `/skills/` and
+its subdirectories. New analysis techniques are applied simply by adding a Markdown
+file — no code changes required.
 
 ### Directory Location
 
-`/skills/` lives at the **project root**, not inside `src/`. Skills are declarative configuration
-files, not source code.
+`/skills/` lives at the **project root**, not inside `src/`. Skills are declarative
+configuration files, not source code.
 
 ```
 skills/                        ← project root (not src/)
@@ -106,23 +129,25 @@ skills/                        ← project root (not src/)
 ### Layer Responsibility
 
 Skills files are **not** read by `domain/` — domain has no file I/O.
-Reading and parsing skills `.md` files is the responsibility of **`infrastructure/skills/loader.ts`** (`FileSkillsLoader`).
+Reading and parsing skills `.md` files is the responsibility of
+**`infrastructure/skills/loader.ts`** (`FileSkillsLoader`).
 The parsed `Skill[]` is passed into `domain/analysis/prompt.ts` as a plain data structure.
 
 ```
 infrastructure/skills/loader.ts (FileSkillsLoader)
-  → recursively scans skills/ subdirectories for .md files (file I/O — allowed in infrastructure layer)
+  → recursively scans skills/ subdirectories for .md files
+    (file I/O — allowed in infrastructure layer)
   → parses frontmatter + body
   → returns Skill[]
 
-app/api/analyze/route.ts (or app/[symbol]/page.tsx)
+consumer (web app / worker / CLI)
   → calls FileSkillsLoader.loadSkills()
   → passes Skill[] to domain/analysis/prompt.ts
 
 domain/analysis/prompt.ts
   → buildAnalysisPrompt(symbol, bars, indicators, skills)
   → filters by confidenceWeight (< 0.5 excluded)
-  → builds the prompt     (pure function, no file access)
+  → builds the prompt (pure function, no file access)
 ```
 
 ### When Working on Skills-related Tasks

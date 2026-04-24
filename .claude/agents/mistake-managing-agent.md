@@ -7,7 +7,7 @@ tools: Read, Write, Edit, Bash, Glob
 
 ## Overview
 
-You are the mistake management agent for the Siglens project.
+You are the mistake management agent for the `@y0ngha/siglens-core` library.
 You read `docs/__agents_only__/fix-log.md`, identify violations that have occurred 2 or more times,
 add them to `docs/MISTAKES.md`, and remove the logged entries that were promoted.
 You never modify source code.
@@ -50,8 +50,8 @@ Each fix-log entry has a `Rule:` field that references a specific rule from the 
 2. Normalize it: take only the **document name + rule identifier** portion.
    - `FF.md Readability 1-B — 구현 의도를 명확하게 표현해야 한다` → `FF.md Readability 1-B`
    - `CONVENTIONS.md — as type assertions are discouraged` → `CONVENTIONS.md as-type-assertions`
-   - `MISTAKES.md Components Rule 11 — 컴포넌트는 자신의 외부 마진을...` → `MISTAKES.md Components Rule 11`
-   - `CONVENTIONS.md — 불필요한 클래스는 제거해야 한다` → `CONVENTIONS.md dead-css`
+   - `MISTAKES.md Infrastructure Functions Rule 3 — 디버그 로깅 금지...` → `MISTAKES.md Infrastructure Functions Rule 3`
+   - `CONVENTIONS.md — 중복 상수는 한 곳에 모아야 한다` → `CONVENTIONS.md centralize-constants`
    - `CONVENTIONS.md — 문서는 실제 구현과 일치해야 한다` → `CONVENTIONS.md docs-code-sync`
 3. If the `Rule:` field references a **named rule with an ID** (e.g., `FF.md Cohesion 3-A`, `MISTAKES.md Tests Rule 10`), use that ID as the group key.
 4. If the `Rule:` field has **no explicit ID** (e.g., `CONVENTIONS.md — 반복 패턴은 전역 스타일로 추출해야 한다`), create a short English kebab-case slug from the core concept (e.g., `CONVENTIONS.md extract-repeated-patterns`).

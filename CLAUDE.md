@@ -1,4 +1,7 @@
-# Siglens — CLAUDE.md
+# siglens-core — CLAUDE.md
+
+This repository is a **pure TypeScript library** (`@y0ngha/siglens-core`) —
+no UI, no React, no Next.js. It is consumed by other projects via npm.
 
 ## ⛔ Request Routing (ALWAYS CHECK FIRST)
 
@@ -133,19 +136,19 @@ Every sub-agent ends its response with a JSON exit signal and nothing else.
 
 ```
 domain         ← No external imports. Pure TypeScript functions only.
-infrastructure ← May import from domain only. Handles file I/O (Skills) and API calls.
-lib            ← External UI utility wrappers (clsx, tailwind-merge, etc.). Pure functions only.
-app (RSC/Route)← May import from infrastructure, domain, lib.
-components     ← May import from domain, lib.
-               Component files (.tsx): Direct imports from infrastructure are prohibited.
-               Hook files (hooks/): May import fetch functions from infrastructure only
-                 → Limited to queryFn/mutationFn connection purpose
-                 → Type imports must be from @/domain/types
+                 No I/O, no Date.now(), no fetch, no console.
+                 Calculation logic is implemented directly (no technicalindicators, etc.)
 
-lib            ← External UI utility wrappers (clsx, tailwind-merge, etc.). Pure functions only.
-               May import types from domain (e.g. Timeframe) when needed for React Query key factories.
-               React Query key factories (QUERY_KEYS) and config constants belong in lib/.
+infrastructure ← May import from domain only.
+                 Owns all I/O — external API calls (Neon, Upstash Redis, etc.),
+                 filesystem access (Skills loader), and process.env reads.
+                 Every external dependency is wrapped behind an interface in `types.ts`.
 ```
+
+Public exports of the library are assembled from `domain/` and `infrastructure/` via
+`src/index.ts`. Consumers of the package (separate UI projects, CLIs, workers) are
+responsible for their own presentation and runtime concerns — `siglens-core` never
+reaches into them.
 
 Violations trigger ESLint errors. PRs cannot be merged.
 
@@ -155,18 +158,15 @@ Violations trigger ESLint errors. PRs cannot be merged.
 
 Invoke the listed skills **before** writing code in each category. Do not skip.
 
-| Situation | Skills to invoke (in order)                               |
-|---|-----------------------------------------------------------|
-| New feature (any kind) | `brainstorming` first — no exceptions                     |
-| UI component / page implementation | `frontend-design` → `web-design-guidelines` → `seo-audit` |
-| React / Next.js code | `vercel-react-best-practices` → `next-cache-components`   |
-| Pure functions / business logic / TypeScript types | `typescript-advanced-types`, `typescript-expert`                             |
+| Situation | Skills to invoke (in order) |
+|---|---|
+| New feature (any kind) | `brainstorming` first — no exceptions |
+| Pure functions / business logic / TypeScript types | `typescript-advanced-types`, `typescript-expert` |
 
 **Rules:**
 - `brainstorming` is mandatory before any new feature, regardless of size.
-- UI skills apply whenever a `.tsx` component or page is being created or significantly modified.
-- React/Next.js skills apply whenever you write hooks, RSC, route handlers, or data-fetching logic.
 - TypeScript skills apply whenever you define types, generics, or domain-layer pure functions.
+- UI-oriented skills (frontend-design, web-design-guidelines, seo-audit, vercel-react-best-practices, next-cache-components) are out of scope for this repository.
 
 ---
 
@@ -185,28 +185,27 @@ Invoke the listed skills **before** writing code in each category. Do not skip.
 Always use `yarn` for package installation. `npm` and `pnpm` are prohibited.
 
 ```bash
-# Dev server (port 4200)
-yarn dev
+# Type check (no emit)
+yarn typecheck
 
-# Build
+# Build (emits dist/)
 yarn build
 
 # Lint
 yarn lint
 yarn lint:fix
-yarn lint:style
-yarn lint:style-fix
 
-# Test
-yarn test
-yarn test-watch
-yarn test-coverage
-yarn test-coverage-watch
-yarn test-coverage-report
+# Test (Vitest)
+yarn test                   # run once
+yarn test --watch           # watch mode
+yarn test --coverage        # with coverage
 
 # Format
 yarn format
 ```
+
+There is no dev server and no style linter — `siglens-core` emits `dist/` via `tsc`
+and is consumed by other projects through npm.
 
 ---
 
@@ -214,12 +213,11 @@ yarn format
 
 | Document | Contents |
 |---|---|
-| `docs/SERVICE.md` | Product overview, target users, tech stack, Skills system |
+| `docs/SERVICE.md` | Library overview, consumers, tech stack, Skills system |
 | `docs/ARCHITECTURE.md` | Layer structure, dependency direction rules, folder layout |
 | `docs/DOMAIN.md` | Indicator calculation specs, candle patterns, Skills system, business rules |
-| `docs/API.md` | Alpaca and Claude API endpoints, request/response schemas |
+| `docs/API.md` | External services consumed by `infrastructure/` (Neon, Upstash Redis, AI providers) |
 | `docs/CONVENTIONS.md` | Coding conventions, naming rules, paradigm guidelines |
 | `docs/FF.md` | FF 4 principles in detail (Readability, Predictability, Cohesion, Coupling) |
-| `docs/DESIGN.md` | Color system, Tailwind config, chart color constants |
 | `docs/GIT_CONVENTIONS.md` | Branch naming, commit message format, PR rules |
 | `docs/MISTAKES.md` | Common mistakes Claude Code repeatedly makes — review before and after implementing |

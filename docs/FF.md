@@ -1,7 +1,11 @@
 # Frontend Fundamentals (FF)
 
 Code quality principles from the Toss Frontend chapter.
-Good frontend code is **code that is easy to modify**.
+Good code is **code that is easy to modify**.
+
+Although "Frontend" is in the name, the four principles below apply to any codebase —
+including a backend-only TypeScript library like `siglens-core`. All examples are
+framework-free TS.
 
 ---
 
@@ -27,56 +31,49 @@ The fewer things the reader needs to hold in mind at once, and the more naturall
 ### 1-A. Separate code that doesn't run simultaneously
 
 ```typescript
-// ❌ Different roles mixed in one component with branching
-function SubmitButton({ isLoading, isSuccess }: Props) {
-    if (isLoading) {
-        return <LoadingButton />;
-    }
-    if (isSuccess) {
-        return <SuccessButton />;
-    }
-    return <DefaultButton />;
+// ❌ Different roles mixed in one function with branching on status
+function formatJob(job: Job): string {
+    if (job.status === 'pending')  return `${job.id}: pending`;
+    if (job.status === 'running')  return `${job.id}: running (${job.progress}%)`;
+    if (job.status === 'complete') return `${job.id}: done in ${job.durationMs}ms`;
+    return `${job.id}: unknown`;
 }
 
-// ✅ Separate states that don't run simultaneously into distinct components
-function SubmitButton({ status }: { status: 'idle' | 'loading' | 'success' }) {
-    const Button = {
-        idle: DefaultButton,
-        loading: LoadingButton,
-        success: SuccessButton,
-    }[status];
+// ✅ Separate formatters by status — each one knows only its own shape
+const FORMAT: Record<JobStatus, (job: Job) => string> = {
+    pending:  (job) => `${job.id}: pending`,
+    running:  (job) => `${job.id}: running (${job.progress}%)`,
+    complete: (job) => `${job.id}: done in ${job.durationMs}ms`,
+};
 
-    return <Button />;
+function formatJob(job: Job): string {
+    return FORMAT[job.status](job);
 }
 ```
 
 ### 1-B. Abstract implementation details
 
 ```typescript
-// ❌ Component knows all implementation details
-function LoginStartPage() {
-    const { data: user } = useQuery(['user'], fetchUser);
-    const isLoggedIn = user !== null && user.token !== null;
-
-    if (isLoggedIn) {
-        return <Navigate to="/dashboard" />;
-    }
-    return <LoginForm />;
+// ❌ Caller knows all implementation details
+async function runAnalysis(symbol: string, timeframe: Timeframe) {
+    const bars = await provider.fetchBars(symbol, timeframe);
+    const normalized = bars.filter(b => b.volume > 0).map(toNormalizedBar);
+    const hasEnoughData = normalized.length >= MIN_BARS_FOR_ANALYSIS;
+    if (!hasEnoughData) throw new Error('Not enough bars');
+    return analyze(normalized);
 }
 
-// ✅ Abstract details into a hook
-function useIsLoggedIn() {
-    const { data: user } = useQuery(['user'], fetchUser);
-    return user !== null && user.token !== null;
+// ✅ Abstract details behind a named helper
+async function loadAnalyzableBars(symbol: string, timeframe: Timeframe): Promise<Bar[]> {
+    const bars = await provider.fetchBars(symbol, timeframe);
+    const normalized = bars.filter(b => b.volume > 0).map(toNormalizedBar);
+    if (normalized.length < MIN_BARS_FOR_ANALYSIS) throw new Error('Not enough bars');
+    return normalized;
 }
 
-function LoginStartPage() {
-    const isLoggedIn = useIsLoggedIn();
-
-    if (isLoggedIn) {
-        return <Navigate to="/dashboard" />;
-    }
-    return <LoginForm />;
+async function runAnalysis(symbol: string, timeframe: Timeframe) {
+    const bars = await loadAnalyzableBars(symbol, timeframe);
+    return analyze(bars);
 }
 ```
 
@@ -146,62 +143,50 @@ Every time a reader has to jump between different parts of the code — up and d
 Write code so it can be read top to bottom, in a single function or file.
 
 ```typescript
-// ❌ Understanding why Invite is disabled requires 3 jumps:
-// policy.canInvite → getPolicyByRole → POLICY_SET
-function Page() {
-    const user = useUser();
+// ❌ Understanding why a trade is blocked requires 3 jumps:
+// policy.canTrade → getPolicyByRole → POLICY_SET
+function authorize(user: User, action: Action): boolean {
     const policy = getPolicyByRole(user.role);
-    return (
-        <div>
-            <Button disabled={!policy.canInvite}>Invite</Button>
-            <Button disabled={!policy.canView}>View</Button>
-        </div>
-    );
+    return policy[action];
 }
-function getPolicyByRole(role) { ... }
-const POLICY_SET = { admin: ['invite', 'view'], viewer: ['view'] };
+function getPolicyByRole(role: Role) { return POLICY_SET[role]; }
+const POLICY_SET = {
+    admin:  { trade: true,  view: true },
+    viewer: { trade: false, view: true },
+};
 
 // ✅ All logic visible in one place — no jumping required
-function Page() {
-    const user = useUser();
+function authorize(user: User, action: Action): boolean {
     const policy = {
-        admin:  { canInvite: true,  canView: true },
-        viewer: { canInvite: false, canView: true },
+        admin:  { trade: true,  view: true },
+        viewer: { trade: false, view: true },
     }[user.role];
-    return (
-        <div>
-            <Button disabled={!policy.canInvite}>Invite</Button>
-            <Button disabled={!policy.canView}>View</Button>
-        </div>
-    );
+    return policy[action];
 }
 ```
 
 ### 1-H. Don't group functions by logic type
 
-Don't create a function or hook just because it handles the same *type* of logic (e.g. "all query params for this page"). A function whose responsibility is "everything of type X" will grow without bound and become hard to understand.
+Don't create a function just because it handles the same *type* of logic (e.g. "all config readers for this module"). A function whose responsibility is "everything of type X" will grow without bound and become hard to understand.
 
 ```typescript
-// ❌ usePageState manages ALL query params — responsibility is unbounded
-export function usePageState() {
-    const [query, setQuery] = useQueryParams({
-        cardId: NumberParam,
-        statementId: NumberParam,
-        dateFrom: DateParam,
-        dateTo: DateParam,
-        statusList: ArrayParam,
-    });
-    // grows every time a new query param is added
+// ❌ readConfig manages ALL env-based config — responsibility is unbounded
+export function readConfig() {
+    return {
+        aiProvider:     process.env.AI_PROVIDER,
+        anthropicKey:   process.env.ANTHROPIC_API_KEY,
+        geminiKey:      process.env.GEMINI_API_KEY,
+        redisUrl:       process.env.UPSTASH_REDIS_REST_URL,
+        redisToken:     process.env.UPSTASH_REDIS_REST_TOKEN,
+        databaseUrl:    process.env.DATABASE_URL,
+        // grows every time a new env var is added
+    };
 }
 
-// ✅ Each hook owns exactly one concern — clear name, narrow scope
-export function useCardIdQueryParam() {
-    const [cardId, _setCardId] = useQueryParam('cardId', NumberParam);
-    const setCardId = useCallback((cardId: number) => {
-        _setCardId({ cardId }, 'replaceIn');
-    }, []);
-    return [cardId ?? undefined, setCardId] as const;
-}
+// ✅ Each reader owns exactly one concern — clear name, narrow scope
+export function readAiConfig(): AiConfig { /* only AI_* vars */ }
+export function readRedisConfig(): RedisConfig | null { /* only UPSTASH_* vars */ }
+export function readDatabaseConfig(): DatabaseConfig | null { /* only DATABASE_URL */ }
 ```
 
 ---
@@ -215,16 +200,16 @@ The more consistently rules are followed, the higher the predictability.
 
 ```typescript
 // ❌ Same name used in different contexts
-// infrastructure/market/alpaca.ts
-export const http = axios.create({ baseURL: 'https://data.alpaca.markets' });
-
 // infrastructure/ai/claude.ts
-export const http = axios.create({ baseURL: 'https://api.anthropic.com' });
+export const http = fetch;
+
+// infrastructure/cache/redis.ts
+export const http = fetch;
 // → import collision
 
 // ✅ Include context in the name
-export const alpacaHttp = axios.create({ baseURL: 'https://data.alpaca.markets' });
-export const claudeHttp = axios.create({ baseURL: 'https://api.anthropic.com' });
+export const claudeHttp = fetch;
+export const upstashHttp = fetch;
 ```
 
 ### 2-B. Unify return types across functions of the same family
@@ -276,19 +261,17 @@ High cohesion means modifying one place doesn't cause unexpected errors elsewher
 ```
 // ❌ Related files scattered across the project
 src/
-├── components/StockChart.tsx
-├── hooks/useStockChart.ts
-├── types/stockChart.ts
-└── utils/stockChartHelpers.ts
+├── domain/indicators/rsi.ts
+├── domain/types/rsi.ts
+└── domain/utils/rsiHelpers.ts
 
 // ✅ Files that change together placed in the same directory
 src/
-└── components/
-    └── chart/
-        ├── StockChart.tsx        ← component
-        ├── useStockChart.ts      ← dedicated hook
-        ├── types.ts              ← dedicated types
-        └── helpers.ts            ← dedicated utils
+└── domain/
+    └── indicators/
+        ├── rsi.ts             ← implementation
+        ├── types.ts           ← rsi-specific types (if not shared)
+        └── constants.ts       ← rsi-specific constants
 ```
 
 ### 3-B. Centralize magic numbers as constants
@@ -309,30 +292,31 @@ export const RSI_DEFAULT_PERIOD = 14;
 const result = new Array(RSI_DEFAULT_PERIOD).fill(null);
 ```
 
-### 3-C. Match form cohesion to the unit of change
+### 3-C. Match validation cohesion to the unit of change
 
-When building forms, the right cohesion level depends on **what unit of change you expect**.
+When validating structured input (a request payload, a parsed Skill frontmatter),
+the right cohesion level depends on **what unit of change you expect**.
 
 **Field-level cohesion** — each field owns its own validation logic independently.
-Choose this when fields have unique validation rules, need async validation, or may be reused across forms.
+Choose this when fields have unique validation rules or may be reused across schemas.
 
-```tsx
-// Each field's validation lives with that field
-<input {...register('email', { validate: value => isValidEmail(value) ? '' : 'Invalid email' })} />
+```typescript
+const isValidSymbol = (s: string) => /^[A-Z]{1,5}$/.test(s);
+const isValidTimeframe = (t: string): t is Timeframe => TIMEFRAMES.includes(t as Timeframe);
 ```
 
-**Form-level cohesion** — all fields are validated together in a single schema.
-Choose this when all fields belong to one business unit (e.g. payment info), or fields are interdependent (e.g. password confirmation).
+**Object-level cohesion** — all fields are validated together in a single schema.
+Choose this when all fields belong to one business unit, or fields are interdependent.
 
-```tsx
-// All validation centralized in a schema
-const schema = z.object({
-    name:  z.string().min(1, 'Required'),
-    email: z.string().email('Invalid email'),
-});
+```typescript
+// All validation centralized in one parser
+function parseAnalysisRequest(input: unknown): AnalysisRequest {
+    // assert shape as a whole — cross-field rules (e.g. from < to) belong here
+    // ...
+}
 ```
 
-The key question: **does change happen field-by-field, or does the whole form change together?**
+The key question: **does change happen field-by-field, or does the whole object change together?**
 
 ---
 
@@ -344,82 +328,61 @@ Lower coupling means the scope of changes is easier to predict.
 ### 4-A. Manage one responsibility at a time
 
 ```typescript
-// ❌ One hook carrying too many responsibilities
-function useStockPage(symbol: string) {
-    const [bars, setBars] = useState<Bar[]>([]);
-    const [timeframe, setTimeframe] = useState('1Day');
-    const [analysis, setAnalysis] = useState<Analysis | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-
-    // data fetch + indicator calculation + AI analysis + error handling all here
+// ❌ One function carrying too many responsibilities
+async function runFullAnalysis(symbol: string, timeframe: Timeframe) {
+    const bars = await provider.fetchBars(symbol, timeframe);
+    const indicators = calculateAllIndicators(bars);
+    const skills = await skillsLoader.loadSkills();
+    const prompt = buildAnalysisPrompt(symbol, bars, indicators, skills);
+    const response = await aiProvider.send(prompt);
+    await cache.set(cacheKey(symbol, timeframe), response, ttlFor(timeframe));
+    return response;
+    // data fetch + indicator calc + skills + prompt + AI + cache all here
     // → modifying one thing affects everything
 }
 
 // ✅ Separate responsibilities
-function useBars(symbol: string, timeframe: string) { ... }
-function useIndicators(bars: Bar[]) { ... }
-function useAnalysis(bars: Bar[], indicators: IndicatorResult) { ... }
+async function loadBarsWithIndicators(symbol: string, timeframe: Timeframe) { ... }
+async function loadSkills() { ... }
+function buildPrompt(symbol: string, bars: Bar[], indicators: IndicatorResult, skills: Skill[]) { ... }
+async function runAnalysis(prompt: string) { ... }
+async function cacheResult(key: string, value: string, ttl: number) { ... }
 ```
 
-### 4-B. External spacing belongs to the caller
-
-A component should not manage its own external margin. Spacing between components is the caller's responsibility.
-
-```typescript
-// ❌ Component defines its own external margin
-function Card({ children }: CardProps) {
-    return <div className="mt-4 p-4 bg-slate-800">{children}</div>;
-}
-
-// ✅ Caller controls external spacing
-function Card({ children }: CardProps) {
-    return <div className="p-4 bg-slate-800">{children}</div>;
-}
-
-// Caller
-<div className="mt-4">
-    <Card>...</Card>
-</div>
-```
-
-### 4-C. Allow duplicate code (connected to the AHA principle)
+### 4-B. Allow duplicate code (connected to the AHA principle)
 
 ```typescript
 // ❌ Premature abstraction increases coupling
-function useChart(type: 'stock' | 'indicator' | 'volume') {
+function calculateIndicator(type: 'rsi' | 'macd' | 'bollinger', closes: number[]) {
     // branching keeps growing with type
     // → changing one type's requirements affects all types
 }
 
 // ✅ Allow duplication until the pattern repeats three times
-function useStockChart() { ... }
-function useIndicatorChart() { ... }
-function useVolumeChart() { ... }
+function calculateRSI(closes: number[]) { ... }
+function calculateMACD(closes: number[]) { ... }
+function calculateBollinger(closes: number[]) { ... }
 // Abstract only after the common pattern becomes clear
 ```
 
-### 4-D. Remove Props Drilling
+### 4-C. Do not force callers to thread unrelated state through the call chain
 
 ```typescript
-// ❌ Intermediate component passes props it doesn't use
-function AnalysisPanel({ symbol, timeframe, bars, indicators, analysis, onReanalyze }) {
-    return (
-        <AnalysisHeader symbol={symbol} timeframe={timeframe} onReanalyze={onReanalyze} />
-        // AnalysisHeader doesn't use bars or indicators but receives them anyway
-    );
+// ❌ Intermediate function passes arguments it never uses
+async function runPipeline(symbol: string, timeframe: Timeframe, correlationId: string) {
+    const bars = await loadBars(symbol, timeframe, correlationId);
+    return analyze(bars, correlationId); // threaded through but not used inside loadBars
 }
 
-// ✅ Solve with Context or component composition
-const AnalysisContext = createContext<AnalysisContextValue>(null);
-
-function AnalysisPanel({ children }) {
-    return (
-        <AnalysisContext.Provider value={...}>
-            {children}
-        </AnalysisContext.Provider>
-    );
+// ✅ Scope each parameter to where it is actually consumed
+async function runPipeline(symbol: string, timeframe: Timeframe, correlationId: string) {
+    const bars = await loadBars(symbol, timeframe);
+    return analyze(bars, correlationId);
 }
 ```
+
+If many layers genuinely share the same context (e.g. a request-scoped logger),
+consider an explicit context object rather than a growing parameter list.
 
 ---
 
@@ -439,14 +402,14 @@ Coupling vs Cohesion
     → Judge based on change frequency and impact range
 ```
 
-**Priority in the Siglens context**
+**Priority in the siglens-core context**
 
 ```
 domain/indicators   → Predictability first
                       (unified return types across same-family functions, consistent null handling)
 
-components/         → Readability first
-                      (chart components should be easy to read, minimize conditional branching)
+domain/analysis     → Readability first
+                      (prompt builders must be easy to scan; minimize conditional branching)
 
 infrastructure/     → Cohesion first
                       (replacing a Provider should require modifying only one file)

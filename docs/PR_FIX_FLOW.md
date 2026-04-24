@@ -24,7 +24,7 @@ Never ask the user "shall I proceed?" between steps — route automatically.
 #### 1-1. Repository
 
 ```
-REPO=y0ngha/siglens
+REPO=y0ngha/siglens-core
 ```
 
 Use this value directly in all `gh` commands.
@@ -36,10 +36,8 @@ Always read (targeted):
 
 | Modified layer | MISTAKES.md sections to read |
 |---|---|
-| domain/ | Coding Paradigm, TypeScript, Domain Functions, Pure Function Contracts |
-| infrastructure/ | Coding Paradigm, TypeScript |
-| components/ | Coding Paradigm, Components, Design & Cohesion |
-| components/chart/ | (above) + Lightweight Charts |
+| domain/ | Coding Paradigm, TypeScript, Domain Functions |
+| infrastructure/ | Coding Paradigm, TypeScript, Infrastructure Functions |
 | \_\_tests\_\_/ | Tests |
 
 Multiple layers → read the union of their sections.
@@ -47,12 +45,11 @@ Multiple layers → read the union of their sections.
 Additional documents based on fix scope:
 - domain/ related → `docs/DOMAIN.md`
 - infrastructure/ → `docs/API.md`
-- components/ → `docs/DESIGN.md`
 
 #### 1-3. Understand PR Context
 
 ```bash
-gh pr view {PR number} --repo y0ngha/siglens
+gh pr view {PR number} --repo y0ngha/siglens-core
 ```
 
 **If the PR cannot be found, stop and report to user.**
@@ -61,7 +58,7 @@ gh pr view {PR number} --repo y0ngha/siglens
 
 ```bash
 # Get head branch name
-gh pr view {PR number} --json headRefName --repo y0ngha/siglens | jq -r '.headRefName'
+gh pr view {PR number} --json headRefName --repo y0ngha/siglens-core | jq -r '.headRefName'
 
 git fetch origin '{head branch name}'
 git checkout '{head branch name}'
@@ -73,21 +70,21 @@ Always use `jq` for JSON parsing. Never use `$()` command substitution — store
 
 ```bash
 # Step 1: Save the latest commit timestamp to a temp file
-gh api repos/y0ngha/siglens/pulls/{PR number}/commits \
+gh api repos/y0ngha/siglens-core/pulls/{PR number}/commits \
   | jq -r '.[-1].commit.committer.date' > /tmp/latest_commit_date.txt
 
 # Step 2: Filter inline comments created after the latest commit
-gh api repos/y0ngha/siglens/pulls/{PR number}/comments \
+gh api repos/y0ngha/siglens-core/pulls/{PR number}/comments \
   | jq --rawfile since /tmp/latest_commit_date.txt \
     '[.[] | select(.created_at > ($since | rtrimstr("\n"))) | {id: .id, path: .path, line: .line, body: .body}]'
 
 # Step 3: Filter reviews submitted after the latest commit
-gh api repos/y0ngha/siglens/pulls/{PR number}/reviews \
+gh api repos/y0ngha/siglens-core/pulls/{PR number}/reviews \
   | jq --rawfile since /tmp/latest_commit_date.txt \
     '[.[] | select(.submitted_at > ($since | rtrimstr("\n"))) | {id: .id, state: .state, submitted_at: .submitted_at, body: .body}]'
 
 # Step 4: Only fetch per-review inline comments when Step 3 body is empty AND inline context (path/line) is required
-gh api repos/y0ngha/siglens/pulls/{PR number}/reviews/{review_id}/comments \
+gh api repos/y0ngha/siglens-core/pulls/{PR number}/reviews/{review_id}/comments \
   | jq '[.[] | {path: .path, line: .line, body: .body}]'
 ```
 
@@ -107,7 +104,7 @@ Reject a comment (do not apply the fix) if any of the following is true:
 
 For every rejected comment, post a reply on GitHub:
 ```bash
-gh api repos/y0ngha/siglens/pulls/comments/{comment_id}/replies \
+gh api repos/y0ngha/siglens-core/pulls/comments/{comment_id}/replies \
   -X POST \
   -f body="This review comment will not be applied. {rejection reason}"
 ```
@@ -120,33 +117,32 @@ After applying, verify against the checklist matching each modified file type:
 
 **Domain Layer Checklist:**
 - [ ] No external library imports (technicalindicators, lodash, etc.)
-- [ ] Pure functions only (no fetch, console.log, Date.now())
+- [ ] Pure functions only (no fetch, console.log, Date.now(), process.env)
 - [ ] Return types explicitly declared
 - [ ] Initial period values must be null (never 0 or NaN)
 - [ ] No for/while loops → use map, filter, reduce, flatMap
+  (exceptions: sliding windows, pointer-convergence — see CONVENTIONS.md)
 - [ ] Maintain immutability (no push, reverse, sort — use spread, toReversed)
 - [ ] Path aliases (@/domain/... format)
 - [ ] No hardcoded literals → extract to constants
 
-**Component Layer Checklist:**
-- [ ] Hook declaration order: useState → useRef → useQuery/useMutation → derived (useMemo/const) → handlers → useLayoutEffect → useEffect → return
-- [ ] Props interface directly above component function
-- [ ] 'use client' only when hooks, handlers, or browser APIs are used
-- [ ] No infrastructure imports in .tsx files (hooks/ may import fetch functions only)
-- [ ] No lightweight-charts imports outside components/chart/
+**Infrastructure Layer Checklist:**
+- [ ] No reverse imports (domain → infrastructure prohibited)
+- [ ] Type imports from @/domain/types only
+- [ ] process.env access is confined to this layer
+- [ ] External dependencies are wrapped behind an interface in `types.ts`
+- [ ] No console.log or debug artifacts
+- [ ] Graceful degradation on missing env vars / network failure
+- [ ] All conditional branches have dedicated test cases
 
 **Test Layer Checklist:**
 - [ ] Test file exists for every new domain/infrastructure file
-- [ ] 100% branch coverage for infrastructure (all ?., ??, if/else paths)
+- [ ] 100% branch coverage (domain and infrastructure)
 - [ ] describe/it text is human-readable, not code expressions
 - [ ] Period-based indicators include all 5 required test cases
 - [ ] No if-guarded assertions (unconditional expect only)
-
-**Infrastructure Layer Checklist:**
-- [ ] No reverse imports (infrastructure → app or domain → infrastructure)
-- [ ] Type imports from @/domain/types only
-- [ ] No console.log or debug artifacts
-- [ ] All conditional branches have dedicated test cases
+- [ ] External services stubbed via `vi.mock` / interface stubs (no real Upstash/Neon/AI calls)
+- [ ] Time-dependent code uses `vi.setSystemTime` — no raw `Date.now()` assertions
 
 Only check the checklists for file types you actually modified.
 
@@ -158,11 +154,9 @@ For each file modified during the fix:
 
    | File type | Sections to read |
    |---|---|
-   | .tsx (component) | Components, Coding Paradigm |
    | .ts (domain/) | Domain Functions, TypeScript, Coding Paradigm |
-   | .ts (infrastructure/) | TypeScript, Coding Paradigm |
+   | .ts (infrastructure/) | Infrastructure Functions, TypeScript, Coding Paradigm |
    | .test.ts | Tests |
-   | .tsx (chart/) | Components, Lightweight Charts |
 
 2. Verify each rule in those sections against the modified file.
 3. When fixing a pattern violation, verify the entire file for the same pattern —
@@ -176,18 +170,17 @@ Run in order. Each must pass before proceeding.
 ```bash
 # Always run
 yarn lint
-yarn lint:style
 yarn format 2>&1 | grep -v "unchanged"
 ```
 
 ```bash
-# Run only if .ts or .tsx files were modified
-git diff --name-only HEAD | grep -E '\.(ts|tsx)$' | xargs -I{} \
-  yarn test --testPathPattern={} --passWithNoTests 2>&1 | tail -30
+# Run only if .ts files were modified
+yarn test --run
 ```
 
 ```bash
 # Always run last
+yarn typecheck
 yarn build 2>&1 | tail -20
 ```
 
