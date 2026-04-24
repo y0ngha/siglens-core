@@ -22,16 +22,15 @@
         "test:coverage": "vitest run --coverage",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "release": "dotenv -e .env.local -- release-it",
-        "release:patch": "dotenv -e .env.local -- release-it patch",
-        "release:minor": "dotenv -e .env.local -- release-it minor",
-        "release:major": "dotenv -e .env.local -- release-it major"
+        "release": "release-it",
+        "release:patch": "release-it patch",
+        "release:minor": "release-it minor",
+        "release:major": "release-it major"
     },
     "devDependencies": {
         "@release-it/conventional-changelog": "^10.0.6",
         "@types/node": "^20.11.0",
         "@vitest/coverage-v8": "^2.1.0",
-        "dotenv-cli": "^11.0.0",
         "eslint": "^9.18.0",
         "prettier": "^3.4.0",
         "release-it": "^19.2.4",
