@@ -2,7 +2,7 @@ import type {
     CandlePatternEntry,
     MultiCandlePatternEntry,
     SingleCandlePatternEntry,
-} from '@/domain/analysis/candle-detection';
+} from '@/domain/types';
 import {
     CANDLE_PATTERN_DETECTION_BARS,
     detectCandlePatternEntries,

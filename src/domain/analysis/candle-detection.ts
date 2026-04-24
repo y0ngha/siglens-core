@@ -1,4 +1,8 @@
-import type { Bar, CandlePattern, MultiCandlePattern } from '@/domain/types';
+import type {
+    Bar,
+    CandlePatternEntry,
+    MultiCandlePattern,
+} from '@/domain/types';
 import {
     detectCandlePattern,
     detectMultiCandlePattern,
@@ -39,26 +43,6 @@ const THREE_BAR_PATTERNS: ReadonlySet<MultiCandlePattern> = new Set([
     'ladder_bottom',
 ]);
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface SingleCandlePatternEntry {
-    barIndex: number;
-    patternType: 'single';
-    singlePattern: CandlePattern;
-    multiPattern: null;
-}
-
-export interface MultiCandlePatternEntry {
-    barIndex: number;
-    patternType: 'multi';
-    singlePattern: null;
-    multiPattern: MultiCandlePattern;
-}
-
-export type CandlePatternEntry =
-    | SingleCandlePatternEntry
-    | MultiCandlePatternEntry;
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const getPatternBarCount = (pattern: MultiCandlePattern): number =>
@@ -66,10 +50,7 @@ const getPatternBarCount = (pattern: MultiCandlePattern): number =>
         ? THREE_BAR_PATTERN_COUNT
         : TWO_BAR_PATTERN_COUNT;
 
-/**
- * Yield merged entries from two sorted CandlePatternEntry arrays in O(n)
- * using a two-pointer approach.
- */
+/** Yield merged entries from two sorted arrays in O(n) using two-pointer. */
 function* mergeSortedGen(
     a: CandlePatternEntry[],
     b: CandlePatternEntry[]
@@ -84,10 +65,7 @@ function* mergeSortedGen(
     while (bi < b.length) yield b[bi++];
 }
 
-/**
- * Merge two CandlePatternEntry arrays that are already sorted by barIndex
- * into a single sorted array in O(n) using a two-pointer approach.
- */
+/** Merge two sorted CandlePatternEntry arrays into one sorted array in O(n) using two-pointer. */
 function mergeSortedEntries(
     a: CandlePatternEntry[],
     b: CandlePatternEntry[]
@@ -95,25 +73,14 @@ function mergeSortedEntries(
     return [...mergeSortedGen(a, b)];
 }
 
-/**
- * Extracts the last CANDLE_PATTERN_DETECTION_BARS bars from the input array.
- * Shared by prompt construction and chart marker rendering.
- */
+/** Extracts the last CANDLE_PATTERN_DETECTION_BARS bars; shared by prompt construction and chart rendering. */
 export function getDetectionBars(bars: Bar[]): Bar[] {
     return bars.slice(-CANDLE_PATTERN_DETECTION_BARS);
 }
 
 // ─── Detection ───────────────────────────────────────────────────────────────
 
-/**
- * Detects candle patterns from the last N bars.
- * Uses CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER bars for detection
- * to ensure 3-bar patterns at the start of the window are correctly detected,
- * but only returns entries for the last CANDLE_PATTERN_DETECTION_BARS bars.
- *
- * Multi-candle patterns take priority: when a multi-candle pattern is detected,
- * all bars involved in that pattern are excluded from single-candle pattern results.
- */
+/** Detects candle patterns from the last N bars; multi-candle patterns take priority and exclude involved bars from single results. */
 export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     const extendedCount =
         CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER;
@@ -124,13 +91,15 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     );
 
     // Detect multi-candle patterns and collect involved bar indices
-    const multiEntryMap = extendedBars.reduce<
-        Map<number, { pattern: MultiCandlePattern; involvedIndices: number[] }>
-    >((acc, _, i) => {
-        if (i < detectionStartIndex) return acc;
+    const multiEntryMap = new Map<
+        number,
+        { pattern: MultiCandlePattern; involvedIndices: number[] }
+    >();
+    for (let i = 0; i < extendedBars.length; i++) {
+        if (i < detectionStartIndex) continue;
         const candleWindow = extendedBars.slice(0, i + 1);
         const detected = detectMultiCandlePattern(candleWindow);
-        if (detected === null) return acc;
+        if (detected === null) continue;
 
         const patternBarCount = getPatternBarCount(detected);
         const startIdx = Math.max(0, i - patternBarCount + 1);
@@ -139,8 +108,8 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
             (__, offset) => startIdx + offset
         );
 
-        return new Map([...acc, [i, { pattern: detected, involvedIndices }]]);
-    }, new Map());
+        multiEntryMap.set(i, { pattern: detected, involvedIndices });
+    }
 
     // Collect all bar indices involved in any multi-candle pattern
     const multiInvolvedIndices = new Set(
@@ -154,43 +123,36 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
         multiEntryMap.entries()
     ).map(([i, { pattern }]) => ({
         barIndex: i - detectionStartIndex,
-        patternType: 'multi' as const,
+        patternType: 'multi' as const, // literal type 추론 보조 — 런타임 값 변경 없음
         singlePattern: null,
         multiPattern: pattern,
     }));
 
     // Build single entries (excluding bars involved in multi patterns)
     const detectionBars = extendedBars.slice(detectionStartIndex);
-    const singleEntries: CandlePatternEntry[] = detectionBars.reduce<
-        CandlePatternEntry[]
-    >((acc, bar, i) => {
-        const extendedIndex = i + detectionStartIndex;
-        if (multiInvolvedIndices.has(extendedIndex)) return acc;
-        const pattern = detectCandlePattern(bar);
-        if (EXCLUDED_SINGLE_PATTERNS.has(pattern)) return acc;
-        return [
-            ...acc,
-            {
-                barIndex: i,
-                patternType: 'single' as const,
-                singlePattern: pattern,
-                multiPattern: null,
-            },
-        ];
-    }, []);
+    const singleEntries: CandlePatternEntry[] = detectionBars.flatMap(
+        (bar, i) => {
+            const extendedIndex = i + detectionStartIndex;
+            if (multiInvolvedIndices.has(extendedIndex)) return [];
+            const pattern = detectCandlePattern(bar);
+            if (EXCLUDED_SINGLE_PATTERNS.has(pattern)) return [];
+            return [
+                {
+                    barIndex: i,
+                    patternType: 'single' as const, // literal type 추론 보조 — 런타임 값 변경 없음
+                    singlePattern: pattern,
+                    multiPattern: null,
+                },
+            ];
+        }
+    );
 
     return mergeSortedEntries(singleEntries, multiEntries);
 }
 
 // ─── Selection ──────────────────────────────────────────────────────────────
 
-/**
- * Selects the last detected candle pattern entries:
- * - Returns the last multi-candle pattern (if any) + the last single-candle pattern (if any).
- * - This ensures both pattern types are represented when they co-exist.
- *
- * Shared by prompt construction and chart marker rendering.
- */
+/** Returns last multi-candle + last single-candle entry (if any); ensures both types are represented when co-existing. */
 export function selectLastCandlePatternEntries(
     entries: CandlePatternEntry[]
 ): CandlePatternEntry[] {

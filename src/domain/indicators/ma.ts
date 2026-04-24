@@ -11,14 +11,12 @@ export function calculateMA(bars: Bar[], period: number): (number | null)[] {
 
     const nulls: (number | null)[] = new Array(period - 1).fill(null);
 
-    const smas: (number | null)[] = closes
-        .slice(period - 1)
-        .map(
-            (_, i) =>
-                closes
-                    .slice(i, i + period)
-                    .reduce((sum, close) => sum + close, 0) / period
-        );
+    let windowSum = closes.slice(0, period).reduce((s, c) => s + c, 0);
+    const smas: (number | null)[] = [windowSum / period];
+    for (let i = period; i < closes.length; i++) {
+        windowSum += closes[i] - closes[i - period];
+        smas.push(windowSum / period);
+    }
 
     return [...nulls, ...smas];
 }

@@ -1,4 +1,10 @@
-import type { Bar, IndicatorResult, MACDResult, Signal } from '@/domain/types';
+import type {
+    Bar,
+    CrossDirection,
+    IndicatorResult,
+    MACDResult,
+    Signal,
+} from '@/domain/types';
 import {
     RSI_OVERBOUGHT_LEVEL,
     RSI_OVERSOLD_LEVEL,
@@ -51,8 +57,6 @@ export function detectRsiOverbought(
         detectedAt: lastIdx,
     };
 }
-
-export type CrossDirection = 'up' | 'down';
 
 export function findCross(
     fast: (number | null)[],

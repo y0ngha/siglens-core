@@ -148,4 +148,8 @@ export type {
     MarketBriefingResponse,
     MarketBriefingSectorAnalysis,
     MarketBriefingVolatilityAnalysis,
+    CrossDirection,
+    CandlePatternEntry,
+    SingleCandlePatternEntry,
+    MultiCandlePatternEntry,
 } from './domain/types';

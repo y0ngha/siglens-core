@@ -38,12 +38,12 @@ import {
 import { detectCandlePattern } from '@/domain/analysis/candle';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
 import {
-    type CandlePatternEntry,
     detectCandlePatternEntries,
     getDetectionBars,
     selectLastCandlePatternEntries,
 } from '@/domain/analysis/candle-detection';
 import type {
+    CandlePatternEntry,
     AnalysisResponse,
     Bar,
     IndicatorResult,

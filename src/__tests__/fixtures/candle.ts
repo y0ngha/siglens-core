@@ -26,10 +26,7 @@ export const makeHammerBar = (i: number): Bar =>
         close: TEST_BAR_BASE_PRICE + HAMMER_BODY_OFFSET,
     });
 
-/**
- * Creates a bearish bar (open > close) followed by a bullish engulfing bar.
- * The bullish bar's body completely engulfs the bearish bar's body.
- */
+/** Creates a bearish bar followed by a bullish engulfing bar (bullish body fully engulfs the bearish body). */
 export const makeEngulfingPair = (startIndex: number): [Bar, Bar] => [
     makeBar(startIndex, {
         open: 110,

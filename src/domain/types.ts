@@ -410,6 +410,26 @@ export type MultiCandlePattern =
     | 'on_neck'
     | 'in_neck';
 
+export interface SingleCandlePatternEntry {
+    barIndex: number;
+    patternType: 'single';
+    singlePattern: CandlePattern;
+    multiPattern: null;
+}
+
+export interface MultiCandlePatternEntry {
+    barIndex: number;
+    patternType: 'multi';
+    singlePattern: null;
+    multiPattern: MultiCandlePattern;
+}
+
+export type CandlePatternEntry =
+    | SingleCandlePatternEntry
+    | MultiCandlePatternEntry;
+
+export type CrossDirection = 'up' | 'down';
+
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 export type BacktestRiskLevel = 'low' | 'moderate' | 'high' | 'extreme';
