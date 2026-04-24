@@ -16,6 +16,7 @@ import {
     detectRsiOversold,
     detectSqueezeMomentumBullish,
     detectSupertrendBullishFlip,
+    findCross,
     findThresholdCross,
 } from '@/domain/signals/confirmed';
 import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
@@ -1166,6 +1167,49 @@ describe('findThresholdCross', () => {
             const values = [-5, 2, 3, 4, 5];
             // cross happened at index 1 (-5 → 2), lookback=2 covers [3, 4]
             expect(findThresholdCross(values, 0, 2, 'up')).toBeNull();
+        });
+    });
+});
+
+describe('findCross', () => {
+    describe('direction: up — fast가 slow를 상향 돌파할 때', () => {
+        it('상향 돌파 인덱스를 반환한다', () => {
+            const fast = [1, 1, 3];
+            const slow = [2, 2, 2];
+            expect(findCross(fast, slow, 3, 'up')).toBe(2);
+        });
+    });
+
+    describe('direction: down — fast가 slow를 하향 돌파할 때', () => {
+        it('하향 돌파 인덱스를 반환한다', () => {
+            const fast = [3, 3, 1];
+            const slow = [2, 2, 2];
+            expect(findCross(fast, slow, 3, 'down')).toBe(2);
+        });
+    });
+
+    describe('null skip — null 값이 있는 구간은 건너뛴다', () => {
+        it('null 값 포함 시 유효한 cross가 없으면 null을 반환한다', () => {
+            const fast = [null, null, null] as (number | null)[];
+            const slow = [null, null, null] as (number | null)[];
+            expect(findCross(fast, slow, 3, 'up')).toBeNull();
+        });
+    });
+
+    describe('돌파가 없을 때', () => {
+        it('null을 반환한다', () => {
+            const fast = [1, 1, 1];
+            const slow = [2, 2, 2];
+            expect(findCross(fast, slow, 3, 'up')).toBeNull();
+        });
+    });
+
+    describe('lookback 경계', () => {
+        it('lookback 범위 밖의 cross는 무시한다', () => {
+            const fast = [3, 1, 1, 1, 1];
+            const slow = [2, 2, 2, 2, 2];
+            // cross at index 1, lookback=2 covers indices [3, 4]
+            expect(findCross(fast, slow, 2, 'down')).toBeNull();
         });
     });
 });

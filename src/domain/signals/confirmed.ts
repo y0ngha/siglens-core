@@ -79,10 +79,7 @@ export function findCross(
     return null;
 }
 
-/**
- * 값 배열이 스칼라 임계값(threshold)을 상향/하향 돌파한 가장 최근 lookback bar 인덱스를 반환.
- * findCross의 "parallel constant array" 패턴을 피하기 위한 전용 헬퍼.
- */
+/** 스칼라 임계값 돌파 인덱스 반환 — findCross의 parallel constant array 패턴 방지 전용. */
 export function findThresholdCross(
     values: (number | null)[],
     threshold: number,

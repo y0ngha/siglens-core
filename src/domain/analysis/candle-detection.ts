@@ -97,7 +97,7 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     >();
     for (let i = 0; i < extendedBars.length; i++) {
         if (i < detectionStartIndex) continue;
-        const candleWindow = extendedBars.slice(0, i + 1);
+        const candleWindow = extendedBars.slice(Math.max(0, i - 2), i + 1);
         const detected = detectMultiCandlePattern(candleWindow);
         if (detected === null) continue;
 

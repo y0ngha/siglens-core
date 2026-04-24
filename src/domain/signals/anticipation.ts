@@ -70,12 +70,7 @@ export function computeEmaSlope(
     return (last - prev) / prev;
 }
 
-// Rank-based percentile (not standard mean-rank `(below + 0.5*equal) / n`).
-// Purpose: Bollinger squeeze detection needs min→0, max→1 so that `rank ≤ 0.1`
-// cleanly means "current width is in bottom 10% of the lookback window".
-// When value is present in the array: `below / (n - 1)` gives 0 for the
-// minimum tie-group and 1 for the maximum tie-group. When value is absent:
-// `below / n` preserves interpolation semantics.
+// 표준 mean-rank 아닌 rank-based — squeeze 감지에서 min→0, max→1이 되도록 설계.
 export function percentileRank(value: number, xs: number[]): number | null {
     if (xs.length === 0) return null;
     if (xs.length === 1) {
@@ -84,8 +79,7 @@ export function percentileRank(value: number, xs: number[]): number | null {
     }
     const below = xs.filter(x => x < value).length;
     const equal = xs.filter(x => x === value).length;
-    // Degenerate case: all values equal — return neutral 0.5 to avoid spurious
-    // "min" or "max" classification when the distribution has zero variance.
+    // all-equal degenerate case — 분산 0에서 min/max 오분류 방지.
     if (equal === xs.length) return 0.5;
     if (equal === 0) {
         return below / xs.length;

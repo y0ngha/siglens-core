@@ -1,5 +1,4 @@
-// IMPORTANT: All AI-facing prompt strings in this file must be written in English.
-// Korean or other languages reduce analysis quality and consistency.
+// All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import {
     ATR_DEFAULT_PERIOD,
@@ -61,32 +60,14 @@ const INDICATOR_DECIMAL_PLACES = 2;
 const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
 
-// 타임프레임별 프롬프트 파라미터.
-//
-// 동일한 "bar 개수" 라 하더라도 실제 시간 지평은 타임프레임마다 크게 달라지므로,
-// AI 프롬프트의 설명력과 잡음 내성을 맞추기 위해 아래 세 값은 타임프레임 인지형
-// 맵으로 관리한다.
-//   - trendSampleCount:     detectTrend 슬라이스 크기. 단기(분봉)에서는 샘플이
-//                           많아야 잡음에 강하고, 장기(일봉)에서는 과한 smoothing
-//                           이 최근 반전을 놓치므로 작은 값을 쓴다.
-//   - recentBarsCount:      프롬프트에 포함할 "최근 봉" 수 + buy/sell volume 요약
-//                           구간. 단기에서는 충분한 컨텍스트를 위해 많이 보고,
-//                           장기에서는 시각적/토큰 부담을 줄인다.
-//   - squeezeZeroCrossLookback: Squeeze Momentum 영점 교차 탐지 lookback. 신호가
-//                           의미 있는 최근 기간이 타임프레임마다 다르다.
-//
-// 세 값은 항상 함께 수정되어야 하므로 MISTAKES.md Design & Cohesion #1 에 따라
-// 단일 PROMPT_CONFIG_BY_TIMEFRAME 맵으로 통합한다. 새 타임프레임 추가 시 한 곳만
-// 갱신하면 되고 누락 가능성이 사라진다.
+// 타임프레임마다 추세 감도·컨텍스트 크기·스퀴즈 lookback이 달라 단일 맵으로 관리.
 interface PromptConfig {
     trendSampleCount: number;
     recentBarsCount: number;
     squeezeZeroCrossLookback: number;
 }
 
-// 타임프레임별 프롬프트 파라미터 단일 맵. 테스트 및 외부 호출자가 동일 값을
-// 참조할 수 있도록 export 한다 (MISTAKES.md Tests #4/#13: boundary constant
-// 는 소스에서 import, 하드코딩 금지).
+// 테스트/외부 호출자가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
 export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
     '5Min': {
         trendSampleCount: 12,
@@ -122,9 +103,7 @@ export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
 
 // detectTrend 의 상대 임계값 비율 (윈도 내 최대 절대값의 몇 % 를 'flat' 으로 간주할지).
 const INDICATOR_TREND_THRESHOLD_RATIO = 0.01;
-// detectTrend 의 절대 최소 임계값. 윈도 값이 모두 0 근처라서 ratio × maxAbs 가
-// 0 에 수렴하는 경우(예: MACD histogram, CCI, CMF 의 영점 교차 구간) 잡음이
-// 'rising'/'falling' 으로 오분류되는 것을 방지한다.
+// ratio × maxAbs가 0에 수렴할 때 잡음이 rising/falling으로 오분류되는 것을 방지.
 const INDICATOR_TREND_MIN_THRESHOLD = 1e-8;
 
 const SMC_MAX_ORDER_BLOCKS = 5;
@@ -165,10 +144,7 @@ const detectTrend = (
         .filter((v): v is number => v !== null);
     if (nonNull.length < 2) return null;
 
-    // 선형 회귀 slope 로 추세 방향을 판정한다. 첫/마지막 값만 비교하면 단일
-    // 극단치(whipsaw) 에 추세가 좌우되지만, slope 는 윈도 내 모든 값을 반영하여
-    // 잡음에 견고하다. windowSpan = slope × (n - 1) 은 fitted line 이 윈도 전체에
-    // 걸쳐 움직인 총 변화량이며, 임계값과 같은 단위로 비교 가능하다.
+    // 선형 회귀 slope 기반 — 극단치 whipsaw에 강하고 windowSpan은 fitted line 총 변화량.
     const n = nonNull.length;
     const xMean = (n - 1) / 2;
     const yMean = nonNull.reduce((sum, v) => sum + v, 0) / n;
@@ -183,10 +159,7 @@ const detectTrend = (
     if (denominator === 0) return 'flat';
     const windowSpan = (numerator / denominator) * (n - 1);
 
-    // 임계값은 윈도 내 최대 절대값을 기준으로 설정한다. 이렇게 하면
-    // MACD histogram, CCI, CMF 처럼 0 근처를 교차하는 지표에서도 잡음이
-    // 무조건 'rising'/'falling' 으로 분류되지 않고, 지표의 실제 스케일에
-    // 비례한 안정적인 임계값이 적용된다.
+    // 지표 스케일 비례 임계값 — MACD/CCI/CMF 영점 교차 구간의 잡음 오분류 방지.
     const windowMaxAbs = nonNull.reduce(
         (max, v) => Math.max(max, Math.abs(v)),
         0
