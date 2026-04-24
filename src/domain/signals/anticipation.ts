@@ -59,7 +59,7 @@ export function computePctB(close: number, bb: BollingerResult): number | null {
     return (close - bb.lower) / denom;
 }
 
-export function computeEma20Slope(
+export function computeEmaSlope(
     ema: (number | null)[],
     lookback: number
 ): number | null {
@@ -248,7 +248,7 @@ function computeSqueezeState(
 
     const ema20 = indicators.ema[TREND_EMA_PERIOD];
     if (ema20 === undefined) return null;
-    const slope = computeEma20Slope(ema20, TREND_SLOPE_LOOKBACK);
+    const slope = computeEmaSlope(ema20, TREND_SLOPE_LOOKBACK);
     if (slope === null) return null;
 
     return { lastIdx, pctB, slope };
@@ -291,6 +291,7 @@ function isWithinProximity(
     ma: number,
     side: 'above' | 'below'
 ): boolean {
+    if (ma === 0) return false;
     const distance = Math.abs(close - ma) / ma;
     if (distance > SR_PROXIMITY_PCT) return false;
     if (side === 'above') return close > ma;

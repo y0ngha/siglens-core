@@ -1,6 +1,6 @@
 import {
     computeBbWidth,
-    computeEma20Slope,
+    computeEmaSlope,
     computePctB,
     detectBollingerSqueezeBearish,
     detectBollingerSqueezeBullish,
@@ -139,34 +139,34 @@ describe('computePctB', () => {
     });
 });
 
-describe('computeEma20Slope', () => {
+describe('computeEmaSlope', () => {
     describe('정상 입력', () => {
         it('(last - prev) / prev 를 반환한다', () => {
             const ema = Array.from({ length: 21 }, (_, i) => 100 + i);
-            expect(computeEma20Slope(ema, 20)).toBeCloseTo(0.2);
+            expect(computeEmaSlope(ema, 20)).toBeCloseTo(0.2);
         });
     });
     describe('데이터 부족 시', () => {
         it('null을 반환한다', () => {
-            expect(computeEma20Slope([100, 101], 20)).toBeNull();
+            expect(computeEmaSlope([100, 101], 20)).toBeNull();
         });
     });
     describe('prev가 0일 때', () => {
         it('null을 반환한다', () => {
             const ema = [0, ...Array(20).fill(1)];
-            expect(computeEma20Slope(ema, 20)).toBeNull();
+            expect(computeEmaSlope(ema, 20)).toBeNull();
         });
     });
     describe('last가 null일 때', () => {
         it('null을 반환한다', () => {
             const ema: (number | null)[] = [...Array(20).fill(1), null];
-            expect(computeEma20Slope(ema, 20)).toBeNull();
+            expect(computeEmaSlope(ema, 20)).toBeNull();
         });
     });
     describe('prev가 null일 때', () => {
         it('null을 반환한다', () => {
             const ema: (number | null)[] = [null, ...Array(20).fill(1)];
-            expect(computeEma20Slope(ema, 20)).toBeNull();
+            expect(computeEmaSlope(ema, 20)).toBeNull();
         });
     });
 });
@@ -756,7 +756,7 @@ describe('detectBollingerSqueezeBullish — 추가 엣지케이스', () => {
         });
     });
 
-    describe('computeEma20Slope가 null을 반환할 때', () => {
+    describe('computeEmaSlope가 null을 반환할 때', () => {
         it('null을 반환한다', () => {
             const { bars, indicators } = squeezeFixture({
                 pctB: 0.6,

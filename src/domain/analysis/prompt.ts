@@ -120,9 +120,6 @@ export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
     },
 };
 
-const resolvePromptConfig = (timeframe: Timeframe): PromptConfig =>
-    PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
-
 // detectTrend 의 상대 임계값 비율 (윈도 내 최대 절대값의 몇 % 를 'flat' 으로 간주할지).
 const INDICATOR_TREND_THRESHOLD_RATIO = 0.01;
 // detectTrend 의 절대 최소 임계값. 윈도 값이 모두 0 근처라서 ratio × maxAbs 가
@@ -1021,7 +1018,7 @@ export function buildAnalysisPrompt(
     const supportResistanceSkills = skillGroups.support_resistance;
     const regularSkills = skillGroups.regular;
 
-    const config = resolvePromptConfig(timeframe);
+    const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
     const sections = [
         `Symbol: ${symbol}`,
