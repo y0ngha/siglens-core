@@ -1,0 +1,67 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env.local
+.env.yaml
+.env
+
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+*storybook.log
+/.idea/
+
+# jest
+.jest
+/TODO.md
+.vercel
+/.claude/projects/
+/worker/dist/
+/worker/node_modules/
+/.superpowers/
+/docs/superpowers/
+
+# backtest batch job state
+/scripts/backtests/.batch-job.txt
+
+/worker/.vscode/
+
+.vscode/
+# Dev-only preview routes — local testing, never deployed
+/src/app/dev/
+/.claire/
+/.claude/worktrees/
+
+**node_modules**
