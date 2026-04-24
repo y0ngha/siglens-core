@@ -1,7 +1,4 @@
-import type {
-    CandlePattern,
-    MultiCandlePattern,
-} from '@/domain/analysis/candle';
+import type { CandlePattern, MultiCandlePattern } from '@/domain/types';
 
 // ─── Single Candle Pattern Labels ─────────────────────────────────────────────
 
@@ -75,6 +72,10 @@ export function getMultiCandlePatternLabel(
 }
 
 export function findCandlePatternLabel(patternName: string): string {
+    // Safe: CANDLE_PATTERN_LABELS / MULTI_CANDLE_PATTERN_LABELS keys are CandlePattern /
+    // MultiCandlePattern, both subsets of string. Widening Record<literal, string> to
+    // Record<string, string> is only to allow lookup by an arbitrary string key — the
+    // runtime result is either the matching label or undefined, handled by `??`.
     const label =
         (CANDLE_PATTERN_LABELS as Record<string, string>)[patternName] ??
         (MULTI_CANDLE_PATTERN_LABELS as Record<string, string>)[patternName];

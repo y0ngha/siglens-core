@@ -1,66 +1,4 @@
-import type { Bar } from '@/domain/types';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type CandlePattern =
-    // Doji 계열
-    | 'flat'
-    | 'gravestone_doji'
-    | 'dragonfly_doji'
-    | 'doji'
-    // Marubozu 계열
-    | 'bullish_marubozu'
-    | 'bearish_marubozu'
-    // 단봉 반전
-    | 'shooting_star'
-    | 'inverted_hammer'
-    | 'hammer'
-    | 'hanging_man'
-    | 'bullish_belt_hold'
-    | 'bearish_belt_hold'
-    // 기본 형태
-    | 'spinning_top'
-    | 'bullish'
-    | 'bearish';
-
-export type MultiCandlePattern =
-    // 상승 반전
-    | 'bullish_engulfing'
-    | 'bullish_harami'
-    | 'bullish_harami_cross'
-    | 'piercing_line'
-    | 'bullish_counterattack_line'
-    | 'morning_star'
-    | 'morning_doji_star'
-    | 'bullish_abandoned_baby'
-    | 'three_white_soldiers'
-    | 'three_inside_up'
-    | 'three_outside_up'
-    | 'bullish_triple_star'
-    | 'ladder_bottom'
-    | 'tweezers_bottom'
-    | 'downside_gap_two_rabbits'
-    // 하락 반전
-    | 'bearish_engulfing'
-    | 'bearish_harami'
-    | 'bearish_harami_cross'
-    | 'dark_cloud_cover'
-    | 'bearish_counterattack_line'
-    | 'evening_star'
-    | 'evening_doji_star'
-    | 'bearish_abandoned_baby'
-    | 'three_black_crows'
-    | 'three_inside_down'
-    | 'three_outside_down'
-    | 'bearish_triple_star'
-    | 'advance_block'
-    | 'tweezers_top'
-    | 'upside_gap_two_crows'
-    // 지속
-    | 'upside_gap_tasuki'
-    | 'downside_gap_tasuki'
-    | 'on_neck'
-    | 'in_neck';
+import type { Bar, CandlePattern, MultiCandlePattern } from '@/domain/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -73,7 +11,7 @@ const SPINNING_TOP_BODY_RATIO = 0.4;
 const LONG_DAY_BODY_RATIO = 0.6;
 const BELT_HOLD_TAIL_RATIO = 0.1;
 const NEAR_PRICE_TOLERANCE = 0.002;
-const MIN_PRICE_DENOMINATOR = 1;
+const MIN_PRICE_DENOMINATOR = 1e-9;
 const IN_NECK_RATIO = 0.05;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

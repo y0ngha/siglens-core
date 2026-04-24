@@ -1,11 +1,4 @@
-import type {
-    CandlePattern,
-    MultiCandlePattern,
-} from '@/domain/analysis/candle';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export type PatternTrend = 'bullish' | 'bearish' | 'neutral';
+import type { CandlePattern, MultiCandlePattern, Trend } from '@/domain/types';
 
 // ─── Pattern Classification Sets ─────────────────────────────────────────────
 
@@ -70,15 +63,13 @@ export const EXCLUDED_SINGLE_PATTERNS: ReadonlySet<CandlePattern> = new Set([
 
 // ─── Trend Classification Functions ──────────────────────────────────────────
 
-export function getSinglePatternTrend(pattern: CandlePattern): PatternTrend {
+export function getSinglePatternTrend(pattern: CandlePattern): Trend {
     if (BULLISH_SINGLE_PATTERNS.has(pattern)) return 'bullish';
     if (BEARISH_SINGLE_PATTERNS.has(pattern)) return 'bearish';
     return 'neutral';
 }
 
-export function getMultiPatternTrend(
-    pattern: MultiCandlePattern
-): PatternTrend {
+export function getMultiPatternTrend(pattern: MultiCandlePattern): Trend {
     if (BULLISH_MULTI_PATTERNS.has(pattern)) return 'bullish';
     if (BEARISH_MULTI_PATTERNS.has(pattern)) return 'bearish';
     return 'neutral';

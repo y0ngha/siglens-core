@@ -27,7 +27,7 @@ export {
     findPivotHighs,
     computeBbWidth,
     computePctB,
-    computeEma20Slope,
+    computeEmaSlope,
     percentileRank,
     detectRsiBullishDivergence,
     detectRsiBearishDivergence,

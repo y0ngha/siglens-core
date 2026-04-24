@@ -1,8 +1,4 @@
-import type { Bar } from '@/domain/types';
-import type {
-    CandlePattern,
-    MultiCandlePattern,
-} from '@/domain/analysis/candle';
+import type { Bar, CandlePattern, MultiCandlePattern } from '@/domain/types';
 import {
     detectCandlePattern,
     detectMultiCandlePattern,
@@ -203,9 +199,7 @@ export function selectLastCandlePatternEntries(
     const lastMultiEntry = entries.findLast(e => e.patternType === 'multi');
     const lastSingleEntry = entries.findLast(e => e.patternType === 'single');
 
-    const result: CandlePatternEntry[] = [];
-    if (lastMultiEntry !== undefined) result.push(lastMultiEntry);
-    if (lastSingleEntry !== undefined) result.push(lastSingleEntry);
-
-    return result.toSorted((a, b) => a.barIndex - b.barIndex);
+    return [lastMultiEntry, lastSingleEntry]
+        .filter((e): e is CandlePatternEntry => e !== undefined)
+        .toSorted((a, b) => a.barIndex - b.barIndex);
 }
