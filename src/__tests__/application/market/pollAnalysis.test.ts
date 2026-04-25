@@ -180,7 +180,9 @@ describe('pollAnalysis 함수는', () => {
 
             expect(mockCacheSet).toHaveBeenCalledWith(
                 expect.any(String),
-                expect.objectContaining({ analyzedAt: '2025-01-15T12:00:00.000Z' }),
+                expect.objectContaining({
+                    analyzedAt: '2025-01-15T12:00:00.000Z',
+                }),
                 3600
             );
         });
