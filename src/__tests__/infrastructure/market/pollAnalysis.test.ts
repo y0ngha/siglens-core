@@ -195,6 +195,23 @@ describe('pollAnalysis 함수는', () => {
 
             expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
         });
+
+        it('analyzedAt은 ISO 형식의 현재 시각이다', async () => {
+            const fixedDate = new Date('2025-01-15T12:00:00.000Z');
+            vi.useFakeTimers();
+            vi.setSystemTime(fixedDate);
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+
+            const result = await pollAnalysis('job-analyzedAt');
+
+            vi.useRealTimers();
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.analyzedAt).toBe(
+                    '2025-01-15T12:00:00.000Z'
+                );
+            }
+        });
     });
 
     describe('캐시 프로바이더가 없을 때', () => {

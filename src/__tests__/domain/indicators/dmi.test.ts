@@ -69,5 +69,18 @@ describe('calculateDMI', () => {
                 }
             });
         });
+
+        it('단조 증가(step=2) bars에서 첫 유효 값은 diPlus≈20, diMinus≈0, adx≈100이다', () => {
+            // DM+[i]=2(constant), DM-[i]=0, TR=10(constant)
+            // Wilder smooth: DI+ = 2/10*100=20, DI- = 0, DX = |20-0|/(20+0)*100 = 100, ADX=100
+            const bars = Array.from({ length: 40 }, (_, i) =>
+                makeBar(100 + i * 2, 90 + i * 2, 95 + i * 2, i)
+            );
+            const result = calculateDMI(bars, DMI_DEFAULT_PERIOD);
+            const firstValid = result[2 * DMI_DEFAULT_PERIOD - 1];
+            expect(firstValid.diPlus).toBeCloseTo(20, 5);
+            expect(firstValid.diMinus).toBeCloseTo(0, 5);
+            expect(firstValid.adx).toBeCloseTo(100, 5);
+        });
     });
 });

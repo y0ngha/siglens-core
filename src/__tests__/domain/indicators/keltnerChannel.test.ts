@@ -92,5 +92,23 @@ describe('calculateKeltnerChannel', () => {
             );
             expect(result).toHaveLength(MIN_BARS + 5);
         });
+
+        it('constant bars에서 middle=100, upper=120, lower=80이다', () => {
+            // close=100 constant → EMA=100, ATR=high-low=10(constant), mult=2.0
+            // upper = 100 + 2.0*10 = 120, lower = 100 - 2.0*10 = 80
+            const bars = Array.from({ length: MIN_BARS + 5 }, (_, i) =>
+                makeBar(100, i)
+            );
+            const result = calculateKeltnerChannel(
+                bars,
+                KELTNER_EMA_PERIOD,
+                KELTNER_ATR_PERIOD,
+                KELTNER_MULTIPLIER
+            );
+            const last = result[result.length - 1];
+            expect(last.middle).toBeCloseTo(100, 5);
+            expect(last.upper).toBeCloseTo(120, 5);
+            expect(last.lower).toBeCloseTo(80, 5);
+        });
     });
 });

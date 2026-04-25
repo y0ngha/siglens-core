@@ -87,5 +87,25 @@ describe('calculateSupertrend', () => {
             );
             expect(result).toHaveLength(SUPERTREND_ATR_PERIOD + 10);
         });
+
+        it('단조 증가 bars에서 첫 supertrend는 40이다', () => {
+            // high=100+i, low=80+i → TR=20(constant), ATR=20
+            // hl2[atrPeriod] = (100+10+80+10)/2 = 100
+            // basic_lower = 100 - 3.0*20 = 40
+            // close=95+10=105 > hl2=100 → trend=up → supertrend=40
+            const bars = Array.from(
+                { length: SUPERTREND_ATR_PERIOD + 5 },
+                (_, i) => makeBar(100 + i, 80 + i, 95 + i, i)
+            );
+            const result = calculateSupertrend(
+                bars,
+                SUPERTREND_ATR_PERIOD,
+                SUPERTREND_MULTIPLIER
+            );
+            expect(result[SUPERTREND_ATR_PERIOD].supertrend).toBeCloseTo(
+                40,
+                5
+            );
+        });
     });
 });

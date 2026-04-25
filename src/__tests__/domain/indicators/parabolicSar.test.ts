@@ -79,5 +79,12 @@ describe('calculateParabolicSAR', () => {
                 }
             });
         });
+
+        it('상승 추세에서 두 번째 bar의 sar은 bars[0].low이다', () => {
+            // initialTrend=up → SAR 초기값 = bars[0].low = 90
+            const bars = [makeBar(110, 90, 95, 0), makeBar(115, 92, 110, 1)];
+            const result = calculateParabolicSAR(bars);
+            expect(result[1].sar).toBeCloseTo(90, 5);
+        });
     });
 });

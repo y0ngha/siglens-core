@@ -82,5 +82,19 @@ describe('calculateStochastic', () => {
             const result = calculateStochastic(bars);
             expect(result[result.length - 1].percentD).not.toBeNull();
         });
+
+        it('단조 증가 bars에서 첫 유효한 percentK는 (18/23)*100이다', () => {
+            // high=100+i, low=90+i, close=95+i → kPeriod=14 윈도우 내
+            // HighestHigh = 100+(i), LowestLow = 90+(i-13), range = 23
+            // FastK = (close - LL) / range * 100 = (95+i - (90+i-13)) / 23 * 100 = 18/23*100
+            const bars = Array.from({ length: MIN_BARS_FOR_D + 5 }, (_, i) =>
+                makeBar(100 + i, 90 + i, 95 + i, i)
+            );
+            const result = calculateStochastic(bars);
+            expect(result[MIN_BARS_FOR_K - 1].percentK).toBeCloseTo(
+                (18 / 23) * 100,
+                5
+            );
+        });
     });
 });

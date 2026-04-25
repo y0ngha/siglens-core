@@ -83,34 +83,28 @@ export function calculateVolumeProfile(
 
     const bucketSize = priceRange / rowSize;
 
-    const bucketVolumes = bars.reduce(
-        (acc: number[], bar: Bar) => {
-            const barRange = bar.high - bar.low;
+    const bucketVolumes = new Array<number>(rowSize).fill(0);
+    for (const bar of bars) {
+        const barRange = bar.high - bar.low;
+        for (let i = 0; i < rowSize; i++) {
+            const bucketLow = lowMin + i * bucketSize;
+            const bucketHigh = bucketLow + bucketSize;
             if (barRange === 0) {
-                return acc.map((vol: number, i: number) => {
-                    const bucketLow = lowMin + i * bucketSize;
-                    const bucketHigh = bucketLow + bucketSize;
-                    const isLastBucket = i === rowSize - 1;
-                    const inBucket =
-                        (bucketLow <= bar.low && bar.low < bucketHigh) ||
-                        (isLastBucket && bar.low === bucketHigh);
-                    return inBucket ? vol + bar.volume : vol;
-                });
-            }
-            return acc.map((vol: number, i: number) => {
-                const bucketLow = lowMin + i * bucketSize;
-                const bucketHigh = bucketLow + bucketSize;
+                const isLastBucket = i === rowSize - 1;
+                const inBucket =
+                    (bucketLow <= bar.low && bar.low < bucketHigh) ||
+                    (isLastBucket && bar.low === bucketHigh);
+                if (inBucket) bucketVolumes[i] += bar.volume;
+            } else {
                 const overlap =
                     Math.min(bar.high, bucketHigh) -
                     Math.max(bar.low, bucketLow);
                 if (overlap > 0) {
-                    return vol + bar.volume * (overlap / barRange);
+                    bucketVolumes[i] += bar.volume * (overlap / barRange);
                 }
-                return vol;
-            });
-        },
-        Array.from<number>({ length: rowSize }).fill(0)
-    );
+            }
+        }
+    }
 
     const pocIndex = bucketVolumes.reduce(
         (maxIdx: number, vol: number, idx: number) =>

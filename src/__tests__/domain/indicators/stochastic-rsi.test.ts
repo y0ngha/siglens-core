@@ -68,5 +68,16 @@ describe('calculateStochRSI', () => {
             const result = calculateStochRSI(closes);
             expect(result).toHaveLength(MIN_BARS + 5);
         });
+
+        it('단조 증가 입력에서 첫 유효한 k는 0이다', () => {
+            // RSI가 항상 100(손실 없음) → StochRSI range=0 → 모두 0 → k=0
+            const closes = Array.from(
+                { length: MIN_BARS + 5 },
+                (_, i) => 100 + i
+            );
+            const result = calculateStochRSI(closes);
+            const firstValid = result.find(r => r.k !== null);
+            expect(firstValid?.k).toBeCloseTo(0, 5);
+        });
     });
 });

@@ -18,3 +18,8 @@ export interface MarketDataProvider {
 export type AcquireReanalyzeCooldownResult =
     | { ok: true }
     | { ok: false; remainingMs: number };
+
+export interface WorkerConfig {
+    workerUrl: string;
+    workerSecret: string;
+}

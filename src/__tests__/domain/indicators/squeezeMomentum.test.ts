@@ -85,5 +85,21 @@ describe('calculateSqueezeMomentum', () => {
                 }
             });
         });
+
+        it('선형 step=0.5 bars에서 첫 유효한 momentum은 4.75이다', () => {
+            // high=100+i*0.5, low=90+i*0.5, close=95+i*0.5
+            // delta[i] = close[i] - ((highestHigh+lowestLow)/2 + SMA(close,n))/2
+            //          = (95+0.5i) - ((100+0.5i + 90+0.5*(i-19))/2 + (95+0.5i-19/4))/2
+            //          = 4.75 (constant for all valid i)
+            // linreg(constant=4.75, kcLength) = 4.75
+            const bars = Array.from(
+                { length: SQUEEZE_MOMENTUM_MIN_BARS + 5 },
+                (_, i) =>
+                    makeBar(100 + i * 0.5, 90 + i * 0.5, 95 + i * 0.5, i)
+            );
+            const result = calculateSqueezeMomentum(bars);
+            const firstValid = result.find(r => r.momentum !== null);
+            expect(firstValid?.momentum).toBeCloseTo(4.75, 5);
+        });
     });
 });

@@ -1,7 +1,4 @@
-interface WorkerConfig {
-    workerUrl: string;
-    workerSecret: string;
-}
+import type { WorkerConfig } from '@/infrastructure/market/types';
 
 export function readWorkerConfig(): WorkerConfig {
     const workerUrl = process.env.WORKER_URL;
