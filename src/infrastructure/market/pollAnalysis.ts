@@ -85,14 +85,15 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
         meta?.atr
     );
 
-    const analyzedAt = new Date().toISOString();
+    const now = new Date();
+    const analyzedAt = now.toISOString();
     const result = { ...reconciled, analyzedAt };
 
     if (meta) {
         const cache = createCacheProvider();
         if (cache !== null) {
             const cacheKey = buildAnalysisCacheKey(meta.symbol, meta.timeframe);
-            const ttl = computeEffectiveTtl(meta.timeframe, new Date());
+            const ttl = computeEffectiveTtl(meta.timeframe, now);
             cache
                 .set(cacheKey, { ...result, skillsDegraded }, ttl)
                 .catch(error =>

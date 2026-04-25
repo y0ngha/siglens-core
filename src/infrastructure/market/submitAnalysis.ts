@@ -1,4 +1,5 @@
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { lastNonNull } from '@/domain/indicators/utils';
 import type {
     AnalysisResponse,
     Skill,
@@ -86,8 +87,4 @@ export async function submitAnalysis(
     });
 
     return { status: 'submitted', jobId };
-}
-
-function lastNonNull(arr: readonly (number | null)[]): number | null {
-    return arr.findLast((v): v is number => v !== null) ?? null;
 }

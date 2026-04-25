@@ -6,6 +6,7 @@ import {
     rollingHighest,
     rollingLowest,
     linreg,
+    lastNonNull,
 } from '@/domain/indicators/utils';
 
 describe('sma', () => {
@@ -85,6 +86,22 @@ describe('rollingLowest', () => {
     it('마지막 period개의 최솟값을 반환한다', () => {
         expect(rollingLowest([10, 50, 20, 30], 3)).toBe(20);
         expect(rollingLowest([10, 50, 20, 30], 2)).toBe(20);
+    });
+});
+
+describe('lastNonNull', () => {
+    it('빈 배열이면 null을 반환한다', () => {
+        expect(lastNonNull([])).toBeNull();
+    });
+
+    it('모든 값이 null이면 null을 반환한다', () => {
+        expect(lastNonNull([null, null, null])).toBeNull();
+    });
+
+    it('마지막 non-null 값을 반환한다', () => {
+        expect(lastNonNull([1, 2, 3])).toBe(3);
+        expect(lastNonNull([null, 2, null])).toBe(2);
+        expect(lastNonNull([1, null, 3, null])).toBe(3);
     });
 });
 

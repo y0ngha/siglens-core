@@ -1,5 +1,6 @@
 import type { Bar, DonchianChannelResult } from '@/domain/types';
 import { DONCHIAN_DEFAULT_PERIOD } from '@/domain/indicators/constants';
+import { slidingMax, slidingMin } from '@/domain/indicators/utils';
 
 export function calculateDonchianChannel(
     bars: Bar[],
@@ -9,21 +10,19 @@ export function calculateDonchianChannel(
     if (bars.length < period)
         return bars.map(() => ({ upper: null, middle: null, lower: null }));
 
-    const result: DonchianChannelResult[] = [];
+    const winMax = slidingMax(
+        bars.map(b => b.high),
+        period
+    );
+    const winMin = slidingMin(
+        bars.map(b => b.low),
+        period
+    );
 
-    for (let i = 0; i < bars.length; i++) {
-        if (i < period - 1) {
-            result.push({ upper: null, middle: null, lower: null });
-            continue;
-        }
-        let upper = -Infinity;
-        let lower = Infinity;
-        for (let j = i - period + 1; j <= i; j++) {
-            if (bars[j].high > upper) upper = bars[j].high;
-            if (bars[j].low < lower) lower = bars[j].low;
-        }
-        result.push({ upper, middle: (upper + lower) / 2, lower });
-    }
-
-    return result;
+    return bars.map((_, i) => {
+        if (i < period - 1) return { upper: null, middle: null, lower: null };
+        const upper = winMax[i]!;
+        const lower = winMin[i]!;
+        return { upper, middle: (upper + lower) / 2, lower };
+    });
 }

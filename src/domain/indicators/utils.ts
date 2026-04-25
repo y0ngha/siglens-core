@@ -92,6 +92,13 @@ export function slidingMin(
 }
 
 /**
+ * Last non-null value in an array. Returns null if all values are null.
+ */
+export function lastNonNull(arr: readonly (number | null)[]): number | null {
+    return arr.findLast((v): v is number => v !== null) ?? null;
+}
+
+/**
  * Linear regression value at the end of the window (offset = 0).
  * Fits a least-squares line to the last `period` values and returns
  * the predicted value at the most recent bar.
