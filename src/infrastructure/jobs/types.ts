@@ -6,14 +6,8 @@ export interface JobMeta {
     symbol: string;
     timeframe: Timeframe;
     skillsDegraded: boolean;
-    /**
-     * 마지막 bar의 종가 — entryPrice 기준값. AI가 entryPrices를 주지 않을 때
-     * reconcile 단계에서 SL/TP 검증/fallback 기준으로 사용한다.
-     */
+    /** AI entryPrice 미제공 시 reconcile 단계에서 SL/TP 검증 기준으로 사용하는 마지막 bar 종가. */
     lastClose?: number;
-    /**
-     * 마지막 ATR 값. SL/TP fallback 계산에 사용한다.
-     * 존재하지 않으면 fallback 불가 — AI 원본 값 유지.
-     */
+    /** SL/TP fallback 계산용 마지막 ATR; 미존재 시 AI 원본값 유지. */
     atr?: number;
 }

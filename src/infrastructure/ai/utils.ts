@@ -1,9 +1,4 @@
-import {
-    parseNumberEnv,
-    stripMarkdownCodeBlock,
-} from '@/domain/utils';
-
-export { parseNumberEnv, stripMarkdownCodeBlock };
+import { stripMarkdownCodeBlock } from '@/domain/utils';
 
 export const AI_SYSTEM_PROMPT = `You are a senior technical analyst specializing in equity chart analysis.
 Your job is to interpret bar data, technical indicators, and candle/chart patterns to produce a structured analysis in JSON.
@@ -21,7 +16,9 @@ OUTPUT FORMAT
 
 export function parseJsonResponse<T>(text: string, source: string): T {
     try {
-        return JSON.parse(stripMarkdownCodeBlock(text)) as T; // JSON.parse returns any; caller enforces T via explicit type argument
+        // JSON.parse returns any; T is caller-enforced — no runtime shape validation here.
+        // Safe only if the caller validates the schema downstream.
+        return JSON.parse(stripMarkdownCodeBlock(text)) as T;
     } catch (error) {
         console.error(`Failed to parse ${source} response. Raw text:`, text);
         throw new Error(`Failed to parse ${source} response as JSON`, {

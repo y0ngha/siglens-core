@@ -8,6 +8,8 @@ vi.mock('@upstash/redis', () => {
 import { Redis } from '@upstash/redis';
 import { createJobRedis } from '@/infrastructure/jobs/redis';
 
+// vi.mock이 Redis 생성자를 vi.fn()으로 교체하지만 TypeScript가 이를 감지하지 못해
+// mock API(mockImplementation, mockClear 등) 접근을 위해 캐스트
 const MockRedis = Redis as unknown as ReturnType<typeof vi.fn>;
 
 describe('createJobRedis', () => {

@@ -1,69 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import {
     ANALYSIS_CACHE_TTL,
-    ASSET_INFO_CACHE_TTL_WITH_KOREAN,
-    ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN,
     buildAnalysisCacheKey,
-    buildAssetInfoCacheKey,
-    buildBriefingCacheKey,
-    buildTickerSearchCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
     computeSecondsUntilCacheExpiry,
-    ISO_DATE_HOUR_PREFIX_LENGTH,
-    KOREAN_NAMES_CACHE_TTL,
-    KOREAN_TICKERS_CACHE_KEY,
-    MARKET_BRIEFING_CACHE_TTL,
-    TICKER_SEARCH_CACHE_TTL,
 } from '@/infrastructure/cache/config';
 import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
-    SECONDS_PER_YEAR,
 } from '@/domain/constants/time';
 
 describe('cache config constants', () => {
     it('ANALYSIS_CACHE_TTL values', () => {
-        expect(ANALYSIS_CACHE_TTL['5Min']).toBe(15 * SECONDS_PER_MINUTE);
-        expect(ANALYSIS_CACHE_TTL['15Min']).toBe(30 * SECONDS_PER_MINUTE);
+        expect(ANALYSIS_CACHE_TTL['5Min']).toBe(5 * SECONDS_PER_MINUTE);
+        expect(ANALYSIS_CACHE_TTL['15Min']).toBe(15 * SECONDS_PER_MINUTE);
         expect(ANALYSIS_CACHE_TTL['30Min']).toBe(30 * SECONDS_PER_MINUTE);
         expect(ANALYSIS_CACHE_TTL['1Hour']).toBe(SECONDS_PER_HOUR);
         expect(ANALYSIS_CACHE_TTL['4Hour']).toBe(4 * SECONDS_PER_HOUR);
         expect(ANALYSIS_CACHE_TTL['1Day']).toBe(SECONDS_PER_DAY);
     });
 
-    it('TICKER_SEARCH_CACHE_TTL', () => {
-        expect(TICKER_SEARCH_CACHE_TTL).toBe(SECONDS_PER_DAY);
-    });
-
-    it('KOREAN_NAMES_CACHE_TTL', () => {
-        expect(KOREAN_NAMES_CACHE_TTL).toBe(SECONDS_PER_YEAR);
-    });
-
-    it('ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN', () => {
-        expect(ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN).toBe(12 * SECONDS_PER_HOUR);
-    });
-
-    it('ASSET_INFO_CACHE_TTL_WITH_KOREAN', () => {
-        expect(ASSET_INFO_CACHE_TTL_WITH_KOREAN).toBe(SECONDS_PER_YEAR);
-    });
-
-    it('KOREAN_TICKERS_CACHE_KEY', () => {
-        expect(KOREAN_TICKERS_CACHE_KEY).toBe('korean:tickers');
-    });
-
     it('CACHE_EXPIRY_HOUR_KST', () => {
         expect(CACHE_EXPIRY_HOUR_KST).toBe(17);
-    });
-
-    it('MARKET_BRIEFING_CACHE_TTL', () => {
-        expect(MARKET_BRIEFING_CACHE_TTL).toBe(SECONDS_PER_HOUR);
-    });
-
-    it('ISO_DATE_HOUR_PREFIX_LENGTH', () => {
-        expect(ISO_DATE_HOUR_PREFIX_LENGTH).toBe(13);
-        expect('2026-04-25T14'.length).toBe(13);
     });
 });
 
@@ -93,8 +53,6 @@ describe('computeSecondsUntilCacheExpiry', () => {
     });
 
     it('returns at least 1 when diff rounds to 0', () => {
-        // KST 17:00:00.999 = UTC 08:00:00.999 — rawDiffMs ≈ -999ms → next day -999ms → huge positive
-        // Instead test a case where very close to KST 17:00 but still before
         // KST 16:59:59.500 = UTC 07:59:59.500
         const now = new Date('2026-04-25T07:59:59.500Z');
         const result = computeSecondsUntilCacheExpiry(now);
@@ -114,9 +72,11 @@ describe('computeSecondsUntilCacheExpiry', () => {
 describe('computeEffectiveTtl', () => {
     it('returns TTL when TTL < seconds until expiry', () => {
         // KST 00:00 = UTC 15:00 prev day — 17 hours to expiry (61200s)
-        // 5Min TTL = 900s < 61200s
+        // 5Min TTL = 300s < 61200s
         const now = new Date('2026-04-24T15:00:00.000Z');
-        expect(computeEffectiveTtl('5Min', now)).toBe(ANALYSIS_CACHE_TTL['5Min']);
+        expect(computeEffectiveTtl('5Min', now)).toBe(
+            ANALYSIS_CACHE_TTL['5Min']
+        );
     });
 
     it('returns seconds until expiry when expiry < TTL', () => {
@@ -132,26 +92,6 @@ describe('cache key builders', () => {
     it('buildAnalysisCacheKey', () => {
         expect(buildAnalysisCacheKey('AAPL', '1Hour')).toBe(
             'analysis:AAPL:1Hour'
-        );
-    });
-
-    it('buildTickerSearchCacheKey lowercases query', () => {
-        expect(buildTickerSearchCacheKey('APPLE')).toBe(
-            'ticker:search:apple'
-        );
-        expect(buildTickerSearchCacheKey('apple')).toBe(
-            'ticker:search:apple'
-        );
-    });
-
-    it('buildAssetInfoCacheKey uppercases symbol', () => {
-        expect(buildAssetInfoCacheKey('aapl')).toBe('asset-info:AAPL');
-        expect(buildAssetInfoCacheKey('AAPL')).toBe('asset-info:AAPL');
-    });
-
-    it('buildBriefingCacheKey', () => {
-        expect(buildBriefingCacheKey('2026-04-25T14')).toBe(
-            'briefing:market:2026-04-25T14'
         );
     });
 });

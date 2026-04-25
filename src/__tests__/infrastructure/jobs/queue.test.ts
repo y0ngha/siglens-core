@@ -88,9 +88,15 @@ describe('job queue — with redis', () => {
 
     it('setJobMeta calls redis.set with correct key and TTL', async () => {
         mockSet.mockResolvedValue('OK');
-        const meta = { symbol: 'AAPL', timeframe: '1Hour' as const, skillsDegraded: false };
+        const meta = {
+            symbol: 'AAPL',
+            timeframe: '1Hour' as const,
+            skillsDegraded: false,
+        };
         await setJobMeta('job1', meta);
-        expect(mockSet).toHaveBeenCalledWith('job:job1:meta', meta, { ex: SECONDS_PER_HOUR });
+        expect(mockSet).toHaveBeenCalledWith('job:job1:meta', meta, {
+            ex: SECONDS_PER_HOUR,
+        });
     });
 
     it('getJobStatus calls redis.get with status key', async () => {
@@ -115,7 +121,11 @@ describe('job queue — with redis', () => {
     });
 
     it('getJobMeta calls redis.get with meta key', async () => {
-        const meta = { symbol: 'TSLA', timeframe: '4Hour' as const, skillsDegraded: true };
+        const meta = {
+            symbol: 'TSLA',
+            timeframe: '4Hour' as const,
+            skillsDegraded: true,
+        };
         mockGet.mockResolvedValue(meta);
         const result = await getJobMeta('job1');
         expect(mockGet).toHaveBeenCalledWith('job:job1:meta');
@@ -125,7 +135,9 @@ describe('job queue — with redis', () => {
     it('cancelJob calls redis.set with cancelled key', async () => {
         mockSet.mockResolvedValue('OK');
         await cancelJob('job1');
-        expect(mockSet).toHaveBeenCalledWith('job:job1:cancelled', '1', { ex: SECONDS_PER_HOUR });
+        expect(mockSet).toHaveBeenCalledWith('job:job1:cancelled', '1', {
+            ex: SECONDS_PER_HOUR,
+        });
     });
 
     it('isJobCancelled returns true when value is "1"', async () => {

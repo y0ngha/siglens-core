@@ -4,13 +4,19 @@ vi.mock('@upstash/redis', () => {
     const mockGet = vi.fn();
     const mockSet = vi.fn();
     const mockDel = vi.fn();
-    const MockRedis = vi.fn(() => ({ get: mockGet, set: mockSet, del: mockDel }));
+    const MockRedis = vi.fn(() => ({
+        get: mockGet,
+        set: mockSet,
+        del: mockDel,
+    }));
     return { Redis: MockRedis };
 });
 
 import { Redis } from '@upstash/redis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 
+// vi.mock이 Redis 생성자를 vi.fn()으로 교체하지만 TypeScript가 이를 감지하지 못해
+// mock API(mockImplementation, mockClear 등) 접근을 위해 캐스트
 const MockRedis = Redis as unknown as ReturnType<typeof vi.fn>;
 
 describe('createCacheProvider', () => {
@@ -57,56 +63,56 @@ describe('createCacheProvider', () => {
         expect(MockRedis).toHaveBeenCalledTimes(2);
     });
 
-    it('get delegates to reader.get', async () => {
-        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
-        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
-        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
+    describe('when env vars are present (no readonly token)', () => {
+        beforeEach(() => {
+            vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+            vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
+            vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
+        });
 
-        const mockGet = vi.fn().mockResolvedValue({ foo: 'bar' });
-        MockRedis.mockImplementation(() => ({
-            get: mockGet,
-            set: vi.fn(),
-            del: vi.fn(),
-        }));
+        it('get delegates to reader.get', async () => {
+            const mockGet = vi.fn().mockResolvedValue({ foo: 'bar' });
+            MockRedis.mockImplementation(() => ({
+                get: mockGet,
+                set: vi.fn(),
+                del: vi.fn(),
+            }));
 
-        const provider = createCacheProvider()!;
-        const result = await provider.get<{ foo: string }>('my-key');
-        expect(mockGet).toHaveBeenCalledWith('my-key');
-        expect(result).toEqual({ foo: 'bar' });
-    });
+            const provider = createCacheProvider()!;
+            const result = await provider.get<{ foo: string }>('my-key');
+            expect(mockGet).toHaveBeenCalledWith('my-key');
+            expect(result).toEqual({ foo: 'bar' });
+        });
 
-    it('set delegates to writer.set with ex option', async () => {
-        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
-        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
-        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
+        it('set delegates to writer.set with ex option', async () => {
+            const mockSet = vi.fn().mockResolvedValue('OK');
+            MockRedis.mockImplementation(() => ({
+                get: vi.fn(),
+                set: mockSet,
+                del: vi.fn(),
+            }));
 
-        const mockSet = vi.fn().mockResolvedValue('OK');
-        MockRedis.mockImplementation(() => ({
-            get: vi.fn(),
-            set: mockSet,
-            del: vi.fn(),
-        }));
+            const provider = createCacheProvider()!;
+            await provider.set('my-key', { data: 1 }, 300);
+            expect(mockSet).toHaveBeenCalledWith(
+                'my-key',
+                { data: 1 },
+                { ex: 300 }
+            );
+        });
 
-        const provider = createCacheProvider()!;
-        await provider.set('my-key', { data: 1 }, 300);
-        expect(mockSet).toHaveBeenCalledWith('my-key', { data: 1 }, { ex: 300 });
-    });
+        it('delete delegates to writer.del', async () => {
+            const mockDel = vi.fn().mockResolvedValue(1);
+            MockRedis.mockImplementation(() => ({
+                get: vi.fn(),
+                set: vi.fn(),
+                del: mockDel,
+            }));
 
-    it('delete delegates to writer.del', async () => {
-        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
-        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
-        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
-
-        const mockDel = vi.fn().mockResolvedValue(1);
-        MockRedis.mockImplementation(() => ({
-            get: vi.fn(),
-            set: vi.fn(),
-            del: mockDel,
-        }));
-
-        const provider = createCacheProvider()!;
-        await provider.delete('my-key');
-        expect(mockDel).toHaveBeenCalledWith('my-key');
+            const provider = createCacheProvider()!;
+            await provider.delete('my-key');
+            expect(mockDel).toHaveBeenCalledWith('my-key');
+        });
     });
 
     it('reader uses readonly client when readonly token is set', async () => {
