@@ -190,7 +190,7 @@ const formatVolume = (n: number): string =>
         .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 const lastNonNull = (arr: (number | null)[]): number | null =>
-    [...arr].reverse().find((v): v is number => v !== null) ?? null;
+    arr.findLast((v): v is number => v !== null) ?? null;
 
 const lastOf = <T>(arr: T[]): T | null =>
     arr.length > 0 ? arr[arr.length - 1] : null;
@@ -271,7 +271,7 @@ const buildCandlePatternEntries = (bars: Bar[]): PromptCandlePatternEntry[] => {
                     ? entry.multiPattern
                     : entry.singlePattern,
         }))
-        .sort(
+        .toSorted(
             (a: PromptCandlePatternEntry, b: PromptCandlePatternEntry) =>
                 b.barsAgo - a.barsAgo
         );

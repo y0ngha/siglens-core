@@ -146,29 +146,12 @@ function findMacdCross(
     lookback: number,
     direction: CrossDirection
 ): number | null {
-    const len = points.length;
-    if (len < 2) return null;
-    const start = Math.max(1, len - lookback);
-    for (let i = start; i < len; i++) {
-        const p = points[i];
-        const prev = points[i - 1];
-        if (
-            p.macd === null ||
-            p.signal === null ||
-            prev.macd === null ||
-            prev.signal === null
-        )
-            continue;
-        if (direction === 'up' && prev.macd <= prev.signal && p.macd > p.signal)
-            return i;
-        if (
-            direction === 'down' &&
-            prev.macd >= prev.signal &&
-            p.macd < p.signal
-        )
-            return i;
-    }
-    return null;
+    return findCross(
+        points.map(p => p.macd),
+        points.map(p => p.signal),
+        lookback,
+        direction
+    );
 }
 
 export function detectMacdBullishCross(

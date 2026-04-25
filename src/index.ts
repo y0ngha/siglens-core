@@ -149,6 +149,8 @@ export type {
     MarketBriefingSectorAnalysis,
     MarketBriefingVolatilityAnalysis,
     CrossDirection,
+    CandlePattern,
+    MultiCandlePattern,
     CandlePatternEntry,
     SingleCandlePatternEntry,
     MultiCandlePatternEntry,
