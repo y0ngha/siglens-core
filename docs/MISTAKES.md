@@ -317,7 +317,6 @@ and have been removed from this file.
 
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
-   → Single-line summaries only; multi-paragraph docstrings must be condensed to one line per function
    → When changing function implementation, update related comments immediately
 ```
 
@@ -387,4 +386,22 @@ and have been removed from this file.
 3. Infrastructure module reading from another infrastructure module in a way that creates implicit coupling
    → Each infrastructure module should handle one external system
    → Cross-module coordination belongs at the consumer level, not inside infrastructure/
+
+4. Infrastructure module public interfaces defined in implementation files instead of types.ts
+   → All infrastructure modules must follow the pattern: types.ts (interfaces first) + implementation files
+   → Public interfaces like JobRedisClient, CallGeminiWithKeyFallbackOptions, UpstashEnvConfig must be in types.ts
+   → This enables consumers and tests to reference the interface independently of implementation
+   ❌ interface JobRedisClient { ... } defined in jobs/redis.ts
+   ❌ interface CallGeminiWithKeyFallbackOptions { ... } defined in gemini.ts
+   ✅ interface JobRedisClient { ... } in jobs/types.ts; jobs/redis.ts imports and implements against it
+   ✅ interface UpstashEnvConfig { ... } in cache/types.ts (shared across cache/redis.ts and jobs/redis.ts)
+
+5. Infrastructure module re-exporting domain symbols
+   → Infrastructure modules must not act as transit paths for domain exports
+   → Consumers must import domain symbols directly from domain/, not through infrastructure/
+   ❌ // infrastructure/ai/utils.ts
+      export { parseJsonResponse } from '@/domain/utils';
+   ❌ // infrastructure/cache/config.ts
+      export { computeSecondsUntilCacheExpiry } from '@/domain/utils';
+   ✅ Consumers import directly: import { parseJsonResponse } from '@/domain/utils'
 ```

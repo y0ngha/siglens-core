@@ -119,16 +119,53 @@ AI 분석 결과는 심볼·타임프레임별 TTL로 캐싱한다.
 
 ```
 infrastructure/cache/
-├── types.ts     ← AnalysisCache 인터페이스
+├── types.ts     ← CacheProvider 인터페이스
 ├── config.ts    ← 캐시 키 / TTL 상수
 └── redis.ts     ← Upstash 구현체
 ```
 
-`AnalysisCache`를 in-memory stub으로 대체하면 단위 테스트에서 외부 호출 없이 검증할 수 있다.
+`CacheProvider`를 in-memory stub으로 대체하면 단위 테스트에서 외부 호출 없이 검증할 수 있다.
 
 ---
 
-## 3. Neon / PostgreSQL
+## 3. Upstash Redis (Job 큐)
+
+동일한 Upstash Redis 인스턴스를 Job 큐로 재사용한다.
+환경변수는 `infrastructure/cache/config.ts`의 `readUpstashConfig()`를 통해 읽는다.
+
+### Redis 키 구조
+
+| 키 패턴 | 값 타입 | 설명 |
+|---|---|---|
+| `job:{jobId}:status` | `JobStatus` | 잡 상태 (`processing` \| `done` \| `error`) |
+| `job:{jobId}:result` | `unknown` | AI 분석 결과 (JSON) |
+| `job:{jobId}:error` | `string` | 실패 원인 메시지 |
+| `job:{jobId}:meta` | `JobMeta` | 잡 메타데이터 (symbol, timeframe 등) |
+| `job:{jobId}:cancelled` | `"1"` | 취소 플래그 (존재 여부로 판단) |
+
+### Job 라이프사이클 함수
+
+`infrastructure/jobs/queue.ts`는 11개의 순수 라이프사이클 함수를 제공한다:
+`setJobMeta`, `getJobStatus`, `getJobResult`, `getJobError`, `getJobMeta`,
+`setJobStatus`, `setJobResult`, `setJobError`, `cancelJob`, `isJobCancelled`, `cleanupJob`
+
+### 구현 위치
+
+```
+infrastructure/jobs/
+├── types.ts     ← JobStatus, JobMeta, JobRedisClient 인터페이스
+├── redis.ts     ← Upstash 기반 JobRedisClient 구현체
+└── queue.ts     ← 8개 job 라이프사이클 함수
+```
+
+### 환경변수
+
+Job 큐는 `infrastructure/cache/config.ts`의 Upstash 환경변수를 공유한다.
+별도 환경변수 불필요.
+
+---
+
+## 4. Neon / PostgreSQL
 
 공식 문서: https://neon.tech/docs
 

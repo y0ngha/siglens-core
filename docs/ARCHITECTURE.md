@@ -109,6 +109,7 @@ const key = process.env.API_KEY; // 금지
     │   ├── ai
     │   ├── cache
     │   ├── db
+    │   ├── jobs
     │   ├── market
     │   └── skills
     └── index.ts
@@ -145,6 +146,7 @@ no external imports, pure functions only.
 - `ai/` — AI 프로바이더 클라이언트 (Claude, Gemini)
 - `cache/` — Upstash Redis 래퍼 (TTL 기반 캐시)
 - `db/` — Neon / PostgreSQL 연결 관리
+- `jobs/` — Redis 기반 Job 큐 (enqueue / dequeue / status 관리)
 - `market/` — 시세 프로바이더 래퍼 (consumer가 주입한 provider 추상화)
 - `skills/` — Skills 파일 로더 (filesystem → `Skill[]`)
 
