@@ -326,6 +326,12 @@ and have been removed from this file.
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → When changing function implementation, update related comments immediately
+
+4. Multi-paragraph JSDoc blocks in implementation files
+   → Never write multi-paragraph docstrings or multi-line comment blocks — one short line max
+   → If module needs detailed documentation, place in a separate .md file or as a single-line comment
+   ❌ /** Lines 1-10 of detailed explanation about function behavior ... */
+   ✅ // Single-line comment explaining the immediate context
 ```
 
 ---
