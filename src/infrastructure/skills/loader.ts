@@ -69,46 +69,34 @@ const classifyLine = (line: string, baseIndent: number): ParsedLine => {
  * 중첩 YAML 블록을 재귀적으로 파싱한다.
  * 들여쓰기(2칸)를 기준으로 depth를 결정한다.
  */
-const parseYamlBlock = (lines: string[], baseIndent: number): YamlNode =>
-    lines.reduce<{ result: YamlNode; skip: number }>(
-        ({ result, skip }, line, idx) => {
-            if (skip > 0) return { result, skip: skip - 1 };
-
-            const classified = classifyLine(line, baseIndent);
-
-            if (classified.kind === 'skip' || classified.kind === 'deeper') {
-                return { result, skip: 0 };
-            }
-            if (classified.kind === 'break') {
-                return { result, skip: lines.length };
-            }
-            if (classified.kind === 'leaf') {
-                return {
-                    result: { ...result, [classified.key]: classified.value },
-                    skip: 0,
-                };
-            }
-
-            // block kind
-            const { key } = classified;
-
-            const childLines = lines.slice(idx + 1).filter(childLine => {
-                const childTrimmed = childLine.trimStart();
-                if (childTrimmed === '') return true;
-                const childIndent = childLine.length - childTrimmed.length;
-                return childIndent > baseIndent;
-            });
-
-            return {
-                result: {
-                    ...result,
-                    [key]: parseYamlBlock(childLines, baseIndent + 2),
-                },
-                skip: childLines.length,
-            };
-        },
-        { result: {}, skip: 0 }
-    ).result;
+const parseYamlBlock = (lines: string[], baseIndent: number): YamlNode => {
+    const result: YamlNode = {};
+    let i = 0;
+    while (i < lines.length) {
+        const classified = classifyLine(lines[i], baseIndent);
+        if (classified.kind === 'break') break;
+        if (classified.kind === 'skip' || classified.kind === 'deeper') {
+            i++;
+            continue;
+        }
+        if (classified.kind === 'leaf') {
+            result[classified.key] = classified.value;
+            i++;
+            continue;
+        }
+        // block kind
+        const { key } = classified;
+        const childLines = lines.slice(i + 1).filter(childLine => {
+            const childTrimmed = childLine.trimStart();
+            if (childTrimmed === '') return true;
+            const childIndent = childLine.length - childTrimmed.length;
+            return childIndent > baseIndent;
+        });
+        result[key] = parseYamlBlock(childLines, baseIndent + 2);
+        i += 1 + childLines.length;
+    }
+    return result;
+};
 
 const parseFrontmatter = (
     raw: string
