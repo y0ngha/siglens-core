@@ -5,22 +5,6 @@
 - Rule: MISTAKES.md Coding Paradigm — append-only local mutable variable에 spread 사용은 O(N²)
 - Context: `const breaks: SMCStructureBreak[] = []`로 선언 후 `breaks.push(...)` 사용으로 교체
 
-- Violation: `pollAnalysisAction.ts`의 `as RawAnalysisResponse` 단언에 근거 주석 없음
-- Rule: MISTAKES.md TypeScript — 타입 단언 시 근거 주석 필수
-- Context: `submitAnalysisAction`이 JSON.stringify(RawAnalysisResponse)로 저장하고 `getJobResult`가 JSON.parse 후 반환한다는 근거 주석 추가
-
-- Violation: `barsApi.ts`의 `fetchBarsWithIndicators`가 `new Date()`를 내부에서 직접 호출해 테스트 불가
-- Rule: MISTAKES.md Tests — 테스트 가능성 확보를 위해 시간 의존성은 파라미터로 주입
-- Context: `now = new Date()` 파라미터 추가
-
-- Violation: `pollBriefingAction.test.ts`에서 `generatedAt`을 타입/형식만 검증하고 실제 값을 검증하지 않음
-- Rule: MISTAKES.md Tests — 시간 의존 값은 `vi.useFakeTimers()` + `vi.setSystemTime()`으로 고정 후 정확한 값 단언
-- Context: `vi.useFakeTimers()` + `vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'))` 추가; `generatedAt === '2025-01-15T12:00:00.000Z'` 단언으로 변경
-
-- Violation: `normalize.ts`의 `normalizeTimeRange` 함수에 테스트 없음
-- Rule: MISTAKES.md Tests — 신규 public 함수는 테스트 커버리지 필수
-- Context: `normalize.test.ts`에 `normalizeTimeRange` 6개 테스트 케이스 추가
-
 - Violation: `domain/indicators/` 25개 인디케이터 파일 모두 테스트 없음
 - Rule: CLAUDE.md Task Execution Rules #3 — 구현 파일과 테스트 파일은 함께 작성
 - Context: utils, atr, ema, rsi, bollinger, obv, buySellVolume, cci, cmf, dmi, donchianChannel, macd, mfi, williamsR, vwap, stochastic, stochastic-rsi, parabolicSar, supertrend, keltnerChannel, ichimoku, squeezeMomentum, volume-profile, smc, index 테스트 파일 25개 신규 작성
@@ -63,19 +47,10 @@
 - Rule: MISTAKES.md Documentation Sync #2 — 구현 변경 시 docs 동기화 필수
 - Context: 코드의 `Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day'`인데 DOMAIN.md는 `'1Min' | '5Min' | '15Min' | '1Hour' | '1Day'`로 표기; TIMEFRAMES 상수, EMA 테이블, 인디케이터 설정표, 봉 개수 기준 모두 동기화
 
-## [PR #24 Round 1 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
-- Violation: `parseJsonResponse` 테스트에서 `console.error` 스파이 설정 후 에러 로깅을 검증 — 구현에 없는 동작을 테스트
-- Rule: MISTAKES.md Tests #6 — 테스트는 실제 구현 동작만 검증; 존재하지 않는 사이드이펙트를 단언하지 않음
-- Context: `utils.test.ts`에서 `vi.spyOn(console, 'error')`로 에러 로깅을 검증했으나 `parseJsonResponse`는 `console.error`를 호출하지 않음; consoleSpy 제거
-
 ## [PR #24 Round 3 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `parseNumberEnv` 함수명이 "env var 파싱"을 시사해 domain/에서 환경변수를 다루는 듯한 인상을 줌
 - Rule: CONVENTIONS.md — 함수 이름은 실제 동작을 정확히 반영해야 함; `parseNumberEnv`는 raw string을 받는 순수 함수이며 env var에 의존하지 않음
 - Context: `domain/utils.ts`의 `parseNumberEnv`를 `parseNumberOrDefault`로 이름 변경
-
-- Violation: `AI_SYSTEM_PROMPT` 테스트가 타입/길이만 검증하고 핵심 계약(한국어 출력, JSON 단독 출력, Deterministic) 미검증
-- Rule: MISTAKES.md Tests — 핵심 계약 위반을 방어하는 테스트가 필요; 시스템 프롬프트 의도치 않은 변경은 런타임에서만 발견됨
-- Context: `utils.test.ts`에 `toContain('Korean')`, `toContain('SINGLE valid JSON object')`, `toContain('Deterministic')` 케이스 추가
 
 ## [PR #24 Round 2 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `queue.ts`에 `setJobStatus`, `setJobResult`, `setJobError` 함수 누락
@@ -114,3 +89,13 @@
 - Violation: `submitAnalysis.ts`와 `pollAnalysis.ts`에서 `Awaited<ReturnType<typeof skillsLoader.loadSkills>>` 복잡한 유틸리티 타입 추론 사용
 - Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
 - Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
+
+## [PR #26 Round 3 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `reanalyzeCooldown.ts`의 `getRedis()`가 호출마다 `new Redis(...)` 인스턴스 생성
+- Rule: MISTAKES.md Design #2 — 동일 외부 자원에 대한 클라이언트는 모듈 스코프 싱글턴으로 관리
+- Context: config key 기반 싱글턴으로 전환; config 미설정 시 null 반환, config 동일 시 캐시된 인스턴스 반환
+
+- Violation: `reanalyzeCooldown.ts` 모듈 상단과 함수 3개에 여러 줄 JSDoc 블록 사용
+- Rule: CONVENTIONS.md — 다단락 docstring 및 여러 줄 주석 블록 절대 금지; 최대 한 줄 주석만 허용
+- Context: 모듈 JSDoc (L7-L16), 함수별 JSDoc 3개 모두 제거
+
