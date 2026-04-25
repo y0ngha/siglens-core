@@ -27,3 +27,16 @@
 - Violation: Loop in `detectCandlePatternEntries` starts at `0` with `if (i < detectionStartIndex) continue;` instead of starting at `detectionStartIndex`
 - Rule: MISTAKES.md Coding Paradigm #2 — avoid redundant computation; set loop start boundary correctly
 - Context: `candle-detection.ts` loop over `extendedBars` guarded against the buffer region with an early `continue`; the loop start index should be `detectionStartIndex` directly
+
+## [PR #23 Round 3 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
+- Violation: `interface PromptConfig` defined locally in `prompt.ts` instead of `domain/types.ts`
+- Rule: MISTAKES.md Architecture #1 — all shared domain types must be centralized in `domain/types.ts`; `PROMPT_CONFIG_BY_TIMEFRAME` is public API so consumers need `PromptConfig` to annotate values
+- Context: `PromptConfig` was module-private in `prompt.ts`; moved to `domain/types.ts` and added to `src/index.ts` export block
+
+- Violation: `skillGroups` built with `reduce` + spread `[...acc[key], skill]` causing O(N²) per bucket
+- Rule: CONVENTIONS.md functional programming exception — use for-loop with local mutable accumulator when reduce + spread causes O(N²)
+- Context: `buildAnalysisPrompt` in `prompt.ts` grouped skills with reduce spreading arrays on every iteration; replaced with for-loop + `push`
+
+- Violation: `as const` in `buildChatPrompt.ts` without a guarantee comment
+- Rule: MISTAKES.md TypeScript #7 — every safe-cast `as` must have a comment explaining the guarantee
+- Context: `{ role: 'user' as const }` in `buildChatPrompt.ts` lacked the required inline comment; added per pattern from `candle-detection.ts`

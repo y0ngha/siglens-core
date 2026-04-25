@@ -94,7 +94,7 @@ Price Targets:
 
     const messages = [
         ...history.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user' as const, content: userMessage },
+        { role: 'user' as const, content: userMessage }, // literal type 추론 보조 — 런타임 값 변경 없음
     ];
 
     return { systemPrompt, messages };

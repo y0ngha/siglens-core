@@ -630,6 +630,12 @@ export interface BarsData {
     indicators: IndicatorResult;
 }
 
+export interface PromptConfig {
+    trendSampleCount: number;
+    recentBarsCount: number;
+    squeezeZeroCrossLookback: number;
+}
+
 export interface TickerBase {
     symbol: string;
     name: string;

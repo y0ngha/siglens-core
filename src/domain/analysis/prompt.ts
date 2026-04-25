@@ -46,6 +46,7 @@ import type {
     AnalysisResponse,
     Bar,
     IndicatorResult,
+    PromptConfig,
     Skill,
     SkillType,
     SMCResult,
@@ -59,13 +60,6 @@ type SkillGroupKey = SkillType | 'regular';
 const INDICATOR_DECIMAL_PLACES = 2;
 const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
-
-// 타임프레임마다 추세 감도·컨텍스트 크기·스퀴즈 lookback이 달라 단일 맵으로 관리.
-interface PromptConfig {
-    trendSampleCount: number;
-    recentBarsCount: number;
-    squeezeZeroCrossLookback: number;
-}
 
 // 테스트/외부 호출자가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
 export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
@@ -173,11 +167,9 @@ const detectTrend = (
     return 'flat';
 };
 
-type PatternEntryType = 'single' | 'multi';
-
 interface PromptCandlePatternEntry {
     barsAgo: number;
-    patternType: PatternEntryType;
+    patternType: CandlePatternEntry['patternType'];
     patternName: string;
 }
 
@@ -970,20 +962,18 @@ export function buildAnalysisPrompt(
         .filter(s => s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT)
         .toSorted(byName);
 
-    const skillGroups = activeSkills.reduce<Record<SkillGroupKey, Skill[]>>(
-        (acc, skill) => {
-            const key: SkillGroupKey = skill.type ?? 'regular';
-            return { ...acc, [key]: [...acc[key], skill] };
-        },
-        {
-            pattern: [],
-            strategy: [],
-            indicator_guide: [],
-            candlestick: [],
-            support_resistance: [],
-            regular: [],
-        }
-    );
+    const skillGroups: Record<SkillGroupKey, Skill[]> = {
+        pattern: [],
+        strategy: [],
+        indicator_guide: [],
+        candlestick: [],
+        support_resistance: [],
+        regular: [],
+    };
+    for (const skill of activeSkills) {
+        const key: SkillGroupKey = skill.type ?? 'regular';
+        skillGroups[key].push(skill);
+    }
     const patternSkills = skillGroups.pattern;
     const strategySkills = skillGroups.strategy;
     const indicatorGuideSkills = skillGroups.indicator_guide;

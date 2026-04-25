@@ -154,4 +154,5 @@ export type {
     CandlePatternEntry,
     SingleCandlePatternEntry,
     MultiCandlePatternEntry,
+    PromptConfig,
 } from './domain/types';

@@ -121,12 +121,14 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     // Build multi entries (only for bars in detection window)
     const multiEntries: CandlePatternEntry[] = Array.from(
         multiEntryMap.entries()
-    ).map(([i, { pattern }]) => ({
-        barIndex: i - detectionStartIndex,
-        patternType: 'multi' as const, // literal type 추론 보조 — 런타임 값 변경 없음
-        singlePattern: null,
-        multiPattern: pattern,
-    }));
+    ).map(
+        ([i, { pattern }]): CandlePatternEntry => ({
+            barIndex: i - detectionStartIndex,
+            patternType: 'multi',
+            singlePattern: null,
+            multiPattern: pattern,
+        })
+    );
 
     // Build single entries (excluding bars involved in multi patterns)
     const detectionBars = extendedBars.slice(detectionStartIndex);
@@ -136,14 +138,13 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
             if (multiInvolvedIndices.has(extendedIndex)) return [];
             const pattern = detectCandlePattern(bar);
             if (EXCLUDED_SINGLE_PATTERNS.has(pattern)) return [];
-            return [
-                {
-                    barIndex: i,
-                    patternType: 'single' as const, // literal type 추론 보조 — 런타임 값 변경 없음
-                    singlePattern: pattern,
-                    multiPattern: null,
-                },
-            ];
+            const entry: CandlePatternEntry = {
+                barIndex: i,
+                patternType: 'single',
+                singlePattern: pattern,
+                multiPattern: null,
+            };
+            return [entry];
         }
     );
 

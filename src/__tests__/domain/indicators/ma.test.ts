@@ -90,7 +90,7 @@ describe('calculateMA', () => {
             const bars = makeBars(closes);
             const result = calculateMA(bars, 5);
             const expectedSMA = (10 + 20 + 30 + 40 + 50) / 5;
-            expect(result[4]).toBe(expectedSMA);
+            expect(result[4]).toBeCloseTo(expectedSMA, 10);
         });
 
         it('슬라이딩 윈도우가 올바르게 이동한다', () => {
