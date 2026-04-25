@@ -55,26 +55,25 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
         return { status: 'error', error: 'Result not found' };
     }
 
-    // submitAnalysis가 JSON.stringify(RawAnalysisResponse)로 저장하고
-    // getJobResult가 JSON.parse 후 반환하므로, 구조가 RawAnalysisResponse와 일치한다고 보장된다.
-    const parsed = rawResult as RawAnalysisResponse;
-    if (!parsed.summary || !parsed.trend || !parsed.riskLevel) {
+    const candidate = rawResult as Record<string, unknown>;
+    if (!candidate.summary || !candidate.trend || !candidate.riskLevel) {
         cleanupJob(jobId).catch(e =>
             console.warn('[Poll] cleanupJob failed:', e)
         );
         return { status: 'error', error: 'Invalid response from worker' };
     }
+    // summary/trend/riskLevel 필드 확인 통과; submitAnalysis가 JSON.stringify(RawAnalysisResponse)로
+    // 저장하고 getJobResult가 JSON.parse 후 반환하므로 구조가 RawAnalysisResponse와 일치한다.
+    const parsed = rawResult as RawAnalysisResponse;
 
     const skillsLoader = new FileSkillsLoader();
-    let skills: Skill[] = [];
-    try {
-        skills = await skillsLoader.loadSkills();
-    } catch (error) {
+    const skills = await skillsLoader.loadSkills().catch(error => {
         console.error(
             '[Poll] Skills loading failed, proceeding without skills:',
             error
         );
-    }
+        return [] as Skill[];
+    });
     const skillsDegraded = meta?.skillsDegraded ?? false;
 
     const enriched = enrichAnalysisWithConfidence(parsed, skills);

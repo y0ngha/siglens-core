@@ -42,17 +42,15 @@ export async function submitAnalysis(
     );
 
     const skillsLoader = new FileSkillsLoader();
-    let skills: Skill[] = [];
     let skillsDegraded = false;
-    try {
-        skills = await skillsLoader.loadSkills();
-    } catch (error) {
+    const skills = await skillsLoader.loadSkills().catch(error => {
         console.error(
             '[Submit] Skills loading failed, proceeding without skills:',
             error
         );
         skillsDegraded = true;
-    }
+        return [] as Skill[];
+    });
 
     const prompt = buildAnalysisPrompt(
         symbol,
