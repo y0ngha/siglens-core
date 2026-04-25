@@ -12,8 +12,12 @@ UI, 렌더링, 프레임워크 종속 코드는 이 레파지토리에 존재하
 
 ```
 ┌─────────────────────────────────────────┐
+│         application (오케스트레이션)     │  여러 infrastructure를 조합하는
+│           market/, …                   │  use-case 단위 함수
+├─────────────────────────────────────────┤
 │          infrastructure (외부)          │  AI Provider, Skills Loader,
-│                                         │  Upstash Redis, Neon DB
+│                                         │  Upstash Redis, Neon DB,
+│                                         │  Market Data Providers
 ├─────────────────────────────────────────┤
 │             domain (순수)              │  인디케이터, 캔들 패턴,
 │                                         │  차트 패턴, 분석 프롬프트
@@ -39,13 +43,20 @@ domain         ← 외부 import 없음
                  Date.now(), fetch, console.*, process.env 전부 금지
 
 infrastructure ← domain import 가능
+                 application import 금지 (ESLint 강제)
                  외부 API (AI 프로바이더 등) 호출 담당
                  Skills 파일 I/O 담당
                  Upstash Redis 캐시 관리 담당 (cache/)
                  Neon / PostgreSQL 연결 관리 담당 (db/)
                  인터페이스(types.ts)를 반드시 먼저 정의
 
-src/index.ts   ← domain, infrastructure에서 노출할 심볼을 재-export
+application    ← domain, infrastructure import 가능
+                 여러 infrastructure 모듈을 조합해 use-case를 완성
+                 domain, infrastructure에서 application import 금지 (ESLint 강제)
+                 현재: market/ (submitAnalysis, pollAnalysis, cancelAnalysisJob,
+                                submitBriefing, pollBriefing)
+
+src/index.ts   ← domain, infrastructure, application에서 노출할 심볼을 재-export
                  외부 consumer가 유일하게 참조하는 진입점
 ```
 
@@ -98,8 +109,12 @@ const key = process.env.API_KEY; // 금지
 ├── skills
 └── src
     ├── __tests__
+    │   ├── application
+    │   │   └── market
     │   ├── domain
     │   └── infrastructure
+    ├── application
+    │   └── market
     ├── domain
     │   ├── analysis
     │   ├── constants
