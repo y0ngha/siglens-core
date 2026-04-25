@@ -58,3 +58,8 @@
 - Violation: DOMAIN.md의 `Timeframe` 타입 및 관련 명세가 실제 코드와 불일치
 - Rule: MISTAKES.md Documentation Sync #2 — 구현 변경 시 docs 동기화 필수
 - Context: 코드의 `Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day'`인데 DOMAIN.md는 `'1Min' | '5Min' | '15Min' | '1Hour' | '1Day'`로 표기; TIMEFRAMES 상수, EMA 테이블, 인디케이터 설정표, 봉 개수 기준 모두 동기화
+
+## [PR #23 Suggestions | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
+- Violation: `!` non-null 단언 주석이 `??` 왼쪽 경로(캐시 배열)에 대한 보장을 설명하지 않음
+- Rule: MISTAKES.md TypeScript #7 — 모든 safe-cast(`as`, `!`)에는 런타임 보장을 설명하는 주석 필요
+- Context: `detectSupportProximityBullish`/`detectResistanceProximityBearish`의 `[lastIdx]!` 단언 주석이 `calculateMA` 반환 경로만 설명하고 `indicators.ma[period]` 경로(caller contract)에 대한 보장을 누락

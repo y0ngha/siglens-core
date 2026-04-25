@@ -211,7 +211,7 @@ export function detectMacdHistogramBearishConvergence(
         // Non-null asserted: prior loop guarantees histogram !== null for all tail elements.
         const prev = tail[i - 1]!.histogram!;
         const cur = tail[i]!.histogram!;
-        if (!(cur < prev)) return null;
+        if (!(Math.abs(cur) < Math.abs(prev))) return null;
     }
     return {
         type: 'macd_histogram_bearish_convergence',
@@ -313,7 +313,8 @@ export function detectSupportProximityBullish(
 
     for (const period of SR_MA_PERIODS) {
         if (barsLength < period) continue;
-        // calculateMA returns a real number at lastIdx when bars.length >= period (checked above)
+        // calculateMA: non-null at lastIdx when bars.length >= period (checked above).
+        // indicators.ma[period]: assumed same length as bars — caller contract.
         const ma = (indicators.ma[period] ?? calculateMA(bars, period))[
             lastIdx
         ]!;
@@ -342,7 +343,8 @@ export function detectResistanceProximityBearish(
 
     for (const period of SR_MA_PERIODS) {
         if (barsLength < period) continue;
-        // calculateMA returns a real number at lastIdx when bars.length >= period (checked above)
+        // calculateMA: non-null at lastIdx when bars.length >= period (checked above).
+        // indicators.ma[period]: assumed same length as bars — caller contract.
         const ma = (indicators.ma[period] ?? calculateMA(bars, period))[
             lastIdx
         ]!;
