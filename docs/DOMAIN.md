@@ -13,7 +13,7 @@
 ```typescript
 // domain/types.ts
 
-export type Timeframe = '1Min' | '5Min' | '15Min' | '1Hour' | '1Day';
+export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 
 export interface TickerBase {
     symbol: string;
@@ -118,7 +118,7 @@ export interface StochRSIResult {
 export const DEFAULT_TIMEFRAME: Timeframe = '1Day';
 
 // 유효한 타임프레임 전체 목록 — URL 파라미터 검증 등 모든 검증은 이 상수를 기준으로 한다.
-export const TIMEFRAMES: readonly Timeframe[] = ['1Min', '5Min', '15Min', '1Hour', '1Day'];
+export const TIMEFRAMES: readonly Timeframe[] = ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'];
 
 // URL 쿼리 파라미터 등 외부 입력에서 Timeframe을 검증할 때 사용한다.
 export function isValidTimeframe(value: string | undefined | null): value is Timeframe;
@@ -426,7 +426,6 @@ calculateIchimokuFutureCloud 함수:
 기본 기간: [9, 20, 21, 60]  ← EMA_DEFAULT_PERIODS (전체 상수)
 
 타임프레임별 실제 사용 기간:
-- 1Min       → [9, 21]   (EMA_DEFAULT_PERIODS에서 9, 21만 선택)
 - 5Min~1Day  → [20, 60]  (EMA_DEFAULT_PERIODS에서 20, 60만 선택)
 
 EMA_DEFAULT_PERIODS는 모든 타임프레임에서 사용 가능한 기간의 합집합이다.
@@ -1108,10 +1107,11 @@ consumer가 결정한다.
 
 | 타임프레임 | RSI | MACD | 볼린저 | EMA |
 |------------|-----|------|--------|-----|
-| 1Min       | 14  | 12/26/9 | 20/2 | 9/21 |
 | 5Min       | 14  | 12/26/9 | 20/2 | 20/60 |
 | 15Min      | 14  | 12/26/9 | 20/2 | 20/60 |
+| 30Min      | 14  | 12/26/9 | 20/2 | 20/60 |
 | 1Hour      | 14  | 12/26/9 | 20/2 | 20/60 |
+| 4Hour      | 14  | 12/26/9 | 20/2 | 20/60 |
 | 1Day       | 14  | 12/26/9 | 20/2 | 20/60 |
 
 ---
@@ -1124,10 +1124,11 @@ bars를 가져올 때 아래 값을 참고로 사용한다.
 ```
 타임프레임별 권장 최초 로딩 봉 개수
 
-1Min   → 200봉 (약 3.3시간)
 5Min   → 288봉 (약 1일)
 15Min  → 200봉 (약 2.5일)
+30Min  → 200봉 (약 4일)
 1Hour  → 200봉 (약 1.2개월)
+4Hour  → 200봉 (약 5개월)
 1Day   → 500봉 (약 2년)
 
 추가 로딩이 필요한 consumer(예: 무한 스크롤 UI)는 매 요청마다 200봉씩 prepend하는
