@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis';
 import type { CacheProvider } from '@/infrastructure/cache/types';
-import { readUpstashConfig } from '@/infrastructure/cache/config';
+import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 export function createCacheProvider(): CacheProvider | null {
     const config = readUpstashConfig();

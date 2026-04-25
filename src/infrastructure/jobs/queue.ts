@@ -3,11 +3,12 @@ import type {
     JobMeta,
     JobRedisClient,
     JobStatus,
+    RedisSetOpts,
 } from '@/infrastructure/jobs/types';
 import { SECONDS_PER_HOUR } from '@/domain/constants/time';
 
-// Upstash는 HTTP REST 기반 — TCP 연결 없음, 함수마다 인스턴스 생성해도 성능 영향 없음.
 const JOB_TTL_SECONDS = SECONDS_PER_HOUR;
+const JOB_TTL_OPTS: RedisSetOpts = { ex: JOB_TTL_SECONDS };
 
 function statusKey(jobId: string): string {
     return `job:${jobId}:status`;
@@ -29,6 +30,7 @@ function cancelledKey(jobId: string): string {
     return `job:${jobId}:cancelled`;
 }
 
+// Upstash는 HTTP REST 기반 — TCP 연결 없음, 함수마다 인스턴스 생성해도 성능 영향 없음.
 async function withJobRedis<T>(
     fn: (redis: JobRedisClient) => Promise<T>,
     fallback: T
@@ -43,7 +45,7 @@ async function withJobRedis<T>(
 
 export async function setJobMeta(jobId: string, meta: JobMeta): Promise<void> {
     return withJobRedis(async redis => {
-        await redis.set(metaKey(jobId), meta, { ex: JOB_TTL_SECONDS });
+        await redis.set(metaKey(jobId), meta, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -73,7 +75,7 @@ export async function setJobStatus(
     status: JobStatus
 ): Promise<void> {
     return withJobRedis(async redis => {
-        await redis.set(statusKey(jobId), status, { ex: JOB_TTL_SECONDS });
+        await redis.set(statusKey(jobId), status, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -82,9 +84,7 @@ export async function setJobResult(
     result: Record<string, unknown>
 ): Promise<void> {
     return withJobRedis(async redis => {
-        await redis.set(resultKey(jobId), result, {
-            ex: JOB_TTL_SECONDS,
-        });
+        await redis.set(resultKey(jobId), result, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -93,17 +93,13 @@ export async function setJobError(
     message: string
 ): Promise<void> {
     return withJobRedis(async redis => {
-        await redis.set(errorKey(jobId), message, {
-            ex: JOB_TTL_SECONDS,
-        });
+        await redis.set(errorKey(jobId), message, JOB_TTL_OPTS);
     }, undefined);
 }
 
 export async function cancelJob(jobId: string): Promise<void> {
     return withJobRedis(async redis => {
-        await redis.set(cancelledKey(jobId), '1', {
-            ex: JOB_TTL_SECONDS,
-        });
+        await redis.set(cancelledKey(jobId), '1', JOB_TTL_OPTS);
     }, undefined);
 }
 

@@ -2,9 +2,13 @@ import type { Timeframe } from '@/domain/types';
 
 export type JobStatus = 'processing' | 'done' | 'error';
 
+export interface RedisSetOpts {
+    ex: number;
+}
+
 export interface JobRedisClient {
     get<T>(key: string): Promise<T | null>;
-    set<T>(key: string, value: T, opts: { ex: number }): Promise<unknown>;
+    set<T>(key: string, value: T, opts: RedisSetOpts): Promise<unknown>;
     del(...keys: string[]): Promise<number>;
 }
 

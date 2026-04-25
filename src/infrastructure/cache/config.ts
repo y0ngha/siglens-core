@@ -5,7 +5,6 @@ import {
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
 import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
-import type { UpstashEnvConfig } from '@/infrastructure/cache/types';
 
 export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
     '5Min': 5 * SECONDS_PER_MINUTE,
@@ -32,15 +31,4 @@ export function buildAnalysisCacheKey(
     timeframe: Timeframe
 ): string {
     return `analysis:${symbol}:${timeframe}`;
-}
-
-export function readUpstashConfig(): UpstashEnvConfig | null {
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-    if (!url || !token) return null;
-    return {
-        url,
-        token,
-        readonlyToken: process.env.UPSTASH_REDIS_REST_READONLY_TOKEN ?? '',
-    };
 }

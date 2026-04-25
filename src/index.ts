@@ -1,3 +1,41 @@
+export { createCacheProvider } from './infrastructure/cache/redis';
+export {
+    ANALYSIS_CACHE_TTL,
+    CACHE_EXPIRY_HOUR_KST,
+    buildAnalysisCacheKey,
+    computeEffectiveTtl,
+} from './infrastructure/cache/config';
+
+export { callGeminiWithKeyFallback } from './infrastructure/ai/gemini';
+export { AI_SYSTEM_PROMPT } from './infrastructure/ai/utils';
+
+export {
+    setJobMeta,
+    getJobStatus,
+    getJobResult,
+    getJobError,
+    getJobMeta,
+    setJobStatus,
+    setJobResult,
+    setJobError,
+    cancelJob,
+    isJobCancelled,
+    cleanupJob,
+} from './infrastructure/jobs/queue';
+
+export type { CacheProvider } from './infrastructure/cache/types';
+export type {
+    GeminiContents,
+    GeminiContent,
+    GeminiPart,
+    CallGeminiWithKeyFallbackOptions,
+} from './infrastructure/ai/types';
+export type {
+    JobStatus,
+    JobMeta,
+    RedisSetOpts,
+} from './infrastructure/jobs/types';
+
 export { calculateMA } from './domain/indicators/ma';
 
 export {

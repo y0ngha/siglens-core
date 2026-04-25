@@ -1,6 +1,13 @@
-export type GeminiContents =
-    | string
-    | Array<{ role: string; parts: Array<{ text: string }> }>;
+export interface GeminiPart {
+    text: string;
+}
+
+export interface GeminiContent {
+    role: string;
+    parts: GeminiPart[];
+}
+
+export type GeminiContents = string | GeminiContent[];
 
 export interface CallGeminiWithKeyFallbackOptions {
     freeApiKey: string | undefined;
