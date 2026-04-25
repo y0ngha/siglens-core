@@ -13,7 +13,7 @@
     },
     "packageManager": "yarn@4.12.0",
     "scripts": {
-        "build": "tsc && tsc-alias",
+        "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",

@@ -10,7 +10,7 @@ import {
     getReanalyzeCooldownMs,
 } from '@/infrastructure/market/reanalyzeCooldown';
 
-const MockRedis = Redis as Mock;
+const MockRedis = Redis as unknown as Mock;
 const mockSet = vi.fn();
 const mockPttl = vi.fn();
 const mockDel = vi.fn();

@@ -21,12 +21,14 @@ const entryPrice = 100;
 const atr = 2;
 
 const baseRec: ActionRecommendation = {
+    positionAnalysis: '',
+    entry: '',
+    exit: '',
+    riskReward: '',
     entryRecommendation: 'enter',
     entryPrices: [100],
     stopLoss: 97,
     takeProfitPrices: [105],
-    exit: '',
-    riskReward: '',
 };
 
 describe('isValidBullishStopLoss', () => {

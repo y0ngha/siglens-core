@@ -6,12 +6,14 @@ import {
 import type { ActionRecommendation } from '@/domain/types';
 
 const baseRec: ActionRecommendation = {
+    positionAnalysis: '',
+    entry: '',
+    exit: '',
+    riskReward: '',
     entryRecommendation: 'enter',
     entryPrices: [150],
     stopLoss: 145,
     takeProfitPrices: [160, 170],
-    exit: '',
-    riskReward: '',
 };
 
 describe('validateActionPrices', () => {
