@@ -1,9 +1,11 @@
+export type GeminiRole = 'user' | 'model';
+
 export interface GeminiPart {
     text: string;
 }
 
 export interface GeminiContent {
-    role: string;
+    role: GeminiRole;
     parts: GeminiPart[];
 }
 

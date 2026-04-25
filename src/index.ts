@@ -25,16 +25,13 @@ export {
 
 export type { CacheProvider } from './infrastructure/cache/types';
 export type {
+    GeminiRole,
     GeminiContents,
     GeminiContent,
     GeminiPart,
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
-export type {
-    JobStatus,
-    JobMeta,
-    RedisSetOpts,
-} from './infrastructure/jobs/types';
+export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 
 export { calculateMA } from './domain/indicators/ma';
 

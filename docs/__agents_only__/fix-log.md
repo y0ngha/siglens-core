@@ -82,6 +82,11 @@
 - Rule: npm 라이브러리 패턴 — 선택적 런타임 의존성은 `peerDependencies`(optional) + `devDependencies`로 분리
 - Context: `package.json`에서 두 패키지를 `peerDependencies`(optional: true) 및 `devDependencies`로 이동
 
+## [PR #24 Round 6 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-26]
+- Violation: `RedisSetOpts` (Upstash 내부 옵션 타입)를 `src/index.ts` 공개 API에 export
+- Rule: 라이브러리 공개 API는 소비자가 실제로 사용하는 타입만 노출해야 함; 구현 세부사항 노출은 내부 변경 시 breaking change가 됨
+- Context: `jobs/types.ts`의 `RedisSetOpts`는 `JobRedisClient` 인터페이스 내부 구현 옵션으로 소비자가 직접 사용할 일이 없음; `index.ts` export 블록에서 제거
+
 ## [PR #24 Round 5 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `jobs/redis.ts`가 `cache/config.ts`에서 `readUpstashConfig`를 직접 import — 인프라 모듈 간 교차 의존
 - Rule: MISTAKES.md Architecture #3 — 각 infrastructure 모듈은 하나의 외부 시스템만 담당; 모듈 간 조율은 소비자 레이어에서
