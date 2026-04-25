@@ -350,9 +350,10 @@ const sqzDirectionLabel = (r: SqueezeMomentumResult): string => {
 
 const countSqueezeDuration = (data: SqueezeMomentumResult[]): number => {
     let count = 0;
-    for (let i = data.length - 1; i >= 0; i--) {
-        if (data[i].sqzOn !== true) break;
+    let i = data.length - 1;
+    while (i >= 0 && data[i].sqzOn === true) {
         count++;
+        i--;
     }
     return count;
 };
