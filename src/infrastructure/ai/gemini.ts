@@ -28,8 +28,6 @@ async function callGemini({
     return response.text ?? '';
 }
 
-export type { CallGeminiWithKeyFallbackOptions };
-
 export async function callGeminiWithKeyFallback({
     freeApiKey,
     paidApiKey,

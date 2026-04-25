@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { SECONDS_PER_HOUR } from '@/domain/constants/time';
+import type { JobMeta } from '@/infrastructure/jobs/types';
 
 const mockGet = vi.fn();
 const mockSet = vi.fn();
@@ -25,6 +26,7 @@ import {
     setJobStatus,
 } from '@/infrastructure/jobs/queue';
 
+// vi.mock이 createJobRedis를 vi.fn()으로 교체하므로 Mock API(mockReturnValue 등) 접근을 위해 캐스트
 const mockCreateJobRedis = createJobRedis as Mock;
 
 const fakeRedis = {
@@ -106,9 +108,9 @@ describe('job queue — with redis', () => {
 
     it('setJobMeta calls redis.set with correct key and TTL', async () => {
         mockSet.mockResolvedValue('OK');
-        const meta = {
+        const meta: JobMeta = {
             symbol: 'AAPL',
-            timeframe: '1Hour' as const,
+            timeframe: '1Hour',
             skillsDegraded: false,
         };
         await setJobMeta('job1', meta);
@@ -139,9 +141,9 @@ describe('job queue — with redis', () => {
     });
 
     it('getJobMeta calls redis.get with meta key', async () => {
-        const meta = {
+        const meta: JobMeta = {
             symbol: 'TSLA',
-            timeframe: '4Hour' as const,
+            timeframe: '4Hour',
             skillsDegraded: true,
         };
         mockGet.mockResolvedValue(meta);

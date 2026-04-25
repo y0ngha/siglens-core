@@ -42,6 +42,7 @@ describe('parseJsonResponse', () => {
         try {
             parseJsonResponse('bad json', 'gemini');
         } catch (err) {
+            // parseJsonResponse는 { cause: error } 옵션과 함께 Error를 던지므로 cause 필드가 런타임에 항상 존재
             expect((err as { cause: unknown }).cause).toBeInstanceOf(
                 SyntaxError
             );

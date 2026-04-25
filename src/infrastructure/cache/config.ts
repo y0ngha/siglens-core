@@ -10,8 +10,6 @@ import {
 } from '@/domain/constants/time';
 import type { UpstashEnvConfig } from '@/infrastructure/cache/types';
 
-export type { UpstashEnvConfig };
-
 export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
     '5Min': 5 * SECONDS_PER_MINUTE,
     '15Min': 15 * SECONDS_PER_MINUTE,
