@@ -1,12 +1,14 @@
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import type {
     AnalysisResponse,
+    Skill,
     SubmitAnalysisResult,
     Timeframe,
 } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { fetchBarsWithIndicators } from '@/infrastructure/market/barsApi';
+import { readWorkerConfig } from '@/infrastructure/market/config';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
@@ -16,13 +18,7 @@ export async function submitAnalysis(
     force: boolean = false,
     fmpSymbol?: string
 ): Promise<SubmitAnalysisResult> {
-    const workerUrl = process.env.WORKER_URL;
-    const workerSecret = process.env.WORKER_SECRET;
-    if (!workerUrl || !workerSecret) {
-        throw new Error(
-            'WORKER_URL and WORKER_SECRET environment variables are required'
-        );
-    }
+    const { workerUrl, workerSecret } = readWorkerConfig();
 
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe);
@@ -45,7 +41,7 @@ export async function submitAnalysis(
     );
 
     const skillsLoader = new FileSkillsLoader();
-    let skills: Awaited<ReturnType<typeof skillsLoader.loadSkills>> = [];
+    let skills: Skill[] = [];
     let skillsDegraded = false;
     try {
         skills = await skillsLoader.loadSkills();

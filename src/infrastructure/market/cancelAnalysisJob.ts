@@ -1,20 +1,20 @@
 import { cancelJob } from '@/infrastructure/jobs/queue';
+import { tryReadWorkerConfig } from '@/infrastructure/market/config';
 
 export async function cancelAnalysisJob(jobId: string): Promise<void> {
-    const workerUrl = process.env.WORKER_URL;
-    const workerSecret = process.env.WORKER_SECRET;
+    const workerConfig = tryReadWorkerConfig();
 
     const tasks: Promise<unknown>[] = [cancelJob(jobId)];
 
     // 워커가 설정된 경우 /cancel 엔드포인트에도 신호를 보내 진행 중인 AI 호출을 즉시 중단한다.
     // AbortSignal.timeout으로 5초 제한 — 취소 요청이 클라이언트 흐름을 오래 잡지 않도록 한다.
-    if (workerUrl && workerSecret) {
+    if (workerConfig !== null) {
         tasks.push(
-            fetch(`${workerUrl}/cancel`, {
+            fetch(`${workerConfig.workerUrl}/cancel`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Worker-Secret': workerSecret,
+                    'X-Worker-Secret': workerConfig.workerSecret,
                 },
                 body: JSON.stringify({ jobId }),
                 signal: AbortSignal.timeout(5000),

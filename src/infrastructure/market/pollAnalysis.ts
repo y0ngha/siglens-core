@@ -1,6 +1,10 @@
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
-import type { PollAnalysisResult, RawAnalysisResponse } from '@/domain/types';
+import type {
+    PollAnalysisResult,
+    RawAnalysisResponse,
+    Skill,
+} from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildAnalysisCacheKey,
@@ -62,7 +66,7 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
     }
 
     const skillsLoader = new FileSkillsLoader();
-    let skills: Awaited<ReturnType<typeof skillsLoader.loadSkills>> = [];
+    let skills: Skill[] = [];
     try {
         skills = await skillsLoader.loadSkills();
     } catch (error) {

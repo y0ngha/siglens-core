@@ -6,17 +6,12 @@ import {
     buildBriefingCacheKey,
     ISO_DATE_HOUR_PREFIX_LENGTH,
 } from '@/infrastructure/cache/config';
+import { readWorkerConfig } from '@/infrastructure/market/config';
 
 export async function submitBriefing(
     data: MarketSummaryData
 ): Promise<SubmitBriefingResult> {
-    const workerUrl = process.env.WORKER_URL;
-    const workerSecret = process.env.WORKER_SECRET;
-    if (!workerUrl || !workerSecret) {
-        throw new Error(
-            'WORKER_URL and WORKER_SECRET environment variables are required'
-        );
-    }
+    const { workerUrl, workerSecret } = readWorkerConfig();
 
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
