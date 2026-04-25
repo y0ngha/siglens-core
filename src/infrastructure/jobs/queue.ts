@@ -1,5 +1,9 @@
 import { createJobRedis } from '@/infrastructure/jobs/redis';
-import type { JobMeta, JobStatus } from '@/infrastructure/jobs/types';
+import type {
+    JobMeta,
+    JobRedisClient,
+    JobStatus,
+} from '@/infrastructure/jobs/types';
 import { SECONDS_PER_HOUR } from '@/domain/constants/time';
 
 // Upstash Redis는 HTTP REST 기반이므로 클라이언트 인스턴스 생성 비용이 없다.
@@ -26,90 +30,99 @@ function cancelledKey(jobId: string): string {
     return `job:${jobId}:cancelled`;
 }
 
+async function withJobRedis<T>(
+    fn: (redis: JobRedisClient) => Promise<T>,
+    fallback: T
+): Promise<T> {
+    const redis = createJobRedis();
+    return redis !== null ? fn(redis) : Promise.resolve(fallback);
+}
+
 // Upstash REST client는 값을 자동으로 직렬화/역직렬화한다.
 // set(key, object) → JSON 문자열로 저장, get(key) → 파싱된 객체로 반환.
 // 따라서 JSON.stringify/JSON.parse를 수동으로 호출하지 않는다.
 
 export async function setJobMeta(jobId: string, meta: JobMeta): Promise<void> {
-    const redis = createJobRedis();
-    if (!redis) return;
-    await redis.set(metaKey(jobId), meta, { ex: JOB_TTL_SECONDS });
+    return withJobRedis(async redis => {
+        await redis.set(metaKey(jobId), meta, { ex: JOB_TTL_SECONDS });
+    }, undefined);
 }
 
 export async function getJobStatus(jobId: string): Promise<JobStatus | null> {
-    const redis = createJobRedis();
-    if (!redis) return null;
-    return redis.get<JobStatus>(statusKey(jobId));
+    return withJobRedis(redis => redis.get<JobStatus>(statusKey(jobId)), null);
 }
 
 export async function getJobResult(
     jobId: string
 ): Promise<Record<string, unknown> | null> {
-    const redis = createJobRedis();
-    if (!redis) return null;
-    return redis.get<Record<string, unknown>>(resultKey(jobId));
+    return withJobRedis(
+        redis => redis.get<Record<string, unknown>>(resultKey(jobId)),
+        null
+    );
 }
 
 export async function getJobError(jobId: string): Promise<string | null> {
-    const redis = createJobRedis();
-    if (!redis) return null;
-    return redis.get<string>(errorKey(jobId));
+    return withJobRedis(redis => redis.get<string>(errorKey(jobId)), null);
 }
 
 export async function getJobMeta(jobId: string): Promise<JobMeta | null> {
-    const redis = createJobRedis();
-    if (!redis) return null;
-    return redis.get<JobMeta>(metaKey(jobId));
+    return withJobRedis(redis => redis.get<JobMeta>(metaKey(jobId)), null);
 }
 
 export async function setJobStatus(
     jobId: string,
     status: JobStatus
 ): Promise<void> {
-    const redis = createJobRedis();
-    if (!redis) return;
-    await redis.set(statusKey(jobId), status, { ex: JOB_TTL_SECONDS });
+    return withJobRedis(async redis => {
+        await redis.set(statusKey(jobId), status, { ex: JOB_TTL_SECONDS });
+    }, undefined);
 }
 
 export async function setJobResult(
     jobId: string,
     result: Record<string, unknown>
 ): Promise<void> {
-    const redis = createJobRedis();
-    if (!redis) return;
-    await redis.set(resultKey(jobId), result, { ex: JOB_TTL_SECONDS });
+    return withJobRedis(async redis => {
+        await redis.set(resultKey(jobId), result, {
+            ex: JOB_TTL_SECONDS,
+        });
+    }, undefined);
 }
 
 export async function setJobError(
     jobId: string,
     message: string
 ): Promise<void> {
-    const redis = createJobRedis();
-    if (!redis) return;
-    await redis.set(errorKey(jobId), message, { ex: JOB_TTL_SECONDS });
+    return withJobRedis(async redis => {
+        await redis.set(errorKey(jobId), message, {
+            ex: JOB_TTL_SECONDS,
+        });
+    }, undefined);
 }
 
 export async function cancelJob(jobId: string): Promise<void> {
-    const redis = createJobRedis();
-    if (!redis) return;
-    await redis.set(cancelledKey(jobId), '1', { ex: JOB_TTL_SECONDS });
+    return withJobRedis(async redis => {
+        await redis.set(cancelledKey(jobId), '1', {
+            ex: JOB_TTL_SECONDS,
+        });
+    }, undefined);
 }
 
 export async function isJobCancelled(jobId: string): Promise<boolean> {
-    const redis = createJobRedis();
-    if (!redis) return false;
-    const val = await redis.get<string>(cancelledKey(jobId));
-    return val === '1';
+    return withJobRedis(
+        async redis => (await redis.get<string>(cancelledKey(jobId))) === '1',
+        false
+    );
 }
 
 export async function cleanupJob(jobId: string): Promise<void> {
-    const redis = createJobRedis();
-    if (!redis) return;
-    await redis.del(
-        statusKey(jobId),
-        resultKey(jobId),
-        errorKey(jobId),
-        metaKey(jobId),
-        cancelledKey(jobId)
-    );
+    return withJobRedis(async redis => {
+        await redis.del(
+            statusKey(jobId),
+            resultKey(jobId),
+            errorKey(jobId),
+            metaKey(jobId),
+            cancelledKey(jobId)
+        );
+    }, undefined);
 }

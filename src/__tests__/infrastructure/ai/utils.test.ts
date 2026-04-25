@@ -6,19 +6,28 @@ describe('AI_SYSTEM_PROMPT', () => {
         expect(typeof AI_SYSTEM_PROMPT).toBe('string');
         expect(AI_SYSTEM_PROMPT.length).toBeGreaterThan(0);
     });
+
+    it('instructs Korean output', () => {
+        expect(AI_SYSTEM_PROMPT).toContain('Korean');
+    });
+
+    it('instructs JSON-only output', () => {
+        expect(AI_SYSTEM_PROMPT).toContain('SINGLE valid JSON object');
+    });
+
+    it('contains Deterministic principle', () => {
+        expect(AI_SYSTEM_PROMPT).toContain('Deterministic');
+    });
 });
 
 describe('parseJsonResponse', () => {
     it('parses plain JSON string', () => {
-        const result = parseJsonResponse<{ n: number }>('{"n":1}', 'test');
+        const result = parseJsonResponse('{"n":1}', 'test');
         expect(result).toEqual({ n: 1 });
     });
 
     it('parses JSON inside markdown code block', () => {
-        const result = parseJsonResponse<{ n: number }>(
-            '```json\n{"n":1}\n```',
-            'test'
-        );
+        const result = parseJsonResponse('```json\n{"n":1}\n```', 'test');
         expect(result).toEqual({ n: 1 });
     });
 

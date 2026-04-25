@@ -14,11 +14,9 @@ OUTPUT FORMAT
 - No prose, no commentary, no markdown code fences.
 - All text content inside the JSON (summary, description, reason, basis, condition, positionAnalysis, entry, exit, riskReward) MUST be written in Korean (한국어) in formal speech level (존댓말, e.g. "~입니다", "~습니다").`;
 
-export function parseJsonResponse<T>(text: string, source: string): T {
+export function parseJsonResponse(text: string, source: string): unknown {
     try {
-        // JSON.parse returns any; T is caller-enforced — no runtime shape validation here.
-        // Safe only if the caller validates the schema downstream.
-        return JSON.parse(stripMarkdownCodeBlock(text)) as T;
+        return JSON.parse(stripMarkdownCodeBlock(text));
     } catch (error) {
         throw new Error(`Failed to parse ${source} response as JSON`, {
             cause: error,

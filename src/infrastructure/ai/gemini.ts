@@ -1,8 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
-
-type GeminiContents =
-    | string
-    | Array<{ role: string; parts: Array<{ text: string }> }>;
+import type {
+    CallGeminiWithKeyFallbackOptions,
+    GeminiContents,
+} from '@/infrastructure/ai/types';
 
 interface GeminiCallOptions {
     apiKey: string;
@@ -28,13 +28,7 @@ async function callGemini({
     return response.text ?? '';
 }
 
-export interface CallGeminiWithKeyFallbackOptions {
-    freeApiKey: string | undefined;
-    paidApiKey: string;
-    model: string;
-    contents: GeminiContents;
-    systemInstruction?: string;
-}
+export type { CallGeminiWithKeyFallbackOptions };
 
 export async function callGeminiWithKeyFallback({
     freeApiKey,

@@ -1,6 +1,6 @@
 const MARKDOWN_CODE_BLOCK_PATTERN = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
 
-export function parseNumberEnv(
+export function parseNumberOrDefault(
     raw: string | undefined,
     defaultValue: number
 ): number {

@@ -1,33 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { parseNumberEnv, stripMarkdownCodeBlock } from '@/domain/utils';
+import { parseNumberOrDefault, stripMarkdownCodeBlock } from '@/domain/utils';
 
-describe('parseNumberEnv', () => {
+describe('parseNumberOrDefault', () => {
     it('returns defaultValue when raw is undefined', () => {
-        expect(parseNumberEnv(undefined, 42)).toBe(42);
+        expect(parseNumberOrDefault(undefined, 42)).toBe(42);
     });
 
     it('returns defaultValue when raw is empty string', () => {
-        expect(parseNumberEnv('', 42)).toBe(42);
+        expect(parseNumberOrDefault('', 42)).toBe(42);
     });
 
     it('parses valid float', () => {
-        expect(parseNumberEnv('3.14', 0)).toBe(3.14);
+        expect(parseNumberOrDefault('3.14', 0)).toBe(3.14);
     });
 
     it('parses valid integer', () => {
-        expect(parseNumberEnv('100', 0)).toBe(100);
+        expect(parseNumberOrDefault('100', 0)).toBe(100);
     });
 
     it('returns defaultValue for non-numeric string', () => {
-        expect(parseNumberEnv('not-a-number', 99)).toBe(99);
+        expect(parseNumberOrDefault('not-a-number', 99)).toBe(99);
     });
 
     it('returns defaultValue for NaN string', () => {
-        expect(parseNumberEnv('NaN', 5)).toBe(5);
+        expect(parseNumberOrDefault('NaN', 5)).toBe(5);
     });
 
     it('returns defaultValue for Infinity', () => {
-        expect(parseNumberEnv('Infinity', 5)).toBe(5);
+        expect(parseNumberOrDefault('Infinity', 5)).toBe(5);
     });
 });
 

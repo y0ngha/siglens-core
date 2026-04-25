@@ -8,6 +8,9 @@ import {
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
+import type { UpstashEnvConfig } from '@/infrastructure/cache/types';
+
+export type { UpstashEnvConfig };
 
 export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
     '5Min': 5 * SECONDS_PER_MINUTE,
@@ -59,12 +62,6 @@ export function buildAnalysisCacheKey(
     timeframe: Timeframe
 ): string {
     return `analysis:${symbol}:${timeframe}`;
-}
-
-export interface UpstashEnvConfig {
-    url: string;
-    token: string;
-    readonlyToken: string;
 }
 
 export function readUpstashConfig(): UpstashEnvConfig | null {
