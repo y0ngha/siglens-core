@@ -2,7 +2,10 @@ export { createCacheProvider } from './infrastructure/cache/redis';
 export {
     ANALYSIS_CACHE_TTL,
     CACHE_EXPIRY_HOUR_KST,
+    MARKET_BRIEFING_CACHE_TTL,
+    ISO_DATE_HOUR_PREFIX_LENGTH,
     buildAnalysisCacheKey,
+    buildBriefingCacheKey,
     computeEffectiveTtl,
 } from './infrastructure/cache/config';
 
@@ -34,6 +37,26 @@ export type {
 export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 
 export { calculateMA } from './domain/indicators/ma';
+export { calculateIndicators } from './domain/indicators';
+
+export { createMarketDataProvider } from './infrastructure/market/factory';
+export { fetchBarsWithIndicators } from './infrastructure/market/barsApi';
+export { submitAnalysisAction } from './infrastructure/market/submitAnalysisAction';
+export { pollAnalysisAction } from './infrastructure/market/pollAnalysisAction';
+export { cancelAnalysisJobAction } from './infrastructure/market/cancelAnalysisJobAction';
+export { submitBriefingAction } from './infrastructure/market/submitBriefingAction';
+export { pollBriefingAction } from './infrastructure/market/pollBriefingAction';
+export {
+    tryAcquireReanalyzeCooldown,
+    releaseReanalyzeCooldown,
+    getReanalyzeCooldownMs,
+} from './infrastructure/market/reanalyzeCooldown';
+
+export { FileSkillsLoader } from './infrastructure/skills/loader';
+export type { SkillsProvider } from './infrastructure/skills/types';
+
+export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
+export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
 
 export {
     detectRsiOversold,
