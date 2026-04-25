@@ -9,14 +9,21 @@ export function calculateDonchianChannel(
     if (bars.length < period)
         return bars.map(() => ({ upper: null, middle: null, lower: null }));
 
-    return bars.map((_, i) => {
-        if (i < period - 1) return { upper: null, middle: null, lower: null };
+    const result: DonchianChannelResult[] = [];
 
-        const window = bars.slice(i - period + 1, i + 1);
-        const upper = Math.max(...window.map(b => b.high));
-        const lower = Math.min(...window.map(b => b.low));
-        const middle = (upper + lower) / 2;
+    for (let i = 0; i < bars.length; i++) {
+        if (i < period - 1) {
+            result.push({ upper: null, middle: null, lower: null });
+            continue;
+        }
+        let upper = -Infinity;
+        let lower = Infinity;
+        for (let j = i - period + 1; j <= i; j++) {
+            if (bars[j].high > upper) upper = bars[j].high;
+            if (bars[j].low < lower) lower = bars[j].low;
+        }
+        result.push({ upper, middle: (upper + lower) / 2, lower });
+    }
 
-        return { upper, middle, lower };
-    });
+    return result;
 }

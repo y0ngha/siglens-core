@@ -1,6 +1,6 @@
 import type { Bar } from '@/domain/types';
 import { CCI_DEFAULT_PERIOD, CCI_NORMALIZATION_CONSTANT } from './constants';
-import { sma, typicalPrice } from './utils';
+import { typicalPrice } from './utils';
 
 export function calculateCCI(
     bars: Bar[],
@@ -13,23 +13,30 @@ export function calculateCCI(
         typicalPrice(bar.high, bar.low, bar.close)
     );
 
-    const nullPrefix: (number | null)[] = new Array(period - 1).fill(null);
+    const result: (number | null)[] = [];
+    let smaSum = 0;
 
-    const computedValues: (number | null)[] = Array.from(
-        { length: typicalPrices.length - period + 1 },
-        (_, i) => {
-            const tpSlice = typicalPrices.slice(i, i + period);
-            const smaValue = sma(tpSlice, period)!;
-            const meanDeviation =
-                tpSlice.reduce((sum, tp) => sum + Math.abs(tp - smaValue), 0) /
-                period;
-            const currentTP = typicalPrices[i + period - 1];
-            return meanDeviation === 0
+    for (let i = 0; i < typicalPrices.length; i++) {
+        smaSum += typicalPrices[i];
+        if (i >= period) smaSum -= typicalPrices[i - period];
+        if (i < period - 1) {
+            result.push(null);
+            continue;
+        }
+        const smaValue = smaSum / period;
+        let meanDevSum = 0;
+        for (let j = i - period + 1; j <= i; j++) {
+            meanDevSum += Math.abs(typicalPrices[j] - smaValue);
+        }
+        const meanDeviation = meanDevSum / period;
+        const currentTP = typicalPrices[i];
+        result.push(
+            meanDeviation === 0
                 ? 0
                 : (currentTP - smaValue) /
-                      (CCI_NORMALIZATION_CONSTANT * meanDeviation);
-        }
-    );
+                      (CCI_NORMALIZATION_CONSTANT * meanDeviation)
+        );
+    }
 
-    return [...nullPrefix, ...computedValues];
+    return result;
 }

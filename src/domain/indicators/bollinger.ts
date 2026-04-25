@@ -13,20 +13,30 @@ export function calculateBollinger(
         return bars.map(() => ({ upper: null, middle: null, lower: null }));
 
     const closes = bars.map(bar => bar.close);
+    const result: BollingerResult[] = [];
+    let windowSum = 0;
+    let windowSumSq = 0;
 
-    return closes.map((_, i) => {
-        if (i < period - 1) return { upper: null, middle: null, lower: null };
-
-        const priceWindow = closes.slice(i - period + 1, i + 1);
-        const middle = priceWindow.reduce((sum, v) => sum + v, 0) / period;
-        const variance =
-            priceWindow.reduce((sum, v) => sum + (v - middle) ** 2, 0) / period;
+    for (let i = 0; i < closes.length; i++) {
+        windowSum += closes[i];
+        windowSumSq += closes[i] ** 2;
+        if (i >= period) {
+            windowSum -= closes[i - period];
+            windowSumSq -= closes[i - period] ** 2;
+        }
+        if (i < period - 1) {
+            result.push({ upper: null, middle: null, lower: null });
+            continue;
+        }
+        const middle = windowSum / period;
+        const variance = Math.max(0, windowSumSq / period - middle ** 2);
         const std = Math.sqrt(variance);
-
-        return {
+        result.push({
             upper: middle + stdDev * std,
             middle,
             lower: middle - stdDev * std,
-        };
-    });
+        });
+    }
+
+    return result;
 }

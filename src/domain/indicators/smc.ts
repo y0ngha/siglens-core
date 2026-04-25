@@ -121,14 +121,20 @@ function detectFairValueGaps(bars: Bar[]): SMCFairValueGap[] {
         })
         .filter((fvg): fvg is SMCFairValueGap => fvg !== null);
 
-    return raw.map(fvg => ({
-        ...fvg,
-        isMitigated: bars.some(
-            (b, idx) =>
-                idx > fvg.index &&
-                (fvg.type === 'bullish' ? b.low <= fvg.high : b.high >= fvg.low)
-        ),
-    }));
+    const mitigated = new Set<number>();
+    for (let i = 0; i < raw.length; i++) {
+        const fvg = raw[i];
+        for (let j = fvg.index + 1; j < bars.length; j++) {
+            const b = bars[j];
+            const isHit =
+                fvg.type === 'bullish' ? b.low <= fvg.high : b.high >= fvg.low;
+            if (isHit) {
+                mitigated.add(i);
+                break;
+            }
+        }
+    }
+    return raw.map((fvg, i) => ({ ...fvg, isMitigated: mitigated.has(i) }));
 }
 
 // ─── Structure break detection (BOS / CHoCH) ─────────────────────────────────

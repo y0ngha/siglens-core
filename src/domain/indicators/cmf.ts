@@ -17,15 +17,23 @@ export function calculateCMF(
     const mfVolumes = bars.map(bar => clv(bar) * bar.volume);
     const volumes = bars.map(bar => bar.volume);
 
-    return bars.map((_, i) => {
-        if (i < period - 1) return null;
-        const mfvSum = mfVolumes
-            .slice(i - period + 1, i + 1)
-            .reduce((sum, v) => sum + v, 0);
-        const volSum = volumes
-            .slice(i - period + 1, i + 1)
-            .reduce((sum, v) => sum + v, 0);
-        if (volSum === 0) return 0;
-        return mfvSum / volSum;
-    });
+    const result: (number | null)[] = [];
+    let mfvWindowSum = 0;
+    let volWindowSum = 0;
+
+    for (let i = 0; i < bars.length; i++) {
+        mfvWindowSum += mfVolumes[i];
+        volWindowSum += volumes[i];
+        if (i >= period) {
+            mfvWindowSum -= mfVolumes[i - period];
+            volWindowSum -= volumes[i - period];
+        }
+        if (i < period - 1) {
+            result.push(null);
+            continue;
+        }
+        result.push(volWindowSum === 0 ? 0 : mfvWindowSum / volWindowSum);
+    }
+
+    return result;
 }
