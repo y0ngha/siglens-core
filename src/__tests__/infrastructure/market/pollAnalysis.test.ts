@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { RawAnalysisResponse } from '@/domain/types';
 
@@ -130,6 +130,10 @@ describe('pollAnalysis 함수는', () => {
             mockGetJobMeta.mockResolvedValue(mockMeta);
         });
 
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
         it('결과를 enrichment하고 done 상태를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawResult);
 
@@ -204,7 +208,6 @@ describe('pollAnalysis 함수는', () => {
 
             const result = await pollAnalysis('job-analyzedAt');
 
-            vi.useRealTimers();
             expect(result.status).toBe('done');
             if (result.status === 'done') {
                 expect(result.result.analyzedAt).toBe(

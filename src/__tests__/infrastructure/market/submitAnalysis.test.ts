@@ -1,12 +1,4 @@
-import {
-    describe,
-    it,
-    expect,
-    vi,
-    beforeEach,
-    afterEach,
-    afterAll,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, Timeframe } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
@@ -120,7 +112,7 @@ describe('submitAnalysis 함수는', () => {
         vi.unstubAllGlobals();
     });
 
-    afterAll(() => {
+    afterEach(() => {
         process.env = originalEnv;
     });
 

@@ -117,10 +117,12 @@ const isSkillCategory = (value: unknown): value is SkillCategory =>
 const parseSkillDisplay = (raw: unknown): SkillDisplay | undefined => {
     if (typeof raw !== 'object' || raw === null) return undefined;
 
+    // typeof raw === 'object' && raw !== null guard passed; cast is safe
     const obj = raw as YamlNode;
     const chartRaw = obj.chart;
     if (typeof chartRaw !== 'object' || chartRaw === null) return undefined;
 
+    // typeof chartRaw === 'object' && chartRaw !== null guard passed; cast is safe
     const chart = chartRaw as YamlNode;
     if (
         typeof chart.show !== 'boolean' &&
