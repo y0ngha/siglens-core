@@ -62,6 +62,33 @@ export async function getJobMeta(jobId: string): Promise<JobMeta | null> {
     return redis.get<JobMeta>(metaKey(jobId));
 }
 
+export async function setJobStatus(
+    jobId: string,
+    status: JobStatus
+): Promise<void> {
+    const redis = createJobRedis();
+    if (!redis) return;
+    await redis.set(statusKey(jobId), status, { ex: JOB_TTL_SECONDS });
+}
+
+export async function setJobResult(
+    jobId: string,
+    result: Record<string, unknown>
+): Promise<void> {
+    const redis = createJobRedis();
+    if (!redis) return;
+    await redis.set(resultKey(jobId), result, { ex: JOB_TTL_SECONDS });
+}
+
+export async function setJobError(
+    jobId: string,
+    message: string
+): Promise<void> {
+    const redis = createJobRedis();
+    if (!redis) return;
+    await redis.set(errorKey(jobId), message, { ex: JOB_TTL_SECONDS });
+}
+
 export async function cancelJob(jobId: string): Promise<void> {
     const redis = createJobRedis();
     if (!redis) return;

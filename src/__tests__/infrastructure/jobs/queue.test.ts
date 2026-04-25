@@ -19,7 +19,10 @@ import {
     getJobResult,
     getJobStatus,
     isJobCancelled,
+    setJobError,
     setJobMeta,
+    setJobResult,
+    setJobStatus,
 } from '@/infrastructure/jobs/queue';
 
 const mockCreateJobRedis = createJobRedis as Mock;
@@ -44,6 +47,21 @@ describe('job queue — redis null (env vars missing)', () => {
             timeframe: '1Hour',
             skillsDegraded: false,
         });
+        expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('setJobStatus returns without calling redis', async () => {
+        await setJobStatus('job1', 'processing');
+        expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('setJobResult returns without calling redis', async () => {
+        await setJobResult('job1', { score: 1 });
+        expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('setJobError returns without calling redis', async () => {
+        await setJobError('job1', 'Something went wrong');
         expect(mockSet).not.toHaveBeenCalled();
     });
 
@@ -164,6 +182,34 @@ describe('job queue — with redis', () => {
             'job:job1:error',
             'job:job1:meta',
             'job:job1:cancelled'
+        );
+    });
+
+    it('setJobStatus calls redis.set with status key', async () => {
+        mockSet.mockResolvedValue('OK');
+        await setJobStatus('job1', 'processing');
+        expect(mockSet).toHaveBeenCalledWith('job:job1:status', 'processing', {
+            ex: SECONDS_PER_HOUR,
+        });
+    });
+
+    it('setJobResult calls redis.set with result key', async () => {
+        mockSet.mockResolvedValue('OK');
+        await setJobResult('job1', { score: 42 });
+        expect(mockSet).toHaveBeenCalledWith(
+            'job:job1:result',
+            { score: 42 },
+            { ex: SECONDS_PER_HOUR }
+        );
+    });
+
+    it('setJobError calls redis.set with error key', async () => {
+        mockSet.mockResolvedValue('OK');
+        await setJobError('job1', 'Something went wrong');
+        expect(mockSet).toHaveBeenCalledWith(
+            'job:job1:error',
+            'Something went wrong',
+            { ex: SECONDS_PER_HOUR }
         );
     });
 });

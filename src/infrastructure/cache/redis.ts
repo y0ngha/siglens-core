@@ -1,19 +1,14 @@
 import { Redis } from '@upstash/redis';
 import type { CacheProvider } from '@/infrastructure/cache/types';
+import { readUpstashConfig } from '@/infrastructure/cache/config';
 
 export function createCacheProvider(): CacheProvider | null {
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const masterToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const config = readUpstashConfig();
+    if (!config) return null;
 
-    if (!url || !masterToken) {
-        return null;
-    }
-
-    const readonlyToken = process.env.UPSTASH_REDIS_REST_READONLY_TOKEN;
-
-    const writer = new Redis({ url, token: masterToken });
-    const reader = readonlyToken
-        ? new Redis({ url, token: readonlyToken })
+    const writer = new Redis({ url: config.url, token: config.token });
+    const reader = config.readonlyToken
+        ? new Redis({ url: config.url, token: config.readonlyToken })
         : writer;
 
     return {

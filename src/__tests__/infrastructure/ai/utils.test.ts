@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { AI_SYSTEM_PROMPT, parseJsonResponse } from '@/infrastructure/ai/utils';
 
 describe('AI_SYSTEM_PROMPT', () => {
@@ -22,19 +22,13 @@ describe('parseJsonResponse', () => {
         expect(result).toEqual({ n: 1 });
     });
 
-    it('throws and logs error on invalid JSON', () => {
-        const consoleSpy = vi
-            .spyOn(console, 'error')
-            .mockImplementation(() => {});
+    it('throws on invalid JSON', () => {
         expect(() =>
             parseJsonResponse('not valid json', 'gemini')
         ).toThrowError('Failed to parse gemini response as JSON');
-        expect(consoleSpy).toHaveBeenCalled();
-        consoleSpy.mockRestore();
     });
 
     it('thrown error has cause', () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
         expect.assertions(1);
         try {
             parseJsonResponse('bad json', 'gemini');

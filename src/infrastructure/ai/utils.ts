@@ -20,7 +20,6 @@ export function parseJsonResponse<T>(text: string, source: string): T {
         // Safe only if the caller validates the schema downstream.
         return JSON.parse(stripMarkdownCodeBlock(text)) as T;
     } catch (error) {
-        console.error(`Failed to parse ${source} response. Raw text:`, text);
         throw new Error(`Failed to parse ${source} response as JSON`, {
             cause: error,
         });

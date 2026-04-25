@@ -60,3 +60,20 @@ export function buildAnalysisCacheKey(
 ): string {
     return `analysis:${symbol}:${timeframe}`;
 }
+
+export interface UpstashEnvConfig {
+    url: string;
+    token: string;
+    readonlyToken: string;
+}
+
+export function readUpstashConfig(): UpstashEnvConfig | null {
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) return null;
+    return {
+        url,
+        token,
+        readonlyToken: process.env.UPSTASH_REDIS_REST_READONLY_TOKEN ?? '',
+    };
+}
