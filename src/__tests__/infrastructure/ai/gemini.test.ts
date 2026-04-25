@@ -62,6 +62,20 @@ describe('callGeminiWithKeyFallback', () => {
         expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     });
 
+    it('uses paid key directly when freeApiKey is empty string', async () => {
+        mockGenerateContent.mockResolvedValue({ text: 'paid response' });
+
+        const result = await callGeminiWithKeyFallback({
+            freeApiKey: '',
+            paidApiKey: 'paid-key',
+            model: 'gemini-2.0-flash',
+            contents: 'Hello',
+        });
+
+        expect(result).toBe('paid response');
+        expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
+
     it('throws when paid key also fails', async () => {
         mockGenerateContent.mockRejectedValue(new Error('all failed'));
 

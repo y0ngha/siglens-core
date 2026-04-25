@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AI_SYSTEM_PROMPT, parseJsonResponse } from '@/infrastructure/ai/utils';
+import { AI_SYSTEM_PROMPT } from '@/infrastructure/ai/utils';
 
 describe('AI_SYSTEM_PROMPT', () => {
     it('is a non-empty string', () => {
@@ -17,35 +17,5 @@ describe('AI_SYSTEM_PROMPT', () => {
 
     it('contains Deterministic principle', () => {
         expect(AI_SYSTEM_PROMPT).toContain('Deterministic');
-    });
-});
-
-describe('parseJsonResponse', () => {
-    it('parses plain JSON string', () => {
-        const result = parseJsonResponse('{"n":1}', 'test');
-        expect(result).toEqual({ n: 1 });
-    });
-
-    it('parses JSON inside markdown code block', () => {
-        const result = parseJsonResponse('```json\n{"n":1}\n```', 'test');
-        expect(result).toEqual({ n: 1 });
-    });
-
-    it('throws on invalid JSON', () => {
-        expect(() =>
-            parseJsonResponse('not valid json', 'gemini')
-        ).toThrowError('Failed to parse gemini response as JSON');
-    });
-
-    it('thrown error has cause', () => {
-        expect.assertions(1);
-        try {
-            parseJsonResponse('bad json', 'gemini');
-        } catch (err) {
-            // parseJsonResponse는 { cause: error } 옵션과 함께 Error를 던지므로 cause 필드가 런타임에 항상 존재
-            expect((err as { cause: unknown }).cause).toBeInstanceOf(
-                SyntaxError
-            );
-        }
     });
 });

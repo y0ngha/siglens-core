@@ -1,4 +1,4 @@
-import { stripMarkdownCodeBlock } from '@/domain/utils';
+export { parseJsonResponse } from '@/domain/utils';
 
 export const AI_SYSTEM_PROMPT = `You are a senior technical analyst specializing in equity chart analysis.
 Your job is to interpret bar data, technical indicators, and candle/chart patterns to produce a structured analysis in JSON.
@@ -13,13 +13,3 @@ OUTPUT FORMAT
 - Respond with a SINGLE valid JSON object and nothing else.
 - No prose, no commentary, no markdown code fences.
 - All text content inside the JSON (summary, description, reason, basis, condition, positionAnalysis, entry, exit, riskReward) MUST be written in Korean (한국어) in formal speech level (존댓말, e.g. "~입니다", "~습니다").`;
-
-export function parseJsonResponse(text: string, source: string): unknown {
-    try {
-        return JSON.parse(stripMarkdownCodeBlock(text));
-    } catch (error) {
-        throw new Error(`Failed to parse ${source} response as JSON`, {
-            cause: error,
-        });
-    }
-}

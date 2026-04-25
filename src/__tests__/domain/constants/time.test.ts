@@ -50,9 +50,9 @@ describe('time constants', () => {
 
     it('derived relationships hold', () => {
         expect(MS_PER_MINUTE).toBe(SECONDS_PER_MINUTE * MS_PER_SECOND);
-        expect(MS_PER_HOUR).toBe(60 * MS_PER_MINUTE);
+        expect(MS_PER_HOUR).toBe(SECONDS_PER_MINUTE * MS_PER_MINUTE);
         expect(MS_PER_DAY).toBe(24 * MS_PER_HOUR);
-        expect(SECONDS_PER_HOUR).toBe(60 * SECONDS_PER_MINUTE);
+        expect(SECONDS_PER_HOUR).toBe(SECONDS_PER_MINUTE * SECONDS_PER_MINUTE);
         expect(SECONDS_PER_DAY).toBe(24 * SECONDS_PER_HOUR);
         expect(SECONDS_PER_YEAR).toBe(365 * SECONDS_PER_DAY);
     });
