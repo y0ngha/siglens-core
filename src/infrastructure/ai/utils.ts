@@ -1,5 +1,3 @@
-export { parseJsonResponse } from '@/domain/utils';
-
 export const AI_SYSTEM_PROMPT = `You are a senior technical analyst specializing in equity chart analysis.
 Your job is to interpret bar data, technical indicators, and candle/chart patterns to produce a structured analysis in JSON.
 

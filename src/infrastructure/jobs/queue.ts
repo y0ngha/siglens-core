@@ -6,8 +6,7 @@ import type {
 } from '@/infrastructure/jobs/types';
 import { SECONDS_PER_HOUR } from '@/domain/constants/time';
 
-// Upstash Redis는 HTTP REST 기반이므로 클라이언트 인스턴스 생성 비용이 없다.
-// TCP 연결을 유지하지 않으므로 함수마다 호출해도 성능 영향이 없다.
+// Upstash는 HTTP REST 기반 — TCP 연결 없음, 함수마다 인스턴스 생성해도 성능 영향 없음.
 const JOB_TTL_SECONDS = SECONDS_PER_HOUR;
 
 function statusKey(jobId: string): string {

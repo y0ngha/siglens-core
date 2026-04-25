@@ -60,10 +60,6 @@
 - Rule: MISTAKES.md Tests #6 — 테스트는 실제 구현 동작만 검증; 존재하지 않는 사이드이펙트를 단언하지 않음
 - Context: `utils.test.ts`에서 `vi.spyOn(console, 'error')`로 에러 로깅을 검증했으나 `parseJsonResponse`는 `console.error`를 호출하지 않음; consoleSpy 제거
 
-- Violation: re-export 테스트(`parseNumberEnv`, `stripMarkdownCodeBlock`)가 `ai/utils.ts`에 포함되어 있었음
-- Rule: MISTAKES.md Architecture — infrastructure 모듈은 domain 유틸리티를 re-export하지 않음; 각 심볼은 원래 정의된 모듈에서 테스트
-- Context: `ai/utils.ts`가 domain utils를 re-export하고 있었고 해당 테스트가 `utils.test.ts`에 포함; re-export 제거 및 테스트 삭제
-
 - Violation: 여러 파일(`cache/redis.ts`, `jobs/redis.ts`)에서 `process.env.UPSTASH_REDIS_REST_URL/TOKEN`을 직접 읽음
 - Rule: MISTAKES.md Infrastructure §4 — 환경변수는 한 곳에서만 읽어야 함(중앙화)
 - Context: `cache/config.ts`에 `readUpstashConfig()` 추가; 두 Redis 팩토리가 해당 함수를 통해 config를 얻도록 변경

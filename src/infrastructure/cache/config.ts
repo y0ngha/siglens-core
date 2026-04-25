@@ -20,8 +20,6 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
 // 전날 분석 캐시를 장 시작 전에 갱신하기 위한 기준 시각
 export const CACHE_EXPIRY_HOUR_KST = 17;
 
-export { computeSecondsUntilCacheExpiry } from '@/domain/utils';
-
 export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     return Math.min(
         ANALYSIS_CACHE_TTL[timeframe],

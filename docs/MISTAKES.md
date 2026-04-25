@@ -396,4 +396,13 @@ and have been removed from this file.
    ❌ interface CallGeminiWithKeyFallbackOptions { ... } defined in gemini.ts
    ✅ interface JobRedisClient { ... } in jobs/types.ts; jobs/redis.ts imports and implements against it
    ✅ interface UpstashEnvConfig { ... } in cache/types.ts (shared across cache/redis.ts and jobs/redis.ts)
+
+5. Infrastructure module re-exporting domain symbols
+   → Infrastructure modules must not act as transit paths for domain exports
+   → Consumers must import domain symbols directly from domain/, not through infrastructure/
+   ❌ // infrastructure/ai/utils.ts
+      export { parseJsonResponse } from '@/domain/utils';
+   ❌ // infrastructure/cache/config.ts
+      export { computeSecondsUntilCacheExpiry } from '@/domain/utils';
+   ✅ Consumers import directly: import { parseJsonResponse } from '@/domain/utils'
 ```

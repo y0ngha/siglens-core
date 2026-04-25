@@ -137,16 +137,17 @@ infrastructure/cache/
 
 | 키 패턴 | 값 타입 | 설명 |
 |---|---|---|
-| `job:status:{jobId}` | `JobStatus` | 잡 상태 (`processing` \| `done` \| `error`) |
-| `job:result:{jobId}` | `unknown` | AI 분석 결과 (JSON) |
-| `job:error:{jobId}` | `string` | 실패 원인 메시지 |
-| `job:meta:{jobId}` | `JobMeta` | 잡 메타데이터 (symbol, timeframe 등) |
-| `job:cancelled:{jobId}` | `1` | 취소 플래그 (존재 여부로 판단) |
+| `job:{jobId}:status` | `JobStatus` | 잡 상태 (`processing` \| `done` \| `error`) |
+| `job:{jobId}:result` | `unknown` | AI 분석 결과 (JSON) |
+| `job:{jobId}:error` | `string` | 실패 원인 메시지 |
+| `job:{jobId}:meta` | `JobMeta` | 잡 메타데이터 (symbol, timeframe 등) |
+| `job:{jobId}:cancelled` | `"1"` | 취소 플래그 (존재 여부로 판단) |
 
 ### Job 라이프사이클 함수
 
-`infrastructure/jobs/queue.ts`는 8개의 순수 라이프사이클 함수를 제공한다:
-`enqueue`, `dequeue`, `complete`, `fail`, `cancel`, `getJob`, `listJobs`, `listJobsByStatus`
+`infrastructure/jobs/queue.ts`는 11개의 순수 라이프사이클 함수를 제공한다:
+`setJobMeta`, `getJobStatus`, `getJobResult`, `getJobError`, `getJobMeta`,
+`setJobStatus`, `setJobResult`, `setJobError`, `cancelJob`, `isJobCancelled`, `cleanupJob`
 
 ### 구현 위치
 
