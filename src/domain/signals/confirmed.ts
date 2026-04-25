@@ -204,8 +204,9 @@ export function detectBollingerLowerBounce(
     indicators: IndicatorResult
 ): Signal | null {
     const bb = indicators.bollinger;
-    if (bars.length < 2 || bb.length < 2) return null;
-    const lastIdx = bars.length - 1;
+    const barsLength = bars.length;
+    if (barsLength < 2 || bb.length < 2) return null;
+    const lastIdx = barsLength - 1;
     const prevBar = bars[lastIdx - 1];
     const curBar = bars[lastIdx];
     const prevBB = bb[lastIdx - 1];
@@ -225,8 +226,9 @@ export function detectBollingerUpperBreakout(
     indicators: IndicatorResult
 ): Signal | null {
     const bb = indicators.bollinger;
-    if (bars.length === 0 || bb.length === 0) return null;
-    const lastIdx = bars.length - 1;
+    const barsLength = bars.length;
+    if (barsLength === 0 || bb.length === 0) return null;
+    const lastIdx = barsLength - 1;
     const curBar = bars[lastIdx];
     const curBB = bb[lastIdx];
     if (curBB.upper === null) return null;
@@ -248,8 +250,8 @@ export function detectSupertrendBullishFlip(
     const lastIdx = st.length - 1;
     const start = Math.max(1, lastIdx - CROSS_LOOKBACK_BARS + 1);
     for (let i = start; i <= lastIdx; i++) {
-        const prev = st[i - 1]?.trend;
-        const cur = st[i]?.trend;
+        const prev = st[i - 1].trend;
+        const cur = st[i].trend;
         if (prev === 'down' && cur === 'up') {
             return {
                 type: 'supertrend_bullish_flip',
@@ -267,8 +269,9 @@ export function detectIchimokuCloudBreakout(
     indicators: IndicatorResult
 ): Signal | null {
     const ichimoku = indicators.ichimoku;
-    if (bars.length < 2 || ichimoku.length < 2) return null;
-    const lastIdx = bars.length - 1;
+    const barsLength = bars.length;
+    if (barsLength < 2 || ichimoku.length < 2) return null;
+    const lastIdx = barsLength - 1;
 
     const prevIchi = ichimoku[lastIdx - 1];
     const curIchi = ichimoku[lastIdx];
@@ -392,8 +395,8 @@ export function detectParabolicSarFlip(
     const lastIdx = sar.length - 1;
     const start = Math.max(1, lastIdx - CROSS_LOOKBACK_BARS + 1);
     for (let i = start; i <= lastIdx; i++) {
-        const prev = sar[i - 1]?.trend;
-        const cur = sar[i]?.trend;
+        const prev = sar[i - 1].trend;
+        const cur = sar[i].trend;
         if (prev === 'down' && cur === 'up') {
             return {
                 type: 'parabolic_sar_flip',
@@ -411,8 +414,9 @@ export function detectKeltnerUpperBreakout(
     indicators: IndicatorResult
 ): Signal | null {
     const keltner = indicators.keltnerChannel;
-    if (bars.length < 2 || keltner.length < 2) return null;
-    const lastIdx = bars.length - 1;
+    const barsLength = bars.length;
+    if (barsLength < 2 || keltner.length < 2) return null;
+    const lastIdx = barsLength - 1;
     const prevKc = keltner[lastIdx - 1];
     const curKc = keltner[lastIdx];
     if (prevKc.upper === null || curKc.upper === null) return null;

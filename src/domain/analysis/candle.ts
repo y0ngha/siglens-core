@@ -77,8 +77,8 @@ export function detectCandlePattern(bar: Bar): CandlePattern {
     if (hasLongLower && hasShortUpper)
         return bullish ? 'hammer' : 'hanging_man';
 
-    // Belt Hold (긴 몸통, 한쪽 꼬리 없음)
-    if (isLongBody(bar)) {
+    // Belt Hold (긴 몸통, 한쪽 꼬리 없음) — range > 0 guaranteed by early return above
+    if (bodyRatio >= LONG_DAY_BODY_RATIO) {
         if (bullish && lower <= bs * BELT_HOLD_TAIL_RATIO)
             return 'bullish_belt_hold';
         if (!bullish && upper <= bs * BELT_HOLD_TAIL_RATIO)
@@ -410,13 +410,14 @@ function detect3CandlePattern(
 export function detectMultiCandlePattern(
     bars: Bar[]
 ): MultiCandlePattern | null {
-    if (bars.length < 2) return null;
+    const n = bars.length;
+    if (n < 2) return null;
 
-    const last = bars[bars.length - 1];
-    const prev = bars[bars.length - 2];
+    const last = bars[n - 1];
+    const prev = bars[n - 2];
 
-    if (bars.length >= 3) {
-        const prev2 = bars[bars.length - 3];
+    if (n >= 3) {
+        const prev2 = bars[n - 3];
         const result = detect3CandlePattern(prev2, prev, last);
         if (result !== null) return result;
     }

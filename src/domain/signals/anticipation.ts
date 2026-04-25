@@ -74,19 +74,24 @@ export function computeEmaSlope(
 
 // 표준 mean-rank 아닌 rank-based — squeeze 감지에서 min→0, max→1이 되도록 설계.
 export function percentileRank(value: number, xs: number[]): number | null {
-    if (xs.length === 0) return null;
-    if (xs.length === 1) {
+    const n = xs.length;
+    if (n === 0) return null;
+    if (n === 1) {
         if (value === xs[0]) return 0.5;
         return value > xs[0] ? 1 : 0;
     }
-    const below = xs.filter(x => x < value).length;
-    const equal = xs.filter(x => x === value).length;
-    // all-equal degenerate case — 분산 0에서 min/max 오분류 방지.
-    if (equal === xs.length) return 0.5;
-    if (equal === 0) {
-        return below / xs.length;
+    let below = 0;
+    let equal = 0;
+    for (const x of xs) {
+        if (x < value) below++;
+        else if (x === value) equal++;
     }
-    return below / (xs.length - 1);
+    // all-equal degenerate case — 분산 0에서 min/max 오분류 방지.
+    if (equal === n) return 0.5;
+    if (equal === 0) {
+        return below / n;
+    }
+    return below / (n - 1);
 }
 
 function detectRegularDivergence(
@@ -111,8 +116,9 @@ function detectRegularDivergence(
 
     // Convert local-window indices back to absolute indices
     const pivots = pivotsLocal.map(i => i + windowStart);
-    const p1 = pivots[pivots.length - 2];
-    const p2 = pivots[pivots.length - 1];
+    const pivotsLen = pivots.length;
+    const p1 = pivots[pivotsLen - 2];
+    const p2 = pivots[pivotsLen - 1];
 
     // Freshness: second pivot must be within last N bars
     if (lastIdx - p2 > DIVERGENCE_FRESHNESS_BARS) return null;
@@ -175,7 +181,7 @@ export function detectMacdHistogramBullishConvergence(
     for (const p of tail) {
         if (p.histogram === null || !(p.histogram < 0)) return null;
     }
-    for (let i = 1; i < tail.length; i++) {
+    for (let i = 1; i < HISTOGRAM_CONVERGENCE_BARS; i++) {
         // Non-null asserted: prior loop guarantees histogram !== null for all tail elements.
         const prev = tail[i - 1]!.histogram!;
         const cur = tail[i]!.histogram!;
@@ -200,7 +206,7 @@ export function detectMacdHistogramBearishConvergence(
     for (const p of tail) {
         if (p.histogram === null || !(p.histogram > 0)) return null;
     }
-    for (let i = 1; i < tail.length; i++) {
+    for (let i = 1; i < HISTOGRAM_CONVERGENCE_BARS; i++) {
         // Non-null asserted: prior loop guarantees histogram !== null for all tail elements.
         const prev = tail[i - 1]!.histogram!;
         const cur = tail[i]!.histogram!;
@@ -219,9 +225,10 @@ function computeSqueezeState(
     indicators: IndicatorResult
 ): { lastIdx: number; pctB: number; slope: number } | null {
     const bb = indicators.bollinger;
-    if (bb.length < SQUEEZE_LOOKBACK_BARS) return null;
-    if (bars.length !== bb.length) return null;
-    const lastIdx = bb.length - 1;
+    const bbLength = bb.length;
+    if (bbLength < SQUEEZE_LOOKBACK_BARS) return null;
+    if (bars.length !== bbLength) return null;
+    const lastIdx = bbLength - 1;
     const lastBB = bb[lastIdx];
     const widthLast = computeBbWidth(lastBB);
     if (widthLast === null) return null;
@@ -296,14 +303,15 @@ export function detectSupportProximityBullish(
     bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
-    if (bars.length < SR_APPROACH_LOOKBACK + 1) return null;
-    const lastIdx = bars.length - 1;
+    const barsLength = bars.length;
+    if (barsLength < SR_APPROACH_LOOKBACK + 1) return null;
+    const lastIdx = barsLength - 1;
     const closeLast = bars[lastIdx].close;
     const closePrev5 = bars[lastIdx - SR_APPROACH_LOOKBACK].close;
     if (!(closeLast < closePrev5)) return null; // must be falling
 
     for (const period of SR_MA_PERIODS) {
-        if (bars.length < period) continue;
+        if (barsLength < period) continue;
         // calculateMA returns a real number at lastIdx when bars.length >= period (checked above)
         const ma = (indicators.ma[period] ?? calculateMA(bars, period))[
             lastIdx
@@ -324,14 +332,15 @@ export function detectResistanceProximityBearish(
     bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
-    if (bars.length < SR_APPROACH_LOOKBACK + 1) return null;
-    const lastIdx = bars.length - 1;
+    const barsLength = bars.length;
+    if (barsLength < SR_APPROACH_LOOKBACK + 1) return null;
+    const lastIdx = barsLength - 1;
     const closeLast = bars[lastIdx].close;
     const closePrev5 = bars[lastIdx - SR_APPROACH_LOOKBACK].close;
     if (!(closeLast > closePrev5)) return null; // must be rising
 
     for (const period of SR_MA_PERIODS) {
-        if (bars.length < period) continue;
+        if (barsLength < period) continue;
         // calculateMA returns a real number at lastIdx when bars.length >= period (checked above)
         const ma = (indicators.ma[period] ?? calculateMA(bars, period))[
             lastIdx

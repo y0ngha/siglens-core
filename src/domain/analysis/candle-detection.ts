@@ -85,9 +85,10 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     const extendedCount =
         CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER;
     const extendedBars = bars.slice(-extendedCount);
+    const extendedLength = extendedBars.length;
     const detectionStartIndex = Math.max(
         0,
-        extendedBars.length - CANDLE_PATTERN_DETECTION_BARS
+        extendedLength - CANDLE_PATTERN_DETECTION_BARS
     );
 
     // Detect multi-candle patterns and collect involved bar indices
@@ -95,7 +96,7 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
         number,
         { pattern: MultiCandlePattern; involvedIndices: number[] }
     >();
-    for (let i = 0; i < extendedBars.length; i++) {
+    for (let i = 0; i < extendedLength; i++) {
         if (i < detectionStartIndex) continue;
         const candleWindow = extendedBars.slice(Math.max(0, i - 2), i + 1);
         const detected = detectMultiCandlePattern(candleWindow);
