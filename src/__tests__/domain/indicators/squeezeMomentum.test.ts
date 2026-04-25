@@ -94,8 +94,7 @@ describe('calculateSqueezeMomentum', () => {
             // linreg(constant=4.75, kcLength) = 4.75
             const bars = Array.from(
                 { length: SQUEEZE_MOMENTUM_MIN_BARS + 5 },
-                (_, i) =>
-                    makeBar(100 + i * 0.5, 90 + i * 0.5, 95 + i * 0.5, i)
+                (_, i) => makeBar(100 + i * 0.5, 90 + i * 0.5, 95 + i * 0.5, i)
             );
             const result = calculateSqueezeMomentum(bars);
             const firstValid = result.find(r => r.momentum !== null);

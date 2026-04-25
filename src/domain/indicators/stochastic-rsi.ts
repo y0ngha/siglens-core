@@ -65,9 +65,7 @@ export function calculateStochRSI(
     }
 
     // ── Pass 2: %K — running SMA of non-null rawStochRSI values ───────────────
-    const kValues: (number | null)[] = new Array(rawStochRSI.length).fill(
-        null
-    );
+    const kValues: (number | null)[] = new Array(rawStochRSI.length).fill(null);
     let kSum = 0;
     let kBufHead = 0;
     let kBufSize = 0;

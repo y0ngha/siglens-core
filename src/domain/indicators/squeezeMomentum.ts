@@ -86,7 +86,8 @@ export function calculateSqueezeMomentum(
             const maxH = winMaxH[i];
             const minL = winMinL[i];
             if (maxH === null || minL === null) continue;
-            deltas[i] = closes[i] - ((maxH + minL) / 2 + closeSum / kcLength) / 2;
+            deltas[i] =
+                closes[i] - ((maxH + minL) / 2 + closeSum / kcLength) / 2;
         }
     }
 
@@ -227,9 +228,7 @@ export function calculateSqueezeMomentum(
 
         // ── Momentum via inline linreg on lrBuf ───────────────────────────
         const slope =
-            lrDenom !== 0
-                ? (lrN * lrSumXY - lrSumX * lrSumY) / lrDenom
-                : 0;
+            lrDenom !== 0 ? (lrN * lrSumXY - lrSumX * lrSumY) / lrDenom : 0;
         const intercept = (lrSumY - slope * lrSumX) / lrN;
         const momentum = intercept + slope * (lrN - 1);
 

@@ -102,10 +102,7 @@ describe('calculateSupertrend', () => {
                 SUPERTREND_ATR_PERIOD,
                 SUPERTREND_MULTIPLIER
             );
-            expect(result[SUPERTREND_ATR_PERIOD].supertrend).toBeCloseTo(
-                40,
-                5
-            );
+            expect(result[SUPERTREND_ATR_PERIOD].supertrend).toBeCloseTo(40, 5);
         });
     });
 });
