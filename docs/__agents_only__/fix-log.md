@@ -45,3 +45,16 @@
 - Violation: `1000` 매직 넘버를 `prompt.ts`에서 인라인으로 사용
 - Rule: MISTAKES.md Coding Paradigm #13 — 하드코딩된 리터럴은 모듈 레벨 상수로 추출
 - Context: `bar.time * 1000`에서 `1000`은 초→밀리초 변환 팩터; `SECONDS_TO_MS` 상수로 추출
+
+## [PR #23 Round 5 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
+- Violation: `detectCandlePattern` belt hold 블록 fallthrough 분기(`bodyRatio ≥ 0.6`이지만 belt hold 조건 불충족 → `'bullish'`/`'bearish'` 반환) 테스트 없음
+- Rule: MISTAKES.md Tests #15 — 100% branch coverage; domain 함수의 모든 분기 테스트 필요
+- Context: `candle.test.ts`에서 `BULLISH_BAR`의 bodyRatio가 0.556이어서 belt hold 블록에 진입하지 않음; fallthrough 케이스를 위한 별도 fixture 추가
+
+- Violation: `countSqueezeDuration`에서 종료 조건이 수렴 predicate인데 `for` 루프 사용
+- Rule: CONVENTIONS.md — 루프 조건이 카운터가 아닌 수렴 predicate일 때 `while` 사용
+- Context: `prompt.ts`의 `countSqueezeDuration`은 뒤에서부터 `sqzOn === true`가 끊기는 지점을 찾는 수렴 탐색; `while` 루프로 교체
+
+- Violation: DOMAIN.md의 `Timeframe` 타입 및 관련 명세가 실제 코드와 불일치
+- Rule: MISTAKES.md Documentation Sync #2 — 구현 변경 시 docs 동기화 필수
+- Context: 코드의 `Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day'`인데 DOMAIN.md는 `'1Min' | '5Min' | '15Min' | '1Hour' | '1Day'`로 표기; TIMEFRAMES 상수, EMA 테이블, 인디케이터 설정표, 봉 개수 기준 모두 동기화
