@@ -95,7 +95,3 @@
 - Rule: MISTAKES.md Design #2 — 동일 외부 자원에 대한 클라이언트는 모듈 스코프 싱글턴으로 관리
 - Context: config key 기반 싱글턴으로 전환; config 미설정 시 null 반환, config 동일 시 캐시된 인스턴스 반환
 
-- Violation: `reanalyzeCooldown.ts` 모듈 상단과 함수 3개에 여러 줄 JSDoc 블록 사용
-- Rule: CONVENTIONS.md — 다단락 docstring 및 여러 줄 주석 블록 절대 금지; 최대 한 줄 주석만 허용
-- Context: 모듈 JSDoc (L7-L16), 함수별 JSDoc 3개 모두 제거
-
