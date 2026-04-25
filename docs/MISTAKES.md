@@ -317,7 +317,6 @@ and have been removed from this file.
 
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
-   → Single-line summaries only; multi-paragraph docstrings must be condensed to one line per function
    → When changing function implementation, update related comments immediately
 ```
 
