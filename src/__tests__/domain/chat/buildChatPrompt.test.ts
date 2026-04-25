@@ -131,6 +131,40 @@ describe('buildChatPrompt 함수는', () => {
             expect(result.systemPrompt).toContain('200.00');
             expect(result.systemPrompt).toContain('Breakout target');
         });
+
+        it('priceTargets.bullish가 null이면 "None"을 포함한다', () => {
+            const analysis: AnalysisResponse = {
+                ...MINIMAL_ANALYSIS,
+                priceTargets: {
+                    bullish: null,
+                    bearish: null,
+                },
+            };
+            const result = buildChatPrompt('AAPL', '1Day', analysis, [], '?');
+            expect(result.systemPrompt).toContain('Bullish scenario: None');
+            expect(result.systemPrompt).toContain('Bearish scenario: None');
+        });
+
+        it('detected: true 패턴이 있으면 skillName과 trend를 포함한다', () => {
+            const analysis: AnalysisResponse = {
+                ...MINIMAL_ANALYSIS,
+                patternSummaries: [
+                    {
+                        id: 'p1',
+                        patternName: 'Head and Shoulders',
+                        skillName: 'Head and Shoulders',
+                        detected: true,
+                        trend: 'bearish',
+                        summary: '하락 반전 패턴',
+                        confidenceWeight: 0.8,
+                    },
+                ],
+            };
+            const result = buildChatPrompt('AAPL', '1Day', analysis, [], '?');
+            expect(result.systemPrompt).toContain(
+                'Head and Shoulders (bearish)'
+            );
+        });
     });
 
     describe('messages를', () => {

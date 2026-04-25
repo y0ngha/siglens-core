@@ -60,6 +60,7 @@ type SkillGroupKey = SkillType | 'regular';
 const INDICATOR_DECIMAL_PLACES = 2;
 const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
+const SECONDS_TO_MS = 1000;
 
 // 테스트/외부 호출자가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
 export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
@@ -240,7 +241,7 @@ const formatLongTermContext = (bars: Bar[]): string => {
 };
 
 const formatBarRow = (bar: Bar): string => {
-    const datetime = new Date(bar.time * 1000)
+    const datetime = new Date(bar.time * SECONDS_TO_MS)
         .toISOString()
         .replace('T', ' ')
         .slice(0, DATETIME_DISPLAY_LENGTH);

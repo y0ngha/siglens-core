@@ -40,3 +40,8 @@
 - Violation: `as const` in `buildChatPrompt.ts` without a guarantee comment
 - Rule: MISTAKES.md TypeScript #7 — every safe-cast `as` must have a comment explaining the guarantee
 - Context: `{ role: 'user' as const }` in `buildChatPrompt.ts` lacked the required inline comment; added per pattern from `candle-detection.ts`
+
+## [PR #23 Round 4 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
+- Violation: `1000` 매직 넘버를 `prompt.ts`에서 인라인으로 사용
+- Rule: MISTAKES.md Coding Paradigm #13 — 하드코딩된 리터럴은 모듈 레벨 상수로 추출
+- Context: `bar.time * 1000`에서 `1000`은 초→밀리초 변환 팩터; `SECONDS_TO_MS` 상수로 추출

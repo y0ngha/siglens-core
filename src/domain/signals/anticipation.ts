@@ -80,12 +80,13 @@ export function percentileRank(value: number, xs: number[]): number | null {
         if (value === xs[0]) return 0.5;
         return value > xs[0] ? 1 : 0;
     }
-    let below = 0;
-    let equal = 0;
-    for (const x of xs) {
-        if (x < value) below++;
-        else if (x === value) equal++;
-    }
+    const { below, equal } = xs.reduce(
+        (acc, x) => ({
+            below: acc.below + (x < value ? 1 : 0),
+            equal: acc.equal + (x === value ? 1 : 0),
+        }),
+        { below: 0, equal: 0 }
+    );
     // all-equal degenerate case — 분산 0에서 min/max 오분류 방지.
     if (equal === n) return 0.5;
     if (equal === 0) {
