@@ -41,11 +41,11 @@ export { calculateIndicators } from './domain/indicators';
 
 export { createMarketDataProvider } from './infrastructure/market/factory';
 export { fetchBarsWithIndicators } from './infrastructure/market/barsApi';
-export { submitAnalysis } from './infrastructure/market/submitAnalysis';
-export { pollAnalysis } from './infrastructure/market/pollAnalysis';
-export { cancelAnalysisJob } from './infrastructure/market/cancelAnalysisJob';
-export { submitBriefing } from './infrastructure/market/submitBriefing';
-export { pollBriefing } from './infrastructure/market/pollBriefing';
+export { submitAnalysis } from './application/market/submitAnalysis';
+export { pollAnalysis } from './application/market/pollAnalysis';
+export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';
+export { submitBriefing } from './application/market/submitBriefing';
+export { pollBriefing } from './application/market/pollBriefing';
 export {
     tryAcquireReanalyzeCooldown,
     releaseReanalyzeCooldown,

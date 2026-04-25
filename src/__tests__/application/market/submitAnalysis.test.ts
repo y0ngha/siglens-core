@@ -8,7 +8,7 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/infrastructure/market/barsApi');
 
-import { submitAnalysis } from '@/infrastructure/market/submitAnalysis';
+import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';

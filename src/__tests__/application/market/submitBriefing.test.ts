@@ -13,7 +13,7 @@ vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
-import { submitBriefing } from '@/infrastructure/market/submitBriefing';
+import { submitBriefing } from '@/application/market/submitBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';

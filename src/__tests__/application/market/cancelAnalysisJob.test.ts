@@ -3,7 +3,7 @@ import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/jobs/queue');
 
-import { cancelAnalysisJob } from '@/infrastructure/market/cancelAnalysisJob';
+import { cancelAnalysisJob } from '@/application/market/cancelAnalysisJob';
 import { cancelJob } from '@/infrastructure/jobs/queue';
 
 const mockCancelJob = cancelJob as Mock;

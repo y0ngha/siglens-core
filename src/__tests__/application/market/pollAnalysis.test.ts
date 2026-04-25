@@ -14,7 +14,7 @@ vi.mock('@/infrastructure/cache/config', async () => {
     return { ...actual, computeEffectiveTtl: vi.fn().mockReturnValue(3600) };
 });
 
-import { pollAnalysis } from '@/infrastructure/market/pollAnalysis';
+import { pollAnalysis } from '@/application/market/pollAnalysis';
 import {
     getJobStatus,
     getJobError,

@@ -5,7 +5,7 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 
-import { pollBriefing } from '@/infrastructure/market/pollBriefing';
+import { pollBriefing } from '@/application/market/pollBriefing';
 import {
     getJobStatus,
     getJobError,
