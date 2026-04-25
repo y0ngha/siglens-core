@@ -70,6 +70,16 @@ const BULLISH_BAR = makeBar(100, 107, 98, 105);
 // regular bearish
 const BEARISH_BAR = makeBar(105, 107, 98, 100);
 
+// belt_hold fallthrough bullish: open=100,high=114.5,low=98,close=110
+//   body=10, range=16.5, bodyRatio≈0.606(≥0.6) — enters belt hold block
+//   lowerShadow=2 > body*0.1=1 → NOT bullish_belt_hold, falls through → 'bullish'
+const BELT_HOLD_FALLTHROUGH_BULLISH_BAR = makeBar(100, 114.5, 98, 110);
+
+// belt_hold fallthrough bearish: open=110,high=114.5,low=98,close=100
+//   body=10, range=16.5, bodyRatio≈0.606(≥0.6) — enters belt hold block
+//   upperShadow=4.5 > body*0.1=1 → NOT bearish_belt_hold, falls through → 'bearish'
+const BELT_HOLD_FALLTHROUGH_BEARISH_BAR = makeBar(110, 114.5, 98, 100);
+
 describe('detectCandlePattern', () => {
     describe('flat', () => {
         it('high === low이면 flat을 반환한다', () => {
@@ -128,6 +138,18 @@ describe('detectCandlePattern', () => {
 
         it('조건에 해당하지 않는 음봉은 bearish를 반환한다', () => {
             expect(detectCandlePattern(BEARISH_BAR)).toBe('bearish');
+        });
+
+        it('몸통비율 ≥ 0.6이지만 아래꼬리가 belt hold 조건 초과인 양봉은 bullish를 반환한다', () => {
+            expect(detectCandlePattern(BELT_HOLD_FALLTHROUGH_BULLISH_BAR)).toBe(
+                'bullish'
+            );
+        });
+
+        it('몸통비율 ≥ 0.6이지만 위꼬리가 belt hold 조건 초과인 음봉은 bearish를 반환한다', () => {
+            expect(detectCandlePattern(BELT_HOLD_FALLTHROUGH_BEARISH_BAR)).toBe(
+                'bearish'
+            );
         });
     });
 
