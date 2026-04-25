@@ -40,7 +40,7 @@ export { calculateMA } from './domain/indicators/ma';
 export { calculateIndicators } from './domain/indicators';
 
 export { createMarketDataProvider } from './infrastructure/market/factory';
-export { fetchBarsWithIndicators } from './infrastructure/market/barsApi';
+export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { submitAnalysis } from './application/market/submitAnalysis';
 export { pollAnalysis } from './application/market/pollAnalysis';
 export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';

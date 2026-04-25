@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import { fetchBarsWithIndicators } from '@/infrastructure/market/barsApi';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import {
     DEFAULT_TIMEFRAME,
     TIMEFRAME_BARS_LIMIT,

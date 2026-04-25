@@ -8,7 +8,7 @@ import type {
 } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
-import { fetchBarsWithIndicators } from '@/infrastructure/market/barsApi';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';

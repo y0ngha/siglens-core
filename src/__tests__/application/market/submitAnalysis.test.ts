@@ -6,13 +6,13 @@ import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/skills/loader');
-vi.mock('@/infrastructure/market/barsApi');
+vi.mock('@/application/market/barsApi');
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
-import { fetchBarsWithIndicators } from '@/infrastructure/market/barsApi';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
