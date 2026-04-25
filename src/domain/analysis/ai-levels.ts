@@ -58,9 +58,6 @@ export function isValidBullishTakeProfit(
     return true;
 }
 
-/**
- * ATR 기반 SL fallback 계산. ATR이 없거나 0 이하이면 undefined.
- */
 export function deriveFallbackStopLoss(
     entryPrice: number,
     atr: number | undefined
@@ -69,9 +66,6 @@ export function deriveFallbackStopLoss(
     return entryPrice - atr * SL_FALLBACK_ATR_MULTIPLIER;
 }
 
-/**
- * ATR 기반 TP fallback 계산. ATR이 없거나 0 이하이면 undefined.
- */
 export function deriveFallbackTakeProfit(
     entryPrice: number,
     atr: number | undefined
@@ -80,9 +74,6 @@ export function deriveFallbackTakeProfit(
     return entryPrice + atr * TP_FALLBACK_ATR_MULTIPLIER;
 }
 
-/**
- * AI 값이 유효하면 AI 값을, 무효하면 ATR 기반 fallback을, 둘 다 없으면 undefined를 반환.
- */
 export function resolveBullishStopLoss(
     aiValue: number | undefined,
     entryPrice: number,
@@ -98,9 +89,6 @@ export function resolveBullishStopLoss(
     return { value: undefined, source: 'missing' };
 }
 
-/**
- * AI TP 값이 유효하면 AI 값을, 무효하면 ATR 기반 fallback을, 둘 다 없으면 undefined를 반환.
- */
 export function resolveBullishTakeProfit(
     aiValue: number | undefined,
     entryPrice: number,

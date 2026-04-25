@@ -32,11 +32,7 @@ function getEtOffsetHours(year: number, month: number, day: number): number {
         : EST_OFFSET_HOURS;
 }
 
-/**
- * FMP intraday timestamps are in America/New_York (ET), not UTC.
- * Converts "YYYY-MM-DD HH:MM:SS" ET string to Unix timestamp (UTC seconds).
- * DST is handled automatically using US rules (2nd Sun Mar → 1st Sun Nov).
- */
+// FMP intraday timestamps are in America/New_York (ET); converts to UTC seconds with DST handling.
 function fmpIntradayDateToUtcSeconds(dateStr: string): number {
     const year = Number(dateStr.substring(0, 4));
     const month = Number(dateStr.substring(5, 7));
@@ -269,19 +265,7 @@ export class FmpProvider implements MarketDataProvider {
         return [...eodBars, todayBar];
     }
 
-    /**
-     * 당일 실시간 quote를 Bar 형태로 반환한다.
-     * 실패 시 null을 반환하여 EOD 데이터만으로 graceful degradation한다.
-     *
-     * EOD 조회 실패(throw)와 달리 quote 실패는 전체 요청을 실패시키지 않는 의도적 비대칭 처리다.
-     * quote는 당일 봉 보강용 부가 데이터이므로 실패해도 차트 렌더링에 치명적이지 않다.
-     * 반면 EOD 데이터는 차트의 핵심이므로 실패 시 즉시 throw한다.
-     *
-     * 주의: timestamp에서 UTC 날짜를 추출하므로 정규장 시간(9:30 AM – 4:00 PM ET) 내에서만
-     * ET 거래일과 날짜가 일치한다. 애프터마켓(예: 8:00 PM ET = 익일 01:00 UTC)의 경우
-     * UTC 날짜가 ET 거래일보다 하루 앞설 수 있으나, FMP /stable/quote는 정규장 기준
-     * 당일 데이터를 반환하므로 현재 구현 범위에서는 문제없다.
-     */
+    // quote failures return null (graceful degradation) — unlike EOD failures which throw.
     async getQuote(symbol: string): Promise<MarketQuote | null> {
         const url = this.buildQuoteUrl(symbol);
         try {

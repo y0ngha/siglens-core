@@ -1,20 +1,4 @@
-/**
- * Smart Money Concepts (SMC) Indicator
- *
- * Concept reference:
- *   Smart Money Concepts (SMC) / ICT (Inner Circle Trader) methodology
- *
- * Original TradingView indicator:
- *   "Smart Money Concepts [LuxAlgo]" by LuxAlgo
- *   https://kr.tradingview.com/script/CnB3fSph-Smart-Money-Concepts-SMC-LuxAlgo/
- *   Licensed under CC BY-NC-SA 4.0
- *   © LuxAlgo
- *
- * This file is an INDEPENDENT TypeScript implementation of publicly documented
- * SMC/ICT trading concepts. It does not copy or directly port any source code
- * from the LuxAlgo PineScript indicator. The algorithms are derived from the
- * publicly available SMC methodology documentation.
- */
+// Independent TypeScript impl of SMC/ICT concepts; not ported from LuxAlgo PineScript (CC BY-NC-SA 4.0 © LuxAlgo).
 
 import type {
     Bar,
@@ -41,17 +25,7 @@ import { slidingMax, slidingMin } from '@/domain/indicators/utils';
 
 // ─── Swing detection ─────────────────────────────────────────────────────────
 
-/**
- * Detect swing highs and swing lows from bar data.
- *
- * A bar at index i is a swing high if its high is the maximum in the window
- * [i - period, i + period]. A swing low uses the minimum. Only bars with at
- * least `period` neighbours on both sides qualify as pivots.
- *
- * Uses a monotone deque sliding window (O(N)) via slidingMax/slidingMin.
- * For a centered window of size 2*period+1, `slidingMax(highs, 2*period+1)[i+period]`
- * yields the max of highs[i-period..i+period].
- */
+// Centered window via right-aligned sliding window: reads result[i+period] to cover highs/lows[i-period..i+period].
 function detectSwingPoints(bars: Bar[], period: number): SMCSwingPoint[] {
     const n = bars.length;
     if (n < period * 2 + 1) return [];
@@ -78,17 +52,7 @@ function detectSwingPoints(bars: Bar[], period: number): SMCSwingPoint[] {
 
 // ─── Fair Value Gap detection ─────────────────────────────────────────────────
 
-/**
- * Detect Fair Value Gaps (FVGs / price imbalances).
- *
- * Bullish FVG at bar i: bars[i].low > bars[i-2].high
- *   → gap zone: [bars[i-2].high (low), bars[i].low (high)]
- *   → mitigated when a later bar's low touches the top of the gap
- *
- * Bearish FVG at bar i: bars[i].high < bars[i-2].low
- *   → gap zone: [bars[i].high (low), bars[i-2].low (high)]
- *   → mitigated when a later bar's high touches the bottom of the gap
- */
+// Bullish FVG: bars[i].low > bars[i-2].high; bearish: bars[i].high < bars[i-2].low.
 function detectFairValueGaps(bars: Bar[]): SMCFairValueGap[] {
     if (bars.length < 3) return [];
 
@@ -145,11 +109,6 @@ interface SwingAdvanceResult {
     wasUpdated: boolean;
 }
 
-/**
- * Advance the active swing pointer to the most recent confirmed pivot
- * at or before `barIndex`. Returns the updated pointer index, active swing,
- * and whether the active swing was replaced (requiring consumed-flag reset).
- */
 function advanceActiveSwing(
     swings: SMCSwingPoint[],
     startIdx: number,
@@ -171,22 +130,7 @@ function advanceActiveSwing(
     return { nextIdx: idx, active, wasUpdated };
 }
 
-/**
- * Detect BOS (Break of Structure) and CHoCH (Change of Character).
- *
- * State machine rules:
- *  - BOS:   close crosses the active swing level in the SAME direction as
- *           the current trend (structural continuation).
- *  - CHoCH: close crosses the active swing level in the OPPOSITE direction
- *           (potential trend reversal — the first counter-trend break).
- *
- * Active swing levels are updated as new pivots become confirmed over time.
- * A level is consumed (marked broken) upon the first close beyond it.
- *
- * Note: for loops are used here because the algorithm relies on two
- * independent advancing pointers (highIdx, lowIdx) over sorted swing arrays,
- * which cannot be expressed cleanly as map/reduce without sacrificing clarity.
- */
+// for loops needed: two independent advancing pointers over sorted swing arrays cannot be expressed as map/reduce.
 function detectStructureBreaks(
     bars: Bar[],
     swingHighs: SMCSwingPoint[],
@@ -264,10 +208,6 @@ interface LastOpposingIndices {
     lastBearish: (number | null)[];
 }
 
-/**
- * Precompute the index of the last bullish and bearish candle at or before
- * each bar index in a single O(n) forward pass.
- */
 function* scanLastIndex(
     bars: Bar[],
     pred: (bar: Bar) => boolean
@@ -286,22 +226,7 @@ function buildLastOpposingIndices(bars: Bar[]): LastOpposingIndices {
     };
 }
 
-/**
- * Detect Order Blocks (OBs).
- *
- * For each confirmed structure break, the order block is the last candle
- * whose body direction is OPPOSITE to the break direction, found in the
- * bars leading up to the break.
- *
- *  - Bullish break → last bearish candle (close < open) before break index
- *  - Bearish break → last bullish candle (close > open) before break index
- *
- * Mitigation: price subsequently crosses through the OB zone entirely
- * (low goes below OB.low for bullish OB, high goes above OB.high for bearish OB).
- *
- * Note: for loops and pre-allocated arrays are used here to avoid O(K²) from
- * reduce+spread and O(N×K) from per-OB bars.slice().some() scans.
- */
+// for loop + suffix arrays avoid O(K²) from reduce+spread and O(N×K) per-OB scan.
 function detectOrderBlocks(
     bars: Bar[],
     structureBreaks: SMCStructureBreak[]
@@ -350,13 +275,6 @@ function detectOrderBlocks(
 
 // ─── Equal High / Low detection ───────────────────────────────────────────────
 
-/**
- * Detect Equal Highs and Equal Lows (EQH / EQL).
- *
- * Two swing highs (or lows) are considered "equal" when their prices are
- * within `SMC_EQUAL_LEVEL_ATR_MULTIPLIER × ATR` of each other at the time
- * of the earlier pivot.
- */
 function detectEqualLevels(
     swingHighs: SMCSwingPoint[],
     swingLows: SMCSwingPoint[],
@@ -411,24 +329,7 @@ interface ZoneRange {
     bottom: number;
 }
 
-/**
- * Resolve the structural range used to compute Premium/Discount/Equilibrium
- * zones. ICT-style SMC reads the "current range" relative to the most recent
- * confirmed structure break:
- *
- *  - Bullish BOS/CHoCH: the broken swing high anchors the range top; the
- *    range bottom is the lowest swing low formed since the break (falling
- *    back to swing lows that formed immediately before the break when no
- *    post-break pullback low exists yet).
- *  - Bearish BOS/CHoCH: symmetric — the broken swing low anchors the bottom
- *    and the highest swing high since the break anchors the top.
- *  - No structure break yet: use the extremes of all detected swings as a
- *    pragmatic fallback. This covers early-warmup and consolidation cases
- *    where no directional commitment has formed.
- *
- * Returns null when the relevant swing arrays are empty and no anchor can be
- * established. The zone builder treats a non-positive span as "no range".
- */
+// Bullish break: broken high tops range, post-break lowest low bottoms it (falls back to pre-break lows if none yet).
 function resolveZoneRange(
     swingHighs: SMCSwingPoint[],
     swingLows: SMCSwingPoint[],
@@ -477,14 +378,6 @@ function resolveZoneRange(
     };
 }
 
-/**
- * Calculate Premium, Discount, and Equilibrium zones from the active
- * structural range (see `resolveZoneRange` for the range derivation rules).
- *
- *  - Premium zone:     top 25% of the range  → price is relatively expensive
- *  - Equilibrium zone: middle 50% of the range
- *  - Discount zone:    bottom 25% of the range → price is relatively cheap
- */
 function detectZones(
     swingHighs: SMCSwingPoint[],
     swingLows: SMCSwingPoint[],

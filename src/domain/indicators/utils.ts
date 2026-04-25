@@ -1,23 +1,12 @@
-/**
- * Simple Moving Average for a number array.
- * Returns null when there are fewer values than the period.
- */
 export function sma(values: number[], period: number): number | null {
     if (values.length < period) return null;
     return values.slice(-period).reduce((sum, v) => sum + v, 0) / period;
 }
 
-/**
- * Typical Price of a bar: (high + low + close) / 3
- */
 export function typicalPrice(high: number, low: number, close: number): number {
     return (high + low + close) / 3;
 }
 
-/**
- * Population standard deviation of a number array.
- * Returns null when there are fewer values than the period.
- */
 export function stdDev(values: number[], period: number): number | null {
     if (values.length < period) return null;
     const vals = values.slice(-period);
@@ -26,10 +15,6 @@ export function stdDev(values: number[], period: number): number | null {
     return Math.sqrt(variance);
 }
 
-/**
- * Rolling maximum of the last `period` values.
- * Returns null when there are fewer values than the period.
- */
 export function rollingHighest(
     values: number[],
     period: number
@@ -38,20 +23,12 @@ export function rollingHighest(
     return Math.max(...values.slice(-period));
 }
 
-/**
- * Rolling minimum of the last `period` values.
- * Returns null when there are fewer values than the period.
- */
 export function rollingLowest(values: number[], period: number): number | null {
     if (values.length < period) return null;
     return Math.min(...values.slice(-period));
 }
 
-/**
- * Sliding window maximum (right-aligned, size = period) using a monotone deque.
- * Returns null for indices < period - 1.
- * O(N) total — each element is added and removed from the deque at most once.
- */
+// O(N) sliding window max via monotone deque — each index pushed/popped at most once.
 export function slidingMax(
     values: number[],
     period: number
@@ -69,11 +46,7 @@ export function slidingMax(
     return result;
 }
 
-/**
- * Sliding window minimum (right-aligned, size = period) using a monotone deque.
- * Returns null for indices < period - 1.
- * O(N) total — each element is added and removed from the deque at most once.
- */
+// O(N) sliding window min via monotone deque — each index pushed/popped at most once.
 export function slidingMin(
     values: number[],
     period: number
@@ -91,21 +64,11 @@ export function slidingMin(
     return result;
 }
 
-/**
- * Last non-null value in an array. Returns null if all values are null.
- */
 export function lastNonNull(arr: readonly (number | null)[]): number | null {
     return arr.findLast((v): v is number => v !== null) ?? null;
 }
 
-/**
- * Linear regression value at the end of the window (offset = 0).
- * Fits a least-squares line to the last `period` values and returns
- * the predicted value at the most recent bar.
- * Returns null when there are fewer values than the period.
- *
- * Equivalent to PineScript: linreg(source, length, 0)
- */
+// Equivalent to PineScript linreg(source, length, 0).
 export function linreg(values: number[], period: number): number | null {
     if (values.length < period) return null;
     const vals = values.slice(-period);

@@ -58,11 +58,7 @@ export function calculateIchimoku(
     });
 }
 
-/**
- * bars의 마지막 displacement 구간에 해당하는 미래 선행스팬(Senkou Span A·B) 값을 반환한다.
- * Ichimoku 표준 명세에 따라 선행스팬은 displacement봉 앞(미래)에 투영되므로,
- * 현재 시점 이후 displacement개의 미래 포인트에 대한 값을 별도로 계산해야 한다.
- */
+// Returns senkou A/B for displacement bars into the future per standard Ichimoku spec.
 export function calculateIchimokuFutureCloud(
     bars: Bar[],
     conversionPeriod = ICHIMOKU_CONVERSION_PERIOD,

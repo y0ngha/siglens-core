@@ -65,10 +65,6 @@ const classifyLine = (line: string, baseIndent: number): ParsedLine => {
     return { kind: 'block', key };
 };
 
-/**
- * 중첩 YAML 블록을 재귀적으로 파싱한다.
- * 들여쓰기(2칸)를 기준으로 depth를 결정한다.
- */
 const parseYamlBlock = (lines: string[], baseIndent: number): YamlNode => {
     const result: YamlNode = {};
     let i = 0;

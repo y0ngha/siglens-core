@@ -27,16 +27,7 @@ export function validateActionPrices(
     return { entryPrices, stopLoss, takeProfitPrices };
 }
 
-/**
- * 차트 오버레이용 "보정값 라인" 정보 추출.
- *
- * AI 원본(`rec.stopLoss`, `rec.takeProfitPrices`)과 보정값(`rec.reconciledLevels`)을
- * 비교해, **값이 실제로 다른 인덱스만** 포함하는 구조를 반환한다.
- *
- * - 보정값 stopLoss가 AI 값과 동일하면 stopLoss는 생략 (중복 라인 방지)
- * - 보정값 takeProfitPrices[i]가 AI 값 [i]와 동일하면 해당 인덱스는 생략
- * - 반환되는 takeProfitPrices는 총 TP 개수(totalCount)를 함께 담아 라벨 분기에 사용한다.
- */
+// Returns only reconciled values that differ from AI originals — avoids duplicate chart overlay lines.
 export function extractReconciledActionLines(
     rec: ActionRecommendation | undefined
 ): ReconciledActionLineData | undefined {
