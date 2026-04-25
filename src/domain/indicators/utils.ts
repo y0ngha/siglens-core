@@ -48,6 +48,50 @@ export function rollingLowest(values: number[], period: number): number | null {
 }
 
 /**
+ * Sliding window maximum (right-aligned, size = period) using a monotone deque.
+ * Returns null for indices < period - 1.
+ * O(N) total — each element is added and removed from the deque at most once.
+ */
+export function slidingMax(
+    values: number[],
+    period: number
+): (number | null)[] {
+    const result: (number | null)[] = new Array(values.length).fill(null);
+    const deq: number[] = []; // indices with decreasing values
+    let front = 0;
+    for (let i = 0; i < values.length; i++) {
+        while (front < deq.length && deq[front] <= i - period) front++;
+        while (front < deq.length && values[deq[deq.length - 1]] <= values[i])
+            deq.pop();
+        deq.push(i);
+        if (i >= period - 1) result[i] = values[deq[front]];
+    }
+    return result;
+}
+
+/**
+ * Sliding window minimum (right-aligned, size = period) using a monotone deque.
+ * Returns null for indices < period - 1.
+ * O(N) total — each element is added and removed from the deque at most once.
+ */
+export function slidingMin(
+    values: number[],
+    period: number
+): (number | null)[] {
+    const result: (number | null)[] = new Array(values.length).fill(null);
+    const deq: number[] = []; // indices with increasing values
+    let front = 0;
+    for (let i = 0; i < values.length; i++) {
+        while (front < deq.length && deq[front] <= i - period) front++;
+        while (front < deq.length && values[deq[deq.length - 1]] >= values[i])
+            deq.pop();
+        deq.push(i);
+        if (i >= period - 1) result[i] = values[deq[front]];
+    }
+    return result;
+}
+
+/**
  * Linear regression value at the end of the window (offset = 0).
  * Fits a least-squares line to the last `period` values and returns
  * the predicted value at the most recent bar.

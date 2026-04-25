@@ -6,8 +6,6 @@ import {
     STOCH_RSI_RSI_PERIOD,
     STOCH_RSI_STOCH_PERIOD,
 } from '@/domain/indicators/constants';
-import { sma } from '@/domain/indicators/utils';
-
 /**
  * Stochastic RSI = (RSI - min(RSI, stochPeriod)) / (max(RSI, stochPeriod) - min(RSI, stochPeriod))
  * %K = SMA(Stochastic RSI, kSmoothing)
@@ -15,6 +13,9 @@ import { sma } from '@/domain/indicators/utils';
  *
  * Range: 0.0 - 1.0 (not multiplied by 100)
  * Default: RSI(14), Stoch(14), K(3), D(3)
+ *
+ * Note: all three passes use circular buffers (for loops) to avoid per-bar
+ * slice() allocations that caused O(N × period) intermediate arrays.
  */
 export function calculateStochRSI(
     closes: number[],
@@ -27,52 +28,93 @@ export function calculateStochRSI(
 
     const rsiValues = calculateRSI(closes, rsiPeriod);
 
-    // Build raw Stochastic RSI aligned to original indices
-    // For each bar, compute (RSI - min(RSI over stochPeriod)) / (max - min)
-    const rawStochRSI: (number | null)[] = rsiValues.map((rsi, i) => {
-        if (rsi === null) return null;
+    // ── Pass 1: raw Stochastic RSI ─────────────────────────────────────────────
+    // Maintain a circular buffer of the last stochPeriod non-null RSI values.
+    // Once RSI becomes non-null it stays non-null, so the buffer fills contiguously.
+    const rawStochRSI: (number | null)[] = new Array(rsiValues.length).fill(
+        null
+    );
+    const rsiCircBuf = new Array<number>(stochPeriod).fill(0);
+    let rsiCircHead = 0;
+    let rsiCircSize = 0;
 
-        // Collect the last stochPeriod RSI values ending at i
-        const windowStart = Math.max(0, i - stochPeriod + 1);
-        const rsiWindow = rsiValues
-            .slice(windowStart, i + 1)
-            .filter((v): v is number => v !== null);
+    for (let i = 0; i < rsiValues.length; i++) {
+        const rsi = rsiValues[i];
+        if (rsi === null) continue;
 
-        if (rsiWindow.length < stochPeriod) return null;
+        if (rsiCircSize < stochPeriod) {
+            rsiCircBuf[(rsiCircHead + rsiCircSize) % stochPeriod] = rsi;
+            rsiCircSize++;
+        } else {
+            rsiCircBuf[rsiCircHead] = rsi;
+            rsiCircHead = (rsiCircHead + 1) % stochPeriod;
+        }
 
-        const maxRSI = Math.max(...rsiWindow);
-        const minRSI = Math.min(...rsiWindow);
+        if (rsiCircSize < stochPeriod) continue;
+
+        let maxRSI = -Infinity;
+        let minRSI = Infinity;
+        for (let k = 0; k < stochPeriod; k++) {
+            const v = rsiCircBuf[k];
+            if (v > maxRSI) maxRSI = v;
+            if (v < minRSI) minRSI = v;
+        }
+
         const range = maxRSI - minRSI;
+        rawStochRSI[i] = range === 0 ? 0 : (rsi - minRSI) / range;
+    }
 
-        if (range === 0) return 0;
-        return (rsi - minRSI) / range;
-    });
+    // ── Pass 2: %K — running SMA of non-null rawStochRSI values ───────────────
+    const kValues: (number | null)[] = new Array(rawStochRSI.length).fill(
+        null
+    );
+    let kSum = 0;
+    let kBufHead = 0;
+    let kBufSize = 0;
+    const kBuf = new Array<number>(kSmoothing).fill(0);
 
-    // Build %K: SMA of rawStochRSI values, aligned to original indices
-    // Collect accumulated valid rawStochRSI values for SMA calculation
-    const kValues: (number | null)[] = rawStochRSI.map((raw, i) => {
-        if (raw === null) return null;
+    for (let i = 0; i < rawStochRSI.length; i++) {
+        const raw = rawStochRSI[i];
+        if (raw === null) continue;
 
-        // Collect last kSmoothing valid rawStochRSI values ending at i
-        const windowStart = Math.max(0, i - kSmoothing + 1);
-        const validWindow = rawStochRSI
-            .slice(windowStart, i + 1)
-            .filter((v): v is number => v !== null);
+        if (kBufSize < kSmoothing) {
+            kBuf[(kBufHead + kBufSize) % kSmoothing] = raw;
+            kSum += raw;
+            kBufSize++;
+        } else {
+            kSum -= kBuf[kBufHead];
+            kBuf[kBufHead] = raw;
+            kBufHead = (kBufHead + 1) % kSmoothing;
+            kSum += raw;
+        }
 
-        return sma(validWindow, kSmoothing);
-    });
+        if (kBufSize >= kSmoothing) kValues[i] = kSum / kSmoothing;
+    }
 
-    // Build %D: SMA of %K values, aligned to original indices
-    const dValues: (number | null)[] = kValues.map((k, i) => {
-        if (k === null) return null;
+    // ── Pass 3: %D — running SMA of non-null %K values ────────────────────────
+    const dValues: (number | null)[] = new Array(kValues.length).fill(null);
+    let dSum = 0;
+    let dBufHead = 0;
+    let dBufSize = 0;
+    const dBuf = new Array<number>(dPeriod).fill(0);
 
-        const windowStart = Math.max(0, i - dPeriod + 1);
-        const validWindow = kValues
-            .slice(windowStart, i + 1)
-            .filter((v): v is number => v !== null);
+    for (let i = 0; i < kValues.length; i++) {
+        const k = kValues[i];
+        if (k === null) continue;
 
-        return sma(validWindow, dPeriod);
-    });
+        if (dBufSize < dPeriod) {
+            dBuf[(dBufHead + dBufSize) % dPeriod] = k;
+            dSum += k;
+            dBufSize++;
+        } else {
+            dSum -= dBuf[dBufHead];
+            dBuf[dBufHead] = k;
+            dBufHead = (dBufHead + 1) % dPeriod;
+            dSum += k;
+        }
+
+        if (dBufSize >= dPeriod) dValues[i] = dSum / dPeriod;
+    }
 
     return closes.map(
         (_, i): StochRSIResult => ({

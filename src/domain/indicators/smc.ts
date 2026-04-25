@@ -37,6 +37,7 @@ import {
     SMC_SWING_PERIOD,
 } from '@/domain/indicators/constants';
 import { calculateATR } from '@/domain/indicators/atr';
+import { slidingMax, slidingMin } from '@/domain/indicators/utils';
 
 // ─── Swing detection ─────────────────────────────────────────────────────────
 
@@ -46,34 +47,33 @@ import { calculateATR } from '@/domain/indicators/atr';
  * A bar at index i is a swing high if its high is the maximum in the window
  * [i - period, i + period]. A swing low uses the minimum. Only bars with at
  * least `period` neighbours on both sides qualify as pivots.
+ *
+ * Uses a monotone deque sliding window (O(N)) via slidingMax/slidingMin.
+ * For a centered window of size 2*period+1, `slidingMax(highs, 2*period+1)[i+period]`
+ * yields the max of highs[i-period..i+period].
  */
 function detectSwingPoints(bars: Bar[], period: number): SMCSwingPoint[] {
-    if (bars.length < period * 2 + 1) return [];
+    const n = bars.length;
+    if (n < period * 2 + 1) return [];
 
-    return bars
-        .map((bar, i) => {
-            if (i < period || i >= bars.length - period) return null;
+    const windowSize = 2 * period + 1;
+    const highs = bars.map(b => b.high);
+    const lows = bars.map(b => b.low);
+    // Sliding max/min over a window of windowSize; result[k] covers [k-windowSize+1, k].
+    // For center i the right-edge is i+period, so we read result[i+period].
+    const winMax = slidingMax(highs, windowSize);
+    const winMin = slidingMin(lows, windowSize);
 
-            const window = bars.slice(i - period, i + period + 1);
-            const maxHigh = window.reduce(
-                (m, b) => Math.max(m, b.high),
-                -Infinity
-            );
-            const minLow = window.reduce(
-                (m, b) => Math.min(m, b.low),
-                Infinity
-            );
-
-            const found: SMCSwingPoint[] = [];
-            if (bar.high === maxHigh)
-                found.push({ index: i, price: bar.high, type: 'high' });
-            if (bar.low === minLow)
-                found.push({ index: i, price: bar.low, type: 'low' });
-
-            return found.length > 0 ? found : null;
-        })
-        .filter((points): points is SMCSwingPoint[] => points !== null)
-        .flat();
+    const result: SMCSwingPoint[] = [];
+    for (let i = period; i < n - period; i++) {
+        const maxHigh = winMax[i + period]!;
+        const minLow = winMin[i + period]!;
+        if (bars[i].high === maxHigh)
+            result.push({ index: i, price: bars[i].high, type: 'high' });
+        if (bars[i].low === minLow)
+            result.push({ index: i, price: bars[i].low, type: 'low' });
+    }
+    return result;
 }
 
 // ─── Fair Value Gap detection ─────────────────────────────────────────────────
@@ -298,6 +298,9 @@ function buildLastOpposingIndices(bars: Bar[]): LastOpposingIndices {
  *
  * Mitigation: price subsequently crosses through the OB zone entirely
  * (low goes below OB.low for bullish OB, high goes above OB.high for bearish OB).
+ *
+ * Note: for loops and pre-allocated arrays are used here to avoid O(K²) from
+ * reduce+spread and O(N×K) from per-OB bars.slice().some() scans.
  */
 function detectOrderBlocks(
     bars: Bar[],
@@ -307,31 +310,42 @@ function detectOrderBlocks(
 
     const { lastBullish, lastBearish } = buildLastOpposingIndices(bars);
 
-    return structureBreaks.reduce<SMCOrderBlock[]>((acc, sb) => {
-        if (sb.index === 0) return acc;
+    // Precompute suffix min-low and suffix max-high for O(1) mitigation checks.
+    const n = bars.length;
+    const suffixMinLow = new Array<number>(n + 1);
+    const suffixMaxHigh = new Array<number>(n + 1);
+    suffixMinLow[n] = Infinity;
+    suffixMaxHigh[n] = -Infinity;
+    for (let i = n - 1; i >= 0; i--) {
+        suffixMinLow[i] = Math.min(bars[i].low, suffixMinLow[i + 1]);
+        suffixMaxHigh[i] = Math.max(bars[i].high, suffixMaxHigh[i + 1]);
+    }
+
+    const obs: SMCOrderBlock[] = [];
+    for (const sb of structureBreaks) {
+        if (sb.index === 0) continue;
 
         const isBullishBreak = sb.type === 'bullish';
         // Bullish break → last bearish candle; Bearish break → last bullish candle
         const obIndex = isBullishBreak
             ? lastBearish[sb.index - 1]
             : lastBullish[sb.index - 1];
-        if (obIndex === null) return acc;
+        if (obIndex === null) continue;
 
         const obBar = bars[obIndex];
-        const ob: SMCOrderBlock = {
+        const isMitigated = isBullishBreak
+            ? suffixMinLow[obIndex + 1] < obBar.low
+            : suffixMaxHigh[obIndex + 1] > obBar.high;
+
+        obs.push({
             startIndex: obIndex,
             high: obBar.high,
             low: obBar.low,
             type: sb.type,
-            isMitigated: bars
-                .slice(obIndex + 1)
-                .some(b =>
-                    isBullishBreak ? b.low < obBar.low : b.high > obBar.high
-                ),
-        };
-
-        return [...acc, ob];
-    }, []);
+            isMitigated,
+        });
+    }
+    return obs;
 }
 
 // ─── Equal High / Low detection ───────────────────────────────────────────────
