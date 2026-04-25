@@ -172,11 +172,17 @@ describe('pollAnalysis 함수는', () => {
         });
 
         it('meta가 있으면 캐시에 저장한다', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
             mockGetJobResult.mockResolvedValueOnce(rawResult);
 
             await pollAnalysis('job-cache');
 
-            expect(mockCacheSet).toHaveBeenCalled();
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ analyzedAt: '2025-01-15T12:00:00.000Z' }),
+                3600
+            );
         });
 
         it('skills 로딩 실패해도 done을 반환한다', async () => {

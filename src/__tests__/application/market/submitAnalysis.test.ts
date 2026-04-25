@@ -110,9 +110,6 @@ describe('submitAnalysis 함수는', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
-    });
-
-    afterEach(() => {
         process.env = originalEnv;
     });
 

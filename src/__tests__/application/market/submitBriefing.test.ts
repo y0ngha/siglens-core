@@ -1,12 +1,4 @@
-import {
-    describe,
-    it,
-    expect,
-    vi,
-    beforeEach,
-    afterEach,
-    afterAll,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/cache/redis');
@@ -70,9 +62,6 @@ describe('submitBriefing 함수는', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
-    });
-
-    afterAll(() => {
         process.env = originalEnv;
     });
 
@@ -89,6 +78,7 @@ describe('submitBriefing 함수는', () => {
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
                 expect(result.generatedAt).toBe(cachedData.generatedAt);
+                expect(result.briefing).toBe(mockBriefing);
             }
             expect(mockFetch).not.toHaveBeenCalled();
         });
