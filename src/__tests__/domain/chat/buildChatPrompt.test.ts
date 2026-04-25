@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import type { AnalysisResponse } from '@/domain/types';
 

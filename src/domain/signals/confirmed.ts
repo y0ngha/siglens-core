@@ -23,7 +23,7 @@ import {
 } from '@/domain/signals/constants';
 
 export function detectRsiOversold(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const rsi = indicators.rsi;
@@ -41,7 +41,7 @@ export function detectRsiOversold(
 }
 
 export function detectRsiOverbought(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const rsi = indicators.rsi;
@@ -79,7 +79,7 @@ export function findCross(
     return null;
 }
 
-/** 스칼라 임계값 돌파 인덱스 반환 — findCross의 parallel constant array 패턴 방지 전용. */
+/** 스칼라 임계값 돌파 인덱스를 반환한다. */
 export function findThresholdCross(
     values: (number | null)[],
     threshold: number,
@@ -172,7 +172,7 @@ function findMacdCross(
 }
 
 export function detectMacdBullishCross(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const idx = findMacdCross(indicators.macd, CROSS_LOOKBACK_BARS, 'up');
@@ -186,7 +186,7 @@ export function detectMacdBullishCross(
 }
 
 export function detectMacdBearishCross(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const idx = findMacdCross(indicators.macd, CROSS_LOOKBACK_BARS, 'down');
@@ -240,7 +240,7 @@ export function detectBollingerUpperBreakout(
 }
 
 export function detectSupertrendBullishFlip(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const st = indicators.supertrend;
@@ -296,7 +296,7 @@ export function detectIchimokuCloudBreakout(
 }
 
 export function detectCciBullishCross(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const cci = indicators.cci;
@@ -322,7 +322,7 @@ export function detectCciBullishCross(
 }
 
 export function detectDmiBullishCross(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const dmi = indicators.dmi;
@@ -343,7 +343,7 @@ export function detectDmiBullishCross(
 }
 
 export function detectCmfBullishFlip(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const cmf = indicators.cmf;
@@ -364,7 +364,7 @@ export function detectCmfBullishFlip(
 }
 
 export function detectMfiOversoldBounce(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const mfi = indicators.mfi;
@@ -384,7 +384,7 @@ export function detectMfiOversoldBounce(
 }
 
 export function detectParabolicSarFlip(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const sar = indicators.parabolicSar;
@@ -429,7 +429,7 @@ export function detectKeltnerUpperBreakout(
 }
 
 export function detectSqueezeMomentumBullish(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const sqz = indicators.squeezeMomentum;

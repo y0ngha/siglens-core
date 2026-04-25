@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt,
     PROMPT_CONFIG_BY_TIMEFRAME,

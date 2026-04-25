@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import type { MarketIndexData, MarketSectorData } from '@/domain/types';
 

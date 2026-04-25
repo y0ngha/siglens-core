@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { calculateMA } from '@/domain/indicators/ma';
 import type { Bar } from '@/domain/types';
 

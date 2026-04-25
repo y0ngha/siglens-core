@@ -20,6 +20,8 @@ import {
 } from '@/domain/signals/constants';
 import { calculateMA } from '@/domain/indicators/ma';
 
+type DivergenceKind = 'bullish' | 'bearish';
+
 function findPivots(
     values: number[],
     window: number,
@@ -86,8 +88,6 @@ export function percentileRank(value: number, xs: number[]): number | null {
     }
     return below / (xs.length - 1);
 }
-
-type DivergenceKind = 'bullish' | 'bearish';
 
 function detectRegularDivergence(
     bars: Bar[],
@@ -166,7 +166,7 @@ export function detectRsiBearishDivergence(
 }
 
 export function detectMacdHistogramBullishConvergence(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const macd = indicators.macd;
@@ -191,7 +191,7 @@ export function detectMacdHistogramBullishConvergence(
 }
 
 export function detectMacdHistogramBearishConvergence(
-    bars: Bar[],
+    _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
     const macd = indicators.macd;

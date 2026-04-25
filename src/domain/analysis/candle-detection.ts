@@ -73,7 +73,7 @@ function mergeSortedEntries(
     return [...mergeSortedGen(a, b)];
 }
 
-/** Extracts the last CANDLE_PATTERN_DETECTION_BARS bars; shared by prompt construction and chart rendering. */
+/** Extracts the last CANDLE_PATTERN_DETECTION_BARS bars. */
 export function getDetectionBars(bars: Bar[]): Bar[] {
     return bars.slice(-CANDLE_PATTERN_DETECTION_BARS);
 }

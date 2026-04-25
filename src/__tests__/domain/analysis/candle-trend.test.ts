@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import {
     EXCLUDED_SINGLE_PATTERNS,
     getMultiPatternTrend,

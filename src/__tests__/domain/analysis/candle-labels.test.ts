@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import {
     CANDLE_PATTERN_LABELS,
     MULTI_CANDLE_PATTERN_LABELS,
