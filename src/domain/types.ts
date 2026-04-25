@@ -710,12 +710,12 @@ export interface RawAnalysisResponse {
 
 // --- Job Result Types (submit + poll 패턴) ---
 
-/** submitAnalysisAction 반환 타입 */
+/** submitAnalysis 반환 타입 */
 export type SubmitAnalysisResult =
     | { status: 'cached'; result: AnalysisResponse }
     | { status: 'submitted'; jobId: string };
 
-/** pollAnalysisAction 반환 타입 */
+/** pollAnalysis 반환 타입 */
 export type PollAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: AnalysisResponse }

@@ -10,7 +10,7 @@ import { fetchBarsWithIndicators } from '@/infrastructure/market/barsApi';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
-export async function submitAnalysisAction(
+export async function submitAnalysis(
     symbol: string,
     timeframe: Timeframe,
     force: boolean = false,

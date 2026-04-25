@@ -1,11 +1,19 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import {
+    describe,
+    it,
+    expect,
+    vi,
+    beforeEach,
+    afterEach,
+    afterAll,
+} from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
-import { submitBriefingAction } from '@/infrastructure/market/submitBriefingAction';
+import { submitBriefing } from '@/infrastructure/market/submitBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
@@ -23,7 +31,6 @@ const mockCacheProvider = {
     delete: vi.fn(),
 };
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 const mockData: MarketSummaryData = {
     indices: [],
@@ -42,11 +49,12 @@ const mockBriefing: MarketBriefingResponse = {
     riskSentiment: 'neutral',
 };
 
-describe('submitBriefingAction 함수는', () => {
+describe('submitBriefing 함수는', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubGlobal('fetch', mockFetch);
         process.env = {
             ...originalEnv,
             WORKER_URL: 'https://worker.test',
@@ -58,6 +66,10 @@ describe('submitBriefingAction 함수는', () => {
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockBuildMarketBriefingPrompt.mockReturnValue('mock prompt');
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     afterAll(() => {
@@ -72,7 +84,7 @@ describe('submitBriefingAction 함수는', () => {
             };
             mockCacheGet.mockResolvedValueOnce(cachedData);
 
-            const result = await submitBriefingAction(mockData);
+            const result = await submitBriefing(mockData);
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
@@ -84,7 +96,7 @@ describe('submitBriefingAction 함수는', () => {
 
     describe('캐시 미스일 때', () => {
         it('Worker /briefing 엔드포인트에 요청을 보낸다', async () => {
-            const result = await submitBriefingAction(mockData);
+            const result = await submitBriefing(mockData);
 
             expect(result.status).toBe('submitted');
             expect(mockFetch).toHaveBeenCalledWith(
@@ -100,7 +112,7 @@ describe('submitBriefingAction 함수는', () => {
         });
 
         it('submitted 상태와 jobId를 반환한다', async () => {
-            const result = await submitBriefingAction(mockData);
+            const result = await submitBriefing(mockData);
 
             expect(result.status).toBe('submitted');
             if (result.status === 'submitted') {
@@ -114,7 +126,7 @@ describe('submitBriefingAction 함수는', () => {
         it('WORKER_URL이 없으면 에러를 던진다', async () => {
             delete process.env.WORKER_URL;
 
-            await expect(submitBriefingAction(mockData)).rejects.toThrow(
+            await expect(submitBriefing(mockData)).rejects.toThrow(
                 'WORKER_URL and WORKER_SECRET environment variables are required'
             );
         });
@@ -122,7 +134,7 @@ describe('submitBriefingAction 함수는', () => {
         it('WORKER_SECRET이 없으면 에러를 던진다', async () => {
             delete process.env.WORKER_SECRET;
 
-            await expect(submitBriefingAction(mockData)).rejects.toThrow(
+            await expect(submitBriefing(mockData)).rejects.toThrow(
                 'WORKER_URL and WORKER_SECRET environment variables are required'
             );
         });
@@ -132,7 +144,7 @@ describe('submitBriefingAction 함수는', () => {
         it('캐시 조회를 건너뛰고 submitted를 반환한다', async () => {
             mockCreateCacheProvider.mockReturnValueOnce(null);
 
-            const result = await submitBriefingAction(mockData);
+            const result = await submitBriefing(mockData);
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();

@@ -96,6 +96,14 @@ and have been removed from this file.
     ❌ const lines = []; for (const rec of reconciled) { lines.push(...extractLines(rec)); } return lines;
     ✅ const lines = reconciled.flatMap(extractLines); return lines;
 
+14.5. Reduce + spread operator causing O(N²) array accumulation
+    → When reducing values into an array, use pre-allocated array + for loop or for loop + push, NOT reduce + spread
+    → Applies to sliding windows, EMA calculations, and any cumulative sequence building
+    ❌ reduce((acc, val) => [...acc, transform(val)], [])  // O(N²) — new array copied each iteration
+    ❌ .slice().map() inside reduce — recomputes slice for each reduction step
+    ✅ const result = []; for (const val of values) { result.push(transform(val)); } return result;
+    ✅ Use pre-allocated typed array for performance-critical indicators (ATR, EMA, MA)
+
 15. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <100% branches
     → Every new domain / infrastructure function must have dedicated unit tests with 100% branch coverage
     ❌ callGeminiWithKeyFallback added to infrastructure/ai/gemini.ts without src/__tests__/infrastructure/ test file

@@ -19,6 +19,10 @@ function makeBars(closes: number[]): Bar[] {
 
 describe('calculateBollinger', () => {
     describe('입력 배열 길이가 period 미만일 때', () => {
+        it('빈 배열을 반환한다', () => {
+            expect(calculateBollinger([])).toEqual([]);
+        });
+
         it('전부 null인 결과 배열을 반환한다', () => {
             const bars = makeBars([10, 20]);
             const result = calculateBollinger(bars, 3);

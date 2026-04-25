@@ -1,25 +1,9 @@
 # Fix Log
 
 ## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `calculateATR`의 `atrValues` 빌드 시 `reduce` + `[...acc, val]` spread 패턴으로 O(N²) 발생
-- Rule: CONVENTIONS.md sliding window 예외 — ATR은 Wilder Smoothing 누적이므로 for loop + pre-allocated array 사용
-- Context: `atr.ts`에서 O(N) pre-allocated array + for loop으로 교체
-
-- Violation: `computeEMAValues`의 EMA 누적 시 `reduce` + `[...acc, val]` spread 패턴으로 O(N²) 발생
-- Rule: CONVENTIONS.md sliding window 예외 — 포인터-컨버전스 패턴에 for loop 허용
-- Context: `ema.ts`에서 for loop + `push`로 교체
-
-- Violation: `buildUniqueIds`의 중복 카운팅 시 `reduce` + spread 패턴으로 O(N²) 발생
-- Rule: CONVENTIONS.md sliding window 예외 — 포인터-컨버전스 패턴에 for loop 허용
-- Context: `confidence.ts`에서 for loop + Map 기반 counter로 교체
-
 - Violation: `smc.ts`의 `detectStructureBreaks`에서 `breaks = [...breaks, {...}]` spread append
 - Rule: MISTAKES.md Coding Paradigm — append-only local mutable variable에 spread 사용은 O(N²)
 - Context: `const breaks: SMCStructureBreak[] = []`로 선언 후 `breaks.push(...)` 사용으로 교체
-
-- Violation: `RawPatternSummary`, `RawStrategyResult` 타입이 `normalize.ts`에 정의됨
-- Rule: MISTAKES.md Architecture #1 — 공유 domain 타입은 `domain/types.ts`에 배치
-- Context: 두 타입을 `domain/types.ts`로 이동; `normalize.ts`에서 import; `confidence.test.ts` import 경로 업데이트
 
 - Violation: `pollAnalysisAction.ts`의 `as RawAnalysisResponse` 단언에 근거 주석 없음
 - Rule: MISTAKES.md TypeScript — 타입 단언 시 근거 주석 필수
@@ -28,10 +12,6 @@
 - Violation: `barsApi.ts`의 `fetchBarsWithIndicators`가 `new Date()`를 내부에서 직접 호출해 테스트 불가
 - Rule: MISTAKES.md Tests — 테스트 가능성 확보를 위해 시간 의존성은 파라미터로 주입
 - Context: `now = new Date()` 파라미터 추가
-
-- Violation: `alpaca.test.ts`, `fmp.test.ts`에서 `global.fetch = mockFetch`로 글로벌 직접 변조
-- Rule: MISTAKES.md Tests — 글로벌 수정은 `vi.stubGlobal`/`vi.unstubAllGlobals`로 격리
-- Context: `vi.stubGlobal('fetch', mockFetch)` / `vi.unstubAllGlobals()` 패턴 적용
 
 - Violation: `pollBriefingAction.test.ts`에서 `generatedAt`을 타입/형식만 검증하고 실제 값을 검증하지 않음
 - Rule: MISTAKES.md Tests — 시간 의존 값은 `vi.useFakeTimers()` + `vi.setSystemTime()`으로 고정 후 정확한 값 단언
@@ -59,10 +39,6 @@
 - Rule: MISTAKES.md Coding Paradigm #10 — `.sort()` mutates the original array; `.toSorted()` must be used
 - Context: `candle-detection.ts` line 210 sorted the result array in-place before returning; fixed to `.toSorted()`
 
-## [PR #23 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
-- Violation: `.slice()` inside `.map()` causing O(n × period) complexity in `calculateMA`
-- Rule: CONVENTIONS.md sliding window rule — use `for` loop exception when `.slice()` inside `.map()` is O(n²)
-- Context: `ma.ts` recomputed window sum for each bar; replaced with O(n) sliding window `for` loop using incremental `windowSum += closes[i] - closes[i - period]`
 
 ## [PR #23 Round 2 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
 - Violation: `[...arr].reverse().find()` used instead of `findLast` in `lastNonNull` helper in `prompt.ts`
@@ -72,15 +48,6 @@
 - Violation: Loop in `detectCandlePatternEntries` starts at `0` with `if (i < detectionStartIndex) continue;` instead of starting at `detectionStartIndex`
 - Rule: MISTAKES.md Coding Paradigm #2 — avoid redundant computation; set loop start boundary correctly
 - Context: `candle-detection.ts` loop over `extendedBars` guarded against the buffer region with an early `continue`; the loop start index should be `detectionStartIndex` directly
-
-## [PR #23 Round 3 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
-- Violation: `interface PromptConfig` defined locally in `prompt.ts` instead of `domain/types.ts`
-- Rule: MISTAKES.md Architecture #1 — all shared domain types must be centralized in `domain/types.ts`; `PROMPT_CONFIG_BY_TIMEFRAME` is public API so consumers need `PromptConfig` to annotate values
-- Context: `PromptConfig` was module-private in `prompt.ts`; moved to `domain/types.ts` and added to `src/index.ts` export block
-
-- Violation: `skillGroups` built with `reduce` + spread `[...acc[key], skill]` causing O(N²) per bucket
-- Rule: CONVENTIONS.md functional programming exception — use for-loop with local mutable accumulator when reduce + spread causes O(N²)
-- Context: `buildAnalysisPrompt` in `prompt.ts` grouped skills with reduce spreading arrays on every iteration; replaced with for-loop + `push`
 
 ## [PR #23 Round 4 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
 - Violation: `1000` 매직 넘버를 `prompt.ts`에서 인라인으로 사용
@@ -100,10 +67,6 @@
 - Violation: `parseJsonResponse` 테스트에서 `console.error` 스파이 설정 후 에러 로깅을 검증 — 구현에 없는 동작을 테스트
 - Rule: MISTAKES.md Tests #6 — 테스트는 실제 구현 동작만 검증; 존재하지 않는 사이드이펙트를 단언하지 않음
 - Context: `utils.test.ts`에서 `vi.spyOn(console, 'error')`로 에러 로깅을 검증했으나 `parseJsonResponse`는 `console.error`를 호출하지 않음; consoleSpy 제거
-
-- Violation: 여러 파일(`cache/redis.ts`, `jobs/redis.ts`)에서 `process.env.UPSTASH_REDIS_REST_URL/TOKEN`을 직접 읽음
-- Rule: MISTAKES.md Infrastructure §4 — 환경변수는 한 곳에서만 읽어야 함(중앙화)
-- Context: `cache/config.ts`에 `readUpstashConfig()` 추가; 두 Redis 팩토리가 해당 함수를 통해 config를 얻도록 변경
 
 ## [PR #24 Round 3 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `parseNumberEnv` 함수명이 "env var 파싱"을 시사해 domain/에서 환경변수를 다루는 듯한 인상을 줌
@@ -136,3 +99,13 @@
 - Violation: `GeminiContents` 타입에 `{ role: string; parts: Array<{ text: string }> }` 중첩 익명 객체 타입 인라인 정의
 - Rule: MISTAKES.md TypeScript #5 — 반복되거나 재사용 가능한 타입 패턴은 named type alias로 추출
 - Context: `infrastructure/ai/types.ts`에서 `GeminiPart`, `GeminiContent` named interface로 추출
+
+## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
+
+- Violation: `AcquireReanalyzeCooldownResult` 타입이 `reanalyzeCooldown.ts` 구현 파일 내부에만 정의됨
+- Rule: MISTAKES.md Architecture #4 — infrastructure 모듈의 public interface는 `types.ts`에 위치해야 함
+- Context: `infrastructure/market/types.ts`로 이동하고 구현 파일에서 import하도록 수정
+
+- Violation: 함수/파일 이름이 `submitAnalysisAction`, `pollAnalysisAction` 등 Next.js 서버 액션 네이밍을 유지
+- Rule: MISTAKES.md Coding Paradigm #9 — 아키텍처 변경 후 이름이 정확하지 않으면 업데이트
+- Context: Next.js 'use server' 액션에서 일반 infrastructure 함수로 전환되었으나 Action suffix가 남아 있어 misleading

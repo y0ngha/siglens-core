@@ -16,9 +16,7 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
-export async function pollBriefingAction(
-    jobId: string
-): Promise<PollBriefingResult> {
+export async function pollBriefing(jobId: string): Promise<PollBriefingResult> {
     const status = await getJobStatus(jobId);
 
     if (status === null || status === 'processing') {

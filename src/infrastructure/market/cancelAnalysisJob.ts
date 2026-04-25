@@ -1,6 +1,6 @@
 import { cancelJob } from '@/infrastructure/jobs/queue';
 
-export async function cancelAnalysisJobAction(jobId: string): Promise<void> {
+export async function cancelAnalysisJob(jobId: string): Promise<void> {
     const workerUrl = process.env.WORKER_URL;
     const workerSecret = process.env.WORKER_SECRET;
 
@@ -29,7 +29,7 @@ export async function cancelAnalysisJobAction(jobId: string): Promise<void> {
         .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
         .forEach(r =>
             console.warn(
-                '[cancelAnalysisJobAction] Failed to signal cancellation:',
+                '[cancelAnalysisJob] Failed to signal cancellation:',
                 jobId,
                 r.reason
             )

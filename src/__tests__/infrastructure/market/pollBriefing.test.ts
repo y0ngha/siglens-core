@@ -5,7 +5,7 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 
-import { pollBriefingAction } from '@/infrastructure/market/pollBriefingAction';
+import { pollBriefing } from '@/infrastructure/market/pollBriefing';
 import {
     getJobStatus,
     getJobError,
@@ -37,7 +37,7 @@ const mockBriefing = {
     riskSentiment: 'neutral',
 };
 
-describe('pollBriefingAction 함수는', () => {
+describe('pollBriefing 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
@@ -50,7 +50,7 @@ describe('pollBriefingAction 함수는', () => {
         it('null이면 processing을 반환한다', async () => {
             mockGetJobStatus.mockResolvedValueOnce(null);
 
-            const result = await pollBriefingAction('job-1');
+            const result = await pollBriefing('job-1');
 
             expect(result.status).toBe('processing');
         });
@@ -58,7 +58,7 @@ describe('pollBriefingAction 함수는', () => {
         it('processing이면 processing을 반환한다', async () => {
             mockGetJobStatus.mockResolvedValueOnce('processing');
 
-            const result = await pollBriefingAction('job-2');
+            const result = await pollBriefing('job-2');
 
             expect(result.status).toBe('processing');
         });
@@ -69,7 +69,7 @@ describe('pollBriefingAction 함수는', () => {
             mockGetJobStatus.mockResolvedValueOnce('error');
             mockGetJobError.mockResolvedValueOnce('Worker crash');
 
-            const result = await pollBriefingAction('job-err');
+            const result = await pollBriefing('job-err');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -82,7 +82,7 @@ describe('pollBriefingAction 함수는', () => {
             mockGetJobStatus.mockResolvedValueOnce('error');
             mockGetJobError.mockResolvedValueOnce(null);
 
-            const result = await pollBriefingAction('job-err-null');
+            const result = await pollBriefing('job-err-null');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -105,7 +105,7 @@ describe('pollBriefingAction 함수는', () => {
         it('결과를 정규화하고 done 상태를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
 
-            const result = await pollBriefingAction('job-done');
+            const result = await pollBriefing('job-done');
 
             expect(result.status).toBe('done');
             if (result.status === 'done') {
@@ -120,7 +120,7 @@ describe('pollBriefingAction 함수는', () => {
         it('결과가 없으면 error를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(null);
 
-            const result = await pollBriefingAction('job-no-result');
+            const result = await pollBriefing('job-no-result');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -136,7 +136,7 @@ describe('pollBriefingAction 함수는', () => {
                 summary: '',
             });
 
-            const result = await pollBriefingAction('job-invalid');
+            const result = await pollBriefing('job-invalid');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -147,7 +147,7 @@ describe('pollBriefingAction 함수는', () => {
         it('캐시에 briefing을 저장한다', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
 
-            await pollBriefingAction('job-cache');
+            await pollBriefing('job-cache');
 
             expect(mockCacheSet).toHaveBeenCalled();
         });
@@ -155,7 +155,7 @@ describe('pollBriefingAction 함수는', () => {
         it('cleanup을 호출한다', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
 
-            await pollBriefingAction('job-cleanup');
+            await pollBriefing('job-cleanup');
 
             expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
         });
@@ -167,7 +167,7 @@ describe('pollBriefingAction 함수는', () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
             mockCreateCacheProvider.mockReturnValueOnce(null);
 
-            const result = await pollBriefingAction('job-no-cache');
+            const result = await pollBriefing('job-no-cache');
 
             expect(result.status).toBe('done');
             expect(mockCacheSet).not.toHaveBeenCalled();

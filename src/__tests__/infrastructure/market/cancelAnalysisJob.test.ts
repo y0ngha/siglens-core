@@ -3,13 +3,13 @@ import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/jobs/queue');
 
-import { cancelAnalysisJobAction } from '@/infrastructure/market/cancelAnalysisJobAction';
+import { cancelAnalysisJob } from '@/infrastructure/market/cancelAnalysisJob';
 import { cancelJob } from '@/infrastructure/jobs/queue';
 
 const mockCancelJob = cancelJob as Mock;
 const mockFetch = vi.fn<() => Promise<Response>>();
 
-describe('cancelAnalysisJobAction', () => {
+describe('cancelAnalysisJob', () => {
     const originalFetch = global.fetch;
 
     beforeEach(() => {
@@ -29,7 +29,7 @@ describe('cancelAnalysisJobAction', () => {
     it('cancelJob에 jobId를 전달한다', async () => {
         mockCancelJob.mockResolvedValueOnce(undefined);
 
-        await cancelAnalysisJobAction('job-abc');
+        await cancelAnalysisJob('job-abc');
 
         expect(mockCancelJob).toHaveBeenCalledWith('job-abc');
     });
@@ -37,18 +37,16 @@ describe('cancelAnalysisJobAction', () => {
     it('cancelJob이 실패해도 에러를 전파하지 않는다 (fire-and-forget)', async () => {
         mockCancelJob.mockRejectedValueOnce(new Error('Redis error'));
 
-        await expect(
-            cancelAnalysisJobAction('job-fail')
-        ).resolves.toBeUndefined();
+        await expect(cancelAnalysisJob('job-fail')).resolves.toBeUndefined();
     });
 
     it('cancelJob이 실패하면 경고 로그를 남긴다', async () => {
         mockCancelJob.mockRejectedValueOnce(new Error('Redis error'));
 
-        await cancelAnalysisJobAction('job-fail');
+        await cancelAnalysisJob('job-fail');
 
         expect(console.warn).toHaveBeenCalledWith(
-            '[cancelAnalysisJobAction] Failed to signal cancellation:',
+            '[cancelAnalysisJob] Failed to signal cancellation:',
             'job-fail',
             expect.any(Error)
         );
@@ -70,7 +68,7 @@ describe('cancelAnalysisJobAction', () => {
         });
 
         it('워커 /cancel 엔드포인트에 POST 요청을 보낸다', async () => {
-            await cancelAnalysisJobAction('job-xyz');
+            await cancelAnalysisJob('job-xyz');
 
             expect(mockFetch).toHaveBeenCalledWith(
                 'https://worker.test/cancel',
@@ -89,17 +87,17 @@ describe('cancelAnalysisJobAction', () => {
             mockFetch.mockRejectedValueOnce(new Error('network error'));
 
             await expect(
-                cancelAnalysisJobAction('job-net-fail')
+                cancelAnalysisJob('job-net-fail')
             ).resolves.toBeUndefined();
         });
 
         it('fetch 실패 시 경고 로그를 남긴다', async () => {
             mockFetch.mockRejectedValueOnce(new Error('network error'));
 
-            await cancelAnalysisJobAction('job-net-fail');
+            await cancelAnalysisJob('job-net-fail');
 
             expect(console.warn).toHaveBeenCalledWith(
-                '[cancelAnalysisJobAction] Failed to signal cancellation:',
+                '[cancelAnalysisJob] Failed to signal cancellation:',
                 'job-net-fail',
                 expect.any(Error)
             );
@@ -110,7 +108,7 @@ describe('cancelAnalysisJobAction', () => {
         it('fetch를 호출하지 않는다', async () => {
             mockCancelJob.mockResolvedValueOnce(undefined);
 
-            await cancelAnalysisJobAction('job-no-worker');
+            await cancelAnalysisJob('job-no-worker');
 
             expect(mockFetch).not.toHaveBeenCalled();
         });
@@ -119,7 +117,7 @@ describe('cancelAnalysisJobAction', () => {
             process.env.WORKER_URL = 'https://worker.test';
             mockCancelJob.mockResolvedValueOnce(undefined);
 
-            await cancelAnalysisJobAction('job-partial');
+            await cancelAnalysisJob('job-partial');
 
             expect(mockFetch).not.toHaveBeenCalled();
             delete process.env.WORKER_URL;
@@ -129,7 +127,7 @@ describe('cancelAnalysisJobAction', () => {
             process.env.WORKER_SECRET = 'test-secret';
             mockCancelJob.mockResolvedValueOnce(undefined);
 
-            await cancelAnalysisJobAction('job-partial');
+            await cancelAnalysisJob('job-partial');
 
             expect(mockFetch).not.toHaveBeenCalled();
             delete process.env.WORKER_SECRET;

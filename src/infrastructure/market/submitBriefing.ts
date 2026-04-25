@@ -7,7 +7,7 @@ import {
     ISO_DATE_HOUR_PREFIX_LENGTH,
 } from '@/infrastructure/cache/config';
 
-export async function submitBriefingAction(
+export async function submitBriefing(
     data: MarketSummaryData
 ): Promise<SubmitBriefingResult> {
     const workerUrl = process.env.WORKER_URL;

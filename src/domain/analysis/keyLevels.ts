@@ -32,18 +32,18 @@ function clusterLevels(
     // levels is non-empty after the guard above
     const sorted = levels.toSorted((a, b) => a.price - b.price);
 
-    const clusters = sorted.slice(1).reduce<KeyLevel[][]>(
-        (acc, current) => {
-            const lastCluster = acc[acc.length - 1]!;
-            const lastPrice = lastCluster[lastCluster.length - 1]!.price;
-
-            if (current.price - lastPrice <= epsilon) {
-                return [...acc.slice(0, -1), [...lastCluster, current]];
-            }
-            return [...acc, [current]];
-        },
-        [[sorted[0]]]
-    );
+    // Sliding window clustering: for-loop avoids O(N²) spread inside reduce
+    const clusters: KeyLevel[][] = [[sorted[0]!]];
+    for (let i = 1; i < sorted.length; i++) {
+        const current = sorted[i]!;
+        const lastCluster = clusters[clusters.length - 1]!;
+        const lastPrice = lastCluster[lastCluster.length - 1]!.price;
+        if (current.price - lastPrice <= epsilon) {
+            lastCluster.push(current);
+        } else {
+            clusters.push([current]);
+        }
+    }
 
     return clusters.map(group => {
         const count = group.length;

@@ -1,6 +1,8 @@
 import { Redis } from '@upstash/redis';
 import type { Timeframe } from '@/domain/types';
+import type { AcquireReanalyzeCooldownResult } from './types';
 import { SECONDS_PER_MINUTE } from '@/domain/constants/time';
+import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 /**
  * 재분석 쿨다운 정책
@@ -16,19 +18,14 @@ import { SECONDS_PER_MINUTE } from '@/domain/constants/time';
 const REANALYZE_COOLDOWN_SEC = 5 * SECONDS_PER_MINUTE;
 const REANALYZE_COOLDOWN_MS = REANALYZE_COOLDOWN_SEC * 1000;
 
-type AcquireReanalyzeCooldownResult =
-    | { ok: true }
-    | { ok: false; remainingMs: number };
-
 function buildKey(symbol: string, timeframe: Timeframe): string {
     return `analysis:cooldown:${symbol}:${timeframe}`;
 }
 
 function getRedis(): Redis | null {
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-    if (!url || !token) return null;
-    return new Redis({ url, token });
+    const config = readUpstashConfig();
+    if (!config) return null;
+    return new Redis({ url: config.url, token: config.token });
 }
 
 /**

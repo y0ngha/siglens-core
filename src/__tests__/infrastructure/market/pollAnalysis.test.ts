@@ -14,7 +14,7 @@ vi.mock('@/infrastructure/cache/config', async () => {
     return { ...actual, computeEffectiveTtl: vi.fn().mockReturnValue(3600) };
 });
 
-import { pollAnalysisAction } from '@/infrastructure/market/pollAnalysisAction';
+import { pollAnalysis } from '@/infrastructure/market/pollAnalysis';
 import {
     getJobStatus,
     getJobError,
@@ -65,7 +65,7 @@ const mockMeta = {
     skillsDegraded: false,
 };
 
-describe('pollAnalysisAction 함수는', () => {
+describe('pollAnalysis 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
@@ -83,7 +83,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('null이면 processing을 반환한다', async () => {
             mockGetJobStatus.mockResolvedValueOnce(null);
 
-            const result = await pollAnalysisAction('job-1');
+            const result = await pollAnalysis('job-1');
 
             expect(result.status).toBe('processing');
         });
@@ -91,7 +91,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('processing이면 processing을 반환한다', async () => {
             mockGetJobStatus.mockResolvedValueOnce('processing');
 
-            const result = await pollAnalysisAction('job-2');
+            const result = await pollAnalysis('job-2');
 
             expect(result.status).toBe('processing');
         });
@@ -102,7 +102,7 @@ describe('pollAnalysisAction 함수는', () => {
             mockGetJobStatus.mockResolvedValueOnce('error');
             mockGetJobError.mockResolvedValueOnce('Worker crash');
 
-            const result = await pollAnalysisAction('job-err');
+            const result = await pollAnalysis('job-err');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -115,7 +115,7 @@ describe('pollAnalysisAction 함수는', () => {
             mockGetJobStatus.mockResolvedValueOnce('error');
             mockGetJobError.mockResolvedValueOnce(null);
 
-            const result = await pollAnalysisAction('job-err-null');
+            const result = await pollAnalysis('job-err-null');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -133,7 +133,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('결과를 enrichment하고 done 상태를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawResult);
 
-            const result = await pollAnalysisAction('job-done');
+            const result = await pollAnalysis('job-done');
 
             expect(result.status).toBe('done');
             expect(mockEnrichAnalysisWithConfidence).toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('결과가 없으면 error를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(null);
 
-            const result = await pollAnalysisAction('job-no-result');
+            const result = await pollAnalysis('job-no-result');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -159,7 +159,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('summary가 없는 결과이면 Invalid response 에러를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce({ trend: 'bullish' });
 
-            const result = await pollAnalysisAction('job-invalid');
+            const result = await pollAnalysis('job-invalid');
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -170,7 +170,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('meta가 있으면 캐시에 저장한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawResult);
 
-            await pollAnalysisAction('job-cache');
+            await pollAnalysis('job-cache');
 
             expect(mockCacheSet).toHaveBeenCalled();
         });
@@ -182,7 +182,7 @@ describe('pollAnalysisAction 함수는', () => {
                 .spyOn(console, 'error')
                 .mockImplementation(() => {});
 
-            const result = await pollAnalysisAction('job-skills-fail');
+            const result = await pollAnalysis('job-skills-fail');
 
             expect(result.status).toBe('done');
             consoleSpy.mockRestore();
@@ -191,7 +191,7 @@ describe('pollAnalysisAction 함수는', () => {
         it('cleanup을 호출한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawResult);
 
-            await pollAnalysisAction('job-cleanup');
+            await pollAnalysis('job-cleanup');
 
             expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
         });
@@ -204,7 +204,7 @@ describe('pollAnalysisAction 함수는', () => {
             mockGetJobMeta.mockResolvedValueOnce(mockMeta);
             mockCreateCacheProvider.mockReturnValueOnce(null);
 
-            const result = await pollAnalysisAction('job-no-cache');
+            const result = await pollAnalysis('job-no-cache');
 
             expect(result.status).toBe('done');
             expect(mockCacheSet).not.toHaveBeenCalled();

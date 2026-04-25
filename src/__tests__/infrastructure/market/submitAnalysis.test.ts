@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import {
+    describe,
+    it,
+    expect,
+    vi,
+    beforeEach,
+    afterEach,
+    afterAll,
+} from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, Timeframe } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
@@ -8,7 +16,7 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/infrastructure/market/barsApi');
 
-import { submitAnalysisAction } from '@/infrastructure/market/submitAnalysisAction';
+import { submitAnalysis } from '@/infrastructure/market/submitAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
@@ -28,7 +36,6 @@ const mockCacheProvider = {
 
 const mockLoadSkills = vi.fn();
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 const mockSymbol = 'AAPL';
 const mockTimeframe: Timeframe = '1Day';
@@ -88,11 +95,12 @@ const mockResult: AnalysisResponse = {
     trendlines: [],
 };
 
-describe('submitAnalysisAction 함수는', () => {
+describe('submitAnalysis 함수는', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubGlobal('fetch', mockFetch);
         process.env = {
             ...originalEnv,
             WORKER_URL: 'https://worker.test',
@@ -108,6 +116,10 @@ describe('submitAnalysisAction 함수는', () => {
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
     });
 
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     afterAll(() => {
         process.env = originalEnv;
     });
@@ -116,10 +128,7 @@ describe('submitAnalysisAction 함수는', () => {
         it('cached 상태와 함께 결과를 반환한다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockResult);
 
-            const result = await submitAnalysisAction(
-                mockSymbol,
-                mockTimeframe
-            );
+            const result = await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
@@ -130,7 +139,7 @@ describe('submitAnalysisAction 함수는', () => {
         });
 
         it('force가 true이면 캐시를 건너뛰고 Worker에 요청을 보낸다', async () => {
-            const result = await submitAnalysisAction(
+            const result = await submitAnalysis(
                 mockSymbol,
                 mockTimeframe,
                 true
@@ -153,10 +162,7 @@ describe('submitAnalysisAction 함수는', () => {
         });
 
         it('fetchBarsWithIndicators를 호출하고 Worker에 요청을 보낸 뒤 jobId를 반환한다', async () => {
-            const result = await submitAnalysisAction(
-                mockSymbol,
-                mockTimeframe
-            );
+            const result = await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
                 mockSymbol,
@@ -185,7 +191,7 @@ describe('submitAnalysisAction 함수는', () => {
             delete process.env.WORKER_URL;
 
             await expect(
-                submitAnalysisAction(mockSymbol, mockTimeframe)
+                submitAnalysis(mockSymbol, mockTimeframe)
             ).rejects.toThrow(
                 'WORKER_URL and WORKER_SECRET environment variables are required'
             );
@@ -197,10 +203,7 @@ describe('submitAnalysisAction 함수는', () => {
                 .mockImplementation(() => {});
             mockLoadSkills.mockRejectedValueOnce(new Error('load failed'));
 
-            const result = await submitAnalysisAction(
-                mockSymbol,
-                mockTimeframe
-            );
+            const result = await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(result.status).toBe('submitted');
             expect(mockFetch).toHaveBeenCalled();
@@ -216,12 +219,7 @@ describe('submitAnalysisAction 함수는', () => {
         it('fetchBarsWithIndicators에 fmpSymbol을 전달한다', async () => {
             const mockFmpSymbol = '^SPX';
 
-            await submitAnalysisAction(
-                'SPX',
-                mockTimeframe,
-                false,
-                mockFmpSymbol
-            );
+            await submitAnalysis('SPX', mockTimeframe, false, mockFmpSymbol);
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
                 'SPX',
@@ -235,10 +233,7 @@ describe('submitAnalysisAction 함수는', () => {
         it('캐시 조회를 건너뛰고 Worker에 요청을 보낸다', async () => {
             mockCreateCacheProvider.mockReturnValue(null);
 
-            const result = await submitAnalysisAction(
-                mockSymbol,
-                mockTimeframe
-            );
+            const result = await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();
@@ -252,7 +247,7 @@ describe('submitAnalysisAction 함수는', () => {
         });
 
         it('마지막 bar 종가(lastClose)를 meta에 저장한다', async () => {
-            await submitAnalysisAction(mockSymbol, mockTimeframe);
+            await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -266,7 +261,7 @@ describe('submitAnalysisAction 함수는', () => {
                 indicators: { ...mockBarsData.indicators, atr: [null, 2.5, 3] },
             });
 
-            await submitAnalysisAction(mockSymbol, mockTimeframe);
+            await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -283,7 +278,7 @@ describe('submitAnalysisAction 함수는', () => {
                 },
             });
 
-            await submitAnalysisAction(mockSymbol, mockTimeframe);
+            await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -292,7 +287,7 @@ describe('submitAnalysisAction 함수는', () => {
         });
 
         it('ATR 배열이 비어있으면 undefined로 저장한다', async () => {
-            await submitAnalysisAction(mockSymbol, mockTimeframe);
+            await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
