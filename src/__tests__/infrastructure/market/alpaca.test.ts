@@ -11,16 +11,17 @@ const mockBar = {
 };
 
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe('AlpacaProvider', () => {
     beforeEach(() => {
+        vi.stubGlobal('fetch', mockFetch);
+        mockFetch.mockReset();
         process.env.ALPACA_API_KEY = 'test-key';
         process.env.ALPACA_API_SECRET = 'test-secret';
-        mockFetch.mockReset();
     });
 
     afterEach(() => {
+        vi.unstubAllGlobals();
         delete process.env.ALPACA_API_KEY;
         delete process.env.ALPACA_API_SECRET;
         delete process.env.ALPACA_SECRET_KEY;

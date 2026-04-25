@@ -527,6 +527,9 @@ export interface CandlePatternSummary {
     summary: string;
 }
 
+export type RawPatternSummary = Omit<PatternSummary, 'confidenceWeight' | 'id'>;
+export type RawStrategyResult = Omit<StrategyResult, 'confidenceWeight' | 'id'>;
+
 export type TrendlineDirection = 'ascending' | 'descending';
 
 export interface TrendlinePoint {

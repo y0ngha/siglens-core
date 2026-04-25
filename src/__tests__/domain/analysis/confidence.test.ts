@@ -6,13 +6,11 @@ import {
 import type {
     PatternResult,
     RawAnalysisResponse,
+    RawPatternSummary,
+    RawStrategyResult,
     Skill,
     SkillChartDisplay,
 } from '@/domain/types';
-import type {
-    RawPatternSummary,
-    RawStrategyResult,
-} from '@/domain/analysis/normalize';
 import {
     HIGH_CONFIDENCE_WEIGHT,
     MEDIUM_CONFIDENCE_WEIGHT,

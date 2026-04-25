@@ -16,9 +16,10 @@ function computeFromDay(timeframe: Timeframe, now: Date): string {
 export async function fetchBarsWithIndicators(
     symbol: string,
     timeframe: Timeframe,
-    fmpSymbol?: string
+    fmpSymbol?: string,
+    now = new Date()
 ): Promise<BarsData> {
-    const fromDay = computeFromDay(timeframe, new Date());
+    const fromDay = computeFromDay(timeframe, now);
     const limit = TIMEFRAME_BARS_LIMIT[timeframe];
     const provider = createMarketDataProvider();
     const bars = await provider.getBars({

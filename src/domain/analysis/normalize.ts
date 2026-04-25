@@ -8,13 +8,13 @@ import type {
     KeyLevels,
     KeyPrice,
     PatternLine,
-    PatternSummary,
     PriceScenario,
     PriceTarget,
     PriceTargets,
+    RawPatternSummary,
+    RawStrategyResult,
     RiskLevel,
     SignalStrength,
-    StrategyResult,
     Trend,
     Trendline,
     TrendlineDirection,
@@ -177,8 +177,6 @@ export function normalizeTimeRange(
     return { start, end };
 }
 
-export type RawPatternSummary = Omit<PatternSummary, 'confidenceWeight' | 'id'>;
-
 export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
     const o = asObject(v);
     if (!o) return null;
@@ -204,8 +202,6 @@ export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
         timeRange: normalizeTimeRange(o.timeRange),
     };
 }
-
-export type RawStrategyResult = Omit<StrategyResult, 'confidenceWeight' | 'id'>;
 
 export function normalizeStrategyResult(v: unknown): RawStrategyResult | null {
     const o = asObject(v);

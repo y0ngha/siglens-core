@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/jobs/queue');
@@ -94,6 +94,12 @@ describe('pollBriefingAction 함수는', () => {
     describe('status가 done일 때', () => {
         beforeEach(() => {
             mockGetJobStatus.mockResolvedValue('done');
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
         });
 
         it('결과를 정규화하고 done 상태를 반환한다', async () => {
@@ -104,7 +110,7 @@ describe('pollBriefingAction 함수는', () => {
             expect(result.status).toBe('done');
             if (result.status === 'done') {
                 expect(result.briefing).toEqual(mockBriefing);
-                expect(typeof result.generatedAt).toBe('string');
+                expect(result.generatedAt).toBe('2025-01-15T12:00:00.000Z');
             }
             expect(mockNormalizeMarketBriefing).toHaveBeenCalledWith({
                 raw: 'data',

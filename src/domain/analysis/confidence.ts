@@ -49,17 +49,15 @@ function findSkill(lookup: SkillLookup, skillName: string): Skill | undefined {
 }
 
 function buildUniqueIds<T, K extends keyof T>(items: T[], key: K): string[] {
-    return items.reduce<{ ids: string[]; counter: Map<string, number> }>(
-        ({ ids, counter }, item) => {
-            const name = String(item[key]);
-            const count = counter.get(name) ?? 0;
-            return {
-                ids: [...ids, `${name}_${count}`],
-                counter: new Map(counter).set(name, count + 1),
-            };
-        },
-        { ids: [], counter: new Map() }
-    ).ids;
+    const ids: string[] = [];
+    const counter = new Map<string, number>();
+    for (const item of items) {
+        const name = String(item[key]);
+        const count = counter.get(name) ?? 0;
+        ids.push(`${name}_${count}`);
+        counter.set(name, count + 1);
+    }
+    return ids;
 }
 
 export function filterPatterns(patterns: PatternResult[]): PatternResult[] {

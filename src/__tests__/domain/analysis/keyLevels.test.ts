@@ -149,7 +149,9 @@ describe('clusterKeyLevels', () => {
 
         const result = clusterKeyLevels(levels, 100);
 
-        expect(result.support[0].price).toBeGreaterThan(result.support[1].price);
+        expect(result.support[0].price).toBeGreaterThan(
+            result.support[1].price
+        );
     });
 
     it('저항선 클러스터는 오름차순 정렬된다', () => {

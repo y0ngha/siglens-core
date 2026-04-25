@@ -12,6 +12,7 @@ import {
     normalizeKeyPrice,
     normalizeTrendlinePoint,
     normalizePatternLine,
+    normalizeTimeRange,
     normalizeTrendline,
     normalizePatternSummary,
     normalizeStrategyResult,
@@ -20,13 +21,13 @@ import {
 } from '@/domain/analysis/normalize';
 
 describe('normalizeTrend', () => {
-    it("유효한 trend 값을 반환한다", () => {
+    it('유효한 trend 값을 반환한다', () => {
         expect(normalizeTrend('bullish')).toBe('bullish');
         expect(normalizeTrend('bearish')).toBe('bearish');
         expect(normalizeTrend('neutral')).toBe('neutral');
     });
 
-    it("유효하지 않은 값이면 neutral을 반환한다", () => {
+    it('유효하지 않은 값이면 neutral을 반환한다', () => {
         expect(normalizeTrend('unknown')).toBe('neutral');
         expect(normalizeTrend(null)).toBe('neutral');
         expect(normalizeTrend(undefined)).toBe('neutral');
@@ -34,36 +35,36 @@ describe('normalizeTrend', () => {
 });
 
 describe('normalizeRiskLevel', () => {
-    it("유효한 riskLevel 값을 반환한다", () => {
+    it('유효한 riskLevel 값을 반환한다', () => {
         expect(normalizeRiskLevel('low')).toBe('low');
         expect(normalizeRiskLevel('medium')).toBe('medium');
         expect(normalizeRiskLevel('high')).toBe('high');
     });
 
-    it("유효하지 않은 값이면 medium을 반환한다", () => {
+    it('유효하지 않은 값이면 medium을 반환한다', () => {
         expect(normalizeRiskLevel('invalid')).toBe('medium');
         expect(normalizeRiskLevel(null)).toBe('medium');
     });
 });
 
 describe('normalizeKeyLevel', () => {
-    it("price가 있으면 KeyLevel을 반환한다", () => {
+    it('price가 있으면 KeyLevel을 반환한다', () => {
         const result = normalizeKeyLevel({ price: 100, reason: 'support' });
         expect(result).toEqual({ price: 100, reason: 'support' });
     });
 
-    it("price가 없으면 null을 반환한다", () => {
+    it('price가 없으면 null을 반환한다', () => {
         expect(normalizeKeyLevel({ reason: 'support' })).toBeNull();
     });
 
-    it("null/undefined이면 null을 반환한다", () => {
+    it('null/undefined이면 null을 반환한다', () => {
         expect(normalizeKeyLevel(null)).toBeNull();
         expect(normalizeKeyLevel(undefined)).toBeNull();
     });
 });
 
 describe('normalizeKeyLevels', () => {
-    it("support와 resistance 배열을 반환한다", () => {
+    it('support와 resistance 배열을 반환한다', () => {
         const result = normalizeKeyLevels({
             support: [{ price: 100, reason: 'low' }],
             resistance: [{ price: 110, reason: 'high' }],
@@ -73,7 +74,7 @@ describe('normalizeKeyLevels', () => {
         expect(result.resistance).toHaveLength(1);
     });
 
-    it("null/undefined이면 빈 배열을 반환한다", () => {
+    it('null/undefined이면 빈 배열을 반환한다', () => {
         const result = normalizeKeyLevels(null);
         expect(result.support).toHaveLength(0);
         expect(result.resistance).toHaveLength(0);
@@ -81,18 +82,21 @@ describe('normalizeKeyLevels', () => {
 });
 
 describe('normalizePriceTarget', () => {
-    it("price가 있으면 PriceTarget을 반환한다", () => {
-        const result = normalizePriceTarget({ price: 100, basis: 'resistance' });
+    it('price가 있으면 PriceTarget을 반환한다', () => {
+        const result = normalizePriceTarget({
+            price: 100,
+            basis: 'resistance',
+        });
         expect(result).toEqual({ price: 100, basis: 'resistance' });
     });
 
-    it("price가 없으면 null을 반환한다", () => {
+    it('price가 없으면 null을 반환한다', () => {
         expect(normalizePriceTarget({ basis: 'test' })).toBeNull();
     });
 });
 
 describe('normalizePriceScenario', () => {
-    it("유효한 PriceScenario를 반환한다", () => {
+    it('유효한 PriceScenario를 반환한다', () => {
         const result = normalizePriceScenario({
             targets: [{ price: 100, condition: '' }],
             condition: 'bullish',
@@ -101,13 +105,13 @@ describe('normalizePriceScenario', () => {
         expect(result!.targets).toHaveLength(1);
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizePriceScenario(null)).toBeNull();
     });
 });
 
 describe('normalizePriceTargets', () => {
-    it("bullish와 bearish를 반환한다", () => {
+    it('bullish와 bearish를 반환한다', () => {
         const result = normalizePriceTargets({
             bullish: { targets: [], condition: '' },
             bearish: { targets: [], condition: '' },
@@ -115,7 +119,7 @@ describe('normalizePriceTargets', () => {
         expect(result).toBeDefined();
     });
 
-    it("null이면 null PriceTargets를 반환한다", () => {
+    it('null이면 null PriceTargets를 반환한다', () => {
         const result = normalizePriceTargets(null);
         expect(result.bullish).toBeNull();
         expect(result.bearish).toBeNull();
@@ -123,7 +127,7 @@ describe('normalizePriceTargets', () => {
 });
 
 describe('normalizeSignal', () => {
-    it("유효한 AnalysisSignal을 반환한다", () => {
+    it('유효한 AnalysisSignal을 반환한다', () => {
         const result = normalizeSignal({
             strength: 'strong',
             trend: 'bullish',
@@ -134,13 +138,13 @@ describe('normalizeSignal', () => {
         expect(result!.description).toBe('RSI below 30');
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizeSignal(null)).toBeNull();
     });
 });
 
 describe('normalizeIndicatorGuideResult', () => {
-    it("유효한 IndicatorGuideResult를 반환한다", () => {
+    it('유효한 IndicatorGuideResult를 반환한다', () => {
         const result = normalizeIndicatorGuideResult({
             name: 'RSI',
             signals: [],
@@ -148,35 +152,35 @@ describe('normalizeIndicatorGuideResult', () => {
         expect(result).toBeDefined();
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizeIndicatorGuideResult(null)).toBeNull();
     });
 });
 
 describe('normalizeKeyPrice', () => {
-    it("price가 있으면 KeyPrice를 반환한다", () => {
+    it('price가 있으면 KeyPrice를 반환한다', () => {
         const result = normalizeKeyPrice({ price: 150, label: 'entry' });
         expect(result).toEqual({ price: 150, label: 'entry' });
     });
 
-    it("price가 없으면 null을 반환한다", () => {
+    it('price가 없으면 null을 반환한다', () => {
         expect(normalizeKeyPrice({ label: 'entry' })).toBeNull();
     });
 });
 
 describe('normalizeTrendlinePoint', () => {
-    it("time과 price가 있으면 TrendlinePoint를 반환한다", () => {
+    it('time과 price가 있으면 TrendlinePoint를 반환한다', () => {
         const result = normalizeTrendlinePoint({ time: 1000, price: 100 });
         expect(result).toEqual({ time: 1000, price: 100 });
     });
 
-    it("time이 없으면 null을 반환한다", () => {
+    it('time이 없으면 null을 반환한다', () => {
         expect(normalizeTrendlinePoint({ price: 100 })).toBeNull();
     });
 });
 
 describe('normalizePatternLine', () => {
-    it("유효한 PatternLine을 반환한다", () => {
+    it('유효한 PatternLine을 반환한다', () => {
         const result = normalizePatternLine({
             start: { time: 1000, price: 100 },
             end: { time: 2000, price: 110 },
@@ -184,13 +188,13 @@ describe('normalizePatternLine', () => {
         expect(result).toBeDefined();
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizePatternLine(null)).toBeNull();
     });
 });
 
 describe('normalizeTrendline', () => {
-    it("유효한 Trendline을 반환한다", () => {
+    it('유효한 Trendline을 반환한다', () => {
         const result = normalizeTrendline({
             direction: 'ascending',
             start: { time: 1000, price: 100 },
@@ -200,13 +204,13 @@ describe('normalizeTrendline', () => {
         expect(result!.direction).toBe('ascending');
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizeTrendline(null)).toBeNull();
     });
 });
 
 describe('normalizePatternSummary', () => {
-    it("유효한 패턴 요약을 반환한다", () => {
+    it('유효한 패턴 요약을 반환한다', () => {
         const result = normalizePatternSummary({
             name: 'Head and Shoulders',
             type: 'reversal',
@@ -215,13 +219,13 @@ describe('normalizePatternSummary', () => {
         expect(result).toBeDefined();
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizePatternSummary(null)).toBeNull();
     });
 });
 
 describe('normalizeStrategyResult', () => {
-    it("유효한 StrategyResult를 반환한다", () => {
+    it('유효한 StrategyResult를 반환한다', () => {
         const result = normalizeStrategyResult({
             name: 'Breakout',
             description: 'Price breaks resistance',
@@ -229,13 +233,13 @@ describe('normalizeStrategyResult', () => {
         expect(result).toBeDefined();
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizeStrategyResult(null)).toBeNull();
     });
 });
 
 describe('normalizeCandlePatternSummary', () => {
-    it("유효한 CandlePatternSummary를 반환한다", () => {
+    it('유효한 CandlePatternSummary를 반환한다', () => {
         const result = normalizeCandlePatternSummary({
             pattern: 'Doji',
             trend: 'neutral',
@@ -244,13 +248,13 @@ describe('normalizeCandlePatternSummary', () => {
         expect(result).toBeDefined();
     });
 
-    it("null이면 null을 반환한다", () => {
+    it('null이면 null을 반환한다', () => {
         expect(normalizeCandlePatternSummary(null)).toBeNull();
     });
 });
 
 describe('normalizeActionRecommendation', () => {
-    it("유효한 ActionRecommendation을 반환한다", () => {
+    it('유효한 ActionRecommendation을 반환한다', () => {
         const result = normalizeActionRecommendation({
             entryRecommendation: 'enter',
             entryPrices: [100],
@@ -265,7 +269,37 @@ describe('normalizeActionRecommendation', () => {
         expect(result!.entryRecommendation).toBe('enter');
     });
 
-    it("텍스트 필드가 모두 비어있으면 undefined를 반환한다", () => {
+    it('텍스트 필드가 모두 비어있으면 undefined를 반환한다', () => {
         expect(normalizeActionRecommendation(null)).toBeUndefined();
+    });
+});
+
+describe('normalizeTimeRange', () => {
+    it('유효한 start와 end를 가진 객체를 반환한다', () => {
+        const result = normalizeTimeRange({ start: 1000, end: 2000 });
+        expect(result).toEqual({ start: 1000, end: 2000 });
+    });
+
+    it('null이면 undefined를 반환한다', () => {
+        expect(normalizeTimeRange(null)).toBeUndefined();
+    });
+
+    it('객체가 아닌 값이면 undefined를 반환한다', () => {
+        expect(normalizeTimeRange('invalid')).toBeUndefined();
+        expect(normalizeTimeRange(42)).toBeUndefined();
+        expect(normalizeTimeRange([])).toBeUndefined();
+    });
+
+    it('start가 없으면 undefined를 반환한다', () => {
+        expect(normalizeTimeRange({ end: 2000 })).toBeUndefined();
+    });
+
+    it('end가 없으면 undefined를 반환한다', () => {
+        expect(normalizeTimeRange({ start: 1000 })).toBeUndefined();
+    });
+
+    it('start 또는 end가 숫자가 아닌 타입이면 undefined를 반환한다', () => {
+        expect(normalizeTimeRange({ start: 'abc', end: 2000 })).toBeUndefined();
+        expect(normalizeTimeRange({ start: 1000, end: null })).toBeUndefined();
     });
 });

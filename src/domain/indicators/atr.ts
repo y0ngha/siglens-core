@@ -21,13 +21,13 @@ export function calculateATR(
     const initialATR =
         trValues.slice(0, period).reduce((sum, tr) => sum + tr, 0) / period;
 
-    const atrValues = trValues.slice(period).reduce<number[]>(
-        (acc, tr) => {
-            const prev = acc[acc.length - 1];
-            return [...acc, (prev * (period - 1) + tr) / period];
-        },
-        [initialATR]
-    );
+    const tailTrValues = trValues.slice(period);
+    const atrValues = new Array<number>(tailTrValues.length + 1);
+    atrValues[0] = initialATR;
+    for (let i = 0; i < tailTrValues.length; i++) {
+        atrValues[i + 1] =
+            (atrValues[i] * (period - 1) + tailTrValues[i]) / period;
+    }
 
     return [...new Array(period).fill(null), ...atrValues];
 }

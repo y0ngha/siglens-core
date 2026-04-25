@@ -62,7 +62,9 @@ describe('isValidBullishTakeProfit', () => {
     });
 
     it('TP가 undefined이면 무효하다', () => {
-        expect(isValidBullishTakeProfit(undefined, entryPrice, atr)).toBe(false);
+        expect(isValidBullishTakeProfit(undefined, entryPrice, atr)).toBe(
+            false
+        );
     });
 
     it('TP가 entryPrice 이하이면 무효하다', () => {
@@ -214,7 +216,11 @@ describe('reconcileBullishActionRecommendation', () => {
             entryRecommendation: 'avoid',
         };
 
-        const result = reconcileBullishActionRecommendation(rec, entryPrice, atr);
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr
+        );
 
         expect(result.wasReconciled).toBe(false);
         expect(result.recommendation.reconciledLevels).toBeUndefined();
@@ -236,7 +242,11 @@ describe('reconcileBullishActionRecommendation', () => {
             stopLoss: 200,
         };
 
-        const result = reconcileBullishActionRecommendation(rec, entryPrice, atr);
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr
+        );
 
         expect(result.wasReconciled).toBe(true);
         expect(result.recommendation.reconciledLevels?.stopLoss).toBeLessThan(
@@ -251,7 +261,11 @@ describe('reconcileBullishActionRecommendation', () => {
             takeProfitPrices: [50],
         };
 
-        const result = reconcileBullishActionRecommendation(rec, entryPrice, atr);
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr
+        );
 
         expect(result.wasReconciled).toBe(true);
         expect(
@@ -265,7 +279,11 @@ describe('reconcileBullishActionRecommendation', () => {
             stopLoss: 200,
         };
 
-        const result = reconcileBullishActionRecommendation(rec, entryPrice, atr);
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr
+        );
 
         expect(result.recommendation.stopLoss).toBe(200);
     });
@@ -307,7 +325,11 @@ describe('postProcessAnalysisWithReconcile', () => {
             },
         };
 
-        const result = postProcessAnalysisWithReconcile(response, undefined, atr);
+        const result = postProcessAnalysisWithReconcile(
+            response,
+            undefined,
+            atr
+        );
 
         expect(result).toBe(response);
     });
@@ -322,7 +344,11 @@ describe('postProcessAnalysisWithReconcile', () => {
             },
         };
 
-        const result = postProcessAnalysisWithReconcile(response, undefined, atr);
+        const result = postProcessAnalysisWithReconcile(
+            response,
+            undefined,
+            atr
+        );
 
         // entryPrice = (100 + 110) / 2 = 105
         // SL 200 > entryPrice 105 → fallback 적용

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FmpProvider } from '@/infrastructure/market/fmp';
 
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 const makeDailyBar = (date: string, close = 150) => ({
     date,
@@ -37,11 +36,13 @@ const makeQuote = (price = 155, timestamp = 1705312200) => [
 
 describe('FmpProvider', () => {
     beforeEach(() => {
-        process.env.FMP_API_KEY = 'test-key';
+        vi.stubGlobal('fetch', mockFetch);
         mockFetch.mockReset();
+        process.env.FMP_API_KEY = 'test-key';
     });
 
     afterEach(() => {
+        vi.unstubAllGlobals();
         delete process.env.FMP_API_KEY;
     });
 
@@ -149,8 +150,7 @@ describe('FmpProvider', () => {
             });
 
             // 2024-06-15 13:30:00 UTC in seconds
-            const expectedTime =
-                Date.UTC(2024, 5, 15, 13, 30, 0) / 1000;
+            const expectedTime = Date.UTC(2024, 5, 15, 13, 30, 0) / 1000;
             expect(bars[0].time).toBe(expectedTime);
         });
 
@@ -168,8 +168,7 @@ describe('FmpProvider', () => {
             });
 
             // 2024-01-15 14:30:00 UTC in seconds
-            const expectedTime =
-                Date.UTC(2024, 0, 15, 14, 30, 0) / 1000;
+            const expectedTime = Date.UTC(2024, 0, 15, 14, 30, 0) / 1000;
             expect(bars[0].time).toBe(expectedTime);
         });
     });

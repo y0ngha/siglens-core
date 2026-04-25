@@ -1,5 +1,50 @@
 # Fix Log
 
+## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `calculateATR`의 `atrValues` 빌드 시 `reduce` + `[...acc, val]` spread 패턴으로 O(N²) 발생
+- Rule: CONVENTIONS.md sliding window 예외 — ATR은 Wilder Smoothing 누적이므로 for loop + pre-allocated array 사용
+- Context: `atr.ts`에서 O(N) pre-allocated array + for loop으로 교체
+
+- Violation: `computeEMAValues`의 EMA 누적 시 `reduce` + `[...acc, val]` spread 패턴으로 O(N²) 발생
+- Rule: CONVENTIONS.md sliding window 예외 — 포인터-컨버전스 패턴에 for loop 허용
+- Context: `ema.ts`에서 for loop + `push`로 교체
+
+- Violation: `buildUniqueIds`의 중복 카운팅 시 `reduce` + spread 패턴으로 O(N²) 발생
+- Rule: CONVENTIONS.md sliding window 예외 — 포인터-컨버전스 패턴에 for loop 허용
+- Context: `confidence.ts`에서 for loop + Map 기반 counter로 교체
+
+- Violation: `smc.ts`의 `detectStructureBreaks`에서 `breaks = [...breaks, {...}]` spread append
+- Rule: MISTAKES.md Coding Paradigm — append-only local mutable variable에 spread 사용은 O(N²)
+- Context: `const breaks: SMCStructureBreak[] = []`로 선언 후 `breaks.push(...)` 사용으로 교체
+
+- Violation: `RawPatternSummary`, `RawStrategyResult` 타입이 `normalize.ts`에 정의됨
+- Rule: MISTAKES.md Architecture #1 — 공유 domain 타입은 `domain/types.ts`에 배치
+- Context: 두 타입을 `domain/types.ts`로 이동; `normalize.ts`에서 import; `confidence.test.ts` import 경로 업데이트
+
+- Violation: `pollAnalysisAction.ts`의 `as RawAnalysisResponse` 단언에 근거 주석 없음
+- Rule: MISTAKES.md TypeScript — 타입 단언 시 근거 주석 필수
+- Context: `submitAnalysisAction`이 JSON.stringify(RawAnalysisResponse)로 저장하고 `getJobResult`가 JSON.parse 후 반환한다는 근거 주석 추가
+
+- Violation: `barsApi.ts`의 `fetchBarsWithIndicators`가 `new Date()`를 내부에서 직접 호출해 테스트 불가
+- Rule: MISTAKES.md Tests — 테스트 가능성 확보를 위해 시간 의존성은 파라미터로 주입
+- Context: `now = new Date()` 파라미터 추가
+
+- Violation: `alpaca.test.ts`, `fmp.test.ts`에서 `global.fetch = mockFetch`로 글로벌 직접 변조
+- Rule: MISTAKES.md Tests — 글로벌 수정은 `vi.stubGlobal`/`vi.unstubAllGlobals`로 격리
+- Context: `vi.stubGlobal('fetch', mockFetch)` / `vi.unstubAllGlobals()` 패턴 적용
+
+- Violation: `pollBriefingAction.test.ts`에서 `generatedAt`을 타입/형식만 검증하고 실제 값을 검증하지 않음
+- Rule: MISTAKES.md Tests — 시간 의존 값은 `vi.useFakeTimers()` + `vi.setSystemTime()`으로 고정 후 정확한 값 단언
+- Context: `vi.useFakeTimers()` + `vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'))` 추가; `generatedAt === '2025-01-15T12:00:00.000Z'` 단언으로 변경
+
+- Violation: `normalize.ts`의 `normalizeTimeRange` 함수에 테스트 없음
+- Rule: MISTAKES.md Tests — 신규 public 함수는 테스트 커버리지 필수
+- Context: `normalize.test.ts`에 `normalizeTimeRange` 6개 테스트 케이스 추가
+
+- Violation: `domain/indicators/` 25개 인디케이터 파일 모두 테스트 없음
+- Rule: CLAUDE.md Task Execution Rules #3 — 구현 파일과 테스트 파일은 함께 작성
+- Context: utils, atr, ema, rsi, bollinger, obv, buySellVolume, cci, cmf, dmi, donchianChannel, macd, mfi, williamsR, vwap, stochastic, stochastic-rsi, parabolicSar, supertrend, keltnerChannel, ichimoku, squeezeMomentum, volume-profile, smc, index 테스트 파일 25개 신규 작성
+
 ## [Issue #2 | chore/2/초기-개발-환경-설정 | 2026-04-24]
 - Violation: release-it config used `${version}` (JS template literal) instead of `{{version}}` (Handlebars) for commitMessage, tagName, tagAnnotation
 - Rule: release-it interpolation uses `{{version}}` syntax — `${version}` is passed as a literal string and breaks tag push trigger matching

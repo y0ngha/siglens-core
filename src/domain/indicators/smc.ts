@@ -193,7 +193,7 @@ function detectStructureBreaks(
     let activeLow: SMCSwingPoint | null = null;
     let highConsumed = false;
     let lowConsumed = false;
-    let breaks: SMCStructureBreak[] = [];
+    const breaks: SMCStructureBreak[] = [];
     let highIdx = 0;
     let lowIdx = 0;
 
@@ -223,15 +223,12 @@ function detectStructureBreaks(
         ) {
             const breakType: SMCBreakType =
                 trend === 'bearish' ? 'choch' : 'bos';
-            breaks = [
-                ...breaks,
-                {
-                    index: i,
-                    price: activeHigh.price,
-                    type: 'bullish',
-                    breakType,
-                },
-            ];
+            breaks.push({
+                index: i,
+                price: activeHigh.price,
+                type: 'bullish',
+                breakType,
+            });
             trend = 'bullish';
             highConsumed = true;
         }
@@ -240,15 +237,12 @@ function detectStructureBreaks(
         if (activeLow !== null && !lowConsumed && bar.close < activeLow.price) {
             const breakType: SMCBreakType =
                 trend === 'bullish' ? 'choch' : 'bos';
-            breaks = [
-                ...breaks,
-                {
-                    index: i,
-                    price: activeLow.price,
-                    type: 'bearish',
-                    breakType,
-                },
-            ];
+            breaks.push({
+                index: i,
+                price: activeLow.price,
+                type: 'bearish',
+                breakType,
+            });
             trend = 'bearish';
             lowConsumed = true;
         }

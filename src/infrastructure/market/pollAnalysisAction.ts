@@ -53,6 +53,8 @@ export async function pollAnalysisAction(
         return { status: 'error', error: 'Result not found' };
     }
 
+    // submitAnalysisAction이 JSON.stringify(RawAnalysisResponse)로 저장하고
+    // getJobResult가 JSON.parse 후 반환하므로, 구조가 RawAnalysisResponse와 일치한다고 보장된다.
     const parsed = rawResult as RawAnalysisResponse;
     if (!parsed.summary || !parsed.trend || !parsed.riskLevel) {
         cleanupJob(jobId).catch(e =>
