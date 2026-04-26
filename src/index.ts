@@ -137,7 +137,10 @@ export {
 } from './domain/analysis/normalizePrimitives';
 export { extendTrendline } from './domain/analysis/trendline';
 export { postProcessAnalysisWithReconcile } from './domain/analysis/ai-levels';
-export { clusterKeyLevels, validateKeyLevels } from './domain/analysis/keyLevels';
+export {
+    clusterKeyLevels,
+    validateKeyLevels,
+} from './domain/analysis/keyLevels';
 export {
     extractReconciledActionLines,
     validateActionPrices,
@@ -186,6 +189,27 @@ export { FileSkillsLoader } from './infrastructure/skills/loader';
 
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
+export {
+    createDatabaseClient,
+    getDatabaseClient,
+    tryGetDatabaseClient,
+    readDatabaseConfig,
+    tryReadDatabaseConfig,
+} from './infrastructure/db';
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+    assetTranslations,
+    koreanTickers,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    usageActionTypeEnum,
+    usageLogs,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
 
 // Job queue (worker-side primitives)
 export {
@@ -317,6 +341,15 @@ export type {
     GeminiPart,
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
+export type {
+    DatabaseClient,
+    DatabaseConfig,
+    NeonSqlClient,
+    OAuthProvider,
+    SiglensDatabase,
+    UsageActionType,
+    UserTier,
+} from './infrastructure/db';
 
 // Domain types
 export type {

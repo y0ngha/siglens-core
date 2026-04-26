@@ -73,3 +73,11 @@
 - Rule: CONVENTIONS.md — Graceful degradation; missing env vars must not crash the library when an alternative path exists
 - Context: WORKER_URL 미설정 환경에서도 캐시에 유효한 데이터가 있으면 반환 가능한데, readWorkerConfig()가 캐시 체크 앞에 있어 항상 throw됐음; readWorkerConfig() 호출을 캐시 미스 이후로 이동
 
+## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
+- Violation: `tryGetDatabaseClient()` created a new Neon/Drizzle client on each optional call
+- Rule: docs/API.md — DB connections must be reused at module level; avoid per-call connection creation
+- Context: Optional DB client path bypassed `cachedClient`; corrected to share the same module-level cache as `getDatabaseClient()`
+
+- Violation: `users.email` had both a unique constraint and a duplicate non-unique index
+- Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
+- Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`

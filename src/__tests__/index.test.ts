@@ -4,6 +4,7 @@ import {
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
+    createDatabaseClient,
     CROSS_LOOKBACK_BARS,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
@@ -16,11 +17,17 @@ import {
     HIGH_CONFIDENCE_WEIGHT,
     normalizeActionRecommendation,
     normalizeTrend,
+    OAUTH_PROVIDER_VALUES,
     postProcessAnalysisWithReconcile,
+    readDatabaseConfig,
     RSI_DEFAULT_PERIOD,
+    USAGE_ACTION_TYPE_VALUES,
+    users,
+    USER_TIER_VALUES,
+    userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type { PatternTrend } from '@/index';
+import type { DatabaseConfig, PatternTrend, UserTier } from '@/index';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -48,5 +55,23 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
+    });
+
+    it('exports database helpers from package entrypoint', () => {
+        const tier: UserTier = 'pro';
+        const config: DatabaseConfig = {
+            databaseUrl:
+                'postgres://user:pass@example.neon.tech/db?sslmode=require',
+        };
+
+        expect(typeof createDatabaseClient).toBe('function');
+        expect(typeof readDatabaseConfig).toBe('function');
+        expect(users.email.name).toBe('email');
+        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
+        expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
+        expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
+        expect(config.databaseUrl).toContain('sslmode=require');
+        expect(tier).toBe('pro');
     });
 });

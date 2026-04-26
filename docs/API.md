@@ -193,19 +193,42 @@ Neon 이외의 Postgres (로컬, RDS 등)도 동일 인터페이스로 사용 �
 - **지속 저장이 필요한 데이터**에만 사용한다 (분석 이력, 사용자 메타데이터 등).
 - 단순 캐시 용도는 Redis를 사용한다 (PostgreSQL ≠ 캐시).
 - 연결은 라이브러리 모듈 레벨에서 재사용한다. 호출 단위 connection 생성을 피한다.
-- 쿼리는 파라미터 바인딩을 사용하고, 문자열 연결로 SQL을 조립하지 않는다.
+- 쿼리는 Drizzle ORM을 통해 실행하고, 문자열 연결로 SQL을 조립하지 않는다.
 
 ### 구현 위치
 
 ```
 infrastructure/db/
-├── types.ts     ← 저장소 인터페이스 (Repository 단위)
-├── client.ts    ← Postgres 클라이언트 초기화
-└── <entity>.ts  ← 각 엔티티 저장소 구현
+├── types.ts     ← DB config/client 타입과 enum literal 타입
+├── config.ts    ← DATABASE_URL 환경변수 reader
+├── schema.ts    ← Drizzle 테이블/enum 스키마
+├── client.ts    ← Neon serverless + Drizzle 클라이언트 초기화
+└── index.ts     ← DB 모듈 re-export
 ```
 
-인터페이스를 먼저 정의하고 구현체가 이를 만족하도록 한다.
-테스트는 저장소 인터페이스를 stub 구현으로 교체해 수행한다.
+인터페이스를 먼저 정의하고 구현체가 이를 만족하도록 한다. 테스트는 Neon/Drizzle 패키지를
+mock 처리해 실제 데이터베이스에 접속하지 않는다.
+
+### Drizzle 마이그레이션
+
+```bash
+yarn db:generate  # schema.ts → drizzle/ 마이그레이션 생성
+yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
+```
+
+`drizzle.config.ts`는 `DATABASE_URL`, `src/infrastructure/db/schema.ts`, `drizzle/`
+출력 경로를 사용한다.
+
+### 테이블
+
+| 테이블 | 목적 |
+|---|---|
+| `users` | 사용자 메타데이터와 구독 tier (`free` / `member` / `pro`) |
+| `sessions` | 사용자 세션과 만료 시각 |
+| `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot`) |
+| `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
+| `korean_tickers` | 한국어 티커 이름 매핑 |
+| `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
 
 ---
 
