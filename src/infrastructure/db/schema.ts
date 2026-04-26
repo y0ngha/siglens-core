@@ -14,39 +14,41 @@ import {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
     USER_TIER_VALUES,
-} from '@/infrastructure/db/constants';
+} from './constants';
 
+/** Postgres enum for user subscription tier. */
 export const userTierEnum = pgEnum('user_tier', USER_TIER_VALUES);
 
+/** Postgres enum for usage action types tracked in usage logs. */
 export const usageActionTypeEnum = pgEnum(
     'usage_action_type',
     USAGE_ACTION_TYPE_VALUES
 );
 
+/** Postgres enum for supported OAuth providers. */
 export const oauthProviderEnum = pgEnum(
     'oauth_provider',
     OAUTH_PROVIDER_VALUES
 );
 
-export const users = pgTable(
-    'users',
-    {
-        id: uuid('id').primaryKey().defaultRandom(),
-        email: varchar('email', { length: 320 }).notNull().unique(),
-        passwordHash: text('password_hash'),
-        name: text('name'),
-        avatarUrl: text('avatar_url'),
-        tier: userTierEnum('tier').notNull().default('free'),
-        createdAt: timestamp('created_at', { withTimezone: true })
-            .notNull()
-            .defaultNow(),
-        updatedAt: timestamp('updated_at', { withTimezone: true })
-            .notNull()
-            .defaultNow(),
-    },
-    () => []
-);
+/** Registered users — one row per account, keyed by UUID. */
+export const users = pgTable('users', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    email: varchar('email', { length: 320 }).notNull().unique(),
+    passwordHash: text('password_hash'),
+    name: text('name'),
+    avatarUrl: text('avatar_url'),
+    tier: userTierEnum('tier').notNull().default('free'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdateFn(() => new Date()),
+});
 
+/** Auth sessions — linked to a user and expire at a fixed timestamp. */
 export const sessions = pgTable(
     'sessions',
     {
@@ -65,6 +67,7 @@ export const sessions = pgTable(
     ]
 );
 
+/** Per-request usage log for rate-limiting and analytics. */
 export const usageLogs = pgTable(
     'usage_logs',
     {
@@ -86,6 +89,7 @@ export const usageLogs = pgTable(
     ]
 );
 
+/** Linked OAuth accounts — one row per (user, provider) pair. */
 export const oauthAccounts = pgTable(
     'oauth_accounts',
     {
@@ -108,6 +112,7 @@ export const oauthAccounts = pgTable(
     ]
 );
 
+/** Korean stock ticker metadata — keyed by ticker symbol. */
 export const koreanTickers = pgTable('korean_tickers', {
     symbol: varchar('symbol', { length: 32 }).primaryKey(),
     koreanName: text('korean_name').notNull(),
@@ -116,9 +121,11 @@ export const koreanTickers = pgTable('korean_tickers', {
     exchangeFullName: text('exchange_full_name').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
         .notNull()
-        .defaultNow(),
+        .defaultNow()
+        .$onUpdateFn(() => new Date()),
 });
 
+/** Korean–English asset name translations — keyed by ticker symbol. */
 export const assetTranslations = pgTable(
     'asset_translations',
     {
@@ -128,7 +135,8 @@ export const assetTranslations = pgTable(
         fmpSymbol: varchar('fmp_symbol', { length: 64 }).notNull(),
         updatedAt: timestamp('updated_at', { withTimezone: true })
             .notNull()
-            .defaultNow(),
+            .defaultNow()
+            .$onUpdateFn(() => new Date()),
     },
     table => [primaryKey({ columns: [table.symbol] })]
 );

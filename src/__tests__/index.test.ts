@@ -66,12 +66,6 @@ describe('public API exports', () => {
     });
 
     it('exports database helpers from package entrypoint', () => {
-        const tier: UserTier = 'pro';
-        const config: DatabaseConfig = {
-            databaseUrl:
-                'postgres://user:pass@example.neon.tech/db?sslmode=require',
-        };
-
         expect(typeof createDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
         expect(typeof registerUser).toBe('function');
@@ -81,8 +75,6 @@ describe('public API exports', () => {
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
         expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
-        expect(config.databaseUrl).toContain('sslmode=require');
-        expect(tier).toBe('pro');
     });
 
     it('exports auth interfaces from package entrypoint', () => {
