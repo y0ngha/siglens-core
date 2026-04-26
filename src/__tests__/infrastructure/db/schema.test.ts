@@ -1,6 +1,3 @@
-import { getTableColumns, getTableName } from 'drizzle-orm';
-import { getTableConfig } from 'drizzle-orm/pg-core';
-import { describe, expect, it } from 'vitest';
 import {
     assetTranslations,
     koreanTickers,
@@ -12,6 +9,9 @@ import {
     users,
     userTierEnum,
 } from '@/infrastructure/db/schema';
+import { getTableColumns, getTableName } from 'drizzle-orm';
+import { getTableConfig } from 'drizzle-orm/pg-core';
+import { describe, expect, it } from 'vitest';
 
 const columnNames = (table: Parameters<typeof getTableColumns>[0]): string[] =>
     Object.values(getTableColumns(table)).map(column => column.name);
@@ -122,6 +122,7 @@ describe('database schema tables', () => {
             'oauth_accounts_provider_account_uidx',
         ]);
         expect(getTableConfig(koreanTickers).indexes).toEqual([]);
+        expect(getTableConfig(assetTranslations).indexes).toEqual([]);
     });
 
     it('enforces primary key constraint on asset_translations', () => {
