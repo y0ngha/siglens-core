@@ -20,6 +20,7 @@ export {
     users,
     userTierEnum,
 } from './schema';
+export { DrizzleUserRepository } from './userRepository';
 export type {
     DatabaseClient,
     DatabaseConfig,

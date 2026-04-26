@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DrizzleUserRepository } from '@/infrastructure/auth/userRepository';
+import { DrizzleUserRepository } from '@/infrastructure/db/userRepository';
 import type { SiglensDatabase } from '@/infrastructure/db/types';
 
 const userRecord = {
@@ -101,6 +101,28 @@ describe('DrizzleUserRepository', () => {
         });
         expect(returning).toHaveBeenCalledWith(expect.any(Object));
         expect(result).toEqual(userRecord);
+    });
+
+    it('inserts a user with avatarUrl provided', async () => {
+        const recordWithAvatar = {
+            ...userRecord,
+            avatarUrl: 'https://example.com/avatar.png',
+        };
+        const { db, values } = makeInsertDb([recordWithAvatar]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.createEmailUser({
+            email: 'user@example.com',
+            passwordHash: 'hashed-password',
+            avatarUrl: 'https://example.com/avatar.png',
+        });
+
+        expect(values).toHaveBeenCalledWith(
+            expect.objectContaining({
+                avatarUrl: 'https://example.com/avatar.png',
+            })
+        );
+        expect(result).toEqual(recordWithAvatar);
     });
 
     it('returns null when email insert conflicts', async () => {

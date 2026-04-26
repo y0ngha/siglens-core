@@ -201,7 +201,7 @@ export {
     readDatabaseConfig,
     tryReadDatabaseConfig,
 } from './infrastructure/db';
-export { DrizzleUserRepository } from './infrastructure/auth';
+export { DrizzleUserRepository } from './infrastructure/db';
 export {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,

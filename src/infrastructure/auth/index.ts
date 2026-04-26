@@ -1,4 +1,3 @@
-export { DrizzleUserRepository } from './userRepository';
 export type {
     AuthUserRecord,
     AuthUserTier,

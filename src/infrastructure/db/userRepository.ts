@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
-import { users } from '@/infrastructure/db/schema';
-import type { SiglensDatabase } from '@/infrastructure/db/types';
+import { users } from './schema';
+import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
     UserRepository,
-} from './types';
+} from '@/infrastructure/auth/types';
 
 const DEFAULT_USER_TIER = 'free';
 
@@ -19,6 +19,11 @@ const authUserColumns = {
     updatedAt: users.updatedAt,
 };
 
+/**
+ * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
+ *
+ * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
+ */
 export class DrizzleUserRepository implements UserRepository {
     constructor(private readonly db: SiglensDatabase) {}
 
