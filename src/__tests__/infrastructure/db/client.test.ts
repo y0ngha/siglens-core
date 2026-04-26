@@ -83,4 +83,15 @@ describe('database client factory', () => {
         expect(neon).toHaveBeenCalledTimes(1);
         expect(drizzle).toHaveBeenCalledTimes(1);
     });
+
+    it('shares the same singleton across required and optional env config', () => {
+        vi.stubEnv('DATABASE_URL', TEST_DATABASE_URL);
+
+        const requiredClient = getDatabaseClient();
+        const optionalClient = tryGetDatabaseClient();
+
+        expect(requiredClient).toBe(optionalClient);
+        expect(neon).toHaveBeenCalledTimes(1);
+        expect(drizzle).toHaveBeenCalledTimes(1);
+    });
 });

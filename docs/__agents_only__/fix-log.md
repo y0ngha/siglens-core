@@ -68,3 +68,12 @@
 - Violation: `schema.test.ts` index test omitted `koreanTickers` from the multi-table index assertion block
 - Rule: Test coverage must be complete for all tables asserted in the same test — partial table coverage creates silent gaps
 - Context: `'defines table indexes for lookup paths'` test verified indexes for `users`, `sessions`, `usageLogs`, `oauthAccounts`, `assetTranslations` but skipped `koreanTickers`; added `expect(getTableConfig(koreanTickers).indexes).toEqual([])`
+
+## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
+- Violation: `@neondatabase/serverless` and `drizzle-orm` were added to `dependencies`, forcing DB packages onto consumers that do not use DB features
+- Rule: npm library dependency pattern — optional runtime integrations belong in `peerDependencies` with `optional: true`, and in `devDependencies` for local tests/builds
+- Context: Moved Neon and Drizzle packages to optional peer dependencies plus dev dependencies and removed the production `dependencies` block
+
+- Violation: Drizzle migration metadata was not regenerated after changing `assetTranslations.symbol` from table-level primary key metadata to inline primary key metadata
+- Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
+- Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes

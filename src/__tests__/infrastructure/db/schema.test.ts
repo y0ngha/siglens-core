@@ -128,6 +128,10 @@ describe('database schema tables', () => {
         expect(getTableColumns(assetTranslations).symbol.primary).toBe(true);
     });
 
+    it('enforces primary key constraint on korean_tickers', () => {
+        expect(getTableColumns(koreanTickers).symbol.primary).toBe(true);
+    });
+
     it('enforces unique constraint on users.email', () => {
         expect(getTableColumns(users).email.isUnique).toBe(true);
     });
