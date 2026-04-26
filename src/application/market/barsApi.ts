@@ -4,7 +4,7 @@ import {
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,
 } from '@/domain/constants/market';
-import { ISO_DATE_PREFIX_LENGTH } from '@/infrastructure/cache/config';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { createMarketDataProvider } from '@/infrastructure/market/factory';
 
 function computeFromDay(timeframe: Timeframe, now: Date): string {

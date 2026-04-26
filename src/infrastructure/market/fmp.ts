@@ -1,5 +1,5 @@
 import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
-import { ISO_DATE_PREFIX_LENGTH } from '@/infrastructure/cache/config';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { readFmpConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
