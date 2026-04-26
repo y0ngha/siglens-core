@@ -54,6 +54,35 @@ async function translateAndCache(
     await setKoreanTickers(entries);
 }
 
+/**
+ * Search for tickers by symbol or company name, with bilingual support.
+ *
+ * Behaviour depends on the input language detected by {@link isKoreanInput}:
+ * - **Korean input**: searched against the persistent Korean-name store
+ *   (no FMP call, no cache layer).
+ * - **English / symbol input**: cache lookup → FMP `searchBySymbol` +
+ *   `searchByName` in parallel → filter to U.S. exchanges → deduplicate via
+ *   {@link deduplicateResults}. Korean names are joined from the persistent
+ *   store; symbols without a translation trigger a background translation
+ *   job that writes through to the store.
+ *
+ * Cache and background-translation failures are logged but never propagate.
+ * Results are capped at 10 entries.
+ *
+ * @param query - Free-text search; trimmed automatically. Empty input
+ *   returns `[]`.
+ * @returns Up to 10 matching tickers, each enriched with a Korean name when
+ *   available — see {@link TickerSearchResult}.
+ *
+ * @example
+ * ```ts
+ * const englishResults = await searchTicker('AAPL');
+ * const koreanResults = await searchTicker('애플');
+ * ```
+ *
+ * @see getAssetInfo
+ * @see isKoreanInput
+ */
 export async function searchTicker(
     query: string
 ): Promise<TickerSearchResult[]> {

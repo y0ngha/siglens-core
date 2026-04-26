@@ -6,6 +6,23 @@ import {
 import type { MarketQuote, MarketSummaryData } from '@/domain/types';
 import { createMarketDataProvider } from '@/infrastructure/market/factory';
 
+/**
+ * Fetch real-time quotes for all dashboard market indices and sector ETFs.
+ *
+ * Issues one quote request per symbol in parallel via the configured market
+ * data provider. Symbols that fail to fetch are emitted with `price` and
+ * `changesPercentage` defaulted to `0` (so the dashboard renders fully even
+ * if a single quote is unavailable).
+ *
+ * @returns Indices and sector ETFs with their most recent quote data —
+ *   see {@link MarketSummaryData}.
+ *
+ * @throws {Error} If the market data provider cannot be constructed (missing
+ *   FMP credentials, etc.).
+ *
+ * @see getMarketSummaryWithBriefing
+ * @see getSectorSignals
+ */
 export async function getMarketSummary(): Promise<MarketSummaryData> {
     const provider = createMarketDataProvider();
 

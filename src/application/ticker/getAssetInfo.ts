@@ -56,6 +56,33 @@ async function translateAndCache(
     }
 }
 
+/**
+ * Resolve canonical asset information for a single ticker symbol.
+ *
+ * Pipeline:
+ * 1. Validate symbol format via {@link isValidTickerFormat}; reject otherwise.
+ * 2. Look up the cache (separate TTLs for entries with vs. without a Korean name).
+ * 3. On cache miss, query FMP, filter to U.S. exchanges, prefer an exact
+ *    symbol match.
+ * 4. Look up the Korean name in the persistent store. If absent, fire a
+ *    background translation job and write through to the store + cache.
+ *
+ * Cache and background-translation failures are logged but never propagate
+ * — this function always returns either an {@link AssetInfo} or `null`
+ * (when the symbol is invalid or no U.S.-listed match exists).
+ *
+ * @param symbol - Ticker symbol; case-insensitive (uppercased internally).
+ * @returns The resolved asset info, or `null` when the symbol cannot be
+ *   identified on any U.S. exchange.
+ *
+ * @example
+ * ```ts
+ * const info = await getAssetInfo('aapl');
+ * if (info) console.log(info.name, info.koreanName);
+ * ```
+ *
+ * @see searchTicker
+ */
 export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
     const upper = symbol.toUpperCase();
     if (!isValidTickerFormat(upper)) return null;

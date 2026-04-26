@@ -5,6 +5,24 @@ import {
     TREND_SLOPE_THRESHOLD,
 } from '@/domain/signals/constants';
 
+/**
+ * Classify the prevailing trend state from EMA slope and recent close.
+ *
+ * Uses the EMA at the configured `TREND_EMA_PERIOD` and looks back
+ * `TREND_SLOPE_LOOKBACK` bars to compute a relative slope. Returns:
+ * - `'uptrend'` when the slope ≥ `+TREND_SLOPE_THRESHOLD` AND the last close
+ *   is above the EMA.
+ * - `'downtrend'` when the slope ≤ `-TREND_SLOPE_THRESHOLD` AND the last
+ *   close is below the EMA.
+ * - `'sideways'` otherwise (including warm-up windows where the required
+ *   EMA period is not yet populated).
+ *
+ * @param bars - OHLCV bars sorted oldest-first.
+ * @param indicators - Indicator suite produced by {@link calculateIndicators}.
+ * @returns The classified trend state.
+ *
+ * @see detectSignals
+ */
 export function classifyTrend(
     bars: Bar[],
     indicators: IndicatorResult

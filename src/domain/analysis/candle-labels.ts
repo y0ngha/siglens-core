@@ -61,16 +61,45 @@ export const MULTI_CANDLE_PATTERN_LABELS: Record<MultiCandlePattern, string> = {
 
 // ─── Label Accessor Functions ─────────────────────────────────────────────────
 
+/**
+ * Look up the Korean display label for a single-bar candle pattern.
+ *
+ * Always returns a non-empty string — every {@link CandlePattern} member
+ * has a label in {@link CANDLE_PATTERN_LABELS}.
+ *
+ * @param pattern - The pattern returned by {@link detectCandlePattern}.
+ * @returns The Korean label (e.g. `"망치형"`, `"도지"`).
+ */
 export function getCandlePatternLabel(pattern: CandlePattern): string {
     return CANDLE_PATTERN_LABELS[pattern];
 }
 
+/**
+ * Look up the Korean display label for a multi-bar candle pattern.
+ *
+ * Always returns a non-empty string — every {@link MultiCandlePattern}
+ * member has a label in {@link MULTI_CANDLE_PATTERN_LABELS}.
+ *
+ * @param pattern - The pattern returned by {@link detectMultiCandlePattern}.
+ * @returns The Korean label (e.g. `"상승 장악형"`, `"적삼병"`).
+ */
 export function getMultiCandlePatternLabel(
     pattern: MultiCandlePattern
 ): string {
     return MULTI_CANDLE_PATTERN_LABELS[pattern];
 }
 
+/**
+ * Look up the Korean label for an arbitrary pattern-name string.
+ *
+ * Useful when the pattern identifier comes from an external source (e.g. a
+ * worker response) and is typed only as `string`. Searches both the
+ * single-bar and multi-bar label maps; falls back to `patternName` itself
+ * when no label is found.
+ *
+ * @param patternName - The pattern identifier — may be any string.
+ * @returns The Korean label, or the original `patternName` when unknown.
+ */
 export function findCandlePatternLabel(patternName: string): string {
     // Safe: CANDLE_PATTERN_LABELS / MULTI_CANDLE_PATTERN_LABELS keys are CandlePattern /
     // MultiCandlePattern, both subsets of string. Widening Record<literal, string> to

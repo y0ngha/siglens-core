@@ -44,6 +44,22 @@ const isNearPrice = (a: number, b: number): boolean =>
 
 // ─── Single Candle Pattern ────────────────────────────────────────────────────
 
+/**
+ * Classify a single OHLCV bar into a {@link CandlePattern}.
+ *
+ * Pattern selection follows the standard taxonomy: doji / dragonfly /
+ * gravestone, marubozu, hammer / inverted hammer, shooting star /
+ * hanging man, belt-hold, spinning top, and the catch-all bullish / bearish
+ * / flat. Detection thresholds (body-to-range ratios, shadow ratios, etc.)
+ * are tuned per the constants at the top of the source file.
+ *
+ * @param bar - A single OHLCV bar.
+ * @returns The detected single-bar pattern label.
+ *
+ * @see detectMultiCandlePattern
+ * @see getSinglePatternTrend
+ * @see getCandlePatternLabel
+ */
 export function detectCandlePattern(bar: Bar): CandlePattern {
     const range = calcRange(bar);
     if (range === 0) return 'flat';
@@ -407,6 +423,23 @@ function detect3CandlePattern(
 
 // ─── Multi Candle Pattern ─────────────────────────────────────────────────────
 
+/**
+ * Detect a 2- or 3-bar {@link MultiCandlePattern} ending at the last bar.
+ *
+ * Examines the final 3 bars (or 2 when only 2 are available) and returns
+ * the first matching pattern. 3-bar formations (morning star, evening star,
+ * three white soldiers, three inside / outside, abandoned baby, etc.) take
+ * priority over 2-bar formations (engulfing, harami, piercing line, dark
+ * cloud cover, tweezers, on-neck, in-neck, etc.). Returns `null` when no
+ * pattern matches or when fewer than 2 bars are provided.
+ *
+ * @param bars - OHLCV bars sorted oldest-first; only the last 3 are read.
+ * @returns The detected multi-bar pattern label, or `null` if none.
+ *
+ * @see detectCandlePattern
+ * @see detectCandlePatternEntries
+ * @see getMultiPatternTrend
+ */
 export function detectMultiCandlePattern(
     bars: Bar[]
 ): MultiCandlePattern | null {
