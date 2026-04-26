@@ -4,6 +4,25 @@ import { tryReadWorkerConfig } from '@/infrastructure/market/config';
 
 const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
 
+/**
+ * Cancel an in-flight analysis job.
+ *
+ * Sends two parallel signals and awaits both via `Promise.allSettled`:
+ * 1. Marks the job as cancelled in Redis so {@link pollAnalysis} reports it.
+ * 2. If a worker URL is configured, POSTs `/cancel` to abort the in-progress
+ *    AI call on the worker side (5-second timeout).
+ *
+ * Both signals are best-effort: rejections are logged via `console.warn` and
+ * swallowed, so this never throws even if Redis is down or the worker
+ * returns a 4xx/5xx. Callers can omit error handling. Stale jobs that
+ * escape cancellation are cleaned up naturally via Redis TTL.
+ *
+ * @param jobId - The `jobId` returned by {@link submitAnalysis}.
+ * @returns Resolves once both cancellation signals have settled (success or failure).
+ *
+ * @see submitAnalysis
+ * @see pollAnalysis
+ */
 export async function cancelAnalysisJob(jobId: string): Promise<void> {
     const workerConfig = tryReadWorkerConfig();
 

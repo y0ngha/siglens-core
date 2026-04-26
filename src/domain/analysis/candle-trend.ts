@@ -63,12 +63,40 @@ export const EXCLUDED_SINGLE_PATTERNS: ReadonlySet<CandlePattern> = new Set([
 
 // ─── Trend Classification Functions ──────────────────────────────────────────
 
+/**
+ * Map a single-bar candle pattern to its directional bias.
+ *
+ * Bullish patterns (hammer, inverted hammer, bullish marubozu / belt-hold,
+ * dragonfly doji) return `'bullish'`. Bearish patterns (shooting star,
+ * hanging man, bearish marubozu / belt-hold, gravestone doji) return
+ * `'bearish'`. Everything else (including the noise patterns in
+ * `EXCLUDED_SINGLE_PATTERNS`) returns `'neutral'`.
+ *
+ * @param pattern - The pattern returned by {@link detectCandlePattern}.
+ * @returns The trend label.
+ *
+ * @see getMultiPatternTrend
+ */
 export function getSinglePatternTrend(pattern: CandlePattern): Trend {
     if (BULLISH_SINGLE_PATTERNS.has(pattern)) return 'bullish';
     if (BEARISH_SINGLE_PATTERNS.has(pattern)) return 'bearish';
     return 'neutral';
 }
 
+/**
+ * Map a multi-bar candle pattern to its directional bias.
+ *
+ * Returns `'bullish'` for reversal-up / continuation-up formations
+ * (engulfing, harami, morning star, three white soldiers, etc.),
+ * `'bearish'` for reversal-down / continuation-down formations (dark cloud
+ * cover, evening star, three black crows, etc.), and `'neutral'` for the
+ * remaining formations (on-neck, in-neck, tasuki gaps, etc.).
+ *
+ * @param pattern - The pattern returned by {@link detectMultiCandlePattern}.
+ * @returns The trend label.
+ *
+ * @see getSinglePatternTrend
+ */
 export function getMultiPatternTrend(pattern: MultiCandlePattern): Trend {
     if (BULLISH_MULTI_PATTERNS.has(pattern)) return 'bullish';
     if (BEARISH_MULTI_PATTERNS.has(pattern)) return 'bearish';

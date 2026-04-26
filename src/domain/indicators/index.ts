@@ -50,6 +50,31 @@ export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
 
+/**
+ * Compute the full indicator suite for an array of OHLCV bars.
+ *
+ * Populates an {@link IndicatorResult} with every indicator the package
+ * supports — RSI, MACD, Bollinger Bands, DMI, Stochastic, StochRSI, CCI,
+ * VWAP, several MA / EMA periods, Volume Profile, Ichimoku, ATR, OBV,
+ * Parabolic SAR, Williams %R, Supertrend, MFI, Keltner Channel, CMF,
+ * Donchian Channel, buy / sell volume split, SMC structure, and Squeeze
+ * Momentum.
+ *
+ * Bars must be in chronological order (oldest first). The function is pure
+ * and does not mutate `bars`. Each indicator's warm-up period is filled
+ * with `null` so callers can distinguish "not yet computed" from a real `0`.
+ *
+ * @param bars - OHLCV bars sorted oldest-first.
+ * @returns Full indicator suite — see {@link IndicatorResult}.
+ *
+ * @example
+ * ```ts
+ * const indicators = calculateIndicators(bars);
+ * const lastRsi = indicators.rsi.at(-1);
+ * ```
+ *
+ * @see detectSignals
+ */
 export function calculateIndicators(bars: Bar[]): IndicatorResult {
     const closes = bars.map(b => b.close);
     return {

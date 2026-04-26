@@ -13,6 +13,9 @@
 # build output
 /dist/
 
+# generated API docs
+/docs/api/
+
 # testing
 /coverage/
 

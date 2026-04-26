@@ -154,6 +154,11 @@ export type { SkillsProvider } from './infrastructure/skills/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 export type {
+    MarketDataProvider,
+    GetBarsOptions,
+    AcquireReanalyzeCooldownResult,
+} from './infrastructure/market/types';
+export type {
     GeminiRole,
     GeminiContents,
     GeminiContent,
@@ -211,6 +216,8 @@ export type {
     PriceTrend,
     AnalysisResponse,
     AnalysisSignal,
+    SignalStrength,
+    ReconciledActionLevels,
     IndicatorGuideResult,
     KeyLevel,
     KeyLevels,

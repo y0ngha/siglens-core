@@ -61,6 +61,29 @@ const DETECTORS: readonly Detector[] = [
     detectResistanceProximityBearish,
 ];
 
+/**
+ * Run every bundled signal detector against bars + indicators and collect
+ * the non-null results.
+ *
+ * Combines 17 confirmed-signal detectors (RSI overbought / oversold,
+ * golden / death cross, MACD cross, Bollinger band touches, Supertrend flip,
+ * Ichimoku breakout, etc.) with 8 anticipation-signal detectors (RSI / MACD
+ * histogram divergences, Bollinger squeeze, support / resistance proximity,
+ * etc.).
+ *
+ * @param bars - OHLCV bars sorted oldest-first.
+ * @param indicators - Indicator suite produced by {@link calculateIndicators}.
+ * @returns A read-only array of detected signals; empty when no detectors fire.
+ *
+ * @example
+ * ```ts
+ * const signals = detectSignals(bars, calculateIndicators(bars));
+ * for (const s of signals) console.log(s.type, s.direction);
+ * ```
+ *
+ * @see calculateIndicators
+ * @see classifyTrend
+ */
 export function detectSignals(
     bars: Bar[],
     indicators: IndicatorResult

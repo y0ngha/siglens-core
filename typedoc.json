@@ -1,0 +1,17 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPoints": ["src/index.ts"],
+    "out": "docs/api",
+    "tsconfig": "tsconfig.json",
+    "name": "@y0ngha/siglens-core",
+    "readme": "README.md",
+    "includeVersion": true,
+    "excludeInternal": true,
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "categorizeByGroup": true,
+    "navigationLinks": {
+        "GitHub": "https://github.com/y0ngha/siglens-core",
+        "Public API Policy": "https://github.com/y0ngha/siglens-core/blob/main/docs/PUBLIC_API.md"
+    }
+}
