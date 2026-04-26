@@ -9,8 +9,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_ALREADY_EXISTS_MESSAGE = 'Email is already registered';
 const INVALID_EMAIL_MESSAGE = 'Email format is invalid';
-const WEAK_PASSWORD_MESSAGE =
-    'Password must be at least 8 characters and include letters and numbers';
+const WEAK_PASSWORD_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters and include letters and numbers`;
 
 function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -46,6 +45,17 @@ function validatePassword(password: string): RegisterUserError | null {
           };
 }
 
+/**
+ * Register a new user with email and password.
+ *
+ * Validates email format and password strength before checking for duplicates.
+ * Email is normalized (trimmed, lowercased) before validation and storage.
+ *
+ * @param input - Registration data: email, password, and optional name/avatarUrl.
+ * @param repository - User persistence interface for duplicate checks and account creation.
+ * @param passwordHasher - Password hashing interface; invoked only after validation passes.
+ * @returns `{ ok: true, user }` on success, or `{ ok: false, error }` with a typed error code.
+ */
 export async function registerUser(
     input: RegisterUserInput,
     repository: UserRepository,
@@ -74,8 +84,8 @@ export async function registerUser(
     const user = await repository.createEmailUser({
         email,
         passwordHash,
-        name: input.name,
-        avatarUrl: input.avatarUrl,
+        name: input.name?.trim(),
+        avatarUrl: input.avatarUrl?.trim(),
     });
 
     return user === null
