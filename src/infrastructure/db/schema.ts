@@ -33,6 +33,7 @@ export const users = pgTable(
     {
         id: uuid('id').primaryKey().defaultRandom(),
         email: varchar('email', { length: 320 }).notNull().unique(),
+        passwordHash: text('password_hash'),
         name: text('name'),
         avatarUrl: text('avatar_url'),
         tier: userTierEnum('tier').notNull().default('free'),

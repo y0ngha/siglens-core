@@ -40,6 +40,7 @@ describe('database schema tables', () => {
         expect(columnNames(users)).toEqual([
             'id',
             'email',
+            'password_hash',
             'name',
             'avatar_url',
             'tier',

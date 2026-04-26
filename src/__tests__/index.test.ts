@@ -8,6 +8,7 @@ import {
     CROSS_LOOKBACK_BARS,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
+    DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
@@ -20,6 +21,7 @@ import {
     OAUTH_PROVIDER_VALUES,
     postProcessAnalysisWithReconcile,
     readDatabaseConfig,
+    registerUser,
     RSI_DEFAULT_PERIOD,
     USAGE_ACTION_TYPE_VALUES,
     users,
@@ -27,7 +29,13 @@ import {
     userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type { DatabaseConfig, PatternTrend, UserTier } from '@/index';
+import type {
+    DatabaseConfig,
+    PasswordHasher,
+    PatternTrend,
+    UserRepository,
+    UserTier,
+} from '@/index';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -66,6 +74,8 @@ describe('public API exports', () => {
 
         expect(typeof createDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
+        expect(typeof registerUser).toBe('function');
+        expect(typeof DrizzleUserRepository).toBe('function');
         expect(users.email.name).toBe('email');
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
@@ -73,5 +83,26 @@ describe('public API exports', () => {
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
         expect(config.databaseUrl).toContain('sslmode=require');
         expect(tier).toBe('pro');
+    });
+
+    it('exports auth interfaces from package entrypoint', () => {
+        const repository: UserRepository = {
+            findByEmail: async () => null,
+            createEmailUser: async input => ({
+                id: 'user-1',
+                email: input.email,
+                name: input.name ?? null,
+                avatarUrl: input.avatarUrl ?? null,
+                tier: 'free',
+                createdAt: new Date('2026-04-26T00:00:00.000Z'),
+                updatedAt: new Date('2026-04-26T00:00:00.000Z'),
+            }),
+        };
+        const passwordHasher: PasswordHasher = {
+            hashPassword: async password => `hashed:${password}`,
+        };
+
+        expect(repository).toHaveProperty('findByEmail');
+        expect(passwordHasher).toHaveProperty('hashPassword');
     });
 });

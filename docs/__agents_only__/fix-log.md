@@ -81,3 +81,13 @@
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
+
+## [Issue #5 Round 1 | feat/5/email-signup | 2026-04-26]
+- Violation: Email signup orchestration was implemented under `infrastructure/auth`
+- Rule: docs/ARCHITECTURE.md — use-case orchestration that coordinates validation, hashing, lookup, and persistence belongs in `application/`
+- Context: Moved `registerUser` and its request/result types to `application/auth`; kept DB repository and external dependency interfaces under `infrastructure/auth`
+
+## [Issue #5 Round 2 | feat/5/email-signup | 2026-04-26]
+- Violation: `infrastructure/auth/types.ts` imported `UserTier` from `infrastructure/db/types`
+- Rule: docs/ARCHITECTURE.md — infrastructure submodules should not depend on each other; keep external-system boundaries independent
+- Context: Replaced the cross-module type import with an auth-local `AuthUserTier` union and a sync note pointing to the DB enum source

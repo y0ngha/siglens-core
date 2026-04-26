@@ -20,6 +20,9 @@ export { getSectorSignals } from './application/dashboard/sectorSignals';
 export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
 
+// Auth
+export { registerUser } from './application/auth';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -196,6 +199,7 @@ export {
     readDatabaseConfig,
     tryReadDatabaseConfig,
 } from './infrastructure/db';
+export { DrizzleUserRepository } from './infrastructure/auth';
 export {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
@@ -350,6 +354,20 @@ export type {
     UsageActionType,
     UserTier,
 } from './infrastructure/db';
+export type {
+    RegisterUserError,
+    RegisterUserErrorCode,
+    RegisterUserErrorField,
+    RegisterUserInput,
+    RegisterUserResult,
+} from './application/auth';
+export type {
+    AuthUserRecord,
+    AuthUserTier,
+    CreateEmailUserInput,
+    PasswordHasher,
+    UserRepository,
+} from './infrastructure/auth';
 
 // Domain types
 export type {
