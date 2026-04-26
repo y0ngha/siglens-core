@@ -24,7 +24,6 @@ export { DrizzleUserRepository } from './userRepository';
 export type {
     DatabaseClient,
     DatabaseConfig,
-    NeonSqlClient,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,

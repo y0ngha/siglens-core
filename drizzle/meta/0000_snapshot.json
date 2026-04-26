@@ -11,7 +11,7 @@
                 "symbol": {
                     "name": "symbol",
                     "type": "varchar(32)",
-                    "primaryKey": false,
+                    "primaryKey": true,
                     "notNull": true
                 },
                 "name": {
@@ -42,12 +42,7 @@
             },
             "indexes": {},
             "foreignKeys": {},
-            "compositePrimaryKeys": {
-                "asset_translations_symbol_pk": {
-                    "name": "asset_translations_symbol_pk",
-                    "columns": ["symbol"]
-                }
-            },
+            "compositePrimaryKeys": {},
             "uniqueConstraints": {},
             "policies": {},
             "checkConstraints": {},

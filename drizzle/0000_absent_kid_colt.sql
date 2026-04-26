@@ -2,12 +2,11 @@ CREATE TYPE "public"."oauth_provider" AS ENUM('google', 'kakao', 'apple');--> st
 CREATE TYPE "public"."usage_action_type" AS ENUM('analysis', 'chatbot');--> statement-breakpoint
 CREATE TYPE "public"."user_tier" AS ENUM('free', 'member', 'pro');--> statement-breakpoint
 CREATE TABLE "asset_translations" (
-	"symbol" varchar(32) NOT NULL,
+	"symbol" varchar(32) PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"korean_name" text NOT NULL,
 	"fmp_symbol" varchar(64) NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "asset_translations_symbol_pk" PRIMARY KEY("symbol")
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "korean_tickers" (

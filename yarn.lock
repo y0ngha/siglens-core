@@ -2117,11 +2117,17 @@ __metadata:
     vitest: "npm:^2.1.0"
   peerDependencies:
     "@google/genai": ^1.50.1
+    "@neondatabase/serverless": ^1.1.0
     "@upstash/redis": ^1.37.0
+    drizzle-orm: ^0.45.2
   peerDependenciesMeta:
     "@google/genai":
       optional: true
+    "@neondatabase/serverless":
+      optional: true
     "@upstash/redis":
+      optional: true
+    drizzle-orm:
       optional: true
   languageName: unknown
   linkType: soft

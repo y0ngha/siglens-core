@@ -8,8 +8,12 @@ import {
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
+const TEST_DATABASE_URL =
+    'postgres://user:pass@example.neon.tech/db?sslmode=require';
+
 const sqlClient = vi.fn();
 const dbClient = { query: {} };
+const EXPECTED_CLIENT = { db: dbClient, sql: sqlClient };
 
 vi.mock('@neondatabase/serverless', () => ({
     neon: vi.fn(() => sqlClient),
@@ -31,24 +35,18 @@ describe('database client factory', () => {
 
     it('creates a Neon-backed Drizzle client', () => {
         const client = createDatabaseClient({
-            databaseUrl:
-                'postgres://user:pass@example.neon.tech/db?sslmode=require',
+            databaseUrl: TEST_DATABASE_URL,
         });
 
-        expect(neon).toHaveBeenCalledWith(
-            'postgres://user:pass@example.neon.tech/db?sslmode=require'
-        );
+        expect(neon).toHaveBeenCalledWith(TEST_DATABASE_URL);
         expect(drizzle).toHaveBeenCalledWith(sqlClient, {
             schema: expect.any(Object),
         });
-        expect(client).toEqual({ db: dbClient, sql: sqlClient });
+        expect(client).toEqual(EXPECTED_CLIENT);
     });
 
     it('reuses the module-level client for required env config', () => {
-        vi.stubEnv(
-            'DATABASE_URL',
-            'postgres://user:pass@example.neon.tech/db?sslmode=require'
-        );
+        vi.stubEnv('DATABASE_URL', TEST_DATABASE_URL);
 
         const firstClient = getDatabaseClient();
         const secondClient = getDatabaseClient();
@@ -75,19 +73,24 @@ describe('database client factory', () => {
     });
 
     it('reuses the module-level client when optional env config is present', () => {
-        vi.stubEnv(
-            'DATABASE_URL',
-            'postgres://user:pass@example.neon.tech/db?sslmode=require'
-        );
+        vi.stubEnv('DATABASE_URL', TEST_DATABASE_URL);
 
         const firstClient = tryGetDatabaseClient();
         const secondClient = tryGetDatabaseClient();
 
-        expect(firstClient).toEqual({
-            db: dbClient,
-            sql: sqlClient,
-        });
+        expect(firstClient).toEqual(EXPECTED_CLIENT);
         expect(firstClient).toBe(secondClient);
+        expect(neon).toHaveBeenCalledTimes(1);
+        expect(drizzle).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares the same singleton across required and optional env config', () => {
+        vi.stubEnv('DATABASE_URL', TEST_DATABASE_URL);
+
+        const requiredClient = getDatabaseClient();
+        const optionalClient = tryGetDatabaseClient();
+
+        expect(requiredClient).toBe(optionalClient);
         expect(neon).toHaveBeenCalledTimes(1);
         expect(drizzle).toHaveBeenCalledTimes(1);
     });

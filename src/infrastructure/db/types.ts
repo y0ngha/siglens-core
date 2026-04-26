@@ -18,17 +18,26 @@ export type OAuthProvider = (typeof OAUTH_PROVIDER_VALUES)[number];
 
 /** Connection configuration required to instantiate a database client. */
 export interface DatabaseConfig {
+    /** PostgreSQL connection string, including credentials and SSL mode. */
     databaseUrl: string;
 }
 
-/** Fully-typed Drizzle ORM database instance scoped to the siglens schema. */
+/**
+ * Fully-typed Drizzle ORM database instance scoped to the siglens schema.
+ * @remarks Tied to the `drizzle-orm/neon-http` adapter; changing the adapter
+ * constitutes a breaking change to this type.
+ */
 export type SiglensDatabase = NeonHttpDatabase<typeof schema>;
 
-/** Raw Neon serverless SQL client returned alongside the Drizzle instance. */
+/**
+ * @internal Raw Neon serverless SQL client — access via DatabaseClient['sql'].
+ */
 export type NeonSqlClient = NeonQueryFunction<false, false>;
 
 /** Bundled handle exposing both the Drizzle ORM layer and the raw SQL client. */
 export interface DatabaseClient {
+    /** Drizzle ORM instance scoped to the siglens schema. */
     db: SiglensDatabase;
+    /** Raw Neon serverless SQL client for template-literal queries. */
     sql: NeonSqlClient;
 }
