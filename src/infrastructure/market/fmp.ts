@@ -1,5 +1,6 @@
 import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { readFmpConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
@@ -13,6 +14,19 @@ const DST_START_MONTH = 3; // March
 const DST_START_NTH_SUNDAY = 2; // 2nd Sunday
 const DST_END_MONTH = 11; // November
 const DST_END_NTH_SUNDAY = 1; // 1st Sunday
+
+// Substring indices for FMP intraday datetime string "YYYY-MM-DD HH:MM:SS"
+const FMP_DATETIME_YEAR_END = 4;
+const FMP_DATETIME_MONTH_START = 5;
+const FMP_DATETIME_MONTH_END = 7;
+const FMP_DATETIME_DAY_START = 8;
+const FMP_DATETIME_DAY_END = 10;
+const FMP_DATETIME_HOUR_START = 11;
+const FMP_DATETIME_HOUR_END = 13;
+const FMP_DATETIME_MINUTE_START = 14;
+const FMP_DATETIME_MINUTE_END = 16;
+const FMP_DATETIME_SECOND_START = 17;
+const FMP_DATETIME_SECOND_END = 19;
 
 function getNthSundayOfMonth(year: number, month: number, n: number): Date {
     const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
@@ -36,12 +50,22 @@ function getEtOffsetHours(year: number, month: number, day: number): number {
 
 // FMP intraday timestamps are in America/New_York (ET); converts to UTC seconds with DST handling.
 function fmpIntradayDateToUtcSeconds(dateStr: string): number {
-    const year = Number(dateStr.substring(0, 4));
-    const month = Number(dateStr.substring(5, 7));
-    const day = Number(dateStr.substring(8, 10));
-    const hour = Number(dateStr.substring(11, 13));
-    const minute = Number(dateStr.substring(14, 16));
-    const second = Number(dateStr.substring(17, 19));
+    const year = Number(dateStr.substring(0, FMP_DATETIME_YEAR_END));
+    const month = Number(
+        dateStr.substring(FMP_DATETIME_MONTH_START, FMP_DATETIME_MONTH_END)
+    );
+    const day = Number(
+        dateStr.substring(FMP_DATETIME_DAY_START, FMP_DATETIME_DAY_END)
+    );
+    const hour = Number(
+        dateStr.substring(FMP_DATETIME_HOUR_START, FMP_DATETIME_HOUR_END)
+    );
+    const minute = Number(
+        dateStr.substring(FMP_DATETIME_MINUTE_START, FMP_DATETIME_MINUTE_END)
+    );
+    const second = Number(
+        dateStr.substring(FMP_DATETIME_SECOND_START, FMP_DATETIME_SECOND_END)
+    );
     const etOffsetHours = getEtOffsetHours(year, month, day);
     // ET + |etOffset| = UTC  (etOffsetHours is negative, so we subtract it)
     const utcMs = Date.UTC(
@@ -52,7 +76,7 @@ function fmpIntradayDateToUtcSeconds(dateStr: string): number {
         minute,
         second
     );
-    return Math.floor(utcMs / 1000);
+    return Math.floor(utcMs / MS_PER_SECOND);
 }
 
 const FMP_INTRADAY_TIMEFRAME_MAP: Record<Exclude<Timeframe, '1Day'>, string> = {
@@ -108,7 +132,9 @@ function toFmpDailyBar(raw: FmpDailyBar): Bar {
         // 'T00:00:00'을 붙여 local time midnight으로 파싱한다.
         // date-only ISO 문자열(예: "2026-04-14")은 UTC midnight으로 파싱되어
         // US Eastern(UTC-4) 등의 타임존에서 하루 앞 날짜로 표시되는 버그가 있다.
-        time: Math.floor(new Date(raw.date + 'T00:00:00').getTime() / 1000),
+        time: Math.floor(
+            new Date(raw.date + 'T00:00:00').getTime() / MS_PER_SECOND
+        ),
         open: raw.open,
         high: raw.high,
         low: raw.low,
@@ -303,12 +329,12 @@ export class FmpProvider implements MarketDataProvider {
             if (!Array.isArray(raw) || raw.length === 0) return null;
 
             const quote = raw[0]!;
-            const d = new Date(quote.timestamp * 1000);
+            const d = new Date(quote.timestamp * MS_PER_SECOND);
             const dateStr = d.toISOString().split('T')[0]!;
 
             return {
                 time: Math.floor(
-                    new Date(dateStr + 'T00:00:00').getTime() / 1000
+                    new Date(dateStr + 'T00:00:00').getTime() / MS_PER_SECOND
                 ),
                 open: quote.open,
                 high: quote.dayHigh,

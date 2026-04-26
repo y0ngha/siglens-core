@@ -1,4 +1,5 @@
 import type { Bar, MarketQuote } from '@/domain/types';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { readAlpacaConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
@@ -19,7 +20,7 @@ interface AlpacaBarsRawResponse {
 
 function toAlpacaBar(raw: AlpacaBar): Bar {
     return {
-        time: Math.floor(new Date(raw.t).getTime() / 1000),
+        time: Math.floor(new Date(raw.t).getTime() / MS_PER_SECOND),
         open: raw.o,
         high: raw.h,
         low: raw.l,

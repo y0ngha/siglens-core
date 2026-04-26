@@ -21,7 +21,7 @@ export function computeEMAValues(
     const tail = values.slice(period);
     for (let i = 0; i < tail.length; i++) {
         // seed 마지막 값은 initialSMA(number)로 보장되므로 as number 사용
-        const prev = result[result.length - 1] as number;
+        const prev = result.at(-1) as number;
         result.push(tail[i] * multiplier + prev * (1 - multiplier));
     }
     return result;

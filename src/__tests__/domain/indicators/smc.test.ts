@@ -87,22 +87,26 @@ describe('calculateSmc', () => {
 
         it('명확한 고점 구조에서 swingHighs가 감지된다', () => {
             const P = SMC_SWING_PERIOD;
-            const bars: Bar[] = [];
-            for (let i = 0; i < P; i++) bars.push(makeBar(100, 90, 95, i));
-            bars.push(makeBar(200, 90, 145, P));
-            for (let i = 0; i < P; i++)
-                bars.push(makeBar(100, 90, 95, P + 1 + i));
+            const bars: Bar[] = [
+                ...Array.from({ length: P }, (_, i) => makeBar(100, 90, 95, i)),
+                makeBar(200, 90, 145, P),
+                ...Array.from({ length: P }, (_, i) =>
+                    makeBar(100, 90, 95, P + 1 + i)
+                ),
+            ];
             const result = calculateSmc(bars);
             expect(result.swingHighs.length).toBeGreaterThan(0);
         });
 
         it('명확한 저점 구조에서 swingLows가 감지된다', () => {
             const P = SMC_SWING_PERIOD;
-            const bars: Bar[] = [];
-            for (let i = 0; i < P; i++) bars.push(makeBar(100, 90, 95, i));
-            bars.push(makeBar(100, 10, 55, P));
-            for (let i = 0; i < P; i++)
-                bars.push(makeBar(100, 90, 95, P + 1 + i));
+            const bars: Bar[] = [
+                ...Array.from({ length: P }, (_, i) => makeBar(100, 90, 95, i)),
+                makeBar(100, 10, 55, P),
+                ...Array.from({ length: P }, (_, i) =>
+                    makeBar(100, 90, 95, P + 1 + i)
+                ),
+            ];
             const result = calculateSmc(bars);
             expect(result.swingLows.length).toBeGreaterThan(0);
         });
@@ -296,11 +300,15 @@ describe('calculateSmc', () => {
         it('ATR이 null인 구간(데이터 부족)의 swing point는 equalHighs에 포함되지 않는다', () => {
             // MIN_SWING_BARS only: swing points exist but ATR is null at their indices
             const P = SMC_SWING_PERIOD;
-            const bars: Bar[] = [];
-            for (let i = 0; i < P; i++) bars.push(makeBar(99, 98, 98.5, i));
-            bars.push(makeBar(105, 98, 101, P)); // swing high — ATR null here
-            for (let i = 0; i < P; i++)
-                bars.push(makeBar(99, 98, 98.5, P + 1 + i));
+            const bars: Bar[] = [
+                ...Array.from({ length: P }, (_, i) =>
+                    makeBar(99, 98, 98.5, i)
+                ),
+                makeBar(105, 98, 101, P), // swing high — ATR null here
+                ...Array.from({ length: P }, (_, i) =>
+                    makeBar(99, 98, 98.5, P + 1 + i)
+                ),
+            ];
             const result = calculateSmc(bars);
             // ATR_PERIOD=14 > swing index (P=5), so ATR is null → no equal levels
             expect(result.equalHighs).toEqual([]);

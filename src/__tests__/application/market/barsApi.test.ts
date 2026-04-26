@@ -4,6 +4,7 @@ import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import {
     DEFAULT_TIMEFRAME,
     TIMEFRAME_BARS_LIMIT,
+    TIMEFRAME_LOOKBACK_DAYS,
 } from '@/domain/constants/market';
 import {
     BOLLINGER_DEFAULT_PERIOD,
@@ -171,16 +172,28 @@ describe('fetchBarsWithIndicators 함수는', () => {
         it('symbol, timeframe, limit, from 파라미터를 getBars에 전달한다', async () => {
             mockGetBars.mockResolvedValueOnce([]);
 
-            await fetchBarsWithIndicators('TSLA', DEFAULT_TIMEFRAME);
+            const fixedNow = new Date('2025-01-15T00:00:00.000Z');
+            const lookbackDays = TIMEFRAME_LOOKBACK_DAYS[DEFAULT_TIMEFRAME];
+            const expectedFromDate = new Date(fixedNow);
+            expectedFromDate.setUTCDate(
+                expectedFromDate.getUTCDate() - lookbackDays
+            );
+            const expectedFrom =
+                expectedFromDate.toISOString().substring(0, 10) + 'T00:00:00Z';
+
+            await fetchBarsWithIndicators(
+                'TSLA',
+                DEFAULT_TIMEFRAME,
+                undefined,
+                fixedNow
+            );
 
             expect(mockGetBars).toHaveBeenCalledWith(
                 expect.objectContaining({
                     symbol: 'TSLA',
                     timeframe: DEFAULT_TIMEFRAME,
                     limit: TIMEFRAME_BARS_LIMIT[DEFAULT_TIMEFRAME],
-                    from: expect.stringMatching(
-                        /^\d{4}-\d{2}-\d{2}T00:00:00Z$/
-                    ),
+                    from: expectedFrom,
                 })
             );
         });
