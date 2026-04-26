@@ -57,6 +57,27 @@ function makeInsertDb(rows: unknown[]): {
     };
 }
 
+function makeUpdateDb(rows: unknown[]): {
+    db: SiglensDatabase;
+    update: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    returning: ReturnType<typeof vi.fn>;
+} {
+    const returning = vi.fn().mockResolvedValue(rows);
+    const where = vi.fn(() => ({ returning }));
+    const set = vi.fn(() => ({ where }));
+    const update = vi.fn(() => ({ set }));
+
+    return {
+        db: { update } as unknown as SiglensDatabase,
+        update,
+        set,
+        where,
+        returning,
+    };
+}
+
 function makeTransactionDb(options: {
     userRows: unknown[];
     accountRows: unknown[];
@@ -102,6 +123,16 @@ function makeTransactionDb(options: {
         accountOnConflictDoNothing,
         userReturning,
         accountReturning,
+    };
+}
+
+function makeFailingTransactionDb(error: Error): {
+    db: SiglensDatabase;
+} {
+    const transaction = vi.fn().mockRejectedValue(error);
+
+    return {
+        db: { transaction } as unknown as SiglensDatabase,
     };
 }
 
@@ -337,6 +368,71 @@ describe('DrizzleUserRepository', () => {
             provider: 'apple',
             providerAccountId: 'provider-user-1',
         });
+
+        expect(result).toBeNull();
+    });
+
+    it('rethrows unexpected OAuth user creation failures', async () => {
+        const error = new Error('database unavailable');
+        const { db } = makeFailingTransactionDb(error);
+        const repository = new DrizzleUserRepository(db);
+
+        await expect(
+            repository.createOAuthUser({
+                email: 'user@example.com',
+                provider: 'google',
+                providerAccountId: 'provider-user-1',
+            })
+        ).rejects.toThrow(error);
+    });
+
+    it('returns the tier found by user id', async () => {
+        const { db, select, from, where, limit } = makeSelectDb([
+            { tier: 'member' },
+        ]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.getUserTier('user-1');
+
+        expect(select).toHaveBeenCalledWith({ tier: expect.any(Object) });
+        expect(from).toHaveBeenCalledWith(expect.any(Object));
+        expect(where).toHaveBeenCalledWith(expect.any(Object));
+        expect(limit).toHaveBeenCalledWith(1);
+        expect(result).toBe('member');
+    });
+
+    it('returns null when no user tier is found', async () => {
+        const { db } = makeSelectDb([]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.getUserTier('missing-user');
+
+        expect(result).toBeNull();
+    });
+
+    it('updates a user tier and returns the persisted tier', async () => {
+        const { db, update, set, where, returning } = makeUpdateDb([
+            { tier: 'pro' },
+        ]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.updateUserTier('user-1', 'pro');
+
+        expect(update).toHaveBeenCalledWith(expect.any(Object));
+        expect(set).toHaveBeenCalledWith({ tier: 'pro' });
+        expect(where).toHaveBeenCalledWith(expect.any(Object));
+        expect(returning).toHaveBeenCalledWith({ tier: expect.any(Object) });
+        expect(result).toBe('pro');
+    });
+
+    it('returns null when no user tier is updated', async () => {
+        const { db } = makeUpdateDb([]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.updateUserTier(
+            'missing-user',
+            'member'
+        );
 
         expect(result).toBeNull();
     });

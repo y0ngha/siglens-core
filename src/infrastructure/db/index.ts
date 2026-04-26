@@ -28,5 +28,6 @@ export type {
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserTierRepository,
     UserTier,
 } from './types';

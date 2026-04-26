@@ -49,3 +49,8 @@
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
+
+## [Issue #8 | feat/8/user-tier-system | 2026-04-27]
+- Violation: `calculateIchimokuFutureCloud` allowed negative/out-of-range source indexes to produce NaN instead of null
+- Rule: Domain indicator warm-up and unavailable values must return null, never NaN
+- Context: Short non-empty Ichimoku inputs now keep future cloud values null when the source window is unavailable

@@ -31,6 +31,11 @@ export {
     registerUser,
     socialLoginUser,
 } from './application/auth';
+export {
+    createUserTierContext,
+    getUserTier,
+    setUserTier,
+} from './application/tier';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -377,6 +382,7 @@ export type {
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserTierRepository,
     UserTier,
 } from './infrastructure/db';
 export type {
@@ -403,6 +409,16 @@ export type {
     SocialLoginUserOptions,
     SocialLoginUserResult,
 } from './application/auth';
+export type {
+    CreateUserTierContextInput,
+    CreateUserTierContextResult,
+    GetUserTierInput,
+    SetUserTierError,
+    SetUserTierErrorCode,
+    SetUserTierInput,
+    SetUserTierResult,
+    UserTierDependencies,
+} from './application/tier';
 export type {
     AuthOAuthProvider,
     AuthSessionRecord,

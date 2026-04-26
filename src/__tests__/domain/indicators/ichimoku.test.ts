@@ -108,6 +108,23 @@ describe('calculateIchimoku', () => {
             }
         });
     });
+
+    describe('데이터가 displacement보다 짧을 때', () => {
+        it('미래 구름 값은 NaN이 아니라 null이다', () => {
+            const bars = Array.from(
+                { length: ICHIMOKU_DISPLACEMENT - 1 },
+                (_, i) => makeBar(100 + i, 90 + i, 95 + i, i)
+            );
+
+            const result = calculateIchimokuFutureCloud(bars);
+
+            expect(result).toHaveLength(ICHIMOKU_DISPLACEMENT);
+            result.forEach(point => {
+                expect(point.senkouA).toBeNull();
+                expect(point.senkouB).toBeNull();
+            });
+        });
+    });
 });
 
 describe('calculateIchimokuFutureCloud', () => {

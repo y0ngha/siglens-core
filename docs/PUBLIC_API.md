@@ -78,7 +78,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (15)
+### Tier 1 — Application Entrypoints (18)
 
 | Symbol | Source |
 |---|---|
@@ -97,6 +97,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `loginUser` | `application/auth/loginUser.ts` |
 | `socialLoginUser` | `application/auth/socialLoginUser.ts` |
 | `logoutUser` | `application/auth/logoutUser.ts` |
+| `getUserTier` | `application/tier/getUserTier.ts` |
+| `createUserTierContext` | `application/tier/createUserTierContext.ts` |
+| `setUserTier` | `application/tier/setUserTier.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -147,6 +150,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `bucketedTimestamp` | `domain/dashboard.ts` |
 | `computeStockSignalResult` | `domain/dashboard.ts` |
 | `lookbackIsoFromNow` | `domain/dashboard.ts` |
+
+**티어 게이트 (8)**
+| Symbol | Source |
+|---|---|
+| `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
+| `isAllowed` / `getTierLimit` | `domain/tier.ts` |
+| `isTimeframeAllowed` / `isInfoDepthAllowed` | `domain/tier.ts` |
+| `isModelAllowed` / `isTier` | `domain/tier.ts` |
 
 ### Tier 3 — Infrastructure Factories & Config
 
@@ -221,7 +232,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입, Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`).
+**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입, Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`), tier 관련 타입(`Tier*`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`).
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
