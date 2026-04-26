@@ -230,6 +230,15 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
 
+### 이메일 인증
+
+`application/auth`는 이메일 회원가입·로그인·로그아웃 유스케이스를 제공한다.
+
+- `registerUser`는 `UserRepository`와 `PasswordHasher`를 주입받아 이메일 중복 확인, 비밀번호 해시 생성, 사용자 생성을 수행한다.
+- `loginUser`는 `EmailAuthUserRepository`, `PasswordVerifier`, `SessionRepository`를 주입받아 자격증명을 검증하고 `sessions.id`를 세션 토큰으로 사용한다.
+- `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
+- HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
+
 ---
 
 ## 4. Filesystem (Skills)

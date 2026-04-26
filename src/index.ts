@@ -21,7 +21,15 @@ export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
 
 // Auth
-export { registerUser } from './application/auth';
+export {
+    AUTH_SESSION_COOKIE_NAME,
+    DEFAULT_AUTH_COOKIE_PATH,
+    DEFAULT_AUTH_COOKIE_SAME_SITE,
+    DEFAULT_SESSION_TTL_SECONDS,
+    loginUser,
+    logoutUser,
+    registerUser,
+} from './application/auth';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -201,7 +209,10 @@ export {
     readDatabaseConfig,
     tryReadDatabaseConfig,
 } from './infrastructure/db';
-export { DrizzleUserRepository } from './infrastructure/db';
+export {
+    DrizzleSessionRepository,
+    DrizzleUserRepository,
+} from './infrastructure/db';
 export {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
@@ -356,6 +367,17 @@ export type {
     UserTier,
 } from './infrastructure/db';
 export type {
+    AuthSessionCookie,
+    LoginUserDependencies,
+    LoginUserError,
+    LoginUserErrorCode,
+    LoginUserInput,
+    LoginUserOptions,
+    LoginUserResult,
+    LogoutUserDependencies,
+    LogoutUserInput,
+    LogoutUserOptions,
+    LogoutUserResult,
     RegisterUserError,
     RegisterUserErrorCode,
     RegisterUserErrorField,
@@ -363,10 +385,16 @@ export type {
     RegisterUserResult,
 } from './application/auth';
 export type {
+    AuthSessionRecord,
     AuthUserRecord,
     AuthUserTier,
+    CreateSessionInput,
     CreateEmailUserInput,
+    EmailAuthUserRecord,
+    EmailAuthUserRepository,
     PasswordHasher,
+    PasswordVerifier,
+    SessionRepository,
     UserRepository,
 } from './infrastructure/auth';
 

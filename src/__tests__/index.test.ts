@@ -8,6 +8,7 @@ import {
     CROSS_LOOKBACK_BARS,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
+    DrizzleSessionRepository,
     DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
@@ -16,6 +17,8 @@ import {
     extractReconciledActionLines,
     extendTrendline,
     HIGH_CONFIDENCE_WEIGHT,
+    loginUser,
+    logoutUser,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
@@ -29,7 +32,14 @@ import {
     userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type { PasswordHasher, PatternTrend, UserRepository } from '@/index';
+import type {
+    EmailAuthUserRepository,
+    PasswordHasher,
+    PasswordVerifier,
+    PatternTrend,
+    SessionRepository,
+    UserRepository,
+} from '@/index';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -63,7 +73,10 @@ describe('public API exports', () => {
         expect(typeof createDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
         expect(typeof registerUser).toBe('function');
+        expect(typeof loginUser).toBe('function');
+        expect(typeof logoutUser).toBe('function');
         expect(typeof DrizzleUserRepository).toBe('function');
+        expect(typeof DrizzleSessionRepository).toBe('function');
         expect(users.email.name).toBe('email');
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
@@ -87,8 +100,26 @@ describe('public API exports', () => {
         const passwordHasher: PasswordHasher = {
             hashPassword: async password => `hashed:${password}`,
         };
+        const emailAuthRepository: EmailAuthUserRepository = {
+            findEmailAuthUserByEmail: async () => null,
+        };
+        const sessionRepository: SessionRepository = {
+            createSession: async input => ({
+                id: 'session-1',
+                userId: input.userId,
+                expiresAt: input.expiresAt,
+                createdAt: new Date('2026-04-26T00:00:00.000Z'),
+            }),
+            deleteSession: async () => true,
+        };
+        const passwordVerifier: PasswordVerifier = {
+            verifyPassword: async () => true,
+        };
 
         expect(repository).toHaveProperty('findByEmail');
         expect(passwordHasher).toHaveProperty('hashPassword');
+        expect(emailAuthRepository).toHaveProperty('findEmailAuthUserByEmail');
+        expect(sessionRepository).toHaveProperty('createSession');
+        expect(passwordVerifier).toHaveProperty('verifyPassword');
     });
 });

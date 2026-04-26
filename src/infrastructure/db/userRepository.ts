@@ -4,6 +4,8 @@ import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
+    EmailAuthUserRecord,
+    EmailAuthUserRepository,
     UserRepository,
 } from '@/infrastructure/auth/types';
 
@@ -19,17 +21,36 @@ const authUserColumns = {
     updatedAt: users.updatedAt,
 };
 
+const emailAuthUserColumns = {
+    ...authUserColumns,
+    passwordHash: users.passwordHash,
+};
+
 /**
  * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
-export class DrizzleUserRepository implements UserRepository {
+export class DrizzleUserRepository
+    implements UserRepository, EmailAuthUserRepository
+{
     constructor(private readonly db: SiglensDatabase) {}
 
     async findByEmail(email: string): Promise<AuthUserRecord | null> {
         const [user] = await this.db
             .select(authUserColumns)
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+
+        return user ?? null;
+    }
+
+    async findEmailAuthUserByEmail(
+        email: string
+    ): Promise<EmailAuthUserRecord | null> {
+        const [user] = await this.db
+            .select(emailAuthUserColumns)
             .from(users)
             .where(eq(users.email, email))
             .limit(1);

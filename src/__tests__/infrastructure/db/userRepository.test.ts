@@ -77,6 +77,37 @@ describe('DrizzleUserRepository', () => {
         expect(result).toBeNull();
     });
 
+    it('returns an email-auth user with password hash', async () => {
+        const emailAuthRecord = {
+            ...userRecord,
+            passwordHash: 'hashed-password',
+        };
+        const { db, select, from, where, limit } = makeSelectDb([
+            emailAuthRecord,
+        ]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result =
+            await repository.findEmailAuthUserByEmail('user@example.com');
+
+        expect(select).toHaveBeenCalledWith(expect.any(Object));
+        expect(from).toHaveBeenCalledWith(expect.any(Object));
+        expect(where).toHaveBeenCalledWith(expect.any(Object));
+        expect(limit).toHaveBeenCalledWith(1);
+        expect(result).toEqual(emailAuthRecord);
+    });
+
+    it('returns null when no email-auth user is found', async () => {
+        const { db } = makeSelectDb([]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.findEmailAuthUserByEmail(
+            'missing@example.com'
+        );
+
+        expect(result).toBeNull();
+    });
+
     it('inserts a free-tier email user with password hash', async () => {
         const { db, insert, values, onConflictDoNothing, returning } =
             makeInsertDb([userRecord]);

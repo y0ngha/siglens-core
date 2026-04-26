@@ -78,7 +78,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (11)
+### Tier 1 — Application Entrypoints (14)
 
 | Symbol | Source |
 |---|---|
@@ -93,6 +93,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `getSectorSignals` | `application/dashboard/sectorSignals.ts` |
 | `getAssetInfo` | `application/ticker/getAssetInfo.ts` |
 | `searchTicker` | `application/ticker/searchTicker.ts` |
+| `registerUser` | `application/auth/registerUser.ts` |
+| `loginUser` | `application/auth/loginUser.ts` |
+| `logoutUser` | `application/auth/logoutUser.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -179,15 +182,23 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `readFmpConfig` | `infrastructure/fmp/config.ts` |
 | `tryReadFmpConfig` | `infrastructure/fmp/config.ts` |
 
-**Database (5 factory/config + schema exports)**
+**Database (5 factory/config + repositories + schema exports)**
 | Symbol | Source |
 |---|---|
 | `createDatabaseClient` / `getDatabaseClient` / `tryGetDatabaseClient` | `infrastructure/db/client.ts` |
 | `readDatabaseConfig` / `tryReadDatabaseConfig` | `infrastructure/db/config.ts` |
+| `DrizzleUserRepository` / `DrizzleSessionRepository` | `infrastructure/db/*Repository.ts` |
 | `users` / `sessions` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
 | `koreanTickers` / `assetTranslations` | `infrastructure/db/schema.ts` |
 | `userTierEnum` / `usageActionTypeEnum` / `oauthProviderEnum` | `infrastructure/db/schema.ts` |
 | `USER_TIER_VALUES` / `USAGE_ACTION_TYPE_VALUES` / `OAUTH_PROVIDER_VALUES` | `infrastructure/db/constants.ts` |
+
+**Auth application (3 use-cases + cookie constants)**
+| Symbol | Source |
+|---|---|
+| `registerUser` / `loginUser` / `logoutUser` | `application/auth` |
+| `AUTH_SESSION_COOKIE_NAME` / `DEFAULT_SESSION_TTL_SECONDS` | `application/auth/sessionCookie.ts` |
+| `DEFAULT_AUTH_COOKIE_PATH` / `DEFAULT_AUTH_COOKIE_SAME_SITE` | `application/auth/sessionCookie.ts` |
 
 **Job queue (worker용) (11)**
 | Symbol | Source |
@@ -209,7 +220,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입, Gemini 관련 타입.
+**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입, Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `SessionRepository`).
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 

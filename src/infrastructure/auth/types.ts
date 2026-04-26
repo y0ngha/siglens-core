@@ -26,6 +26,28 @@ export interface AuthUserRecord {
 }
 
 /**
+ * Email-auth user record including the password hash needed for credential checks.
+ */
+export interface EmailAuthUserRecord extends AuthUserRecord {
+    /** Hashed password for email/password authentication; null for OAuth-only users. */
+    passwordHash: string | null;
+}
+
+/**
+ * Persisted auth session record.
+ */
+export interface AuthSessionRecord {
+    /** Session identifier used as the session token. */
+    id: string;
+    /** User that owns the session. */
+    userId: string;
+    /** Fixed expiration timestamp. */
+    expiresAt: Date;
+    /** Timestamp when the session was created. */
+    createdAt: Date;
+}
+
+/**
  * Input for creating a new email-based user account.
  */
 export interface CreateEmailUserInput {
@@ -53,6 +75,20 @@ export interface PasswordHasher {
 }
 
 /**
+ * Interface for comparing a plain-text password against a stored password hash.
+ */
+export interface PasswordVerifier {
+    /**
+     * Compare a plain-text password with a stored password hash.
+     *
+     * @param password - Plain-text password supplied by the user.
+     * @param passwordHash - Stored password hash for the account.
+     * @returns Whether the password matches the hash.
+     */
+    verifyPassword(password: string, passwordHash: string): Promise<boolean>;
+}
+
+/**
  * Interface for user persistence operations required by the auth use-cases.
  */
 export interface UserRepository {
@@ -73,4 +109,50 @@ export interface UserRepository {
     createEmailUser(
         input: CreateEmailUserInput
     ): Promise<AuthUserRecord | null>;
+}
+
+/**
+ * Interface for credential lookup required by email login.
+ */
+export interface EmailAuthUserRepository {
+    /**
+     * Find an email-auth user, including password hash, by normalized email.
+     *
+     * @param email - Normalized (lowercased, trimmed) email to look up.
+     * @returns The matching user with password hash, or null if not found.
+     */
+    findEmailAuthUserByEmail(
+        email: string
+    ): Promise<EmailAuthUserRecord | null>;
+}
+
+/**
+ * Input for creating a new persisted session.
+ */
+export interface CreateSessionInput {
+    /** User that owns the session. */
+    userId: string;
+    /** Fixed expiration timestamp. */
+    expiresAt: Date;
+}
+
+/**
+ * Interface for session persistence operations.
+ */
+export interface SessionRepository {
+    /**
+     * Create and persist a session.
+     *
+     * @param input - Session owner and expiration timestamp.
+     * @returns The created session record.
+     */
+    createSession(input: CreateSessionInput): Promise<AuthSessionRecord>;
+
+    /**
+     * Delete a session by token.
+     *
+     * @param sessionToken - Session identifier stored in the auth cookie.
+     * @returns Whether a session row was deleted.
+     */
+    deleteSession(sessionToken: string): Promise<boolean>;
 }
