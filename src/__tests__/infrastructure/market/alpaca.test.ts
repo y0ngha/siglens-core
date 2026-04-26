@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { AlpacaProvider } from '@/infrastructure/market/alpaca';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockBar = {
     t: '2024-01-15T09:30:00Z',
@@ -69,7 +70,7 @@ describe('AlpacaProvider', () => {
             expect(bars).toHaveLength(1);
             expect(bars[0]).toEqual({
                 time: Math.floor(
-                    new Date('2024-01-15T09:30:00Z').getTime() / 1000
+                    new Date('2024-01-15T09:30:00Z').getTime() / MS_PER_SECOND
                 ),
                 open: 100,
                 high: 105,

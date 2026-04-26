@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { FmpProvider } from '@/infrastructure/market/fmp';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockFetch = vi.fn();
 
@@ -150,7 +151,8 @@ describe('FmpProvider', () => {
             });
 
             // 2024-06-15 13:30:00 UTC in seconds
-            const expectedTime = Date.UTC(2024, 5, 15, 13, 30, 0) / 1000;
+            const expectedTime =
+                Date.UTC(2024, 5, 15, 13, 30, 0) / MS_PER_SECOND;
             expect(bars[0].time).toBe(expectedTime);
         });
 
@@ -168,7 +170,8 @@ describe('FmpProvider', () => {
             });
 
             // 2024-01-15 14:30:00 UTC in seconds
-            const expectedTime = Date.UTC(2024, 0, 15, 14, 30, 0) / 1000;
+            const expectedTime =
+                Date.UTC(2024, 0, 15, 14, 30, 0) / MS_PER_SECOND;
             expect(bars[0].time).toBe(expectedTime);
         });
     });
@@ -273,7 +276,7 @@ describe('FmpProvider', () => {
         it('quote의 time이 마지막 EOD bar와 같으면 quote를 추가하지 않는다', async () => {
             // Today's quote timestamp — same date as EOD bar
             const todayTimestamp = Math.floor(
-                new Date('2024-01-15T00:00:00').getTime() / 1000
+                new Date('2024-01-15T00:00:00').getTime() / MS_PER_SECOND
             );
             mockFetch
                 .mockResolvedValueOnce({
