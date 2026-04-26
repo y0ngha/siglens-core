@@ -50,8 +50,11 @@ async function fetchFmpEndpoint(
             signal: AbortSignal.timeout(FMP_FETCH_TIMEOUT_MS),
         });
         if (!res.ok) return [];
-        // FMP API contract guarantees an array shape; runtime check below preserves null safety.
         const raw: unknown = await res.json();
+        // FMP search endpoints return a JSON array of records matching FmpSearchResult.
+        // We verify array shape via Array.isArray; per-element shape is not validated at
+        // runtime — caller-side `filterUsExchanges` and `toTickerSearchResult` rely on
+        // FMP's documented response contract. Cast scope is limited to this boundary.
         return Array.isArray(raw) ? (raw as FmpSearchResult[]) : [];
     } catch {
         return [];

@@ -27,6 +27,11 @@ import type { MarketDataProvider } from '@/infrastructure/market/types';
 // FMP/Alpaca 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;
 
+interface BarsAndQuotesResults {
+    barsResults: PromiseSettledResult<Bar[]>[];
+    quoteResults: PromiseSettledResult<MarketQuote | null>[];
+}
+
 async function fetchInChunks<T, R>(
     items: readonly T[],
     chunkSize: number,
@@ -48,10 +53,7 @@ async function fetchBarsAndQuotes(
     provider: MarketDataProvider,
     timeframe: DashboardTimeframe,
     fromIso: string
-): Promise<{
-    barsResults: PromiseSettledResult<Bar[]>[];
-    quoteResults: PromiseSettledResult<MarketQuote | null>[];
-}> {
+): Promise<BarsAndQuotesResults> {
     // DashboardTimeframe('15Min' | '1Hour' | '1Day')은 Timeframe 의 부분집합이므로
     // provider.getBars 시그니처에 맞추기 위한 안전한 widening.
     const tf: Timeframe = timeframe;
