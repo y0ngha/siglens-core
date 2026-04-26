@@ -123,4 +123,8 @@ describe('database schema tables', () => {
         ]);
         expect(getTableConfig(assetTranslations).primaryKeys).toHaveLength(1);
     });
+
+    it('enforces unique constraint on users.email', () => {
+        expect(getTableColumns(users).email.isUnique).toBe(true);
+    });
 });

@@ -189,14 +189,14 @@ export { FileSkillsLoader } from './infrastructure/skills/loader';
 
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
+
+// Database
 export {
     createDatabaseClient,
     getDatabaseClient,
     tryGetDatabaseClient,
     readDatabaseConfig,
     tryReadDatabaseConfig,
-} from './infrastructure/db';
-export {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
     USER_TIER_VALUES,
