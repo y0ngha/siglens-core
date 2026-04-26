@@ -19,6 +19,8 @@ import {
     KOREAN_NAMES_CACHE_TTL,
     KOREAN_TICKERS_CACHE_KEY,
     MARKET_BRIEFING_CACHE_TTL,
+    SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
+    SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
     TICKER_SEARCH_CACHE_TTL,
 } from '@/infrastructure/cache/config';
@@ -126,10 +128,10 @@ describe('cache key builders', () => {
     it('SECTOR_SIGNALS_TTL_BY_TIMEFRAME has all dashboard timeframes', () => {
         expect(SECTOR_SIGNALS_TTL_BY_TIMEFRAME['1Day']).toBe(SECONDS_PER_HOUR);
         expect(SECTOR_SIGNALS_TTL_BY_TIMEFRAME['1Hour']).toBe(
-            15 * SECONDS_PER_MINUTE
+            SECTOR_SIGNALS_1HOUR_TTL_MINUTES * SECONDS_PER_MINUTE
         );
         expect(SECTOR_SIGNALS_TTL_BY_TIMEFRAME['15Min']).toBe(
-            5 * SECONDS_PER_MINUTE
+            SECTOR_SIGNALS_15MIN_TTL_MINUTES * SECONDS_PER_MINUTE
         );
     });
 });

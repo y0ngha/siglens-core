@@ -11,13 +11,16 @@ import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
 export const MARKET_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
 
 // 대시보드 섹터 시그널: 타임프레임별 데이터 갱신 주기에 맞춘 TTL
+export const SECTOR_SIGNALS_1HOUR_TTL_MINUTES = 15;
+export const SECTOR_SIGNALS_15MIN_TTL_MINUTES = 5;
+
 export const SECTOR_SIGNALS_TTL_BY_TIMEFRAME: Record<
     DashboardTimeframe,
     number
 > = {
     '1Day': SECONDS_PER_HOUR,
-    '1Hour': 15 * SECONDS_PER_MINUTE,
-    '15Min': 5 * SECONDS_PER_MINUTE,
+    '1Hour': SECTOR_SIGNALS_1HOUR_TTL_MINUTES * SECONDS_PER_MINUTE,
+    '15Min': SECTOR_SIGNALS_15MIN_TTL_MINUTES * SECONDS_PER_MINUTE,
 };
 
 // 티커 검색 결과: 하루 캐시
