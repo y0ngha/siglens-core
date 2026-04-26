@@ -20,10 +20,6 @@
 - Rule: CONVENTIONS.md — 루프 조건이 카운터가 아닌 수렴 predicate일 때 `while` 사용
 - Context: `prompt.ts`의 `countSqueezeDuration`은 뒤에서부터 `sqzOn === true`가 끊기는 지점을 찾는 수렴 탐색; `while` 루프로 교체
 
-- Violation: DOMAIN.md의 `Timeframe` 타입 및 관련 명세가 실제 코드와 불일치
-- Rule: MISTAKES.md Documentation Sync #2 — 구현 변경 시 docs 동기화 필수
-- Context: 코드의 `Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day'`인데 DOMAIN.md는 `'1Min' | '5Min' | '15Min' | '1Hour' | '1Day'`로 표기; TIMEFRAMES 상수, EMA 테이블, 인디케이터 설정표, 봉 개수 기준 모두 동기화
-
 ## [PR #24 Round 3 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `parseNumberEnv` 함수명이 "env var 파싱"을 시사해 domain/에서 환경변수를 다루는 듯한 인상을 줌
 - Rule: CONVENTIONS.md — 함수 이름은 실제 동작을 정확히 반영해야 함; `parseNumberEnv`는 raw string을 받는 순수 함수이며 env var에 의존하지 않음
@@ -37,11 +33,6 @@
 - Violation: `@google/genai`, `@upstash/redis`가 `dependencies`에 포함되어 소비자 프로젝트에 강제 설치
 - Rule: npm 라이브러리 패턴 — 선택적 런타임 의존성은 `peerDependencies`(optional) + `devDependencies`로 분리
 - Context: `package.json`에서 두 패키지를 `peerDependencies`(optional: true) 및 `devDependencies`로 이동
-
-## [PR #24 Round 5 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
-- Violation: `GeminiContents` 타입에 `{ role: string; parts: Array<{ text: string }> }` 중첩 익명 객체 타입 인라인 정의
-- Rule: MISTAKES.md TypeScript #5 — 반복되거나 재사용 가능한 타입 패턴은 named type alias로 추출
-- Context: `infrastructure/ai/types.ts`에서 `GeminiPart`, `GeminiContent` named interface로 추출
 
 ## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
 
@@ -58,35 +49,22 @@
 - Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
 - Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
 
-## [PR #26 Round 3 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `reanalyzeCooldown.ts`의 `getRedis()`가 호출마다 `new Redis(...)` 인스턴스 생성
-- Rule: MISTAKES.md Design #2 — 동일 외부 자원에 대한 클라이언트는 모듈 스코프 싱글턴으로 관리
-- Context: config key 기반 싱글턴으로 전환; config 미설정 시 null 반환, config 동일 시 캐시된 인스턴스 반환
-
 ## [PR #26 Round 5 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `CachedBriefingData` 인터페이스가 `domain/types.ts`에 선언되어 있으나 `briefing: unknown` 필드가 보여주듯 캐시 직렬화 전용 infrastructure 구조체
 - Rule: 레이어 분리 원칙 — infrastructure 관심사 타입은 `infrastructure/cache/types.ts`에 위치해야 하며 도메인 레이어에 노출되면 안 됨
 - Context: `domain/types.ts`에서 제거하고 `infrastructure/cache/types.ts`로 이동; `application/market/submitBriefing.ts` import 경로 업데이트
 
-## [PR #26 Round 4 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `submitAnalysis.ts`, `submitBriefing.ts`에서 `readWorkerConfig()`를 캐시 조회 전에 호출
-- Rule: CONVENTIONS.md — Graceful degradation; missing env vars must not crash the library when an alternative path exists
-- Context: WORKER_URL 미설정 환경에서도 캐시에 유효한 데이터가 있으면 반환 가능한데, readWorkerConfig()가 캐시 체크 앞에 있어 항상 throw됐음; readWorkerConfig() 호출을 캐시 미스 이후로 이동
-
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
-- Violation: `tryGetDatabaseClient()` created a new Neon/Drizzle client on each optional call
-- Rule: docs/API.md — DB connections must be reused at module level; avoid per-call connection creation
-- Context: Optional DB client path bypassed `cachedClient`; corrected to share the same module-level cache as `getDatabaseClient()`
-
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
 
-## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: Tier 3 exported functions missing `@returns` JSDoc tag in `client.ts` and `config.ts`
-- Rule: docs/CONVENTIONS.md JSDoc Rules — Tier 3 (infra factories & config) requires description, @param, and @returns tags
-- Context: `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig` all had return information embedded in description prose but no standalone `@returns` tag
+## [PR #32 Round 3 | feat/3/neon-drizzle-db-schema | 2026-04-27]
+- Violation: `assetTranslations` used table-level `primaryKey({ columns: [...] })` while `koreanTickers` used inline `.primaryKey()` for the same single-column PK pattern
+- Rule: MISTAKES.md Coding Paradigm #6.5 — state/code divergence; same pattern in the same module must use a consistent approach
+- Context: Unified to inline `.primaryKey()` for both tables; removed `primaryKey` import from `drizzle-orm/pg-core`
 
-- Violation: varchar column length literals used directly in `schema.ts` without named constants
-- Rule: MISTAKES.md Coding Paradigm #13 — all magic numbers must be extracted to module-level constants
-- Context: `length: 320`, `length: 32`, `length: 64` used inline; `SYMBOL_MAX_LENGTH = 32` appeared in both `koreanTickers` and `assetTranslations` without a shared constant
+## [PR #32 Round 2 | feat/3/neon-drizzle-db-schema | 2026-04-27]
+- Violation: `schema.test.ts` index test omitted `koreanTickers` from the multi-table index assertion block
+- Rule: Test coverage must be complete for all tables asserted in the same test — partial table coverage creates silent gaps
+- Context: `'defines table indexes for lookup paths'` test verified indexes for `users`, `sessions`, `usageLogs`, `oauthAccounts`, `assetTranslations` but skipped `koreanTickers`; added `expect(getTableConfig(koreanTickers).indexes).toEqual([])`
