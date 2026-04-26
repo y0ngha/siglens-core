@@ -1,9 +1,6 @@
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
-import type {
-    CachedBriefingData,
-    MarketSummaryData,
-    SubmitBriefingResult,
-} from '@/domain/types';
+import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
+import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {

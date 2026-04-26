@@ -87,6 +87,11 @@
 - Rule: MISTAKES.md Design #2 — 동일 외부 자원에 대한 클라이언트는 모듈 스코프 싱글턴으로 관리
 - Context: config key 기반 싱글턴으로 전환; config 미설정 시 null 반환, config 동일 시 캐시된 인스턴스 반환
 
+## [PR #26 Round 5 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `CachedBriefingData` 인터페이스가 `domain/types.ts`에 선언되어 있으나 `briefing: unknown` 필드가 보여주듯 캐시 직렬화 전용 infrastructure 구조체
+- Rule: 레이어 분리 원칙 — infrastructure 관심사 타입은 `infrastructure/cache/types.ts`에 위치해야 하며 도메인 레이어에 노출되면 안 됨
+- Context: `domain/types.ts`에서 제거하고 `infrastructure/cache/types.ts`로 이동; `application/market/submitBriefing.ts` import 경로 업데이트
+
 ## [PR #26 Round 4 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `submitAnalysis.ts`, `submitBriefing.ts`에서 `readWorkerConfig()`를 캐시 조회 전에 호출
 - Rule: CONVENTIONS.md — Graceful degradation; missing env vars must not crash the library when an alternative path exists

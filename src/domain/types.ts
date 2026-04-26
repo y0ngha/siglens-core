@@ -61,11 +61,6 @@ export interface MarketBriefingResponse {
     riskSentiment: string;
 }
 
-export interface CachedBriefingData {
-    briefing: unknown;
-    generatedAt: string;
-}
-
 export type SubmitBriefingResult =
     | {
           status: 'cached';

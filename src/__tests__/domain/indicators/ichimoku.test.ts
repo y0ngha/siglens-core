@@ -136,5 +136,18 @@ describe('calculateIchimokuFutureCloud', () => {
                 expect('senkouB' in point).toBe(true);
             });
         });
+
+        it('고정 입력(high=110, low=90)에서 senkouA와 senkouB가 명세와 일치한다', () => {
+            // high=110, low=90 고정: 모든 sliding window 최댓값=110, 최솟값=90
+            // tenkan = kijun = (110+90)/2 = 100, senkouA = (100+100)/2 = 100, senkouB = (110+90)/2 = 100
+            const bars = Array.from({ length: MIN_BARS + 10 }, (_, i) =>
+                makeBar(110, 90, 100, i)
+            );
+            const result = calculateIchimokuFutureCloud(bars);
+            result.forEach(point => {
+                expect(point.senkouA).toBeCloseTo(100, 5);
+                expect(point.senkouB).toBeCloseTo(100, 5);
+            });
+        });
     });
 });
