@@ -132,21 +132,47 @@ const key = process.env.API_KEY; // 금지
 
 ### src/index.ts
 
-라이브러리의 **유일한 public entry**. `domain/`과 `infrastructure/`에서
-외부 consumer에게 노출할 심볼을 재-export한다.
+라이브러리의 **유일한 public entry**. `domain/`, `infrastructure/`, `application/`에서
+외부 consumer에게 노출할 심볼을 Tier 단위로 그룹화하여 재-export한다.
 
 ```typescript
-// src/index.ts
-export { calculateRSI, calculateMACD, /* ... */ } from './domain/indicators';
-export { detectCandlePatterns } from './domain/analysis';
+// src/index.ts (Tier별 그룹화 구조)
+// === Tier 1: Application Entrypoints ===
+export { submitAnalysis, pollAnalysis /* ... */ } from './application/market/...';
+
+// === Tier 2: Domain Building Blocks ===
+export { calculateIndicators } from './domain/indicators';
+export { detectSignals, classifyTrend } from './domain/signals';
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
-export { createMarketDataProvider } from './infrastructure/market';
+
+// === Tier 3: Infrastructure Factories & Config ===
+export { createMarketDataProvider } from './infrastructure/market/factory';
 export { FileSkillsLoader } from './infrastructure/skills/loader';
+
+// === Tier 4: Public Types & Constants ===
 export type { Bar, Timeframe, IndicatorResult /* ... */ } from './domain/types';
 ```
 
 Consumer는 `@y0ngha/siglens-core`에서 이 심볼만 import한다.
-Deep import(`@y0ngha/siglens-core/src/domain/...`)는 지원하지 않는다.
+Deep import(`@y0ngha/siglens-core/src/domain/...` 또는 `@y0ngha/siglens-core/dist/...`)는 지원하지 않는다.
+
+개별 지표 계산기(`calculateRSI` 등), 개별 신호 감지기(`detectRsiOversold` 등),
+정규화 헬퍼(`asString` 등)는 internal로 분류되어 `src/index.ts`에서 export하지 않는다.
+자세한 분류 기준과 인벤토리는 [`docs/PUBLIC_API.md`](./PUBLIC_API.md) 참고.
+
+### Public API Boundary (Tiers)
+
+Layer 의존 규칙(`domain → infrastructure → application`)과 **직교하는** 또 다른 축으로
+Public API 노출 정책이 있다. 한 layer 내에도 public과 internal이 공존한다.
+
+- **Tier 1**: `application/` 진입점 (예: `submitAnalysis`, `getMarketSummary`)
+- **Tier 2**: `domain/` high-level 함수 (예: `calculateIndicators`, `detectSignals`, `buildAnalysisPrompt`)
+- **Tier 3**: `infrastructure/` factory & config (예: `createCacheProvider`, `FileSkillsLoader`)
+- **Tier 4**: 모든 public 타입/인터페이스/상수
+- **Internal**: 다른 public 함수의 보조 구현. `src/index.ts`에서 export하지 않으며 정의부에 `/** @internal */` 태그를 단다.
+
+Tier 정의, 함수별 분류, 새 함수 추가 시 결정 워크플로우, semver 정책은
+[`docs/PUBLIC_API.md`](./PUBLIC_API.md)에서 관리한다.
 
 ### domain/signals/
 

@@ -215,6 +215,7 @@ and is consumed by other projects through npm.
 |---|---|
 | `docs/SERVICE.md` | Library overview, consumers, tech stack, Skills system |
 | `docs/ARCHITECTURE.md` | Layer structure, dependency direction rules, folder layout |
+| `docs/PUBLIC_API.md` | Tier-based public/internal classification, export inventory, semver policy |
 | `docs/DOMAIN.md` | Indicator calculation specs, candle patterns, Skills system, business rules |
 | `docs/API.md` | External services consumed by `infrastructure/` (Neon, Upstash Redis, AI providers) |
 | `docs/CONVENTIONS.md` | Coding conventions, naming rules, paradigm guidelines |

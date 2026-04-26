@@ -16,6 +16,25 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
+/**
+ * Poll the result of a briefing job submitted via {@link submitBriefing}.
+ *
+ * Returns one of three outcomes:
+ * - `processing`: the worker has not finished yet. Caller should retry.
+ * - `error`: missing or malformed result (`summary` field absent), or the
+ *   worker reported a failure.
+ * - `done`: normalized briefing plus its `generatedAt` timestamp. The result
+ *   is also written to the hourly briefing cache so subsequent
+ *   {@link submitBriefing} calls within the same hour return it as cached.
+ *
+ * On every terminal outcome (`error` or `done`) the job is cleaned up from
+ * Redis (best-effort).
+ *
+ * @param jobId - The `jobId` returned by {@link submitBriefing}.
+ * @returns The current poll outcome — see {@link PollBriefingResult}.
+ *
+ * @see submitBriefing
+ */
 export async function pollBriefing(jobId: string): Promise<PollBriefingResult> {
     const status = await getJobStatus(jobId);
 

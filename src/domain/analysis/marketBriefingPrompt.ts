@@ -1,5 +1,23 @@
 import type { MarketIndexData, MarketSectorData } from '@/domain/types';
 
+/**
+ * Build the AI market-briefing prompt from the dashboard summary data.
+ *
+ * Renders a compact JSON-schema prompt that asks the worker LLM for a
+ * `MarketBriefingResponse` covering the overall market summary, dominant
+ * themes, leading / lagging sectors, VIX-based volatility commentary, and a
+ * risk-on / off / neutral verdict.
+ *
+ * Output JSON fields are constrained to Korean (존댓말) by the schema text;
+ * indices and sectors are formatted with signed percentage changes.
+ *
+ * @param indices - Quoted market indices (S&P, Nasdaq, etc.) typically from
+ *   {@link getMarketSummary}.
+ * @param sectors - Quoted sector ETFs.
+ * @returns The fully-rendered prompt string.
+ *
+ * @see normalizeMarketBriefing
+ */
 export function buildMarketBriefingPrompt(
     indices: MarketIndexData[],
     sectors: MarketSectorData[]
