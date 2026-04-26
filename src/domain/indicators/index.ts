@@ -49,6 +49,7 @@ export * from './donchianChannel';
 export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
+export * from './constants';
 
 /**
  * Compute the full indicator suite for an array of OHLCV bars.

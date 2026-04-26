@@ -2,6 +2,8 @@ import type { CandlePattern, MultiCandlePattern, Trend } from '@/domain/types';
 
 // ─── Pattern Classification Sets ─────────────────────────────────────────────
 
+export type PatternTrend = Trend;
+
 const BULLISH_SINGLE_PATTERNS: ReadonlySet<CandlePattern> = new Set([
     'hammer',
     'inverted_hammer',
