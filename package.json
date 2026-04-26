@@ -11,6 +11,10 @@
     "engines": {
         "node": ">=20"
     },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
+        "access": "restricted"
+    },
     "packageManager": "yarn@4.12.0",
     "scripts": {
         "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
