@@ -3,11 +3,23 @@ export {
     ANALYSIS_CACHE_TTL,
     CACHE_EXPIRY_HOUR_KST,
     MARKET_BRIEFING_CACHE_TTL,
-    ISO_DATE_HOUR_PREFIX_LENGTH,
+    SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
+    TICKER_SEARCH_CACHE_TTL,
+    KOREAN_NAMES_CACHE_TTL,
+    KOREAN_TICKERS_CACHE_KEY,
+    ASSET_INFO_CACHE_TTL_WITH_KOREAN,
+    ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN,
     buildAnalysisCacheKey,
+    buildAssetInfoCacheKey,
     buildBriefingCacheKey,
+    buildSectorSignalsCacheKey,
+    buildTickerSearchCacheKey,
     computeEffectiveTtl,
 } from './infrastructure/cache/config';
+export {
+    ISO_DATE_HOUR_PREFIX_LENGTH,
+    ISO_DATE_PREFIX_LENGTH,
+} from './domain/constants/format';
 
 export { callGeminiWithKeyFallback } from './infrastructure/ai/gemini';
 export { AI_SYSTEM_PROMPT } from './infrastructure/ai/utils';
@@ -40,6 +52,8 @@ export { calculateMA } from './domain/indicators/ma';
 export { calculateIndicators } from './domain/indicators';
 
 export { createMarketDataProvider } from './infrastructure/market/factory';
+export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
+export type { FmpConfig } from './infrastructure/fmp/types';
 export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { submitAnalysis } from './application/market/submitAnalysis';
 export { pollAnalysis } from './application/market/pollAnalysis';
@@ -54,6 +68,55 @@ export {
 
 export { FileSkillsLoader } from './infrastructure/skills/loader';
 export type { SkillsProvider } from './infrastructure/skills/types';
+
+// ─── Ticker (search / asset info / Korean names) ─────────────────────────────
+export {
+    filterUsExchanges,
+    searchByName,
+    searchBySymbol,
+    toTickerSearchResult,
+} from './infrastructure/ticker/fmpTickerApi';
+export {
+    getKoreanNames,
+    searchByKoreanName,
+    setKoreanTickers,
+} from './infrastructure/ticker/koreanNameStore';
+export { translateCompanyNames } from './infrastructure/ticker/koreanTranslator';
+export { tryReadTranslatorConfig } from './infrastructure/ticker/config';
+export { getAssetInfo } from './application/ticker/getAssetInfo';
+export { searchTicker } from './application/ticker/searchTicker';
+export type {
+    FmpSearchResult,
+    TranslatorConfig,
+    TranslatorEntry,
+} from './infrastructure/ticker/types';
+export {
+    deduplicateResults,
+    isKoreanInput,
+    isValidTickerFormat,
+} from './domain/ticker';
+
+// ─── Dashboard (market summary / sector signals) ─────────────────────────────
+export { getMarketSummary } from './application/dashboard/getMarketSummary';
+export { getMarketSummaryWithBriefing } from './application/dashboard/getMarketSummaryWithBriefing';
+export { getSectorSignals } from './application/dashboard/sectorSignals';
+export {
+    bucketedTimestamp,
+    computeStockSignalResult,
+    lookbackIsoFromNow,
+} from './domain/dashboard';
+export {
+    DASHBOARD_TIMEFRAMES,
+    DASHBOARD_TIMEFRAME_LABELS,
+    DEFAULT_DASHBOARD_TIMEFRAME,
+    MARKET_INDICES,
+    MARKET_SUMMARY_FMP_SYMBOLS,
+    SECTOR_ETFS,
+    SECTOR_GROUPS,
+    SECTOR_STOCKS,
+    SIGNAL_SECTORS,
+} from './domain/constants/dashboard-tickers';
+export { classifyTrend, detectSignals } from './domain/signals';
 
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
@@ -213,4 +276,25 @@ export type {
     SingleCandlePatternEntry,
     MultiCandlePatternEntry,
     PromptConfig,
+    TickerBase,
+    KoreanTickerEntry,
+    TickerSearchResult,
+    AssetInfo,
+    TickerCategory,
+    CategoryId,
+    IndexTicker,
+    SectorEtf,
+    SectorGroupDef,
+    SectorStock,
+    SectorSignalsResult,
+    StockSignalResult,
+    StockWithConflict,
+    ConflictInfo,
+    ConflictResolution,
+    DashboardTimeframe,
+    MarketQuote,
+    MarketSummaryData,
+    MarketSummaryWithBriefing,
+    SubmitBriefingResult,
+    PollBriefingResult,
 } from './domain/types';

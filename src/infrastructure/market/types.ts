@@ -28,7 +28,3 @@ export interface AlpacaConfig {
     apiKey: string;
     secretKey: string;
 }
-
-export interface FmpConfig {
-    apiKey: string;
-}

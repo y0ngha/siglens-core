@@ -3,10 +3,10 @@ import type {
     PollBriefingResult,
 } from '@/domain/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
+import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildBriefingCacheKey,
-    ISO_DATE_HOUR_PREFIX_LENGTH,
     MARKET_BRIEFING_CACHE_TTL,
 } from '@/infrastructure/cache/config';
 import {

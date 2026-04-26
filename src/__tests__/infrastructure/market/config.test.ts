@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
     readAlpacaConfig,
-    readFmpConfig,
     readMarketProviderType,
     readWorkerConfig,
     tryReadWorkerConfig,
@@ -51,25 +50,6 @@ describe('readAlpacaConfig', () => {
                 apiKey: 'key',
                 secretKey: 'legacy-secret',
             });
-        });
-    });
-});
-
-describe('readFmpConfig', () => {
-    afterEach(() => {
-        delete process.env.FMP_API_KEY;
-    });
-
-    describe('FMP_API_KEY가 없을 때', () => {
-        it('에러를 던진다', () => {
-            expect(() => readFmpConfig()).toThrow('FMP_API_KEY must be set');
-        });
-    });
-
-    describe('FMP_API_KEY가 설정된 경우', () => {
-        it('apiKey를 반환한다', () => {
-            process.env.FMP_API_KEY = 'fmp-key';
-            expect(readFmpConfig()).toEqual({ apiKey: 'fmp-key' });
         });
     });
 });

@@ -79,7 +79,7 @@ export interface SectorGroupDef {
     symbols: readonly string[];
 }
 
-export interface MarketSummaryActionResult {
+export interface MarketSummaryWithBriefing {
     summary: MarketSummaryData;
     briefing: SubmitBriefingResult;
 }

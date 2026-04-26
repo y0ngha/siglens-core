@@ -1,6 +1,5 @@
 import type {
     AlpacaConfig,
-    FmpConfig,
     MarketDataProviderType,
     WorkerConfig,
 } from '@/infrastructure/market/types';
@@ -15,14 +14,6 @@ export function readAlpacaConfig(): AlpacaConfig {
         );
     }
     return { apiKey, secretKey };
-}
-
-export function readFmpConfig(): FmpConfig {
-    const apiKey = process.env.FMP_API_KEY;
-    if (!apiKey) {
-        throw new Error('FMP_API_KEY must be set');
-    }
-    return { apiKey };
 }
 
 export function readMarketProviderType(): MarketDataProviderType {

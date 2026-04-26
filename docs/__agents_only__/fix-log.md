@@ -6,11 +6,6 @@
 - Context: `fetchBarsWithIndicators` 호출 시 `now` 파라미터 미전달; 고정 `now`와 `TIMEFRAME_LOOKBACK_DAYS` 기반 expected 값으로 정확한 날짜 검증 추가
 
 
-## [PR #26 Round 3 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `normalize.test.ts` 4개 테스트가 잘못된 필드명으로 null 반환을 toBeDefined()로 허위 통과
-- Rule: MISTAKES.md Tests #13 — 테스트는 구현 코드를 직접 검증; 로컬 재정의나 잘못된 입력으로 tautological 결과 생성 금지
-- Context: normalizePatternSummary/normalizeStrategyResult/normalizeCandlePatternSummary/normalizeIndicatorGuideResult에 잘못된 필드명(name:/pattern:) 사용; not.toBeNull() + 필드 단언으로 교체
-
 ## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `alpaca.ts`, `fmp.ts`, `factory.ts` 생성자/팩토리에서 `process.env` 직접 읽기
 - Rule: MISTAKES.md Infrastructure #4 — env var 읽기는 config 모듈에 집중
