@@ -1,4 +1,6 @@
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
 import type {
     AnalysisResponse,
@@ -6,12 +8,13 @@ import type {
     SubmitAnalysisResult,
     Timeframe,
 } from '@/domain/types';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
-import { fetchBarsWithIndicators } from '@/application/market/barsApi';
-import { readWorkerConfig } from '@/infrastructure/market/config';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
+import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+
+const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 export async function submitAnalysis(
     symbol: string,
@@ -80,7 +83,7 @@ export async function submitAnalysis(
             'X-Worker-Secret': workerSecret,
         },
         body: JSON.stringify({ jobId, prompt }),
-        signal: AbortSignal.timeout(300_000),
+        signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[Submit] Worker request failed:', error);
     });

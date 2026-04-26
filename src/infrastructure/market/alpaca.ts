@@ -1,6 +1,7 @@
 import { MS_PER_SECOND } from '@/domain/constants/time';
 import type { Bar, MarketQuote } from '@/domain/types';
 import { readAlpacaConfig } from '@/infrastructure/market/config';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 import type {
     GetBarsOptions,
     MarketDataProvider,
@@ -67,6 +68,7 @@ export class AlpacaProvider implements MarketDataProvider {
                 'APCA-API-KEY-ID': this.apiKey,
                 'APCA-API-SECRET-KEY': this.secretKey,
             },
+            signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT), // 30초 타임아웃
         });
 
         if (!res.ok) {

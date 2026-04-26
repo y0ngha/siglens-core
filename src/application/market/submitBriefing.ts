@@ -1,13 +1,14 @@
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
-import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
-import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 import {
     buildBriefingCacheKey,
     ISO_DATE_HOUR_PREFIX_LENGTH,
 } from '@/infrastructure/cache/config';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
+import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { readWorkerConfig } from '@/infrastructure/market/config';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 
 export async function submitBriefing(
     data: MarketSummaryData
@@ -45,7 +46,7 @@ export async function submitBriefing(
             'X-Worker-Secret': workerSecret,
         },
         body: JSON.stringify({ jobId, prompt }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
     }).catch(error => {
         console.error('[Briefing/Submit] Worker request failed:', error);
     });

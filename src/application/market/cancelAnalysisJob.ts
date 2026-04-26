@@ -1,5 +1,8 @@
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { cancelJob } from '@/infrastructure/jobs/queue';
 import { tryReadWorkerConfig } from '@/infrastructure/market/config';
+
+const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
 
 export async function cancelAnalysisJob(jobId: string): Promise<void> {
     const workerConfig = tryReadWorkerConfig();
@@ -17,7 +20,9 @@ export async function cancelAnalysisJob(jobId: string): Promise<void> {
                           'X-Worker-Secret': workerConfig.workerSecret,
                       },
                       body: JSON.stringify({ jobId }),
-                      signal: AbortSignal.timeout(5000),
+                      signal: AbortSignal.timeout(
+                          CANCEL_ANALYSIS_JOB_TIMEOUT_MS
+                      ),
                   }),
               ]
             : []),
