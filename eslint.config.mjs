@@ -4,6 +4,7 @@ export default tseslint.config(
     {
         ignores: [
             'dist/**',
+            'docs/api/**',
             'node_modules/**',
             'coverage/**',
             '.yarn/**',
