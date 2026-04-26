@@ -30,11 +30,9 @@ import {
     validateActionPrices,
 } from '@/index';
 import type {
-    DatabaseConfig,
     PasswordHasher,
     PatternTrend,
     UserRepository,
-    UserTier,
 } from '@/index';
 
 describe('public API exports', () => {
