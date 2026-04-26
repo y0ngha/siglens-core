@@ -1,7 +1,7 @@
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_SECOND } from '@/domain/constants/time';
 import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
-import { readFmpConfig } from '@/infrastructure/market/config';
+import { readFmpConfig } from '@/infrastructure/fmp/config';
 import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 import type {
     GetBarsOptions,

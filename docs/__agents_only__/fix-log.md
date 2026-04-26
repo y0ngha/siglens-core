@@ -1,30 +1,5 @@
 # Fix Log
 
-## [PR #26 Round 6 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `barsApi.test.ts`의 `from` 파라미터 검증이 정규식 형식 체크에 그쳐 날짜 계산 정확성 미검증
-- Rule: MISTAKES.md Tests #14 — 시간 의존 함수 테스트는 시간 소스를 명시적으로 고정해야 함
-- Context: `fetchBarsWithIndicators` 호출 시 `now` 파라미터 미전달; 고정 `now`와 `TIMEFRAME_LOOKBACK_DAYS` 기반 expected 값으로 정확한 날짜 검증 추가
-
-
-## [PR #26 Round 3 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `normalize.test.ts` 4개 테스트가 잘못된 필드명으로 null 반환을 toBeDefined()로 허위 통과
-- Rule: MISTAKES.md Tests #13 — 테스트는 구현 코드를 직접 검증; 로컬 재정의나 잘못된 입력으로 tautological 결과 생성 금지
-- Context: normalizePatternSummary/normalizeStrategyResult/normalizeCandlePatternSummary/normalizeIndicatorGuideResult에 잘못된 필드명(name:/pattern:) 사용; not.toBeNull() + 필드 단언으로 교체
-
-## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `alpaca.ts`, `fmp.ts`, `factory.ts` 생성자/팩토리에서 `process.env` 직접 읽기
-- Rule: MISTAKES.md Infrastructure #4 — env var 읽기는 config 모듈에 집중
-- Context: AlpacaProvider, FmpProvider, createMarketDataProvider가 각자 process.env를 읽고 있었음; readAlpacaConfig / readFmpConfig / readMarketProviderType으로 분리
-
-- Violation: `ichimoku.test.ts`의 tenkan 검증이 if 가드로 래핑되어 null 시 침묵 통과; kijun/senkouA/senkouB toBeCloseTo 없음
-- Rule: MISTAKES.md Tests #12 — 기간 기반 지표 테스트는 toBeCloseTo로 정확도 검증 필수, if 래핑 금지
-- Context: `if (last.tenkan !== null) { expect(...) }` 패턴으로 kijun/senkouA/senkouB 수치 검증 누락
-- Context: `const breaks: SMCStructureBreak[] = []`로 선언 후 `breaks.push(...)` 사용으로 교체
-
-- Violation: `domain/indicators/` 25개 인디케이터 파일 모두 테스트 없음
-- Rule: CLAUDE.md Task Execution Rules #3 — 구현 파일과 테스트 파일은 함께 작성
-- Context: utils, atr, ema, rsi, bollinger, obv, buySellVolume, cci, cmf, dmi, donchianChannel, macd, mfi, williamsR, vwap, stochastic, stochastic-rsi, parabolicSar, supertrend, keltnerChannel, ichimoku, squeezeMomentum, volume-profile, smc, index 테스트 파일 25개 신규 작성
-
 ## [Issue #2 | chore/2/초기-개발-환경-설정 | 2026-04-24]
 - Violation: release-it config used `${version}` (JS template literal) instead of `{{version}}` (Handlebars) for commitMessage, tagName, tagAnnotation
 - Rule: release-it interpolation uses `{{version}}` syntax — `${version}` is passed as a literal string and breaks tag push trigger matching
@@ -62,11 +37,6 @@
 - Violation: `@google/genai`, `@upstash/redis`가 `dependencies`에 포함되어 소비자 프로젝트에 강제 설치
 - Rule: npm 라이브러리 패턴 — 선택적 런타임 의존성은 `peerDependencies`(optional) + `devDependencies`로 분리
 - Context: `package.json`에서 두 패키지를 `peerDependencies`(optional: true) 및 `devDependencies`로 이동
-
-## [PR #24 Round 6 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-26]
-- Violation: `RedisSetOpts` (Upstash 내부 옵션 타입)를 `src/index.ts` 공개 API에 export
-- Rule: 라이브러리 공개 API는 소비자가 실제로 사용하는 타입만 노출해야 함; 구현 세부사항 노출은 내부 변경 시 breaking change가 됨
-- Context: `jobs/types.ts`의 `RedisSetOpts`는 `JobRedisClient` 인터페이스 내부 구현 옵션으로 소비자가 직접 사용할 일이 없음; `index.ts` export 블록에서 제거
 
 ## [PR #24 Round 5 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `GeminiContents` 타입에 `{ role: string; parts: Array<{ text: string }> }` 중첩 익명 객체 타입 인라인 정의

@@ -425,4 +425,17 @@ and have been removed from this file.
    ❌ // infrastructure/cache/config.ts
       export { computeSecondsUntilCacheExpiry } from '@/domain/utils';
    ✅ Consumers import directly: import { parseJsonResponse } from '@/domain/utils'
+
+6. Internal implementation constants/types leaked to public API via src/index.ts
+   → Library public API must export only symbols consumers actually use
+   → Implementation details (internal cache keys, Redis options, internal interfaces) must not be re-exported
+   → Leaking internal symbols causes breaking changes when internals are refactored
+   ❌ // cache/config.ts defines KOREAN_TICKERS_CACHE_KEY (internal implementation detail)
+      // src/index.ts exports { KOREAN_TICKERS_CACHE_KEY } from '@/infrastructure/cache/config'
+      // → consumers depend on internal constant; renaming breaks their code
+   ❌ // jobs/types.ts defines RedisSetOpts (internal Upstash API options)
+      // src/index.ts exports { RedisSetOpts } 
+      // → consumers never use this; breaks when Upstash API changes
+   ✅ Remove internal constants/types from src/index.ts export blocks
+   ✅ Only export interfaces and functions consumers explicitly call (e.g., JobQueue, SkillsProvider)
 ```

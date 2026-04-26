@@ -1,10 +1,8 @@
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
+import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
-import {
-    buildBriefingCacheKey,
-    ISO_DATE_HOUR_PREFIX_LENGTH,
-} from '@/infrastructure/cache/config';
+import { buildBriefingCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { readWorkerConfig } from '@/infrastructure/market/config';
