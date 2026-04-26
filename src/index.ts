@@ -29,6 +29,7 @@ export {
     loginUser,
     logoutUser,
     registerUser,
+    socialLoginUser,
 } from './application/auth';
 
 // =============================================================================
@@ -383,15 +384,24 @@ export type {
     RegisterUserErrorField,
     RegisterUserInput,
     RegisterUserResult,
+    SocialLoginUserDependencies,
+    SocialLoginUserError,
+    SocialLoginUserErrorCode,
+    SocialLoginUserInput,
+    SocialLoginUserOptions,
+    SocialLoginUserResult,
 } from './application/auth';
 export type {
+    AuthOAuthProvider,
     AuthSessionRecord,
     AuthUserRecord,
     AuthUserTier,
-    CreateSessionInput,
     CreateEmailUserInput,
+    CreateOAuthUserInput,
+    CreateSessionInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    OAuthUserRepository,
     PasswordHasher,
     PasswordVerifier,
     SessionRepository,

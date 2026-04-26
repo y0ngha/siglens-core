@@ -1,15 +1,19 @@
-import { eq } from 'drizzle-orm';
-import { users } from './schema';
+import { and, eq } from 'drizzle-orm';
+import { oauthAccounts, users } from './schema';
 import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
+    CreateOAuthUserInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    OAuthUserRepository,
     UserRepository,
 } from '@/infrastructure/auth/types';
 
 const DEFAULT_USER_TIER = 'free';
+
+class OAuthAccountConflictError extends Error {}
 
 const authUserColumns = {
     id: users.id,
@@ -32,7 +36,7 @@ const emailAuthUserColumns = {
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
 export class DrizzleUserRepository
-    implements UserRepository, EmailAuthUserRepository
+    implements UserRepository, EmailAuthUserRepository, OAuthUserRepository
 {
     constructor(private readonly db: SiglensDatabase) {}
 
@@ -74,5 +78,75 @@ export class DrizzleUserRepository
             .returning(authUserColumns);
 
         return user ?? null;
+    }
+
+    async findByOAuthAccount(
+        provider: CreateOAuthUserInput['provider'],
+        providerAccountId: string
+    ): Promise<AuthUserRecord | null> {
+        const [user] = await this.db
+            .select(authUserColumns)
+            .from(oauthAccounts)
+            .innerJoin(users, eq(oauthAccounts.userId, users.id))
+            .where(
+                and(
+                    eq(oauthAccounts.provider, provider),
+                    eq(oauthAccounts.providerAccountId, providerAccountId)
+                )
+            )
+            .limit(1);
+
+        return user ?? null;
+    }
+
+    async createOAuthUser(
+        input: CreateOAuthUserInput
+    ): Promise<AuthUserRecord | null> {
+        try {
+            return await this.db.transaction(async tx => {
+                const [user] = await tx
+                    .insert(users)
+                    .values({
+                        email: input.email,
+                        passwordHash: null,
+                        name: input.name ?? null,
+                        avatarUrl: input.avatarUrl ?? null,
+                        tier: DEFAULT_USER_TIER,
+                    })
+                    .onConflictDoNothing({ target: users.email })
+                    .returning(authUserColumns);
+
+                if (user === undefined) {
+                    return null;
+                }
+
+                const [account] = await tx
+                    .insert(oauthAccounts)
+                    .values({
+                        userId: user.id,
+                        provider: input.provider,
+                        providerAccountId: input.providerAccountId,
+                    })
+                    .onConflictDoNothing({
+                        target: [
+                            oauthAccounts.provider,
+                            oauthAccounts.providerAccountId,
+                        ],
+                    })
+                    .returning({ id: oauthAccounts.id });
+
+                if (account === undefined) {
+                    throw new OAuthAccountConflictError();
+                }
+
+                return user;
+            });
+        } catch (error) {
+            if (error instanceof OAuthAccountConflictError) {
+                return null;
+            }
+
+            throw error;
+        }
     }
 }

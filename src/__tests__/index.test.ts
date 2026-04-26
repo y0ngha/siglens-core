@@ -26,6 +26,7 @@ import {
     readDatabaseConfig,
     registerUser,
     RSI_DEFAULT_PERIOD,
+    socialLoginUser,
     USAGE_ACTION_TYPE_VALUES,
     users,
     USER_TIER_VALUES,
@@ -34,6 +35,7 @@ import {
 } from '@/index';
 import type {
     EmailAuthUserRepository,
+    OAuthUserRepository,
     PasswordHasher,
     PasswordVerifier,
     PatternTrend,
@@ -74,6 +76,7 @@ describe('public API exports', () => {
         expect(typeof readDatabaseConfig).toBe('function');
         expect(typeof registerUser).toBe('function');
         expect(typeof loginUser).toBe('function');
+        expect(typeof socialLoginUser).toBe('function');
         expect(typeof logoutUser).toBe('function');
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
@@ -103,6 +106,11 @@ describe('public API exports', () => {
         const emailAuthRepository: EmailAuthUserRepository = {
             findEmailAuthUserByEmail: async () => null,
         };
+        const oauthRepository: OAuthUserRepository = {
+            findByOAuthAccount: async () => null,
+            findByEmail: async () => null,
+            createOAuthUser: async () => null,
+        };
         const sessionRepository: SessionRepository = {
             createSession: async input => ({
                 id: 'session-1',
@@ -119,6 +127,7 @@ describe('public API exports', () => {
         expect(repository).toHaveProperty('findByEmail');
         expect(passwordHasher).toHaveProperty('hashPassword');
         expect(emailAuthRepository).toHaveProperty('findEmailAuthUserByEmail');
+        expect(oauthRepository).toHaveProperty('findByOAuthAccount');
         expect(sessionRepository).toHaveProperty('createSession');
         expect(passwordVerifier).toHaveProperty('verifyPassword');
     });

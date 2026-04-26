@@ -7,6 +7,7 @@ export {
 export { loginUser } from './loginUser';
 export { logoutUser } from './logoutUser';
 export { registerUser } from './registerUser';
+export { socialLoginUser } from './socialLoginUser';
 export type {
     AuthSessionCookie,
     LoginUserDependencies,
@@ -24,4 +25,10 @@ export type {
     RegisterUserErrorField,
     RegisterUserInput,
     RegisterUserResult,
+    SocialLoginUserDependencies,
+    SocialLoginUserError,
+    SocialLoginUserErrorCode,
+    SocialLoginUserInput,
+    SocialLoginUserOptions,
+    SocialLoginUserResult,
 } from './types';

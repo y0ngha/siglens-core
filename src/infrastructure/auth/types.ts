@@ -6,6 +6,13 @@
 export type AuthUserTier = 'free' | 'member' | 'pro';
 
 /**
+ * Mirrors OAUTH_PROVIDER_VALUES in infrastructure/db/constants.ts.
+ * Keep this union in sync with the database enum without importing across
+ * infrastructure module boundaries.
+ */
+export type AuthOAuthProvider = 'google' | 'kakao' | 'apple';
+
+/**
  * A persisted user account record returned from the database.
  */
 export interface AuthUserRecord {
@@ -55,6 +62,22 @@ export interface CreateEmailUserInput {
     email: string;
     /** Hashed password produced by {@link PasswordHasher.hashPassword}. */
     passwordHash: string;
+    /** Optional display name. */
+    name?: string;
+    /** Optional avatar image URL. */
+    avatarUrl?: string;
+}
+
+/**
+ * Input for creating a new OAuth-based user account and provider link.
+ */
+export interface CreateOAuthUserInput {
+    /** Normalized email address (lowercased, trimmed). */
+    email: string;
+    /** OAuth provider that authenticated the account. */
+    provider: AuthOAuthProvider;
+    /** Stable provider-side account identifier. */
+    providerAccountId: string;
     /** Optional display name. */
     name?: string;
     /** Optional avatar image URL. */
@@ -124,6 +147,41 @@ export interface EmailAuthUserRepository {
     findEmailAuthUserByEmail(
         email: string
     ): Promise<EmailAuthUserRecord | null>;
+}
+
+/**
+ * Interface for OAuth login account lookup and creation.
+ */
+export interface OAuthUserRepository {
+    /**
+     * Find a user linked to an OAuth provider account.
+     *
+     * @param provider - OAuth provider identifier.
+     * @param providerAccountId - Stable provider-side account identifier.
+     * @returns The linked user, or null if no link exists.
+     */
+    findByOAuthAccount(
+        provider: AuthOAuthProvider,
+        providerAccountId: string
+    ): Promise<AuthUserRecord | null>;
+
+    /**
+     * Find a user by their normalized email address.
+     *
+     * @param email - Normalized (lowercased, trimmed) email to look up.
+     * @returns The matching {@link AuthUserRecord}, or null if not found.
+     */
+    findByEmail(email: string): Promise<AuthUserRecord | null>;
+
+    /**
+     * Create a free-tier OAuth user and link the provider account.
+     *
+     * @param input - OAuth profile and provider account data.
+     * @returns The created {@link AuthUserRecord}, or null if email/provider conflicts.
+     */
+    createOAuthUser(
+        input: CreateOAuthUserInput
+    ): Promise<AuthUserRecord | null>;
 }
 
 /**

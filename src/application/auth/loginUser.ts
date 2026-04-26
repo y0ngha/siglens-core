@@ -6,11 +6,7 @@ import type {
     LoginUserResult,
 } from './types';
 import type { AuthUserRecord } from '@/infrastructure/auth/types';
-import {
-    addSeconds,
-    createSessionCookie,
-    DEFAULT_SESSION_TTL_SECONDS,
-} from './sessionCookie';
+import { createAuthSession } from './sessionCookie';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Email or password is incorrect';
 
@@ -73,20 +69,14 @@ export async function loginUser(
         return { ok: false, error: invalidCredentialsError() };
     }
 
-    const sessionTtlSeconds =
-        options.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
     const now = options.now ?? new Date();
-    const expiresAt = addSeconds(now, sessionTtlSeconds);
-    const session = await dependencies.sessions.createSession({
+    const { session, cookie } = await createAuthSession({
         userId: user.id,
-        expiresAt,
-    });
-    const cookie = createSessionCookie({
-        token: session.id,
-        expires: session.expiresAt,
-        maxAgeSeconds: sessionTtlSeconds,
-        name: options.cookieName,
-        secure: options.secureCookie,
+        sessions: dependencies.sessions,
+        now,
+        sessionTtlSeconds: options.sessionTtlSeconds,
+        cookieName: options.cookieName,
+        secureCookie: options.secureCookie,
         sameSite: options.sameSite,
         path: options.path,
     });
