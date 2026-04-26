@@ -23,3 +23,12 @@ export interface WorkerConfig {
     workerUrl: string;
     workerSecret: string;
 }
+
+export interface AlpacaConfig {
+    apiKey: string;
+    secretKey: string;
+}
+
+export interface FmpConfig {
+    apiKey: string;
+}

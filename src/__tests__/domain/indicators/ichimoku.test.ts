@@ -64,16 +64,38 @@ describe('calculateIchimoku', () => {
         });
 
         it('tenkan은 high+low의 중간값이다', () => {
-            // 모든 bar가 동일한 high/low이면 midpoint = (high+low)/2
             const bars = Array.from(
                 { length: ICHIMOKU_CONVERSION_PERIOD + 5 },
                 (_, i) => makeBar(110, 90, 100, i)
             );
             const result = calculateIchimoku(bars);
             const last = result[result.length - 1];
-            if (last.tenkan !== null) {
-                expect(last.tenkan).toBeCloseTo(100);
-            }
+            expect(last.tenkan).not.toBeNull();
+            expect(last.tenkan).toBeCloseTo(100);
+        });
+
+        it('kijun은 high+low의 중간값이다', () => {
+            const bars = Array.from(
+                { length: MIN_BARS + 5 },
+                (_, i) => makeBar(110, 90, 100, i)
+            );
+            const result = calculateIchimoku(bars);
+            const last = result[result.length - 1];
+            expect(last.kijun).not.toBeNull();
+            expect(last.kijun).toBeCloseTo(100);
+        });
+
+        it('senkouA와 senkouB의 계산값이 명세와 일치한다', () => {
+            const bars = Array.from(
+                { length: MIN_BARS + 5 },
+                (_, i) => makeBar(110, 90, 100, i)
+            );
+            const result = calculateIchimoku(bars);
+            const last = result[result.length - 1];
+            expect(last.senkouA).not.toBeNull();
+            expect(last.senkouA).toBeCloseTo(100);
+            expect(last.senkouB).not.toBeNull();
+            expect(last.senkouB).toBeCloseTo(100);
         });
 
         it('displacement만큼 이전 bar가 없으면 senkouA와 senkouB가 null이다', () => {

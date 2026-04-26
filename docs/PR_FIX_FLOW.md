@@ -120,8 +120,8 @@ After applying, verify against the checklist matching each modified file type:
 - [ ] Pure functions only (no fetch, console.log, Date.now(), process.env)
 - [ ] Return types explicitly declared
 - [ ] Initial period values must be null (never 0 or NaN)
-- [ ] No for/while loops → use map, filter, reduce, flatMap
-  (exceptions: sliding windows, pointer-convergence — see CONVENTIONS.md)
+- [ ] Prefer map, filter, flatMap, reduce; for-loop + push allowed when functional equivalent increases complexity or readability
+  (see CONVENTIONS.md and MISTAKES.md #14, #14.5)
 - [ ] Maintain immutability (no push, reverse, sort — use spread, toReversed)
 - [ ] Path aliases (@/domain/... format)
 - [ ] No hardcoded literals → extract to constants

@@ -89,12 +89,20 @@ and have been removed from this file.
     ✅ const CACHE_EXPIRY_HOUR_KST = 17; function computeSecondsUntilCacheExpiry() { ... }
     ✅ const PRICE_DECIMAL_FACTOR = 100; Math.round(rawPrice * PRICE_DECIMAL_FACTOR) / PRICE_DECIMAL_FACTOR
 
-14. Domain functions using imperative for-loop + push instead of higher-order functions
-    → Domain functions must use map, filter, flatMap, reduce — never direct mutation with push/splice
+14. Defaulting to imperative for-loop + push when a higher-order function is equally readable and efficient
+    → Prefer map, filter, flatMap, reduce for straightforward one-item → one-result transformations
+    → for-loop + push is acceptable when:
+      · The functional equivalent would increase time complexity (see #14.5 — spread inside flatMap/reduce causes O(N²))
+      · Conditional multi-push per iteration makes flatMap + spread harder to read without measurable clarity gain
     ❌ const result = []; for (const item of data) { result.push(transform(item)); } return result;
+       → replace with data.map(transform); no complexity difference, declarative wins
     ✅ const result = data.map(transform); return result;
-    ❌ const lines = []; for (const rec of reconciled) { lines.push(...extractLines(rec)); } return lines;
-    ✅ const lines = reconciled.flatMap(extractLines); return lines;
+    ✅ const result: T[] = [];
+       for (let i = period; i < n - period; i++) {
+           if (bars[i].high === winMax[i]) result.push({ type: 'high', ... });
+           if (bars[i].low  === winMin[i]) result.push({ type: 'low',  ... });
+       }
+       → each iteration conditionally appends 0–2 items; flatMap + spread equivalent adds intermediate arrays without clarity gain
 
 14.5. Reduce + spread operator causing O(N²) array accumulation
     → When reducing values into an array, use pre-allocated array + for loop or for loop + push, NOT reduce + spread
@@ -326,12 +334,6 @@ and have been removed from this file.
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → When changing function implementation, update related comments immediately
-
-4. Multi-paragraph JSDoc blocks in implementation files
-   → Never write multi-paragraph docstrings or multi-line comment blocks — one short line max
-   → If module needs detailed documentation, place in a separate .md file or as a single-line comment
-   ❌ /** Lines 1-10 of detailed explanation about function behavior ... */
-   ✅ // Single-line comment explaining the immediate context
 ```
 
 ---

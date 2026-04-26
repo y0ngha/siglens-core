@@ -1,4 +1,5 @@
 import type { Bar, MarketQuote } from '@/domain/types';
+import { readAlpacaConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
 const BASE_URL = 'https://data.alpaca.markets/v2';
@@ -32,16 +33,7 @@ export class AlpacaProvider implements MarketDataProvider {
     private readonly secretKey: string;
 
     constructor() {
-        const apiKey = process.env.ALPACA_API_KEY;
-        const secretKey =
-            process.env.ALPACA_API_SECRET ?? process.env.ALPACA_SECRET_KEY;
-
-        if (!apiKey || !secretKey) {
-            throw new Error(
-                'ALPACA_API_KEY and (ALPACA_API_SECRET or ALPACA_SECRET_KEY) must be set'
-            );
-        }
-
+        const { apiKey, secretKey } = readAlpacaConfig();
         this.apiKey = apiKey;
         this.secretKey = secretKey;
     }

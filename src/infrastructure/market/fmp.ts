@@ -1,4 +1,5 @@
 import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
+import { readFmpConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
 const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
@@ -119,12 +120,7 @@ export class FmpProvider implements MarketDataProvider {
     private readonly apiKey: string;
 
     constructor() {
-        const apiKey = process.env.FMP_API_KEY;
-
-        if (!apiKey) {
-            throw new Error('FMP_API_KEY must be set');
-        }
-
+        const { apiKey } = readFmpConfig();
         this.apiKey = apiKey;
     }
 

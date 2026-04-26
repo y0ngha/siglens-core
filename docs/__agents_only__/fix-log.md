@@ -3,6 +3,15 @@
 ## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `smc.ts`의 `detectStructureBreaks`에서 `breaks = [...breaks, {...}]` spread append
 - Rule: MISTAKES.md Coding Paradigm — append-only local mutable variable에 spread 사용은 O(N²)
+
+## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `alpaca.ts`, `fmp.ts`, `factory.ts` 생성자/팩토리에서 `process.env` 직접 읽기
+- Rule: MISTAKES.md Infrastructure #4 — env var 읽기는 config 모듈에 집중
+- Context: AlpacaProvider, FmpProvider, createMarketDataProvider가 각자 process.env를 읽고 있었음; readAlpacaConfig / readFmpConfig / readMarketProviderType으로 분리
+
+- Violation: `ichimoku.test.ts`의 tenkan 검증이 if 가드로 래핑되어 null 시 침묵 통과; kijun/senkouA/senkouB toBeCloseTo 없음
+- Rule: MISTAKES.md Tests #12 — 기간 기반 지표 테스트는 toBeCloseTo로 정확도 검증 필수, if 래핑 금지
+- Context: `if (last.tenkan !== null) { expect(...) }` 패턴으로 kijun/senkouA/senkouB 수치 검증 누락
 - Context: `const breaks: SMCStructureBreak[] = []`로 선언 후 `breaks.push(...)` 사용으로 교체
 
 - Violation: `domain/indicators/` 25개 인디케이터 파일 모두 테스트 없음
