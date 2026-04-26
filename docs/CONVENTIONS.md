@@ -537,6 +537,107 @@ infrastructure/ Call domain generator functions and consume their results.
 
 ---
 
+## JSDoc Rules
+
+`siglens-core` is consumed as an npm package. Every symbol exported from `src/index.ts`
+must carry JSDoc that lets a consumer understand the function from IDE hover or generated
+docs without reading the source. Internal helpers carry only the `@internal` tag.
+
+The boundary between public (Tier 1–4) and internal symbols is defined in
+[`docs/PUBLIC_API.md`](./PUBLIC_API.md). This section defines **how to write the JSDoc**.
+
+### Required Tags by Tier
+
+| Tier | Required | Recommended | Language |
+|---|---|---|---|
+| Tier 1 (application entrypoints) | description, `@param`, `@returns` | `@throws`, `@example`, `@see` | English |
+| Tier 2 (domain building blocks) | description, `@param`, `@returns` | `@example`, `@see` | English |
+| Tier 3 (infra factories & config) | description, `@param`, `@returns` | `@throws` (when env is missing), `@see` | English |
+| Tier 4 (types) | type-level description, one-line per field | `@example` (composite types) | English |
+| Internal | `@internal` tag | (free) | (free) |
+
+Public-facing JSDoc is written in **English** because the npm package is published
+publicly and may be consumed by non-Korean developers. Internal-only JSDoc may be
+written in either language.
+
+### Standard Template (Tier 1 example)
+
+```typescript
+/**
+ * Submit an analysis job for a given symbol/timeframe.
+ *
+ * Returns immediately with one of two outcomes:
+ * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`).
+ * - `submitted`: a new job has been enqueued; poll with {@link pollAnalysis}.
+ *
+ * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param timeframe - Alpaca timeframe literal (`"5Min" | "15Min" | ... | "1Day"`).
+ * @returns Submission outcome — see {@link SubmitAnalysisResult}.
+ *
+ * @throws {Error} If FMP/Alpaca credentials are missing in env.
+ *
+ * @example
+ * ```ts
+ * const result = await submitAnalysis("AAPL", "1Day");
+ * if (result.status === "cached") return result.data;
+ * const polled = await pollAnalysis(result.jobId);
+ * ```
+ *
+ * @see pollAnalysis
+ * @see cancelAnalysisJob
+ */
+```
+
+### Internal Marker
+
+Every function that is **not** re-exported from `src/index.ts` must carry the
+`@internal` tag. This keeps TypeDoc output clean (`excludeInternal: true`) and
+warns consumers if they happen to grep through `dist/`.
+
+```typescript
+/**
+ * @internal
+ * Helper used by calculateIndicators(); not part of the public API.
+ */
+export function calculateRSI(closes: number[], period: number): (number | null)[] {
+    // ...
+}
+```
+
+A bare `/** @internal */` is acceptable but a one-line note describing the role
+is preferred.
+
+### Don'ts
+
+```typescript
+// ❌ Don't write JSDoc that just restates the type signature.
+/**
+ * Get the symbol.
+ * @param symbol - The symbol.
+ * @returns The symbol.
+ */
+function getSymbol(symbol: string): string { ... }
+
+// ❌ Don't reference the current PR/issue/caller — write timeless docs.
+/**
+ * Added in PR #123 for the X feature. Used by the Y page.
+ */
+
+// ❌ Don't duplicate type info that the parameter type already conveys.
+/**
+ * @param bars - An array of bars (Bar[]). Each bar is a Bar object with time, open, etc.
+ */
+
+// ✅ Do explain the *why*, edge cases, and side effects the type cannot express.
+/**
+ * Calculates RSI with Wilder's smoothing.
+ * The first `period - 1` values are `null` because RSI is undefined before
+ * a full period of data is available.
+ */
+```
+
+---
+
 ## ESLint Rules
 
 Never use `eslint-disable` or `eslint-disable-next-line` comments.
