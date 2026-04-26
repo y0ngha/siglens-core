@@ -126,15 +126,11 @@ export async function getSectorSignals(
     };
 
     if (cache !== null) {
-        try {
-            await cache.set(
-                cacheKey,
-                payload,
-                SECTOR_SIGNALS_TTL_BY_TIMEFRAME[timeframe]
-            );
-        } catch {
-            // Graceful degradation: cache write failure does not block the response.
-        }
+        cache
+            .set(cacheKey, payload, SECTOR_SIGNALS_TTL_BY_TIMEFRAME[timeframe])
+            .catch(() => {
+                // Graceful degradation: cache write failure does not block the response.
+            });
     }
 
     return payload;

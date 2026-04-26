@@ -9,17 +9,6 @@ import type { FmpSearchResult } from '@/infrastructure/ticker/types';
 
 const mockFetch = vi.fn();
 
-beforeEach(() => {
-    vi.stubGlobal('fetch', mockFetch);
-    mockFetch.mockReset();
-    process.env.FMP_API_KEY = 'test-key';
-});
-
-afterEach(() => {
-    vi.unstubAllGlobals();
-    delete process.env.FMP_API_KEY;
-});
-
 const apple: FmpSearchResult = {
     symbol: 'AAPL',
     name: 'Apple Inc.',
@@ -62,6 +51,17 @@ describe('filterUsExchanges', () => {
 });
 
 describe('searchBySymbol/searchByName', () => {
+    beforeEach(() => {
+        vi.stubGlobal('fetch', mockFetch);
+        mockFetch.mockReset();
+        process.env.FMP_API_KEY = 'test-key';
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        delete process.env.FMP_API_KEY;
+    });
+
     it('FMP_API_KEY가 없으면 빈 배열을 반환한다', async () => {
         delete process.env.FMP_API_KEY;
         await expect(searchBySymbol('AAPL')).resolves.toEqual([]);

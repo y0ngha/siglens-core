@@ -40,18 +40,18 @@ const microsoft: KoreanTickerEntry = {
     exchangeFullName: 'NASDAQ Global Select',
 };
 
-beforeEach(() => {
-    mockCache.get.mockReset();
-    mockCache.set.mockReset();
-    mockCache.delete.mockReset();
-    createCacheProviderMock.mockReturnValue(mockCache);
-});
-
-afterEach(() => {
-    createCacheProviderMock.mockReset();
-});
-
 describe('searchByKoreanName', () => {
+    beforeEach(() => {
+        mockCache.get.mockReset();
+        mockCache.set.mockReset();
+        mockCache.delete.mockReset();
+        createCacheProviderMock.mockReturnValue(mockCache);
+    });
+
+    afterEach(() => {
+        createCacheProviderMock.mockReset();
+    });
+
     it('cache provider 가 null 이면 빈 배열 반환', async () => {
         createCacheProviderMock.mockReturnValue(null);
         await expect(searchByKoreanName('애')).resolves.toEqual([]);
@@ -76,6 +76,17 @@ describe('searchByKoreanName', () => {
 });
 
 describe('getKoreanNames', () => {
+    beforeEach(() => {
+        mockCache.get.mockReset();
+        mockCache.set.mockReset();
+        mockCache.delete.mockReset();
+        createCacheProviderMock.mockReturnValue(mockCache);
+    });
+
+    afterEach(() => {
+        createCacheProviderMock.mockReset();
+    });
+
     it('빈 symbols 입력은 즉시 빈 객체 반환', async () => {
         await expect(getKoreanNames([])).resolves.toEqual({});
         expect(mockCache.get).not.toHaveBeenCalled();
@@ -94,6 +105,17 @@ describe('getKoreanNames', () => {
 });
 
 describe('setKoreanTickers', () => {
+    beforeEach(() => {
+        mockCache.get.mockReset();
+        mockCache.set.mockReset();
+        mockCache.delete.mockReset();
+        createCacheProviderMock.mockReturnValue(mockCache);
+    });
+
+    afterEach(() => {
+        createCacheProviderMock.mockReset();
+    });
+
     it('빈 배열은 cache 호출 없이 종료한다', async () => {
         await setKoreanTickers([]);
         expect(mockCache.get).not.toHaveBeenCalled();

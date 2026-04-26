@@ -2,6 +2,7 @@ import {
     ISO_DATE_HOUR_PREFIX_LENGTH,
     ISO_DATE_PREFIX_LENGTH,
 } from '@/domain/constants/format';
+import { MS_PER_DAY } from '@/domain/constants/time';
 import { calculateIndicators } from '@/domain/indicators';
 import { classifyTrend, detectSignals } from '@/domain/signals';
 import type {
@@ -43,9 +44,8 @@ export function lookbackIsoFromNow(
     timeframe: DashboardTimeframe,
     now: Date
 ): string {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() - LOOKBACK_DAYS_BY_TIMEFRAME[timeframe]);
-    return d.toISOString();
+    const msToSubtract = LOOKBACK_DAYS_BY_TIMEFRAME[timeframe] * MS_PER_DAY;
+    return new Date(now.getTime() - msToSubtract).toISOString();
 }
 
 export function computeStockSignalResult(

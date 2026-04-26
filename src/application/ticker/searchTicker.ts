@@ -90,14 +90,17 @@ export async function searchTicker(
 
     const unmapped = enriched.filter(r => !r.koreanName);
     if (unmapped.length > 0) {
-        // Fire-and-forget: background translation does not block search results.
-        translateAndCache(unmapped).catch(() => {});
+        translateAndCache(unmapped).catch(e =>
+            console.warn('[searchTicker] background translation failed', e)
+        );
     }
 
     const final = enriched.slice(0, MAX_SEARCH_RESULTS);
 
     if (cache) {
-        cache.set(cacheKey, final, TICKER_SEARCH_CACHE_TTL).catch(() => {});
+        cache
+            .set(cacheKey, final, TICKER_SEARCH_CACHE_TTL)
+            .catch(e => console.warn('[searchTicker] cache write failed', e));
     }
 
     return final;

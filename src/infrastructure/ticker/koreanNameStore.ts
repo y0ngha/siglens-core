@@ -55,7 +55,8 @@ export async function getKoreanNames(
         const koreanName = symbolMap.get(symbol);
         return koreanName ? [[symbol, koreanName]] : [];
     });
-    return Object.fromEntries(pairs);
+    // Object.fromEntries widens to { [k: string]: string } but pairs is readonly [string, string][], so the cast is safe.
+    return Object.fromEntries(pairs) as Record<string, string>;
 }
 
 export async function setKoreanTickers(

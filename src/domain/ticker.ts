@@ -17,9 +17,12 @@ export function deduplicateResults(
     results: TickerSearchResult[]
 ): TickerSearchResult[] {
     const seen = new Set<string>();
-    return results.filter(result => {
-        if (seen.has(result.symbol)) return false;
-        seen.add(result.symbol);
-        return true;
-    });
+    const out: TickerSearchResult[] = [];
+    for (const result of results) {
+        if (!seen.has(result.symbol)) {
+            seen.add(result.symbol);
+            out.push(result);
+        }
+    }
+    return out;
 }

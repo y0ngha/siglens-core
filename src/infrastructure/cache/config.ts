@@ -27,7 +27,7 @@ export const TICKER_SEARCH_CACHE_TTL = SECONDS_PER_DAY;
 export const KOREAN_NAMES_CACHE_TTL = SECONDS_PER_YEAR;
 
 // 한국어 미보유: 번역 대기 → 12시간 후 재시도 가능하도록 단기 보존
-const ASSET_INFO_HOURS_WITHOUT_KOREAN = 12;
+export const ASSET_INFO_HOURS_WITHOUT_KOREAN = 12;
 export const ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN =
     ASSET_INFO_HOURS_WITHOUT_KOREAN * SECONDS_PER_HOUR;
 // 한국어 보유: 완성된 데이터 → 1년 장기 보존

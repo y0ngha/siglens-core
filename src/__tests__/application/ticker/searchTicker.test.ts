@@ -64,28 +64,28 @@ const microsoft: FmpSearchResult = {
     exchangeFullName: 'NASDAQ Global Select',
 };
 
-beforeEach(() => {
-    mockCache.get.mockReset();
-    mockCache.set.mockReset();
-    mockCache.set.mockResolvedValue(undefined);
-    createCacheProviderMock.mockReset();
-    createCacheProviderMock.mockReturnValue(mockCache);
-    searchBySymbolMock.mockReset();
-    searchByNameMock.mockReset();
-    searchByKoreanNameMock.mockReset();
-    getKoreanNamesMock.mockReset();
-    getKoreanNamesMock.mockResolvedValue({});
-    setKoreanTickersMock.mockReset();
-    setKoreanTickersMock.mockResolvedValue();
-    translateCompanyNamesMock.mockReset();
-    translateCompanyNamesMock.mockResolvedValue({});
-});
-
-afterEach(() => {
-    vi.clearAllMocks();
-});
-
 describe('searchTicker', () => {
+    beforeEach(() => {
+        mockCache.get.mockReset();
+        mockCache.set.mockReset();
+        mockCache.set.mockResolvedValue(undefined);
+        createCacheProviderMock.mockReset();
+        createCacheProviderMock.mockReturnValue(mockCache);
+        searchBySymbolMock.mockReset();
+        searchByNameMock.mockReset();
+        searchByKoreanNameMock.mockReset();
+        getKoreanNamesMock.mockReset();
+        getKoreanNamesMock.mockResolvedValue({});
+        setKoreanTickersMock.mockReset();
+        setKoreanTickersMock.mockResolvedValue();
+        translateCompanyNamesMock.mockReset();
+        translateCompanyNamesMock.mockResolvedValue({});
+    });
+
+    afterEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('빈 query 는 빈 배열 반환', async () => {
         await expect(searchTicker('   ')).resolves.toEqual([]);
         expect(searchBySymbolMock).not.toHaveBeenCalled();

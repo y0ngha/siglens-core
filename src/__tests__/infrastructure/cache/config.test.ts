@@ -8,6 +8,7 @@ import {
     ANALYSIS_CACHE_TTL,
     ASSET_INFO_CACHE_TTL_WITH_KOREAN,
     ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN,
+    ASSET_INFO_HOURS_WITHOUT_KOREAN,
     buildAnalysisCacheKey,
     buildAssetInfoCacheKey,
     buildBriefingCacheKey,
@@ -59,9 +60,8 @@ describe('cache config constants', () => {
     });
 
     it('ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN', () => {
-        const HOURS = 12;
         expect(ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN).toBe(
-            HOURS * SECONDS_PER_HOUR
+            ASSET_INFO_HOURS_WITHOUT_KOREAN * SECONDS_PER_HOUR
         );
     });
 

@@ -101,17 +101,17 @@ const stubSignal: Signal = {
     detectedAt: 0,
 };
 
-beforeEach(() => {
-    detectSignalsMock.mockReset();
-    classifyTrendMock.mockReset();
-    classifyTrendMock.mockReturnValue('sideways');
-});
-
-afterEach(() => {
-    vi.clearAllMocks();
-});
-
 describe('computeStockSignalResult', () => {
+    beforeEach(() => {
+        detectSignalsMock.mockReset();
+        classifyTrendMock.mockReset();
+        classifyTrendMock.mockReturnValue('sideways');
+    });
+
+    afterEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('bar 가 2개 미만이면 null', () => {
         const bars: Bar[] = [
             { time: 0, open: 1, high: 1, low: 1, close: 1, volume: 1 },

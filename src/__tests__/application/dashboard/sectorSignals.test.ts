@@ -31,22 +31,23 @@ import { getSectorSignals } from '@/application/dashboard/sectorSignals';
 
 const fixedNow = new Date('2026-04-25T13:48:00.000Z');
 
-beforeEach(() => {
-    mockCache.get.mockReset();
-    mockCache.set.mockReset();
-    createCacheProviderMock.mockReset();
-    createCacheProviderMock.mockReturnValue(mockCache);
-    getQuoteMock.mockReset();
-    getQuoteMock.mockResolvedValue(null);
-    getBarsMock.mockReset();
-    getBarsMock.mockResolvedValue([]);
-});
-
-afterEach(() => {
-    vi.clearAllMocks();
-});
-
 describe('getSectorSignals', () => {
+    beforeEach(() => {
+        mockCache.get.mockReset();
+        mockCache.set.mockReset();
+        mockCache.set.mockResolvedValue(undefined);
+        createCacheProviderMock.mockReset();
+        createCacheProviderMock.mockReturnValue(mockCache);
+        getQuoteMock.mockReset();
+        getQuoteMock.mockResolvedValue(null);
+        getBarsMock.mockReset();
+        getBarsMock.mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('cache hit 시 cached payload 를 반환한다', async () => {
         const cached: SectorSignalsResult = {
             computedAt: fixedNow.toISOString(),

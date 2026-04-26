@@ -8,20 +8,20 @@ vi.mock('@/infrastructure/ai/gemini', () => ({
 
 import { translateCompanyNames } from '@/infrastructure/ticker/koreanTranslator';
 
-beforeEach(() => {
-    callGeminiMock.mockReset();
-    process.env.TRANSLATE_API_KEY = 'paid-key';
-    process.env.TRANSLATE_FREE_API_KEY = 'free-key';
-    process.env.TRANSLATE_MODEL = 'gemini-test';
-});
-
-afterEach(() => {
-    delete process.env.TRANSLATE_API_KEY;
-    delete process.env.TRANSLATE_FREE_API_KEY;
-    delete process.env.TRANSLATE_MODEL;
-});
-
 describe('translateCompanyNames', () => {
+    beforeEach(() => {
+        callGeminiMock.mockReset();
+        process.env.TRANSLATE_API_KEY = 'paid-key';
+        process.env.TRANSLATE_FREE_API_KEY = 'free-key';
+        process.env.TRANSLATE_MODEL = 'gemini-test';
+    });
+
+    afterEach(() => {
+        delete process.env.TRANSLATE_API_KEY;
+        delete process.env.TRANSLATE_FREE_API_KEY;
+        delete process.env.TRANSLATE_MODEL;
+    });
+
     it('빈 입력은 즉시 빈 객체를 반환한다', async () => {
         await expect(translateCompanyNames([])).resolves.toEqual({});
         expect(callGeminiMock).not.toHaveBeenCalled();

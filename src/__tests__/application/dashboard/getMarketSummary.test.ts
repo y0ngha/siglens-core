@@ -18,15 +18,15 @@ import {
     SECTOR_ETFS,
 } from '@/domain/constants/dashboard-tickers';
 
-beforeEach(() => {
-    getQuoteMock.mockReset();
-});
-
-afterEach(() => {
-    vi.clearAllMocks();
-});
-
 describe('getMarketSummary', () => {
+    beforeEach(() => {
+        getQuoteMock.mockReset();
+    });
+
+    afterEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('각 indices 에 quote 매핑 → price/changesPercentage 포함', async () => {
         getQuoteMock.mockImplementation(async sym =>
             sym === '^GSPC'

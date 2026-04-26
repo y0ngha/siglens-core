@@ -6,6 +6,7 @@ import {
     buildAssetInfoCacheKey,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import type { CacheProvider } from '@/infrastructure/cache/types';
 import {
     filterUsExchanges,
     searchBySymbol,
@@ -24,7 +25,8 @@ interface AssetInfoMatch {
 
 async function translateAndCache(
     symbol: string,
-    match: AssetInfoMatch
+    match: AssetInfoMatch,
+    cache: CacheProvider | null
 ): Promise<void> {
     const translated = await translateCompanyNames([
         { symbol, name: match.name },
@@ -41,7 +43,6 @@ async function translateAndCache(
     };
     await setKoreanTickers([entry]);
 
-    const cache = createCacheProvider();
     if (!cache) return;
 
     try {
@@ -88,9 +89,12 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
     };
 
     if (!koreanName) {
-        // Fire-and-forget: translation is opportunistic. Errors are swallowed.
-        translateAndCache(upper, { name, exchange, exchangeFullName }).catch(
-            () => {}
+        translateAndCache(
+            upper,
+            { name, exchange, exchangeFullName },
+            cache
+        ).catch(e =>
+            console.warn('[getAssetInfo] background translation failed', e)
         );
     }
 
@@ -98,7 +102,9 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
         const ttl = koreanName
             ? ASSET_INFO_CACHE_TTL_WITH_KOREAN
             : ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN;
-        cache.set(cacheKey, info, ttl).catch(() => {});
+        cache
+            .set(cacheKey, info, ttl)
+            .catch(e => console.warn('[getAssetInfo] cache write failed', e));
     }
 
     return info;
