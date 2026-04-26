@@ -185,6 +185,11 @@ and have been removed from this file.
    ✅ // Object.keys widens to string[], but SKILL_STAT_CONFIG: Record<SkillType, …> guarantees keys
       const SKILL_TYPES = Object.keys(SKILL_STAT_CONFIG) as SkillType[];  // TS limitation, not runtime risk
    → Mandatory: every safe-cast `as` must be accompanied by a comment explaining the guarantee.
+   ⚠️  Test file exception: `as` casts in `*.test.ts` files (e.g. test stubs typed with
+      `as unknown as SomeType`, `vi.fn() as Mock<...>`) do NOT require a comment.
+      Test stubs intentionally implement only the subset of an interface exercised by the test;
+      adding a comment to every stub cast adds noise without safety value.
+      ✅ `}) as unknown as Dirent;` — no comment needed in test files
 ```
 
 ---

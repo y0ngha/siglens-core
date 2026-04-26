@@ -1,5 +1,11 @@
 # Fix Log
 
+## [PR #26 Round 6 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `barsApi.test.ts`의 `from` 파라미터 검증이 정규식 형식 체크에 그쳐 날짜 계산 정확성 미검증
+- Rule: MISTAKES.md Tests #14 — 시간 의존 함수 테스트는 시간 소스를 명시적으로 고정해야 함
+- Context: `fetchBarsWithIndicators` 호출 시 `now` 파라미터 미전달; 고정 `now`와 `TIMEFRAME_LOOKBACK_DAYS` 기반 expected 값으로 정확한 날짜 검증 추가
+
+
 ## [PR #26 Round 3 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `normalize.test.ts` 4개 테스트가 잘못된 필드명으로 null 반환을 toBeDefined()로 허위 통과
 - Rule: MISTAKES.md Tests #13 — 테스트는 구현 코드를 직접 검증; 로컬 재정의나 잘못된 입력으로 tautological 결과 생성 금지
