@@ -24,6 +24,28 @@ function getRedis(): Redis | null {
     return _redis;
 }
 
+/**
+ * Attempt to acquire the per-symbol reanalysis cooldown lock.
+ *
+ * Used by the UI to prevent the same user (or duplicate concurrent tabs)
+ * from triggering a fresh analysis for the same symbol+timeframe within a
+ * 5-minute window. Implemented as Redis `SET key NX EX 300`.
+ *
+ * Behaviour:
+ * - Lock acquired → `{ ok: true }`. Caller proceeds with the analysis.
+ * - Lock held → `{ ok: false, remainingMs }`. Caller blocks (or returns
+ *   cached) and shows the remaining time to the user.
+ * - Upstash env missing or Redis call throws → `{ ok: true }`. Cooldown is
+ *   a UX safeguard, not a security boundary; failing open is preferred
+ *   over failing closed.
+ *
+ * @param symbol - U.S. equity ticker.
+ * @param timeframe - Bar resolution.
+ * @returns The acquisition result.
+ *
+ * @see releaseReanalyzeCooldown
+ * @see getReanalyzeCooldownMs
+ */
 export async function tryAcquireReanalyzeCooldown(
     symbol: string,
     timeframe: Timeframe
@@ -50,6 +72,20 @@ export async function tryAcquireReanalyzeCooldown(
     }
 }
 
+/**
+ * Release the cooldown lock for a symbol+timeframe.
+ *
+ * Called when an analysis completes early (e.g. cache hit) so the next
+ * request for the same symbol does not have to wait for the natural TTL
+ * to expire. Errors are logged and swallowed.
+ *
+ * No-op when Upstash env is not configured.
+ *
+ * @param symbol - U.S. equity ticker.
+ * @param timeframe - Bar resolution.
+ *
+ * @see tryAcquireReanalyzeCooldown
+ */
 export async function releaseReanalyzeCooldown(
     symbol: string,
     timeframe: Timeframe
@@ -63,6 +99,19 @@ export async function releaseReanalyzeCooldown(
     }
 }
 
+/**
+ * Inspect the remaining cooldown for a symbol+timeframe (in milliseconds).
+ *
+ * Useful for surfacing a countdown in the UI without trying to acquire the
+ * lock. Returns `0` when no cooldown is held, when Upstash env is missing,
+ * or when the Redis call fails.
+ *
+ * @param symbol - U.S. equity ticker.
+ * @param timeframe - Bar resolution.
+ * @returns Remaining cooldown in milliseconds, or `0`.
+ *
+ * @see tryAcquireReanalyzeCooldown
+ */
 export async function getReanalyzeCooldownMs(
     symbol: string,
     timeframe: Timeframe

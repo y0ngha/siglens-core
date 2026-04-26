@@ -204,7 +204,33 @@ export async function countSkillFiles(): Promise<SkillCounts> {
     };
 }
 
+/**
+ * Filesystem-backed implementation of {@link SkillsProvider}.
+ *
+ * Recursively walks the `skills/` directory under the current working
+ * directory, parses each `.md` file's YAML frontmatter (name, description,
+ * type, category, pattern, indicators, confidence weight, display config),
+ * and pairs it with the body content as a {@link Skill}.
+ *
+ * Files that fail to parse a frontmatter block are silently dropped —
+ * downstream callers should treat the loader as best-effort and degrade
+ * gracefully when a single skill file is malformed.
+ *
+ * @example
+ * ```ts
+ * const loader = new FileSkillsLoader();
+ * const skills = await loader.loadSkills();
+ * ```
+ *
+ * @see Skill
+ * @see SkillsProvider
+ */
 export class FileSkillsLoader implements SkillsProvider {
+    /**
+     * Load every skill defined under `skills/`.
+     *
+     * @returns The full list of parsed skills.
+     */
     async loadSkills(): Promise<Skill[]> {
         const mdFiles = await collectMdFiles(SKILLS_DIR);
 

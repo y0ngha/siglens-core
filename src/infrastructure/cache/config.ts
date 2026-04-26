@@ -7,7 +7,13 @@ import {
 } from '@/domain/constants/time';
 import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
 
-// 시장 브리핑: 1시간 캐시 (시장 데이터 변화 주기에 맞춤)
+/**
+ * TTL for cached market briefings (in seconds).
+ *
+ * Set to one hour so all callers within a given hour share a single AI
+ * briefing for the same dashboard summary. The briefing cache key
+ * incorporates the ISO date+hour, so rollover happens automatically.
+ */
 export const MARKET_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
 
 // 대시보드 섹터 시그널: 타임프레임별 데이터 갱신 주기에 맞춘 TTL
@@ -38,6 +44,14 @@ export const ASSET_INFO_CACHE_TTL_WITH_KOREAN = SECONDS_PER_YEAR;
 
 export const KOREAN_TICKERS_CACHE_KEY = 'korean:tickers';
 
+/**
+ * Per-timeframe TTL (seconds) for cached symbol analyses.
+ *
+ * Keyed by {@link Timeframe} — shorter timeframes get shorter TTLs so
+ * stale results never stay cached longer than the underlying bar
+ * resolution. {@link computeEffectiveTtl} clamps these values further when
+ * the daily KST cache-expiry boundary is approaching.
+ */
 export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
     '5Min': 5 * SECONDS_PER_MINUTE,
     '15Min': 15 * SECONDS_PER_MINUTE,
@@ -47,10 +61,27 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
     '1Day': SECONDS_PER_DAY,
 };
 
-// KST 17:00 = UTC 08:00 = EST 04:00 (미국 프리마켓 시작 전)
-// 전날 분석 캐시를 장 시작 전에 갱신하기 위한 기준 시각
+/**
+ * Daily cache-expiry boundary in KST hours (24-hour clock).
+ *
+ * KST 17:00 = UTC 08:00 = EST 04:00 — chosen to flush cached analyses
+ * just before the U.S. pre-market opens, so the next session starts
+ * with fresh results.
+ */
 export const CACHE_EXPIRY_HOUR_KST = 17;
 
+/**
+ * Compute the effective analysis-cache TTL for a given timeframe at `now`.
+ *
+ * Returns the smaller of:
+ * - `ANALYSIS_CACHE_TTL[timeframe]` — the static per-timeframe ceiling.
+ * - Seconds remaining until the next `CACHE_EXPIRY_HOUR_KST` boundary —
+ *   ensures cached results don't survive into the next trading day.
+ *
+ * @param timeframe - Bar resolution.
+ * @param now - The "now" reference; useful in tests.
+ * @returns Effective TTL in seconds.
+ */
 export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     return Math.min(
         ANALYSIS_CACHE_TTL[timeframe],
@@ -58,6 +89,16 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     );
 }
 
+/**
+ * Build the Redis key for a cached symbol analysis.
+ *
+ * Format: `analysis:<symbol>:<timeframe>`. Symbol is used verbatim — pass
+ * the canonical uppercase form.
+ *
+ * @param symbol - U.S. equity ticker.
+ * @param timeframe - Bar resolution.
+ * @returns The cache key.
+ */
 export function buildAnalysisCacheKey(
     symbol: string,
     timeframe: Timeframe
@@ -65,6 +106,16 @@ export function buildAnalysisCacheKey(
     return `analysis:${symbol}:${timeframe}`;
 }
 
+/**
+ * Build the Redis key for a cached market briefing.
+ *
+ * Format: `briefing:market:<dateHour>`. The `dateHour` argument is the ISO
+ * date+hour prefix (e.g. `"2026-04-26T14"`) so all callers within a given
+ * hour share a single cached briefing.
+ *
+ * @param dateHour - ISO date+hour prefix.
+ * @returns The cache key.
+ */
 export function buildBriefingCacheKey(dateHour: string): string {
     return `briefing:market:${dateHour}`;
 }

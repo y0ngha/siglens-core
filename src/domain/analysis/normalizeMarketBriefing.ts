@@ -36,6 +36,23 @@ function normalizeVolatilityAnalysis(
     };
 }
 
+/**
+ * Convert an arbitrary worker payload into a fully-validated
+ * {@link MarketBriefingResponse}.
+ *
+ * Defensively coerces every field via the `as*` primitive helpers — non-string
+ * values become `''`, missing arrays become `[]`, missing objects become
+ * empty defaults. Returns a well-formed object even when `raw` is `null`,
+ * `undefined`, or a malformed shape, so callers never need to null-check
+ * individual fields.
+ *
+ * @param raw - The unvalidated worker response. Expected to be a JSON
+ *   object matching the {@link buildMarketBriefingPrompt} schema, but any
+ *   value is accepted.
+ * @returns A safe-to-render {@link MarketBriefingResponse}.
+ *
+ * @see buildMarketBriefingPrompt
+ */
 export function normalizeMarketBriefing(raw: unknown): MarketBriefingResponse {
     const o = asObject(raw);
     if (!o) {

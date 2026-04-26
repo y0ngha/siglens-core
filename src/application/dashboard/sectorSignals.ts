@@ -93,6 +93,31 @@ function combineResults(
     });
 }
 
+/**
+ * Compute per-stock trading signals across every sector tracked by the dashboard.
+ *
+ * For each ticker in `SECTOR_STOCKS`, fetches recent bars + the latest quote,
+ * runs them through the indicator and signal pipelines, and returns a
+ * compact result. Results are cached per `(timeframe, time-bucket)` so
+ * concurrent dashboard loads within the same bucket share a single fetch.
+ *
+ * Provider calls are chunked (10 at a time) to stay below FMP/Alpaca rate
+ * limits. Per-ticker failures are dropped from the result (graceful
+ * degradation): if one symbol's bars or quote rejects, the rest of the
+ * dashboard still renders.
+ *
+ * @param timeframe - Dashboard bar resolution. Defaults to
+ *   `DEFAULT_DASHBOARD_TIMEFRAME`.
+ * @param now - Override the "now" reference used to compute the time bucket
+ *   and lookback window. Useful in tests; defaults to `new Date()`.
+ * @returns Computation timestamp plus per-stock signal results —
+ *   see {@link SectorSignalsResult}.
+ *
+ * @throws {Error} If the market data provider cannot be constructed.
+ *
+ * @see getMarketSummary
+ * @see bucketedTimestamp
+ */
 export async function getSectorSignals(
     timeframe: DashboardTimeframe = DEFAULT_DASHBOARD_TIMEFRAME,
     now: Date = new Date()

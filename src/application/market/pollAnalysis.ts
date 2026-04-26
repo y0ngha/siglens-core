@@ -19,6 +19,36 @@ import {
 } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
+/**
+ * Poll the result of an analysis job submitted via {@link submitAnalysis}.
+ *
+ * Returns one of three outcomes:
+ * - `processing`: the worker has not finished yet. Caller should retry.
+ * - `error`: the worker reported a failure, the result was missing, or the
+ *   payload was malformed (`summary` / `trend` / `riskLevel` field absent).
+ * - `done`: the result is ready. The raw worker response is enriched with
+ *   skill-confidence weighting and reconciled against the latest close/ATR,
+ *   then cached for the remaining timeframe-aware TTL before being returned.
+ *
+ * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
+ * (best-effort — cleanup failures are logged but do not affect the return
+ * value). Skill loading at poll time is best-effort, falling back to an empty
+ * skill list if it fails.
+ *
+ * @param jobId - The `jobId` returned by {@link submitAnalysis}.
+ * @returns The current poll outcome — see {@link PollAnalysisResult}.
+ *
+ * @example
+ * ```ts
+ * const result = await pollAnalysis(jobId);
+ * if (result.status === 'processing') scheduleRetry();
+ * else if (result.status === 'error') showError(result.error);
+ * else renderAnalysis(result.result);
+ * ```
+ *
+ * @see submitAnalysis
+ * @see cancelAnalysisJob
+ */
 export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
     const status = await getJobStatus(jobId);
 

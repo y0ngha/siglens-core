@@ -73,14 +73,44 @@ function mergeSortedEntries(
     return [...mergeSortedGen(a, b)];
 }
 
-/** Extracts the last CANDLE_PATTERN_DETECTION_BARS bars. */
+/**
+ * Slice the most recent `CANDLE_PATTERN_DETECTION_BARS` bars from a series.
+ *
+ * Helper used by both pattern detection and downstream rendering to
+ * reference the same fixed-size detection window — keeps `barIndex`
+ * values consistent across modules.
+ *
+ * @param bars - Full OHLCV bar series sorted oldest-first.
+ * @returns The trailing detection window (or the full array if shorter).
+ *
+ * @see detectCandlePatternEntries
+ */
 export function getDetectionBars(bars: Bar[]): Bar[] {
     return bars.slice(-CANDLE_PATTERN_DETECTION_BARS);
 }
 
 // ─── Detection ───────────────────────────────────────────────────────────────
 
-/** Detects candle patterns from the last N bars; multi-candle patterns take priority and exclude involved bars from single results. */
+/**
+ * Detect every candle pattern within the trailing detection window.
+ *
+ * For each bar in the last `CANDLE_PATTERN_DETECTION_BARS`, evaluates 2-
+ * and 3-bar multi-candle patterns first (using a small leading buffer so
+ * 3-bar patterns can be detected at the start of the window). Bars
+ * involved in any multi pattern are excluded from single-pattern detection
+ * to prevent overlap. Single-pattern entries in `EXCLUDED_SINGLE_PATTERNS`
+ * (the directional / flat / spinning-top noise patterns) are also dropped.
+ *
+ * Returned entries are merged in chronological `barIndex` order using a
+ * two-pointer merge of the multi and single sub-lists.
+ *
+ * @param bars - Full OHLCV bar series sorted oldest-first; only the trailing
+ *   detection window plus a small buffer is examined.
+ * @returns Detected pattern entries in ascending `barIndex` order.
+ *
+ * @see selectLastCandlePatternEntries
+ * @see getDetectionBars
+ */
 export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     const extendedCount =
         CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER;
@@ -153,7 +183,21 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
 
 // ─── Selection ──────────────────────────────────────────────────────────────
 
-/** Returns last multi-candle + last single-candle entry (if any); ensures both types are represented when co-existing. */
+/**
+ * Pick the latest multi-bar and single-bar pattern entries from the full set.
+ *
+ * Returns at most two entries — the most recent multi pattern (if any) and
+ * the most recent single pattern (if any) — sorted by `barIndex`. This
+ * keeps prompt rendering and chart annotation focused on the freshest
+ * actionable formation in each category instead of cluttering the output
+ * with every detected entry.
+ *
+ * @param entries - The full result of {@link detectCandlePatternEntries}.
+ * @returns Up to two entries (most recent multi + most recent single) in
+ *   ascending `barIndex` order; empty when `entries` is empty.
+ *
+ * @see detectCandlePatternEntries
+ */
 export function selectLastCandlePatternEntries(
     entries: CandlePatternEntry[]
 ): CandlePatternEntry[] {

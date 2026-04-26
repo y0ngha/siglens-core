@@ -953,6 +953,31 @@ function byName(a: Skill, b: Skill): number {
     return a.name.localeCompare(b.name, 'en');
 }
 
+/**
+ * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
+ *
+ * Composes a fully-rendered English prompt that the worker LLM consumes to
+ * produce an `AnalysisResponse`. Sections include current market status,
+ * long-term context, recent bars with detected candle patterns, buy / sell
+ * volume split, every indicator value with timeframe-aware trend labels,
+ * SMC structure, and per-skill writing rules.
+ *
+ * Skills with `confidenceWeight < MIN_CONFIDENCE_WEIGHT` are excluded.
+ * Active skills are sorted by name and grouped by `type` (pattern, strategy,
+ * indicator_guide, candlestick, support_resistance, regular). The number of
+ * trend samples and recent bars varies per `timeframe` via
+ * `PROMPT_CONFIG_BY_TIMEFRAME`.
+ *
+ * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param bars - OHLCV bars sorted oldest-first.
+ * @param indicators - Indicator suite produced by {@link calculateIndicators}.
+ * @param skills - Skill definitions to inject (defaults to none).
+ * @param timeframe - Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
+ * @returns The fully-rendered prompt string.
+ *
+ * @see calculateIndicators
+ * @see enrichAnalysisWithConfidence
+ */
 export function buildAnalysisPrompt(
     symbol: string,
     bars: Bar[],

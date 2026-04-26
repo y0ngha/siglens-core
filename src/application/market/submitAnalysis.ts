@@ -16,6 +16,45 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
+/**
+ * Submit an analysis job for a given symbol/timeframe.
+ *
+ * Resolves to one of two outcomes:
+ * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
+ *   by `symbol` + `timeframe`).
+ * - `submitted`: the bars + indicators were fetched, the prompt was built, a
+ *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
+ *   POST was sent to the configured worker. Poll the result with
+ *   {@link pollAnalysis}.
+ *
+ * Skill loading is best-effort — if it fails, the analysis proceeds with
+ * `skillsDegraded: true` recorded on the job meta so consumers can warn the
+ * user. The worker call uses a 5-minute `AbortSignal.timeout`; failures are
+ * logged but do not propagate to the caller (the job stays in `processing`
+ * until it times out naturally).
+ *
+ * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param timeframe - Bar resolution literal (`"5Min" | "15Min" | ... | "1Day"`).
+ * @param force - When `true`, bypass the cache and always submit a new job.
+ *   Defaults to `false`.
+ * @param fmpSymbol - Optional override symbol forwarded to the market data
+ *   provider when FMP uses a different identifier.
+ * @returns Either a cached analysis or a freshly submitted job descriptor —
+ *   see {@link SubmitAnalysisResult}.
+ *
+ * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
+ *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
+ *
+ * @example
+ * ```ts
+ * const submission = await submitAnalysis('AAPL', '1Day');
+ * if (submission.status === 'cached') return submission.result;
+ * const polled = await pollAnalysis(submission.jobId);
+ * ```
+ *
+ * @see pollAnalysis
+ * @see cancelAnalysisJob
+ */
 export async function submitAnalysis(
     symbol: string,
     timeframe: Timeframe,

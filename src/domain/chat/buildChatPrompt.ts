@@ -44,6 +44,24 @@ function formatDetectedPatterns(
     return detected.map(p => `${p.skillName} (${p.trend})`).join(', ');
 }
 
+/**
+ * Build a chat prompt payload (system prompt + message history) for an
+ * already-completed analysis.
+ *
+ * The system prompt instructs the LLM to answer in friendly Korean, scoped
+ * strictly to the provided analysis (questions about other stocks or general
+ * advice are politely refused). It embeds the trend, risk level, summary,
+ * trading strategy, key levels, detected patterns, indicator signals, and
+ * price targets so the LLM can answer without re-fetching anything.
+ *
+ * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param timeframe - The timeframe of the analysis being discussed.
+ * @param analysis - The `AnalysisResponse` from a previously completed job.
+ * @param history - Prior conversation turns; appended verbatim to the
+ *   message list before `userMessage`.
+ * @param userMessage - The user's latest input.
+ * @returns The prompt payload — see {@link ChatPromptPayload}.
+ */
 export function buildChatPrompt(
     symbol: string,
     timeframe: Timeframe,
