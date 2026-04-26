@@ -121,6 +121,7 @@ describe('database schema tables', () => {
             'oauth_accounts_user_id_idx',
             'oauth_accounts_provider_account_uidx',
         ]);
+        expect(getTableConfig(koreanTickers).indexes).toEqual([]);
         expect(getTableConfig(assetTranslations).primaryKeys).toHaveLength(1);
     });
 
