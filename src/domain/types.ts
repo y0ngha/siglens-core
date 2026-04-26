@@ -686,6 +686,7 @@ export interface RunAnalysisInput {
 }
 
 /**
+ * @internal
  * LLM이 반환하는 원시 분석 응답.
  *
  * 프롬프트에서는 모든 필드를 required로 요청하지만,
@@ -693,6 +694,10 @@ export interface RunAnalysisInput {
  * 반환되는 케이스까지 관측된다. 따라서 모든 필드를 unknown으로 받아
  * {@link enrichAnalysisWithConfidence}에서 런타임 정규화한 뒤
  * {@link AnalysisResponse}로 변환한다.
+ *
+ * 외부 노출 금지 — 외부 LLM 응답 스키마와 직접 결합되므로 public API로 노출하지
+ * 않는다. `enrichAnalysisWithConfidence`는 외부 경계에서 `unknown`을 받아 내부적으로
+ * 이 타입으로 cast한다.
  */
 export interface RawAnalysisResponse {
     summary?: unknown;

@@ -65,9 +65,15 @@ export function filterPatterns(patterns: PatternResult[]): PatternResult[] {
 }
 
 export function enrichAnalysisWithConfidence(
-    raw: RawAnalysisResponse,
+    rawInput: unknown,
     skills: Skill[]
 ): AnalysisResponse {
+    // rawInput is typed `unknown` at the public boundary so consumers do not
+    // need to import the internal RawAnalysisResponse shape (which mirrors the
+    // external LLM response and would couple consumers to that schema).
+    // RawAnalysisResponse only widens the top-level into optional unknowns —
+    // every field is still validated by the normalize* helpers below.
+    const raw = rawInput as RawAnalysisResponse;
     const lookup = buildSkillLookup(skills);
 
     // 모든 배열 필드를 타입 검증하며 정규화한다.

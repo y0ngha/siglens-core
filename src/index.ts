@@ -215,7 +215,6 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
-    RawAnalysisResponse,
     AnalysisSignal,
     SignalStrength,
     ReconciledActionLevels,
