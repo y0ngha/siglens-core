@@ -1,6 +1,7 @@
-import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_SECOND } from '@/domain/constants/time';
+import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 import { readFmpConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
@@ -236,7 +237,9 @@ export class FmpProvider implements MarketDataProvider {
             endDate
         );
 
-        const res = await fetch(url);
+        const res = await fetch(url, {
+            signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
+        });
 
         if (!res.ok) {
             throw new Error(`FMP API error: ${res.status} ${res.statusText}`);
@@ -297,7 +300,9 @@ export class FmpProvider implements MarketDataProvider {
     async getQuote(symbol: string): Promise<MarketQuote | null> {
         const url = this.buildQuoteUrl(symbol);
         try {
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
+            });
             if (!res.ok) return null;
 
             // FMP /stable/quote API 응답 형식: FmpQuote 객체 배열 (FMP API spec 보장)
@@ -321,7 +326,9 @@ export class FmpProvider implements MarketDataProvider {
     private async fetchTodayQuoteBar(symbol: string): Promise<Bar | null> {
         const url = this.buildQuoteUrl(symbol);
         try {
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
+            });
             if (!res.ok) return null;
 
             // res.json() returns unknown; FMP quote API response shape guaranteed by provider contract

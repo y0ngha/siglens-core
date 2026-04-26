@@ -1,8 +1,8 @@
-import { Redis } from '@upstash/redis';
-import type { Timeframe } from '@/domain/types';
-import type { AcquireReanalyzeCooldownResult } from './types';
 import { SECONDS_PER_MINUTE } from '@/domain/constants/time';
+import type { Timeframe } from '@/domain/types';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
+import { Redis } from '@upstash/redis';
+import type { AcquireReanalyzeCooldownResult } from './types';
 
 const REANALYZE_COOLDOWN_SEC = 5 * SECONDS_PER_MINUTE;
 const REANALYZE_COOLDOWN_MS = REANALYZE_COOLDOWN_SEC * 1000;
