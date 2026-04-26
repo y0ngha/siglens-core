@@ -1,4 +1,5 @@
 import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
+import { ISO_DATE_PREFIX_LENGTH } from '@/infrastructure/cache/config';
 import { readFmpConfig } from './config';
 import type { GetBarsOptions, MarketDataProvider } from './types';
 
@@ -177,9 +178,14 @@ export class FmpProvider implements MarketDataProvider {
     async getBars(options: GetBarsOptions): Promise<Bar[]> {
         const { symbol: fmpSymbol, timeframe, before, from } = options;
 
-        const fromDate = from !== undefined ? from.substring(0, 10) : undefined;
+        const fromDate =
+            from !== undefined
+                ? from.substring(0, ISO_DATE_PREFIX_LENGTH)
+                : undefined;
         const endDate =
-            before !== undefined ? before.substring(0, 10) : undefined;
+            before !== undefined
+                ? before.substring(0, ISO_DATE_PREFIX_LENGTH)
+                : undefined;
 
         if (timeframe === '1Day') {
             return this.getDailyBars(fmpSymbol, fromDate, endDate);

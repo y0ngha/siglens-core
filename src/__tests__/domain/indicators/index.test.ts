@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { calculateIndicators } from '@/domain/indicators/index';
+import {
+    ICHIMOKU_DISPLACEMENT,
+    ICHIMOKU_SPAN_B_PERIOD,
+} from '@/domain/indicators/constants';
 import type { Bar } from '@/domain/types';
 
 function makeBar(high: number, low: number, close: number, time: number): Bar {
     return { time, open: close, high, low, close, volume: 1000 };
 }
 
-// calculateIndicators는 내부적으로 가장 긴 period(ICHIMOKU_SPAN_B + DISPLACEMENT = 78)를 사용
-const ENOUGH_BARS = 100;
+// calculateIndicators 내부 가장 긴 warmup = ICHIMOKU_SPAN_B_PERIOD + ICHIMOKU_DISPLACEMENT
+const ENOUGH_BARS = ICHIMOKU_SPAN_B_PERIOD + ICHIMOKU_DISPLACEMENT + 22;
 
 describe('calculateIndicators', () => {
     describe('빈 배열일 때', () => {

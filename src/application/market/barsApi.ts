@@ -4,13 +4,16 @@ import {
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,
 } from '@/domain/constants/market';
+import { ISO_DATE_PREFIX_LENGTH } from '@/infrastructure/cache/config';
 import { createMarketDataProvider } from '@/infrastructure/market/factory';
 
 function computeFromDay(timeframe: Timeframe, now: Date): string {
     const lookbackDays = TIMEFRAME_LOOKBACK_DAYS[timeframe];
     const from = new Date(now);
     from.setUTCDate(from.getUTCDate() - lookbackDays);
-    return from.toISOString().substring(0, 10) + 'T00:00:00Z';
+    return (
+        from.toISOString().substring(0, ISO_DATE_PREFIX_LENGTH) + 'T00:00:00Z'
+    );
 }
 
 export async function fetchBarsWithIndicators(

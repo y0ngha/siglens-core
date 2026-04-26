@@ -1,5 +1,9 @@
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
-import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
+import type {
+    CachedBriefingData,
+    MarketSummaryData,
+    SubmitBriefingResult,
+} from '@/domain/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
@@ -11,8 +15,6 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 export async function submitBriefing(
     data: MarketSummaryData
 ): Promise<SubmitBriefingResult> {
-    const { workerUrl, workerSecret } = readWorkerConfig();
-
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
     const cacheKey = buildBriefingCacheKey(dateHour);
@@ -20,10 +22,7 @@ export async function submitBriefing(
     const cache = createCacheProvider();
     if (cache !== null) {
         try {
-            const cached = await cache.get<{
-                briefing: unknown;
-                generatedAt: string;
-            }>(cacheKey);
+            const cached = await cache.get<CachedBriefingData>(cacheKey);
             if (cached !== null) {
                 return {
                     status: 'cached',
@@ -35,6 +34,8 @@ export async function submitBriefing(
             console.error('[Briefing/Submit] Cache read failed:', error);
         }
     }
+
+    const { workerUrl, workerSecret } = readWorkerConfig();
 
     const prompt = buildMarketBriefingPrompt(data.indices, data.sectors);
     const jobId = crypto.randomUUID();

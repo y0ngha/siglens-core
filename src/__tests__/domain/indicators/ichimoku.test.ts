@@ -75,9 +75,8 @@ describe('calculateIchimoku', () => {
         });
 
         it('kijun은 high+low의 중간값이다', () => {
-            const bars = Array.from(
-                { length: MIN_BARS + 5 },
-                (_, i) => makeBar(110, 90, 100, i)
+            const bars = Array.from({ length: MIN_BARS + 5 }, (_, i) =>
+                makeBar(110, 90, 100, i)
             );
             const result = calculateIchimoku(bars);
             const last = result[result.length - 1];
@@ -86,9 +85,8 @@ describe('calculateIchimoku', () => {
         });
 
         it('senkouA와 senkouB의 계산값이 명세와 일치한다', () => {
-            const bars = Array.from(
-                { length: MIN_BARS + 5 },
-                (_, i) => makeBar(110, 90, 100, i)
+            const bars = Array.from({ length: MIN_BARS + 5 }, (_, i) =>
+                makeBar(110, 90, 100, i)
             );
             const result = calculateIchimoku(bars);
             const last = result[result.length - 1];

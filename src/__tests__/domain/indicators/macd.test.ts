@@ -54,8 +54,9 @@ describe('calculateMACD', () => {
             const result = calculateMACD(bars);
             const firstValid = result.find(r => r.macd !== null);
             expect(firstValid).toBeDefined();
-            // 상승 추세에서 fast EMA > slow EMA → MACD > 0
-            expect(firstValid!.macd).toBeGreaterThan(0);
+            // 단조 증가 선형 시퀀스에서 fast EMA(12) 래그 = (12-1)/2 = 5.5,
+            // slow EMA(26) SMA 시드 래그 = (26-1)/2 = 12.5 → MACD = 12.5 - 5.5 = 7.0
+            expect(firstValid!.macd).toBeCloseTo(7.0, 5);
         });
 
         it('signal이 충분한 데이터가 있을 때 null이 아니다', () => {

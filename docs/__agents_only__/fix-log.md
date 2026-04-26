@@ -1,9 +1,5 @@
 # Fix Log
 
-## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `smc.ts`의 `detectStructureBreaks`에서 `breaks = [...breaks, {...}]` spread append
-- Rule: MISTAKES.md Coding Paradigm — append-only local mutable variable에 spread 사용은 O(N²)
-
 ## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `alpaca.ts`, `fmp.ts`, `factory.ts` 생성자/팩토리에서 `process.env` 직접 읽기
 - Rule: MISTAKES.md Infrastructure #4 — env var 읽기는 config 모듈에 집중
@@ -27,25 +23,11 @@
 - Rule: CLAUDE.md — yarn must be used for all package operations; npm is prohibited
 - Context: publish.yml initially used `npm publish` and NODE_AUTH_TOKEN; corrected to `yarn npm publish` with YARN_NPM_AUTH_TOKEN and added npmScopes config to .yarnrc.yml for yarn 4 registry routing
 
-## [Issue #1 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-24]
-- Violation: `.sort()` used instead of `.toSorted()` in `selectLastCandlePatternEntries`
-- Rule: MISTAKES.md Coding Paradigm #10 — `.sort()` mutates the original array; `.toSorted()` must be used
-- Context: `candle-detection.ts` line 210 sorted the result array in-place before returning; fixed to `.toSorted()`
-
 
 ## [PR #23 Round 2 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
 - Violation: `[...arr].reverse().find()` used instead of `findLast` in `lastNonNull` helper in `prompt.ts`
 - Rule: Consistency with ES2023 APIs already used in the same PR — `candle-detection.ts` already uses `findLast`; `tsconfig.json` targets ES2023
 - Context: `lastNonNull` helper copied an array and reversed it just to find the last non-null value; `findLast` avoids the O(n) array copy entirely
-
-- Violation: Loop in `detectCandlePatternEntries` starts at `0` with `if (i < detectionStartIndex) continue;` instead of starting at `detectionStartIndex`
-- Rule: MISTAKES.md Coding Paradigm #2 — avoid redundant computation; set loop start boundary correctly
-- Context: `candle-detection.ts` loop over `extendedBars` guarded against the buffer region with an early `continue`; the loop start index should be `detectionStartIndex` directly
-
-## [PR #23 Round 4 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
-- Violation: `1000` 매직 넘버를 `prompt.ts`에서 인라인으로 사용
-- Rule: MISTAKES.md Coding Paradigm #13 — 하드코딩된 리터럴은 모듈 레벨 상수로 추출
-- Context: `bar.time * 1000`에서 `1000`은 초→밀리초 변환 팩터; `SECONDS_TO_MS` 상수로 추출
 
 ## [PR #23 Round 5 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
 - Violation: `countSqueezeDuration`에서 종료 조건이 수렴 predicate인데 `for` 루프 사용
@@ -103,4 +85,9 @@
 - Violation: `reanalyzeCooldown.ts`의 `getRedis()`가 호출마다 `new Redis(...)` 인스턴스 생성
 - Rule: MISTAKES.md Design #2 — 동일 외부 자원에 대한 클라이언트는 모듈 스코프 싱글턴으로 관리
 - Context: config key 기반 싱글턴으로 전환; config 미설정 시 null 반환, config 동일 시 캐시된 인스턴스 반환
+
+## [PR #26 Round 4 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `submitAnalysis.ts`, `submitBriefing.ts`에서 `readWorkerConfig()`를 캐시 조회 전에 호출
+- Rule: CONVENTIONS.md — Graceful degradation; missing env vars must not crash the library when an alternative path exists
+- Context: WORKER_URL 미설정 환경에서도 캐시에 유효한 데이터가 있으면 반환 가능한데, readWorkerConfig()가 캐시 체크 앞에 있어 항상 throw됐음; readWorkerConfig() 호출을 캐시 미스 이후로 이동
 

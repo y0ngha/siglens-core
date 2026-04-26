@@ -34,7 +34,10 @@ describe('readAlpacaConfig', () => {
         it('apiKey와 secretKey를 반환한다', () => {
             process.env.ALPACA_API_KEY = 'key';
             process.env.ALPACA_API_SECRET = 'secret';
-            expect(readAlpacaConfig()).toEqual({ apiKey: 'key', secretKey: 'secret' });
+            expect(readAlpacaConfig()).toEqual({
+                apiKey: 'key',
+                secretKey: 'secret',
+            });
         });
     });
 
@@ -42,7 +45,10 @@ describe('readAlpacaConfig', () => {
         it('ALPACA_SECRET_KEY를 secretKey로 반환한다', () => {
             process.env.ALPACA_API_KEY = 'key';
             process.env.ALPACA_SECRET_KEY = 'legacy-secret';
-            expect(readAlpacaConfig()).toEqual({ apiKey: 'key', secretKey: 'legacy-secret' });
+            expect(readAlpacaConfig()).toEqual({
+                apiKey: 'key',
+                secretKey: 'legacy-secret',
+            });
         });
     });
 });

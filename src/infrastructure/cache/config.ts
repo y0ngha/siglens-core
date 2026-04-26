@@ -9,6 +9,9 @@ import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
 // 시장 브리핑: 1시간 캐시 (시장 데이터 변화 주기에 맞춤)
 export const MARKET_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
 
+// ISO 8601 날짜 접두어("YYYY-MM-DD")의 문자 수
+export const ISO_DATE_PREFIX_LENGTH = 10;
+
 // ISO 8601 문자열에서 시(hour) 단위 접두어("YYYY-MM-DDTHH")의 문자 수
 export const ISO_DATE_HOUR_PREFIX_LENGTH = 13;
 

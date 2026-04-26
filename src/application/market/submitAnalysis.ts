@@ -19,8 +19,6 @@ export async function submitAnalysis(
     force: boolean = false,
     fmpSymbol?: string
 ): Promise<SubmitAnalysisResult> {
-    const { workerUrl, workerSecret } = readWorkerConfig();
-
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe);
 
@@ -35,6 +33,8 @@ export async function submitAnalysis(
         }
     }
 
+    const { workerUrl, workerSecret } = readWorkerConfig();
+
     const { bars, indicators } = await fetchBarsWithIndicators(
         symbol,
         timeframe,
@@ -42,15 +42,16 @@ export async function submitAnalysis(
     );
 
     const skillsLoader = new FileSkillsLoader();
-    let skillsDegraded = false;
-    const skills = await skillsLoader.loadSkills().catch(error => {
-        console.error(
-            '[Submit] Skills loading failed, proceeding without skills:',
-            error
-        );
-        skillsDegraded = true;
-        return [] as Skill[];
-    });
+    const [skills, skillsDegraded] = await skillsLoader
+        .loadSkills()
+        .then(s => [s, false] as const)
+        .catch(error => {
+            console.error(
+                '[Submit] Skills loading failed, proceeding without skills:',
+                error
+            );
+            return [[] as Skill[], true] as const;
+        });
 
     const prompt = buildAnalysisPrompt(
         symbol,
