@@ -70,7 +70,7 @@ describe('registerUser', () => {
         expect(hashPassword).not.toHaveBeenCalled();
     });
 
-    it('rejects weak password before repository access', async () => {
+    it('rejects weak password (no numbers) before repository access', async () => {
         const { repository, passwordHasher, findByEmail, hashPassword } =
             makeDependencies();
 
@@ -87,6 +87,50 @@ describe('registerUser', () => {
                 field: 'password',
                 message:
                     'Password must be at least 8 characters and include letters and numbers',
+            },
+        });
+        expect(findByEmail).not.toHaveBeenCalled();
+        expect(hashPassword).not.toHaveBeenCalled();
+    });
+
+    it('rejects password shorter than minimum length', async () => {
+        const { repository, passwordHasher, findByEmail, hashPassword } =
+            makeDependencies();
+
+        const result = await registerUser(
+            { email: 'user@example.com', password: 'Ps1' },
+            repository,
+            passwordHasher
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            error: {
+                code: 'weak_password',
+                field: 'password',
+                message: expect.any(String),
+            },
+        });
+        expect(findByEmail).not.toHaveBeenCalled();
+        expect(hashPassword).not.toHaveBeenCalled();
+    });
+
+    it('rejects password with no letters', async () => {
+        const { repository, passwordHasher, findByEmail, hashPassword } =
+            makeDependencies();
+
+        const result = await registerUser(
+            { email: 'user@example.com', password: '12345678' },
+            repository,
+            passwordHasher
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            error: {
+                code: 'weak_password',
+                field: 'password',
+                message: expect.any(String),
             },
         });
         expect(findByEmail).not.toHaveBeenCalled();

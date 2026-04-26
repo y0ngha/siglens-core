@@ -29,11 +29,7 @@ import {
     userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type {
-    PasswordHasher,
-    PatternTrend,
-    UserRepository,
-} from '@/index';
+import type { PasswordHasher, PatternTrend, UserRepository } from '@/index';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
