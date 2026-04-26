@@ -20,6 +20,24 @@ import { translateCompanyNames } from '@/infrastructure/ticker/koreanTranslator'
 
 const MAX_SEARCH_RESULTS = 10;
 
+function toKoreanEntry(
+    symbol: string,
+    koreanName: string,
+    unmappedMap: Map<string, TickerSearchResult>
+): KoreanTickerEntry[] {
+    const result = unmappedMap.get(symbol);
+    if (!result) return [];
+    return [
+        {
+            symbol,
+            koreanName,
+            name: result.name,
+            exchange: result.exchange,
+            exchangeFullName: result.exchangeFullName,
+        },
+    ];
+}
+
 async function translateAndCache(
     unmapped: TickerSearchResult[]
 ): Promise<void> {
@@ -30,19 +48,7 @@ async function translateAndCache(
     const unmappedMap = new Map(unmapped.map(r => [r.symbol, r]));
 
     const entries = Object.entries(translated).flatMap<KoreanTickerEntry>(
-        ([symbol, koreanName]) => {
-            const result = unmappedMap.get(symbol);
-            if (!result) return [];
-            return [
-                {
-                    symbol,
-                    koreanName,
-                    name: result.name,
-                    exchange: result.exchange,
-                    exchangeFullName: result.exchangeFullName,
-                },
-            ];
-        }
+        ([symbol, koreanName]) => toKoreanEntry(symbol, koreanName, unmappedMap)
     );
 
     await setKoreanTickers(entries);
