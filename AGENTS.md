@@ -31,6 +31,10 @@ Instead, use this Codex workflow:
    - create a commit,
    - push the branch,
    - create or update the pull request.
+9. When creating or updating a pull request, read
+   `.github/PULL_REQUEST_TEMPLATE.md` first and use that template structure for
+   the PR body. Fill every applicable section with the actual issue number,
+   implementation summary, changed file lists, and validation results.
 
 The main Codex session remains responsible for implementation and fixes.
 The review sub-agent is responsible only for review feedback and approval.
