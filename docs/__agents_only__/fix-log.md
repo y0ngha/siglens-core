@@ -81,3 +81,12 @@
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
+
+## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
+- Violation: Tier 3 exported functions missing `@returns` JSDoc tag in `client.ts` and `config.ts`
+- Rule: docs/CONVENTIONS.md JSDoc Rules — Tier 3 (infra factories & config) requires description, @param, and @returns tags
+- Context: `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig` all had return information embedded in description prose but no standalone `@returns` tag
+
+- Violation: varchar column length literals used directly in `schema.ts` without named constants
+- Rule: MISTAKES.md Coding Paradigm #13 — all magic numbers must be extracted to module-level constants
+- Context: `length: 320`, `length: 32`, `length: 64` used inline; `SYMBOL_MAX_LENGTH = 32` appeared in both `koreanTickers` and `assetTranslations` without a shared constant
