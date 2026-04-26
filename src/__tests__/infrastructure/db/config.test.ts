@@ -4,6 +4,9 @@ import {
     tryReadDatabaseConfig,
 } from '@/infrastructure/db/config';
 
+const TEST_DATABASE_URL =
+    'postgres://user:pass@example.neon.tech/db?sslmode=require';
+
 describe('readDatabaseConfig', () => {
     afterEach(() => {
         vi.unstubAllEnvs();
@@ -18,14 +21,10 @@ describe('readDatabaseConfig', () => {
     });
 
     it('returns database config when DATABASE_URL is present', () => {
-        vi.stubEnv(
-            'DATABASE_URL',
-            'postgres://user:pass@example.neon.tech/db?sslmode=require'
-        );
+        vi.stubEnv('DATABASE_URL', TEST_DATABASE_URL);
 
         expect(readDatabaseConfig()).toEqual({
-            databaseUrl:
-                'postgres://user:pass@example.neon.tech/db?sslmode=require',
+            databaseUrl: TEST_DATABASE_URL,
         });
     });
 });
@@ -42,14 +41,10 @@ describe('tryReadDatabaseConfig', () => {
     });
 
     it('returns database config when DATABASE_URL is present', () => {
-        vi.stubEnv(
-            'DATABASE_URL',
-            'postgres://user:pass@example.neon.tech/db?sslmode=require'
-        );
+        vi.stubEnv('DATABASE_URL', TEST_DATABASE_URL);
 
         expect(tryReadDatabaseConfig()).toEqual({
-            databaseUrl:
-                'postgres://user:pass@example.neon.tech/db?sslmode=require',
+            databaseUrl: TEST_DATABASE_URL,
         });
     });
 });

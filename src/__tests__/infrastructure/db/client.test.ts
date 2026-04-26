@@ -13,6 +13,7 @@ const TEST_DATABASE_URL =
 
 const sqlClient = vi.fn();
 const dbClient = { query: {} };
+const EXPECTED_CLIENT = { db: dbClient, sql: sqlClient };
 
 vi.mock('@neondatabase/serverless', () => ({
     neon: vi.fn(() => sqlClient),
@@ -41,7 +42,7 @@ describe('database client factory', () => {
         expect(drizzle).toHaveBeenCalledWith(sqlClient, {
             schema: expect.any(Object),
         });
-        expect(client).toEqual({ db: dbClient, sql: sqlClient });
+        expect(client).toEqual(EXPECTED_CLIENT);
     });
 
     it('reuses the module-level client for required env config', () => {
@@ -77,10 +78,7 @@ describe('database client factory', () => {
         const firstClient = tryGetDatabaseClient();
         const secondClient = tryGetDatabaseClient();
 
-        expect(firstClient).toEqual({
-            db: dbClient,
-            sql: sqlClient,
-        });
+        expect(firstClient).toEqual(EXPECTED_CLIENT);
         expect(firstClient).toBe(secondClient);
         expect(neon).toHaveBeenCalledTimes(1);
         expect(drizzle).toHaveBeenCalledTimes(1);

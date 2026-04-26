@@ -39,7 +39,7 @@ export function tryGetDatabaseClient(): DatabaseClient | null {
     return cachedClient;
 }
 
-/** @internal */
+/** @internal Resets the module-level cached client between test runs. */
 export function resetDatabaseClientForTests(): void {
     cachedClient = null;
 }

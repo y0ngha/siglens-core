@@ -3,7 +3,6 @@ import {
     index,
     pgEnum,
     pgTable,
-    primaryKey,
     text,
     timestamp,
     uniqueIndex,
@@ -20,6 +19,8 @@ const EMAIL_MAX_LENGTH = 320;
 const SYMBOL_MAX_LENGTH = 32;
 const EXCHANGE_MAX_LENGTH = 32;
 const FMP_SYMBOL_MAX_LENGTH = 64;
+
+const nowFn = (): Date => new Date();
 
 /** Postgres enum for user subscription tier. */
 export const userTierEnum = pgEnum('user_tier', USER_TIER_VALUES);
@@ -49,7 +50,7 @@ export const users = pgTable('users', {
     updatedAt: timestamp('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow()
-        .$onUpdateFn(() => new Date()),
+        .$onUpdateFn(nowFn),
 });
 
 /** Auth sessions — linked to a user and expire at a fixed timestamp. */
@@ -126,23 +127,19 @@ export const koreanTickers = pgTable('korean_tickers', {
     updatedAt: timestamp('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow()
-        .$onUpdateFn(() => new Date()),
+        .$onUpdateFn(nowFn),
 });
 
 /** Korean–English asset name translations — keyed by ticker symbol. */
-export const assetTranslations = pgTable(
-    'asset_translations',
-    {
-        symbol: varchar('symbol', { length: SYMBOL_MAX_LENGTH }).notNull(),
-        name: text('name').notNull(),
-        koreanName: text('korean_name').notNull(),
-        fmpSymbol: varchar('fmp_symbol', {
-            length: FMP_SYMBOL_MAX_LENGTH,
-        }).notNull(),
-        updatedAt: timestamp('updated_at', { withTimezone: true })
-            .notNull()
-            .defaultNow()
-            .$onUpdateFn(() => new Date()),
-    },
-    table => [primaryKey({ columns: [table.symbol] })]
-);
+export const assetTranslations = pgTable('asset_translations', {
+    symbol: varchar('symbol', { length: SYMBOL_MAX_LENGTH }).primaryKey(),
+    name: text('name').notNull(),
+    koreanName: text('korean_name').notNull(),
+    fmpSymbol: varchar('fmp_symbol', {
+        length: FMP_SYMBOL_MAX_LENGTH,
+    }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdateFn(nowFn),
+});

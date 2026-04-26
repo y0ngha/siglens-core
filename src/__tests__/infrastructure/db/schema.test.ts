@@ -122,7 +122,10 @@ describe('database schema tables', () => {
             'oauth_accounts_provider_account_uidx',
         ]);
         expect(getTableConfig(koreanTickers).indexes).toEqual([]);
-        expect(getTableConfig(assetTranslations).primaryKeys).toHaveLength(1);
+    });
+
+    it('enforces primary key constraint on asset_translations', () => {
+        expect(getTableColumns(assetTranslations).symbol.primary).toBe(true);
     });
 
     it('enforces unique constraint on users.email', () => {
