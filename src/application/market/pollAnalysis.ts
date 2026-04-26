@@ -55,6 +55,8 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
         return { status: 'error', error: 'Result not found' };
     }
 
+    // getJobResult는 JSON.parse 결과를 반환하므로 unknown에서 Record<string, unknown>으로의
+    // 캐스트는 필드 존재 확인을 위한 안전한 타입 축소이다.
     const candidate = rawResult as Record<string, unknown>;
     if (!candidate.summary || !candidate.trend || !candidate.riskLevel) {
         cleanupJob(jobId).catch(e =>

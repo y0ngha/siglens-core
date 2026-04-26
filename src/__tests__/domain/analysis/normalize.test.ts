@@ -146,10 +146,11 @@ describe('normalizeSignal', () => {
 describe('normalizeIndicatorGuideResult', () => {
     it('유효한 IndicatorGuideResult를 반환한다', () => {
         const result = normalizeIndicatorGuideResult({
-            name: 'RSI',
+            indicatorName: 'RSI',
             signals: [],
         });
-        expect(result).toBeDefined();
+        expect(result).not.toBeNull();
+        expect(result!.indicatorName).toBe('RSI');
     });
 
     it('null이면 null을 반환한다', () => {
@@ -212,11 +213,15 @@ describe('normalizeTrendline', () => {
 describe('normalizePatternSummary', () => {
     it('유효한 패턴 요약을 반환한다', () => {
         const result = normalizePatternSummary({
-            name: 'Head and Shoulders',
-            type: 'reversal',
-            lines: [],
+            patternName: 'Head and Shoulders',
+            skillName: 'head_and_shoulders_skill',
+            detected: true,
+            trend: 'bearish',
+            summary: 'Reversal pattern detected',
         });
-        expect(result).toBeDefined();
+        expect(result).not.toBeNull();
+        expect(result!.patternName).toBe('Head and Shoulders');
+        expect(result!.skillName).toBe('head_and_shoulders_skill');
     });
 
     it('null이면 null을 반환한다', () => {
@@ -227,10 +232,12 @@ describe('normalizePatternSummary', () => {
 describe('normalizeStrategyResult', () => {
     it('유효한 StrategyResult를 반환한다', () => {
         const result = normalizeStrategyResult({
-            name: 'Breakout',
-            description: 'Price breaks resistance',
+            strategyName: 'Breakout',
+            trend: 'bullish',
+            summary: 'Price breaks resistance',
         });
-        expect(result).toBeDefined();
+        expect(result).not.toBeNull();
+        expect(result!.strategyName).toBe('Breakout');
     });
 
     it('null이면 null을 반환한다', () => {
@@ -241,11 +248,13 @@ describe('normalizeStrategyResult', () => {
 describe('normalizeCandlePatternSummary', () => {
     it('유효한 CandlePatternSummary를 반환한다', () => {
         const result = normalizeCandlePatternSummary({
-            pattern: 'Doji',
+            patternName: 'Doji',
+            detected: false,
             trend: 'neutral',
-            description: 'Indecision',
+            summary: 'Indecision',
         });
-        expect(result).toBeDefined();
+        expect(result).not.toBeNull();
+        expect(result!.patternName).toBe('Doji');
     });
 
     it('null이면 null을 반환한다', () => {
