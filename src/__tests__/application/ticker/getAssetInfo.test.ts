@@ -96,6 +96,7 @@ describe('getAssetInfo', () => {
             { symbol: 'AAPL', name: 'Apple Inc.' },
             expect.any(Number)
         );
+        expect(translateCompanyNamesMock).toHaveBeenCalledTimes(1);
     });
 
     it('한국명 보유 시 koreanName을 결과에 포함하고 긴 TTL 사용', async () => {

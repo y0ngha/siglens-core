@@ -7,6 +7,7 @@ import type {
     Signal,
     TrendState,
 } from '@/domain/types';
+import { MS_PER_DAY } from '@/domain/constants/time';
 
 const detectSignalsMock =
     vi.fn<(bars: Bar[], indicators: IndicatorResult) => readonly Signal[]>();
@@ -50,8 +51,6 @@ describe('bucketedTimestamp', () => {
 });
 
 describe('lookbackIsoFromNow', () => {
-    const MS_PER_DAY = 86_400_000;
-
     it('1Day 는 약 400일 전 ISO 반환', () => {
         const now = new Date('2026-04-25T00:00:00.000Z');
         const iso = lookbackIsoFromNow('1Day', now);
