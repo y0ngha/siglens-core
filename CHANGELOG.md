@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/y0ngha/siglens-core/compare/v0.1.1...v0.1.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* 빠진 export 추가 ([1c46968](https://github.com/y0ngha/siglens-core/commit/1c46968cfbf2f7d8c774e6ef1b5895de896673d3))
+
 ## 0.1.1 (2026-04-26)
 
 
