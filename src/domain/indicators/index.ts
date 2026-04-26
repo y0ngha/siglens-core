@@ -50,6 +50,7 @@ export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
 export * from './constants';
+export * from './utils';
 
 /**
  * Compute the full indicator suite for an array of OHLCV bars.
