@@ -1122,6 +1122,56 @@ export interface ChatPromptPayload {
     messages: ChatMessage[];
 }
 
+// ─── Tier Gating ──────────────────────────────────────────────────────────────
+
+/** User subscription tier used for feature gating. */
+export type Tier = 'free' | 'member' | 'pro';
+
+/** Daily usage-limited feature identifiers. */
+export type TierLimitedFeature = 'analysisPerDay' | 'chatbotPerDay';
+
+/** Analysis detail fragments exposed per tier. */
+export type TierInfoDepth =
+    | 'direction'
+    | 'summary'
+    | 'partial_detail'
+    | 'full_detail'
+    | 'entry'
+    | 'stoploss'
+    | 'target'
+    | 'confidence';
+
+/** AI model identifiers allowed by tier gating. */
+export type TierModel =
+    | 'gemini-2.5-flash'
+    | 'gemini-2.5-flash-lite'
+    | 'gemini-2.5-pro'
+    | 'claude-sonnet-4'
+    | 'claude-opus-4';
+
+/** Usage limits keyed by feature for every tier. */
+export type TierFeatureLimits = Record<
+    TierLimitedFeature,
+    Record<Tier, number>
+>;
+
+/** Centralized tier configuration consumed by domain and application gates. */
+export interface TierConfig {
+    limits: TierFeatureLimits;
+    timeframes: Record<Tier, readonly Timeframe[]>;
+    infoDepth: Record<Tier, readonly TierInfoDepth[]>;
+    models: Record<Tier, readonly TierModel[]>;
+    featureFlags: {
+        enableTierRestrictions: boolean;
+    };
+}
+
+/** Request-scoped user tier data for server middleware and handlers. */
+export interface UserTierContext {
+    userId: string | null;
+    tier: Tier;
+}
+
 // ─── Backtesting ──────────────────────────────────────────────────────────────
 
 /** Internal: backtest signal outcome. */

@@ -158,6 +158,18 @@ export {
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
 
+// Tier gating
+export {
+    DEFAULT_TIER,
+    TIER_CONFIG,
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
+
 // Ticker validation utilities
 export {
     deduplicateResults,
@@ -411,6 +423,13 @@ export type {
 // Domain types
 export type {
     Timeframe,
+    Tier,
+    TierConfig,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,
