@@ -137,7 +137,10 @@ export {
 } from './domain/analysis/normalizePrimitives';
 export { extendTrendline } from './domain/analysis/trendline';
 export { postProcessAnalysisWithReconcile } from './domain/analysis/ai-levels';
-export { clusterKeyLevels, validateKeyLevels } from './domain/analysis/keyLevels';
+export {
+    clusterKeyLevels,
+    validateKeyLevels,
+} from './domain/analysis/keyLevels';
 export {
     extractReconciledActionLines,
     validateActionPrices,

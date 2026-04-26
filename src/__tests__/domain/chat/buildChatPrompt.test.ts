@@ -165,6 +165,76 @@ describe('buildChatPrompt 함수는', () => {
                 'Head and Shoulders (bearish)'
             );
         });
+
+        it('분석과 연결된 가격대 후속 질문을 허용하도록 지시한다', () => {
+            const result = buildChatPrompt(
+                'PLTR',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                [],
+                '138까지 내려가면 어떻게해?'
+            );
+            expect(result.systemPrompt).toContain(
+                'You MAY answer follow-up questions when they are clearly connected to this analysis'
+            );
+            expect(result.systemPrompt).toContain(
+                'a price level, support/resistance, target, stop, trend, risk, signal, pattern, indicator, or scenario mentioned in the analysis'
+            );
+        });
+
+        it('이전 답변에서 나온 개념 확장 질문을 허용하도록 지시한다', () => {
+            const history = [
+                {
+                    role: 'model' as const,
+                    content: '추세가 바뀌려면 더 강한 신호가 필요해 보여요.',
+                },
+            ];
+            const result = buildChatPrompt(
+                'PLTR',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                history,
+                '강한 신호는 어떻게 포착해?'
+            );
+            expect(result.systemPrompt).toContain(
+                'a concept that appeared in your previous answer in this conversation'
+            );
+            expect(result.systemPrompt).toContain(
+                'Do not refuse a question only because the exact wording is absent from the report'
+            );
+        });
+
+        it('분석 맥락 설명을 위한 일반 기술적 분석 지식 활용을 허용한다', () => {
+            const result = buildChatPrompt(
+                'PLTR',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                [],
+                '추세 전환 신호는 보통 어떻게 확인해?'
+            );
+            expect(result.systemPrompt).toContain(
+                'general technical-analysis knowledge needed to explain what the analysis means or how to monitor a related signal'
+            );
+            expect(result.systemPrompt).toContain(
+                "clearly connect it back to PLTR's provided analysis"
+            );
+        });
+
+        it('무관한 종목과 개인 포트폴리오 조언은 계속 거절하도록 지시한다', () => {
+            const result = buildChatPrompt(
+                'PLTR',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                [],
+                'TSLA랑 내 포트폴리오는 어떻게 할까?'
+            );
+            expect(result.systemPrompt).toContain(
+                'other stocks, unrelated macro topics, personal portfolio advice'
+            );
+            expect(result.systemPrompt).toContain(
+                '이 분석 결과와 관련된 질문만 답변할 수 있어요.'
+            );
+        });
     });
 
     describe('messages를', () => {
