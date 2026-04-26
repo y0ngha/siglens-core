@@ -1,0 +1,127 @@
+# domain/
+
+Pure business logic layer. Zero I/O, zero side effects, zero external dependencies.
+
+## Responsibility
+
+This layer owns all calculation logic: technical indicators, candle pattern detection,
+chart pattern analysis, signal detection, and prompt construction.
+If it can be expressed as a pure function, it belongs here.
+
+## Dependency Rules
+
+```
+domain ← NO external imports (npm packages, AI libraries, technical-indicator libs, etc.)
+         NO imports from infrastructure/ or application/
+         NO Date.now(), fetch, console.*, process.env
+         Pure TypeScript only
+```
+
+**Allowed imports inside domain/:**
+- Other files within `domain/` (e.g. `domain/types.ts`, peer files in same sub-folder)
+- Node built-in types that are purely type-level (no runtime I/O)
+
+**Prohibited:**
+```typescript
+// ❌ External library
+import { RSI } from 'technicalindicators';
+
+// ❌ Infrastructure import
+import { redisCache } from '@/infrastructure/cache/redis';
+
+// ❌ Side effects
+const now = Date.now();
+console.log(closes);
+const key = process.env.API_KEY;
+```
+
+## Coding Rules
+
+**Functions must be pure:** same input → same output, no side effects.
+
+**Immutability:** never mutate input arguments.
+```typescript
+// ❌ bars.push(bar)      ✅ [...bars, bar]
+// ❌ bar.close = 100     ✅ { ...bar, close: 100 }
+// ❌ arr.sort()          ✅ arr.toSorted()
+// ❌ arr.reverse()       ✅ arr.toReversed()
+```
+
+**Types live in `domain/types.ts`**, not in individual implementation files.
+```typescript
+// ❌ Define MACDResult inside macd.ts
+// ✅ Define MACDResult in domain/types.ts, import it in macd.ts
+```
+
+**No hardcoded literals:** extract to constants files.
+```typescript
+// ❌ period = 14
+// ✅ period = RSI_DEFAULT_PERIOD  (domain/indicators/constants.ts or domain/constants/)
+```
+
+**Null for uninitialized periods:**
+```typescript
+// Initial period values must be null, not 0 or undefined
+const result: (number | null)[] = new Array(period - 1).fill(null);
+```
+
+**Exported functions must declare explicit return types:**
+```typescript
+export function calculateRSI(closes: number[], period: number): (number | null)[] { ... }
+```
+
+**Named interfaces over inline return types:**
+```typescript
+// ❌ function compute(): { gain: number; loss: number } { ... }
+// ✅ interface GainLoss { gain: number; loss: number }
+//    function compute(): GainLoss { ... }
+```
+
+## Lazy Evaluation
+
+Use generator pipelines for large datasets (1,000+ Bar records, multi-stage transforms).
+
+```typescript
+// ✅ Define lazy pipeline; materialize only at the final step
+function* slidingWindow<T>(items: T[], size: number): Generator<T[]> {
+    for (let i = 0; i + size <= items.length; i++) {
+        yield items.slice(i, i + size);
+    }
+}
+```
+
+**Rule:** generator pipeline definitions belong in `domain/`. Materialization (spread / `Array.from`)
+happens only as the last step inside the exported function.
+
+## Performance Exceptions
+
+A `for` loop with a local mutable accumulator is allowed when `reduce + spread` causes O(N²):
+- All three conditions must hold: pure contract, no mutation of inputs, returned array is immutable to callers.
+
+```typescript
+// ✅ O(N) accumulator pattern (state-machine indicators)
+const results: Result[] = new Array(bars.length);
+let state = initialState;
+for (let i = 0; i < bars.length; i++) {
+    const { state: next, result } = nextStep(state, bars[i]);
+    results[i] = result;
+    state = next;
+}
+return results;
+```
+
+## Testing
+
+- Coverage target: **100% branch coverage** (required).
+- Test file location: `src/__tests__/domain/<sub-folder>/<file>.test.ts`
+- No mocks needed — pure functions are trivially testable with direct inputs.
+
+Required cases for period-based indicators:
+
+| Case | description |
+|------|-------------|
+| Empty array | returns empty array |
+| Input shorter than period | returns all-null array |
+| Initial null range | first `period - 1` values are null |
+| Valid value range | values from index `period - 1` onward are non-null numbers |
+| Calculation accuracy | first computed value matches the spec |
