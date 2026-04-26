@@ -1,7 +1,10 @@
-import { AlpacaProvider } from './alpaca';
-import { readMarketProviderType } from './config';
-import { FmpProvider } from './fmp';
-import type { MarketDataProvider, MarketDataProviderType } from './types';
+import { AlpacaProvider } from '@/infrastructure/market/alpaca';
+import { readMarketProviderType } from '@/infrastructure/market/config';
+import { FmpProvider } from '@/infrastructure/market/fmp';
+import type {
+    MarketDataProvider,
+    MarketDataProviderType,
+} from '@/infrastructure/market/types';
 
 const MARKET_PROVIDER_MAP: Record<
     MarketDataProviderType,

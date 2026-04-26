@@ -1,7 +1,10 @@
-import type { Bar, MarketQuote } from '@/domain/types';
 import { MS_PER_SECOND } from '@/domain/constants/time';
-import { readAlpacaConfig } from './config';
-import type { GetBarsOptions, MarketDataProvider } from './types';
+import type { Bar, MarketQuote } from '@/domain/types';
+import { readAlpacaConfig } from '@/infrastructure/market/config';
+import type {
+    GetBarsOptions,
+    MarketDataProvider,
+} from '@/infrastructure/market/types';
 
 const BASE_URL = 'https://data.alpaca.markets/v2';
 
