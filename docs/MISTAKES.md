@@ -66,6 +66,8 @@ and have been removed from this file.
    → When replacing implementations, renaming patterns, or moving code, update the names
    ❌ fetchBars (no longer a fetch — now reads from cache)
    ✅ loadBars (accurate to new implementation)
+   → Also applies when external dependencies are removed: submitAnalysisAction + pollAnalysisAction are no longer Next.js server actions, should be renamed
+   ✅ submitAnalysis + pollAnalysis when migrated to general infrastructure layer
 
 10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
@@ -414,8 +416,12 @@ and have been removed from this file.
    → This enables consumers and tests to reference the interface independently of implementation
    ❌ interface JobRedisClient { ... } defined in jobs/redis.ts
    ❌ interface CallGeminiWithKeyFallbackOptions { ... } defined in gemini.ts
+   ❌ type AcquireReanalyzeCooldownResult { ... } defined in reanalyzeCooldown.ts
+   ❌ type CachedBriefingData { ... } defined in domain/types.ts (infra concern, should be in infrastructure/cache/types.ts)
    ✅ interface JobRedisClient { ... } in jobs/types.ts; jobs/redis.ts imports and implements against it
    ✅ interface UpstashEnvConfig { ... } in cache/types.ts (shared across cache/redis.ts and jobs/redis.ts)
+   ✅ type AcquireReanalyzeCooldownResult { ... } in infrastructure/market/types.ts; reanalyzeCooldown.ts imports it
+   ✅ type CachedBriefingData { ... } in infrastructure/cache/types.ts; application/market imports from infra, not domain
 
 5. Infrastructure module re-exporting domain symbols
    → Infrastructure modules must not act as transit paths for domain exports
