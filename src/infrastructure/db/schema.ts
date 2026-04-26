@@ -16,6 +16,11 @@ import {
     USER_TIER_VALUES,
 } from './constants';
 
+const EMAIL_MAX_LENGTH = 320;
+const SYMBOL_MAX_LENGTH = 32;
+const EXCHANGE_MAX_LENGTH = 32;
+const FMP_SYMBOL_MAX_LENGTH = 64;
+
 /** Postgres enum for user subscription tier. */
 export const userTierEnum = pgEnum('user_tier', USER_TIER_VALUES);
 
@@ -34,7 +39,7 @@ export const oauthProviderEnum = pgEnum(
 /** Registered users — one row per account, keyed by UUID. */
 export const users = pgTable('users', {
     id: uuid('id').primaryKey().defaultRandom(),
-    email: varchar('email', { length: 320 }).notNull().unique(),
+    email: varchar('email', { length: EMAIL_MAX_LENGTH }).notNull().unique(),
     name: text('name'),
     avatarUrl: text('avatar_url'),
     tier: userTierEnum('tier').notNull().default('free'),
@@ -113,10 +118,10 @@ export const oauthAccounts = pgTable(
 
 /** Korean stock ticker metadata — keyed by ticker symbol. */
 export const koreanTickers = pgTable('korean_tickers', {
-    symbol: varchar('symbol', { length: 32 }).primaryKey(),
+    symbol: varchar('symbol', { length: SYMBOL_MAX_LENGTH }).primaryKey(),
     koreanName: text('korean_name').notNull(),
     name: text('name').notNull(),
-    exchange: varchar('exchange', { length: 32 }).notNull(),
+    exchange: varchar('exchange', { length: EXCHANGE_MAX_LENGTH }).notNull(),
     exchangeFullName: text('exchange_full_name').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
         .notNull()
@@ -128,10 +133,12 @@ export const koreanTickers = pgTable('korean_tickers', {
 export const assetTranslations = pgTable(
     'asset_translations',
     {
-        symbol: varchar('symbol', { length: 32 }).notNull(),
+        symbol: varchar('symbol', { length: SYMBOL_MAX_LENGTH }).notNull(),
         name: text('name').notNull(),
         koreanName: text('korean_name').notNull(),
-        fmpSymbol: varchar('fmp_symbol', { length: 64 }).notNull(),
+        fmpSymbol: varchar('fmp_symbol', {
+            length: FMP_SYMBOL_MAX_LENGTH,
+        }).notNull(),
         updatedAt: timestamp('updated_at', { withTimezone: true })
             .notNull()
             .defaultNow()
