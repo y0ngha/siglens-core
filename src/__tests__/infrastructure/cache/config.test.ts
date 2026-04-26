@@ -1,15 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import {
-    ANALYSIS_CACHE_TTL,
-    buildAnalysisCacheKey,
-    CACHE_EXPIRY_HOUR_KST,
-    computeEffectiveTtl,
-} from '@/infrastructure/cache/config';
 import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
+import {
+    ANALYSIS_CACHE_TTL,
+    buildAnalysisCacheKey,
+    buildBriefingCacheKey,
+    CACHE_EXPIRY_HOUR_KST,
+    computeEffectiveTtl,
+    ISO_DATE_HOUR_PREFIX_LENGTH,
+    MARKET_BRIEFING_CACHE_TTL,
+} from '@/infrastructure/cache/config';
+import { describe, expect, it } from 'vitest';
 
 describe('cache config constants', () => {
     it('ANALYSIS_CACHE_TTL values', () => {
@@ -23,6 +26,14 @@ describe('cache config constants', () => {
 
     it('CACHE_EXPIRY_HOUR_KST', () => {
         expect(CACHE_EXPIRY_HOUR_KST).toBe(17);
+    });
+
+    it('MARKET_BRIEFING_CACHE_TTL', () => {
+        expect(MARKET_BRIEFING_CACHE_TTL).toBe(SECONDS_PER_HOUR);
+    });
+
+    it('ISO_DATE_HOUR_PREFIX_LENGTH', () => {
+        expect(ISO_DATE_HOUR_PREFIX_LENGTH).toBe(13);
     });
 });
 
@@ -51,5 +62,9 @@ describe('cache key builders', () => {
         expect(buildAnalysisCacheKey('AAPL', '1Hour')).toBe(
             'analysis:AAPL:1Hour'
         );
+    });
+
+    it('buildBriefingCacheKey', () => {
+        expect(buildBriefingCacheKey('1Hour')).toBe('briefing:market:1Hour');
     });
 });

@@ -1,0 +1,55 @@
+import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
+import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
+import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
+import {
+    buildBriefingCacheKey,
+    ISO_DATE_HOUR_PREFIX_LENGTH,
+} from '@/infrastructure/cache/config';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
+import type { CachedBriefingData } from '@/infrastructure/cache/types';
+import { readWorkerConfig } from '@/infrastructure/market/config';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
+
+export async function submitBriefing(
+    data: MarketSummaryData
+): Promise<SubmitBriefingResult> {
+    const now = new Date();
+    const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+    const cacheKey = buildBriefingCacheKey(dateHour);
+
+    const cache = createCacheProvider();
+    if (cache !== null) {
+        try {
+            const cached = await cache.get<CachedBriefingData>(cacheKey);
+            if (cached !== null) {
+                return {
+                    status: 'cached',
+                    briefing: normalizeMarketBriefing(cached.briefing),
+                    generatedAt: cached.generatedAt,
+                };
+            }
+        } catch (error) {
+            console.error('[Briefing/Submit] Cache read failed:', error);
+        }
+    }
+
+    const { workerUrl, workerSecret } = readWorkerConfig();
+
+    const prompt = buildMarketBriefingPrompt(data.indices, data.sectors);
+    const jobId = crypto.randomUUID();
+
+    // fire-and-forget: 에러는 무시하고 caller에게 jobId만 반환한다.
+    fetch(`${workerUrl}/briefing`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Worker-Secret': workerSecret,
+        },
+        body: JSON.stringify({ jobId, prompt }),
+        signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
+    }).catch(error => {
+        console.error('[Briefing/Submit] Worker request failed:', error);
+    });
+
+    return { status: 'submitted', jobId };
+}

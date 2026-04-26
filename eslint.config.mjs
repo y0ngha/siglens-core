@@ -30,5 +30,25 @@ export default tseslint.config(
                 },
             ],
         },
+    },
+    // domain은 infrastructure, application을 import할 수 없다
+    {
+        files: ['src/domain/**/*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                { patterns: ['@/infrastructure/*', '@/application/*'] },
+            ],
+        },
+    },
+    // infrastructure는 application을 import할 수 없다
+    {
+        files: ['src/infrastructure/**/*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                { patterns: ['@/application/*'] },
+            ],
+        },
     }
 );

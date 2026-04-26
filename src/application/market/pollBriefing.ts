@@ -1,0 +1,69 @@
+import type {
+    MarketBriefingResponse,
+    PollBriefingResult,
+} from '@/domain/types';
+import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
+import {
+    buildBriefingCacheKey,
+    ISO_DATE_HOUR_PREFIX_LENGTH,
+    MARKET_BRIEFING_CACHE_TTL,
+} from '@/infrastructure/cache/config';
+import {
+    cleanupJob,
+    getJobError,
+    getJobResult,
+    getJobStatus,
+} from '@/infrastructure/jobs/queue';
+
+export async function pollBriefing(jobId: string): Promise<PollBriefingResult> {
+    const status = await getJobStatus(jobId);
+
+    if (status === null || status === 'processing') {
+        return { status: 'processing' };
+    }
+
+    if (status === 'error') {
+        const error = await getJobError(jobId);
+        cleanupJob(jobId).catch(e =>
+            console.warn('[Briefing/Poll] cleanupJob failed:', e)
+        );
+        return { status: 'error', error: error ?? 'Unknown error' };
+    }
+
+    // status === 'done'
+    const raw = await getJobResult(jobId);
+    if (!raw) {
+        cleanupJob(jobId).catch(e =>
+            console.warn('[Briefing/Poll] cleanupJob failed:', e)
+        );
+        return { status: 'error', error: 'Result not found' };
+    }
+
+    const briefing: MarketBriefingResponse = normalizeMarketBriefing(raw);
+
+    if (!briefing.summary) {
+        cleanupJob(jobId).catch(e =>
+            console.warn('[Briefing/Poll] cleanupJob failed:', e)
+        );
+        return { status: 'error', error: 'Invalid briefing result' };
+    }
+
+    const now = new Date();
+    const generatedAt = now.toISOString();
+    const dateHour = generatedAt.slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+    const cacheKey = buildBriefingCacheKey(dateHour);
+    const cache = createCacheProvider();
+    if (cache !== null) {
+        cache
+            .set(cacheKey, { briefing, generatedAt }, MARKET_BRIEFING_CACHE_TTL)
+            .catch(err =>
+                console.error('[Briefing/Poll] Cache write failed:', err)
+            );
+    }
+
+    cleanupJob(jobId).catch(e =>
+        console.warn('[Briefing/Poll] cleanupJob failed:', e)
+    );
+    return { status: 'done', briefing, generatedAt };
+}

@@ -1,0 +1,90 @@
+import { MS_PER_SECOND } from '@/domain/constants/time';
+import type { Bar, MarketQuote } from '@/domain/types';
+import { readAlpacaConfig } from '@/infrastructure/market/config';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
+import type {
+    GetBarsOptions,
+    MarketDataProvider,
+} from '@/infrastructure/market/types';
+
+const BASE_URL = 'https://data.alpaca.markets/v2';
+
+interface AlpacaBar {
+    t: string; // timestamp (RFC3339)
+    o: number; // open
+    h: number; // high
+    l: number; // low
+    c: number; // close
+    v: number; // volume
+}
+
+interface AlpacaBarsRawResponse {
+    bars?: AlpacaBar[];
+}
+
+function toAlpacaBar(raw: AlpacaBar): Bar {
+    return {
+        time: Math.floor(new Date(raw.t).getTime() / MS_PER_SECOND),
+        open: raw.o,
+        high: raw.h,
+        low: raw.l,
+        close: raw.c,
+        volume: raw.v,
+    };
+}
+
+export class AlpacaProvider implements MarketDataProvider {
+    private readonly apiKey: string;
+    private readonly secretKey: string;
+
+    constructor() {
+        const { apiKey, secretKey } = readAlpacaConfig();
+        this.apiKey = apiKey;
+        this.secretKey = secretKey;
+    }
+
+    async getBars(options: GetBarsOptions): Promise<Bar[]> {
+        const { symbol, timeframe, limit = 500, before, from } = options;
+
+        const params = new URLSearchParams({
+            timeframe,
+            limit: String(limit),
+            adjustment: 'raw',
+            feed: 'iex',
+        });
+
+        if (before !== undefined) {
+            params.set('end', before);
+        }
+
+        if (from !== undefined) {
+            params.set('start', from);
+        }
+
+        const url = `${BASE_URL}/stocks/${symbol}/bars?${params}`;
+
+        const res = await fetch(url, {
+            headers: {
+                'APCA-API-KEY-ID': this.apiKey,
+                'APCA-API-SECRET-KEY': this.secretKey,
+            },
+            signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT), // 30초 타임아웃
+        });
+
+        if (!res.ok) {
+            throw new Error(
+                `Alpaca API error: ${res.status} ${res.statusText}`
+            );
+        }
+
+        // res.json() returns unknown; asserting shape against Alpaca API contract
+        const raw = (await res.json()) as AlpacaBarsRawResponse;
+
+        return (raw.bars ?? []).map(r => toAlpacaBar(r));
+    }
+
+    // AlpacaProvider는 quote 엔드포인트를 지원하지 않음 — FmpProvider 전용 기능
+    async getQuote(_symbol: string): Promise<MarketQuote | null> {
+        return null;
+    }
+}

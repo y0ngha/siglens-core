@@ -89,12 +89,28 @@ and have been removed from this file.
     ✅ const CACHE_EXPIRY_HOUR_KST = 17; function computeSecondsUntilCacheExpiry() { ... }
     ✅ const PRICE_DECIMAL_FACTOR = 100; Math.round(rawPrice * PRICE_DECIMAL_FACTOR) / PRICE_DECIMAL_FACTOR
 
-14. Domain functions using imperative for-loop + push instead of higher-order functions
-    → Domain functions must use map, filter, flatMap, reduce — never direct mutation with push/splice
+14. Defaulting to imperative for-loop + push when a higher-order function is equally readable and efficient
+    → Prefer map, filter, flatMap, reduce for straightforward one-item → one-result transformations
+    → for-loop + push is acceptable when:
+      · The functional equivalent would increase time complexity (see #14.5 — spread inside flatMap/reduce causes O(N²))
+      · Conditional multi-push per iteration makes flatMap + spread harder to read without measurable clarity gain
     ❌ const result = []; for (const item of data) { result.push(transform(item)); } return result;
+       → replace with data.map(transform); no complexity difference, declarative wins
     ✅ const result = data.map(transform); return result;
-    ❌ const lines = []; for (const rec of reconciled) { lines.push(...extractLines(rec)); } return lines;
-    ✅ const lines = reconciled.flatMap(extractLines); return lines;
+    ✅ const result: T[] = [];
+       for (let i = period; i < n - period; i++) {
+           if (bars[i].high === winMax[i]) result.push({ type: 'high', ... });
+           if (bars[i].low  === winMin[i]) result.push({ type: 'low',  ... });
+       }
+       → each iteration conditionally appends 0–2 items; flatMap + spread equivalent adds intermediate arrays without clarity gain
+
+14.5. Reduce + spread operator causing O(N²) array accumulation
+    → When reducing values into an array, use pre-allocated array + for loop or for loop + push, NOT reduce + spread
+    → Applies to sliding windows, EMA calculations, and any cumulative sequence building
+    ❌ reduce((acc, val) => [...acc, transform(val)], [])  // O(N²) — new array copied each iteration
+    ❌ .slice().map() inside reduce — recomputes slice for each reduction step
+    ✅ const result = []; for (const val of values) { result.push(transform(val)); } return result;
+    ✅ Use pre-allocated typed array for performance-critical indicators (ATR, EMA, MA)
 
 15. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <100% branches
     → Every new domain / infrastructure function must have dedicated unit tests with 100% branch coverage
@@ -169,6 +185,11 @@ and have been removed from this file.
    ✅ // Object.keys widens to string[], but SKILL_STAT_CONFIG: Record<SkillType, …> guarantees keys
       const SKILL_TYPES = Object.keys(SKILL_STAT_CONFIG) as SkillType[];  // TS limitation, not runtime risk
    → Mandatory: every safe-cast `as` must be accompanied by a comment explaining the guarantee.
+   ⚠️  Test file exception: `as` casts in `*.test.ts` files (e.g. test stubs typed with
+      `as unknown as SomeType`, `vi.fn() as Mock<...>`) do NOT require a comment.
+      Test stubs intentionally implement only the subset of an interface exercised by the test;
+      adding a comment to every stub cast adds noise without safety value.
+      ✅ `}) as unknown as Dirent;` — no comment needed in test files
 ```
 
 ---

@@ -13,7 +13,7 @@
     },
     "packageManager": "yarn@4.12.0",
     "scripts": {
-        "build": "tsc && tsc-alias",
+        "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
@@ -46,6 +46,7 @@
         "@upstash/redis": "^1.37.0",
         "@vitest/coverage-v8": "^2.1.0",
         "eslint": "^9.18.0",
+        "husky": "^9.1.7",
         "prettier": "^3.4.0",
         "release-it": "^19.2.4",
         "tsc-alias": "^1.8.10",
