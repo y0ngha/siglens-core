@@ -22,6 +22,16 @@ UPSTASH_REDIS_REST_URL=             # Upstash Redis REST URL
 UPSTASH_REDIS_REST_TOKEN=           # master 토큰 (읽기/쓰기)
 UPSTASH_REDIS_REST_READONLY_TOKEN=  # readonly 토큰 (없으면 master 사용)
 
+# Market Data Provider (선택 — 기본값 fmp)
+MARKET_DATA_PROVIDER=fmp            # fmp | alpaca
+FMP_API_KEY=                        # MARKET_DATA_PROVIDER=fmp 시 필수
+ALPACA_API_KEY=                     # MARKET_DATA_PROVIDER=alpaca 시 필수
+ALPACA_API_SECRET=                  # MARKET_DATA_PROVIDER=alpaca 시 필수
+
+# Worker (선택 — submitAnalysis 시 외부 worker에 위임할 때만)
+WORKER_URL=                         # worker 엔드포인트 URL
+WORKER_SECRET=                      # worker 인증 시크릿
+
 # Neon / PostgreSQL (선택 — DB 레이어가 필요한 호출자에만)
 DATABASE_URL=                       # postgres://user:pass@host/db?sslmode=require
 ```

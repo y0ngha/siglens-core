@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #26 Round 3 | feat/18/infrastructure-market-이전 | 2026-04-26]
+- Violation: `normalize.test.ts` 4개 테스트가 잘못된 필드명으로 null 반환을 toBeDefined()로 허위 통과
+- Rule: MISTAKES.md Tests #13 — 테스트는 구현 코드를 직접 검증; 로컬 재정의나 잘못된 입력으로 tautological 결과 생성 금지
+- Context: normalizePatternSummary/normalizeStrategyResult/normalizeCandlePatternSummary/normalizeIndicatorGuideResult에 잘못된 필드명(name:/pattern:) 사용; not.toBeNull() + 필드 단언으로 교체
+
 ## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `alpaca.ts`, `fmp.ts`, `factory.ts` 생성자/팩토리에서 `process.env` 직접 읽기
 - Rule: MISTAKES.md Infrastructure #4 — env var 읽기는 config 모듈에 집중
@@ -58,10 +63,6 @@
 - Context: `jobs/types.ts`의 `RedisSetOpts`는 `JobRedisClient` 인터페이스 내부 구현 옵션으로 소비자가 직접 사용할 일이 없음; `index.ts` export 블록에서 제거
 
 ## [PR #24 Round 5 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
-- Violation: `jobs/redis.ts`가 `cache/config.ts`에서 `readUpstashConfig`를 직접 import — 인프라 모듈 간 교차 의존
-- Rule: MISTAKES.md Architecture #3 — 각 infrastructure 모듈은 하나의 외부 시스템만 담당; 모듈 간 조율은 소비자 레이어에서
-- Context: `cache/config.ts`에 배치했던 `readUpstashConfig`를 `infrastructure/upstash/config.ts`로 이동; `cache/redis.ts`와 `jobs/redis.ts` 모두 공유 모듈에서 직접 import하도록 수정
-
 - Violation: `GeminiContents` 타입에 `{ role: string; parts: Array<{ text: string }> }` 중첩 익명 객체 타입 인라인 정의
 - Rule: MISTAKES.md TypeScript #5 — 반복되거나 재사용 가능한 타입 패턴은 named type alias로 추출
 - Context: `infrastructure/ai/types.ts`에서 `GeminiPart`, `GeminiContent` named interface로 추출
