@@ -136,4 +136,14 @@ describe('getAssetInfo', () => {
         const result = await getAssetInfo('AAPL');
         expect(result).toEqual({ symbol: 'AAPL', name: 'Apple Inc.' });
     });
+
+    it('번역 결과에 symbol 이 없으면 setKoreanTickers 를 호출하지 않는다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        searchBySymbolMock.mockResolvedValue([apple]);
+        getKoreanNamesMock.mockResolvedValue({});
+        translateCompanyNamesMock.mockResolvedValue({});
+        await getAssetInfo('AAPL');
+        await Promise.resolve();
+        expect(setKoreanTickersMock).not.toHaveBeenCalled();
+    });
 });
