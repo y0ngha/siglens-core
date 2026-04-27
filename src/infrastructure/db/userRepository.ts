@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
 import { users } from './schema';
-import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
@@ -8,7 +7,9 @@ import type {
     EmailAuthUserRepository,
     UserRepository,
 } from '@/infrastructure/auth/types';
+import type { SiglensDatabase } from './types';
 
+// Matches schema.ts users.tier .default('free'); update both if the default tier changes.
 const DEFAULT_USER_TIER = 'free';
 
 const authUserColumns = {
@@ -30,6 +31,7 @@ const emailAuthUserColumns = {
  * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
+ * @see {@link UserRepository}
  */
 export class DrizzleUserRepository
     implements UserRepository, EmailAuthUserRepository

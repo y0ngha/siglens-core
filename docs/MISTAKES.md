@@ -444,4 +444,16 @@ and have been removed from this file.
       // → consumers never use this; breaks when Upstash API changes
    ✅ Remove internal constants/types from src/index.ts export blocks
    ✅ Only export interfaces and functions consumers explicitly call (e.g., JobQueue, SkillsProvider)
+
+7. Tier 3 (factories/config) and Tier 4 (public types/constants) mixed in a single export block
+   → src/index.ts must separate Tier 3 export blocks (factories, config, providers) from Tier 4 (schema objects, enums, constant arrays)
+   → When adding new Tier 3 symbols (e.g. DrizzleUserRepository) to an existing export block, re-split if that block contains any Tier 4 symbols
+   ❌ // src/index.ts — single export mixes factory (DrizzleUserRepository) with schema (users, sessions)
+      export { DrizzleUserRepository, users, sessions, USER_TIER_VALUES } from '@/infrastructure/db'
+   ❌ // Adding new Tier 3 to existing block without splitting schema/constants to Tier 4
+      export { createDatabaseClient, DrizzleUserRepository, assetTranslations, USER_TIER_VALUES }
+   ✅ // Tier 3: Factories & Config
+      export { createDatabaseClient, DrizzleUserRepository } from '@/infrastructure/db'
+      // Tier 4: Database schema & constants
+      export { users, sessions, assetTranslations, USER_TIER_VALUES } from '@/infrastructure/db'
 ```
