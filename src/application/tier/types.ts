@@ -1,4 +1,4 @@
-import type { Tier, UserTierContext } from '@/domain/types';
+import type { Tier } from '@/domain/types';
 import type { UserTierRepository } from '@/infrastructure/db';
 
 /** Input for looking up a user's persisted tier. */
@@ -42,6 +42,3 @@ export interface SetUserTierError {
 export type SetUserTierResult =
     | { ok: true; userId: string; tier: Tier }
     | { ok: false; error: SetUserTierError };
-
-/** Request-scoped tier context returned to middleware/server helpers. */
-export type CreateUserTierContextResult = UserTierContext;

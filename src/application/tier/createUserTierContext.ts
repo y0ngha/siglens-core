@@ -1,9 +1,6 @@
 import { DEFAULT_TIER } from '@/domain/tier';
-import type {
-    CreateUserTierContextInput,
-    CreateUserTierContextResult,
-    UserTierDependencies,
-} from './types';
+import type { UserTierContext } from '@/domain/types';
+import type { CreateUserTierContextInput, UserTierDependencies } from './types';
 
 /**
  * Build request-scoped tier context for middleware/server handlers.
@@ -28,7 +25,7 @@ import type {
 export async function createUserTierContext(
     input: CreateUserTierContextInput,
     dependencies: UserTierDependencies
-): Promise<CreateUserTierContextResult> {
+): Promise<UserTierContext> {
     const userId = input.userId ?? null;
     const tier =
         userId === null

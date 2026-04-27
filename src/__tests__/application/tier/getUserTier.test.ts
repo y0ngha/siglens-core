@@ -1,28 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getUserTier } from '@/application/tier';
-import type { UserTierRepository } from '@/infrastructure/db';
-
-function makeRepository(
-    tier: Awaited<ReturnType<UserTierRepository['getUserTier']>>
-): {
-    repository: UserTierRepository;
-    getUserTierMock: ReturnType<typeof vi.fn>;
-} {
-    const getUserTierMock = vi.fn().mockResolvedValue(tier);
-    const updateUserTier = vi.fn().mockResolvedValue(null);
-
-    return {
-        repository: {
-            getUserTier: getUserTierMock,
-            updateUserTier,
-        },
-        getUserTierMock,
-    };
-}
+import { makeUserTierRepositoryMock } from './helpers';
 
 describe('getUserTier', () => {
     it('returns the persisted user tier', async () => {
-        const { repository, getUserTierMock } = makeRepository('pro');
+        const { repository, getUserTierMock } = makeUserTierRepositoryMock({
+            getUserTier: 'pro',
+        });
 
         const result = await getUserTier(
             { userId: 'user-1' },
@@ -34,7 +18,7 @@ describe('getUserTier', () => {
     });
 
     it('falls back to free when the user is missing', async () => {
-        const { repository, getUserTierMock } = makeRepository(null);
+        const { repository, getUserTierMock } = makeUserTierRepositoryMock();
 
         const result = await getUserTier(
             { userId: 'missing-user' },

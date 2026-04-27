@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
-import { oauthAccounts, users } from './schema';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { Tier } from '@/domain/types';
+import { oauthAccounts, users } from './schema';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,

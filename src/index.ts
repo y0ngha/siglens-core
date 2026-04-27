@@ -412,7 +412,6 @@ export type {
 } from './application/auth';
 export type {
     CreateUserTierContextInput,
-    CreateUserTierContextResult,
     GetUserTierInput,
     SetUserTierError,
     SetUserTierErrorCode,

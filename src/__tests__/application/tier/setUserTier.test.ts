@@ -1,28 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { setUserTier } from '@/application/tier';
-import type { UserTierRepository } from '@/infrastructure/db';
-
-function makeRepository(
-    tier: Awaited<ReturnType<UserTierRepository['updateUserTier']>>
-): {
-    repository: UserTierRepository;
-    updateUserTierMock: ReturnType<typeof vi.fn>;
-} {
-    const getUserTier = vi.fn().mockResolvedValue(null);
-    const updateUserTierMock = vi.fn().mockResolvedValue(tier);
-
-    return {
-        repository: {
-            getUserTier,
-            updateUserTier: updateUserTierMock,
-        },
-        updateUserTierMock,
-    };
-}
+import { makeUserTierRepositoryMock } from './helpers';
 
 describe('setUserTier', () => {
     it('updates a user tier for admin workflows', async () => {
-        const { repository, updateUserTierMock } = makeRepository('pro');
+        const { repository, updateUserTierMock } = makeUserTierRepositoryMock({
+            updateUserTier: 'pro',
+        });
 
         const result = await setUserTier(
             { userId: 'user-1', tier: 'pro' },
@@ -34,7 +18,7 @@ describe('setUserTier', () => {
     });
 
     it('returns a not-found error when the target user does not exist', async () => {
-        const { repository, updateUserTierMock } = makeRepository(null);
+        const { repository, updateUserTierMock } = makeUserTierRepositoryMock();
 
         const result = await setUserTier(
             { userId: 'missing-user', tier: 'member' },

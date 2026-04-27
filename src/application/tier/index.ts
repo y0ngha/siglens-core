@@ -3,7 +3,6 @@ export { getUserTier } from './getUserTier';
 export { setUserTier } from './setUserTier';
 export type {
     CreateUserTierContextInput,
-    CreateUserTierContextResult,
     GetUserTierInput,
     SetUserTierError,
     SetUserTierErrorCode,
