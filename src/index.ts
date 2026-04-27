@@ -31,6 +31,8 @@ export {
 
 // Auth
 export {
+    deleteAccount,
+    findUserBySessionToken,
     loginUser,
     logoutUser,
     registerUser,
@@ -274,6 +276,12 @@ export {
     DrizzleUserRepository,
 } from './infrastructure/db';
 
+// Password adapters
+export {
+    bcryptPasswordHasher,
+    bcryptPasswordVerifier,
+} from './infrastructure/auth';
+
 // Job queue (worker-side primitives)
 export {
     setJobMeta,
@@ -443,6 +451,14 @@ export type {
 export type {
     AuthSessionCookie,
     AuthSessionOptions,
+    DeleteAccountDependencies,
+    DeleteAccountError,
+    DeleteAccountErrorCode,
+    DeleteAccountInput,
+    DeleteAccountOptions,
+    DeleteAccountResult,
+    FindUserBySessionTokenDependencies,
+    FindUserBySessionTokenOptions,
     LoginUserDependencies,
     LoginUserError,
     LoginUserErrorCode,
