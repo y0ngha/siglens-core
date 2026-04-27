@@ -58,13 +58,14 @@ describe('createUserTierContext', () => {
     });
 
     it('falls back to free when an authenticated user is missing', async () => {
-        const { repository } = makeRepository(null);
+        const { repository, getUserTierMock } = makeRepository(null);
 
         const result = await createUserTierContext(
             { userId: 'missing-user' },
             { users: repository }
         );
 
+        expect(getUserTierMock).toHaveBeenCalledWith('missing-user');
         expect(result).toEqual({ userId: 'missing-user', tier: 'free' });
     });
 });

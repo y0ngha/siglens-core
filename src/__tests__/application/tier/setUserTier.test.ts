@@ -34,13 +34,17 @@ describe('setUserTier', () => {
     });
 
     it('returns a not-found error when the target user does not exist', async () => {
-        const { repository } = makeRepository(null);
+        const { repository, updateUserTierMock } = makeRepository(null);
 
         const result = await setUserTier(
             { userId: 'missing-user', tier: 'member' },
             { users: repository }
         );
 
+        expect(updateUserTierMock).toHaveBeenCalledWith(
+            'missing-user',
+            'member'
+        );
         expect(result).toEqual({
             ok: false,
             error: {

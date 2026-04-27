@@ -1,5 +1,4 @@
-import type { Tier } from '@/domain/types';
-import type { UserTierContext } from '@/infrastructure/auth/types';
+import type { Tier, UserTierContext } from '@/domain/types';
 import type { UserTierRepository } from '@/infrastructure/db/types';
 
 /** Input for looking up a user's persisted tier. */

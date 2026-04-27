@@ -1174,6 +1174,12 @@ export interface TierConfig {
     featureFlags: TierFeatureFlags;
 }
 
+/** Request-scoped user tier data for server middleware and handlers. */
+export interface UserTierContext {
+    userId: string | null;
+    tier: Tier;
+}
+
 // ─── Backtesting ──────────────────────────────────────────────────────────────
 
 /** Internal: backtest signal outcome. */

@@ -130,3 +130,12 @@
 - Violation: DB environment readers, cached singleton helpers, and raw `DatabaseClient` wrapper were exposed from the package entrypoint without a consumer-facing need
 - Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
 - Context: kept `createDatabaseClient` as the explicit DB construction entrypoint while removing `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig`, and `DatabaseClient` from `src/index.ts`
+
+## [PR #37 | feat/8/user-tier-system | 2026-04-28]
+- Violation: `UserTierContext` shared interface defined in `infrastructure/auth/types.ts` though it is consumed across application/tier and infrastructure/auth modules
+- Rule: MISTAKES.md Architecture #1 — shared domain types referenced by 2+ files must live in `domain/types.ts`
+- Context: moved `UserTierContext` to `domain/types.ts`, dropped the duplicate definition from `infrastructure/auth/types.ts`, and updated `src/index.ts` to re-export it from the domain block
+
+- Violation: tier use-case "not-found"/fallback test branches asserted only the return value, omitting `toHaveBeenCalledWith` checks present in sibling success branches
+- Rule: CONVENTIONS.md / FF Cohesion — sibling test branches in the same describe block must apply the same assertion strategy so behavior coverage is symmetric
+- Context: `createUserTierContext` fallback test and `setUserTier` not-found test gained `toHaveBeenCalledWith(...)` assertions on the repository mock to match the success-path tests

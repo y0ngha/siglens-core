@@ -432,11 +432,7 @@ export type {
     SessionRepository,
     UserRepository,
 } from './infrastructure/db';
-export type {
-    PasswordHasher,
-    PasswordVerifier,
-    UserTierContext,
-} from './infrastructure/auth';
+export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 
 // Domain types
 export type {
@@ -449,6 +445,7 @@ export type {
     TierInfoDepth,
     TierLimitedFeature,
     TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,
