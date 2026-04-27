@@ -112,6 +112,24 @@ export interface AuthSessionCookie {
 }
 
 /**
+ * Shared session and cookie creation options.
+ */
+export interface AuthSessionOptions {
+    /** Current time used to calculate session expiration; defaults to `new Date()`. */
+    now?: Date;
+    /** Session lifetime in seconds. */
+    sessionTtlSeconds?: number;
+    /** Cookie name; defaults to the library auth session name. */
+    cookieName?: string;
+    /** Whether to mark the cookie secure; defaults to true. */
+    secureCookie?: boolean;
+    /** SameSite policy; defaults to `lax`. */
+    sameSite?: AuthSessionCookie['sameSite'];
+    /** Cookie path; defaults to `/`. */
+    path?: string;
+}
+
+/**
  * Login dependencies injected by the caller.
  */
 export interface LoginUserDependencies {
@@ -126,20 +144,7 @@ export interface LoginUserDependencies {
 /**
  * Login runtime options.
  */
-export interface LoginUserOptions {
-    /** Current time used to calculate session expiration; defaults to `new Date()`. */
-    now?: Date;
-    /** Session lifetime in seconds. */
-    sessionTtlSeconds?: number;
-    /** Cookie name; defaults to the library auth session name. */
-    cookieName?: string;
-    /** Whether to mark the cookie secure; defaults to true. */
-    secureCookie?: boolean;
-    /** SameSite policy; defaults to `lax`. */
-    sameSite?: AuthSessionCookie['sameSite'];
-    /** Cookie path; defaults to `/`. */
-    path?: string;
-}
+export interface LoginUserOptions extends AuthSessionOptions {}
 
 /**
  * Discriminated union result of a {@link loginUser} call.
@@ -199,20 +204,7 @@ export interface SocialLoginUserDependencies {
 /**
  * OAuth login runtime options.
  */
-export interface SocialLoginUserOptions {
-    /** Current time used to calculate session expiration; defaults to `new Date()`. */
-    now?: Date;
-    /** Session lifetime in seconds. */
-    sessionTtlSeconds?: number;
-    /** Cookie name; defaults to the library auth session name. */
-    cookieName?: string;
-    /** Whether to mark the cookie secure; defaults to true. */
-    secureCookie?: boolean;
-    /** SameSite policy; defaults to `lax`. */
-    sameSite?: AuthSessionCookie['sameSite'];
-    /** Cookie path; defaults to `/`. */
-    path?: string;
-}
+export interface SocialLoginUserOptions extends AuthSessionOptions {}
 
 /**
  * Discriminated union result of a {@link socialLoginUser} call.

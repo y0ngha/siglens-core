@@ -1,4 +1,9 @@
 import {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+} from '@/infrastructure/db/constants';
+import {
     assetTranslations,
     koreanTickers,
     oauthAccounts,
@@ -18,18 +23,18 @@ const columnNames = (table: Parameters<typeof getTableColumns>[0]): string[] =>
 
 describe('database enums', () => {
     it('defines user tier values', () => {
-        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
     });
 
     it('defines usage action type values', () => {
-        expect(usageActionTypeEnum.enumValues).toEqual(['analysis', 'chatbot']);
+        expect(usageActionTypeEnum.enumValues).toEqual([
+            ...USAGE_ACTION_TYPE_VALUES,
+        ]);
     });
 
     it('defines OAuth provider values', () => {
         expect(oauthProviderEnum.enumValues).toEqual([
-            'google',
-            'kakao',
-            'apple',
+            ...OAUTH_PROVIDER_VALUES,
         ]);
     });
 });

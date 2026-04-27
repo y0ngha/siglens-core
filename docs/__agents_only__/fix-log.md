@@ -115,3 +115,8 @@
 - Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
 - Rule: MISTAKES.md Predictability #1 — unrelated changes must be moved to a separate PR or reverted
 - Context: the merge accidentally dropped a large block of `export type { ... }` entries from src/index.ts that have nothing to do with the OAuth feature
+
+## [PR #35 | feat/7/social-login | 2026-04-27]
+- Violation: `LoginUserOptions` and `SocialLoginUserOptions` duplicated the same session and cookie option fields instead of sharing a base interface
+- Rule: CONVENTIONS.md TypeScript Rules — related interfaces with shared fields must use `extends`
+- Context: the social-login use case introduced an options interface identical to the existing email-login options shape; extracted `AuthSessionOptions` and had both use-case options extend it

@@ -12,6 +12,7 @@ import type {
     UserRepository,
 } from './types';
 
+// Matches schema.ts users.tier .default('free'); update both if the default tier changes.
 const DEFAULT_USER_TIER = 'free';
 
 class OAuthAccountConflictError extends Error {}

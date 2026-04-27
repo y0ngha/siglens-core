@@ -201,14 +201,12 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 // Database
 export {
     createDatabaseClient,
-    getDatabaseClient,
-    tryGetDatabaseClient,
-    readDatabaseConfig,
-    tryReadDatabaseConfig,
-} from './infrastructure/db';
-export {
     DrizzleSessionRepository,
     DrizzleUserRepository,
+    getDatabaseClient,
+    readDatabaseConfig,
+    tryGetDatabaseClient,
+    tryReadDatabaseConfig,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -375,6 +373,7 @@ export type {
 } from './infrastructure/db';
 export type {
     AuthSessionCookie,
+    AuthSessionOptions,
     LoginUserDependencies,
     LoginUserError,
     LoginUserErrorCode,

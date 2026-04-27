@@ -16,18 +16,24 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extractReconciledActionLines,
     extendTrendline,
+    getDatabaseClient,
     HIGH_CONFIDENCE_WEIGHT,
     loginUser,
     logoutUser,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
+    oauthAccounts,
     postProcessAnalysisWithReconcile,
     readDatabaseConfig,
     registerUser,
     RSI_DEFAULT_PERIOD,
+    sessions,
     socialLoginUser,
+    tryGetDatabaseClient,
+    tryReadDatabaseConfig,
     USAGE_ACTION_TYPE_VALUES,
+    usageLogs,
     users,
     USER_TIER_VALUES,
     userTierEnum,
@@ -80,7 +86,10 @@ describe('public API exports', () => {
 
     it('exports database factory helpers from package entrypoint', () => {
         expect(typeof createDatabaseClient).toBe('function');
+        expect(typeof getDatabaseClient).toBe('function');
+        expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
+        expect(typeof tryReadDatabaseConfig).toBe('function');
     });
 
     it('exports database repository classes from package entrypoint', () => {
@@ -90,6 +99,9 @@ describe('public API exports', () => {
 
     it('exports database schema objects from package entrypoint', () => {
         expect(users.email.name).toBe('email');
+        expect(sessions.userId.name).toBe('user_id');
+        expect(usageLogs.actionType.name).toBe('action_type');
+        expect(oauthAccounts.provider.name).toBe('provider');
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
     });
 
@@ -142,5 +154,26 @@ describe('public API exports', () => {
         expect(oauthRepository).toHaveProperty('findByOAuthAccount');
         expect(sessionRepository).toHaveProperty('createSession');
         expect(passwordVerifier).toHaveProperty('verifyPassword');
+    });
+
+    it('runs logout through the package entrypoint', async () => {
+        const sessionRepository: SessionRepository = {
+            createSession: async input => ({
+                id: 'session-1',
+                userId: input.userId,
+                expiresAt: input.expiresAt,
+                createdAt: new Date('2026-04-26T00:00:00.000Z'),
+            }),
+            deleteSession: async () => true,
+        };
+
+        const logoutResult = await logoutUser(
+            { sessionToken: 'session-1' },
+            { sessions: sessionRepository }
+        );
+
+        expect(logoutResult.ok).toBe(true);
+        expect(logoutResult.sessionInvalidated).toBe(true);
+        expect(logoutResult.cookie).toBeDefined();
     });
 });
