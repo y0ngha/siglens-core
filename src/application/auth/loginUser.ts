@@ -10,10 +10,10 @@ import type {
     EmailAuthUserRecord,
 } from '@/infrastructure/auth/types';
 import {
-    addSeconds,
     createSessionCookie,
     DEFAULT_SESSION_TTL_SECONDS,
 } from './sessionCookie';
+import { addSeconds } from '@/domain/utils/date';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Email or password is incorrect';
 
@@ -39,6 +39,12 @@ function omitPasswordHash(user: EmailAuthUserRecord): AuthUserRecord {
  * Normalizes email before lookup, verifies the supplied password against the
  * stored hash, persists a session, and returns HTTP-only cookie metadata for
  * the caller to attach to the response.
+ *
+ * @param input - Email and plain-text password supplied by the user.
+ * @param dependencies - Repositories and password verifier injected by the caller.
+ * @param options - Runtime overrides for TTL, cookie name, secure flag, and current time.
+ * @returns Discriminated union: `{ ok: true }` with user/session/cookie on success,
+ *   or `{ ok: false }` with `invalid_credentials` error.
  */
 export async function loginUser(
     input: LoginUserInput,

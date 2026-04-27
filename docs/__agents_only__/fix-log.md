@@ -51,10 +51,6 @@
 - Rule: CONVENTIONS.md — every file must end with a newline character
 - Context: Migration SQL file generated without trailing newline; added manually
 
-- Violation: Missing @example and @see JSDoc tags on Tier 1 export registerUser in application/auth/registerUser.ts
-- Rule: CONVENTIONS.md Tier 1 recommended JSDoc tags — @example and @see are recommended for Tier 1 exports to aid IDE hover documentation for library consumers
-- Context: registerUser had @param and @returns but no usage example or cross-references to its dependency injection interfaces
-
 ## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
 - Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
 - Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
@@ -83,3 +79,12 @@
 - Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
 - Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
+
+## [PR #34 Round 2 | feat/6/email-login | 2026-04-27]
+- Violation: Non-re-exported functions (`createSessionCookie`, `createExpiredSessionCookie`, `addSeconds`) exported from `sessionCookie.ts` without `@internal` tag
+- Rule: CONVENTIONS.md — every function exported from a module but not re-exported from `src/index.ts` must carry the `@internal` JSDoc tag
+- Context: Three functions were module-public but library-internal; added `/** @internal */` to each
+
+- Violation: Tier 4 public constants (`AUTH_SESSION_COOKIE_NAME`, `DEFAULT_SESSION_TTL_SECONDS`, `DEFAULT_AUTH_COOKIE_PATH`, `DEFAULT_AUTH_COOKIE_SAME_SITE`) missing JSDoc
+- Rule: CONVENTIONS.md — every symbol exported from `src/index.ts` must carry JSDoc for IDE hover; constants with non-obvious values (e.g. `2592000` = 30 days) especially require it
+- Context: Four session cookie constants were exported without any JSDoc; added single-line descriptions to each

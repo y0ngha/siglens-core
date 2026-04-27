@@ -16,17 +16,25 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extractReconciledActionLines,
     extendTrendline,
+    getDatabaseClient,
     HIGH_CONFIDENCE_WEIGHT,
+    koreanTickers,
     loginUser,
     logoutUser,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
+    oauthAccounts,
+    oauthProviderEnum,
     postProcessAnalysisWithReconcile,
     readDatabaseConfig,
     registerUser,
     RSI_DEFAULT_PERIOD,
+    sessions,
+    tryGetDatabaseClient,
     USAGE_ACTION_TYPE_VALUES,
+    usageActionTypeEnum,
+    usageLogs,
     users,
     USER_TIER_VALUES,
     userTierEnum,
@@ -71,6 +79,8 @@ describe('public API exports', () => {
 
     it('exports database helpers from package entrypoint', () => {
         expect(typeof createDatabaseClient).toBe('function');
+        expect(typeof getDatabaseClient).toBe('function');
+        expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
         expect(typeof registerUser).toBe('function');
         expect(typeof loginUser).toBe('function');
@@ -78,7 +88,17 @@ describe('public API exports', () => {
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
         expect(users.email.name).toBe('email');
+        expect(sessions.userId.name).toBe('user_id');
+        expect(usageLogs.userId.name).toBe('user_id');
+        expect(oauthAccounts.userId.name).toBe('user_id');
+        expect(typeof koreanTickers).toBe('object');
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(usageActionTypeEnum.enumValues).toEqual(['analysis', 'chatbot']);
+        expect(oauthProviderEnum.enumValues).toEqual([
+            'google',
+            'kakao',
+            'apple',
+        ]);
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
         expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);

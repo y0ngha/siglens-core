@@ -11,6 +11,11 @@ import { createExpiredSessionCookie } from './sessionCookie';
  *
  * Returns expired HTTP-only cookie metadata even when no matching persisted
  * session exists, allowing callers to reliably clear the browser cookie.
+ *
+ * @param input - Session token stored in the auth cookie.
+ * @param dependencies - Session repository injected by the caller.
+ * @param options - Runtime overrides for cookie name, secure flag, SameSite, and path.
+ * @returns Result with `sessionInvalidated` flag and expired cookie metadata.
  */
 export async function logoutUser(
     input: LogoutUserInput,

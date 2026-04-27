@@ -213,20 +213,6 @@ export {
     DrizzleSessionRepository,
     DrizzleUserRepository,
 } from './infrastructure/db';
-export {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-    assetTranslations,
-    koreanTickers,
-    oauthAccounts,
-    oauthProviderEnum,
-    sessions,
-    usageActionTypeEnum,
-    usageLogs,
-    users,
-    userTierEnum,
-} from './infrastructure/db';
 
 // Job queue (worker-side primitives)
 export {
@@ -253,6 +239,22 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Database schema & constants
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+    assetTranslations,
+    koreanTickers,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    usageActionTypeEnum,
+    usageLogs,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
 
 // Dashboard tickers / sectors
 export {
@@ -400,6 +402,7 @@ export type {
 
 // Domain types
 export type {
+    AnalysisSignalType,
     Timeframe,
     Bar,
     IndicatorResult,
@@ -449,11 +452,17 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     SignalStrength,
+    BacktestCase,
+    BacktestMeta,
+    BacktestRiskLevel,
     ReconciledActionLevels,
     IndicatorGuideResult,
     KeyLevel,
     KeyLevels,
+    ClusteredKeyLevel,
+    ClusteredKeyLevels,
     KeyPrice,
+    QuadrantKey,
     PriceTarget,
     PriceScenario,
     PriceTargets,
@@ -467,8 +476,15 @@ export type {
     TrendlinePoint,
     ActionRecommendation,
     EntryRecommendation,
+    ReconciledActionLineData,
+    ValidatedActionPrices,
     ChatMessage,
+    ChatActionResult,
+    ChatErrorCode,
+    ChatLoadingPhase,
+    ChatModel,
     ChatPromptPayload,
+    ChatSession,
     MarketIndexData,
     MarketSectorData,
     MarketBriefingResponse,
@@ -484,6 +500,8 @@ export type {
     TickerBase,
     KoreanTickerEntry,
     TickerSearchResult,
+    SkillCounts,
+    SkillShowcaseItem,
     AssetInfo,
     TickerCategory,
     CategoryId,
@@ -505,4 +523,17 @@ export type {
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,
+    LevelSource,
+    ResolvedLevel,
+    ReconcileResult,
+    ReconciledTpEntry,
+    RunAnalysisInput,
+    RawAnalysisResponse,
+    BacktestSignalResult,
+    BacktestAiResult,
+    BacktestExitReason,
+    BacktestAiPriceTarget,
+    BacktestAiEntryRecommendation,
+    BacktestAiAnalysis,
+    BacktestData,
 } from './domain/types';
