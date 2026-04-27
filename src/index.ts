@@ -19,6 +19,15 @@ export { getSectorSignals } from './application/dashboard/sectorSignals';
 // Ticker
 export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
+export type { BackgroundTaskOptions } from './application/types';
+
+// Chat
+export { requestChatCompletion } from './application/chat/requestChatCompletion';
+export {
+    GEMINI_2_5_FLASH_MODEL,
+    GEMINI_2_5_FLASH_LITE_MODEL,
+    VALID_CHAT_MODELS,
+} from './application/chat/constants';
 
 // Auth
 export {
@@ -41,6 +50,43 @@ export {
 
 // Aggregate calculators / detectors
 export { calculateIndicators } from './domain/indicators';
+export {
+    calculateATR,
+    calculateBollinger,
+    calculateBuySellVolume,
+    calculateCCI,
+    calculateCMF,
+    calculateDMI,
+    calculateDonchianChannel,
+    calculateEMA,
+    calculateIchimoku,
+    calculateIchimokuFutureCloud,
+    calculateKeltnerChannel,
+    calculateMA,
+    calculateMACD,
+    calculateMFI,
+    calculateOBV,
+    calculateParabolicSAR,
+    calculateRSI,
+    calculateSmc,
+    calculateSqueezeMomentum,
+    calculateStochastic,
+    calculateStochRSI,
+    calculateSupertrend,
+    calculateVolumeProfile,
+    calculateVWAP,
+    calculateWilliamsR,
+    computeEMAValues,
+    lastNonNull,
+    linreg,
+    rollingHighest,
+    rollingLowest,
+    slidingMax,
+    slidingMin,
+    sma,
+    stdDev,
+    typicalPrice,
+} from './domain/indicators';
 export { classifyTrend, detectSignals } from './domain/signals';
 
 // Prompt builders
@@ -207,6 +253,14 @@ export { createMarketDataProvider } from './infrastructure/market/factory';
 export { callGeminiWithKeyFallback } from './infrastructure/ai/gemini';
 export { AI_SYSTEM_PROMPT } from './infrastructure/ai/utils';
 
+// Chat token store
+export {
+    CHAT_TOKEN_LIMIT,
+    CHAT_TOKEN_TTL_SEC,
+    createChatTokenStore,
+    hashClientIp,
+} from './infrastructure/chat/tokenStore';
+
 // Skills loader
 export { FileSkillsLoader } from './infrastructure/skills/loader';
 
@@ -362,6 +416,7 @@ export {
 
 // Infrastructure interfaces
 export type { CacheProvider } from './infrastructure/cache/types';
+export type { ChatTokenStore } from './infrastructure/chat/types';
 export type { SkillsProvider } from './infrastructure/skills/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
@@ -432,6 +487,13 @@ export type {
     UserRepository,
 } from './infrastructure/db';
 export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
+
+// Application types
+export type {
+    RequestChatCompletionParams,
+    RequestChatCompletionDependencies,
+    RequestChatCompletionResult,
+} from './application/chat/types';
 
 // Domain types
 export type {
@@ -577,4 +639,5 @@ export type {
     BacktestAiEntryRecommendation,
     BacktestAiAnalysis,
     BacktestData,
+    WaitUntil,
 } from './domain/types';

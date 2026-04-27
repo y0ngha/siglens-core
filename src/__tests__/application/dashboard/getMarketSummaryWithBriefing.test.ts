@@ -1,19 +1,33 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BackgroundTaskOptions } from '@/application/types';
 import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 
 const getMarketSummaryMock = vi.fn<() => Promise<MarketSummaryData>>();
-const submitBriefingMock = vi.fn<() => Promise<SubmitBriefingResult>>();
+const submitBriefingMock =
+    vi.fn<
+        (
+            data?: MarketSummaryData,
+            options?: BackgroundTaskOptions
+        ) => Promise<SubmitBriefingResult>
+    >();
 
 vi.mock('@/application/dashboard/getMarketSummary', () => ({
     getMarketSummary: () => getMarketSummaryMock(),
 }));
 vi.mock('@/application/market/submitBriefing', () => ({
-    submitBriefing: () => submitBriefingMock(),
+    submitBriefing: (
+        data: MarketSummaryData,
+        options?: BackgroundTaskOptions
+    ) => submitBriefingMock(data, options),
 }));
 
 import { getMarketSummaryWithBriefing } from '@/application/dashboard/getMarketSummaryWithBriefing';
 
 describe('getMarketSummaryWithBriefing', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('summary + briefing 을 결합해 반환한다', async () => {
         const summary: MarketSummaryData = {
             indices: [],
@@ -28,5 +42,24 @@ describe('getMarketSummaryWithBriefing', () => {
 
         const result = await getMarketSummaryWithBriefing();
         expect(result).toEqual({ summary, briefing });
+        expect(submitBriefingMock).toHaveBeenCalledWith(summary, undefined);
+    });
+
+    it('waitUntil 옵션을 submitBriefing으로 전달한다', async () => {
+        const summary: MarketSummaryData = {
+            indices: [],
+            sectors: [],
+        };
+        const briefing: SubmitBriefingResult = {
+            status: 'submitted',
+            jobId: 'job-1',
+        };
+        const options: BackgroundTaskOptions = { waitUntil: vi.fn() };
+        getMarketSummaryMock.mockResolvedValue(summary);
+        submitBriefingMock.mockResolvedValue(briefing);
+
+        await getMarketSummaryWithBriefing(options);
+
+        expect(submitBriefingMock).toHaveBeenCalledWith(summary, options);
     });
 });

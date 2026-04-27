@@ -28,6 +28,10 @@ import {
     koreanTickers,
     loginUser,
     logoutUser,
+    requestChatCompletion,
+    createChatTokenStore,
+    GEMINI_2_5_FLASH_MODEL,
+    VALID_CHAT_MODELS,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
@@ -198,5 +202,12 @@ describe('public API exports', () => {
         expect(logoutResult.ok).toBe(true);
         expect(logoutResult.sessionInvalidated).toBe(true);
         expect(logoutResult.cookie).toBeDefined();
+    });
+
+    it('exports chat application and infrastructure entrypoints', () => {
+        expect(typeof requestChatCompletion).toBe('function');
+        expect(typeof createChatTokenStore).toBe('function');
+        expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
+        expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
     });
 });

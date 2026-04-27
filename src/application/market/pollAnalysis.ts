@@ -1,3 +1,5 @@
+import { cleanupInBackground, fireAndForget } from '@/application/background';
+import type { BackgroundTaskOptions } from '@/application/types';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import type {
@@ -11,7 +13,6 @@ import {
     computeEffectiveTtl,
 } from '@/infrastructure/cache/config';
 import {
-    cleanupJob,
     getJobError,
     getJobMeta,
     getJobResult,
@@ -36,6 +37,8 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
  * skill list if it fails.
  *
  * @param jobId - The `jobId` returned by {@link submitAnalysis}.
+ * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
+ *   so Redis cleanup and cache writes can continue after the response.
  * @returns The current poll outcome — see {@link PollAnalysisResult}.
  *
  * @example
@@ -49,7 +52,10 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
  * @see submitAnalysis
  * @see cancelAnalysisJob
  */
-export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
+export async function pollAnalysis(
+    jobId: string,
+    options?: BackgroundTaskOptions
+): Promise<PollAnalysisResult> {
     const status = await getJobStatus(jobId);
 
     if (status === null || status === 'processing') {
@@ -58,9 +64,7 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
 
     if (status === 'error') {
         const error = await getJobError(jobId);
-        cleanupJob(jobId).catch(e =>
-            console.warn('[Poll] cleanupJob failed:', e)
-        );
+        cleanupInBackground(jobId, '[Poll]', options);
         return { status: 'error', error: error ?? 'Unknown error' };
     }
 
@@ -79,9 +83,7 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
             symbol: meta?.symbol,
             timeframe: meta?.timeframe,
         });
-        cleanupJob(jobId).catch(e =>
-            console.warn('[Poll] cleanupJob failed:', e)
-        );
+        cleanupInBackground(jobId, '[Poll]', options);
         return { status: 'error', error: 'Result not found' };
     }
 
@@ -89,9 +91,7 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
     // 캐스트는 필드 존재 확인을 위한 안전한 타입 축소이다.
     const candidate = rawResult as Record<string, unknown>;
     if (!candidate.summary || !candidate.trend || !candidate.riskLevel) {
-        cleanupJob(jobId).catch(e =>
-            console.warn('[Poll] cleanupJob failed:', e)
-        );
+        cleanupInBackground(jobId, '[Poll]', options);
         return { status: 'error', error: 'Invalid response from worker' };
     }
     // summary/trend/riskLevel 필드 확인 통과; submitAnalysis가 JSON.stringify(RawAnalysisResponse)로
@@ -125,15 +125,18 @@ export async function pollAnalysis(jobId: string): Promise<PollAnalysisResult> {
         if (cache !== null) {
             const cacheKey = buildAnalysisCacheKey(meta.symbol, meta.timeframe);
             const ttl = computeEffectiveTtl(meta.timeframe, now);
-            cache
-                .set(cacheKey, { ...result, skillsDegraded }, ttl)
-                .catch(error =>
-                    console.error('[Poll] Cache write failed:', error)
-                );
+            fireAndForget(
+                cache
+                    .set(cacheKey, { ...result, skillsDegraded }, ttl)
+                    .catch(error =>
+                        console.error('[Poll] Cache write failed:', error)
+                    ),
+                options
+            );
         }
     }
 
-    cleanupJob(jobId).catch(e => console.warn('[Poll] cleanupJob failed:', e));
+    cleanupInBackground(jobId, '[Poll]', options);
 
     return { status: 'done', result };
 }

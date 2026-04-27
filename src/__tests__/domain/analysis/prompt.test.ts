@@ -2320,6 +2320,11 @@ describe('prompt', () => {
         it('체크리스트에 결론 단계가 포함된다', () => {
             expect(result).toContain('7. CONCLUDE');
         });
+
+        it('summary 문단을 빈 줄로 구분하도록 지시한다', () => {
+            expect(result).toContain('Use \\n\\n between topic paragraphs');
+            expect(result).toContain('3 to 5 short paragraphs');
+        });
     });
 
     describe('매매 추천 가이드라인', () => {
@@ -2349,6 +2354,16 @@ describe('prompt', () => {
         it('결정 트리 Step 3: 텍스트 필드 작성 지시가 포함된다', () => {
             expect(result).toContain('Step 3');
             expect(result).toContain('positionAnalysis');
+        });
+
+        it('actionRecommendation 텍스트 필드를 문단과 목록으로 작성하도록 지시한다', () => {
+            expect(result).toContain('Step 3 formatting');
+            expect(result).toContain(
+                'each actionRecommendation text field must be readable markdown Korean'
+            );
+            expect(result).toContain(
+                'use bullet lists for multiple prices or conditions'
+            );
         });
 
         it('actionRecommendation 필드가 스키마에 포함된다', () => {
@@ -2432,6 +2447,21 @@ describe('prompt', () => {
                 'strategyResults Writing Rules for Strategy Skills'
             );
             expect(result).toContain('- 엘리어트 파동');
+        });
+
+        it('strategyResults summary를 한 줄 나열이 아닌 마크다운 줄 단위로 작성하도록 지시한다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                [],
+                makeIndicators(),
+                [strategySkill]
+            );
+            expect(result).toContain(
+                'Put each **label**: value item on its own line'
+            );
+            expect(result).toContain(
+                'Never return strategyResults[].summary as one sentence'
+            );
         });
 
         it('strategy skill이 없으면 strategyResults Writing Rules 지시사항이 포함되지 않는다', () => {

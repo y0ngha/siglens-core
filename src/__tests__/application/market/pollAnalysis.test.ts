@@ -187,6 +187,16 @@ describe('pollAnalysis 함수는', () => {
             );
         });
 
+        it('waitUntil이 제공되면 캐시 저장과 cleanup promise를 등록한다', async () => {
+            const waitUntil = vi.fn();
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+
+            await pollAnalysis('job-wait-until', { waitUntil });
+
+            expect(waitUntil).toHaveBeenCalledTimes(2);
+            expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+        });
+
         it('skills 로딩 실패해도 done을 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawResult);
             mockLoadSkills.mockRejectedValueOnce(new Error('load failed'));

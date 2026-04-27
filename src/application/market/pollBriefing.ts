@@ -1,3 +1,5 @@
+import { cleanupInBackground, fireAndForget } from '@/application/background';
+import type { BackgroundTaskOptions } from '@/application/types';
 import type {
     MarketBriefingResponse,
     PollBriefingResult,
@@ -10,7 +12,6 @@ import {
     MARKET_BRIEFING_CACHE_TTL,
 } from '@/infrastructure/cache/config';
 import {
-    cleanupJob,
     getJobError,
     getJobResult,
     getJobStatus,
@@ -31,11 +32,16 @@ import {
  * Redis (best-effort).
  *
  * @param jobId - The `jobId` returned by {@link submitBriefing}.
+ * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
+ *   so Redis cleanup and cache writes can continue after the response.
  * @returns The current poll outcome — see {@link PollBriefingResult}.
  *
  * @see submitBriefing
  */
-export async function pollBriefing(jobId: string): Promise<PollBriefingResult> {
+export async function pollBriefing(
+    jobId: string,
+    options?: BackgroundTaskOptions
+): Promise<PollBriefingResult> {
     const status = await getJobStatus(jobId);
 
     if (status === null || status === 'processing') {
@@ -44,27 +50,21 @@ export async function pollBriefing(jobId: string): Promise<PollBriefingResult> {
 
     if (status === 'error') {
         const error = await getJobError(jobId);
-        cleanupJob(jobId).catch(e =>
-            console.warn('[Briefing/Poll] cleanupJob failed:', e)
-        );
+        cleanupInBackground(jobId, '[Briefing/Poll]', options);
         return { status: 'error', error: error ?? 'Unknown error' };
     }
 
     // status === 'done'
     const raw = await getJobResult(jobId);
     if (!raw) {
-        cleanupJob(jobId).catch(e =>
-            console.warn('[Briefing/Poll] cleanupJob failed:', e)
-        );
+        cleanupInBackground(jobId, '[Briefing/Poll]', options);
         return { status: 'error', error: 'Result not found' };
     }
 
     const briefing: MarketBriefingResponse = normalizeMarketBriefing(raw);
 
     if (!briefing.summary) {
-        cleanupJob(jobId).catch(e =>
-            console.warn('[Briefing/Poll] cleanupJob failed:', e)
-        );
+        cleanupInBackground(jobId, '[Briefing/Poll]', options);
         return { status: 'error', error: 'Invalid briefing result' };
     }
 
@@ -74,15 +74,20 @@ export async function pollBriefing(jobId: string): Promise<PollBriefingResult> {
     const cacheKey = buildBriefingCacheKey(dateHour);
     const cache = createCacheProvider();
     if (cache !== null) {
-        cache
-            .set(cacheKey, { briefing, generatedAt }, MARKET_BRIEFING_CACHE_TTL)
-            .catch(err =>
-                console.error('[Briefing/Poll] Cache write failed:', err)
-            );
+        fireAndForget(
+            cache
+                .set(
+                    cacheKey,
+                    { briefing, generatedAt },
+                    MARKET_BRIEFING_CACHE_TTL
+                )
+                .catch(err =>
+                    console.error('[Briefing/Poll] Cache write failed:', err)
+                ),
+            options
+        );
     }
 
-    cleanupJob(jobId).catch(e =>
-        console.warn('[Briefing/Poll] cleanupJob failed:', e)
-    );
+    cleanupInBackground(jobId, '[Briefing/Poll]', options);
     return { status: 'done', briefing, generatedAt };
 }

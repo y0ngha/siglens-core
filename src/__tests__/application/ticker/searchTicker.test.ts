@@ -172,6 +172,19 @@ describe('searchTicker', () => {
         expect(translateCompanyNamesMock).toHaveBeenCalledTimes(1);
     });
 
+    it('waitUntil이 제공되면 번역과 캐시 저장 promise를 등록한다', async () => {
+        const waitUntil = vi.fn();
+        mockCache.get.mockResolvedValue(null);
+        searchBySymbolMock.mockResolvedValue([apple]);
+        searchByNameMock.mockResolvedValue([]);
+        getKoreanNamesMock.mockResolvedValue({});
+
+        await searchTicker('AAPL', { waitUntil });
+
+        expect(waitUntil).toHaveBeenCalledTimes(2);
+        expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+    });
+
     it('cache provider 가 null 이어도 정상 동작', async () => {
         createCacheProviderMock.mockReturnValue(null);
         searchBySymbolMock.mockResolvedValue([apple]);

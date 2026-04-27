@@ -152,6 +152,16 @@ describe('pollBriefing 함수는', () => {
             expect(mockCacheSet).toHaveBeenCalled();
         });
 
+        it('waitUntil이 제공되면 캐시 저장과 cleanup promise를 등록한다', async () => {
+            const waitUntil = vi.fn();
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+
+            await pollBriefing('job-wait-until', { waitUntil });
+
+            expect(waitUntil).toHaveBeenCalledTimes(2);
+            expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+        });
+
         it('cleanup을 호출한다', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
 

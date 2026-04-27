@@ -176,6 +176,16 @@ describe('submitAnalysis 함수는', () => {
             );
         });
 
+        it('waitUntil이 제공되면 Worker 요청 promise를 등록한다', async () => {
+            const waitUntil = vi.fn();
+
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                waitUntil,
+            });
+
+            expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+        });
+
         it('WORKER_URL이 없으면 에러를 던진다', async () => {
             delete process.env.WORKER_URL;
 

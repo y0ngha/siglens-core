@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.1.9](https://github.com/y0ngha/siglens-core/compare/v0.1.8...v0.1.9) (2026-04-27)
+
+
+### Features
+
+* AI 채팅 진행시 서버 오류일 경우 보상 트랜잭션 진행 ([6e80d49](https://github.com/y0ngha/siglens-core/commit/6e80d494cae7d810faaf53a92c11e316bda010e5))
+
+## [0.1.8](https://github.com/y0ngha/siglens-core/compare/v0.1.7...v0.1.8) (2026-04-27)
+
+
+### Features
+
+* 채팅 프롬프트 형식 추가 ([2d59dc8](https://github.com/y0ngha/siglens-core/commit/2d59dc817ace94d384dd44e0261601b550b60679))
+
+
+### Performance Improvements
+
+* 프롬프트, 채팅 프롬프트 가독성 및 품질 개선 ([05dbd09](https://github.com/y0ngha/siglens-core/commit/05dbd094eeb9f55ef90e242a03a49659588a13be))
+
+## [0.1.7](https://github.com/y0ngha/siglens-core/compare/v0.1.6...v0.1.7) (2026-04-27)
+
+## [0.1.6](https://github.com/y0ngha/siglens-core/compare/v0.1.5...v0.1.6) (2026-04-27)
+
+
+### Features
+
+* support waitUntil for background application tasks ([2fe5fac](https://github.com/y0ngha/siglens-core/commit/2fe5fac2e8f14b10babc5b493a964b6ed2c54282))
+
+## [0.1.5](https://github.com/y0ngha/siglens-core/compare/v0.1.4...v0.1.5) (2026-04-27)
+
+## [0.1.4](https://github.com/y0ngha/siglens-core/compare/v0.1.3...v0.1.4) (2026-04-26)
+
+
+### Bug Fixes
+
+* 일목균형표 방어로직 추가 ([bba68a7](https://github.com/y0ngha/siglens-core/commit/bba68a722d0151af3722087a0ea7911a5bab285b))
+
+## [0.1.3](https://github.com/y0ngha/siglens-core/compare/v0.1.2...v0.1.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* AI 후속 질문 범위 판별 개선 ([a62f304](https://github.com/y0ngha/siglens-core/commit/a62f304fa880ea4346aea751d49a9d2753e4a3bf))
+
+
+### Features
+
+* siglens에 필요한 type export ([c43a01e](https://github.com/y0ngha/siglens-core/commit/c43a01ec743898ab77ff4a2d46b2030347216cdd))
+
 ## [0.1.2](https://github.com/y0ngha/siglens-core/compare/v0.1.1...v0.1.2) (2026-04-26)
 
 

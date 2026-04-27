@@ -1,3 +1,5 @@
+import { fireAndForget } from '@/application/background';
+import type { BackgroundTaskOptions } from '@/application/types';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
@@ -39,6 +41,8 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  *   Defaults to `false`.
  * @param fmpSymbol - Optional override symbol forwarded to the market data
  *   provider when FMP uses a different identifier.
+ * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
+ *   so the worker dispatch can continue after the response.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
  *   see {@link SubmitAnalysisResult}.
  *
@@ -59,7 +63,8 @@ export async function submitAnalysis(
     symbol: string,
     timeframe: Timeframe,
     force: boolean = false,
-    fmpSymbol?: string
+    fmpSymbol?: string,
+    options?: BackgroundTaskOptions
 ): Promise<SubmitAnalysisResult> {
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe);
@@ -114,8 +119,9 @@ export async function submitAnalysis(
         atr,
     });
 
-    // fire-and-forget: 에러는 무시하고 caller에게 jobId만 반환한다.
-    fetch(`${workerUrl}/analyze`, {
+    // fire-and-forget: caller에게 jobId만 반환하고 worker dispatch는 백그라운드 처리.
+    // serverless 환경(Vercel)에서는 options.waitUntil이 응답 후 promise 종료를 보장한다.
+    const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -126,6 +132,7 @@ export async function submitAnalysis(
     }).catch(error => {
         console.error('[Submit] Worker request failed:', error);
     });
+    fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };
 }
