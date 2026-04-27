@@ -9,7 +9,7 @@ import type {
     AuthUserRecord,
     OAuthUserRepository,
     SessionRepository,
-} from '@/infrastructure/auth';
+} from '@/infrastructure/db/types';
 
 const now = new Date('2026-04-27T00:00:00.000Z');
 const createdAt = new Date('2026-04-26T00:00:00.000Z');

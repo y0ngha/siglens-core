@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { sessions } from './schema';
-import type { SiglensDatabase } from './types';
 import type {
     AuthSessionRecord,
     CreateSessionInput,
     SessionRepository,
-} from '@/infrastructure/auth/types';
+    SiglensDatabase,
+} from './types';
 
 const sessionColumns = {
     id: sessions.id,

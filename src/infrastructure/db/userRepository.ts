@@ -1,6 +1,5 @@
 import { and, eq } from 'drizzle-orm';
 import { oauthAccounts, users } from './schema';
-import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
@@ -8,8 +7,9 @@ import type {
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     OAuthUserRepository,
+    SiglensDatabase,
     UserRepository,
-} from '@/infrastructure/auth/types';
+} from './types';
 
 const DEFAULT_USER_TIER = 'free';
 

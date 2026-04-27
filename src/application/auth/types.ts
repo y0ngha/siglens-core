@@ -1,12 +1,16 @@
 import type {
     AuthSessionRecord,
     AuthUserRecord,
-    AuthOAuthProvider,
     EmailAuthUserRepository,
+    OAuthProvider,
     OAuthUserRepository,
-    PasswordVerifier,
     SessionRepository,
-} from '@/infrastructure/auth/types';
+} from '@/infrastructure/db/types';
+import type { PasswordVerifier } from '@/infrastructure/auth/types';
+import type {
+    AuthValidationErrorCode,
+    AuthValidationErrorField,
+} from '@/domain/types';
 
 /**
  * Error codes returned when user registration fails.
@@ -16,14 +20,13 @@ import type {
  * - `email_already_exists` — the email is already registered.
  */
 export type RegisterUserErrorCode =
-    | 'invalid_email'
-    | 'weak_password'
+    | AuthValidationErrorCode
     | 'email_already_exists';
 
 /**
  * The input field associated with a registration validation error.
  */
-export type RegisterUserErrorField = 'email' | 'password';
+export type RegisterUserErrorField = AuthValidationErrorField;
 
 /**
  * Input data required to register a new user with email and password.
@@ -162,7 +165,7 @@ export type SocialLoginUserErrorCode =
  */
 export interface SocialLoginUserInput {
     /** OAuth provider that authenticated the account. */
-    provider: AuthOAuthProvider;
+    provider: OAuthProvider;
     /** Stable provider-side account identifier. */
     providerAccountId: string;
     /** Provider-confirmed email address; normalized before lookup/storage. */

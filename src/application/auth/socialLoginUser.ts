@@ -1,3 +1,7 @@
+import { normalizeEmail, validateEmail } from '@/domain/auth/validation';
+import type { AuthUserRecord } from '@/infrastructure/db/types';
+import { EMAIL_ALREADY_EXISTS_CODE } from './constants';
+import { createAuthSession } from './sessionCookie';
 import type {
     SocialLoginUserDependencies,
     SocialLoginUserError,
@@ -5,22 +9,11 @@ import type {
     SocialLoginUserOptions,
     SocialLoginUserResult,
 } from './types';
-import type { AuthUserRecord } from '@/infrastructure/auth/types';
-import { createAuthSession } from './sessionCookie';
 
 const EMAIL_ALREADY_EXISTS_MESSAGE =
     'Email is already registered with another login method';
 const INVALID_OAUTH_PROFILE_MESSAGE =
     'OAuth profile is missing a valid email or account identifier';
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
-}
-
-function isValidEmail(email: string): boolean {
-    return EMAIL_PATTERN.test(email);
-}
 
 function normalizeOptionalProfileValue(
     value: string | undefined
@@ -30,7 +23,7 @@ function normalizeOptionalProfileValue(
 
 function emailAlreadyExistsError(): SocialLoginUserError {
     return {
-        code: 'email_already_exists',
+        code: EMAIL_ALREADY_EXISTS_CODE,
         message: EMAIL_ALREADY_EXISTS_MESSAGE,
     };
 }
@@ -69,6 +62,32 @@ async function createSessionResult(
  * create a free-tier user and link the provider account. If the provider email
  * already belongs to an email/password account, the function returns a conflict
  * so the consumer can drive an explicit account-linking flow.
+ *
+ * @param input - OAuth provider callback data: provider, providerAccountId, email, optional profile fields.
+ * @param dependencies - Repositories injected by the caller for OAuth/user persistence and session creation.
+ * @param options - Runtime overrides for session TTL, cookie name, secure flag, SameSite, path, and current time.
+ * @returns Discriminated union: `{ ok: true }` with user/session/cookie on success, or `{ ok: false }` with `invalid_oauth_profile` / `email_already_exists`.
+ *
+ * @example
+ * ```typescript
+ * const result = await socialLoginUser(
+ *     {
+ *         provider: 'google',
+ *         providerAccountId: 'google-uid-123',
+ *         email: 'user@example.com',
+ *         name: 'User',
+ *     },
+ *     { users: drizzleUserRepository, sessions: drizzleSessionRepository },
+ * );
+ * if (result.ok) {
+ *     console.log('OAuth login:', result.user.id);
+ * } else {
+ *     console.error('OAuth login failed:', result.error.code);
+ * }
+ * ```
+ *
+ * @see {@link SocialLoginUserDependencies} for the dependency injection contract.
+ * @see {@link SocialLoginUserOptions} for available runtime overrides.
  */
 export async function socialLoginUser(
     input: SocialLoginUserInput,
@@ -77,7 +96,7 @@ export async function socialLoginUser(
 ): Promise<SocialLoginUserResult> {
     const providerAccountId = input.providerAccountId.trim();
     const email = normalizeEmail(input.email);
-    if (providerAccountId === '' || !isValidEmail(email)) {
+    if (providerAccountId === '' || validateEmail(email) !== null) {
         return { ok: false, error: invalidOAuthProfileError() };
     }
 

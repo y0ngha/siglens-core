@@ -22,10 +22,6 @@ export { searchTicker } from './application/ticker/searchTicker';
 
 // Auth
 export {
-    AUTH_SESSION_COOKIE_NAME,
-    DEFAULT_AUTH_COOKIE_PATH,
-    DEFAULT_AUTH_COOKIE_SAME_SITE,
-    DEFAULT_SESSION_TTL_SECONDS,
     loginUser,
     logoutUser,
     registerUser,
@@ -255,6 +251,14 @@ export {
 // Tier 4 — Public Types & Constants
 // =============================================================================
 
+// Auth session cookie constants
+export {
+    AUTH_SESSION_COOKIE_NAME,
+    DEFAULT_AUTH_COOKIE_PATH,
+    DEFAULT_AUTH_COOKIE_SAME_SITE,
+    DEFAULT_SESSION_TTL_SECONDS,
+} from './application/auth';
+
 // Dashboard tickers / sectors
 export {
     DASHBOARD_TIMEFRAMES,
@@ -392,24 +396,22 @@ export type {
     SocialLoginUserResult,
 } from './application/auth';
 export type {
-    AuthOAuthProvider,
     AuthSessionRecord,
     AuthUserRecord,
-    AuthUserTier,
     CreateEmailUserInput,
     CreateOAuthUserInput,
     CreateSessionInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     OAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
     SessionRepository,
     UserRepository,
-} from './infrastructure/auth';
+} from './infrastructure/db';
+export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 
 // Domain types
 export type {
+    AnalysisSignalType,
     Timeframe,
     Bar,
     IndicatorResult,
@@ -459,11 +461,17 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     SignalStrength,
+    BacktestCase,
+    BacktestMeta,
+    BacktestRiskLevel,
     ReconciledActionLevels,
     IndicatorGuideResult,
     KeyLevel,
     KeyLevels,
+    ClusteredKeyLevel,
+    ClusteredKeyLevels,
     KeyPrice,
+    QuadrantKey,
     PriceTarget,
     PriceScenario,
     PriceTargets,
@@ -477,8 +485,15 @@ export type {
     TrendlinePoint,
     ActionRecommendation,
     EntryRecommendation,
+    ReconciledActionLineData,
+    ValidatedActionPrices,
     ChatMessage,
+    ChatActionResult,
+    ChatErrorCode,
+    ChatLoadingPhase,
+    ChatModel,
     ChatPromptPayload,
+    ChatSession,
     MarketIndexData,
     MarketSectorData,
     MarketBriefingResponse,
@@ -494,6 +509,8 @@ export type {
     TickerBase,
     KoreanTickerEntry,
     TickerSearchResult,
+    SkillCounts,
+    SkillShowcaseItem,
     AssetInfo,
     TickerCategory,
     CategoryId,
@@ -515,4 +532,17 @@ export type {
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,
+    LevelSource,
+    ResolvedLevel,
+    ReconcileResult,
+    ReconciledTpEntry,
+    RunAnalysisInput,
+    RawAnalysisResponse,
+    BacktestSignalResult,
+    BacktestAiResult,
+    BacktestExitReason,
+    BacktestAiPriceTarget,
+    BacktestAiEntryRecommendation,
+    BacktestAiAnalysis,
+    BacktestData,
 } from './domain/types';
