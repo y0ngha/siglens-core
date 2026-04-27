@@ -33,6 +33,18 @@ describe('createUserTierContext', () => {
         expect(result).toEqual({ userId: null, tier: 'free' });
     });
 
+    it('treats an undefined userId as an anonymous request', async () => {
+        const { repository, getUserTierMock } = makeRepository('pro');
+
+        const result = await createUserTierContext(
+            { userId: undefined },
+            { users: repository }
+        );
+
+        expect(getUserTierMock).not.toHaveBeenCalled();
+        expect(result).toEqual({ userId: null, tier: 'free' });
+    });
+
     it('adds the persisted tier to authenticated request context', async () => {
         const { repository, getUserTierMock } = makeRepository('member');
 

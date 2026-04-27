@@ -7,6 +7,10 @@ import type { GetUserTierInput, UserTierDependencies } from './types';
  *
  * Missing users degrade to the default free tier so callers can keep request
  * handling deterministic while treating unknown accounts as least privileged.
+ *
+ * @param input - Identifies the user whose tier should be looked up.
+ * @param dependencies - Repository providing tier persistence access.
+ * @returns The persisted tier, or the default free tier when the user is not found.
  */
 export async function getUserTier(
     input: GetUserTierInput,

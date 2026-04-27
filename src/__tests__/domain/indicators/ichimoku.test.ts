@@ -108,6 +108,14 @@ describe('calculateIchimoku', () => {
             }
         });
     });
+});
+
+describe('calculateIchimokuFutureCloud', () => {
+    describe('빈 배열일 때', () => {
+        it('빈 배열을 반환한다', () => {
+            expect(calculateIchimokuFutureCloud([])).toEqual([]);
+        });
+    });
 
     describe('데이터가 displacement보다 짧을 때', () => {
         it('미래 구름 값은 NaN이 아니라 null이다', () => {
@@ -123,14 +131,6 @@ describe('calculateIchimoku', () => {
                 expect(point.senkouA).toBeNull();
                 expect(point.senkouB).toBeNull();
             });
-        });
-    });
-});
-
-describe('calculateIchimokuFutureCloud', () => {
-    describe('빈 배열일 때', () => {
-        it('빈 배열을 반환한다', () => {
-            expect(calculateIchimokuFutureCloud([])).toEqual([]);
         });
     });
 

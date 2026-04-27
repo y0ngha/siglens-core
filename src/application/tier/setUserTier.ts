@@ -1,21 +1,16 @@
 import type {
-    SetUserTierError,
     SetUserTierInput,
     SetUserTierResult,
     UserTierDependencies,
 } from './types';
 
-const USER_NOT_FOUND_MESSAGE = 'User was not found';
-
-function userNotFoundError(): SetUserTierError {
-    return {
-        code: 'user_not_found',
-        message: USER_NOT_FOUND_MESSAGE,
-    };
-}
-
 /**
  * Manually change a user's tier for admin workflows.
+ *
+ * @param input - Target user id and the new tier to persist.
+ * @param dependencies - Repository providing tier persistence access.
+ * @returns A discriminated result indicating success with the persisted tier or
+ *          a structured `user_not_found` error when the target user does not exist.
  */
 export async function setUserTier(
     input: SetUserTierInput,
@@ -27,6 +22,9 @@ export async function setUserTier(
     );
 
     return tier === null
-        ? { ok: false, error: userNotFoundError() }
+        ? {
+              ok: false,
+              error: { code: 'user_not_found', message: 'User was not found' },
+          }
         : { ok: true, userId: input.userId, tier };
 }
