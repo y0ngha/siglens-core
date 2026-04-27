@@ -19,6 +19,7 @@ export { getSectorSignals } from './application/dashboard/sectorSignals';
 // Ticker
 export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
+export type { BackgroundTaskOptions } from './application/types';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -494,4 +495,5 @@ export type {
     BacktestAiEntryRecommendation,
     BacktestAiAnalysis,
     BacktestData,
+    WaitUntil,
 } from './domain/types';

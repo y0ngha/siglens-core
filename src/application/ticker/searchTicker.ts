@@ -1,3 +1,5 @@
+import { fireAndForget } from '@/application/background';
+import type { BackgroundTaskOptions } from '@/application/types';
 import { deduplicateResults, isKoreanInput } from '@/domain/ticker';
 import type { KoreanTickerEntry, TickerSearchResult } from '@/domain/types';
 import {
@@ -71,6 +73,8 @@ async function translateAndCache(
  *
  * @param query - Free-text search; trimmed automatically. Empty input
  *   returns `[]`.
+ * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
+ *   so translation and cache writes can continue after the response.
  * @returns Up to 10 matching tickers, each enriched with a Korean name when
  *   available — see {@link TickerSearchResult}.
  *
@@ -84,7 +88,8 @@ async function translateAndCache(
  * @see isKoreanInput
  */
 export async function searchTicker(
-    query: string
+    query: string,
+    options?: BackgroundTaskOptions
 ): Promise<TickerSearchResult[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
@@ -125,17 +130,25 @@ export async function searchTicker(
 
     const unmapped = enriched.filter(r => !r.koreanName);
     if (unmapped.length > 0) {
-        translateAndCache(unmapped).catch(e =>
-            console.warn('[searchTicker] background translation failed', e)
+        fireAndForget(
+            translateAndCache(unmapped).catch(e =>
+                console.warn('[searchTicker] background translation failed', e)
+            ),
+            options
         );
     }
 
     const final = enriched.slice(0, MAX_SEARCH_RESULTS);
 
     if (cache) {
-        cache
-            .set(cacheKey, final, TICKER_SEARCH_CACHE_TTL)
-            .catch(e => console.warn('[searchTicker] cache write failed', e));
+        fireAndForget(
+            cache
+                .set(cacheKey, final, TICKER_SEARCH_CACHE_TTL)
+                .catch(e =>
+                    console.warn('[searchTicker] cache write failed', e)
+                ),
+            options
+        );
     }
 
     return final;

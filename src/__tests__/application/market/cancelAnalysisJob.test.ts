@@ -83,6 +83,14 @@ describe('cancelAnalysisJob', () => {
             );
         });
 
+        it('waitUntil이 제공되면 워커 /cancel 요청 promise를 등록한다', async () => {
+            const waitUntil = vi.fn();
+
+            await cancelAnalysisJob('job-xyz', { waitUntil });
+
+            expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+        });
+
         it('fetch 실패해도 에러를 전파하지 않는다', async () => {
             mockFetch.mockRejectedValueOnce(new Error('network error'));
 

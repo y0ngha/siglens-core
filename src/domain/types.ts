@@ -1192,3 +1192,10 @@ export type QuadrantKey =
     | 'bullishExpected'
     | 'bearishExpected'
     | 'bearishConfirmed';
+
+/**
+ * Fire-and-forget dispatcher. On Vercel serverless, pass `waitUntil` from
+ * `@vercel/functions` so the runtime keeps the promise alive past the response.
+ * On long-lived runtimes (Cloud Run worker), the default is sufficient.
+ */
+export type WaitUntil = (promise: Promise<unknown>) => void;

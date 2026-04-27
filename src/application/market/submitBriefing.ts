@@ -1,3 +1,5 @@
+import { fireAndForget } from '@/application/background';
+import type { BackgroundTaskOptions } from '@/application/types';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
@@ -20,6 +22,8 @@ import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
  *
  * @param data - Market summary input (indices + sector ETFs) typically
  *   produced by {@link getMarketSummary}.
+ * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
+ *   so the worker dispatch can continue after the response.
  * @returns Either a cached briefing or a freshly submitted job descriptor —
  *   see {@link SubmitBriefingResult}.
  *
@@ -38,7 +42,8 @@ import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
  * @see getMarketSummaryWithBriefing
  */
 export async function submitBriefing(
-    data: MarketSummaryData
+    data: MarketSummaryData,
+    options?: BackgroundTaskOptions
 ): Promise<SubmitBriefingResult> {
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
@@ -65,8 +70,8 @@ export async function submitBriefing(
     const prompt = buildMarketBriefingPrompt(data.indices, data.sectors);
     const jobId = crypto.randomUUID();
 
-    // fire-and-forget: 에러는 무시하고 caller에게 jobId만 반환한다.
-    fetch(`${workerUrl}/briefing`, {
+    // fire-and-forget: serverless 환경에선 options.waitUntil로 응답 후 promise 종료 보장.
+    const dispatch = fetch(`${workerUrl}/briefing`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -77,6 +82,7 @@ export async function submitBriefing(
     }).catch(error => {
         console.error('[Briefing/Submit] Worker request failed:', error);
     });
+    fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };
 }
