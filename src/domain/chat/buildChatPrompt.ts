@@ -44,6 +44,18 @@ function formatDetectedPatterns(
     return detected.map(p => `${p.skillName} (${p.trend})`).join(', ');
 }
 
+function formatStrategyResults(
+    strategyResults: AnalysisResponse['strategyResults']
+): string {
+    if (strategyResults.length === 0) return 'None';
+    return strategyResults
+        .map(
+            r =>
+                `### ${r.strategyName} (${r.trend})\n${r.summary || 'No summary'}`
+        )
+        .join('\n\n');
+}
+
 /**
  * Build a chat prompt payload (system prompt + message history) for an
  * already-completed analysis.
@@ -86,6 +98,10 @@ Do not refuse a question only because the exact wording is absent from the repor
 The user is NOT a technical trader — they may not know terms like RSI, MACD, or support levels.
 Explain everything in plain, friendly Korean. Use natural analogies when they genuinely help understanding, but avoid forced comparisons.
 Respond in Korean (한국어) in a warm, conversational tone.
+When the answer contains multiple contexts, format it with readable markdown:
+- use short paragraphs separated by blank lines;
+- use bullets for multiple levels, conditions, or actions;
+- avoid returning one dense paragraph.
 
 === ANALYSIS DATA ===
 Symbol: ${symbol} | Timeframe: ${timeframe}
@@ -109,6 +125,9 @@ Key Levels:
 - Support: ${formatKeyLevels(analysis.keyLevels.support)}
 
 Detected Patterns: ${formatDetectedPatterns(analysis.patternSummaries)}
+
+Strategy Results:
+${formatStrategyResults(analysis.strategyResults)}
 
 Indicator Signals:
 ${formatIndicatorSignals(analysis.indicatorResults) || 'None'}

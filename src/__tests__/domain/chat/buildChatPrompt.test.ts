@@ -166,6 +166,44 @@ describe('buildChatPrompt 함수는', () => {
             );
         });
 
+        it('strategyResults가 있으면 전략별 요약을 포함한다', () => {
+            const analysis: AnalysisResponse = {
+                ...MINIMAL_ANALYSIS,
+                strategyResults: [
+                    {
+                        id: 's1',
+                        strategyName: '다이버전스 전략',
+                        trend: 'bullish',
+                        summary:
+                            '**감지된 다이버전스**: Regular Bullish\n\n**매매 신호**: 매수 관점 대기',
+                        confidenceWeight: 0.78,
+                    },
+                ],
+            };
+            const result = buildChatPrompt('AAPL', '1Day', analysis, [], '?');
+            expect(result.systemPrompt).toContain('Strategy Results:');
+            expect(result.systemPrompt).toContain(
+                '### 다이버전스 전략 (bullish)'
+            );
+            expect(result.systemPrompt).toContain('Regular Bullish');
+        });
+
+        it('답변을 읽기 좋은 마크다운 문단으로 구성하도록 지시한다', () => {
+            const result = buildChatPrompt(
+                'AAPL',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                [],
+                '?'
+            );
+            expect(result.systemPrompt).toContain(
+                'format it with readable markdown'
+            );
+            expect(result.systemPrompt).toContain(
+                'use short paragraphs separated by blank lines'
+            );
+        });
+
         it('분석과 연결된 가격대 후속 질문을 허용하도록 지시한다', () => {
             const result = buildChatPrompt(
                 'PLTR',

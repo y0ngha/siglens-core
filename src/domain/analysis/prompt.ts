@@ -651,7 +651,7 @@ const ANALYSIS_RESPONSE_SCHEMA: Record<
     string
 > = {
     summary:
-        '"A comprehensive, accessible summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock and what does it mean for the investor? Use \\n to separate each topic."',
+        '"A comprehensive, accessible Korean markdown summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock and what does it mean for the investor? Use \\n\\n between paragraphs, and use short bullet lists only when they improve readability."',
     trend: '"bullish | bearish | neutral"',
     indicatorResults:
         '[{ "indicatorName": "RSI Signal Guide", "signals": [{ "type": "skill", "description": "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능", "strength": "strong | moderate | weak", "trend": "bullish | bearish | neutral" }] }]',
@@ -664,14 +664,14 @@ const ANALYSIS_RESPONSE_SCHEMA: Record<
         // Only chart patterns defined in skills/*.md. Candle patterns go in candlePatterns.
         '[{ "patternName": "...", "skillName": "...", "detected": true, "trend": "bullish | bearish | neutral", "summary": "...", "keyPrices": [{ "label": "넥라인", "price": 150.00 }], "patternLines": [{ "label": "상단 추세선", "start": { "time": 1700000000, "price": 155.00 }, "end": { "time": 1700100000, "price": 152.00 } }, { "label": "하단 추세선", "start": { "time": 1700000000, "price": 148.00 }, "end": { "time": 1700100000, "price": 146.00 } }], "timeRange": { "start": 1700000000, "end": 1700100000 } }]',
     strategyResults:
-        '[{ "strategyName": "...", "trend": "bullish | bearish | neutral (REQUIRED — never omit)", "summary": "..." }]',
+        '[{ "strategyName": "...", "trend": "bullish | bearish | neutral (REQUIRED — never omit)", "summary": "Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes" }]',
     candlePatterns:
         // Only candle patterns detected from bar data. Skills patterns go in patternSummaries.
         '[{ "patternName": "three_outside_down", "detected": true, "trend": "bearish", "summary": "..." }]',
     trendlines:
         '[{ "direction": "ascending | descending", "start": { "time": 1700000000, "price": 150.00 }, "end": { "time": 1700100000, "price": 155.00 } }]',
     actionRecommendation:
-        '{ "positionAnalysis": "Current price position vs support/resistance analysis (long position perspective)", "entry": "Long (buy) entry strategy with specific price ranges", "exit": "Long position exit strategy: take-profit targets and stop-loss price ranges", "riskReward": "Risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3)", "entryRecommendation": "enter | wait | avoid", "entryPrices": [165.00, 167.00], "stopLoss": 160.00, "takeProfitPrices": [180.00, 195.00] }',
+        '{ "positionAnalysis": "Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n", "entry": "Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n", "exit": "Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n", "riskReward": "Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence", "entryRecommendation": "enter | wait | avoid", "entryPrices": [165.00, 167.00], "stopLoss": 160.00, "takeProfitPrices": [180.00, 195.00] }',
 };
 
 const ANALYSIS_INTENT_BLOCK = [
@@ -755,6 +755,14 @@ const ANALYSIS_GUIDELINES = [
     '- Weight signals by the number of confirming indicators and the strength of each signal.',
     '- Mention the conflict explicitly in the summary so the user understands the mixed picture.',
     '',
+    '### Readable Text Formatting Rules',
+    '- All long-form Korean prose fields must be easy to render in a UI without becoming one dense line.',
+    '- Use markdown where it improves readability: **short labels**, bullet lists, and compact numbered steps are allowed.',
+    '- Use \\n\\n to separate paragraphs when the context changes (trend overview, signal conflict, key levels, risk, conclusion).',
+    '- Use single \\n only inside a compact list or between adjacent **label**: value lines.',
+    '- Do not join multiple independent ideas with repeated periods in one line. Split them into separate paragraphs or list items.',
+    '- Apply these rules to summary, strategyResults[].summary, candlePatterns[].summary, patternSummaries[].summary, and every actionRecommendation text field.',
+    '',
     '### Summary Writing Checklist (follow every step)',
     '1. STATE the overall trend direction and strength in plain language.',
     '2. SUMMARIZE key indicator findings — explain practical meaning, not raw values (e.g., "주가가 빠르게 상승하여 단기 조정 가능성이 있습니다" not "RSI is 75").',
@@ -763,7 +771,8 @@ const ANALYSIS_GUIDELINES = [
     '5. DESCRIBE key support/resistance levels and their significance.',
     '6. ASSESS risk — warning signs and what could go wrong.',
     '7. CONCLUDE: "What is happening with this stock and what does it mean for the investor?"',
-    '- Use \\n between each topic. Never write a single long paragraph.',
+    '- Use \\n\\n between topic paragraphs. Never write a single long paragraph.',
+    '- Prefer 3 to 5 short paragraphs. Each paragraph should cover one context: trend, signals, levels, risk, investor takeaway.',
     '- If signals conflict, state the mixed picture and which side has stronger confluence.',
     '',
     '### Action Recommendation Decision Tree',
@@ -782,6 +791,7 @@ const ANALYSIS_GUIDELINES = [
     '  - entry: specific long buy price ranges with reasoning. Always provide specific prices, not vague descriptions.',
     '  - exit: take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry)',
     '  - riskReward: ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3")',
+    '- Step 3 formatting: each actionRecommendation text field must be readable markdown Korean. Use \\n\\n between context paragraphs, and use bullet lists for multiple prices or conditions.',
     '- Consistency: entryPrices, stopLoss, takeProfitPrices must numerically match the text in entry/exit fields — they are the same prices in structured form for chart rendering.',
     '',
     '### Insufficient Data',
@@ -842,6 +852,8 @@ const buildAnalysisRequest = (
                   '- For each strategy skill listed below, include exactly one entry in strategyResults.',
                   "- Follow the summary format specified in each strategy skill's ## AI Analysis Instructions section.",
                   '- The summary field must use the structured markdown format with **label**: value lines.',
+                  '- Put each **label**: value item on its own line. When moving from status/inputs to interpretation/trading implication, insert \\n\\n.',
+                  '- Never return strategyResults[].summary as one sentence containing many "**label**:" fragments separated only by periods.',
                   '- REQUIRED FIELDS (never omit any):',
                   '  1. strategyName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match one strategy skill name from the list below.',
                   '  2. trend: one of "bullish", "bearish", "neutral". Set based on the skill\'s own analysis instructions. NEVER omit this field — if the analysis is inconclusive, use "neutral".',
@@ -934,7 +946,7 @@ const buildAnalysisRequest = (
     return [
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
-        'Use \\n to separate each topic in the summary field — do not write a single long paragraph. Other text fields should also use \\n for readability.',
+        'Use markdown-friendly readable text. Use \\n\\n to separate context paragraphs in summary and other long-form text fields; use single \\n only inside compact lists or adjacent label lines.',
         'Based on the data above, perform technical analysis and respond in the following JSON format:',
         SCHEMA_PREFACE,
         buildSchemaBody(),
