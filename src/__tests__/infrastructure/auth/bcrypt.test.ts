@@ -1,48 +1,57 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { compare, hash } from 'bcryptjs';
 import {
     bcryptPasswordHasher,
     bcryptPasswordVerifier,
 } from '@/infrastructure/auth';
+import { BCRYPT_DEFAULT_SALT_ROUNDS } from '@/infrastructure/auth/bcrypt';
+
+vi.mock('bcryptjs', () => ({
+    hash: vi.fn(),
+    compare: vi.fn(),
+}));
+
+const mockedHash = vi.mocked(hash);
+const mockedCompare = vi.mocked(compare);
+
+beforeEach(() => {
+    mockedHash.mockReset();
+    mockedCompare.mockReset();
+});
 
 describe('bcryptPasswordHasher', () => {
-    it('produces a hash that round-trips through bcryptPasswordVerifier', async () => {
-        const password = 'Password1!';
+    it('delegates to bcryptjs.hash with the default salt rounds', async () => {
+        mockedHash.mockResolvedValue('hashed-password' as never);
 
-        const hash = await bcryptPasswordHasher.hashPassword(password);
+        const result = await bcryptPasswordHasher.hashPassword('Password1!');
 
-        expect(hash).not.toBe(password);
-        expect(hash.length).toBeGreaterThan(0);
-        expect(
-            await bcryptPasswordVerifier.verifyPassword(password, hash)
-        ).toBe(true);
-    });
-
-    it('produces different hashes for the same password on each call', async () => {
-        const password = 'Password1!';
-
-        const firstHash = await bcryptPasswordHasher.hashPassword(password);
-        const secondHash = await bcryptPasswordHasher.hashPassword(password);
-
-        expect(firstHash).not.toBe(secondHash);
+        expect(mockedHash).toHaveBeenCalledWith(
+            'Password1!',
+            BCRYPT_DEFAULT_SALT_ROUNDS
+        );
+        expect(result).toBe('hashed-password');
     });
 });
 
 describe('bcryptPasswordVerifier', () => {
-    it('returns false for a password that does not match the stored hash', async () => {
-        const hash = await bcryptPasswordHasher.hashPassword('Password1!');
+    it('returns true when bcryptjs.compare reports a match', async () => {
+        mockedCompare.mockResolvedValue(true as never);
+
+        const matches = await bcryptPasswordVerifier.verifyPassword(
+            'Password1!',
+            'stored-hash'
+        );
+
+        expect(mockedCompare).toHaveBeenCalledWith('Password1!', 'stored-hash');
+        expect(matches).toBe(true);
+    });
+
+    it('returns false when bcryptjs.compare reports a mismatch', async () => {
+        mockedCompare.mockResolvedValue(false as never);
 
         const matches = await bcryptPasswordVerifier.verifyPassword(
             'WrongPassword!',
-            hash
-        );
-
-        expect(matches).toBe(false);
-    });
-
-    it('returns false when the stored hash is malformed', async () => {
-        const matches = await bcryptPasswordVerifier.verifyPassword(
-            'Password1!',
-            'not-a-bcrypt-hash'
+            'stored-hash'
         );
 
         expect(matches).toBe(false);

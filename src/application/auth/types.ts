@@ -301,6 +301,20 @@ export interface DeleteAccountDependencies {
 }
 
 /**
+ * Cookie metadata overrides applied to the expired cookie returned on success.
+ */
+export interface DeleteAccountOptions {
+    /** Cookie name; defaults to the library auth session name. */
+    cookieName?: string;
+    /** Whether to mark the cookie secure; defaults to true. */
+    secureCookie?: boolean;
+    /** SameSite policy; defaults to `lax`. */
+    sameSite?: AuthSessionCookie['sameSite'];
+    /** Cookie path; defaults to `/`. */
+    path?: string;
+}
+
+/**
  * Structured error returned when account deletion fails.
  */
 export interface DeleteAccountError {
@@ -313,9 +327,11 @@ export interface DeleteAccountError {
 /**
  * Discriminated union result of a {@link deleteAccount} call.
  *
- * - `{ ok: true }` — the account was deleted; dependent sessions were cascaded.
+ * - `{ ok: true, cookie }` — the account was deleted; dependent sessions were
+ *   cascaded and `cookie` is expired metadata the caller should apply to the
+ *   HTTP response to clear the browser-side session cookie.
  * - `{ ok: false, error }` — the account could not be deleted.
  */
 export type DeleteAccountResult =
-    | { ok: true }
+    | { ok: true; cookie: AuthSessionCookie }
     | { ok: false; error: DeleteAccountError };

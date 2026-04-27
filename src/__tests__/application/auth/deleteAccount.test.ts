@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deleteAccount } from '@/application/auth';
+import { AUTH_SESSION_COOKIE_NAME, deleteAccount } from '@/application/auth';
 import type { UserRepository } from '@/infrastructure/db/types';
 
 function makeDependencies(deleted: boolean): {
@@ -22,13 +22,50 @@ function makeDependencies(deleted: boolean): {
 }
 
 describe('deleteAccount', () => {
-    it('deletes the user account and reports success', async () => {
+    it('deletes the user account and returns an expired HTTP-only cookie', async () => {
         const { dependencies, deleteUser } = makeDependencies(true);
 
         const result = await deleteAccount({ userId: 'user-1' }, dependencies);
 
         expect(deleteUser).toHaveBeenCalledWith('user-1');
-        expect(result).toEqual({ ok: true });
+        expect(result).toEqual({
+            ok: true,
+            cookie: {
+                name: AUTH_SESSION_COOKIE_NAME,
+                value: '',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'lax',
+                path: '/',
+                expires: new Date('1970-01-01T00:00:00.000Z'),
+                maxAgeSeconds: 0,
+            },
+        });
+    });
+
+    it('applies custom cookie overrides on success', async () => {
+        const { dependencies } = makeDependencies(true);
+
+        const result = await deleteAccount({ userId: 'user-1' }, dependencies, {
+            cookieName: 'custom_session',
+            secureCookie: false,
+            sameSite: 'none',
+            path: '/app',
+        });
+
+        expect(result).toEqual({
+            ok: true,
+            cookie: {
+                name: 'custom_session',
+                value: '',
+                httpOnly: true,
+                secure: false,
+                sameSite: 'none',
+                path: '/app',
+                expires: new Date('1970-01-01T00:00:00.000Z'),
+                maxAgeSeconds: 0,
+            },
+        });
     });
 
     it('returns user_not_found when no row matches the user id', async () => {

@@ -24,6 +24,8 @@ export const BCRYPT_DEFAULT_SALT_ROUNDS = 12;
  *     { users, passwordHasher: bcryptPasswordHasher },
  * );
  * ```
+ *
+ * @see {@link PasswordHasher} for the interface contract.
  */
 export const bcryptPasswordHasher: PasswordHasher = {
     hashPassword(password: string): Promise<string> {
@@ -45,6 +47,8 @@ export const bcryptPasswordHasher: PasswordHasher = {
  *     { users, sessions, passwordVerifier: bcryptPasswordVerifier },
  * );
  * ```
+ *
+ * @see {@link PasswordVerifier} for the interface contract.
  */
 export const bcryptPasswordVerifier: PasswordVerifier = {
     verifyPassword(password: string, passwordHash: string): Promise<boolean> {

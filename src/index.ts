@@ -455,6 +455,7 @@ export type {
     DeleteAccountError,
     DeleteAccountErrorCode,
     DeleteAccountInput,
+    DeleteAccountOptions,
     DeleteAccountResult,
     FindUserBySessionTokenDependencies,
     FindUserBySessionTokenOptions,

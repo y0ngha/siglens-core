@@ -1,7 +1,9 @@
+import { createExpiredSessionCookie } from './sessionCookie';
 import type {
     DeleteAccountDependencies,
     DeleteAccountError,
     DeleteAccountInput,
+    DeleteAccountOptions,
     DeleteAccountResult,
 } from './types';
 
@@ -21,9 +23,14 @@ function userNotFoundError(): DeleteAccountError {
  * foreign-key cascade; usage logs have their `userId` set to null per
  * schema policy so that aggregate analytics remain intact.
  *
+ * On success, expired HTTP-only cookie metadata is returned so the caller
+ * can clear the browser-side session cookie in the same response — mirroring
+ * the {@link logoutUser} contract.
+ *
  * @param input - User identifier to delete.
  * @param dependencies - User repository injected by the caller.
- * @returns `{ ok: true }` on success, or `{ ok: false, error: { code: 'user_not_found' } }` when no row matched.
+ * @param options - Runtime overrides for cookie name, secure flag, SameSite, and path.
+ * @returns `{ ok: true, cookie }` on success, or `{ ok: false, error: { code: 'user_not_found' } }` when no row matched.
  *
  * @example
  * ```typescript
@@ -32,15 +39,17 @@ function userNotFoundError(): DeleteAccountError {
  *     { users: drizzleUserRepository },
  * );
  * if (result.ok) {
- *     response.setHeader('Set-Cookie', serializeCookie(expiredCookie));
+ *     response.setHeader('Set-Cookie', serializeCookie(result.cookie));
  * }
  * ```
  *
  * @see {@link DeleteAccountDependencies} for the dependency injection contract.
+ * @see {@link DeleteAccountOptions} for available runtime overrides.
  */
 export async function deleteAccount(
     input: DeleteAccountInput,
-    dependencies: DeleteAccountDependencies
+    dependencies: DeleteAccountDependencies,
+    options: DeleteAccountOptions = {}
 ): Promise<DeleteAccountResult> {
     const deleted = await dependencies.users.deleteUser(input.userId);
 
@@ -48,5 +57,12 @@ export async function deleteAccount(
         return { ok: false, error: userNotFoundError() };
     }
 
-    return { ok: true };
+    const cookie = createExpiredSessionCookie({
+        name: options.cookieName,
+        secure: options.secureCookie,
+        sameSite: options.sameSite,
+        path: options.path,
+    });
+
+    return { ok: true, cookie };
 }
