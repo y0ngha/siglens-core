@@ -1,0 +1,127 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+    DrizzleAssetTranslationRepository,
+    DrizzleKoreanTickerRepository,
+} from '@/infrastructure/db/tickerRepository';
+import type {
+    AssetTranslationRecord,
+    SiglensDatabase,
+} from '@/infrastructure/db/types';
+import type { KoreanTickerEntry } from '@/domain/types';
+
+const apple: KoreanTickerEntry = {
+    symbol: 'AAPL',
+    name: 'Apple Inc.',
+    koreanName: '애플',
+    exchange: 'NASDAQ',
+    exchangeFullName: 'NASDAQ Global Select',
+};
+
+const microsoft: KoreanTickerEntry = {
+    symbol: 'MSFT',
+    name: 'Microsoft Corporation',
+    koreanName: '마이크로소프트',
+    exchange: 'NASDAQ',
+    exchangeFullName: 'NASDAQ Global Select',
+};
+
+function makeSelectFromDb(rows: unknown[]): {
+    db: SiglensDatabase;
+    select: ReturnType<typeof vi.fn>;
+    from: ReturnType<typeof vi.fn>;
+} {
+    const fromResult = Promise.resolve(rows);
+    const from = vi.fn(() => fromResult);
+    const select = vi.fn(() => ({ from }));
+    return { db: { select } as unknown as SiglensDatabase, select, from };
+}
+
+function makeFindBySymbolDb(rows: unknown[]): {
+    db: SiglensDatabase;
+    limit: ReturnType<typeof vi.fn>;
+} {
+    const limit = vi.fn().mockResolvedValue(rows);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    return { db: { select } as unknown as SiglensDatabase, limit };
+}
+
+function makeUpsertDb(): {
+    db: SiglensDatabase;
+    insert: ReturnType<typeof vi.fn>;
+    values: ReturnType<typeof vi.fn>;
+    onConflictDoUpdate: ReturnType<typeof vi.fn>;
+} {
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn(() => ({ onConflictDoUpdate }));
+    const insert = vi.fn(() => ({ values }));
+    return {
+        db: { insert } as unknown as SiglensDatabase,
+        insert,
+        values,
+        onConflictDoUpdate,
+    };
+}
+
+describe('DrizzleKoreanTickerRepository', () => {
+    it('findAll 은 모든 row 를 반환한다', async () => {
+        const { db } = makeSelectFromDb([apple, microsoft]);
+        const repo = new DrizzleKoreanTickerRepository(db);
+        await expect(repo.findAll()).resolves.toEqual([apple, microsoft]);
+    });
+
+    it('findAll 은 빈 결과도 그대로 반환한다', async () => {
+        const { db } = makeSelectFromDb([]);
+        const repo = new DrizzleKoreanTickerRepository(db);
+        await expect(repo.findAll()).resolves.toEqual([]);
+    });
+
+    it('upsertMany 는 빈 입력에서 insert 를 호출하지 않는다', async () => {
+        const { db, insert } = makeUpsertDb();
+        const repo = new DrizzleKoreanTickerRepository(db);
+        await repo.upsertMany([]);
+        expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('upsertMany 는 insert + onConflictDoUpdate 를 호출한다', async () => {
+        const { db, insert, values, onConflictDoUpdate } = makeUpsertDb();
+        const repo = new DrizzleKoreanTickerRepository(db);
+        await repo.upsertMany([apple, microsoft]);
+        expect(insert).toHaveBeenCalledTimes(1);
+        const passed = values.mock.calls[0][0] as KoreanTickerEntry[];
+        expect(passed).toHaveLength(2);
+        expect(passed[0]).toMatchObject({ symbol: 'AAPL', koreanName: '애플' });
+        expect(onConflictDoUpdate).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('DrizzleAssetTranslationRepository', () => {
+    const record: AssetTranslationRecord = {
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        koreanName: '애플',
+        fmpSymbol: 'AAPL',
+    };
+
+    it('findBySymbol 은 row 를 반환한다', async () => {
+        const { db } = makeFindBySymbolDb([record]);
+        const repo = new DrizzleAssetTranslationRepository(db);
+        await expect(repo.findBySymbol('AAPL')).resolves.toEqual(record);
+    });
+
+    it('findBySymbol 은 row 가 없으면 null 을 반환한다', async () => {
+        const { db } = makeFindBySymbolDb([]);
+        const repo = new DrizzleAssetTranslationRepository(db);
+        await expect(repo.findBySymbol('AAPL')).resolves.toBeNull();
+    });
+
+    it('upsert 는 insert + onConflictDoUpdate 를 호출한다', async () => {
+        const { db, insert, values, onConflictDoUpdate } = makeUpsertDb();
+        const repo = new DrizzleAssetTranslationRepository(db);
+        await repo.upsert(record);
+        expect(insert).toHaveBeenCalledTimes(1);
+        expect(values).toHaveBeenCalledWith(record);
+        expect(onConflictDoUpdate).toHaveBeenCalledTimes(1);
+    });
+});

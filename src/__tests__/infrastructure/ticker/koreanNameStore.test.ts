@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CacheProvider } from '@/infrastructure/cache/types';
+import type {
+    DatabaseClient,
+    KoreanTickerRepository,
+} from '@/infrastructure/db/types';
 
 const mockCache: {
     get: ReturnType<typeof vi.fn>;
@@ -11,10 +15,30 @@ const mockCache: {
     delete: vi.fn(),
 };
 
+const mockRepository: {
+    findAll: ReturnType<typeof vi.fn>;
+    upsertMany: ReturnType<typeof vi.fn>;
+} = {
+    findAll: vi.fn(),
+    upsertMany: vi.fn(),
+};
+
 const createCacheProviderMock = vi.fn<() => CacheProvider | null>();
+const tryGetDatabaseClientMock = vi.fn<() => DatabaseClient | null>();
+const repositoryFactoryMock = vi.fn<(db: unknown) => KoreanTickerRepository>();
 
 vi.mock('@/infrastructure/cache/redis', () => ({
     createCacheProvider: () => createCacheProviderMock(),
+}));
+vi.mock('@/infrastructure/db/client', () => ({
+    tryGetDatabaseClient: () => tryGetDatabaseClientMock(),
+}));
+vi.mock('@/infrastructure/db/tickerRepository', () => ({
+    DrizzleKoreanTickerRepository: class {
+        constructor(db: unknown) {
+            return repositoryFactoryMock(db);
+        }
+    },
 }));
 
 import {
@@ -40,104 +64,131 @@ const microsoft: KoreanTickerEntry = {
     exchangeFullName: 'NASDAQ Global Select',
 };
 
+const fakeDbClient = {
+    db: {} as unknown,
+    sql: {} as unknown,
+} as DatabaseClient;
+
+function resetMocks(): void {
+    mockCache.get.mockReset();
+    mockCache.set.mockReset();
+    mockCache.set.mockResolvedValue(undefined);
+    mockCache.delete.mockReset();
+    mockRepository.findAll.mockReset();
+    mockRepository.upsertMany.mockReset();
+    mockRepository.upsertMany.mockResolvedValue(undefined);
+    createCacheProviderMock.mockReset();
+    createCacheProviderMock.mockReturnValue(mockCache);
+    tryGetDatabaseClientMock.mockReset();
+    tryGetDatabaseClientMock.mockReturnValue(fakeDbClient);
+    repositoryFactoryMock.mockReset();
+    repositoryFactoryMock.mockReturnValue(mockRepository);
+}
+
 describe('searchByKoreanName', () => {
-    beforeEach(() => {
-        mockCache.get.mockReset();
-        mockCache.set.mockReset();
-        mockCache.delete.mockReset();
-        createCacheProviderMock.mockReturnValue(mockCache);
-    });
+    beforeEach(resetMocks);
+    afterEach(() => vi.clearAllMocks());
 
-    afterEach(() => {
-        createCacheProviderMock.mockReset();
-    });
-
-    it('cache provider 가 null 이면 빈 배열 반환', async () => {
-        createCacheProviderMock.mockReturnValue(null);
-        await expect(searchByKoreanName('애')).resolves.toEqual([]);
-    });
-
-    it('koreanName 부분 일치를 case-insensitive 로 찾는다', async () => {
+    it('cache hit 시 cache 결과로 검색한다', async () => {
         mockCache.get.mockResolvedValue([apple, microsoft]);
         const result = await searchByKoreanName('애');
         expect(result).toHaveLength(1);
         expect(result[0].symbol).toBe('AAPL');
+        expect(mockRepository.findAll).not.toHaveBeenCalled();
     });
 
-    it('cache get 실패 시 빈 배열로 안전하게 처리한다', async () => {
-        mockCache.get.mockRejectedValue(new Error('cache down'));
-        await expect(searchByKoreanName('애')).resolves.toEqual([]);
-    });
-
-    it('null entries 응답을 빈 배열로 처리한다', async () => {
+    it('cache miss(null) 시 DB 조회 후 cache 갱신', async () => {
         mockCache.get.mockResolvedValue(null);
+        mockRepository.findAll.mockResolvedValue([apple]);
+        const result = await searchByKoreanName('애');
+        expect(result[0].symbol).toBe('AAPL');
+        expect(mockCache.set).toHaveBeenCalledWith(
+            'korean:tickers',
+            [apple],
+            expect.any(Number)
+        );
+    });
+
+    it('cache get 실패 시 DB 로 폴백한다', async () => {
+        mockCache.get.mockRejectedValue(new Error('cache down'));
+        mockRepository.findAll.mockResolvedValue([apple]);
+        const result = await searchByKoreanName('애');
+        expect(result[0].symbol).toBe('AAPL');
+    });
+
+    it('cache 와 DB 모두 비어있으면 빈 배열', async () => {
+        mockCache.get.mockResolvedValue(null);
+        mockRepository.findAll.mockResolvedValue([]);
         await expect(searchByKoreanName('애')).resolves.toEqual([]);
+        expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
+    it('DB 클라이언트 없고 cache 도 없으면 빈 배열', async () => {
+        createCacheProviderMock.mockReturnValue(null);
+        tryGetDatabaseClientMock.mockReturnValue(null);
+        await expect(searchByKoreanName('애')).resolves.toEqual([]);
+    });
+
+    it('DB 클라이언트 없고 cache 미스면 빈 배열', async () => {
+        mockCache.get.mockResolvedValue(null);
+        tryGetDatabaseClientMock.mockReturnValue(null);
+        await expect(searchByKoreanName('애')).resolves.toEqual([]);
+        expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
+    it('cache write 실패는 DB 결과 반환을 막지 않는다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        mockRepository.findAll.mockResolvedValue([apple]);
+        mockCache.set.mockRejectedValue(new Error('cache write down'));
+        const result = await searchByKoreanName('애');
+        expect(result[0].symbol).toBe('AAPL');
     });
 });
 
 describe('getKoreanNames', () => {
-    beforeEach(() => {
-        mockCache.get.mockReset();
-        mockCache.set.mockReset();
-        mockCache.delete.mockReset();
-        createCacheProviderMock.mockReturnValue(mockCache);
-    });
+    beforeEach(resetMocks);
+    afterEach(() => vi.clearAllMocks());
 
-    afterEach(() => {
-        createCacheProviderMock.mockReset();
-    });
-
-    it('빈 symbols 입력은 즉시 빈 객체 반환', async () => {
+    it('빈 symbols 입력은 cache 호출 없이 빈 객체 반환', async () => {
         await expect(getKoreanNames([])).resolves.toEqual({});
         expect(mockCache.get).not.toHaveBeenCalled();
     });
 
-    it('cache provider 가 null 이면 빈 객체 반환', async () => {
-        createCacheProviderMock.mockReturnValue(null);
-        await expect(getKoreanNames(['AAPL'])).resolves.toEqual({});
-    });
-
-    it('매핑된 symbol 만 반환한다', async () => {
+    it('cache 결과에서 매핑된 symbol 만 반환', async () => {
         mockCache.get.mockResolvedValue([apple, microsoft]);
         const result = await getKoreanNames(['AAPL', 'TSLA']);
         expect(result).toEqual({ AAPL: '애플' });
     });
+
+    it('cache miss 시 DB 결과를 매핑한다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        mockRepository.findAll.mockResolvedValue([microsoft]);
+        const result = await getKoreanNames(['MSFT']);
+        expect(result).toEqual({ MSFT: '마이크로소프트' });
+    });
 });
 
 describe('setKoreanTickers', () => {
-    beforeEach(() => {
-        mockCache.get.mockReset();
-        mockCache.set.mockReset();
-        mockCache.delete.mockReset();
-        createCacheProviderMock.mockReturnValue(mockCache);
-    });
+    beforeEach(resetMocks);
+    afterEach(() => vi.clearAllMocks());
 
-    afterEach(() => {
-        createCacheProviderMock.mockReset();
-    });
-
-    it('빈 배열은 cache 호출 없이 종료한다', async () => {
+    it('빈 배열은 DB / cache 호출 없이 종료한다', async () => {
         await setKoreanTickers([]);
-        expect(mockCache.get).not.toHaveBeenCalled();
+        expect(mockRepository.upsertMany).not.toHaveBeenCalled();
         expect(mockCache.set).not.toHaveBeenCalled();
     });
 
-    it('cache provider 가 null 이면 아무 동작도 하지 않는다', async () => {
-        createCacheProviderMock.mockReturnValue(null);
-        await setKoreanTickers([apple]);
-        expect(mockCache.set).not.toHaveBeenCalled();
-    });
-
-    it('기존 entry 와 신규 entry 를 symbol 기준으로 머지한다', async () => {
+    it('DB upsert 후 기존 cache 와 머지하여 cache 갱신', async () => {
         const oldApple: KoreanTickerEntry = { ...apple, koreanName: '구버전' };
         mockCache.get.mockResolvedValue([oldApple, microsoft]);
         await setKoreanTickers([apple]);
+        expect(mockRepository.upsertMany).toHaveBeenCalledWith([apple]);
         expect(mockCache.set).toHaveBeenCalledTimes(1);
         const [, mergedValue] = mockCache.set.mock.calls[0];
         expect(mergedValue).toEqual([microsoft, apple]);
     });
 
-    it('기존 cache 가 비어있을 때도 신규 entry 를 저장한다', async () => {
+    it('cache 가 비어있을 때도 신규 entry 만 저장한다', async () => {
         mockCache.get.mockResolvedValue(null);
         await setKoreanTickers([apple]);
         expect(mockCache.set).toHaveBeenCalledWith(
@@ -145,6 +196,27 @@ describe('setKoreanTickers', () => {
             [apple],
             expect.any(Number)
         );
+    });
+
+    it('DB 클라이언트 없으면 DB 호출 없이 cache 만 갱신', async () => {
+        tryGetDatabaseClientMock.mockReturnValue(null);
+        mockCache.get.mockResolvedValue(null);
+        await setKoreanTickers([apple]);
+        expect(mockRepository.upsertMany).not.toHaveBeenCalled();
+        expect(mockCache.set).toHaveBeenCalledTimes(1);
+    });
+
+    it('DB upsert 실패 시 cache 도 건드리지 않고 종료', async () => {
+        mockRepository.upsertMany.mockRejectedValue(new Error('db down'));
+        await setKoreanTickers([apple]);
+        expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
+    it('cache provider 가 null 이면 DB 만 갱신', async () => {
+        createCacheProviderMock.mockReturnValue(null);
+        await setKoreanTickers([apple]);
+        expect(mockRepository.upsertMany).toHaveBeenCalledTimes(1);
+        expect(mockCache.set).not.toHaveBeenCalled();
     });
 
     it('cache 실패는 흡수한다', async () => {
