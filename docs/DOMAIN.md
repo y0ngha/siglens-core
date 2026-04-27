@@ -1120,6 +1120,33 @@ interface AnalysisResponse {
 }
 ```
 
+### 티어별 분석 결과 필터링
+
+`filterAnalysisResult(result, tier)`는 `TIER_CONFIG.infoDepth[tier]`를 기준으로
+`AnalysisResponse`의 공개 가능한 조각만 남기는 순수 함수다. 기본 설정처럼
+`enableTierRestrictions`가 `false`이면 `{ result, lockedInfoDepth: [] }`를 반환하며
+원본 `result` 객체를 그대로 보존한다.
+
+제한이 켜진 경우 허용되지 않은 필드는 `null`로 대체한다. 예외적으로
+`confidenceWeight`는 기존 숫자 타입을 유지하기 위해 `0`으로 대체한다. consumer는
+`lockedInfoDepth`를 보고 잠금 표시를 렌더링할 수 있다. 기본 매핑은 다음과 같다.
+
+```
+direction       → trend
+summary         → summary
+partial_detail  → indicatorResults, riskLevel, keyLevels, candlePatterns
+full_detail     → patternSummaries, strategyResults, trendlines,
+                  actionRecommendation.positionAnalysis
+entry           → actionRecommendation.entry, entryRecommendation, entryPrices
+stoploss        → actionRecommendation.stopLoss
+target          → priceTargets, actionRecommendation.takeProfitPrices
+confidence      → patternSummaries[].confidenceWeight,
+                  strategyResults[].confidenceWeight
+```
+
+`actionRecommendation.exit`, `riskReward`, `reconciledLevels`는 손절과 목표가를
+함께 설명하는 필드이므로 `stoploss`와 `target`이 모두 허용될 때만 공개한다.
+
 ### 필드별 의미
 
 ```

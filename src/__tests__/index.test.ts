@@ -18,6 +18,7 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extractReconciledActionLines,
     extendTrendline,
+    filterAnalysisResult,
     HIGH_CONFIDENCE_WEIGHT,
     getTierLimit,
     isAllowed,
@@ -102,6 +103,7 @@ describe('public API exports', () => {
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
         expect(isTier('member')).toBe(true);
+        expect(typeof filterAnalysisResult).toBe('function');
     });
 
     it('exports auth application entrypoints from package entrypoint', () => {

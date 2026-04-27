@@ -3,6 +3,7 @@ import {
     CANDLE_PATTERN_DETECTION_BARS,
     detectGoldenCross,
     EMA_DEFAULT_PERIODS,
+    filterAnalysisResult,
     GEMINI_2_5_FLASH_MODEL,
     HIGH_CONFIDENCE_WEIGHT,
     normalizeTrend,
@@ -20,6 +21,7 @@ describe('browser public API exports', () => {
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
         expect(HIGH_CONFIDENCE_WEIGHT).toBe(0.8);
+        expect(typeof filterAnalysisResult).toBe('function');
         expect(typeof detectGoldenCross).toBe('function');
         expect(normalizeTrend('bullish')).toBe('bullish');
         expect(skillType).toBe('indicator_guide');
