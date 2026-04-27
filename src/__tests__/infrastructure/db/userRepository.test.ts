@@ -79,6 +79,24 @@ function makeUpdateDb(rows: unknown[]): {
     };
 }
 
+function makeDeleteDb(rows: unknown[]): {
+    db: SiglensDatabase;
+    delete: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    returning: ReturnType<typeof vi.fn>;
+} {
+    const returning = vi.fn().mockResolvedValue(rows);
+    const where = vi.fn(() => ({ returning }));
+    const deleteFn = vi.fn(() => ({ where }));
+
+    return {
+        db: { delete: deleteFn } as unknown as SiglensDatabase,
+        delete: deleteFn,
+        where,
+        returning,
+    };
+}
+
 function makeTransactionDb(options: {
     userRows: unknown[];
     accountRows: unknown[];
@@ -158,6 +176,54 @@ describe('DrizzleUserRepository', () => {
         const result = await repository.findByEmail('missing@example.com');
 
         expect(result).toBeNull();
+    });
+
+    it('returns a user found by id', async () => {
+        const { db, select, from, where, limit } = makeSelectDb([userRecord]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.findById('user-1');
+
+        expect(select).toHaveBeenCalledWith(expect.any(Object));
+        expect(from).toHaveBeenCalledWith(expect.any(Object));
+        expect(where).toHaveBeenCalledWith(expect.any(Object));
+        expect(limit).toHaveBeenCalledWith(1);
+        expect(result).toEqual(userRecord);
+    });
+
+    it('returns null when no user is found by id', async () => {
+        const { db } = makeSelectDb([]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.findById('missing-user');
+
+        expect(result).toBeNull();
+    });
+
+    it('returns true when deleting an existing user', async () => {
+        const {
+            db,
+            delete: deleteFn,
+            where,
+            returning,
+        } = makeDeleteDb([{ id: 'user-1' }]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.deleteUser('user-1');
+
+        expect(deleteFn).toHaveBeenCalledWith(users);
+        expect(where).toHaveBeenCalledWith(expect.any(Object));
+        expect(returning).toHaveBeenCalledWith({ id: users.id });
+        expect(result).toBe(true);
+    });
+
+    it('returns false when no user is deleted', async () => {
+        const { db } = makeDeleteDb([]);
+        const repository = new DrizzleUserRepository(db);
+
+        const result = await repository.deleteUser('missing-user');
+
+        expect(result).toBe(false);
     });
 
     it('returns an email-auth user with password hash', async () => {

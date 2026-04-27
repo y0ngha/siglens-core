@@ -29,6 +29,27 @@ function makeInsertDb(rows: unknown[]): {
     };
 }
 
+function makeSelectDb(rows: unknown[]): {
+    db: SiglensDatabase;
+    select: ReturnType<typeof vi.fn>;
+    from: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    limit: ReturnType<typeof vi.fn>;
+} {
+    const limit = vi.fn().mockResolvedValue(rows);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+
+    return {
+        db: { select } as unknown as SiglensDatabase,
+        select,
+        from,
+        where,
+        limit,
+    };
+}
+
 function makeDeleteDb(rows: unknown[]): {
     db: SiglensDatabase;
     delete: ReturnType<typeof vi.fn>;
@@ -69,6 +90,35 @@ describe('DrizzleSessionRepository', () => {
             createdAt: sessions.createdAt,
         });
         expect(result).toEqual(sessionRecord);
+    });
+
+    it('returns the session record when one matches the token', async () => {
+        const { db, select, from, where, limit } = makeSelectDb([
+            sessionRecord,
+        ]);
+        const repository = new DrizzleSessionRepository(db);
+
+        const result = await repository.findSession('session-1');
+
+        expect(select).toHaveBeenCalledWith({
+            id: sessions.id,
+            userId: sessions.userId,
+            expiresAt: sessions.expiresAt,
+            createdAt: sessions.createdAt,
+        });
+        expect(from).toHaveBeenCalledWith(expect.any(Object));
+        expect(where).toHaveBeenCalledWith(expect.any(Object));
+        expect(limit).toHaveBeenCalledWith(1);
+        expect(result).toEqual(sessionRecord);
+    });
+
+    it('returns null when no session matches the token', async () => {
+        const { db } = makeSelectDb([]);
+        const repository = new DrizzleSessionRepository(db);
+
+        const result = await repository.findSession('missing-session');
+
+        expect(result).toBeNull();
     });
 
     it('returns true when deleting an existing session', async () => {

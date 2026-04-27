@@ -35,6 +35,16 @@ export class DrizzleSessionRepository implements SessionRepository {
         return session!;
     }
 
+    async findSession(sessionToken: string): Promise<AuthSessionRecord | null> {
+        const [session] = await this.db
+            .select(sessionColumns)
+            .from(sessions)
+            .where(eq(sessions.id, sessionToken))
+            .limit(1);
+
+        return session ?? null;
+    }
+
     async deleteSession(sessionToken: string): Promise<boolean> {
         const deletedSessions = await this.db
             .delete(sessions)
