@@ -11,6 +11,19 @@ import type {
  * @param dependencies - Repository providing tier persistence access.
  * @returns A discriminated result indicating success with the persisted tier or
  *          a structured `user_not_found` error when the target user does not exist.
+ *
+ * @example
+ * ```ts
+ * const result = await setUserTier(
+ *     { userId: 'user-1', tier: 'pro' },
+ *     { users: new DrizzleUserRepository(db) }
+ * );
+ * if (!result.ok) {
+ *     // result.error.code === 'user_not_found'
+ * }
+ * ```
+ *
+ * @see {@link UserTierRepository.updateUserTier}
  */
 export async function setUserTier(
     input: SetUserTierInput,

@@ -1176,7 +1176,9 @@ export interface TierConfig {
 
 /** Request-scoped user tier data for server middleware and handlers. */
 export interface UserTierContext {
+    /** Authenticated user UUID, or null for anonymous requests. */
     userId: string | null;
+    /** Resolved subscription tier for this request. */
     tier: Tier;
 }
 

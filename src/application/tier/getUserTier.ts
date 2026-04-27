@@ -11,6 +11,16 @@ import type { GetUserTierInput, UserTierDependencies } from './types';
  * @param input - Identifies the user whose tier should be looked up.
  * @param dependencies - Repository providing tier persistence access.
  * @returns The persisted tier, or the default free tier when the user is not found.
+ *
+ * @example
+ * ```ts
+ * const tier = await getUserTier(
+ *     { userId: session.userId },
+ *     { users: new DrizzleUserRepository(db) }
+ * );
+ * ```
+ *
+ * @see {@link UserTierRepository.getUserTier}
  */
 export async function getUserTier(
     input: GetUserTierInput,

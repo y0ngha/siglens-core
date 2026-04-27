@@ -1,5 +1,5 @@
 import type { Tier, UserTierContext } from '@/domain/types';
-import type { UserTierRepository } from '@/infrastructure/db/types';
+import type { UserTierRepository } from '@/infrastructure/db';
 
 /** Input for looking up a user's persisted tier. */
 export interface GetUserTierInput {

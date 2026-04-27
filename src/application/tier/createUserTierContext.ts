@@ -14,6 +14,16 @@ import type {
  * @param input - Optional authenticated user id; null/undefined treats the request as anonymous.
  * @param dependencies - Repository providing tier persistence access.
  * @returns Request-scoped context containing the resolved user id and tier.
+ *
+ * @example
+ * ```ts
+ * const context = await createUserTierContext(
+ *     { userId: session?.userId ?? null },
+ *     { users: new DrizzleUserRepository(db) }
+ * );
+ * ```
+ *
+ * @see {@link UserTierContext}
  */
 export async function createUserTierContext(
     input: CreateUserTierContextInput,

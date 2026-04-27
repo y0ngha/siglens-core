@@ -61,10 +61,6 @@
 - Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
 - Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
 
-- Violation: DrizzleUserRepository class-level JSDoc missing @see {@link UserRepository} cross-reference
-- Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
-- Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
-
 ## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
 - Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
 - Rule: ARCHITECTURE.md — types and constants must be defined in the layer that produces them; infrastructure-concern error codes must not appear in domain/
@@ -79,27 +75,14 @@
 - Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
 
-## [PR #34 Round 2 | feat/6/email-login | 2026-04-27]
-- Violation: Tier 4 public constants (`AUTH_SESSION_COOKIE_NAME`, `DEFAULT_SESSION_TTL_SECONDS`, `DEFAULT_AUTH_COOKIE_PATH`, `DEFAULT_AUTH_COOKIE_SAME_SITE`) missing JSDoc
-- Rule: CONVENTIONS.md — every symbol exported from `src/index.ts` must carry JSDoc for IDE hover; constants with non-obvious values (e.g. `2592000` = 30 days) especially require it
-- Context: Four session cookie constants were exported without any JSDoc; added single-line descriptions to each
-
 ## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
 - Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
 - Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
 - Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
 
-- Violation: `DrizzleSessionRepository` Tier 3 JSDoc missing `@returns` tag
-- Rule: CONVENTIONS.md — Tier 3 (infra factories & config) requires `description`, `@param`, and `@returns`
-- Context: Class-as-factory pattern; constructor returns an instance of the repository but `@returns` was omitted
-
 - Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
 - Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
 - Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
-
-- Violation: `index.test.ts` "exports database helpers" test mixed DB factories, schema tables, enum values, and auth use-case functions in a single `it()` block with a misleading title
-- Rule: CONVENTIONS.md / FF — Cohesion — one test case must cover one concern; the title must describe the actual content
-- Context: A single integration smoke test grew to assert across four distinct export categories, hiding the auth-function checks behind a database-helper title
 
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: infrastructure/db imported types from infrastructure/auth, creating cross-module coupling between two infrastructure modules
@@ -110,11 +93,6 @@
 - Violation: module-internal exports (createSessionCookie, createExpiredSessionCookie, addSeconds, createAuthSession) missing `@internal` JSDoc tag
 - Rule: MISTAKES.md #9.5 — every function/constant exported from a module but not re-exported in src/index.ts must have `@internal`
 - Context: createAuthSession was newly introduced for the social-login flow without the tag; the existing helpers lost their tags during the merge
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: Tier 1 application entrypoint `socialLoginUser` shipped without `@param`/`@returns`/`@example` JSDoc tags
-- Rule: CONVENTIONS.md JSDoc Rules — Tier 1 requires description, @param, @returns; @example/@see are recommended
-- Context: new use-case added during social login implementation only had a description block; sibling Tier 1 functions (loginUser, logoutUser) also lost their tags during merge resolution
 
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
@@ -136,6 +114,7 @@
 - Rule: MISTAKES.md Architecture #1 — shared domain types referenced by 2+ files must live in `domain/types.ts`
 - Context: moved `UserTierContext` to `domain/types.ts`, dropped the duplicate definition from `infrastructure/auth/types.ts`, and updated `src/index.ts` to re-export it from the domain block
 
-- Violation: tier use-case "not-found"/fallback test branches asserted only the return value, omitting `toHaveBeenCalledWith` checks present in sibling success branches
-- Rule: CONVENTIONS.md / FF Cohesion — sibling test branches in the same describe block must apply the same assertion strategy so behavior coverage is symmetric
-- Context: `createUserTierContext` fallback test and `setUserTier` not-found test gained `toHaveBeenCalledWith(...)` assertions on the repository mock to match the success-path tests
+## [PR #37 Round 2 | feat/8/user-tier-system | 2026-04-28]
+- Violation: `application/tier/types.ts` imported `UserTierRepository` from the deep `@/infrastructure/db/types` path while sibling files import via the `@/infrastructure/db` module index
+- Rule: FF Coupling — consumers should import from a module's public index, not its internal implementation files, so internal restructuring stays non-breaking
+- Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`

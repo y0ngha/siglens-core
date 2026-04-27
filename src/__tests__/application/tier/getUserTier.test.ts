@@ -34,13 +34,14 @@ describe('getUserTier', () => {
     });
 
     it('falls back to free when the user is missing', async () => {
-        const { repository } = makeRepository(null);
+        const { repository, getUserTierMock } = makeRepository(null);
 
         const result = await getUserTier(
             { userId: 'missing-user' },
             { users: repository }
         );
 
+        expect(getUserTierMock).toHaveBeenCalledWith('missing-user');
         expect(result).toBe('free');
     });
 });
