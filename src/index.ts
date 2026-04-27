@@ -418,6 +418,7 @@ export type {
     PasswordVerifier,
     SessionRepository,
     UserRepository,
+    UserTierContext,
 } from './infrastructure/auth';
 
 // Domain types
@@ -425,11 +426,11 @@ export type {
     Timeframe,
     Tier,
     TierConfig,
+    TierFeatureFlags,
     TierFeatureLimits,
     TierInfoDepth,
     TierLimitedFeature,
     TierModel,
-    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,

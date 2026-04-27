@@ -13,4 +13,5 @@ export type {
     PasswordVerifier,
     SessionRepository,
     UserRepository,
+    UserTierContext,
 } from './types';

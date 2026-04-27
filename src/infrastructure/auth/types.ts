@@ -1,9 +1,19 @@
+import type { Tier } from '@/domain/types';
+
 /**
  * Mirrors USER_TIER_VALUES in infrastructure/db/constants.ts.
  * Keep this union in sync with the database enum without importing across
  * infrastructure module boundaries.
  */
 export type AuthUserTier = 'free' | 'member' | 'pro';
+
+/**
+ * Request-scoped user tier data for server middleware and handlers.
+ */
+export interface UserTierContext {
+    userId: string | null;
+    tier: Tier;
+}
 
 /**
  * Mirrors OAUTH_PROVIDER_VALUES in infrastructure/db/constants.ts.

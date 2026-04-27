@@ -1155,21 +1155,18 @@ export type TierFeatureLimits = Record<
     Record<Tier, number>
 >;
 
+/** Toggle set controlling which tier gates are enforced at runtime. */
+export interface TierFeatureFlags {
+    enableTierRestrictions: boolean;
+}
+
 /** Centralized tier configuration consumed by domain and application gates. */
 export interface TierConfig {
     limits: TierFeatureLimits;
     timeframes: Record<Tier, readonly Timeframe[]>;
     infoDepth: Record<Tier, readonly TierInfoDepth[]>;
     models: Record<Tier, readonly TierModel[]>;
-    featureFlags: {
-        enableTierRestrictions: boolean;
-    };
-}
-
-/** Request-scoped user tier data for server middleware and handlers. */
-export interface UserTierContext {
-    userId: string | null;
-    tier: Tier;
+    featureFlags: TierFeatureFlags;
 }
 
 // ─── Backtesting ──────────────────────────────────────────────────────────────
