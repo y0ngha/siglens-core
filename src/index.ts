@@ -190,25 +190,13 @@ export { FileSkillsLoader } from './infrastructure/skills/loader';
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 
-// Database
+// Database factories & config
 export {
     createDatabaseClient,
     getDatabaseClient,
     tryGetDatabaseClient,
     readDatabaseConfig,
     tryReadDatabaseConfig,
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-    assetTranslations,
-    koreanTickers,
-    oauthAccounts,
-    oauthProviderEnum,
-    sessions,
-    usageActionTypeEnum,
-    usageLogs,
-    users,
-    userTierEnum,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -236,6 +224,22 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Database schema & constants
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+    assetTranslations,
+    koreanTickers,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    usageActionTypeEnum,
+    usageLogs,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
 
 // Dashboard tickers / sectors
 export {
@@ -344,7 +348,6 @@ export type {
 export type {
     DatabaseClient,
     DatabaseConfig,
-    NeonSqlClient,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
