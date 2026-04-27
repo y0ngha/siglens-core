@@ -192,6 +192,32 @@ describe('registerUser', () => {
         expect(result).toEqual({ ok: true, user: createdUser });
     });
 
+    it('trims whitespace from name and avatarUrl before creating user', async () => {
+        const createdUser = makeUser('user@example.com');
+        const { repository, passwordHasher, createEmailUser } =
+            makeDependencies({
+                createdUser,
+            });
+
+        await registerUser(
+            {
+                email: 'user@example.com',
+                password: 'Password1',
+                name: '  Ada  ',
+                avatarUrl: '  https://example.com/avatar.png  ',
+            },
+            repository,
+            passwordHasher
+        );
+
+        expect(createEmailUser).toHaveBeenCalledWith({
+            email: 'user@example.com',
+            passwordHash: 'hashed-password',
+            name: 'Ada',
+            avatarUrl: 'https://example.com/avatar.png',
+        });
+    });
+
     it('returns duplicate email error when insert races with another signup', async () => {
         const { repository, passwordHasher } = makeDependencies({
             createdUser: null,
