@@ -20,6 +20,9 @@ export { getSectorSignals } from './application/dashboard/sectorSignals';
 export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
 
+// Auth
+export { registerUser } from './application/auth';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -193,9 +196,10 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 // Database factories & config
 export {
     createDatabaseClient,
+    DrizzleUserRepository,
     getDatabaseClient,
-    tryGetDatabaseClient,
     readDatabaseConfig,
+    tryGetDatabaseClient,
     tryReadDatabaseConfig,
 } from './infrastructure/db';
 
@@ -227,16 +231,16 @@ export {
 
 // Database schema & constants
 export {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
     assetTranslations,
     koreanTickers,
+    OAUTH_PROVIDER_VALUES,
     oauthAccounts,
     oauthProviderEnum,
     sessions,
+    USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
+    USER_TIER_VALUES,
     users,
     userTierEnum,
 } from './infrastructure/db';
@@ -329,6 +333,14 @@ export {
 } from './domain/indicators/constants';
 
 // Infrastructure interfaces
+export type {
+    RegisterUserError,
+    RegisterUserErrorCode,
+    RegisterUserErrorField,
+    RegisterUserInput,
+    RegisterUserResult,
+} from './application/auth';
+export type { PasswordHasher } from './infrastructure/auth';
 export type { CacheProvider } from './infrastructure/cache/types';
 export type { SkillsProvider } from './infrastructure/skills/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
@@ -346,16 +358,20 @@ export type {
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
 export type {
+    AuthUserRecord,
+    CreateEmailUserInput,
     DatabaseClient,
     DatabaseConfig,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserRepository,
     UserTier,
 } from './infrastructure/db';
 
 // Domain types
 export type {
+    AnalysisSignalType,
     Timeframe,
     Bar,
     IndicatorResult,
@@ -405,11 +421,17 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     SignalStrength,
+    BacktestCase,
+    BacktestMeta,
+    BacktestRiskLevel,
     ReconciledActionLevels,
     IndicatorGuideResult,
     KeyLevel,
     KeyLevels,
+    ClusteredKeyLevel,
+    ClusteredKeyLevels,
     KeyPrice,
+    QuadrantKey,
     PriceTarget,
     PriceScenario,
     PriceTargets,
@@ -423,8 +445,15 @@ export type {
     TrendlinePoint,
     ActionRecommendation,
     EntryRecommendation,
+    ReconciledActionLineData,
+    ValidatedActionPrices,
     ChatMessage,
+    ChatActionResult,
+    ChatErrorCode,
+    ChatLoadingPhase,
+    ChatModel,
     ChatPromptPayload,
+    ChatSession,
     MarketIndexData,
     MarketSectorData,
     MarketBriefingResponse,
@@ -443,6 +472,8 @@ export type {
     AssetInfo,
     TickerCategory,
     CategoryId,
+    SkillCounts,
+    SkillShowcaseItem,
     IndexTicker,
     SectorEtf,
     SectorGroupDef,
@@ -461,4 +492,17 @@ export type {
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,
+    LevelSource,
+    ResolvedLevel,
+    ReconcileResult,
+    ReconciledTpEntry,
+    RunAnalysisInput,
+    RawAnalysisResponse,
+    BacktestSignalResult,
+    BacktestAiResult,
+    BacktestExitReason,
+    BacktestAiPriceTarget,
+    BacktestAiEntryRecommendation,
+    BacktestAiAnalysis,
+    BacktestData,
 } from './domain/types';

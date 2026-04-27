@@ -66,6 +66,8 @@ and have been removed from this file.
    → When replacing implementations, renaming patterns, or moving code, update the names
    ❌ fetchBars (no longer a fetch — now reads from cache)
    ✅ loadBars (accurate to new implementation)
+   → Also applies when external dependencies are removed: submitAnalysisAction + pollAnalysisAction are no longer Next.js server actions, should be renamed
+   ✅ submitAnalysis + pollAnalysis when migrated to general infrastructure layer
 
 10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
@@ -414,8 +416,12 @@ and have been removed from this file.
    → This enables consumers and tests to reference the interface independently of implementation
    ❌ interface JobRedisClient { ... } defined in jobs/redis.ts
    ❌ interface CallGeminiWithKeyFallbackOptions { ... } defined in gemini.ts
+   ❌ type AcquireReanalyzeCooldownResult { ... } defined in reanalyzeCooldown.ts
+   ❌ type CachedBriefingData { ... } defined in domain/types.ts (infra concern, should be in infrastructure/cache/types.ts)
    ✅ interface JobRedisClient { ... } in jobs/types.ts; jobs/redis.ts imports and implements against it
    ✅ interface UpstashEnvConfig { ... } in cache/types.ts (shared across cache/redis.ts and jobs/redis.ts)
+   ✅ type AcquireReanalyzeCooldownResult { ... } in infrastructure/market/types.ts; reanalyzeCooldown.ts imports it
+   ✅ type CachedBriefingData { ... } in infrastructure/cache/types.ts; application/market imports from infra, not domain
 
 5. Infrastructure module re-exporting domain symbols
    → Infrastructure modules must not act as transit paths for domain exports
@@ -438,4 +444,16 @@ and have been removed from this file.
       // → consumers never use this; breaks when Upstash API changes
    ✅ Remove internal constants/types from src/index.ts export blocks
    ✅ Only export interfaces and functions consumers explicitly call (e.g., JobQueue, SkillsProvider)
+
+7. Tier 3 (factories/config) and Tier 4 (public types/constants) mixed in a single export block
+   → src/index.ts must separate Tier 3 export blocks (factories, config, providers) from Tier 4 (schema objects, enums, constant arrays)
+   → When adding new Tier 3 symbols (e.g. DrizzleUserRepository) to an existing export block, re-split if that block contains any Tier 4 symbols
+   ❌ // src/index.ts — single export mixes factory (DrizzleUserRepository) with schema (users, sessions)
+      export { DrizzleUserRepository, users, sessions, USER_TIER_VALUES } from '@/infrastructure/db'
+   ❌ // Adding new Tier 3 to existing block without splitting schema/constants to Tier 4
+      export { createDatabaseClient, DrizzleUserRepository, assetTranslations, USER_TIER_VALUES }
+   ✅ // Tier 3: Factories & Config
+      export { createDatabaseClient, DrizzleUserRepository } from '@/infrastructure/db'
+      // Tier 4: Database schema & constants
+      export { users, sessions, assetTranslations, USER_TIER_VALUES } from '@/infrastructure/db'
 ```

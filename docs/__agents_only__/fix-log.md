@@ -20,11 +20,6 @@
 - Rule: CONVENTIONS.md — 루프 조건이 카운터가 아닌 수렴 predicate일 때 `while` 사용
 - Context: `prompt.ts`의 `countSqueezeDuration`은 뒤에서부터 `sqzOn === true`가 끊기는 지점을 찾는 수렴 탐색; `while` 루프로 교체
 
-## [PR #24 Round 3 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
-- Violation: `parseNumberEnv` 함수명이 "env var 파싱"을 시사해 domain/에서 환경변수를 다루는 듯한 인상을 줌
-- Rule: CONVENTIONS.md — 함수 이름은 실제 동작을 정확히 반영해야 함; `parseNumberEnv`는 raw string을 받는 순수 함수이며 env var에 의존하지 않음
-- Context: `domain/utils.ts`의 `parseNumberEnv`를 `parseNumberOrDefault`로 이름 변경
-
 ## [PR #24 Round 2 | feat/17/infrastructure-cache-jobs-ai-이전 | 2026-04-25]
 - Violation: `queue.ts`에 `setJobStatus`, `setJobResult`, `setJobError` 함수 누락
 - Rule: API 대칭성 — `getJobStatus`/`getJobResult`/`getJobError`가 있으면 대응하는 set 함수도 있어야 함
@@ -36,37 +31,50 @@
 - Rule: MISTAKES.md Architecture #4 — infrastructure 모듈의 public interface는 `types.ts`에 위치해야 함
 - Context: `infrastructure/market/types.ts`로 이동하고 구현 파일에서 import하도록 수정
 
-- Violation: 함수/파일 이름이 `submitAnalysisAction`, `pollAnalysisAction` 등 Next.js 서버 액션 네이밍을 유지
-- Rule: MISTAKES.md Coding Paradigm #9 — 아키텍처 변경 후 이름이 정확하지 않으면 업데이트
-- Context: Next.js 'use server' 액션에서 일반 infrastructure 함수로 전환되었으나 Action suffix가 남아 있어 misleading
-
 ## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
 - Violation: `submitAnalysis.ts`와 `pollAnalysis.ts`에서 `Awaited<ReturnType<typeof skillsLoader.loadSkills>>` 복잡한 유틸리티 타입 추론 사용
 - Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
 - Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
-
-## [PR #26 Round 5 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `CachedBriefingData` 인터페이스가 `domain/types.ts`에 선언되어 있으나 `briefing: unknown` 필드가 보여주듯 캐시 직렬화 전용 infrastructure 구조체
-- Rule: 레이어 분리 원칙 — infrastructure 관심사 타입은 `infrastructure/cache/types.ts`에 위치해야 하며 도메인 레이어에 노출되면 안 됨
-- Context: `domain/types.ts`에서 제거하고 `infrastructure/cache/types.ts`로 이동; `application/market/submitBriefing.ts` import 경로 업데이트
 
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
 
-
 ## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
 - Violation: Drizzle migration metadata was not regenerated after changing `assetTranslations.symbol` from table-level primary key metadata to inline primary key metadata
 - Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
 - Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes
 
+## [PR #33 | feat/5/email-signup | 2026-04-27]
+- Violation: Missing EOF newline in drizzle/0001_sharp_triathlon.sql
+- Rule: CONVENTIONS.md — every file must end with a newline character
+- Context: Migration SQL file generated without trailing newline; added manually
 
-## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: Tier 4 schema objects (users, sessions, usageLogs, etc.) and constants (USER_TIER_VALUES, OAUTH_PROVIDER_VALUES, USAGE_ACTION_TYPE_VALUES) exported in Tier 3 (Infrastructure Factories & Config) block in src/index.ts
-- Rule: ARCHITECTURE.md Tier grouping — Tier 3 is for factories/config, Tier 4 is for public types/constants
-- Context: Database export block mixed Tier 3 factory functions with Tier 4 schema objects in a single export statement; split into separate Tier 3 (factories) and Tier 4 (schema & constants) blocks
+- Violation: Missing @example and @see JSDoc tags on Tier 1 export registerUser in application/auth/registerUser.ts
+- Rule: CONVENTIONS.md Tier 1 recommended JSDoc tags — @example and @see are recommended for Tier 1 exports to aid IDE hover documentation for library consumers
+- Context: registerUser had @param and @returns but no usage example or cross-references to its dependency injection interfaces
 
-- Violation: JSDoc @param for createDatabaseClient duplicated the parameter type name without adding information beyond what the type signature already conveys
-- Rule: CONVENTIONS.md JSDoc Rules — do not duplicate type info the parameter type already conveys; explain the why, edge cases, or side effects the type cannot express
-- Context: @param config described as "Database connection configuration" which merely restates the type; updated to reference readDatabaseConfig as the canonical constructor
+## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
+- Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
+- Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
+- Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
+
+- Violation: DrizzleUserRepository class-level JSDoc missing @see {@link UserRepository} cross-reference
+- Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
+- Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
+
+## [PR #33 Round 3 | feat/5/email-signup | 2026-04-27]
+- Violation: Two separate `import type` blocks from the same `'./types'` path in `userRepository.ts`
+- Rule: CONVENTIONS.md Import style — merge all imports from the same specifier into a single statement
+- Context: `SiglensDatabase` was imported in a separate block from `AuthUserRecord`, `CreateEmailUserInput`, `UserRepository`; merged into one block
+
+
+## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
+- Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
+- Rule: ARCHITECTURE.md — types and constants must be defined in the layer that produces them; infrastructure-concern error codes must not appear in domain/
+- Context: Moved `EMAIL_ALREADY_EXISTS_CODE` from `domain/auth/constants.ts` to new `application/auth/constants.ts`; narrowed `AuthValidationErrorCode` to `'invalid_email' | 'weak_password'`; defined independent `RegisterUserError` interface in `application/auth/types.ts` with `RegisterUserErrorCode = AuthValidationErrorCode | 'email_already_exists'`
+
+- Violation: 26 individual indicator functions (`calculateATR`, `calculateBollinger`, etc.) exported as Tier 2 public API
+- Rule: ARCHITECTURE.md / PUBLIC_API.md — individual indicator calculators are classified as internal and must not appear in `src/index.ts`
+- Context: Export block for 26 functions removed from Tier 2 section; only the aggregate `calculateIndicators` is exported

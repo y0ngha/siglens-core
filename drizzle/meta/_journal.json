@@ -8,6 +8,13 @@
             "when": 1777212624738,
             "tag": "0000_absent_kid_colt",
             "breakpoints": true
+        },
+        {
+            "idx": 1,
+            "version": "7",
+            "when": 1777213326343,
+            "tag": "0001_sharp_triathlon",
+            "breakpoints": true
         }
     ]
 }

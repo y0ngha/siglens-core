@@ -20,12 +20,16 @@ export {
     users,
     userTierEnum,
 } from './schema';
+export { DrizzleUserRepository } from './userRepository';
 export type {
+    AuthUserRecord,
+    CreateEmailUserInput,
     DatabaseClient,
     DatabaseConfig,
     NeonSqlClient,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserRepository,
     UserTier,
 } from './types';

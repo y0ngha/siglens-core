@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import type { PasswordHasher, PatternTrend, UserRepository } from '@/index';
 import {
     asArray,
     assetTranslations,
@@ -9,22 +9,24 @@ import {
     CROSS_LOOKBACK_BARS,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
+    DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
     EXCLUDED_SINGLE_PATTERNS,
-    extractReconciledActionLines,
     extendTrendline,
+    extractReconciledActionLines,
     getDatabaseClient,
     HIGH_CONFIDENCE_WEIGHT,
     koreanTickers,
     normalizeActionRecommendation,
     normalizeTrend,
-    oauthAccounts,
     OAUTH_PROVIDER_VALUES,
+    oauthAccounts,
     oauthProviderEnum,
     postProcessAnalysisWithReconcile,
     readDatabaseConfig,
+    registerUser,
     RSI_DEFAULT_PERIOD,
     sessions,
     tryGetDatabaseClient,
@@ -32,12 +34,12 @@ import {
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
-    users,
     USER_TIER_VALUES,
+    users,
     userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type { PatternTrend } from '@/index';
+import { describe, expect, it } from 'vitest';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -72,6 +74,8 @@ describe('public API exports', () => {
         expect(typeof getDatabaseClient).toBe('function');
         expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
+        expect(typeof registerUser).toBe('function');
+        expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof tryReadDatabaseConfig).toBe('function');
     });
 
@@ -95,5 +99,34 @@ describe('public API exports', () => {
             ...OAUTH_PROVIDER_VALUES,
         ]);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
+    });
+
+    it('registerUser rejects an invalid email via exported interfaces', async () => {
+        const repository: UserRepository = {
+            findByEmail: async () => null,
+            createEmailUser: async input => ({
+                id: 'user-1',
+                email: input.email,
+                name: input.name ?? null,
+                avatarUrl: input.avatarUrl ?? null,
+                tier: 'free',
+                createdAt: new Date('2026-04-26T00:00:00.000Z'),
+                updatedAt: new Date('2026-04-26T00:00:00.000Z'),
+            }),
+        };
+        const passwordHasher: PasswordHasher = {
+            hashPassword: async password => `hashed:${password}`,
+        };
+
+        const result = await registerUser(
+            { email: 'not-an-email', password: 'Password1' },
+            repository,
+            passwordHasher
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            error: expect.objectContaining({ code: 'invalid_email' }),
+        });
     });
 });

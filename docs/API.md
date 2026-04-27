@@ -223,7 +223,7 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 
 | 테이블 | 목적 |
 |---|---|
-| `users` | 사용자 메타데이터와 구독 tier (`free` / `member` / `pro`) |
+| `users` | 사용자 메타데이터, 이메일 로그인용 비밀번호 해시, 구독 tier (`free` / `member` / `pro`) |
 | `sessions` | 사용자 세션과 만료 시각 |
 | `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot`) |
 | `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
