@@ -210,20 +210,6 @@ export {
     DrizzleSessionRepository,
     DrizzleUserRepository,
 } from './infrastructure/db';
-export {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-    assetTranslations,
-    koreanTickers,
-    oauthAccounts,
-    oauthProviderEnum,
-    sessions,
-    usageActionTypeEnum,
-    usageLogs,
-    users,
-    userTierEnum,
-} from './infrastructure/db';
 
 // Job queue (worker-side primitives)
 export {
@@ -258,6 +244,22 @@ export {
     DEFAULT_AUTH_COOKIE_SAME_SITE,
     DEFAULT_SESSION_TTL_SECONDS,
 } from './application/auth';
+
+// Database schema objects / enum values
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+    assetTranslations,
+    koreanTickers,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    usageActionTypeEnum,
+    usageLogs,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
 
 // Dashboard tickers / sectors
 export {

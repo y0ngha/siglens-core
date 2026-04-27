@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { oauthAccounts, users } from '@/infrastructure/db/schema';
 import { DrizzleUserRepository } from '@/infrastructure/db/userRepository';
 import type { SiglensDatabase } from '@/infrastructure/db/types';
 
@@ -170,7 +171,7 @@ describe('DrizzleUserRepository', () => {
             name: 'Ada',
         });
 
-        expect(insert).toHaveBeenCalledWith(expect.any(Object));
+        expect(insert).toHaveBeenCalledWith(users);
         expect(values).toHaveBeenCalledWith({
             email: 'user@example.com',
             passwordHash: 'hashed-password',
@@ -179,9 +180,17 @@ describe('DrizzleUserRepository', () => {
             tier: 'free',
         });
         expect(onConflictDoNothing).toHaveBeenCalledWith({
-            target: expect.any(Object),
+            target: users.email,
         });
-        expect(returning).toHaveBeenCalledWith(expect.any(Object));
+        expect(returning).toHaveBeenCalledWith({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            avatarUrl: users.avatarUrl,
+            tier: users.tier,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+        });
         expect(result).toEqual(userRecord);
     });
 
@@ -281,7 +290,7 @@ describe('DrizzleUserRepository', () => {
             providerAccountId: 'provider-user-1',
         });
         expect(accountOnConflictDoNothing).toHaveBeenCalledWith({
-            target: [expect.any(Object), expect.any(Object)],
+            target: [oauthAccounts.provider, oauthAccounts.providerAccountId],
         });
         expect(result).toEqual(userRecord);
     });
@@ -339,5 +348,20 @@ describe('DrizzleUserRepository', () => {
         });
 
         expect(result).toBeNull();
+    });
+
+    it('rethrows unexpected transaction errors during OAuth user creation', async () => {
+        const unexpectedError = new Error('database unavailable');
+        const transaction = vi.fn().mockRejectedValue(unexpectedError);
+        const db = { transaction } as unknown as SiglensDatabase;
+        const repository = new DrizzleUserRepository(db);
+
+        await expect(
+            repository.createOAuthUser({
+                email: 'user@example.com',
+                provider: 'google',
+                providerAccountId: 'provider-user-1',
+            })
+        ).rejects.toThrow(unexpectedError);
     });
 });

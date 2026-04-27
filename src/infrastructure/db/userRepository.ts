@@ -6,6 +6,7 @@ import type {
     CreateOAuthUserInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    OAuthProvider,
     OAuthUserRepository,
     SiglensDatabase,
     UserRepository,
@@ -31,7 +32,8 @@ const emailAuthUserColumns = {
 };
 
 /**
- * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
+ * Drizzle ORM implementation of {@link UserRepository}, {@link EmailAuthUserRepository},
+ * and {@link OAuthUserRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
@@ -81,7 +83,7 @@ export class DrizzleUserRepository
     }
 
     async findByOAuthAccount(
-        provider: CreateOAuthUserInput['provider'],
+        provider: OAuthProvider,
         providerAccountId: string
     ): Promise<AuthUserRecord | null> {
         const [user] = await this.db

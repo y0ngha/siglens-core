@@ -71,17 +71,29 @@ describe('public API exports', () => {
         expect(trend).toBe('neutral');
     });
 
-    it('exports database helpers from package entrypoint', () => {
-        expect(typeof createDatabaseClient).toBe('function');
-        expect(typeof readDatabaseConfig).toBe('function');
+    it('exports auth application entrypoints from package entrypoint', () => {
         expect(typeof registerUser).toBe('function');
         expect(typeof loginUser).toBe('function');
         expect(typeof socialLoginUser).toBe('function');
         expect(typeof logoutUser).toBe('function');
+    });
+
+    it('exports database factory helpers from package entrypoint', () => {
+        expect(typeof createDatabaseClient).toBe('function');
+        expect(typeof readDatabaseConfig).toBe('function');
+    });
+
+    it('exports database repository classes from package entrypoint', () => {
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
+    });
+
+    it('exports database schema objects from package entrypoint', () => {
         expect(users.email.name).toBe('email');
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+    });
+
+    it('exports database enum values from package entrypoint', () => {
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
         expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
