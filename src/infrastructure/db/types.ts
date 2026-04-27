@@ -42,7 +42,7 @@ export interface AuthUserRecord {
 export interface CreateEmailUserInput {
     /** Normalized email address (lowercased, trimmed). */
     email: string;
-    /** Hashed password produced by a {@link UserRepository}-compatible hasher. */
+    /** Hashed password produced by a {@link PasswordHasher}-compatible hasher. */
     passwordHash: string;
     /** Optional display name. */
     name?: string;

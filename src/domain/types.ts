@@ -1192,3 +1192,26 @@ export type QuadrantKey =
     | 'bullishExpected'
     | 'bearishExpected'
     | 'bearishConfirmed';
+
+// =============================================================================
+// Auth
+// =============================================================================
+
+/** Machine-readable error code identifying a user registration failure reason. */
+export type AuthValidationErrorCode =
+    | 'invalid_email'
+    | 'weak_password'
+    | 'email_already_exists';
+
+/** The input field associated with a user registration validation error. */
+export type AuthValidationErrorField = 'email' | 'password';
+
+/** A structured validation or conflict error produced during user registration. */
+export interface AuthValidationError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: AuthValidationErrorCode;
+    /** The input field that caused the error. */
+    field: AuthValidationErrorField;
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}

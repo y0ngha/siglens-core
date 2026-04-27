@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { users } from './schema';
-import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
+    SiglensDatabase,
     UserRepository,
 } from './types';
 

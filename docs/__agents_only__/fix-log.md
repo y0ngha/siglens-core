@@ -36,11 +36,6 @@
 - Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
 - Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
 
-## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: `client.ts`, `config.ts`, `schema.ts`, `types.ts` all used `@/infrastructure/db/...` absolute paths to import siblings within the same module folder
-- Rule: CONVENTIONS.md Import Path Rules — relative imports inside a single module folder are correct; absolute `@/...` paths are for cross-layer references
-- Context: All four files replaced absolute sibling imports with `./types`, `./constants`, `./schema` relative imports
-
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
@@ -60,10 +55,6 @@
 - Rule: CONVENTIONS.md Tier 1 recommended JSDoc tags — @example and @see are recommended for Tier 1 exports to aid IDE hover documentation for library consumers
 - Context: registerUser had @param and @returns but no usage example or cross-references to its dependency injection interfaces
 
-- Violation: JSDoc @param for createDatabaseClient duplicated the parameter type name without adding information beyond what the type signature already conveys
-- Rule: CONVENTIONS.md JSDoc Rules — do not duplicate type info the parameter type already conveys; explain the why, edge cases, or side effects the type cannot express
-- Context: @param config described as "Database connection configuration" which merely restates the type; updated to reference readDatabaseConfig as the canonical constructor
-
 ## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
 - Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
 - Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
@@ -72,3 +63,9 @@
 - Violation: DrizzleUserRepository class-level JSDoc missing @see {@link UserRepository} cross-reference
 - Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
 - Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
+
+## [PR #33 Round 3 | feat/5/email-signup | 2026-04-27]
+- Violation: Two separate `import type` blocks from the same `'./types'` path in `userRepository.ts`
+- Rule: CONVENTIONS.md Import style — merge all imports from the same specifier into a single statement
+- Context: `SiglensDatabase` was imported in a separate block from `AuthUserRecord`, `CreateEmailUserInput`, `UserRepository`; merged into one block
+
