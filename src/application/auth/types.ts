@@ -5,6 +5,7 @@ import type {
     OAuthProvider,
     OAuthUserRepository,
     SessionRepository,
+    UserRepository,
 } from '@/infrastructure/db/types';
 import type { PasswordVerifier } from '@/infrastructure/auth/types';
 import type {
@@ -259,3 +260,62 @@ export interface LogoutUserResult {
     /** Expired cookie metadata the caller should apply to the HTTP response. */
     cookie: AuthSessionCookie;
 }
+
+/**
+ * Dependencies required to resolve a session token to its owning user.
+ */
+export interface FindUserBySessionTokenDependencies {
+    /** User persistence repository providing id-based lookup. */
+    users: UserRepository;
+    /** Session persistence repository providing token-based lookup. */
+    sessions: SessionRepository;
+}
+
+/**
+ * Runtime overrides for {@link findUserBySessionToken}.
+ */
+export interface FindUserBySessionTokenOptions {
+    /** Current time used to evaluate session expiration; defaults to `new Date()`. */
+    now?: Date;
+}
+
+/**
+ * Error code returned when account deletion cannot be completed.
+ */
+export type DeleteAccountErrorCode = 'user_not_found';
+
+/**
+ * Input data required to delete a user account.
+ */
+export interface DeleteAccountInput {
+    /** User UUID identifying the account to delete. */
+    userId: string;
+}
+
+/**
+ * Dependencies required to delete an account and its dependent rows.
+ */
+export interface DeleteAccountDependencies {
+    /** User persistence repository providing id-based deletion. */
+    users: UserRepository;
+}
+
+/**
+ * Structured error returned when account deletion fails.
+ */
+export interface DeleteAccountError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: DeleteAccountErrorCode;
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}
+
+/**
+ * Discriminated union result of a {@link deleteAccount} call.
+ *
+ * - `{ ok: true }` — the account was deleted; dependent sessions were cascaded.
+ * - `{ ok: false, error }` — the account could not be deleted.
+ */
+export type DeleteAccountResult =
+    | { ok: true }
+    | { ok: false; error: DeleteAccountError };
