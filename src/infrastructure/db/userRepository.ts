@@ -7,6 +7,7 @@ import type {
     UserRepository,
 } from './types';
 
+// Matches schema.ts users.tier .default('free'); update both if the default tier changes.
 const DEFAULT_USER_TIER = 'free';
 
 const authUserColumns = {
@@ -23,6 +24,7 @@ const authUserColumns = {
  * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
+ * @see {@link UserRepository}
  */
 export class DrizzleUserRepository implements UserRepository {
     constructor(private readonly db: SiglensDatabase) {}

@@ -1,3 +1,8 @@
+import {
+    EMAIL_ALREADY_EXISTS_CODE,
+    INVALID_EMAIL_CODE,
+    WEAK_PASSWORD_CODE,
+} from '@/application/constants/error-code';
 import type { PasswordHasher } from '@/infrastructure/auth';
 import type { UserRepository } from '@/infrastructure/db';
 import type {
@@ -11,6 +16,12 @@ const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_ALREADY_EXISTS_MESSAGE = 'Email is already registered';
 const INVALID_EMAIL_MESSAGE = 'Email format is invalid';
 const WEAK_PASSWORD_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters and include letters and numbers`;
+
+const EMAIL_ALREADY_EXISTS_ERROR: RegisterUserError = {
+    code: EMAIL_ALREADY_EXISTS_CODE,
+    field: 'email',
+    message: EMAIL_ALREADY_EXISTS_MESSAGE,
+};
 
 function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -28,7 +39,7 @@ function validateEmail(email: string): RegisterUserError | null {
     return EMAIL_PATTERN.test(email)
         ? null
         : {
-              code: 'invalid_email',
+              code: INVALID_EMAIL_CODE,
               field: 'email',
               message: INVALID_EMAIL_MESSAGE,
           };
@@ -40,7 +51,7 @@ function validatePassword(password: string): RegisterUserError | null {
         hasNumber(password)
         ? null
         : {
-              code: 'weak_password',
+              code: WEAK_PASSWORD_CODE,
               field: 'password',
               message: WEAK_PASSWORD_MESSAGE,
           };
@@ -88,14 +99,7 @@ export async function registerUser(
 
     const existingUser = await repository.findByEmail(email);
     if (existingUser !== null) {
-        return {
-            ok: false,
-            error: {
-                code: 'email_already_exists',
-                field: 'email',
-                message: EMAIL_ALREADY_EXISTS_MESSAGE,
-            },
-        };
+        return { ok: false, error: EMAIL_ALREADY_EXISTS_ERROR };
     }
 
     const passwordHash = await passwordHasher.hashPassword(input.password);
@@ -107,13 +111,6 @@ export async function registerUser(
     });
 
     return user === null
-        ? {
-              ok: false,
-              error: {
-                  code: 'email_already_exists',
-                  field: 'email',
-                  message: EMAIL_ALREADY_EXISTS_MESSAGE,
-              },
-          }
+        ? { ok: false, error: EMAIL_ALREADY_EXISTS_ERROR }
         : { ok: true, user };
 }

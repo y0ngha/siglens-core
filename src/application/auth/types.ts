@@ -1,4 +1,9 @@
 import type { AuthUserRecord } from '@/infrastructure/db/types';
+import type {
+    EMAIL_ALREADY_EXISTS_CODE,
+    INVALID_EMAIL_CODE,
+    WEAK_PASSWORD_CODE,
+} from '@/application/constants/error-code';
 
 /**
  * Error codes returned when user registration fails.
@@ -8,9 +13,9 @@ import type { AuthUserRecord } from '@/infrastructure/db/types';
  * - `email_already_exists` — the email is already registered.
  */
 export type RegisterUserErrorCode =
-    | 'invalid_email'
-    | 'weak_password'
-    | 'email_already_exists';
+    | typeof INVALID_EMAIL_CODE
+    | typeof WEAK_PASSWORD_CODE
+    | typeof EMAIL_ALREADY_EXISTS_CODE;
 
 /**
  * The input field associated with a registration validation error.
