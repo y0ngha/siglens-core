@@ -1,4 +1,4 @@
-import { EMAIL_ALREADY_EXISTS_CODE } from '@/domain/auth/constants';
+import { EMAIL_ALREADY_EXISTS_CODE } from './constants';
 import {
     normalizeEmail,
     validateEmail,

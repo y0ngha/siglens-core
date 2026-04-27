@@ -69,3 +69,12 @@
 - Rule: CONVENTIONS.md Import style — merge all imports from the same specifier into a single statement
 - Context: `SiglensDatabase` was imported in a separate block from `AuthUserRecord`, `CreateEmailUserInput`, `UserRepository`; merged into one block
 
+
+## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
+- Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
+- Rule: ARCHITECTURE.md — types and constants must be defined in the layer that produces them; infrastructure-concern error codes must not appear in domain/
+- Context: Moved `EMAIL_ALREADY_EXISTS_CODE` from `domain/auth/constants.ts` to new `application/auth/constants.ts`; narrowed `AuthValidationErrorCode` to `'invalid_email' | 'weak_password'`; defined independent `RegisterUserError` interface in `application/auth/types.ts` with `RegisterUserErrorCode = AuthValidationErrorCode | 'email_already_exists'`
+
+- Violation: 26 individual indicator functions (`calculateATR`, `calculateBollinger`, etc.) exported as Tier 2 public API
+- Rule: ARCHITECTURE.md / PUBLIC_API.md — individual indicator calculators are classified as internal and must not appear in `src/index.ts`
+- Context: Export block for 26 functions removed from Tier 2 section; only the aggregate `calculateIndicators` is exported

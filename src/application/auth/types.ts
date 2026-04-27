@@ -1,6 +1,5 @@
 import type { AuthUserRecord } from '@/infrastructure/db';
 import type {
-    AuthValidationError,
     AuthValidationErrorCode,
     AuthValidationErrorField,
 } from '@/domain/types';
@@ -12,7 +11,9 @@ import type {
  * - `weak_password` — the password is too short or lacks required character types.
  * - `email_already_exists` — the email is already registered.
  */
-export type RegisterUserErrorCode = AuthValidationErrorCode;
+export type RegisterUserErrorCode =
+    | AuthValidationErrorCode
+    | 'email_already_exists';
 
 /**
  * The input field associated with a registration validation error.
@@ -22,7 +23,14 @@ export type RegisterUserErrorField = AuthValidationErrorField;
 /**
  * A structured validation or conflict error returned when registration fails.
  */
-export type RegisterUserError = AuthValidationError;
+export interface RegisterUserError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: RegisterUserErrorCode;
+    /** The input field that caused the error. */
+    field: RegisterUserErrorField;
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}
 
 /**
  * Input data required to register a new user with email and password.

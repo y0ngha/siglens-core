@@ -1197,11 +1197,8 @@ export type QuadrantKey =
 // Auth
 // =============================================================================
 
-/** Machine-readable error code identifying a user registration failure reason. */
-export type AuthValidationErrorCode =
-    | 'invalid_email'
-    | 'weak_password'
-    | 'email_already_exists';
+/** Machine-readable error code identifying a domain validation failure reason. */
+export type AuthValidationErrorCode = 'invalid_email' | 'weak_password';
 
 /** The input field associated with a user registration validation error. */
 export type AuthValidationErrorField = 'email' | 'password';

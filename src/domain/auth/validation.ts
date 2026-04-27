@@ -6,6 +6,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const INVALID_EMAIL_MESSAGE = 'Email format is invalid';
 const WEAK_PASSWORD_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters and include letters and numbers`;
 
+/** @internal Normalizes an email address for consistent storage and lookup. */
 export function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
 }
@@ -18,6 +19,7 @@ function hasNumber(value: string): boolean {
     return /\d/.test(value);
 }
 
+/** @internal Returns a validation error if the email format is invalid, null otherwise. */
 export function validateEmail(email: string): AuthValidationError | null {
     return EMAIL_PATTERN.test(email)
         ? null
@@ -28,6 +30,7 @@ export function validateEmail(email: string): AuthValidationError | null {
           };
 }
 
+/** @internal Returns a validation error if the password does not meet strength requirements, null otherwise. */
 export function validatePassword(password: string): AuthValidationError | null {
     return password.length >= MIN_PASSWORD_LENGTH &&
         hasLetter(password) &&
