@@ -114,6 +114,8 @@ describe('tier', () => {
     describe('isTier', () => {
         it('identifies valid tier literals', () => {
             expect(isTier('free')).toBe(true);
+            expect(isTier('member')).toBe(true);
+            expect(isTier('pro')).toBe(true);
             expect(isTier('enterprise')).toBe(false);
         });
     });

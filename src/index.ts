@@ -156,8 +156,6 @@ export {
 
 // Tier gating
 export {
-    DEFAULT_TIER,
-    TIER_CONFIG,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -266,6 +264,9 @@ export {
     users,
     userTierEnum,
 } from './infrastructure/db';
+
+// Tier gating constants
+export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
 
 // Dashboard tickers / sectors
 export {

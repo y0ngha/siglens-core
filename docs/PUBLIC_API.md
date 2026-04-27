@@ -120,10 +120,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
 | `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
 
-**티어 제한 (7)**
+**티어 제한 함수 (6)**
 | Symbol | Source |
 |---|---|
-| `DEFAULT_TIER` / `TIER_CONFIG` | `domain/tier.ts` |
 | `isAllowed` / `getTierLimit` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
 | `isTier` | `domain/tier.ts` |
@@ -235,6 +234,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 **캔들 라벨 맵** — `CANDLE_PATTERN_LABELS`, `MULTI_CANDLE_PATTERN_LABELS`.
 
 **지표 상수** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `EMA_DEFAULT_PERIODS` 등 `src/domain/indicators/constants.ts`의 지표 계산 기본값과 임계값.
+
+**티어 제한 상수** — `DEFAULT_TIER`, `TIER_CONFIG` (`domain/tier.ts`).
 
 **고급 도메인 헬퍼** — 개별 신호 감지기, 신호 상수, 정규화 함수, AI 레벨 보정, 추세선/키레벨/action recommendation 보조 함수는 외부 consumer의 세부 렌더링·검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다.
 

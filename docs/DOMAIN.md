@@ -143,8 +143,8 @@ export const TIER_CONFIG = {
   },
   timeframes: {
     free: ['1Day'],
-    member: ['1Hour', '4Hour', '1Day'],
-    pro: ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'],
+    member: ['1Day', '1Hour', '4Hour'],
+    pro: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
   },
   infoDepth: {
     free: ['direction', 'summary'],
