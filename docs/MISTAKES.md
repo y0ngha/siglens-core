@@ -424,6 +424,15 @@ and have been removed from this file.
 ## Architecture
 
 ```
+0. Error codes and types must be defined in the layer that produces them
+   → Application layer error codes (AUTH_ALREADY_EXISTS, registration failures) belong in application/auth/types.ts, not domain/
+   → When a violation is produced by application logic or infrastructure I/O, it is NOT a domain concern
+   → Domain layer contains only pure calculation/transformation logic and their error cases, never application-specific violations
+   ❌ EMAIL_ALREADY_EXISTS_CODE in domain/auth/constants.ts (produced by application duplicate-check logic)
+   ❌ AuthValidationErrorCode = '...' | 'email_already_exists' in domain (application concern, not domain validation)
+   ✅ EMAIL_ALREADY_EXISTS_CODE in application/auth/constants.ts
+   ✅ AuthValidationErrorCode = 'invalid_email' | 'weak_password' in domain (pure validation); RegisterUserErrorCode includes application variants
+
 1. Type interfaces defined in implementation files instead of domain/types.ts
    → All shared domain types (interfaces, unions, enums) must be centralized in domain/types.ts
    → If multiple files reference the same type, move it to domain/types.ts for single source of truth
@@ -460,7 +469,17 @@ and have been removed from this file.
       export { computeSecondsUntilCacheExpiry } from '@/domain/utils';
    ✅ Consumers import directly: import { parseJsonResponse } from '@/domain/utils'
 
-6. Internal implementation constants/types leaked to public API via src/index.ts
+6. Individual domain indicator calculators exported to public API
+   → Indicator calculation functions (calculateATR, calculateBollinger, calculateEMA, etc.) are implementation details
+   → Only the aggregate calculateIndicators entry point should be exported to Tier 2 public API
+   → Exporting individual calculators locks them into the public contract, blocking internal refactoring
+   ❌ // src/index.ts Tier 2
+      export { calculateATR, calculateBollinger, calculateBollingerMulti, calculateCCI, ... } from '@/domain/indicators'
+      // → 26 indicator functions become public; cannot refactor calculation internals without breaking consumers
+   ✅ Only export { calculateIndicators } as the entry point
+   ✅ Keep individual calculateXXX functions internal (@internal JSDoc) for library-internal use
+
+6.5. Internal implementation constants/types leaked to public API via src/index.ts
    → Library public API must export only symbols consumers actually use
    → Implementation details (internal cache keys, Redis options, internal interfaces) must not be re-exported
    → Leaking internal symbols causes breaking changes when internals are refactored
