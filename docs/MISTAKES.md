@@ -69,6 +69,14 @@ and have been removed from this file.
    → Also applies when external dependencies are removed: submitAnalysisAction + pollAnalysisAction are no longer Next.js server actions, should be renamed
    ✅ submitAnalysis + pollAnalysis when migrated to general infrastructure layer
 
+9.5. Module-internal exports missing @internal JSDoc tag
+   → Every function/constant exported from a module but not re-exported in src/index.ts must have /** @internal */ JSDoc
+   → Enables IDE tooling and consumers to distinguish public API from internal helpers
+   ❌ export function createSessionCookie(user) { ... }  // in sessionCookie.ts, not in src/index.ts
+   ❌ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;  // private constant, no @internal tag
+   ✅ /** @internal */ export function createSessionCookie(user) { ... }
+   ✅ /** @internal */ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;
+
 10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
     ❌ arr.sort() // in-place mutation
@@ -152,6 +160,13 @@ and have been removed from this file.
 3. Unused/missing type imports
    → Remove unused type imports; add missing ones for explicit annotations
    → When TypeScript infers automatically, the import is unnecessary
+
+3.5. Multiple import blocks from the same module
+   → Merge all imports from a single specifier into one block
+   ❌ import type { SiglensDatabase } from './types';
+      // ... code ...
+      import type { AuthUserRecord, CreateEmailUserInput } from './types';
+   ✅ import type { SiglensDatabase, AuthUserRecord, CreateEmailUserInput } from './types';
 
 4. Interface field declaration does not match runtime behavior
    → Required fields marked `?` in the interface or absent fields declared as required
@@ -341,6 +356,13 @@ and have been removed from this file.
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → When changing function implementation, update related comments immediately
+
+4. Tier 1 public exports missing required JSDoc tags
+   → Tier 1 functions require @param and @returns tags for IDE hover documentation
+   → Recommended tags (@example, @see) improve consumer guidance
+   ❌ export function loginUser(input, deps) { ... }  // missing all JSDoc
+   ❌ export function registerUser(...) { /** description only */ }  // no @param/@returns/@example/@see
+   ✅ export function loginUser(...) { /** description. @param input deps. @returns result. @example usage. @see related */ }
 ```
 
 ---
@@ -444,4 +466,16 @@ and have been removed from this file.
       // → consumers never use this; breaks when Upstash API changes
    ✅ Remove internal constants/types from src/index.ts export blocks
    ✅ Only export interfaces and functions consumers explicitly call (e.g., JobQueue, SkillsProvider)
+
+7. Tier 3 (factories/config) and Tier 4 (public types/constants) mixed in a single export block
+   → src/index.ts must separate Tier 3 export blocks (factories, config, providers) from Tier 4 (schema objects, enums, constant arrays)
+   → When adding new Tier 3 symbols (e.g. DrizzleUserRepository) to an existing export block, re-split if that block contains any Tier 4 symbols
+   ❌ // src/index.ts — single export mixes factory (DrizzleUserRepository) with schema (users, sessions)
+      export { DrizzleUserRepository, users, sessions, USER_TIER_VALUES } from '@/infrastructure/db'
+   ❌ // Adding new Tier 3 to existing block without splitting schema/constants to Tier 4
+      export { createDatabaseClient, DrizzleUserRepository, assetTranslations, USER_TIER_VALUES }
+   ✅ // Tier 3: Factories & Config
+      export { createDatabaseClient, DrizzleUserRepository } from '@/infrastructure/db'
+      // Tier 4: Database schema & constants
+      export { users, sessions, assetTranslations, USER_TIER_VALUES } from '@/infrastructure/db'
 ```

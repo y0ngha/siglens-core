@@ -25,10 +25,6 @@
 - Rule: API 대칭성 — `getJobStatus`/`getJobResult`/`getJobError`가 있으면 대응하는 set 함수도 있어야 함
 - Context: `queue.ts`에 3개 write 함수 추가; 각각 `job:{id}:status/result/error` 키에 TTL 1시간으로 저장
 
-- Violation: `@google/genai`, `@upstash/redis`가 `dependencies`에 포함되어 소비자 프로젝트에 강제 설치
-- Rule: npm 라이브러리 패턴 — 선택적 런타임 의존성은 `peerDependencies`(optional) + `devDependencies`로 분리
-- Context: `package.json`에서 두 패키지를 `peerDependencies`(optional: true) 및 `devDependencies`로 이동
-
 ## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
 
 - Violation: `AcquireReanalyzeCooldownResult` 타입이 `reanalyzeCooldown.ts` 구현 파일 내부에만 정의됨
@@ -40,12 +36,71 @@
 - Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
 - Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
 
-## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: `client.ts`, `config.ts`, `schema.ts`, `types.ts` all used `@/infrastructure/db/...` absolute paths to import siblings within the same module folder
-- Rule: CONVENTIONS.md Import Path Rules — relative imports inside a single module folder are correct; absolute `@/...` paths are for cross-layer references
-- Context: All four files replaced absolute sibling imports with `./types`, `./constants`, `./schema` relative imports
-
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
+
+## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
+- Violation: Drizzle migration metadata was not regenerated after changing `assetTranslations.symbol` from table-level primary key metadata to inline primary key metadata
+- Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
+- Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes
+
+## [PR #33 | feat/5/email-signup | 2026-04-27]
+- Violation: Missing EOF newline in drizzle/0001_sharp_triathlon.sql
+- Rule: CONVENTIONS.md — every file must end with a newline character
+- Context: Migration SQL file generated without trailing newline; added manually
+
+## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
+- Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
+- Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
+- Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
+
+- Violation: DrizzleUserRepository class-level JSDoc missing @see {@link UserRepository} cross-reference
+- Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
+- Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
+
+## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
+- Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
+- Rule: ARCHITECTURE.md — types and constants must be defined in the layer that produces them; infrastructure-concern error codes must not appear in domain/
+- Context: Moved `EMAIL_ALREADY_EXISTS_CODE` from `domain/auth/constants.ts` to new `application/auth/constants.ts`; narrowed `AuthValidationErrorCode` to `'invalid_email' | 'weak_password'`; defined independent `RegisterUserError` interface in `application/auth/types.ts` with `RegisterUserErrorCode = AuthValidationErrorCode | 'email_already_exists'`
+
+- Violation: 26 individual indicator functions (`calculateATR`, `calculateBollinger`, etc.) exported as Tier 2 public API
+- Rule: ARCHITECTURE.md / PUBLIC_API.md — individual indicator calculators are classified as internal and must not appear in `src/index.ts`
+- Context: Export block for 26 functions removed from Tier 2 section; only the aggregate `calculateIndicators` is exported
+
+## [PR #34 | feat/6/email-login | 2026-04-27]
+- Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
+- Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
+- Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
+
+## [PR #34 Round 2 | feat/6/email-login | 2026-04-27]
+- Violation: Tier 4 public constants (`AUTH_SESSION_COOKIE_NAME`, `DEFAULT_SESSION_TTL_SECONDS`, `DEFAULT_AUTH_COOKIE_PATH`, `DEFAULT_AUTH_COOKIE_SAME_SITE`) missing JSDoc
+- Rule: CONVENTIONS.md — every symbol exported from `src/index.ts` must carry JSDoc for IDE hover; constants with non-obvious values (e.g. `2592000` = 30 days) especially require it
+- Context: Four session cookie constants were exported without any JSDoc; added single-line descriptions to each
+
+## [PR #34 Round 3 | feat/6/email-login | 2026-04-27]
+- Violation: Auth export block in `src/index.ts` mixed Tier 1 use-case functions (`loginUser`, `logoutUser`, `registerUser`) with Tier 4 session cookie constants in a single block
+- Rule: `src/index.ts` structure convention — each export block must contain symbols of a single Tier only; mixing Tiers in one block obscures API classification for consumers
+- Context: Tier 4 constants moved to the Tier 4 section; Tier 1 block now contains only use-case entry points
+
+## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
+- Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
+- Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
+- Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
+
+- Violation: `DrizzleSessionRepository` Tier 3 JSDoc missing `@returns` tag
+- Rule: CONVENTIONS.md — Tier 3 (infra factories & config) requires `description`, `@param`, and `@returns`
+- Context: Class-as-factory pattern; constructor returns an instance of the repository but `@returns` was omitted
+
+- Violation: Bare `/** @internal */` on `createSessionCookie` and `createExpiredSessionCookie`
+- Rule: CONVENTIONS.md — bare `@internal` is acceptable but a one-line role description is preferred
+- Context: Both helpers exported from `sessionCookie.ts` lacked any descriptive note alongside `@internal`
+
+- Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
+- Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
+- Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
+
+- Violation: `index.test.ts` "exports database helpers" test mixed DB factories, schema tables, enum values, and auth use-case functions in a single `it()` block with a misleading title
+- Rule: CONVENTIONS.md / FF — Cohesion — one test case must cover one concern; the title must describe the actual content
+- Context: A single integration smoke test grew to assert across four distinct export categories, hiding the auth-function checks behind a database-helper title
