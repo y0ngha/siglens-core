@@ -78,3 +78,8 @@
 - Violation: 26 individual indicator functions (`calculateATR`, `calculateBollinger`, etc.) exported as Tier 2 public API
 - Rule: ARCHITECTURE.md / PUBLIC_API.md — individual indicator calculators are classified as internal and must not appear in `src/index.ts`
 - Context: Export block for 26 functions removed from Tier 2 section; only the aggregate `calculateIndicators` is exported
+
+## [PR #34 | feat/6/email-login | 2026-04-27]
+- Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
+- Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
+- Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record

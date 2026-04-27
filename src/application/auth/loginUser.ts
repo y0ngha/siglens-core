@@ -5,7 +5,10 @@ import type {
     LoginUserOptions,
     LoginUserResult,
 } from './types';
-import type { AuthUserRecord } from '@/infrastructure/auth/types';
+import type {
+    AuthUserRecord,
+    EmailAuthUserRecord,
+} from '@/infrastructure/auth/types';
 import {
     addSeconds,
     createSessionCookie,
@@ -25,24 +28,9 @@ function invalidCredentialsError(): LoginUserError {
     };
 }
 
-function omitPasswordHash(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    avatarUrl: string | null;
-    tier: AuthUserRecord['tier'];
-    createdAt: Date;
-    updatedAt: Date;
-}): AuthUserRecord {
-    return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-        tier: user.tier,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-    };
+function omitPasswordHash(user: EmailAuthUserRecord): AuthUserRecord {
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return safeUser;
 }
 
 /**
