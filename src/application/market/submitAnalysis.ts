@@ -1,9 +1,15 @@
 import { fireAndForget } from '@/application/background';
-import type { BackgroundTaskOptions } from '@/application/types';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import type { SubmitAnalysisOptions } from '@/application/market/types';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
+import {
+    DEFAULT_TIER,
+    TIER_CONFIG,
+    getAllowedTimeframes,
+    isTimeframeAllowed,
+} from '@/domain/tier';
 import type {
     AnalysisResponse,
     Skill,
@@ -41,10 +47,12 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  *   Defaults to `false`.
  * @param fmpSymbol - Optional override symbol forwarded to the market data
  *   provider when FMP uses a different identifier.
- * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
- *   so the worker dispatch can continue after the response.
+ * @param options - Optional tier gating and background-task hooks. Pass
+ *   Vercel's `waitUntil` so the worker dispatch can continue after the
+ *   response.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
- *   see {@link SubmitAnalysisResult}.
+ *   see {@link SubmitAnalysisResult}. Returns `status: "error"` when the
+ *   request's tier cannot access the timeframe.
  *
  * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
  *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
@@ -64,8 +72,24 @@ export async function submitAnalysis(
     timeframe: Timeframe,
     force: boolean = false,
     fmpSymbol?: string,
-    options?: BackgroundTaskOptions
+    options: SubmitAnalysisOptions = {}
 ): Promise<SubmitAnalysisResult> {
+    const tier = options.tierContext?.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+    if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
+        const allowedTimeframes = getAllowedTimeframes(tier, tierConfig);
+        return {
+            status: 'error',
+            error: {
+                code: 'timeframe_not_allowed',
+                message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
+                tier,
+                timeframe,
+                allowedTimeframes,
+            },
+        };
+    }
+
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe);
 

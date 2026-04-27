@@ -6,6 +6,7 @@ import type {
     TierModel,
     Timeframe,
 } from '@/domain/types';
+import { TIMEFRAMES } from '@/domain/constants/market';
 
 /** @internal All supported subscription tiers, ordered free -> member -> pro. */
 export const TIER_VALUES = [
@@ -121,6 +122,25 @@ export function getTierLimit(
 }
 
 /**
+ * Return the timeframes available to a tier.
+ *
+ * Always returns every known timeframe when
+ * `config.featureFlags.enableTierRestrictions` is `false`.
+ *
+ * @param tier - The user's subscription tier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns A new array of allowed timeframes for the active restriction mode.
+ */
+export function getAllowedTimeframes(
+    tier: Tier,
+    config: TierConfig = TIER_CONFIG
+): Timeframe[] {
+    return config.featureFlags.enableTierRestrictions
+        ? [...config.timeframes[tier]]
+        : [...TIMEFRAMES];
+}
+
+/**
  * Return whether a timeframe is available to the tier.
  *
  * Always returns `true` when `config.featureFlags.enableTierRestrictions` is `false`.
@@ -136,7 +156,7 @@ export function isTimeframeAllowed(
     config: TierConfig = TIER_CONFIG
 ): boolean {
     return config.featureFlags.enableTierRestrictions
-        ? config.timeframes[tier].includes(timeframe)
+        ? getAllowedTimeframes(tier, config).includes(timeframe)
         : true;
 }
 

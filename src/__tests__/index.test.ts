@@ -18,6 +18,7 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extractReconciledActionLines,
     extendTrendline,
+    getAllowedTimeframes,
     HIGH_CONFIDENCE_WEIGHT,
     getTierLimit,
     isAllowed,
@@ -97,6 +98,14 @@ describe('public API exports', () => {
         expect(DEFAULT_TIER).toBe('free');
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
         expect(isAllowed('free', 'analysisPerDay')).toBe(true);
+        expect(getAllowedTimeframes('free')).toEqual([
+            '5Min',
+            '15Min',
+            '30Min',
+            '1Hour',
+            '4Hour',
+            '1Day',
+        ]);
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
         expect(isTimeframeAllowed('free', '5Min')).toBe(true);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);

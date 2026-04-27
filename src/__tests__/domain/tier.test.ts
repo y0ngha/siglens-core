@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
+    getAllowedTimeframes,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -63,6 +64,32 @@ describe('tier', () => {
 
         it('returns Infinity for uncapped tiers with default config', () => {
             expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
+        });
+    });
+
+    describe('getAllowedTimeframes', () => {
+        it('returns every timeframe when restrictions are disabled', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: false },
+            };
+
+            expect(getAllowedTimeframes('free', config)).toEqual([
+                '5Min',
+                '15Min',
+                '30Min',
+                '1Hour',
+                '4Hour',
+                '1Day',
+            ]);
+        });
+
+        it('returns the configured timeframe list when restrictions are enabled', () => {
+            expect(getAllowedTimeframes('member', restrictedConfig)).toEqual([
+                '1Day',
+                '1Hour',
+                '4Hour',
+            ]);
         });
     });
 

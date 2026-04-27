@@ -163,9 +163,11 @@ export const TIER_CONFIG = {
 ```
 
 `enableTierRestrictions`가 `false`이면 `isAllowed`, `isTimeframeAllowed`,
-`isInfoDepthAllowed`, `isModelAllowed`는 항상 허용 결과를 반환한다. 플래그가
-`true`이면 `TIER_CONFIG`의 각 tier별 값만 허용한다. 기본 제한값은 모두
-`Infinity`라서 초기 배포 상태는 fully open이다.
+`isInfoDepthAllowed`, `isModelAllowed`는 항상 허용 결과를 반환하고
+`getAllowedTimeframes(tier)`는 전체 `Timeframe[]`을 반환한다. 플래그가 `true`이면
+`TIER_CONFIG`의 각 tier별 값만 허용하며, `submitAnalysis`는 요청자의 tier가 잠긴
+타임프레임에 접근할 때 `status: 'error'`와 `code: 'timeframe_not_allowed'`를
+반환한다. 기본 제한값은 모두 `Infinity`라서 초기 배포 상태는 fully open이다.
 
 ---
 
