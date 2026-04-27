@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     asArray,
+    assetTranslations,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
@@ -14,14 +15,23 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extractReconciledActionLines,
     extendTrendline,
+    getDatabaseClient,
     HIGH_CONFIDENCE_WEIGHT,
+    koreanTickers,
     normalizeActionRecommendation,
     normalizeTrend,
+    oauthAccounts,
     OAUTH_PROVIDER_VALUES,
+    oauthProviderEnum,
     postProcessAnalysisWithReconcile,
     readDatabaseConfig,
     RSI_DEFAULT_PERIOD,
+    sessions,
+    tryGetDatabaseClient,
+    tryReadDatabaseConfig,
     USAGE_ACTION_TYPE_VALUES,
+    usageActionTypeEnum,
+    usageLogs,
     users,
     USER_TIER_VALUES,
     userTierEnum,
@@ -59,11 +69,25 @@ describe('public API exports', () => {
 
     it('exports database helpers from package entrypoint', () => {
         expect(typeof createDatabaseClient).toBe('function');
+        expect(typeof getDatabaseClient).toBe('function');
+        expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
+        expect(typeof tryReadDatabaseConfig).toBe('function');
         expect(users.email.name).toBe('email');
-        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(sessions.userId.name).toBe('user_id');
+        expect(usageLogs.actionType.name).toBe('action_type');
+        expect(oauthAccounts.provider.name).toBe('provider');
+        expect(koreanTickers.symbol.name).toBe('symbol');
+        expect(assetTranslations.symbol.name).toBe('symbol');
+        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
+        expect(usageActionTypeEnum.enumValues).toEqual([
+            ...USAGE_ACTION_TYPE_VALUES,
+        ]);
         expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
+        expect(oauthProviderEnum.enumValues).toEqual([
+            ...OAUTH_PROVIDER_VALUES,
+        ]);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 });

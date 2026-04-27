@@ -23,6 +23,7 @@ export {
 export type {
     DatabaseClient,
     DatabaseConfig,
+    NeonSqlClient,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,

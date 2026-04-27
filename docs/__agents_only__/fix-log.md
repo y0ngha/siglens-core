@@ -30,10 +30,6 @@
 - Rule: API 대칭성 — `getJobStatus`/`getJobResult`/`getJobError`가 있으면 대응하는 set 함수도 있어야 함
 - Context: `queue.ts`에 3개 write 함수 추가; 각각 `job:{id}:status/result/error` 키에 TTL 1시간으로 저장
 
-- Violation: `@google/genai`, `@upstash/redis`가 `dependencies`에 포함되어 소비자 프로젝트에 강제 설치
-- Rule: npm 라이브러리 패턴 — 선택적 런타임 의존성은 `peerDependencies`(optional) + `devDependencies`로 분리
-- Context: `package.json`에서 두 패키지를 `peerDependencies`(optional: true) 및 `devDependencies`로 이동
-
 ## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
 
 - Violation: `AcquireReanalyzeCooldownResult` 타입이 `reanalyzeCooldown.ts` 구현 파일 내부에만 정의됨
@@ -70,10 +66,7 @@
 - Context: `'defines table indexes for lookup paths'` test verified indexes for `users`, `sessions`, `usageLogs`, `oauthAccounts`, `assetTranslations` but skipped `koreanTickers`; added `expect(getTableConfig(koreanTickers).indexes).toEqual([])`
 
 ## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: `@neondatabase/serverless` and `drizzle-orm` were added to `dependencies`, forcing DB packages onto consumers that do not use DB features
-- Rule: npm library dependency pattern — optional runtime integrations belong in `peerDependencies` with `optional: true`, and in `devDependencies` for local tests/builds
-- Context: Moved Neon and Drizzle packages to optional peer dependencies plus dev dependencies and removed the production `dependencies` block
-
 - Violation: Drizzle migration metadata was not regenerated after changing `assetTranslations.symbol` from table-level primary key metadata to inline primary key metadata
 - Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
 - Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes
+
