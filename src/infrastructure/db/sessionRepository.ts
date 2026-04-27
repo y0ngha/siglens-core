@@ -5,7 +5,7 @@ import type {
     AuthSessionRecord,
     CreateSessionInput,
     SessionRepository,
-} from '@/infrastructure/auth/types';
+} from './types';
 
 const sessionColumns = {
     id: sessions.id,

@@ -16,6 +16,18 @@ import { createExpiredSessionCookie } from './sessionCookie';
  * @param dependencies - Session repository injected by the caller.
  * @param options - Runtime overrides for cookie name, secure flag, SameSite, and path.
  * @returns Result with `sessionInvalidated` flag and expired cookie metadata.
+ *
+ * @example
+ * ```typescript
+ * const result = await logoutUser(
+ *     { sessionToken: cookieValue },
+ *     { sessions: drizzleSessionRepository },
+ * );
+ * // result.sessionInvalidated is true when a session row was deleted
+ * ```
+ *
+ * @see {@link LogoutUserDependencies} for the dependency injection contract.
+ * @see {@link LogoutUserOptions} for available runtime overrides.
  */
 export async function logoutUser(
     input: LogoutUserInput,

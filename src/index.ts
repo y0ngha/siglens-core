@@ -21,15 +21,7 @@ export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
 
 // Auth
-export {
-    AUTH_SESSION_COOKIE_NAME,
-    DEFAULT_AUTH_COOKIE_PATH,
-    DEFAULT_AUTH_COOKIE_SAME_SITE,
-    DEFAULT_SESSION_TTL_SECONDS,
-    loginUser,
-    logoutUser,
-    registerUser,
-} from './application/auth';
+export { loginUser, logoutUser, registerUser } from './application/auth';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -204,14 +196,12 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 // Database
 export {
     createDatabaseClient,
+    DrizzleSessionRepository,
+    DrizzleUserRepository,
     getDatabaseClient,
     tryGetDatabaseClient,
     readDatabaseConfig,
     tryReadDatabaseConfig,
-} from './infrastructure/db';
-export {
-    DrizzleSessionRepository,
-    DrizzleUserRepository,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -239,6 +229,14 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Auth session cookie constants
+export {
+    AUTH_SESSION_COOKIE_NAME,
+    DEFAULT_AUTH_COOKIE_PATH,
+    DEFAULT_AUTH_COOKIE_SAME_SITE,
+    DEFAULT_SESSION_TTL_SECONDS,
+} from './application/auth';
 
 // Database schema & constants
 export {
@@ -390,15 +388,14 @@ export type {
     AuthSessionRecord,
     AuthUserRecord,
     AuthUserTier,
-    CreateSessionInput,
     CreateEmailUserInput,
+    CreateSessionInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
     SessionRepository,
     UserRepository,
-} from './infrastructure/auth';
+} from './infrastructure/db';
+export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 
 // Domain types
 export type {

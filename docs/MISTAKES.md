@@ -69,6 +69,14 @@ and have been removed from this file.
    → Also applies when external dependencies are removed: submitAnalysisAction + pollAnalysisAction are no longer Next.js server actions, should be renamed
    ✅ submitAnalysis + pollAnalysis when migrated to general infrastructure layer
 
+9.5. Module-internal exports missing @internal JSDoc tag
+   → Every function/constant exported from a module but not re-exported in src/index.ts must have /** @internal */ JSDoc
+   → Enables IDE tooling and consumers to distinguish public API from internal helpers
+   ❌ export function createSessionCookie(user) { ... }  // in sessionCookie.ts, not in src/index.ts
+   ❌ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;  // private constant, no @internal tag
+   ✅ /** @internal */ export function createSessionCookie(user) { ... }
+   ✅ /** @internal */ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;
+
 10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
     ❌ arr.sort() // in-place mutation

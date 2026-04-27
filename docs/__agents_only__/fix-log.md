@@ -81,10 +81,11 @@
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
 
 ## [PR #34 Round 2 | feat/6/email-login | 2026-04-27]
-- Violation: Non-re-exported functions (`createSessionCookie`, `createExpiredSessionCookie`, `addSeconds`) exported from `sessionCookie.ts` without `@internal` tag
-- Rule: CONVENTIONS.md — every function exported from a module but not re-exported from `src/index.ts` must carry the `@internal` JSDoc tag
-- Context: Three functions were module-public but library-internal; added `/** @internal */` to each
-
 - Violation: Tier 4 public constants (`AUTH_SESSION_COOKIE_NAME`, `DEFAULT_SESSION_TTL_SECONDS`, `DEFAULT_AUTH_COOKIE_PATH`, `DEFAULT_AUTH_COOKIE_SAME_SITE`) missing JSDoc
 - Rule: CONVENTIONS.md — every symbol exported from `src/index.ts` must carry JSDoc for IDE hover; constants with non-obvious values (e.g. `2592000` = 30 days) especially require it
 - Context: Four session cookie constants were exported without any JSDoc; added single-line descriptions to each
+
+## [PR #34 Round 3 | feat/6/email-login | 2026-04-27]
+- Violation: Auth export block in `src/index.ts` mixed Tier 1 use-case functions (`loginUser`, `logoutUser`, `registerUser`) with Tier 4 session cookie constants in a single block
+- Rule: `src/index.ts` structure convention — each export block must contain symbols of a single Tier only; mixing Tiers in one block obscures API classification for consumers
+- Context: Tier 4 constants moved to the Tier 4 section; Tier 1 block now contains only use-case entry points

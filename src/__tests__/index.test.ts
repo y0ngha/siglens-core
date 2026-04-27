@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     asArray,
+    assetTranslations,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
@@ -32,6 +33,7 @@ import {
     RSI_DEFAULT_PERIOD,
     sessions,
     tryGetDatabaseClient,
+    tryReadDatabaseConfig,
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
@@ -82,6 +84,7 @@ describe('public API exports', () => {
         expect(typeof getDatabaseClient).toBe('function');
         expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
+        expect(typeof tryReadDatabaseConfig).toBe('function');
         expect(typeof registerUser).toBe('function');
         expect(typeof loginUser).toBe('function');
         expect(typeof logoutUser).toBe('function');
@@ -92,6 +95,7 @@ describe('public API exports', () => {
         expect(usageLogs.userId.name).toBe('user_id');
         expect(oauthAccounts.userId.name).toBe('user_id');
         expect(typeof koreanTickers).toBe('object');
+        expect(typeof assetTranslations).toBe('object');
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
         expect(usageActionTypeEnum.enumValues).toEqual(['analysis', 'chatbot']);
         expect(oauthProviderEnum.enumValues).toEqual([
@@ -104,7 +108,7 @@ describe('public API exports', () => {
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 
-    it('exports auth interfaces from package entrypoint', () => {
+    it('exports auth interfaces from package entrypoint', async () => {
         const repository: UserRepository = {
             findByEmail: async () => null,
             createEmailUser: async input => ({
@@ -141,5 +145,13 @@ describe('public API exports', () => {
         expect(emailAuthRepository).toHaveProperty('findEmailAuthUserByEmail');
         expect(sessionRepository).toHaveProperty('createSession');
         expect(passwordVerifier).toHaveProperty('verifyPassword');
+
+        const logoutResult = await logoutUser(
+            { sessionToken: 'session-1' },
+            { sessions: sessionRepository }
+        );
+        expect(logoutResult.ok).toBe(true);
+        expect(logoutResult.sessionInvalidated).toBe(true);
+        expect(logoutResult.cookie).toBeDefined();
     });
 });

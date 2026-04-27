@@ -5,7 +5,7 @@ import {
     validatePassword,
 } from '@/domain/auth/validation';
 import type { PasswordHasher } from '@/infrastructure/auth';
-import type { UserRepository } from '@/infrastructure/auth/types';
+import type { UserRepository } from '@/infrastructure/db/types';
 import type {
     RegisterUserError,
     RegisterUserInput,

@@ -2,9 +2,9 @@ import type {
     AuthSessionRecord,
     AuthUserRecord,
     EmailAuthUserRepository,
-    PasswordVerifier,
     SessionRepository,
-} from '@/infrastructure/auth/types';
+} from '@/infrastructure/db/types';
+import type { PasswordVerifier } from '@/infrastructure/auth/types';
 
 /**
  * Error codes returned when user registration fails.

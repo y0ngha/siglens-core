@@ -8,9 +8,9 @@ import type {
     AuthSessionRecord,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
-    PasswordVerifier,
     SessionRepository,
-} from '@/infrastructure/auth';
+} from '@/infrastructure/db/types';
+import type { PasswordVerifier } from '@/infrastructure/auth';
 
 const now = new Date('2026-04-27T00:00:00.000Z');
 const createdAt = new Date('2026-04-26T00:00:00.000Z');

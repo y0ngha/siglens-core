@@ -8,7 +8,7 @@ import type {
 import type {
     AuthUserRecord,
     EmailAuthUserRecord,
-} from '@/infrastructure/auth/types';
+} from '@/infrastructure/db/types';
 import {
     createSessionCookie,
     DEFAULT_SESSION_TTL_SECONDS,
@@ -45,6 +45,22 @@ function omitPasswordHash(user: EmailAuthUserRecord): AuthUserRecord {
  * @param options - Runtime overrides for TTL, cookie name, secure flag, and current time.
  * @returns Discriminated union: `{ ok: true }` with user/session/cookie on success,
  *   or `{ ok: false }` with `invalid_credentials` error.
+ *
+ * @example
+ * ```typescript
+ * const result = await loginUser(
+ *     { email: 'user@example.com', password: 'Secret1!' },
+ *     { users: drizzleUserRepository, sessions: drizzleSessionRepository, passwordVerifier: bcryptVerifier },
+ * );
+ * if (result.ok) {
+ *     console.log('Logged in:', result.user.id);
+ * } else {
+ *     console.error('Login failed:', result.error.code);
+ * }
+ * ```
+ *
+ * @see {@link LoginUserDependencies} for the dependency injection contract.
+ * @see {@link LoginUserOptions} for available runtime overrides.
  */
 export async function loginUser(
     input: LoginUserInput,

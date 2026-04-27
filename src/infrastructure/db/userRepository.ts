@@ -6,7 +6,7 @@ import type {
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     UserRepository,
-} from '@/infrastructure/auth/types';
+} from './types';
 import type { SiglensDatabase } from './types';
 
 // Matches schema.ts users.tier .default('free'); update both if the default tier changes.

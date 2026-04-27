@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AUTH_SESSION_COOKIE_NAME, logoutUser } from '@/application/auth';
-import type { SessionRepository } from '@/infrastructure/auth';
+import type { SessionRepository } from '@/infrastructure/db/types';
 
 function makeDependencies(sessionInvalidated: boolean): {
     dependencies: { sessions: SessionRepository };
