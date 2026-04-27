@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.12](https://github.com/y0ngha/siglens-core/compare/v0.1.10...v0.1.12) (2026-04-27)
+
+
+### Bug Fixes
+
+* 리뷰 코멘트 반영 - bcrypt 목킹, [@see](https://github.com/see) 태그, deleteAccount 쿠키 메타 ([82bd07c](https://github.com/y0ngha/siglens-core/commit/82bd07c98129d71c167bdc5aa4e411d76887034f)), closes [#11](https://github.com/y0ngha/siglens-core/issues/11)
+
+
+### Features
+
+* 공개 API 및 모듈 export 추가 ([8ec1038](https://github.com/y0ngha/siglens-core/commit/8ec1038d1a03c4a2f5a655af43d1fb1bd4777abd))
+* 데이터베이스 레포지토리 auth 기능 확장 ([277bce2](https://github.com/y0ngha/siglens-core/commit/277bce2a258d077d8a5df82a21dbab930a2dffd3))
+* auth 헬퍼 묶음 및 회원탈퇴 use-case 추가 ([d4fcbf5](https://github.com/y0ngha/siglens-core/commit/d4fcbf5d9b9d0732c4fce08e97f8b5d88950994c))
+* bcrypt 어댑터 및 인프라 auth 모듈 추가 ([b5ea632](https://github.com/y0ngha/siglens-core/commit/b5ea632052510af983eb238dab9e19285fae8cce))
+
 ## [0.1.10](https://github.com/y0ngha/siglens-core/compare/v0.1.9...v0.1.10) (2026-04-27)
 
 
