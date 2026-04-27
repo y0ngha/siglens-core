@@ -341,6 +341,13 @@ and have been removed from this file.
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → When changing function implementation, update related comments immediately
+
+4. Tier 1 public exports missing required JSDoc tags
+   → Tier 1 functions require @param and @returns tags for IDE hover documentation
+   → Recommended tags (@example, @see) improve consumer guidance
+   ❌ export function loginUser(input, deps) { ... }  // missing all JSDoc
+   ❌ export function registerUser(...) { /** description only */ }  // no @param/@returns/@example/@see
+   ✅ export function loginUser(...) { /** description. @param input deps. @returns result. @example usage. @see related */ }
 ```
 
 ---
