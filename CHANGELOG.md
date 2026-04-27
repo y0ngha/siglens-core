@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.1.10](https://github.com/y0ngha/siglens-core/compare/v0.1.9...v0.1.10) (2026-04-27)
+
+
+### Bug Fixes
+
+* 리뷰 코멘트 반영 - DB 스키마 타입 export 및 테스트 보완 ([65d17c0](https://github.com/y0ngha/siglens-core/commit/65d17c0566cea513f61d08e8a4254dc06ebf05b0))
+* 이메일 로그인 리뷰 코멘트 반영 ([6b84fe7](https://github.com/y0ngha/siglens-core/commit/6b84fe7b801bd4fcde1754aca692cb45ffa2e271))
+* address PR [#35](https://github.com/y0ngha/siglens-core/issues/35) follow-up review ([03b69da](https://github.com/y0ngha/siglens-core/commit/03b69da554c27bb179ea275fffde30a96a5290b5))
+* address PR [#36](https://github.com/y0ngha/siglens-core/issues/36) tier export review ([adfe234](https://github.com/y0ngha/siglens-core/commit/adfe234b1f2acd6e15e764617092e33b9e8b7da2))
+* address social login review comments ([ff8307a](https://github.com/y0ngha/siglens-core/commit/ff8307ae019117f9316554efc225f32c59537c8c))
+* Neon Drizzle 스키마 설정 개선 ([8a9b70e](https://github.com/y0ngha/siglens-core/commit/8a9b70ee78b67a44bb32aa6625c4919d51705247))
+* Neon Drizzle DB 타입 및 내보내기 정정 ([65f5914](https://github.com/y0ngha/siglens-core/commit/65f59144a5578cbf59a3aff6465eb1d60fe093bc))
+* Neon Drizzle DB 테스트 및 스키마 코드 품질 개선 ([800f806](https://github.com/y0ngha/siglens-core/commit/800f8063c873f1ee94211204a125501c5f4381df))
+* PR [#32](https://github.com/y0ngha/siglens-core/issues/32) 리뷰 코멘트 반영 - DB Tier 3/4 exports 분리 및 NeonSqlClient 제거 ([00c56ca](https://github.com/y0ngha/siglens-core/commit/00c56cac306508328477449d6adc5908a96cc474))
+* PR [#33](https://github.com/y0ngha/siglens-core/issues/33) 리뷰 코멘트 반영 - infra 크로스모듈 커플링 제거 및 Tier 그룹핑 회귀 수정 ([7e2d357](https://github.com/y0ngha/siglens-core/commit/7e2d357e19cf0f2367f7937c4eb5703c16ce71be))
+* PR [#37](https://github.com/y0ngha/siglens-core/issues/37) 리뷰 코멘트 반영 ([db2f3d4](https://github.com/y0ngha/siglens-core/commit/db2f3d44ed62a55c1f99009501fa270dd1d964ef))
+* registerUser 함수 개선 (입력값 trim, 비밀번호 메시지 템플릿) ([ded0040](https://github.com/y0ngha/siglens-core/commit/ded0040deb608abd01e66c20b2fba2780404a851))
+* resolve PR [#35](https://github.com/y0ngha/siglens-core/issues/35) review blockers ([d4bb15e](https://github.com/y0ngha/siglens-core/commit/d4bb15ec6ff585fd42ee297963537237c42e1e60))
+* review fix ([371b6ae](https://github.com/y0ngha/siglens-core/commit/371b6ae14da3d512ae1fce9a757dc464fe6fc661))
+* trim PR 35 database public API ([9578331](https://github.com/y0ngha/siglens-core/commit/957833107760217d3ccb9833668e1efb819f00a4))
+
+
+### Features
+
+* 사용자 등급 시스템 구현 ([846c911](https://github.com/y0ngha/siglens-core/commit/846c91114a5ea495261d3d5e963287c8b2b38125))
+* 이메일 회원가입 구현 ([0b11ebe](https://github.com/y0ngha/siglens-core/commit/0b11ebe991cb329958f67690a68cbd47c95a20f5))
+* 티어 제한 설정 추가 ([f1d73d7](https://github.com/y0ngha/siglens-core/commit/f1d73d770794aa6d38cadd454840cc9985afacab))
+* implement email login ([4ddbded](https://github.com/y0ngha/siglens-core/commit/4ddbded8700e96d503c21f1887ec7981bb91f9fa))
+* implement social login ([8da8606](https://github.com/y0ngha/siglens-core/commit/8da8606b22d2835da9d26365ff6b390da29b6968))
+* Neon Drizzle DB 스키마 연동 ([018a4f7](https://github.com/y0ngha/siglens-core/commit/018a4f79c8622985dbc6fc2a7912b93ca10dc21b))
+* Neon Drizzle DB 스키마 연동 ([5ed15ce](https://github.com/y0ngha/siglens-core/commit/5ed15ceaf60352b58502d796d6fa9a74f17dccf4))
+
 ## [0.1.9](https://github.com/y0ngha/siglens-core/compare/v0.1.8...v0.1.9) (2026-04-27)
 
 
