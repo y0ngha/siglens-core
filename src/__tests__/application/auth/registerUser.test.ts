@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerUser } from '@/application/auth/registerUser';
-import type { AuthUserRecord } from '@/infrastructure/auth/types';
-import type { PasswordHasher, UserRepository } from '@/infrastructure/auth';
+import type { PasswordHasher } from '@/infrastructure/auth';
+import type { AuthUserRecord, UserRepository } from '@/infrastructure/db/types';
 
 const createdAt = new Date('2026-04-26T00:00:00.000Z');
 const updatedAt = new Date('2026-04-26T00:00:01.000Z');
@@ -190,6 +190,32 @@ describe('registerUser', () => {
             avatarUrl: 'https://example.com/avatar.png',
         });
         expect(result).toEqual({ ok: true, user: createdUser });
+    });
+
+    it('trims whitespace from name and avatarUrl before creating user', async () => {
+        const createdUser = makeUser('user@example.com');
+        const { repository, passwordHasher, createEmailUser } =
+            makeDependencies({
+                createdUser,
+            });
+
+        await registerUser(
+            {
+                email: 'user@example.com',
+                password: 'Password1',
+                name: '  Ada  ',
+                avatarUrl: '  https://example.com/avatar.png  ',
+            },
+            repository,
+            passwordHasher
+        );
+
+        expect(createEmailUser).toHaveBeenCalledWith({
+            email: 'user@example.com',
+            passwordHash: 'hashed-password',
+            name: 'Ada',
+            avatarUrl: 'https://example.com/avatar.png',
+        });
     });
 
     it('returns duplicate email error when insert races with another signup', async () => {

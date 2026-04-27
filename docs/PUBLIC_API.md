@@ -123,6 +123,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
 | `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
 
+**티어 제한 함수 (6)**
+| Symbol | Source |
+|---|---|
+| `isAllowed` / `getTierLimit` | `domain/tier.ts` |
+| `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
+| `isTier` | `domain/tier.ts` |
+
 **캔들 패턴 (UI/프롬프트에서 사용) (10)**
 | Symbol | Source |
 |---|---|
@@ -194,11 +201,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `readFmpConfig` | `infrastructure/fmp/config.ts` |
 | `tryReadFmpConfig` | `infrastructure/fmp/config.ts` |
 
-**Database (5 factory/config + repositories + schema exports)**
+**Database (1 factory + repositories + schema exports)**
 | Symbol | Source |
 |---|---|
-| `createDatabaseClient` / `getDatabaseClient` / `tryGetDatabaseClient` | `infrastructure/db/client.ts` |
-| `readDatabaseConfig` / `tryReadDatabaseConfig` | `infrastructure/db/config.ts` |
+| `createDatabaseClient` | `infrastructure/db/client.ts` |
 | `DrizzleUserRepository` / `DrizzleSessionRepository` | `infrastructure/db/*Repository.ts` |
 | `users` / `sessions` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
 | `koreanTickers` / `assetTranslations` | `infrastructure/db/schema.ts` |
@@ -230,15 +236,17 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 4 — Types & Constants
 
-**도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
+**도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선/티어 제한 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입, Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`), tier 관련 타입(`Tier*`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`).
+**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`), tier 관련 타입(`Tier*`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`).
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
 **캔들 라벨 맵** — `CANDLE_PATTERN_LABELS`, `MULTI_CANDLE_PATTERN_LABELS`.
 
 **지표 상수** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `EMA_DEFAULT_PERIODS` 등 `src/domain/indicators/constants.ts`의 지표 계산 기본값과 임계값.
+
+**티어 제한 상수** — `DEFAULT_TIER`, `TIER_CONFIG` (`domain/tier.ts`).
 
 **고급 도메인 헬퍼** — 개별 신호 감지기, 신호 상수, 정규화 함수, AI 레벨 보정, 추세선/키레벨/action recommendation 보조 함수는 외부 consumer의 세부 렌더링·검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다.
 

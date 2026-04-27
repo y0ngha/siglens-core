@@ -23,11 +23,21 @@ export {
 export { DrizzleSessionRepository } from './sessionRepository';
 export { DrizzleUserRepository } from './userRepository';
 export type {
+    AuthSessionRecord,
+    AuthUserRecord,
+    CreateEmailUserInput,
+    CreateOAuthUserInput,
+    CreateSessionInput,
     DatabaseClient,
     DatabaseConfig,
+    EmailAuthUserRecord,
+    EmailAuthUserRepository,
     OAuthProvider,
+    OAuthUserRepository,
+    SessionRepository,
     SiglensDatabase,
     UsageActionType,
-    UserTierRepository,
+    UserRepository,
     UserTier,
+    UserTierRepository,
 } from './types';

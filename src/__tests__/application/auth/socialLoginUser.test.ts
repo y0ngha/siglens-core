@@ -9,7 +9,7 @@ import type {
     AuthUserRecord,
     OAuthUserRepository,
     SessionRepository,
-} from '@/infrastructure/auth';
+} from '@/infrastructure/db/types';
 
 const now = new Date('2026-04-27T00:00:00.000Z');
 const createdAt = new Date('2026-04-26T00:00:00.000Z');
@@ -227,6 +227,37 @@ describe('socialLoginUser', () => {
             providerAccountId: 'google-account-1',
             name: 'Ada',
             avatarUrl: 'https://example.com/avatar.png',
+        });
+        expect(result).toEqual(
+            expect.objectContaining({
+                ok: true,
+                user: createdUser,
+            })
+        );
+    });
+
+    it('omits optional profile fields when provider profile does not include them', async () => {
+        const createdUser = makeUser('user-1');
+        const { dependencies, createOAuthUser } = makeDependencies({
+            createdUser,
+        });
+
+        const result = await socialLoginUser(
+            {
+                provider: 'google',
+                providerAccountId: 'google-account-1',
+                email: 'user@example.com',
+            },
+            dependencies,
+            { now }
+        );
+
+        expect(createOAuthUser).toHaveBeenCalledWith({
+            email: 'user@example.com',
+            provider: 'google',
+            providerAccountId: 'google-account-1',
+            name: undefined,
+            avatarUrl: undefined,
         });
         expect(result).toEqual(
             expect.objectContaining({

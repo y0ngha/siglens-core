@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { sessions } from './schema';
-import type { SiglensDatabase } from './types';
 import type {
     AuthSessionRecord,
     CreateSessionInput,
     SessionRepository,
-} from '@/infrastructure/auth/types';
+    SiglensDatabase,
+} from './types';
 
 const sessionColumns = {
     id: sessions.id,
@@ -18,6 +18,7 @@ const sessionColumns = {
  * Drizzle ORM implementation of {@link SessionRepository} backed by Neon PostgreSQL.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
+ * @returns A repository that persists and deletes auth sessions.
  */
 export class DrizzleSessionRepository implements SessionRepository {
     constructor(private readonly db: SiglensDatabase) {}

@@ -1,16 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     AUTH_SESSION_COOKIE_NAME,
     DEFAULT_SESSION_TTL_SECONDS,
     loginUser,
 } from '@/application/auth';
+import type { PasswordVerifier } from '@/infrastructure/auth';
 import type {
     AuthSessionRecord,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
-    PasswordVerifier,
     SessionRepository,
-} from '@/infrastructure/auth';
+} from '@/infrastructure/db/types';
 
 const now = new Date('2026-04-27T00:00:00.000Z');
 const createdAt = new Date('2026-04-26T00:00:00.000Z');
@@ -79,6 +79,39 @@ function makeDependencies(options?: {
 }
 
 describe('loginUser', () => {
+    describe('when options.now is not provided', () => {
+        const fixedNow = new Date('2026-04-27T12:00:00.000Z');
+
+        beforeEach(() => {
+            vi.useFakeTimers();
+            vi.setSystemTime(fixedNow);
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('uses the current system time as the session start', async () => {
+            const expectedExpiresAt = new Date(
+                fixedNow.getTime() + DEFAULT_SESSION_TTL_SECONDS * 1000
+            );
+            const { dependencies, createSession } = makeDependencies({
+                session: makeSession(expectedExpiresAt),
+            });
+
+            const result = await loginUser(
+                { email: 'user@example.com', password: 'Password1' },
+                dependencies
+            );
+
+            expect(createSession).toHaveBeenCalledWith({
+                userId: 'user-1',
+                expiresAt: expectedExpiresAt,
+            });
+            expect(result).toMatchObject({ ok: true });
+        });
+    });
+
     it('returns invalid credentials when no user is found', async () => {
         const { dependencies, verifyPassword, createSession } =
             makeDependencies({ user: null });

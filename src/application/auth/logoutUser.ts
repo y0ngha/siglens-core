@@ -11,6 +11,23 @@ import { createExpiredSessionCookie } from './sessionCookie';
  *
  * Returns expired HTTP-only cookie metadata even when no matching persisted
  * session exists, allowing callers to reliably clear the browser cookie.
+ *
+ * @param input - Session token stored in the auth cookie.
+ * @param dependencies - Session repository injected by the caller.
+ * @param options - Runtime overrides for cookie name, secure flag, SameSite, and path.
+ * @returns `{ ok: true, sessionInvalidated, cookie }` — `sessionInvalidated` indicates whether a row was deleted.
+ *
+ * @example
+ * ```typescript
+ * const result = await logoutUser(
+ *     { sessionToken: cookies.get('siglens_session') },
+ *     { sessions: drizzleSessionRepository },
+ * );
+ * response.setHeader('Set-Cookie', serializeCookie(result.cookie));
+ * ```
+ *
+ * @see {@link LogoutUserDependencies} for the dependency injection contract.
+ * @see {@link LogoutUserOptions} for available runtime overrides.
  */
 export async function logoutUser(
     input: LogoutUserInput,

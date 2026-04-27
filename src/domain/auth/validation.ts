@@ -1,0 +1,44 @@
+import type { AuthValidationError } from '@/domain/types';
+import { INVALID_EMAIL_CODE, WEAK_PASSWORD_CODE } from './constants';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 8;
+const INVALID_EMAIL_MESSAGE = 'Email format is invalid';
+const WEAK_PASSWORD_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters and include letters and numbers`;
+
+/** @internal Normalizes an email address for consistent storage and lookup. */
+export function normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+}
+
+function hasLetter(value: string): boolean {
+    return /[A-Za-z]/.test(value);
+}
+
+function hasNumber(value: string): boolean {
+    return /\d/.test(value);
+}
+
+/** @internal Returns a validation error if the email format is invalid, null otherwise. */
+export function validateEmail(email: string): AuthValidationError | null {
+    return EMAIL_PATTERN.test(email)
+        ? null
+        : {
+              code: INVALID_EMAIL_CODE,
+              field: 'email',
+              message: INVALID_EMAIL_MESSAGE,
+          };
+}
+
+/** @internal Returns a validation error if the password does not meet strength requirements, null otherwise. */
+export function validatePassword(password: string): AuthValidationError | null {
+    return password.length >= MIN_PASSWORD_LENGTH &&
+        hasLetter(password) &&
+        hasNumber(password)
+        ? null
+        : {
+              code: WEAK_PASSWORD_CODE,
+              field: 'password',
+              message: WEAK_PASSWORD_MESSAGE,
+          };
+}

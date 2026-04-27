@@ -1,4 +1,9 @@
 import {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+} from '@/infrastructure/db/constants';
+import {
     assetTranslations,
     koreanTickers,
     oauthAccounts,
@@ -18,18 +23,18 @@ const columnNames = (table: Parameters<typeof getTableColumns>[0]): string[] =>
 
 describe('database enums', () => {
     it('defines user tier values', () => {
-        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
     });
 
     it('defines usage action type values', () => {
-        expect(usageActionTypeEnum.enumValues).toEqual(['analysis', 'chatbot']);
+        expect(usageActionTypeEnum.enumValues).toEqual([
+            ...USAGE_ACTION_TYPE_VALUES,
+        ]);
     });
 
     it('defines OAuth provider values', () => {
         expect(oauthProviderEnum.enumValues).toEqual([
-            'google',
-            'kakao',
-            'apple',
+            ...OAUTH_PROVIDER_VALUES,
         ]);
     });
 });
@@ -106,14 +111,23 @@ describe('database schema tables', () => {
         ]);
     });
 
-    it('defines table indexes for lookup paths', () => {
+    it('defines no indexes for users table', () => {
         expect(getTableConfig(users).indexes).toEqual([]);
+    });
+
+    it('defines lookup indexes for sessions table', () => {
         expect(
             getTableConfig(sessions).indexes.map(index => index.config.name)
         ).toEqual(['sessions_user_id_idx', 'sessions_expires_at_idx']);
+    });
+
+    it('defines lookup indexes for usage logs table', () => {
         expect(
             getTableConfig(usageLogs).indexes.map(index => index.config.name)
         ).toEqual(['usage_logs_user_id_idx', 'usage_logs_ip_hash_date_idx']);
+    });
+
+    it('defines lookup indexes for OAuth accounts table', () => {
         expect(
             getTableConfig(oauthAccounts).indexes.map(
                 index => index.config.name
@@ -122,7 +136,13 @@ describe('database schema tables', () => {
             'oauth_accounts_user_id_idx',
             'oauth_accounts_provider_account_uidx',
         ]);
+    });
+
+    it('defines no indexes for Korean tickers table', () => {
         expect(getTableConfig(koreanTickers).indexes).toEqual([]);
+    });
+
+    it('defines no indexes for asset translations table', () => {
         expect(getTableConfig(assetTranslations).indexes).toEqual([]);
     });
 

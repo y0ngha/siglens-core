@@ -1,3 +1,9 @@
+import { normalizeEmail } from '@/domain/auth/validation';
+import type {
+    AuthUserRecord,
+    EmailAuthUserRecord,
+} from '@/infrastructure/db/types';
+import { createAuthSession } from './sessionCookie';
 import type {
     LoginUserDependencies,
     LoginUserError,
@@ -5,14 +11,8 @@ import type {
     LoginUserOptions,
     LoginUserResult,
 } from './types';
-import type { AuthUserRecord } from '@/infrastructure/auth/types';
-import { createAuthSession } from './sessionCookie';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Email or password is incorrect';
-
-function normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
-}
 
 function invalidCredentialsError(): LoginUserError {
     return {
@@ -21,24 +21,9 @@ function invalidCredentialsError(): LoginUserError {
     };
 }
 
-function omitPasswordHash(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    avatarUrl: string | null;
-    tier: AuthUserRecord['tier'];
-    createdAt: Date;
-    updatedAt: Date;
-}): AuthUserRecord {
-    return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-        tier: user.tier,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-    };
+function omitPasswordHash(user: EmailAuthUserRecord): AuthUserRecord {
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return safeUser;
 }
 
 /**
@@ -47,6 +32,27 @@ function omitPasswordHash(user: {
  * Normalizes email before lookup, verifies the supplied password against the
  * stored hash, persists a session, and returns HTTP-only cookie metadata for
  * the caller to attach to the response.
+ *
+ * @param input - Email and plain-text password supplied by the user.
+ * @param dependencies - Repositories and password verifier injected by the caller.
+ * @param options - Runtime overrides for TTL, cookie name, secure flag, SameSite, path, and current time.
+ * @returns Discriminated union: `{ ok: true }` with user/session/cookie on success, or `{ ok: false }` with `invalid_credentials` error.
+ *
+ * @example
+ * ```typescript
+ * const result = await loginUser(
+ *     { email: 'user@example.com', password: 'Secret1!' },
+ *     { users: drizzleUserRepository, sessions: drizzleSessionRepository, passwordVerifier: bcryptVerifier },
+ * );
+ * if (result.ok) {
+ *     console.log('Logged in:', result.user.id);
+ * } else {
+ *     console.error('Login failed:', result.error.code);
+ * }
+ * ```
+ *
+ * @see {@link LoginUserDependencies} for the dependency injection contract.
+ * @see {@link LoginUserOptions} for available runtime overrides.
  */
 export async function loginUser(
     input: LoginUserInput,

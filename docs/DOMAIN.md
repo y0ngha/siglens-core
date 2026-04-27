@@ -143,18 +143,18 @@ export const TIER_CONFIG = {
   },
   timeframes: {
     free: ['1Day'],
-    member: ['1Hour', '4Hour', '1Day'],
-    pro: ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'],
+    member: ['1Day', '1Hour', '4Hour'],
+    pro: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
   },
   infoDepth: {
     free: ['direction', 'summary'],
     member: ['direction', 'summary', 'partial_detail'],
-    pro: ['direction', 'summary', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
+    pro: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
   },
   models: {
     free: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-    member: ['gemini-2.5-pro', 'claude-sonnet-4'],
-    pro: ['gemini-2.5-pro', 'claude-sonnet-4', 'claude-opus-4'],
+    member: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4'],
+    pro: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4', 'claude-opus-4'],
   },
   featureFlags: {
     enableTierRestrictions: false,
