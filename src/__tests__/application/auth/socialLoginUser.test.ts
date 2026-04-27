@@ -81,7 +81,7 @@ function makeDependencies(options?: {
                 findByEmail,
                 createOAuthUser,
             },
-            sessions: { createSession, deleteSession },
+            sessions: { createSession, findSession: vi.fn(), deleteSession },
         },
         findByOAuthAccount,
         findByEmail,
