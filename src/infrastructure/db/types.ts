@@ -29,9 +29,7 @@ export interface DatabaseConfig {
  */
 export type SiglensDatabase = NeonHttpDatabase<typeof schema>;
 
-/**
- * @internal Raw Neon serverless SQL client — access via DatabaseClient['sql'].
- */
+/** Raw Neon serverless SQL client — access via DatabaseClient['sql']. */
 export type NeonSqlClient = NeonQueryFunction<false, false>;
 
 /** Bundled handle exposing both the Drizzle ORM layer and the raw SQL client. */

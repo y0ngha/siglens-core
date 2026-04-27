@@ -5,11 +5,11 @@
 
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';
-export { submitAnalysis } from './application/market/submitAnalysis';
-export { pollAnalysis } from './application/market/pollAnalysis';
 export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';
-export { submitBriefing } from './application/market/submitBriefing';
+export { pollAnalysis } from './application/market/pollAnalysis';
 export { pollBriefing } from './application/market/pollBriefing';
+export { submitAnalysis } from './application/market/submitAnalysis';
+export { submitBriefing } from './application/market/submitBriefing';
 
 // Dashboard
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
@@ -34,8 +34,8 @@ export { calculateIndicators } from './domain/indicators';
 export { classifyTrend, detectSignals } from './domain/signals';
 
 // Prompt builders
-export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
+export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 
 // Response normalization
@@ -54,18 +54,47 @@ export {
     selectLastCandlePatternEntries,
 } from './domain/analysis/candle-detection';
 export {
+    findCandlePatternLabel,
     getCandlePatternLabel,
     getMultiCandlePatternLabel,
-    findCandlePatternLabel,
 } from './domain/analysis/candle-labels';
 export {
     EXCLUDED_SINGLE_PATTERNS,
-    getSinglePatternTrend,
     getMultiPatternTrend,
+    getSinglePatternTrend,
 } from './domain/analysis/candle-trend';
 export type { PatternTrend } from './domain/analysis/candle-trend';
 
 // Signal constants / detectors
+export {
+    detectBollingerSqueezeBearish,
+    detectBollingerSqueezeBullish,
+    detectMacdHistogramBearishConvergence,
+    detectMacdHistogramBullishConvergence,
+    detectResistanceProximityBearish,
+    detectRsiBearishDivergence,
+    detectRsiBullishDivergence,
+    detectSupportProximityBullish,
+} from './domain/signals/anticipation';
+export {
+    detectBollingerLowerBounce,
+    detectBollingerUpperBreakout,
+    detectCciBullishCross,
+    detectCmfBullishFlip,
+    detectDeathCross,
+    detectDmiBullishCross,
+    detectGoldenCross,
+    detectIchimokuCloudBreakout,
+    detectKeltnerUpperBreakout,
+    detectMacdBearishCross,
+    detectMacdBullishCross,
+    detectMfiOversoldBounce,
+    detectParabolicSarFlip,
+    detectRsiOverbought,
+    detectRsiOversold,
+    detectSqueezeMomentumBullish,
+    detectSupertrendBullishFlip,
+} from './domain/signals/confirmed';
 export {
     CCI_BULLISH_CROSS_LEVEL,
     CCI_OVERSOLD_CROSS_LEVEL,
@@ -90,37 +119,17 @@ export {
     TREND_SLOPE_LOOKBACK,
     TREND_SLOPE_THRESHOLD,
 } from './domain/signals/constants';
-export {
-    detectBollingerLowerBounce,
-    detectBollingerUpperBreakout,
-    detectCciBullishCross,
-    detectCmfBullishFlip,
-    detectDeathCross,
-    detectDmiBullishCross,
-    detectGoldenCross,
-    detectIchimokuCloudBreakout,
-    detectKeltnerUpperBreakout,
-    detectMacdBearishCross,
-    detectMacdBullishCross,
-    detectMfiOversoldBounce,
-    detectParabolicSarFlip,
-    detectRsiOverbought,
-    detectRsiOversold,
-    detectSqueezeMomentumBullish,
-    detectSupertrendBullishFlip,
-} from './domain/signals/confirmed';
-export {
-    detectBollingerSqueezeBearish,
-    detectBollingerSqueezeBullish,
-    detectMacdHistogramBearishConvergence,
-    detectMacdHistogramBullishConvergence,
-    detectResistanceProximityBearish,
-    detectRsiBearishDivergence,
-    detectRsiBullishDivergence,
-    detectSupportProximityBullish,
-} from './domain/signals/anticipation';
 
 // Analysis normalization / helpers
+export {
+    extractReconciledActionLines,
+    validateActionPrices,
+} from './domain/analysis/actionRecommendation';
+export { postProcessAnalysisWithReconcile } from './domain/analysis/ai-levels';
+export {
+    clusterKeyLevels,
+    validateKeyLevels,
+} from './domain/analysis/keyLevels';
 export {
     normalizeActionRecommendation,
     normalizeCandlePatternSummary,
@@ -139,15 +148,6 @@ export {
     compact,
 } from './domain/analysis/normalizePrimitives';
 export { extendTrendline } from './domain/analysis/trendline';
-export { postProcessAnalysisWithReconcile } from './domain/analysis/ai-levels';
-export {
-    clusterKeyLevels,
-    validateKeyLevels,
-} from './domain/analysis/keyLevels';
-export {
-    extractReconciledActionLines,
-    validateActionPrices,
-} from './domain/analysis/actionRecommendation';
 
 // Ticker validation utilities
 export {
@@ -170,15 +170,15 @@ export {
 // these factories and supply env-derived configuration.
 
 // Cache
-export { createCacheProvider } from './infrastructure/cache/redis';
 export {
     ANALYSIS_CACHE_TTL,
-    MARKET_BRIEFING_CACHE_TTL,
-    CACHE_EXPIRY_HOUR_KST,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
+    MARKET_BRIEFING_CACHE_TTL,
 } from './infrastructure/cache/config';
+export { createCacheProvider } from './infrastructure/cache/redis';
 
 // Market data providers
 export { createMarketDataProvider } from './infrastructure/market/factory';
@@ -193,50 +193,48 @@ export { FileSkillsLoader } from './infrastructure/skills/loader';
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 
-// Database
+// Database factories & config
 export {
-    createDatabaseClient,
-    getDatabaseClient,
-    tryGetDatabaseClient,
-    readDatabaseConfig,
-    tryReadDatabaseConfig,
-} from './infrastructure/db';
-export { DrizzleUserRepository } from './infrastructure/db';
-export {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
     assetTranslations,
+    createDatabaseClient,
+    DrizzleUserRepository,
+    getDatabaseClient,
     koreanTickers,
+    OAUTH_PROVIDER_VALUES,
     oauthAccounts,
     oauthProviderEnum,
+    readDatabaseConfig,
     sessions,
+    tryGetDatabaseClient,
+    tryReadDatabaseConfig,
+    USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
+    USER_TIER_VALUES,
     users,
     userTierEnum,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
 export {
-    setJobMeta,
-    getJobMeta,
-    getJobStatus,
-    setJobStatus,
-    getJobResult,
-    setJobResult,
-    getJobError,
-    setJobError,
     cancelJob,
-    isJobCancelled,
     cleanupJob,
+    getJobError,
+    getJobMeta,
+    getJobResult,
+    getJobStatus,
+    isJobCancelled,
+    setJobError,
+    setJobMeta,
+    setJobResult,
+    setJobStatus,
 } from './infrastructure/jobs/queue';
 
 // Reanalyze cooldown
 export {
-    tryAcquireReanalyzeCooldown,
-    releaseReanalyzeCooldown,
     getReanalyzeCooldownMs,
+    releaseReanalyzeCooldown,
+    tryAcquireReanalyzeCooldown,
 } from './infrastructure/market/reanalyzeCooldown';
 
 // =============================================================================
@@ -245,8 +243,8 @@ export {
 
 // Dashboard tickers / sectors
 export {
-    DASHBOARD_TIMEFRAMES,
     DASHBOARD_TIMEFRAME_LABELS,
+    DASHBOARD_TIMEFRAMES,
     DEFAULT_DASHBOARD_TIMEFRAME,
     MARKET_INDICES,
     MARKET_SUMMARY_FMP_SYMBOLS,
@@ -310,17 +308,17 @@ export {
     SQUEEZE_MOMENTUM_KC_LENGTH,
     SQUEEZE_MOMENTUM_KC_MULT,
     SQUEEZE_MOMENTUM_MIN_BARS,
-    STOCHASTIC_D_PERIOD,
-    STOCHASTIC_K_PERIOD,
-    STOCHASTIC_OVERBOUGHT_LEVEL,
-    STOCHASTIC_OVERSOLD_LEVEL,
-    STOCHASTIC_SMOOTHING,
     STOCH_RSI_D_PERIOD,
     STOCH_RSI_K_PERIOD,
     STOCH_RSI_OVERBOUGHT_LEVEL,
     STOCH_RSI_OVERSOLD_LEVEL,
     STOCH_RSI_RSI_PERIOD,
     STOCH_RSI_STOCH_PERIOD,
+    STOCHASTIC_D_PERIOD,
+    STOCHASTIC_K_PERIOD,
+    STOCHASTIC_OVERBOUGHT_LEVEL,
+    STOCHASTIC_OVERSOLD_LEVEL,
+    STOCHASTIC_SMOOTHING,
     SUPERTREND_ATR_PERIOD,
     SUPERTREND_MULTIPLIER,
     UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
@@ -331,30 +329,6 @@ export {
 } from './domain/indicators/constants';
 
 // Infrastructure interfaces
-export type { CacheProvider } from './infrastructure/cache/types';
-export type { SkillsProvider } from './infrastructure/skills/types';
-export type { FmpConfig } from './infrastructure/fmp/types';
-export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
-export type {
-    MarketDataProvider,
-    GetBarsOptions,
-    AcquireReanalyzeCooldownResult,
-} from './infrastructure/market/types';
-export type {
-    GeminiRole,
-    GeminiContents,
-    GeminiContent,
-    GeminiPart,
-    CallGeminiWithKeyFallbackOptions,
-} from './infrastructure/ai/types';
-export type {
-    DatabaseClient,
-    DatabaseConfig,
-    OAuthProvider,
-    SiglensDatabase,
-    UsageActionType,
-    UserTier,
-} from './infrastructure/db';
 export type {
     RegisterUserError,
     RegisterUserErrorCode,
@@ -363,118 +337,142 @@ export type {
     RegisterUserResult,
 } from './application/auth';
 export type {
+    CallGeminiWithKeyFallbackOptions,
+    GeminiContent,
+    GeminiContents,
+    GeminiPart,
+    GeminiRole,
+} from './infrastructure/ai/types';
+export type {
     AuthUserRecord,
     AuthUserTier,
     CreateEmailUserInput,
     PasswordHasher,
     UserRepository,
 } from './infrastructure/auth';
+export type { CacheProvider } from './infrastructure/cache/types';
+export type {
+    DatabaseClient,
+    DatabaseConfig,
+    OAuthProvider,
+    SiglensDatabase,
+    UsageActionType,
+    UserTier,
+} from './infrastructure/db';
+export type { FmpConfig } from './infrastructure/fmp/types';
+export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
+export type {
+    AcquireReanalyzeCooldownResult,
+    GetBarsOptions,
+    MarketDataProvider,
+} from './infrastructure/market/types';
+export type { SkillsProvider } from './infrastructure/skills/types';
 
 // Domain types
 export type {
-    Timeframe,
-    Bar,
-    IndicatorResult,
-    MACDResult,
-    BollingerResult,
-    DMIResult,
-    StochasticResult,
-    StochRSIResult,
-    VolumeProfileRow,
-    VolumeProfileResult,
-    IchimokuResult,
-    IchimokuFuturePoint,
-    ParabolicSARResult,
-    SupertrendResult,
-    KeltnerChannelResult,
-    DonchianChannelResult,
-    BuySellVolumeResult,
-    SqueezeMomentumResult,
-    SMCResult,
-    SMCZone,
-    SMCSwingPoint,
-    SMCOrderBlock,
-    SMCFairValueGap,
-    SMCEqualLevel,
-    SMCStructureBreak,
-    SMCStructureDirection,
-    SMCBreakType,
-    SMCSwingPointType,
-    SMCZoneType,
-    Skill,
-    SkillType,
-    SkillCategory,
-    SkillChartDisplay,
-    SkillDisplay,
-    ChartDisplayType,
-    Signal,
-    SignalType,
-    SignalDirection,
-    SignalPhase,
-    ConfirmedSignalType,
-    ExpectedSignalType,
-    TrendState,
-    Trend,
-    RiskLevel,
-    TrendDirection,
-    PriceTrend,
+    ActionRecommendation,
     AnalysisResponse,
     AnalysisSignal,
-    SignalStrength,
-    ReconciledActionLevels,
+    AssetInfo,
+    Bar,
+    BarsData,
+    BollingerResult,
+    BuySellVolumeResult,
+    CandlePattern,
+    CandlePatternEntry,
+    CandlePatternSummary,
+    CategoryId,
+    ChartDisplayType,
+    ChatMessage,
+    ChatPromptPayload,
+    ConfirmedSignalType,
+    ConflictInfo,
+    ConflictResolution,
+    CrossDirection,
+    DashboardTimeframe,
+    DMIResult,
+    DonchianChannelResult,
+    EntryRecommendation,
+    ExpectedSignalType,
+    IchimokuFuturePoint,
+    IchimokuResult,
+    IndexTicker,
     IndicatorGuideResult,
+    IndicatorResult,
+    KeltnerChannelResult,
     KeyLevel,
     KeyLevels,
     KeyPrice,
-    PriceTarget,
-    PriceScenario,
-    PriceTargets,
-    PatternSummary,
-    PatternResult,
-    PatternLine,
-    StrategyResult,
-    CandlePatternSummary,
-    Trendline,
-    TrendlineDirection,
-    TrendlinePoint,
-    ActionRecommendation,
-    EntryRecommendation,
-    ChatMessage,
-    ChatPromptPayload,
-    MarketIndexData,
-    MarketSectorData,
+    KoreanTickerEntry,
+    MACDResult,
     MarketBriefingResponse,
     MarketBriefingSectorAnalysis,
     MarketBriefingVolatilityAnalysis,
-    CrossDirection,
-    CandlePattern,
-    MultiCandlePattern,
-    CandlePatternEntry,
-    SingleCandlePatternEntry,
-    MultiCandlePatternEntry,
-    PromptConfig,
-    TickerBase,
-    KoreanTickerEntry,
-    TickerSearchResult,
-    AssetInfo,
-    TickerCategory,
-    CategoryId,
-    IndexTicker,
-    SectorEtf,
-    SectorGroupDef,
-    SectorStock,
-    SectorSignalsResult,
-    StockSignalResult,
-    StockWithConflict,
-    ConflictInfo,
-    ConflictResolution,
-    DashboardTimeframe,
+    MarketIndexData,
     MarketQuote,
+    MarketSectorData,
     MarketSummaryData,
     MarketSummaryWithBriefing,
-    BarsData,
-    SubmitAnalysisResult,
+    MultiCandlePattern,
+    MultiCandlePatternEntry,
+    ParabolicSARResult,
+    PatternLine,
+    PatternResult,
+    PatternSummary,
     PollAnalysisResult,
-    SubmitBriefingResult,
     PollBriefingResult,
+    PriceScenario,
+    PriceTarget,
+    PriceTargets,
+    PriceTrend,
+    PromptConfig,
+    ReconciledActionLevels,
+    RiskLevel,
+    SectorEtf,
+    SectorGroupDef,
+    SectorSignalsResult,
+    SectorStock,
+    Signal,
+    SignalDirection,
+    SignalPhase,
+    SignalStrength,
+    SignalType,
+    SingleCandlePatternEntry,
+    Skill,
+    SkillCategory,
+    SkillChartDisplay,
+    SkillDisplay,
+    SkillType,
+    SMCBreakType,
+    SMCEqualLevel,
+    SMCFairValueGap,
+    SMCOrderBlock,
+    SMCResult,
+    SMCStructureBreak,
+    SMCStructureDirection,
+    SMCSwingPoint,
+    SMCSwingPointType,
+    SMCZone,
+    SMCZoneType,
+    SqueezeMomentumResult,
+    StochasticResult,
+    StochRSIResult,
+    StockSignalResult,
+    StockWithConflict,
+    StrategyResult,
+    SubmitAnalysisResult,
+    SubmitBriefingResult,
+    SupertrendResult,
+    TickerBase,
+    TickerCategory,
+    TickerSearchResult,
+    Timeframe,
+    Trend,
+    TrendDirection,
+    Trendline,
+    TrendlineDirection,
+    TrendlinePoint,
+    TrendState,
+    VolumeProfileResult,
+    VolumeProfileRow,
 } from './domain/types';

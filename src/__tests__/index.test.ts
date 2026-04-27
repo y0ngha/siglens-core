@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import type { PasswordHasher, PatternTrend, UserRepository } from '@/index';
 import {
     asArray,
+    assetTranslations,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
@@ -13,23 +14,32 @@ import {
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
     EXCLUDED_SINGLE_PATTERNS,
-    extractReconciledActionLines,
     extendTrendline,
+    extractReconciledActionLines,
+    getDatabaseClient,
     HIGH_CONFIDENCE_WEIGHT,
+    koreanTickers,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
+    oauthAccounts,
+    oauthProviderEnum,
     postProcessAnalysisWithReconcile,
     readDatabaseConfig,
     registerUser,
     RSI_DEFAULT_PERIOD,
+    sessions,
+    tryGetDatabaseClient,
+    tryReadDatabaseConfig,
     USAGE_ACTION_TYPE_VALUES,
-    users,
+    usageActionTypeEnum,
+    usageLogs,
     USER_TIER_VALUES,
+    users,
     userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type { PasswordHasher, PatternTrend, UserRepository } from '@/index';
+import { describe, expect, it } from 'vitest';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -59,15 +69,35 @@ describe('public API exports', () => {
         expect(trend).toBe('neutral');
     });
 
-    it('exports database helpers from package entrypoint', () => {
+    it('exports database client factory functions', () => {
         expect(typeof createDatabaseClient).toBe('function');
+        expect(typeof getDatabaseClient).toBe('function');
+        expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
         expect(typeof registerUser).toBe('function');
         expect(typeof DrizzleUserRepository).toBe('function');
+        expect(typeof tryReadDatabaseConfig).toBe('function');
+    });
+
+    it('exports drizzle schema table objects', () => {
         expect(users.email.name).toBe('email');
-        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(sessions.userId.name).toBe('user_id');
+        expect(usageLogs.actionType.name).toBe('action_type');
+        expect(oauthAccounts.provider.name).toBe('provider');
+        expect(koreanTickers.symbol.name).toBe('symbol');
+        expect(assetTranslations.symbol.name).toBe('symbol');
+    });
+
+    it('exports enum objects matching constant values', () => {
+        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
+        expect(usageActionTypeEnum.enumValues).toEqual([
+            ...USAGE_ACTION_TYPE_VALUES,
+        ]);
         expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
+        expect(oauthProviderEnum.enumValues).toEqual([
+            ...OAUTH_PROVIDER_VALUES,
+        ]);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 
