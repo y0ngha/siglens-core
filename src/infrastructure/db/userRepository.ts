@@ -5,9 +5,9 @@ import type {
     CreateEmailUserInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    SiglensDatabase,
     UserRepository,
 } from './types';
-import type { SiglensDatabase } from './types';
 
 // Matches schema.ts users.tier .default('free'); update both if the default tier changes.
 const DEFAULT_USER_TIER = 'free';

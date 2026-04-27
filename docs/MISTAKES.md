@@ -161,6 +161,13 @@ and have been removed from this file.
    → Remove unused type imports; add missing ones for explicit annotations
    → When TypeScript infers automatically, the import is unnecessary
 
+3.5. Multiple import blocks from the same module
+   → Merge all imports from a single specifier into one block
+   ❌ import type { SiglensDatabase } from './types';
+      // ... code ...
+      import type { AuthUserRecord, CreateEmailUserInput } from './types';
+   ✅ import type { SiglensDatabase, AuthUserRecord, CreateEmailUserInput } from './types';
+
 4. Interface field declaration does not match runtime behavior
    → Required fields marked `?` in the interface or absent fields declared as required
    → When tests and implementation show a field is optional, update interface to `fieldName?`

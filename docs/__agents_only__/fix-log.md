@@ -60,12 +60,6 @@
 - Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
 - Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
 
-## [PR #33 Round 3 | feat/5/email-signup | 2026-04-27]
-- Violation: Two separate `import type` blocks from the same `'./types'` path in `userRepository.ts`
-- Rule: CONVENTIONS.md Import style — merge all imports from the same specifier into a single statement
-- Context: `SiglensDatabase` was imported in a separate block from `AuthUserRecord`, `CreateEmailUserInput`, `UserRepository`; merged into one block
-
-
 ## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
 - Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
 - Rule: ARCHITECTURE.md — types and constants must be defined in the layer that produces them; infrastructure-concern error codes must not appear in domain/
@@ -89,3 +83,24 @@
 - Violation: Auth export block in `src/index.ts` mixed Tier 1 use-case functions (`loginUser`, `logoutUser`, `registerUser`) with Tier 4 session cookie constants in a single block
 - Rule: `src/index.ts` structure convention — each export block must contain symbols of a single Tier only; mixing Tiers in one block obscures API classification for consumers
 - Context: Tier 4 constants moved to the Tier 4 section; Tier 1 block now contains only use-case entry points
+
+## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
+- Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
+- Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
+- Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
+
+- Violation: `DrizzleSessionRepository` Tier 3 JSDoc missing `@returns` tag
+- Rule: CONVENTIONS.md — Tier 3 (infra factories & config) requires `description`, `@param`, and `@returns`
+- Context: Class-as-factory pattern; constructor returns an instance of the repository but `@returns` was omitted
+
+- Violation: Bare `/** @internal */` on `createSessionCookie` and `createExpiredSessionCookie`
+- Rule: CONVENTIONS.md — bare `@internal` is acceptable but a one-line role description is preferred
+- Context: Both helpers exported from `sessionCookie.ts` lacked any descriptive note alongside `@internal`
+
+- Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
+- Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
+- Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
+
+- Violation: `index.test.ts` "exports database helpers" test mixed DB factories, schema tables, enum values, and auth use-case functions in a single `it()` block with a misleading title
+- Rule: CONVENTIONS.md / FF — Cohesion — one test case must cover one concern; the title must describe the actual content
+- Context: A single integration smoke test grew to assert across four distinct export categories, hiding the auth-function checks behind a database-helper title

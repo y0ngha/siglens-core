@@ -14,7 +14,7 @@ export const DEFAULT_AUTH_COOKIE_SAME_SITE = 'lax';
 
 const EXPIRED_COOKIE_DATE = new Date('1970-01-01T00:00:00.000Z');
 
-/** @internal */
+/** @internal Builds an active HTTP-only session cookie from token and expiry metadata. */
 export function createSessionCookie(params: {
     token: string;
     expires: Date;
@@ -36,7 +36,7 @@ export function createSessionCookie(params: {
     };
 }
 
-/** @internal */
+/** @internal Builds a zero-maxAge, epoch-expired cookie for browser-side session clearing. */
 export function createExpiredSessionCookie(params?: {
     name?: string;
     secure?: boolean;

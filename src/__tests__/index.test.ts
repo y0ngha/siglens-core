@@ -42,14 +42,7 @@ import {
     userTierEnum,
     validateActionPrices,
 } from '@/index';
-import type {
-    EmailAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
-    PatternTrend,
-    SessionRepository,
-    UserRepository,
-} from '@/index';
+import type { PatternTrend, SessionRepository } from '@/index';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -79,23 +72,26 @@ describe('public API exports', () => {
         expect(trend).toBe('neutral');
     });
 
-    it('exports database helpers from package entrypoint', () => {
+    it('exports database client factories from package entrypoint', () => {
         expect(typeof createDatabaseClient).toBe('function');
         expect(typeof getDatabaseClient).toBe('function');
         expect(typeof tryGetDatabaseClient).toBe('function');
         expect(typeof readDatabaseConfig).toBe('function');
         expect(typeof tryReadDatabaseConfig).toBe('function');
-        expect(typeof registerUser).toBe('function');
-        expect(typeof loginUser).toBe('function');
-        expect(typeof logoutUser).toBe('function');
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
+    });
+
+    it('exports schema tables from package entrypoint', () => {
         expect(users.email.name).toBe('email');
         expect(sessions.userId.name).toBe('user_id');
         expect(usageLogs.userId.name).toBe('user_id');
         expect(oauthAccounts.userId.name).toBe('user_id');
         expect(typeof koreanTickers).toBe('object');
         expect(typeof assetTranslations).toBe('object');
+    });
+
+    it('exports schema enum values from package entrypoint', () => {
         expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
         expect(usageActionTypeEnum.enumValues).toEqual(['analysis', 'chatbot']);
         expect(oauthProviderEnum.enumValues).toEqual([
@@ -108,25 +104,13 @@ describe('public API exports', () => {
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 
-    it('exports auth interfaces from package entrypoint', async () => {
-        const repository: UserRepository = {
-            findByEmail: async () => null,
-            createEmailUser: async input => ({
-                id: 'user-1',
-                email: input.email,
-                name: input.name ?? null,
-                avatarUrl: input.avatarUrl ?? null,
-                tier: 'free',
-                createdAt: new Date('2026-04-26T00:00:00.000Z'),
-                updatedAt: new Date('2026-04-26T00:00:00.000Z'),
-            }),
-        };
-        const passwordHasher: PasswordHasher = {
-            hashPassword: async password => `hashed:${password}`,
-        };
-        const emailAuthRepository: EmailAuthUserRepository = {
-            findEmailAuthUserByEmail: async () => null,
-        };
+    it('exports auth use-case functions from package entrypoint', () => {
+        expect(typeof registerUser).toBe('function');
+        expect(typeof loginUser).toBe('function');
+        expect(typeof logoutUser).toBe('function');
+    });
+
+    it('logoutUser invalidates session and returns expired cookie via exported interfaces', async () => {
         const sessionRepository: SessionRepository = {
             createSession: async input => ({
                 id: 'session-1',
@@ -136,15 +120,6 @@ describe('public API exports', () => {
             }),
             deleteSession: async () => true,
         };
-        const passwordVerifier: PasswordVerifier = {
-            verifyPassword: async () => true,
-        };
-
-        expect(repository).toHaveProperty('findByEmail');
-        expect(passwordHasher).toHaveProperty('hashPassword');
-        expect(emailAuthRepository).toHaveProperty('findEmailAuthUserByEmail');
-        expect(sessionRepository).toHaveProperty('createSession');
-        expect(passwordVerifier).toHaveProperty('verifyPassword');
 
         const logoutResult = await logoutUser(
             { sessionToken: 'session-1' },

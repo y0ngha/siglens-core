@@ -5,7 +5,10 @@ import type {
     SessionRepository,
 } from '@/infrastructure/db/types';
 import type { PasswordVerifier } from '@/infrastructure/auth/types';
-import type { AuthValidationErrorCode } from '@/domain/types';
+import type {
+    AuthValidationErrorCode,
+    AuthValidationErrorField,
+} from '@/domain/types';
 
 /**
  * Error codes returned when user registration fails.
@@ -21,7 +24,7 @@ export type RegisterUserErrorCode =
 /**
  * The input field associated with a registration validation error.
  */
-export type RegisterUserErrorField = 'email' | 'password';
+export type RegisterUserErrorField = AuthValidationErrorField;
 
 /**
  * Input data required to register a new user with email and password.
