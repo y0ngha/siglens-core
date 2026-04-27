@@ -36,6 +36,20 @@ export function createChatTokenStore(): ChatTokenStore {
             }
         },
 
+        async refundConsumedToken(hashedClientId: string): Promise<void> {
+            if (redis === null) return;
+
+            try {
+                const key = buildChatTokenKey(hashedClientId);
+                const count = await redis.get<number>(key);
+                if (count !== null && count > 0) {
+                    await redis.decr(key);
+                }
+            } catch {
+                return;
+            }
+        },
+
         async getRemainingTokens(hashedClientId: string): Promise<number> {
             if (redis === null) return CHAT_TOKEN_LIMIT;
 

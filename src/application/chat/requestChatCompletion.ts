@@ -2,6 +2,7 @@ import { constants } from 'node:http2';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import type {
     ChatActionResult,
+    ChatErrorCode,
     ChatModel,
     ChatPromptPayload,
 } from '@/domain/types';
@@ -19,6 +20,11 @@ import type {
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
+
+const COMPENSATED_CHAT_ERRORS = [
+    'server_busy',
+    'server_error',
+] as const satisfies readonly ChatErrorCode[];
 
 function getHttpErrorStatus(error: unknown): number | undefined {
     if (typeof error !== 'object' || error === null || !('status' in error)) {
@@ -54,6 +60,23 @@ function toGeminiContents(payload: ChatPromptPayload): GeminiContent[] {
     }));
 }
 
+function shouldRefundConsumedToken(result: ChatActionResult): boolean {
+    return (
+        !result.ok &&
+        COMPENSATED_CHAT_ERRORS.some(error => error === result.error)
+    );
+}
+
+async function refundConsumedTokenSafely(
+    refund: () => Promise<void>
+): Promise<void> {
+    try {
+        await refund();
+    } catch {
+        return;
+    }
+}
+
 /**
  * Request a Gemini chat completion for an existing analysis.
  *
@@ -61,6 +84,10 @@ function toGeminiContents(payload: ChatPromptPayload): GeminiContent[] {
  * headers and environment variables. This use-case owns SigLens chat policy:
  * IP hashing, token consumption, prompt construction, Gemini payload mapping,
  * key fallback invocation, remaining-token lookup, and UI-facing error codes.
+ *
+ * Token consumption is compensated when Gemini failures map to server-owned
+ * errors (`server_busy` or `server_error`). User/quota outcomes
+ * (`token_exhausted` and `rate_limited`) are not refunded.
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,
@@ -101,6 +128,13 @@ export async function requestChatCompletion(
 
         return { ok: true, message, remainingTokens };
     } catch (error) {
-        return toChatErrorResult(error);
+        const result = toChatErrorResult(error);
+        if (shouldRefundConsumedToken(result)) {
+            await refundConsumedTokenSafely(() =>
+                tokenStore.refundConsumedToken(hashedClientId)
+            );
+        }
+
+        return result;
     }
 }

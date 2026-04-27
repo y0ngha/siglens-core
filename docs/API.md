@@ -150,6 +150,9 @@ infrastructure/cache/
 동일한 Upstash Redis 인스턴스를 채팅 토큰 제한에도 사용한다.
 환경변수는 `infrastructure/upstash/config.ts`의 `readUpstashConfig()`를 통해 읽는다.
 미설정 또는 Redis 오류 시 채팅은 통과 처리되어 graceful degradation을 유지한다.
+Gemini 호출 이후 `server_busy` 또는 `server_error`로 매핑되는 서버 책임 오류가
+발생하면 application layer가 이미 소비된 토큰을 1회 보상한다. 사용자/쿼터 책임으로
+보는 `rate_limited`와 실제 토큰 고갈(`token_exhausted`)은 보상하지 않는다.
 
 ### Redis 키 구조
 

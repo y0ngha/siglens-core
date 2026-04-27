@@ -43,17 +43,20 @@ function createParams(
 
 describe('requestChatCompletion', () => {
     const tryConsumeToken = vi.fn();
+    const refundConsumedToken = vi.fn();
     const getRemainingTokens = vi.fn();
     const callGemini = vi.fn();
 
     const tokenStore: ChatTokenStore = {
         tryConsumeToken,
+        refundConsumedToken,
         getRemainingTokens,
     };
 
     beforeEach(() => {
         vi.clearAllMocks();
         tryConsumeToken.mockResolvedValue(true);
+        refundConsumedToken.mockResolvedValue(undefined);
         getRemainingTokens.mockResolvedValue(4);
         callGemini.mockResolvedValue(
             '분석 기준으로는 조금 기다리는 편이 좋아요.'
@@ -157,6 +160,7 @@ describe('requestChatCompletion', () => {
         });
 
         expect(result).toEqual({ ok: false, error: 'rate_limited' });
+        expect(refundConsumedToken).not.toHaveBeenCalled();
         expect(getRemainingTokens).not.toHaveBeenCalled();
     });
 
@@ -173,6 +177,9 @@ describe('requestChatCompletion', () => {
         });
 
         expect(result).toEqual({ ok: false, error: 'server_busy' });
+        expect(refundConsumedToken).toHaveBeenCalledWith(
+            '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
+        );
     });
 
     it('maps Gemini errors without numeric status to server_error', async () => {
@@ -186,10 +193,28 @@ describe('requestChatCompletion', () => {
         });
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(refundConsumedToken).toHaveBeenCalledWith(
+            '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
+        );
     });
 
     it('maps non-object thrown values to server_error', async () => {
         callGemini.mockRejectedValueOnce('string error');
+
+        const result = await requestChatCompletion(createParams(), {
+            tokenStore,
+            callGemini,
+        });
+
+        expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(refundConsumedToken).toHaveBeenCalledWith(
+            '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
+        );
+    });
+
+    it('keeps the original server_error when token refund fails', async () => {
+        callGemini.mockRejectedValueOnce(new Error('network failed'));
+        refundConsumedToken.mockRejectedValueOnce(new Error('refund failed'));
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,

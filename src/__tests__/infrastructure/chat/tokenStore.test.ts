@@ -1,24 +1,26 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const { mockIncr, mockExpire, mockGet, mockRedisConstructor } = vi.hoisted(
-    () => {
+const { mockIncr, mockExpire, mockGet, mockDecr, mockRedisConstructor } =
+    vi.hoisted(() => {
         const incr = vi.fn();
         const expire = vi.fn();
         const get = vi.fn();
+        const decr = vi.fn();
         const constructor = vi.fn(() => ({
             incr,
             expire,
             get,
+            decr,
         }));
 
         return {
             mockIncr: incr,
             mockExpire: expire,
             mockGet: get,
+            mockDecr: decr,
             mockRedisConstructor: constructor,
         };
-    }
-);
+    });
 
 vi.mock('@upstash/redis', () => ({
     Redis: mockRedisConstructor,
@@ -111,6 +113,54 @@ describe('createChatTokenStore', () => {
         const result = await store.tryConsumeToken('hashed-id');
 
         expect(result).toBe(true);
+    });
+
+    it('refunds one consumed token when a count exists', async () => {
+        mockGet.mockResolvedValueOnce(2);
+        mockDecr.mockResolvedValueOnce(1);
+
+        const store = createChatTokenStore();
+        await store.refundConsumedToken('hashed-id');
+
+        expect(mockGet).toHaveBeenCalledWith('chat:tokens:hashed-id');
+        expect(mockDecr).toHaveBeenCalledWith('chat:tokens:hashed-id');
+    });
+
+    it('does not refund when the token key is absent', async () => {
+        mockGet.mockResolvedValueOnce(null);
+
+        const store = createChatTokenStore();
+        await store.refundConsumedToken('hashed-id');
+
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
+    it('does not refund when the token count is already zero', async () => {
+        mockGet.mockResolvedValueOnce(0);
+
+        const store = createChatTokenStore();
+        await store.refundConsumedToken('hashed-id');
+
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
+    it('skips token refund when Redis config is missing', async () => {
+        delete process.env.UPSTASH_REDIS_REST_URL;
+
+        const store = createChatTokenStore();
+        await store.refundConsumedToken('hashed-id');
+
+        expect(mockRedisConstructor).not.toHaveBeenCalled();
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
+    it('swallows Redis refund failures', async () => {
+        mockGet.mockRejectedValueOnce(new Error('redis failed'));
+
+        const store = createChatTokenStore();
+        await expect(
+            store.refundConsumedToken('hashed-id')
+        ).resolves.toBeUndefined();
     });
 
     it('returns the token limit when no token key exists', async () => {
