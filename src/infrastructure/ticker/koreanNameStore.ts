@@ -4,6 +4,10 @@ import {
     KOREAN_TICKERS_CACHE_KEY,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import type { CacheProvider } from '@/infrastructure/cache/types';
+import { tryGetDatabaseClient } from '@/infrastructure/db/client';
+import { DrizzleKoreanTickerRepository } from '@/infrastructure/db/tickerRepository';
+import type { KoreanTickerRepository } from '@/infrastructure/db/types';
 
 function koreanEntryToSearchResult(
     entry: KoreanTickerEntry
@@ -17,20 +21,56 @@ function koreanEntryToSearchResult(
     };
 }
 
-async function loadAllEntries(): Promise<KoreanTickerEntry[]> {
-    const cache = createCacheProvider();
-    if (!cache) return [];
+function tryGetRepository(): KoreanTickerRepository | null {
+    const client = tryGetDatabaseClient();
+    if (!client) return null;
+    return new DrizzleKoreanTickerRepository(client.db);
+}
 
+async function readFromCache(
+    cache: CacheProvider
+): Promise<KoreanTickerEntry[] | null> {
     try {
-        const entries = await cache.get<KoreanTickerEntry[]>(
-            KOREAN_TICKERS_CACHE_KEY
-        );
-        return entries ?? [];
+        return await cache.get<KoreanTickerEntry[]>(KOREAN_TICKERS_CACHE_KEY);
     } catch {
-        return [];
+        return null;
     }
 }
 
+async function writeToCache(
+    cache: CacheProvider,
+    entries: KoreanTickerEntry[]
+): Promise<void> {
+    try {
+        await cache.set(
+            KOREAN_TICKERS_CACHE_KEY,
+            entries,
+            KOREAN_NAMES_CACHE_TTL
+        );
+    } catch {
+        // Graceful degradation: cache write failure should not propagate.
+    }
+}
+
+async function loadAllEntries(): Promise<KoreanTickerEntry[]> {
+    const cache = createCacheProvider();
+
+    if (cache) {
+        const cached = await readFromCache(cache);
+        if (cached !== null) return cached;
+    }
+
+    const repository = tryGetRepository();
+    if (!repository) return [];
+
+    const entries = await repository.findAll();
+    if (cache && entries.length > 0) {
+        await writeToCache(cache, entries);
+    }
+    return entries;
+}
+
+/** @internal Korean-name substring lookup over the cached/persisted ticker store. */
 export async function searchByKoreanName(
     query: string
 ): Promise<TickerSearchResult[]> {
@@ -43,6 +83,7 @@ export async function searchByKoreanName(
         .map(koreanEntryToSearchResult);
 }
 
+/** @internal Resolve Korean names for a list of canonical ticker symbols. */
 export async function getKoreanNames(
     symbols: string[]
 ): Promise<Record<string, string>> {
@@ -59,10 +100,32 @@ export async function getKoreanNames(
     return Object.fromEntries(pairs) as Record<string, string>;
 }
 
+function mergeEntries(
+    existing: readonly KoreanTickerEntry[],
+    incoming: readonly KoreanTickerEntry[]
+): KoreanTickerEntry[] {
+    const incomingSymbols = new Set(incoming.map(e => e.symbol));
+    return [
+        ...existing.filter(e => !incomingSymbols.has(e.symbol)),
+        ...incoming,
+    ];
+}
+
+/** @internal Upsert ticker entries to the DB and refresh the Redis cache. */
 export async function setKoreanTickers(
     newEntries: KoreanTickerEntry[]
 ): Promise<void> {
     if (newEntries.length === 0) return;
+
+    const repository = tryGetRepository();
+    if (repository) {
+        try {
+            await repository.upsertMany(newEntries);
+        } catch {
+            // Graceful degradation: DB write failure should not propagate.
+            return;
+        }
+    }
 
     const cache = createCacheProvider();
     if (!cache) return;
@@ -71,14 +134,9 @@ export async function setKoreanTickers(
         const existing =
             (await cache.get<KoreanTickerEntry[]>(KOREAN_TICKERS_CACHE_KEY)) ??
             [];
-        const newSymbols = new Set(newEntries.map(e => e.symbol));
-        const merged = [
-            ...existing.filter(e => !newSymbols.has(e.symbol)),
-            ...newEntries,
-        ];
         await cache.set(
             KOREAN_TICKERS_CACHE_KEY,
-            merged,
+            mergeEntries(existing, newEntries),
             KOREAN_NAMES_CACHE_TTL
         );
     } catch {
