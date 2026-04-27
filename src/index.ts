@@ -27,6 +27,11 @@ export {
     registerUser,
     socialLoginUser,
 } from './application/auth';
+export {
+    createUserTierContext,
+    getUserTier,
+    setUserTier,
+} from './application/tier';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -154,6 +159,16 @@ export {
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
 
+// Tier gating
+export {
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
+
 // Ticker validation utilities
 export {
     deduplicateResults,
@@ -254,6 +269,9 @@ export {
     users,
     userTierEnum,
 } from './infrastructure/db';
+
+// Tier gating constants
+export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
 
 // Dashboard tickers / sectors
 export {
@@ -364,6 +382,7 @@ export type {
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserTierRepository,
     UserTier,
 } from './infrastructure/db';
 export type {
@@ -392,6 +411,15 @@ export type {
     SocialLoginUserResult,
 } from './application/auth';
 export type {
+    CreateUserTierContextInput,
+    GetUserTierInput,
+    SetUserTierError,
+    SetUserTierErrorCode,
+    SetUserTierInput,
+    SetUserTierResult,
+    UserTierDependencies,
+} from './application/tier';
+export type {
     AuthSessionRecord,
     AuthUserRecord,
     CreateEmailUserInput,
@@ -409,6 +437,14 @@ export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 export type {
     AnalysisSignalType,
     Timeframe,
+    Tier,
+    TierConfig,
+    TierFeatureFlags,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,

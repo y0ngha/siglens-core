@@ -7,6 +7,7 @@ import {
     clusterKeyLevels,
     createDatabaseClient,
     CROSS_LOOKBACK_BARS,
+    DEFAULT_TIER,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
     DrizzleSessionRepository,
@@ -18,6 +19,12 @@ import {
     extractReconciledActionLines,
     extendTrendline,
     HIGH_CONFIDENCE_WEIGHT,
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
     koreanTickers,
     loginUser,
     logoutUser,
@@ -31,6 +38,7 @@ import {
     RSI_DEFAULT_PERIOD,
     sessions,
     socialLoginUser,
+    TIER_CONFIG,
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
@@ -75,6 +83,17 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
+    });
+
+    it('exports tier gating helpers from package entrypoint', () => {
+        expect(DEFAULT_TIER).toBe('free');
+        expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
+        expect(isAllowed('free', 'analysisPerDay')).toBe(true);
+        expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
+        expect(isTimeframeAllowed('free', '5Min')).toBe(true);
+        expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
+        expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
+        expect(isTier('member')).toBe(true);
     });
 
     it('exports auth application entrypoints from package entrypoint', () => {

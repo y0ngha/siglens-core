@@ -1,4 +1,6 @@
 import { and, eq } from 'drizzle-orm';
+import { DEFAULT_TIER } from '@/domain/tier';
+import type { Tier } from '@/domain/types';
 import { oauthAccounts, users } from './schema';
 import type {
     AuthUserRecord,
@@ -10,10 +12,8 @@ import type {
     OAuthUserRepository,
     SiglensDatabase,
     UserRepository,
+    UserTierRepository,
 } from './types';
-
-// Matches schema.ts users.tier .default('free'); update both if the default tier changes.
-const DEFAULT_USER_TIER = 'free';
 
 class OAuthAccountConflictError extends Error {}
 
@@ -39,7 +39,11 @@ const emailAuthUserColumns = {
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
 export class DrizzleUserRepository
-    implements UserRepository, EmailAuthUserRepository, OAuthUserRepository
+    implements
+        UserRepository,
+        EmailAuthUserRepository,
+        OAuthUserRepository,
+        UserTierRepository
 {
     constructor(private readonly db: SiglensDatabase) {}
 
@@ -75,7 +79,7 @@ export class DrizzleUserRepository
                 passwordHash: input.passwordHash,
                 name: input.name ?? null,
                 avatarUrl: input.avatarUrl ?? null,
-                tier: DEFAULT_USER_TIER,
+                tier: DEFAULT_TIER,
             })
             .onConflictDoNothing({ target: users.email })
             .returning(authUserColumns);
@@ -114,7 +118,7 @@ export class DrizzleUserRepository
                         passwordHash: null,
                         name: input.name ?? null,
                         avatarUrl: input.avatarUrl ?? null,
-                        tier: DEFAULT_USER_TIER,
+                        tier: DEFAULT_TIER,
                     })
                     .onConflictDoNothing({ target: users.email })
                     .returning(authUserColumns);
@@ -151,5 +155,25 @@ export class DrizzleUserRepository
 
             throw error;
         }
+    }
+
+    async getUserTier(userId: string): Promise<Tier | null> {
+        const [user] = await this.db
+            .select({ tier: users.tier })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        return user?.tier ?? null;
+    }
+
+    async updateUserTier(userId: string, tier: Tier): Promise<Tier | null> {
+        const [user] = await this.db
+            .update(users)
+            .set({ tier })
+            .where(eq(users.id, userId))
+            .returning({ tier: users.tier });
+
+        return user?.tier ?? null;
     }
 }
