@@ -63,3 +63,12 @@
 - Violation: JSDoc @param for createDatabaseClient duplicated the parameter type name without adding information beyond what the type signature already conveys
 - Rule: CONVENTIONS.md JSDoc Rules — do not duplicate type info the parameter type already conveys; explain the why, edge cases, or side effects the type cannot express
 - Context: @param config described as "Database connection configuration" which merely restates the type; updated to reference readDatabaseConfig as the canonical constructor
+
+## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
+- Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
+- Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
+- Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
+
+- Violation: DrizzleUserRepository class-level JSDoc missing @see {@link UserRepository} cross-reference
+- Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
+- Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
