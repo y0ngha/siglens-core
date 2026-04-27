@@ -61,7 +61,14 @@ describe('DrizzleSessionRepository', () => {
             userId: 'user-1',
             expiresAt,
         });
-        expect(returning).toHaveBeenCalledWith(expect.any(Object));
+        expect(returning).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: expect.any(Object),
+                userId: expect.any(Object),
+                expiresAt: expect.any(Object),
+                createdAt: expect.any(Object),
+            })
+        );
         expect(result).toEqual(sessionRecord);
     });
 

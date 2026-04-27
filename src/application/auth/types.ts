@@ -5,6 +5,7 @@ import type {
     SessionRepository,
 } from '@/infrastructure/db/types';
 import type { PasswordVerifier } from '@/infrastructure/auth/types';
+import type { AuthValidationErrorCode } from '@/domain/types';
 
 /**
  * Error codes returned when user registration fails.
@@ -14,8 +15,7 @@ import type { PasswordVerifier } from '@/infrastructure/auth/types';
  * - `email_already_exists` — the email is already registered.
  */
 export type RegisterUserErrorCode =
-    | 'invalid_email'
-    | 'weak_password'
+    | AuthValidationErrorCode
     | 'email_already_exists';
 
 /**

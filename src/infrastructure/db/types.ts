@@ -10,9 +10,6 @@ import type * as schema from './schema';
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];
 
-/** Subscription tier used in auth user records — alias for {@link UserTier}. */
-export type AuthUserTier = UserTier;
-
 /**
  * A persisted user account record returned from the database.
  */
@@ -26,7 +23,7 @@ export interface AuthUserRecord {
     /** Optional avatar image URL; null when not provided at registration. */
     avatarUrl: string | null;
     /** Subscription tier assigned to the user. */
-    tier: AuthUserTier;
+    tier: UserTier;
     /** Timestamp when the account was created. */
     createdAt: Date;
     /** Timestamp when the account was last updated. */

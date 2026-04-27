@@ -25,7 +25,6 @@ export { DrizzleUserRepository } from './userRepository';
 export type {
     AuthSessionRecord,
     AuthUserRecord,
-    AuthUserTier,
     CreateEmailUserInput,
     CreateSessionInput,
     DatabaseClient,

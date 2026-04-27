@@ -387,7 +387,6 @@ export type {
 export type {
     AuthSessionRecord,
     AuthUserRecord,
-    AuthUserTier,
     CreateEmailUserInput,
     CreateSessionInput,
     EmailAuthUserRecord,

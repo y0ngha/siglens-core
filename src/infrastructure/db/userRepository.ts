@@ -28,10 +28,12 @@ const emailAuthUserColumns = {
 };
 
 /**
- * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
+ * Drizzle ORM implementation of {@link UserRepository} and {@link EmailAuthUserRepository}
+ * backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  * @see {@link UserRepository}
+ * @see {@link EmailAuthUserRepository}
  */
 export class DrizzleUserRepository
     implements UserRepository, EmailAuthUserRepository
