@@ -39,7 +39,12 @@ function makeDependencies(options?: {
     const hashPassword = vi.fn().mockResolvedValue('hashed-password');
 
     return {
-        repository: { findByEmail, createEmailUser },
+        repository: {
+            findByEmail,
+            findById: vi.fn(),
+            createEmailUser,
+            deleteUser: vi.fn(),
+        },
         passwordHasher: { hashPassword },
         findByEmail,
         createEmailUser,

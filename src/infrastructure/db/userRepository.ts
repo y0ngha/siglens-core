@@ -57,6 +57,25 @@ export class DrizzleUserRepository
         return user ?? null;
     }
 
+    async findById(userId: string): Promise<AuthUserRecord | null> {
+        const [user] = await this.db
+            .select(authUserColumns)
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        return user ?? null;
+    }
+
+    async deleteUser(userId: string): Promise<boolean> {
+        const deletedUsers = await this.db
+            .delete(users)
+            .where(eq(users.id, userId))
+            .returning({ id: users.id });
+
+        return deletedUsers.length > 0;
+    }
+
     async findEmailAuthUserByEmail(
         email: string
     ): Promise<EmailAuthUserRecord | null> {

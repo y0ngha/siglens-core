@@ -1,9 +1,9 @@
-import type { AuthSessionCookie } from './types';
+import { addSeconds } from '@/domain/utils/date';
 import type {
     AuthSessionRecord,
     SessionRepository,
 } from '@/infrastructure/db/types';
-import { addSeconds } from '@/domain/utils/date';
+import type { AuthSessionCookie } from './types';
 
 /** Default cookie name used for the auth session token. */
 export const AUTH_SESSION_COOKIE_NAME = 'siglens_session';

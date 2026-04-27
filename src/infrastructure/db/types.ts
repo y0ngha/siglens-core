@@ -112,6 +112,14 @@ export interface UserRepository {
     findByEmail(email: string): Promise<AuthUserRecord | null>;
 
     /**
+     * Find a user by their unique identifier.
+     *
+     * @param userId - User UUID to look up.
+     * @returns The matching {@link AuthUserRecord}, or null if not found.
+     */
+    findById(userId: string): Promise<AuthUserRecord | null>;
+
+    /**
      * Create a new email-based user account.
      *
      * @param input - Registration data including email, password hash, and optional profile fields.
@@ -120,6 +128,15 @@ export interface UserRepository {
     createEmailUser(
         input: CreateEmailUserInput
     ): Promise<AuthUserRecord | null>;
+
+    /**
+     * Delete a user account by id, cascading removal of dependent rows
+     * (sessions are deleted, usage logs have their `userId` set to null).
+     *
+     * @param userId - User UUID to delete.
+     * @returns Whether a user row was deleted.
+     */
+    deleteUser(userId: string): Promise<boolean>;
 }
 
 /**
@@ -183,6 +200,17 @@ export interface SessionRepository {
      * @returns The created session record.
      */
     createSession(input: CreateSessionInput): Promise<AuthSessionRecord>;
+
+    /**
+     * Look up a persisted session by its token.
+     *
+     * Expiration is not enforced at this layer; callers must compare
+     * {@link AuthSessionRecord.expiresAt} against the current time.
+     *
+     * @param sessionToken - Session identifier stored in the auth cookie.
+     * @returns The matching session record, or null if no row matches.
+     */
+    findSession(sessionToken: string): Promise<AuthSessionRecord | null>;
 
     /**
      * Delete a session by token.
