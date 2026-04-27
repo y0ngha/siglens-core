@@ -1,3 +1,4 @@
+import type { AssetInfoMatch } from '@/application/ticker/types';
 import { isValidTickerFormat } from '@/domain/ticker';
 import type { AssetInfo, KoreanTickerEntry } from '@/domain/types';
 import {
@@ -7,6 +8,12 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CacheProvider } from '@/infrastructure/cache/types';
+import { tryGetDatabaseClient } from '@/infrastructure/db/client';
+import { DrizzleAssetTranslationRepository } from '@/infrastructure/db/tickerRepository';
+import type {
+    AssetTranslationRecord,
+    AssetTranslationRepository,
+} from '@/infrastructure/db/types';
 import {
     filterUsExchanges,
     searchBySymbol,
@@ -17,13 +24,66 @@ import {
 } from '@/infrastructure/ticker/koreanNameStore';
 import { translateCompanyNames } from '@/infrastructure/ticker/koreanTranslator';
 
-interface AssetInfoMatch {
-    name: string;
-    exchange: string;
-    exchangeFullName: string;
+function tryGetRepository(): AssetTranslationRepository | null {
+    const client = tryGetDatabaseClient();
+    if (!client) return null;
+    return new DrizzleAssetTranslationRepository(client.db);
 }
 
-async function translateAndCache(
+function recordToAssetInfo(record: AssetTranslationRecord): AssetInfo {
+    return {
+        symbol: record.symbol,
+        name: record.name,
+        koreanName: record.koreanName,
+    };
+}
+
+async function readFromDatabase(symbol: string): Promise<AssetInfo | null> {
+    const repository = tryGetRepository();
+    if (!repository) return null;
+
+    try {
+        const record = await repository.findBySymbol(symbol);
+        return record ? recordToAssetInfo(record) : null;
+    } catch (e) {
+        console.warn('[getAssetInfo] DB read failed', e);
+        return null;
+    }
+}
+
+async function persistTranslation(
+    symbol: string,
+    name: string,
+    koreanName: string,
+    cache: CacheProvider | null
+): Promise<void> {
+    const repository = tryGetRepository();
+    if (repository) {
+        try {
+            await repository.upsert({
+                symbol,
+                name,
+                koreanName,
+                fmpSymbol: symbol,
+            });
+        } catch (e) {
+            console.warn('[getAssetInfo] DB upsert failed', e);
+        }
+    }
+
+    if (!cache) return;
+    try {
+        await cache.set(
+            buildAssetInfoCacheKey(symbol),
+            { symbol, name, koreanName },
+            ASSET_INFO_CACHE_TTL_WITH_KOREAN
+        );
+    } catch (e) {
+        console.warn('[getAssetInfo] cache write failed', e);
+    }
+}
+
+async function translateAndPersist(
     symbol: string,
     match: AssetInfoMatch,
     cache: CacheProvider | null
@@ -42,18 +102,7 @@ async function translateAndCache(
         exchangeFullName: match.exchangeFullName,
     };
     await setKoreanTickers([entry]);
-
-    if (!cache) return;
-
-    try {
-        await cache.set(
-            buildAssetInfoCacheKey(symbol),
-            { symbol, name: match.name, koreanName },
-            ASSET_INFO_CACHE_TTL_WITH_KOREAN
-        );
-    } catch {
-        // Graceful degradation: cache write failure does not affect callers.
-    }
+    await persistTranslation(symbol, match.name, koreanName, cache);
 }
 
 /**
@@ -61,15 +110,19 @@ async function translateAndCache(
  *
  * Pipeline:
  * 1. Validate symbol format via {@link isValidTickerFormat}; reject otherwise.
- * 2. Look up the cache (separate TTLs for entries with vs. without a Korean name).
- * 3. On cache miss, query FMP, filter to U.S. exchanges, prefer an exact
+ * 2. Look up the Redis cache (separate TTLs for entries with vs. without a
+ *    Korean name).
+ * 3. On cache miss, look up the persistent `asset_translations` table —
+ *    when found, write through to the cache and return.
+ * 4. On both miss, query FMP, filter to U.S. exchanges, prefer an exact
  *    symbol match.
- * 4. Look up the Korean name in the persistent store. If absent, fire a
- *    background translation job and write through to the store + cache.
+ * 5. Look up the Korean name in the persistent store. If absent, fire a
+ *    background translation job that upserts the asset_translations row +
+ *    cache; otherwise upsert immediately.
  *
- * Cache and background-translation failures are logged but never propagate
- * — this function always returns either an {@link AssetInfo} or `null`
- * (when the symbol is invalid or no U.S.-listed match exists).
+ * Cache, DB, and background-translation failures are logged but never
+ * propagate — this function always returns either an {@link AssetInfo} or
+ * `null` (when the symbol is invalid or no U.S.-listed match exists).
  *
  * @param symbol - Ticker symbol; case-insensitive (uppercased internally).
  * @returns The resolved asset info, or `null` when the symbol cannot be
@@ -99,6 +152,18 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
         }
     }
 
+    const fromDb = await readFromDatabase(upper);
+    if (fromDb) {
+        if (cache) {
+            cache
+                .set(cacheKey, fromDb, ASSET_INFO_CACHE_TTL_WITH_KOREAN)
+                .catch(e =>
+                    console.warn('[getAssetInfo] cache write failed', e)
+                );
+        }
+        return fromDb;
+    }
+
     const fmpResults = await searchBySymbol(upper);
     const usResults = filterUsExchanges(fmpResults);
     const match = usResults.find(r => r.symbol === upper) ?? usResults[0];
@@ -115,22 +180,24 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
         ...(koreanName && { koreanName }),
     };
 
-    if (!koreanName) {
-        translateAndCache(
-            upper,
-            { name, exchange, exchangeFullName },
-            cache
-        ).catch(e =>
-            console.warn('[getAssetInfo] background translation failed', e)
+    if (koreanName) {
+        persistTranslation(upper, name, koreanName, cache).catch(e =>
+            console.warn('[getAssetInfo] persist failed', e)
         );
+        return info;
     }
 
-    if (cache) {
-        const ttl = koreanName
-            ? ASSET_INFO_CACHE_TTL_WITH_KOREAN
-            : ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN;
+    translateAndPersist(
+        upper,
+        { name, exchange, exchangeFullName },
         cache
-            .set(cacheKey, info, ttl)
+    ).catch(e =>
+        console.warn('[getAssetInfo] background translation failed', e)
+    );
+
+    if (cache) {
+        cache
+            .set(cacheKey, info, ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN)
             .catch(e => console.warn('[getAssetInfo] cache write failed', e));
     }
 
