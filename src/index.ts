@@ -22,10 +22,6 @@ export { searchTicker } from './application/ticker/searchTicker';
 
 // Auth
 export {
-    AUTH_SESSION_COOKIE_NAME,
-    DEFAULT_AUTH_COOKIE_PATH,
-    DEFAULT_AUTH_COOKIE_SAME_SITE,
-    DEFAULT_SESSION_TTL_SECONDS,
     loginUser,
     logoutUser,
     registerUser,
@@ -217,28 +213,8 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 // Database
 export {
     createDatabaseClient,
-    getDatabaseClient,
-    tryGetDatabaseClient,
-    readDatabaseConfig,
-    tryReadDatabaseConfig,
-} from './infrastructure/db';
-export {
     DrizzleSessionRepository,
     DrizzleUserRepository,
-} from './infrastructure/db';
-export {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-    assetTranslations,
-    koreanTickers,
-    oauthAccounts,
-    oauthProviderEnum,
-    sessions,
-    usageActionTypeEnum,
-    usageLogs,
-    users,
-    userTierEnum,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -266,6 +242,30 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Auth session cookie constants
+export {
+    AUTH_SESSION_COOKIE_NAME,
+    DEFAULT_AUTH_COOKIE_PATH,
+    DEFAULT_AUTH_COOKIE_SAME_SITE,
+    DEFAULT_SESSION_TTL_SECONDS,
+} from './application/auth';
+
+// Database schema objects / enum values
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+    assetTranslations,
+    koreanTickers,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    usageActionTypeEnum,
+    usageLogs,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
 
 // Dashboard tickers / sectors
 export {
@@ -372,7 +372,6 @@ export type {
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
 export type {
-    DatabaseClient,
     DatabaseConfig,
     OAuthProvider,
     SiglensDatabase,
@@ -381,6 +380,7 @@ export type {
 } from './infrastructure/db';
 export type {
     AuthSessionCookie,
+    AuthSessionOptions,
     LoginUserDependencies,
     LoginUserError,
     LoginUserErrorCode,
@@ -404,25 +404,26 @@ export type {
     SocialLoginUserResult,
 } from './application/auth';
 export type {
-    AuthOAuthProvider,
     AuthSessionRecord,
     AuthUserRecord,
-    AuthUserTier,
     CreateEmailUserInput,
     CreateOAuthUserInput,
     CreateSessionInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     OAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
     SessionRepository,
     UserRepository,
+} from './infrastructure/db';
+export type {
+    PasswordHasher,
+    PasswordVerifier,
     UserTierContext,
 } from './infrastructure/auth';
 
 // Domain types
 export type {
+    AnalysisSignalType,
     Timeframe,
     Tier,
     TierConfig,
@@ -479,11 +480,17 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     SignalStrength,
+    BacktestCase,
+    BacktestMeta,
+    BacktestRiskLevel,
     ReconciledActionLevels,
     IndicatorGuideResult,
     KeyLevel,
     KeyLevels,
+    ClusteredKeyLevel,
+    ClusteredKeyLevels,
     KeyPrice,
+    QuadrantKey,
     PriceTarget,
     PriceScenario,
     PriceTargets,
@@ -497,8 +504,15 @@ export type {
     TrendlinePoint,
     ActionRecommendation,
     EntryRecommendation,
+    ReconciledActionLineData,
+    ValidatedActionPrices,
     ChatMessage,
+    ChatActionResult,
+    ChatErrorCode,
+    ChatLoadingPhase,
+    ChatModel,
     ChatPromptPayload,
+    ChatSession,
     MarketIndexData,
     MarketSectorData,
     MarketBriefingResponse,
@@ -514,6 +528,8 @@ export type {
     TickerBase,
     KoreanTickerEntry,
     TickerSearchResult,
+    SkillCounts,
+    SkillShowcaseItem,
     AssetInfo,
     TickerCategory,
     CategoryId,
@@ -535,4 +551,17 @@ export type {
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,
+    LevelSource,
+    ResolvedLevel,
+    ReconcileResult,
+    ReconciledTpEntry,
+    RunAnalysisInput,
+    RawAnalysisResponse,
+    BacktestSignalResult,
+    BacktestAiResult,
+    BacktestExitReason,
+    BacktestAiPriceTarget,
+    BacktestAiEntryRecommendation,
+    BacktestAiAnalysis,
+    BacktestData,
 } from './domain/types';

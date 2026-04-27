@@ -120,6 +120,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
 | `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
 
+**티어 제한 (7)**
+| Symbol | Source |
+|---|---|
+| `DEFAULT_TIER` / `TIER_CONFIG` | `domain/tier.ts` |
+| `isAllowed` / `getTierLimit` | `domain/tier.ts` |
+| `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
+| `isTier` | `domain/tier.ts` |
+
 **캔들 패턴 (UI/프롬프트에서 사용) (10)**
 | Symbol | Source |
 |---|---|
@@ -183,11 +191,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `readFmpConfig` | `infrastructure/fmp/config.ts` |
 | `tryReadFmpConfig` | `infrastructure/fmp/config.ts` |
 
-**Database (5 factory/config + repositories + schema exports)**
+**Database (1 factory + repositories + schema exports)**
 | Symbol | Source |
 |---|---|
-| `createDatabaseClient` / `getDatabaseClient` / `tryGetDatabaseClient` | `infrastructure/db/client.ts` |
-| `readDatabaseConfig` / `tryReadDatabaseConfig` | `infrastructure/db/config.ts` |
+| `createDatabaseClient` | `infrastructure/db/client.ts` |
 | `DrizzleUserRepository` / `DrizzleSessionRepository` | `infrastructure/db/*Repository.ts` |
 | `users` / `sessions` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
 | `koreanTickers` / `assetTranslations` | `infrastructure/db/schema.ts` |
@@ -219,9 +226,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 4 — Types & Constants
 
-**도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
+**도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선/티어 제한 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입, Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`).
+**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`).
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 

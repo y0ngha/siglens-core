@@ -1,16 +1,18 @@
 import { and, eq } from 'drizzle-orm';
 import { oauthAccounts, users } from './schema';
-import type { SiglensDatabase } from './types';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
     CreateOAuthUserInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    OAuthProvider,
     OAuthUserRepository,
+    SiglensDatabase,
     UserRepository,
-} from '@/infrastructure/auth/types';
+} from './types';
 
+// Matches schema.ts users.tier .default('free'); update both if the default tier changes.
 const DEFAULT_USER_TIER = 'free';
 
 class OAuthAccountConflictError extends Error {}
@@ -31,7 +33,8 @@ const emailAuthUserColumns = {
 };
 
 /**
- * Drizzle ORM implementation of {@link UserRepository} backed by a Neon PostgreSQL database.
+ * Drizzle ORM implementation of {@link UserRepository}, {@link EmailAuthUserRepository},
+ * and {@link OAuthUserRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
@@ -81,7 +84,7 @@ export class DrizzleUserRepository
     }
 
     async findByOAuthAccount(
-        provider: CreateOAuthUserInput['provider'],
+        provider: OAuthProvider,
         providerAccountId: string
     ): Promise<AuthUserRecord | null> {
         const [user] = await this.db

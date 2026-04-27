@@ -1130,7 +1130,12 @@ export type Tier = 'free' | 'member' | 'pro';
 /** Daily usage-limited feature identifiers. */
 export type TierLimitedFeature = 'analysisPerDay' | 'chatbotPerDay';
 
-/** Analysis detail fragments exposed per tier. */
+/**
+ * Analysis detail fragments exposed per tier.
+ *
+ * Values use the serialized AI response field names, so multi-word fragments
+ * intentionally remain snake_case.
+ */
 export type TierInfoDepth =
     | 'direction'
     | 'summary'
@@ -1239,3 +1244,19 @@ export type QuadrantKey =
     | 'bullishExpected'
     | 'bearishExpected'
     | 'bearishConfirmed';
+
+/** Validation error code shared across auth use-cases. */
+export type AuthValidationErrorCode = 'invalid_email' | 'weak_password';
+
+/** Input field associated with an auth validation error. */
+export type AuthValidationErrorField = 'email' | 'password';
+
+/** Structured validation error produced by domain auth helpers. */
+export interface AuthValidationError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: AuthValidationErrorCode;
+    /** Input field that caused the error. */
+    field: AuthValidationErrorField;
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}

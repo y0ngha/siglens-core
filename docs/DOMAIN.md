@@ -149,12 +149,12 @@ export const TIER_CONFIG = {
   infoDepth: {
     free: ['direction', 'summary'],
     member: ['direction', 'summary', 'partial_detail'],
-    pro: ['direction', 'summary', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
+    pro: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
   },
   models: {
     free: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-    member: ['gemini-2.5-pro', 'claude-sonnet-4'],
-    pro: ['gemini-2.5-pro', 'claude-sonnet-4', 'claude-opus-4'],
+    member: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4'],
+    pro: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4', 'claude-opus-4'],
   },
   featureFlags: {
     enableTierRestrictions: false,

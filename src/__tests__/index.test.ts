@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
     asArray,
+    assetTranslations,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
     createDatabaseClient,
     CROSS_LOOKBACK_BARS,
+    DEFAULT_TIER,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
     DrizzleSessionRepository,
@@ -17,17 +19,29 @@ import {
     extractReconciledActionLines,
     extendTrendline,
     HIGH_CONFIDENCE_WEIGHT,
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+    koreanTickers,
     loginUser,
     logoutUser,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
+    oauthAccounts,
+    oauthProviderEnum,
     postProcessAnalysisWithReconcile,
-    readDatabaseConfig,
     registerUser,
     RSI_DEFAULT_PERIOD,
+    sessions,
     socialLoginUser,
+    TIER_CONFIG,
     USAGE_ACTION_TYPE_VALUES,
+    usageActionTypeEnum,
+    usageLogs,
     users,
     USER_TIER_VALUES,
     userTierEnum,
@@ -71,17 +85,50 @@ describe('public API exports', () => {
         expect(trend).toBe('neutral');
     });
 
-    it('exports database helpers from package entrypoint', () => {
-        expect(typeof createDatabaseClient).toBe('function');
-        expect(typeof readDatabaseConfig).toBe('function');
+    it('exports tier gating helpers from package entrypoint', () => {
+        expect(DEFAULT_TIER).toBe('free');
+        expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
+        expect(isAllowed('free', 'analysisPerDay')).toBe(true);
+        expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
+        expect(isTimeframeAllowed('free', '5Min')).toBe(true);
+        expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
+        expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
+        expect(isTier('member')).toBe(true);
+    });
+
+    it('exports auth application entrypoints from package entrypoint', () => {
         expect(typeof registerUser).toBe('function');
         expect(typeof loginUser).toBe('function');
         expect(typeof socialLoginUser).toBe('function');
         expect(typeof logoutUser).toBe('function');
+    });
+
+    it('exports database client factory from package entrypoint', () => {
+        expect(typeof createDatabaseClient).toBe('function');
+    });
+
+    it('exports database repository classes from package entrypoint', () => {
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
+    });
+
+    it('exports database schema objects from package entrypoint', () => {
         expect(users.email.name).toBe('email');
-        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(sessions.userId.name).toBe('user_id');
+        expect(usageLogs.actionType.name).toBe('action_type');
+        expect(oauthAccounts.provider.name).toBe('provider');
+        expect(koreanTickers.symbol.name).toBe('symbol');
+        expect(assetTranslations.symbol.name).toBe('symbol');
+        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
+        expect(usageActionTypeEnum.enumValues).toEqual([
+            ...USAGE_ACTION_TYPE_VALUES,
+        ]);
+        expect(oauthProviderEnum.enumValues).toEqual([
+            ...OAUTH_PROVIDER_VALUES,
+        ]);
+    });
+
+    it('exports database enum values from package entrypoint', () => {
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
         expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
@@ -130,5 +177,26 @@ describe('public API exports', () => {
         expect(oauthRepository).toHaveProperty('findByOAuthAccount');
         expect(sessionRepository).toHaveProperty('createSession');
         expect(passwordVerifier).toHaveProperty('verifyPassword');
+    });
+
+    it('runs logout through the package entrypoint', async () => {
+        const sessionRepository: SessionRepository = {
+            createSession: async input => ({
+                id: 'session-1',
+                userId: input.userId,
+                expiresAt: input.expiresAt,
+                createdAt: new Date('2026-04-26T00:00:00.000Z'),
+            }),
+            deleteSession: async () => true,
+        };
+
+        const logoutResult = await logoutUser(
+            { sessionToken: 'session-1' },
+            { sessions: sessionRepository }
+        );
+
+        expect(logoutResult.ok).toBe(true);
+        expect(logoutResult.sessionInvalidated).toBe(true);
+        expect(logoutResult.cookie).toBeDefined();
     });
 });

@@ -8,7 +8,7 @@ let cachedClient: DatabaseClient | null = null;
 
 /**
  * Creates a new Drizzle client backed by Neon serverless.
- * @param config Database connection configuration.
+ * @param config Database connection configuration supplied by the caller.
  * @returns A `DatabaseClient` containing the Drizzle `db` and raw `sql` handles.
  */
 export function createDatabaseClient(config: DatabaseConfig): DatabaseClient {

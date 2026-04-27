@@ -7,7 +7,7 @@ import type {
     Timeframe,
 } from '@/domain/types';
 
-/** All supported subscription tiers, ordered free → member → pro. */
+/** @internal All supported subscription tiers, ordered free -> member -> pro. */
 export const TIER_VALUES = [
     'free',
     'member',
