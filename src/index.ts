@@ -203,10 +203,6 @@ export {
     createDatabaseClient,
     DrizzleSessionRepository,
     DrizzleUserRepository,
-    getDatabaseClient,
-    readDatabaseConfig,
-    tryGetDatabaseClient,
-    tryReadDatabaseConfig,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -364,7 +360,6 @@ export type {
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
 export type {
-    DatabaseClient,
     DatabaseConfig,
     OAuthProvider,
     SiglensDatabase,

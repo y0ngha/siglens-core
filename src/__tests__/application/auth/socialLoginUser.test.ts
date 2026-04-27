@@ -236,6 +236,37 @@ describe('socialLoginUser', () => {
         );
     });
 
+    it('omits optional profile fields when provider profile does not include them', async () => {
+        const createdUser = makeUser('user-1');
+        const { dependencies, createOAuthUser } = makeDependencies({
+            createdUser,
+        });
+
+        const result = await socialLoginUser(
+            {
+                provider: 'google',
+                providerAccountId: 'google-account-1',
+                email: 'user@example.com',
+            },
+            dependencies,
+            { now }
+        );
+
+        expect(createOAuthUser).toHaveBeenCalledWith({
+            email: 'user@example.com',
+            provider: 'google',
+            providerAccountId: 'google-account-1',
+            name: undefined,
+            avatarUrl: undefined,
+        });
+        expect(result).toEqual(
+            expect.objectContaining({
+                ok: true,
+                user: createdUser,
+            })
+        );
+    });
+
     it('uses the raced provider link when creation loses to another OAuth login', async () => {
         const racedUser = makeUser('user-1');
         const { dependencies, findByOAuthAccount, createSession } =

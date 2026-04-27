@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     asArray,
+    assetTranslations,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
@@ -16,23 +17,22 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extractReconciledActionLines,
     extendTrendline,
-    getDatabaseClient,
     HIGH_CONFIDENCE_WEIGHT,
+    koreanTickers,
     loginUser,
     logoutUser,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
     oauthAccounts,
+    oauthProviderEnum,
     postProcessAnalysisWithReconcile,
-    readDatabaseConfig,
     registerUser,
     RSI_DEFAULT_PERIOD,
     sessions,
     socialLoginUser,
-    tryGetDatabaseClient,
-    tryReadDatabaseConfig,
     USAGE_ACTION_TYPE_VALUES,
+    usageActionTypeEnum,
     usageLogs,
     users,
     USER_TIER_VALUES,
@@ -84,12 +84,8 @@ describe('public API exports', () => {
         expect(typeof logoutUser).toBe('function');
     });
 
-    it('exports database factory helpers from package entrypoint', () => {
+    it('exports database client factory from package entrypoint', () => {
         expect(typeof createDatabaseClient).toBe('function');
-        expect(typeof getDatabaseClient).toBe('function');
-        expect(typeof tryGetDatabaseClient).toBe('function');
-        expect(typeof readDatabaseConfig).toBe('function');
-        expect(typeof tryReadDatabaseConfig).toBe('function');
     });
 
     it('exports database repository classes from package entrypoint', () => {
@@ -102,7 +98,15 @@ describe('public API exports', () => {
         expect(sessions.userId.name).toBe('user_id');
         expect(usageLogs.actionType.name).toBe('action_type');
         expect(oauthAccounts.provider.name).toBe('provider');
-        expect(userTierEnum.enumValues).toEqual(['free', 'member', 'pro']);
+        expect(koreanTickers.symbol.name).toBe('symbol');
+        expect(assetTranslations.symbol.name).toBe('symbol');
+        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
+        expect(usageActionTypeEnum.enumValues).toEqual([
+            ...USAGE_ACTION_TYPE_VALUES,
+        ]);
+        expect(oauthProviderEnum.enumValues).toEqual([
+            ...OAUTH_PROVIDER_VALUES,
+        ]);
     });
 
     it('exports database enum values from package entrypoint', () => {
