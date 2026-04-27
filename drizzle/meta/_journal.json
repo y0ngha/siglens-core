@@ -15,6 +15,13 @@
             "when": 1777213326343,
             "tag": "0001_sharp_triathlon",
             "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1777318357343,
+            "tag": "0002_add_premium_model_usage_action",
+            "breakpoints": true
         }
     ]
 }

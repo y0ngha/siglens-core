@@ -11,6 +11,7 @@ import {
     detectBollingerSqueezeBearish,
     detectGoldenCross,
     DrizzleSessionRepository,
+    DrizzleUsageLogRepository,
     DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
@@ -30,11 +31,13 @@ import {
     bcryptPasswordVerifier,
     deleteAccount,
     findUserBySessionToken,
+    GEMINI_2_5_PRO_MODEL,
     loginUser,
     logoutUser,
     requestChatCompletion,
     createChatTokenStore,
     GEMINI_2_5_FLASH_MODEL,
+    getAllowedModels,
     VALID_CHAT_MODELS,
     normalizeActionRecommendation,
     normalizeTrend,
@@ -101,6 +104,7 @@ describe('public API exports', () => {
         expect(isTimeframeAllowed('free', '5Min')).toBe(true);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
+        expect(getAllowedModels('free')).toContain('claude-opus-4');
         expect(isTier('member')).toBe(true);
     });
 
@@ -125,6 +129,7 @@ describe('public API exports', () => {
     it('exports database repository classes from package entrypoint', () => {
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
+        expect(typeof DrizzleUsageLogRepository).toBe('function');
     });
 
     it('exports database schema objects from package entrypoint', () => {
@@ -145,7 +150,11 @@ describe('public API exports', () => {
 
     it('exports database enum values from package entrypoint', () => {
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
-        expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
+        expect(USAGE_ACTION_TYPE_VALUES).toEqual([
+            'analysis',
+            'chatbot',
+            'premium_model',
+        ]);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 
@@ -223,6 +232,7 @@ describe('public API exports', () => {
         expect(typeof requestChatCompletion).toBe('function');
         expect(typeof createChatTokenStore).toBe('function');
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
+        expect(GEMINI_2_5_PRO_MODEL).toBe('gemini-2.5-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
     });
 });

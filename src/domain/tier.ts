@@ -3,6 +3,7 @@ import type {
     TierConfig,
     TierInfoDepth,
     TierLimitedFeature,
+    ModelId,
     TierModel,
     Timeframe,
 } from '@/domain/types';
@@ -118,6 +119,31 @@ export function getTierLimit(
     config: TierConfig = TIER_CONFIG
 ): number {
     return config.limits[feature][tier];
+}
+
+/**
+ * Return the AI models currently available to a tier.
+ *
+ * When tier restrictions are disabled, returns every configured model across
+ * all tiers so launch-time callers can render the complete model picker.
+ *
+ * @param tier - The user's subscription tier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns A new array containing the model ids available to the tier.
+ */
+export function getAllowedModels(
+    tier: Tier,
+    config: TierConfig = TIER_CONFIG
+): ModelId[] {
+    return config.featureFlags.enableTierRestrictions
+        ? [...config.models[tier]]
+        : Array.from(
+              new Set([
+                  ...config.models.free,
+                  ...config.models.member,
+                  ...config.models.pro,
+              ])
+          );
 }
 
 /**

@@ -5,7 +5,9 @@ import type {
     ChatErrorCode,
     ChatModel,
     ChatPromptPayload,
+    TierConfig,
 } from '@/domain/types';
+import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import { callGeminiWithKeyFallback } from '@/infrastructure/ai/gemini';
 import type { GeminiContent } from '@/infrastructure/ai/types';
 import {
@@ -20,6 +22,9 @@ import type {
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
+
+const ISO_DATE_LENGTH = 10;
+const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
 
 const COMPENSATED_CHAT_ERRORS = [
     'server_busy',
@@ -53,6 +58,14 @@ function isValidChatModel(model: ChatModel): boolean {
     return VALID_CHAT_MODELS.some(validModel => validModel === model);
 }
 
+function isPremiumChatModel(model: ChatModel, config: TierConfig): boolean {
+    return !config.models.free.includes(model);
+}
+
+function toUsageDate(date: Date): string {
+    return date.toISOString().slice(0, ISO_DATE_LENGTH);
+}
+
 function toGeminiContents(payload: ChatPromptPayload): GeminiContent[] {
     return payload.messages.map(message => ({
         role: message.role,
@@ -77,6 +90,16 @@ async function refundConsumedTokenSafely(
     }
 }
 
+async function recordPremiumModelUsageSafely(
+    recordUsage: () => Promise<void>
+): Promise<void> {
+    try {
+        await recordUsage();
+    } catch {
+        return;
+    }
+}
+
 /**
  * Request a Gemini chat completion for an existing analysis.
  *
@@ -96,6 +119,15 @@ export async function requestChatCompletion(
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
     if (!isValidChatModel(model) || !params.paidApiKey) {
         return { ok: false, error: 'server_error' };
+    }
+
+    const tierContext = params.tierContext ?? {
+        userId: null,
+        tier: DEFAULT_TIER,
+    };
+    const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
+    if (!isModelAllowed(tierContext.tier, model, tierConfig)) {
+        return { ok: false, error: 'model_not_allowed' };
     }
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
@@ -125,6 +157,26 @@ export async function requestChatCompletion(
         });
         const remainingTokens =
             await tokenStore.getRemainingTokens(hashedClientId);
+        const usageLogs = dependencies.usageLogs;
+        if (
+            tierContext.userId !== null &&
+            tierContext.tier === 'member' &&
+            isPremiumChatModel(model, tierConfig) &&
+            usageLogs !== undefined
+        ) {
+            const userId = tierContext.userId;
+            await recordPremiumModelUsageSafely(() =>
+                usageLogs.recordUsage({
+                    userId,
+                    ipHash: hashedClientId,
+                    actionType: PREMIUM_MODEL_USAGE_ACTION,
+                    modelUsed: model,
+                    date: toUsageDate(
+                        (dependencies.getCurrentDate ?? (() => new Date()))()
+                    ),
+                })
+            );
+        }
 
         return { ok: true, message, remainingTokens };
     } catch (error) {

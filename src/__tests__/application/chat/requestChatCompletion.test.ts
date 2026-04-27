@@ -4,11 +4,14 @@ import type { Mock } from 'vitest';
 import {
     GEMINI_2_5_FLASH_LITE_MODEL,
     GEMINI_2_5_FLASH_MODEL,
+    GEMINI_2_5_PRO_MODEL,
 } from '@/application/chat/constants';
 import { requestChatCompletion } from '@/application/chat/requestChatCompletion';
 import type { RequestChatCompletionParams } from '@/application/chat/types';
-import type { AnalysisResponse, ChatModel } from '@/domain/types';
+import { TIER_CONFIG } from '@/domain/tier';
+import type { AnalysisResponse, ChatModel, TierConfig } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { UsageLogRepository } from '@/infrastructure/db';
 
 const MINIMAL_ANALYSIS: AnalysisResponse = {
     summary: 'AAPL trending up.',
@@ -24,6 +27,11 @@ const MINIMAL_ANALYSIS: AnalysisResponse = {
     strategyResults: [],
     candlePatterns: [],
     trendlines: [],
+};
+
+const RESTRICTED_TIER_CONFIG: TierConfig = {
+    ...TIER_CONFIG,
+    featureFlags: { enableTierRestrictions: true },
 };
 
 function createParams(
@@ -46,6 +54,7 @@ describe('requestChatCompletion', () => {
     const refundConsumedToken = vi.fn();
     const getRemainingTokens = vi.fn();
     const callGemini = vi.fn();
+    const recordUsage = vi.fn();
 
     const tokenStore: ChatTokenStore = {
         tryConsumeToken,
@@ -53,11 +62,16 @@ describe('requestChatCompletion', () => {
         getRemainingTokens,
     };
 
+    const usageLogs: UsageLogRepository = {
+        recordUsage,
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
         tryConsumeToken.mockResolvedValue(true);
         refundConsumedToken.mockResolvedValue(undefined);
         getRemainingTokens.mockResolvedValue(4);
+        recordUsage.mockResolvedValue(undefined);
         callGemini.mockResolvedValue(
             '분석 기준으로는 조금 기다리는 편이 좋아요.'
         );
@@ -93,6 +107,24 @@ describe('requestChatCompletion', () => {
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
         expect(tryConsumeToken).not.toHaveBeenCalled();
+    });
+
+    it('returns model_not_allowed before token consumption when tier restrictions reject the model', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'free' },
+            }),
+            {
+                tokenStore,
+                callGemini,
+                tierConfig: RESTRICTED_TIER_CONFIG,
+            }
+        );
+
+        expect(result).toEqual({ ok: false, error: 'model_not_allowed' });
+        expect(tryConsumeToken).not.toHaveBeenCalled();
+        expect(callGemini).not.toHaveBeenCalled();
     });
 
     it('builds a Gemini request and returns message with remaining tokens', async () => {
@@ -145,6 +177,60 @@ describe('requestChatCompletion', () => {
 
         const firstCall = (callGemini as Mock).mock.calls[0]?.[0];
         expect(firstCall).toMatchObject({ model: GEMINI_2_5_FLASH_MODEL });
+    });
+
+    it('records member premium model usage after a successful response', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            {
+                tokenStore,
+                callGemini,
+                usageLogs,
+                getCurrentDate: () => new Date('2026-04-28T12:34:56.000Z'),
+            }
+        );
+
+        expect(result.ok).toBe(true);
+        expect(recordUsage).toHaveBeenCalledWith({
+            userId: 'user-1',
+            ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
+            actionType: 'premium_model',
+            modelUsed: GEMINI_2_5_PRO_MODEL,
+            date: '2026-04-28',
+        });
+    });
+
+    it('does not record free model usage for members', async () => {
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_FLASH_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            { tokenStore, callGemini, usageLogs }
+        );
+
+        expect(recordUsage).not.toHaveBeenCalled();
+    });
+
+    it('keeps successful chat response when premium usage tracking fails', async () => {
+        recordUsage.mockRejectedValueOnce(new Error('database unavailable'));
+
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            { tokenStore, callGemini, usageLogs }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
     });
 
     it('maps Gemini rate limit errors to rate_limited', async () => {

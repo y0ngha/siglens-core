@@ -3,10 +3,13 @@ import type {
     ChatActionResult,
     ChatMessage,
     ChatModel,
+    TierConfig,
     Timeframe,
+    UserTierContext,
 } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
+import type { UsageLogRepository } from '@/infrastructure/db';
 
 export interface RequestChatCompletionParams {
     symbol: string;
@@ -18,11 +21,15 @@ export interface RequestChatCompletionParams {
     model?: ChatModel;
     freeApiKey?: string;
     paidApiKey?: string;
+    tierContext?: UserTierContext;
 }
 
 export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
+    usageLogs?: UsageLogRepository;
+    tierConfig?: TierConfig;
+    getCurrentDate?: () => Date;
 }
 
 export type RequestChatCompletionResult = ChatActionResult;

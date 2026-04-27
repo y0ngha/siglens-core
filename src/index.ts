@@ -26,6 +26,7 @@ export { requestChatCompletion } from './application/chat/requestChatCompletion'
 export {
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
+    GEMINI_2_5_PRO_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 
@@ -209,6 +210,7 @@ export {
 
 // Tier gating
 export {
+    getAllowedModels,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -273,6 +275,7 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 export {
     createDatabaseClient,
     DrizzleSessionRepository,
+    DrizzleUsageLogRepository,
     DrizzleUserRepository,
 } from './infrastructure/db';
 
@@ -442,9 +445,11 @@ export type {
 } from './infrastructure/ai/types';
 export type {
     DatabaseConfig,
+    CreateUsageLogInput,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UsageLogRepository,
     UserTierRepository,
     UserTier,
 } from './infrastructure/db';
@@ -515,6 +520,7 @@ export type {
 export type {
     AnalysisSignalType,
     Timeframe,
+    ModelId,
     Tier,
     TierConfig,
     TierFeatureFlags,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
+    getAllowedModels,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -63,6 +64,27 @@ describe('tier', () => {
 
         it('returns Infinity for uncapped tiers with default config', () => {
             expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
+        });
+    });
+
+    describe('getAllowedModels', () => {
+        it('returns every configured model when restrictions are disabled', () => {
+            expect(getAllowedModels('free')).toEqual([
+                'gemini-2.5-flash',
+                'gemini-2.5-flash-lite',
+                'gemini-2.5-pro',
+                'claude-sonnet-4',
+                'claude-opus-4',
+            ]);
+        });
+
+        it('returns tier-specific models when restrictions are enabled', () => {
+            expect(getAllowedModels('member', restrictedConfig)).toEqual([
+                'gemini-2.5-flash',
+                'gemini-2.5-flash-lite',
+                'gemini-2.5-pro',
+                'claude-sonnet-4',
+            ]);
         });
     });
 

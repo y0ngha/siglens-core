@@ -21,6 +21,7 @@ export {
     userTierEnum,
 } from './schema';
 export { DrizzleSessionRepository } from './sessionRepository';
+export { DrizzleUsageLogRepository } from './usageLogRepository';
 export { DrizzleUserRepository } from './userRepository';
 export type {
     AuthSessionRecord,
@@ -28,6 +29,7 @@ export type {
     CreateEmailUserInput,
     CreateOAuthUserInput,
     CreateSessionInput,
+    CreateUsageLogInput,
     DatabaseClient,
     DatabaseConfig,
     EmailAuthUserRecord,
@@ -37,6 +39,7 @@ export type {
     SessionRepository,
     SiglensDatabase,
     UsageActionType,
+    UsageLogRepository,
     UserRepository,
     UserTier,
     UserTierRepository,

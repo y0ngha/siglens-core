@@ -116,3 +116,8 @@
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
 - Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
+
+## [Issue #14 | feat/14/ai-model-tier-separation | 2026-04-28]
+- Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
+- Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
+- Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint

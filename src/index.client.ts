@@ -57,8 +57,22 @@ export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export {
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
+    GEMINI_2_5_PRO_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
+
+// Tier gating
+export {
+    DEFAULT_TIER,
+    TIER_CONFIG,
+    getAllowedModels,
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
 
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
@@ -304,6 +318,15 @@ export type {
 export type {
     AnalysisSignalType,
     Timeframe,
+    ModelId,
+    Tier,
+    TierConfig,
+    TierFeatureFlags,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,
