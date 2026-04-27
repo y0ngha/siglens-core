@@ -13,7 +13,7 @@ UI, 렌더링, 프레임워크 종속 코드는 이 레파지토리에 존재하
 ```
 ┌─────────────────────────────────────────┐
 │         application (오케스트레이션)     │  여러 infrastructure를 조합하는
-│           market/, …                   │  use-case 단위 함수
+│           market/, chat/, …            │  use-case 단위 함수
 ├─────────────────────────────────────────┤
 │          infrastructure (외부)          │  AI Provider, Skills Loader,
 │                                         │  Upstash Redis, Neon DB,
@@ -54,7 +54,8 @@ application    ← domain, infrastructure import 가능
                  여러 infrastructure 모듈을 조합해 use-case를 완성
                  domain, infrastructure에서 application import 금지 (ESLint 강제)
                  현재: market/ (submitAnalysis, pollAnalysis, cancelAnalysisJob,
-                                submitBriefing, pollBriefing)
+                                submitBriefing, pollBriefing),
+                       chat/ (requestChatCompletion)
 
 src/index.ts   ← domain, infrastructure, application에서 노출할 심볼을 재-export
                  외부 consumer가 유일하게 참조하는 진입점
@@ -114,6 +115,7 @@ const key = process.env.API_KEY; // 금지
     │   ├── domain
     │   └── infrastructure
     ├── application
+    │   ├── chat
     │   └── market
     ├── domain
     │   ├── analysis
@@ -123,6 +125,7 @@ const key = process.env.API_KEY; // 금지
     ├── infrastructure
     │   ├── ai
     │   ├── cache
+    │   ├── chat
     │   ├── db
     │   ├── jobs
     │   ├── market
@@ -186,6 +189,7 @@ no external imports, pure functions only.
 
 - `ai/` — AI 프로바이더 클라이언트 (Claude, Gemini)
 - `cache/` — Upstash Redis 래퍼 (TTL 기반 캐시)
+- `chat/` — Upstash Redis 기반 채팅 토큰 저장소
 - `db/` — Neon / PostgreSQL 연결 관리
 - `jobs/` — Redis 기반 Job 큐 (enqueue / dequeue / status 관리)
 - `market/` — 시세 프로바이더 래퍼 (consumer가 주입한 provider 추상화)

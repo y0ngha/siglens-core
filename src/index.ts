@@ -21,6 +21,14 @@ export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
 export type { BackgroundTaskOptions } from './application/types';
 
+// Chat
+export { requestChatCompletion } from './application/chat/requestChatCompletion';
+export {
+    GEMINI_2_5_FLASH_MODEL,
+    GEMINI_2_5_FLASH_LITE_MODEL,
+    VALID_CHAT_MODELS,
+} from './application/chat/constants';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -222,6 +230,14 @@ export { createMarketDataProvider } from './infrastructure/market/factory';
 export { callGeminiWithKeyFallback } from './infrastructure/ai/gemini';
 export { AI_SYSTEM_PROMPT } from './infrastructure/ai/utils';
 
+// Chat token store
+export {
+    CHAT_TOKEN_LIMIT,
+    CHAT_TOKEN_TTL_SEC,
+    createChatTokenStore,
+    hashClientIp,
+} from './infrastructure/chat/tokenStore';
+
 // Skills loader
 export { FileSkillsLoader } from './infrastructure/skills/loader';
 
@@ -343,6 +359,7 @@ export {
 
 // Infrastructure interfaces
 export type { CacheProvider } from './infrastructure/cache/types';
+export type { ChatTokenStore } from './infrastructure/chat/types';
 export type { SkillsProvider } from './infrastructure/skills/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
@@ -358,6 +375,13 @@ export type {
     GeminiPart,
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
+
+// Application types
+export type {
+    RequestChatCompletionParams,
+    RequestChatCompletionDependencies,
+    RequestChatCompletionResult,
+} from './application/chat/types';
 
 // Domain types
 export type {

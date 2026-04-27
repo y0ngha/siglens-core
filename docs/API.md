@@ -16,6 +16,7 @@
 AI_PROVIDER=claude                  # claude | gemini (기본값: claude)
 ANTHROPIC_API_KEY=                  # AI_PROVIDER=claude 시 필수
 GEMINI_API_KEY=                     # AI_PROVIDER=gemini 시 필수
+GEMINI_CHAT_FREE_API_KEY=           # 선택 — 채팅 Gemini free-tier key fallback용
 
 # Upstash Redis (선택 — 미설정 시 캐시 없이 동작)
 UPSTASH_REDIS_REST_URL=             # Upstash Redis REST URL
@@ -86,6 +87,12 @@ Query parameter: key={GEMINI_API_KEY}
 
 **구현 위치**: `infrastructure/ai/gemini.ts`
 
+채팅 completion use-case(`application/chat/requestChatCompletion.ts`)는
+consumer가 전달한 `paidApiKey`와 선택적 `freeApiKey`를
+`callGeminiWithKeyFallback()`에 주입한다. Next.js 같은 consumer는 자신의
+런타임에서 `GEMINI_API_KEY`와 `GEMINI_CHAT_FREE_API_KEY`를 읽고,
+`siglens-core`에는 문자열 config만 전달한다.
+
 ### AI Provider 선택
 
 ```bash
@@ -135,6 +142,28 @@ infrastructure/cache/
 ```
 
 `CacheProvider`를 in-memory stub으로 대체하면 단위 테스트에서 외부 호출 없이 검증할 수 있다.
+
+---
+
+## 2-1. Upstash Redis (채팅 토큰 제한)
+
+동일한 Upstash Redis 인스턴스를 채팅 토큰 제한에도 사용한다.
+환경변수는 `infrastructure/upstash/config.ts`의 `readUpstashConfig()`를 통해 읽는다.
+미설정 또는 Redis 오류 시 채팅은 통과 처리되어 graceful degradation을 유지한다.
+
+### Redis 키 구조
+
+| 키 패턴 | 값 타입 | 설명 |
+|---|---|---|
+| `chat:tokens:{hashedClientId}` | number | 클라이언트별 일일 채팅 토큰 사용량 |
+
+### 구현 위치
+
+```
+infrastructure/chat/
+├── types.ts       ← ChatTokenStore 인터페이스
+└── tokenStore.ts  ← Upstash 기반 구현체 + IP 해시 helper
+```
 
 ---
 

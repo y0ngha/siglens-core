@@ -54,6 +54,11 @@ export { classifyTrend, detectSignals } from './domain/signals';
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
+export {
+    GEMINI_2_5_FLASH_MODEL,
+    GEMINI_2_5_FLASH_LITE_MODEL,
+    VALID_CHAT_MODELS,
+} from './application/chat/constants';
 
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
@@ -288,6 +293,12 @@ export type {
     GeminiPart,
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
+export type { ChatTokenStore } from './infrastructure/chat/types';
+export type {
+    RequestChatCompletionParams,
+    RequestChatCompletionDependencies,
+    RequestChatCompletionResult,
+} from './application/chat/types';
 
 // Domain types
 export type {

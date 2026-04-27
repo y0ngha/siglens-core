@@ -78,7 +78,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (11)
+### Tier 1 — Application Entrypoints (12)
 
 | Symbol | Source |
 |---|---|
@@ -93,6 +93,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `getSectorSignals` | `application/dashboard/sectorSignals.ts` |
 | `getAssetInfo` | `application/ticker/getAssetInfo.ts` |
 | `searchTicker` | `application/ticker/searchTicker.ts` |
+| `requestChatCompletion` | `application/chat/requestChatCompletion.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -157,6 +158,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildBriefingCacheKey` | `infrastructure/cache/config.ts` |
 | `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
 
+**채팅 토큰 저장소 (1 factory + 3 helper/const)**
+| Symbol | Source |
+|---|---|
+| `createChatTokenStore` | `infrastructure/chat/tokenStore.ts` |
+| `hashClientIp` | `infrastructure/chat/tokenStore.ts` |
+| `CHAT_TOKEN_LIMIT` | `infrastructure/chat/tokenStore.ts` |
+| `CHAT_TOKEN_TTL_SEC` | `infrastructure/chat/tokenStore.ts` |
+
 **시장 데이터 (1)**
 | Symbol | Source |
 |---|---|
@@ -199,7 +208,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선 결과 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Gemini 관련 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Gemini 관련 타입, 채팅 application 타입.
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
