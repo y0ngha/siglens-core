@@ -39,4 +39,5 @@ export type {
     UsageActionType,
     UserRepository,
     UserTier,
+    UserTierRepository,
 } from './types';

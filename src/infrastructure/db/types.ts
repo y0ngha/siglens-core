@@ -6,6 +6,7 @@ import type {
     USER_TIER_VALUES,
 } from './constants';
 import type * as schema from './schema';
+import type { Tier } from '@/domain/types';
 
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];
@@ -216,4 +217,24 @@ export interface DatabaseClient {
     db: SiglensDatabase;
     /** Raw Neon serverless SQL client for template-literal queries. */
     sql: NeonSqlClient;
+}
+
+/** Persistence operations required by tier-gating use-cases. */
+export interface UserTierRepository {
+    /**
+     * Find the tier currently assigned to a user.
+     *
+     * @param userId - User UUID to look up.
+     * @returns The persisted tier, or null when the user does not exist.
+     */
+    getUserTier(userId: string): Promise<Tier | null>;
+
+    /**
+     * Manually update a user's tier.
+     *
+     * @param userId - User UUID to update.
+     * @param tier - New tier to persist.
+     * @returns The updated tier, or null when the user does not exist.
+     */
+    updateUserTier(userId: string, tier: Tier): Promise<Tier | null>;
 }

@@ -1,13 +1,3 @@
-import type { Tier } from '@/domain/types';
-
-/**
- * Request-scoped user tier data for server middleware and handlers.
- */
-export interface UserTierContext {
-    userId: string | null;
-    tier: Tier;
-}
-
 /**
  * Interface for hashing plain-text passwords before storage.
  */

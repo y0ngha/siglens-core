@@ -1,5 +1,1 @@
-export type {
-    PasswordHasher,
-    PasswordVerifier,
-    UserTierContext,
-} from './types';
+export type { PasswordHasher, PasswordVerifier } from './types';

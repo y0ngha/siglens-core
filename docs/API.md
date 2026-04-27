@@ -242,6 +242,15 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 - `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
 - HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
 
+### 사용자 티어
+
+`application/tier`는 사용자 등급 조회, 요청 컨텍스트 구성, 관리자 등급 변경 유스케이스를
+제공한다.
+
+- `getUserTier`는 `UserTierRepository.getUserTier()`로 `users.tier`를 조회하고, 대상 사용자가 없으면 `free`로 fallback한다.
+- `createUserTierContext`는 consumer의 미들웨어/서버 핸들러가 인증된 `userId`를 전달하면 `{ userId, tier }` 요청 컨텍스트를 반환한다. 익명 요청은 repository 접근 없이 `free`가 된다.
+- `setUserTier`는 관리자 화면 또는 운영 도구에서 `users.tier`를 수동 변경할 때 사용한다. 대상 사용자가 없으면 `user_not_found` 결과를 반환한다.
+
 ---
 
 ## 4. Filesystem (Skills)
