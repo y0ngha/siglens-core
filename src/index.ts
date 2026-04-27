@@ -21,7 +21,17 @@ export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
 
 // Auth
-export { loginUser, logoutUser, registerUser } from './application/auth';
+export {
+    loginUser,
+    logoutUser,
+    registerUser,
+    socialLoginUser,
+} from './application/auth';
+export {
+    createUserTierContext,
+    getUserTier,
+    setUserTier,
+} from './application/tier';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -149,6 +159,16 @@ export {
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
 
+// Tier gating
+export {
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
+
 // Ticker validation utilities
 export {
     deduplicateResults,
@@ -198,10 +218,6 @@ export {
     createDatabaseClient,
     DrizzleSessionRepository,
     DrizzleUserRepository,
-    getDatabaseClient,
-    tryGetDatabaseClient,
-    readDatabaseConfig,
-    tryReadDatabaseConfig,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -238,7 +254,7 @@ export {
     DEFAULT_SESSION_TTL_SECONDS,
 } from './application/auth';
 
-// Database schema & constants
+// Database schema objects / enum values
 export {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
@@ -253,6 +269,9 @@ export {
     users,
     userTierEnum,
 } from './infrastructure/db';
+
+// Tier gating constants
+export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
 
 // Dashboard tickers / sectors
 export {
@@ -359,15 +378,16 @@ export type {
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
 export type {
-    DatabaseClient,
     DatabaseConfig,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserTierRepository,
     UserTier,
 } from './infrastructure/db';
 export type {
     AuthSessionCookie,
+    AuthSessionOptions,
     LoginUserDependencies,
     LoginUserError,
     LoginUserErrorCode,
@@ -383,14 +403,31 @@ export type {
     RegisterUserErrorField,
     RegisterUserInput,
     RegisterUserResult,
+    SocialLoginUserDependencies,
+    SocialLoginUserError,
+    SocialLoginUserErrorCode,
+    SocialLoginUserInput,
+    SocialLoginUserOptions,
+    SocialLoginUserResult,
 } from './application/auth';
+export type {
+    CreateUserTierContextInput,
+    GetUserTierInput,
+    SetUserTierError,
+    SetUserTierErrorCode,
+    SetUserTierInput,
+    SetUserTierResult,
+    UserTierDependencies,
+} from './application/tier';
 export type {
     AuthSessionRecord,
     AuthUserRecord,
     CreateEmailUserInput,
+    CreateOAuthUserInput,
     CreateSessionInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    OAuthUserRepository,
     SessionRepository,
     UserRepository,
 } from './infrastructure/db';
@@ -400,6 +437,14 @@ export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 export type {
     AnalysisSignalType,
     Timeframe,
+    Tier,
+    TierConfig,
+    TierFeatureFlags,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,

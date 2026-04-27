@@ -14,7 +14,7 @@ function midpointAt(
 ): number | null {
     const h = maxH[idx];
     const l = minL[idx];
-    return h !== null && l !== null ? (h + l) / 2 : null;
+    return typeof h === 'number' && typeof l === 'number' ? (h + l) / 2 : null;
 }
 
 export function calculateIchimoku(

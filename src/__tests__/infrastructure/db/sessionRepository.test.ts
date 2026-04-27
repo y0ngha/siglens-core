@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DrizzleSessionRepository } from '@/infrastructure/db/sessionRepository';
+import { sessions } from '@/infrastructure/db/schema';
 import type { SiglensDatabase } from '@/infrastructure/db/types';
 
 const expiresAt = new Date('2026-05-27T00:00:00.000Z');
@@ -61,14 +62,12 @@ describe('DrizzleSessionRepository', () => {
             userId: 'user-1',
             expiresAt,
         });
-        expect(returning).toHaveBeenCalledWith(
-            expect.objectContaining({
-                id: expect.any(Object),
-                userId: expect.any(Object),
-                expiresAt: expect.any(Object),
-                createdAt: expect.any(Object),
-            })
-        );
+        expect(returning).toHaveBeenCalledWith({
+            id: sessions.id,
+            userId: sessions.userId,
+            expiresAt: sessions.expiresAt,
+            createdAt: sessions.createdAt,
+        });
         expect(result).toEqual(sessionRecord);
     });
 

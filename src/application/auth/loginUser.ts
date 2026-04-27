@@ -1,3 +1,9 @@
+import { normalizeEmail } from '@/domain/auth/validation';
+import type {
+    AuthUserRecord,
+    EmailAuthUserRecord,
+} from '@/infrastructure/db/types';
+import { createAuthSession } from './sessionCookie';
 import type {
     LoginUserDependencies,
     LoginUserError,
@@ -5,21 +11,8 @@ import type {
     LoginUserOptions,
     LoginUserResult,
 } from './types';
-import type {
-    AuthUserRecord,
-    EmailAuthUserRecord,
-} from '@/infrastructure/db/types';
-import {
-    createSessionCookie,
-    DEFAULT_SESSION_TTL_SECONDS,
-} from './sessionCookie';
-import { addSeconds } from '@/domain/utils/date';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Email or password is incorrect';
-
-function normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
-}
 
 function invalidCredentialsError(): LoginUserError {
     return {
@@ -42,9 +35,8 @@ function omitPasswordHash(user: EmailAuthUserRecord): AuthUserRecord {
  *
  * @param input - Email and plain-text password supplied by the user.
  * @param dependencies - Repositories and password verifier injected by the caller.
- * @param options - Runtime overrides for TTL, cookie name, secure flag, and current time.
- * @returns Discriminated union: `{ ok: true }` with user/session/cookie on success,
- *   or `{ ok: false }` with `invalid_credentials` error.
+ * @param options - Runtime overrides for TTL, cookie name, secure flag, SameSite, path, and current time.
+ * @returns Discriminated union: `{ ok: true }` with user/session/cookie on success, or `{ ok: false }` with `invalid_credentials` error.
  *
  * @example
  * ```typescript
@@ -83,20 +75,14 @@ export async function loginUser(
         return { ok: false, error: invalidCredentialsError() };
     }
 
-    const sessionTtlSeconds =
-        options.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
     const now = options.now ?? new Date();
-    const expiresAt = addSeconds(now, sessionTtlSeconds);
-    const session = await dependencies.sessions.createSession({
+    const { session, cookie } = await createAuthSession({
         userId: user.id,
-        expiresAt,
-    });
-    const cookie = createSessionCookie({
-        token: session.id,
-        expires: session.expiresAt,
-        maxAgeSeconds: sessionTtlSeconds,
-        name: options.cookieName,
-        secure: options.secureCookie,
+        sessions: dependencies.sessions,
+        now,
+        sessionTtlSeconds: options.sessionTtlSeconds,
+        cookieName: options.cookieName,
+        secureCookie: options.secureCookie,
         sameSite: options.sameSite,
         path: options.path,
     });

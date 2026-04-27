@@ -4,13 +4,13 @@ import {
     DEFAULT_SESSION_TTL_SECONDS,
     loginUser,
 } from '@/application/auth';
+import type { PasswordVerifier } from '@/infrastructure/auth';
 import type {
     AuthSessionRecord,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     SessionRepository,
 } from '@/infrastructure/db/types';
-import type { PasswordVerifier } from '@/infrastructure/auth';
 
 const now = new Date('2026-04-27T00:00:00.000Z');
 const createdAt = new Date('2026-04-26T00:00:00.000Z');

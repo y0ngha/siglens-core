@@ -18,8 +18,7 @@ const sessionColumns = {
  * Drizzle ORM implementation of {@link SessionRepository} backed by Neon PostgreSQL.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
- * @returns A repository instance backed by the provided database client.
- * @see {@link SessionRepository}
+ * @returns A repository that persists and deletes auth sessions.
  */
 export class DrizzleSessionRepository implements SessionRepository {
     constructor(private readonly db: SiglensDatabase) {}

@@ -1,4 +1,9 @@
 import type { AuthSessionCookie } from './types';
+import type {
+    AuthSessionRecord,
+    SessionRepository,
+} from '@/infrastructure/db/types';
+import { addSeconds } from '@/domain/utils/date';
 
 /** Default cookie name used for the auth session token. */
 export const AUTH_SESSION_COOKIE_NAME = 'siglens_session';
@@ -52,4 +57,35 @@ export function createExpiredSessionCookie(params?: {
         sameSite: params?.sameSite,
         path: params?.path,
     });
+}
+
+/** @internal Shared session + cookie creation helper used by login use-cases. */
+export async function createAuthSession(params: {
+    userId: string;
+    sessions: SessionRepository;
+    now: Date;
+    sessionTtlSeconds?: number;
+    cookieName?: string;
+    secureCookie?: boolean;
+    sameSite?: AuthSessionCookie['sameSite'];
+    path?: string;
+}): Promise<{ session: AuthSessionRecord; cookie: AuthSessionCookie }> {
+    const sessionTtlSeconds =
+        params.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS;
+    const expiresAt = addSeconds(params.now, sessionTtlSeconds);
+    const session = await params.sessions.createSession({
+        userId: params.userId,
+        expiresAt,
+    });
+    const cookie = createSessionCookie({
+        token: session.id,
+        expires: session.expiresAt,
+        maxAgeSeconds: sessionTtlSeconds,
+        name: params.cookieName,
+        secure: params.secureCookie,
+        sameSite: params.sameSite,
+        path: params.path,
+    });
+
+    return { session, cookie };
 }

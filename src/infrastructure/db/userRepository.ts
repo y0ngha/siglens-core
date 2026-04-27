@@ -1,16 +1,21 @@
-import { eq } from 'drizzle-orm';
-import { users } from './schema';
+import { and, eq } from 'drizzle-orm';
+import { DEFAULT_TIER } from '@/domain/tier';
+import type { Tier } from '@/domain/types';
+import { oauthAccounts, users } from './schema';
 import type {
     AuthUserRecord,
     CreateEmailUserInput,
+    CreateOAuthUserInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    OAuthProvider,
+    OAuthUserRepository,
     SiglensDatabase,
     UserRepository,
+    UserTierRepository,
 } from './types';
 
-// Matches schema.ts users.tier .default('free'); update both if the default tier changes.
-const DEFAULT_USER_TIER = 'free';
+class OAuthAccountConflictError extends Error {}
 
 const authUserColumns = {
     id: users.id,
@@ -28,15 +33,17 @@ const emailAuthUserColumns = {
 };
 
 /**
- * Drizzle ORM implementation of {@link UserRepository} and {@link EmailAuthUserRepository}
- * backed by a Neon PostgreSQL database.
+ * Drizzle ORM implementation of {@link UserRepository}, {@link EmailAuthUserRepository},
+ * and {@link OAuthUserRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
- * @see {@link UserRepository}
- * @see {@link EmailAuthUserRepository}
  */
 export class DrizzleUserRepository
-    implements UserRepository, EmailAuthUserRepository
+    implements
+        UserRepository,
+        EmailAuthUserRepository,
+        OAuthUserRepository,
+        UserTierRepository
 {
     constructor(private readonly db: SiglensDatabase) {}
 
@@ -72,11 +79,101 @@ export class DrizzleUserRepository
                 passwordHash: input.passwordHash,
                 name: input.name ?? null,
                 avatarUrl: input.avatarUrl ?? null,
-                tier: DEFAULT_USER_TIER,
+                tier: DEFAULT_TIER,
             })
             .onConflictDoNothing({ target: users.email })
             .returning(authUserColumns);
 
         return user ?? null;
+    }
+
+    async findByOAuthAccount(
+        provider: OAuthProvider,
+        providerAccountId: string
+    ): Promise<AuthUserRecord | null> {
+        const [user] = await this.db
+            .select(authUserColumns)
+            .from(oauthAccounts)
+            .innerJoin(users, eq(oauthAccounts.userId, users.id))
+            .where(
+                and(
+                    eq(oauthAccounts.provider, provider),
+                    eq(oauthAccounts.providerAccountId, providerAccountId)
+                )
+            )
+            .limit(1);
+
+        return user ?? null;
+    }
+
+    async createOAuthUser(
+        input: CreateOAuthUserInput
+    ): Promise<AuthUserRecord | null> {
+        try {
+            return await this.db.transaction(async tx => {
+                const [user] = await tx
+                    .insert(users)
+                    .values({
+                        email: input.email,
+                        passwordHash: null,
+                        name: input.name ?? null,
+                        avatarUrl: input.avatarUrl ?? null,
+                        tier: DEFAULT_TIER,
+                    })
+                    .onConflictDoNothing({ target: users.email })
+                    .returning(authUserColumns);
+
+                if (user === undefined) {
+                    return null;
+                }
+
+                const [account] = await tx
+                    .insert(oauthAccounts)
+                    .values({
+                        userId: user.id,
+                        provider: input.provider,
+                        providerAccountId: input.providerAccountId,
+                    })
+                    .onConflictDoNothing({
+                        target: [
+                            oauthAccounts.provider,
+                            oauthAccounts.providerAccountId,
+                        ],
+                    })
+                    .returning({ id: oauthAccounts.id });
+
+                if (account === undefined) {
+                    throw new OAuthAccountConflictError();
+                }
+
+                return user;
+            });
+        } catch (error) {
+            if (error instanceof OAuthAccountConflictError) {
+                return null;
+            }
+
+            throw error;
+        }
+    }
+
+    async getUserTier(userId: string): Promise<Tier | null> {
+        const [user] = await this.db
+            .select({ tier: users.tier })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        return user?.tier ?? null;
+    }
+
+    async updateUserTier(userId: string, tier: Tier): Promise<Tier | null> {
+        const [user] = await this.db
+            .update(users)
+            .set({ tier })
+            .where(eq(users.id, userId))
+            .returning({ tier: users.tier });
+
+        return user?.tier ?? null;
     }
 }

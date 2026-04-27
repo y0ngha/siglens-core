@@ -77,6 +77,12 @@ and have been removed from this file.
    ✅ /** @internal */ export function createSessionCookie(user) { ... }
    ✅ /** @internal */ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;
 
+9.6. Bare @internal tag without descriptive comment
+   → Bare /** @internal */ is valid but a one-line role description is preferred for clarity
+   → Helps developers understand the module-internal helper's purpose without diving into implementation
+   ❌ export function createSessionCookie(user) { /** @internal */ ... }
+   ✅ /** @internal Helper to attach session cookie to response. */ export function createSessionCookie(user) { ... }
+
 10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
     ❌ arr.sort() // in-place mutation

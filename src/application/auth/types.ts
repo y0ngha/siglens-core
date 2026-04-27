@@ -2,6 +2,8 @@ import type {
     AuthSessionRecord,
     AuthUserRecord,
     EmailAuthUserRepository,
+    OAuthProvider,
+    OAuthUserRepository,
     SessionRepository,
 } from '@/infrastructure/db/types';
 import type { PasswordVerifier } from '@/infrastructure/auth/types';
@@ -110,21 +112,9 @@ export interface AuthSessionCookie {
 }
 
 /**
- * Login dependencies injected by the caller.
+ * Shared session and cookie creation options.
  */
-export interface LoginUserDependencies {
-    /** Credential lookup repository. */
-    users: EmailAuthUserRepository;
-    /** Session persistence repository. */
-    sessions: SessionRepository;
-    /** Password comparison service. */
-    passwordVerifier: PasswordVerifier;
-}
-
-/**
- * Login runtime options.
- */
-export interface LoginUserOptions {
+export interface AuthSessionOptions {
     /** Current time used to calculate session expiration; defaults to `new Date()`. */
     now?: Date;
     /** Session lifetime in seconds. */
@@ -140,6 +130,23 @@ export interface LoginUserOptions {
 }
 
 /**
+ * Login dependencies injected by the caller.
+ */
+export interface LoginUserDependencies {
+    /** Credential lookup repository. */
+    users: EmailAuthUserRepository;
+    /** Session persistence repository. */
+    sessions: SessionRepository;
+    /** Password comparison service. */
+    passwordVerifier: PasswordVerifier;
+}
+
+/**
+ * Login runtime options.
+ */
+export interface LoginUserOptions extends AuthSessionOptions {}
+
+/**
  * Discriminated union result of a {@link loginUser} call.
  */
 export type LoginUserResult =
@@ -150,6 +157,66 @@ export type LoginUserResult =
           cookie: AuthSessionCookie;
       }
     | { ok: false; error: LoginUserError };
+
+/**
+ * Error code returned when OAuth login cannot complete automatically.
+ */
+export type SocialLoginUserErrorCode =
+    | 'invalid_oauth_profile'
+    | 'email_already_exists';
+
+/**
+ * Input data received from a successful OAuth provider callback.
+ */
+export interface SocialLoginUserInput {
+    /** OAuth provider that authenticated the account. */
+    provider: OAuthProvider;
+    /** Stable provider-side account identifier. */
+    providerAccountId: string;
+    /** Provider-confirmed email address; normalized before lookup/storage. */
+    email: string;
+    /** Optional display name from provider profile. */
+    name?: string;
+    /** Optional avatar image URL from provider profile. */
+    avatarUrl?: string;
+}
+
+/**
+ * Structured OAuth login error for account-link conflicts.
+ */
+export interface SocialLoginUserError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: SocialLoginUserErrorCode;
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}
+
+/**
+ * OAuth login dependencies injected by the caller.
+ */
+export interface SocialLoginUserDependencies {
+    /** OAuth account and user persistence repository. */
+    users: OAuthUserRepository;
+    /** Session persistence repository. */
+    sessions: SessionRepository;
+}
+
+/**
+ * OAuth login runtime options.
+ */
+export interface SocialLoginUserOptions extends AuthSessionOptions {}
+
+/**
+ * Discriminated union result of a {@link socialLoginUser} call.
+ */
+export type SocialLoginUserResult =
+    | {
+          ok: true;
+          user: AuthUserRecord;
+          session: AuthSessionRecord;
+          cookie: AuthSessionCookie;
+      }
+    | { ok: false; error: SocialLoginUserError };
 
 /**
  * Input data required to log out a session.

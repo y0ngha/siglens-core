@@ -6,9 +6,16 @@ import type {
     USER_TIER_VALUES,
 } from './constants';
 import type * as schema from './schema';
+import type { Tier } from '@/domain/types';
 
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];
+
+/** Action type recorded in usage logs. */
+export type UsageActionType = (typeof USAGE_ACTION_TYPE_VALUES)[number];
+
+/** OAuth provider used to authenticate the user. */
+export type OAuthProvider = (typeof OAUTH_PROVIDER_VALUES)[number];
 
 /**
  * A persisted user account record returned from the database.
@@ -58,8 +65,24 @@ export interface AuthSessionRecord {
 export interface CreateEmailUserInput {
     /** Normalized email address (lowercased, trimmed). */
     email: string;
-    /** Hashed password produced by a {@link PasswordHasher}. */
+    /** Hashed password produced by {@link PasswordHasher.hashPassword}. */
     passwordHash: string;
+    /** Optional display name. */
+    name?: string;
+    /** Optional avatar image URL. */
+    avatarUrl?: string;
+}
+
+/**
+ * Input for creating a new OAuth-based user account and provider link.
+ */
+export interface CreateOAuthUserInput {
+    /** Normalized email address (lowercased, trimmed). */
+    email: string;
+    /** OAuth provider that authenticated the account. */
+    provider: OAuthProvider;
+    /** Stable provider-side account identifier. */
+    providerAccountId: string;
     /** Optional display name. */
     name?: string;
     /** Optional avatar image URL. */
@@ -115,6 +138,41 @@ export interface EmailAuthUserRepository {
 }
 
 /**
+ * Interface for OAuth login account lookup and creation.
+ */
+export interface OAuthUserRepository {
+    /**
+     * Find a user linked to an OAuth provider account.
+     *
+     * @param provider - OAuth provider identifier.
+     * @param providerAccountId - Stable provider-side account identifier.
+     * @returns The linked user, or null if no link exists.
+     */
+    findByOAuthAccount(
+        provider: OAuthProvider,
+        providerAccountId: string
+    ): Promise<AuthUserRecord | null>;
+
+    /**
+     * Find a user by their normalized email address.
+     *
+     * @param email - Normalized (lowercased, trimmed) email to look up.
+     * @returns The matching {@link AuthUserRecord}, or null if not found.
+     */
+    findByEmail(email: string): Promise<AuthUserRecord | null>;
+
+    /**
+     * Create a free-tier OAuth user and link the provider account.
+     *
+     * @param input - OAuth profile and provider account data.
+     * @returns The created {@link AuthUserRecord}, or null if email/provider conflicts.
+     */
+    createOAuthUser(
+        input: CreateOAuthUserInput
+    ): Promise<AuthUserRecord | null>;
+}
+
+/**
  * Interface for session persistence operations.
  */
 export interface SessionRepository {
@@ -134,12 +192,6 @@ export interface SessionRepository {
      */
     deleteSession(sessionToken: string): Promise<boolean>;
 }
-
-/** Action type recorded in usage logs. */
-export type UsageActionType = (typeof USAGE_ACTION_TYPE_VALUES)[number];
-
-/** OAuth provider used to authenticate the user. */
-export type OAuthProvider = (typeof OAUTH_PROVIDER_VALUES)[number];
 
 /** Connection configuration required to instantiate a database client. */
 export interface DatabaseConfig {
@@ -165,4 +217,24 @@ export interface DatabaseClient {
     db: SiglensDatabase;
     /** Raw Neon serverless SQL client for template-literal queries. */
     sql: NeonSqlClient;
+}
+
+/** Persistence operations required by tier-gating use-cases. */
+export interface UserTierRepository {
+    /**
+     * Find the tier currently assigned to a user.
+     *
+     * @param userId - User UUID to look up.
+     * @returns The persisted tier, or null when the user does not exist.
+     */
+    getUserTier(userId: string): Promise<Tier | null>;
+
+    /**
+     * Manually update a user's tier.
+     *
+     * @param userId - User UUID to update.
+     * @param tier - New tier to persist.
+     * @returns The updated tier, or null when the user does not exist.
+     */
+    updateUserTier(userId: string, tier: Tier): Promise<Tier | null>;
 }

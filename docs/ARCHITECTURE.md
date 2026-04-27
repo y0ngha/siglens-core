@@ -110,11 +110,19 @@ const key = process.env.API_KEY; // 금지
 └── src
     ├── __tests__
     │   ├── application
-    │   │   └── market
+    │   │   ├── auth
+    │   │   ├── dashboard
+    │   │   ├── market
+    │   │   ├── ticker
+    │   │   └── tier
     │   ├── domain
     │   └── infrastructure
     ├── application
-    │   └── market
+    │   ├── auth
+    │   ├── dashboard
+    │   ├── market
+    │   ├── ticker
+    │   └── tier
     ├── domain
     │   ├── analysis
     │   ├── constants
