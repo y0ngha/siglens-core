@@ -1,11 +1,11 @@
-import { EMAIL_ALREADY_EXISTS_CODE } from './constants';
 import {
     normalizeEmail,
     validateEmail,
     validatePassword,
 } from '@/domain/auth/validation';
 import type { PasswordHasher } from '@/infrastructure/auth';
-import type { UserRepository } from '@/infrastructure/db';
+import type { UserRepository } from '@/infrastructure/db/types';
+import { EMAIL_ALREADY_EXISTS_CODE } from './constants';
 import type {
     RegisterUserError,
     RegisterUserInput,
@@ -14,17 +14,20 @@ import type {
 
 const EMAIL_ALREADY_EXISTS_MESSAGE = 'Email is already registered';
 
-const EMAIL_ALREADY_EXISTS_ERROR: RegisterUserError = {
-    code: EMAIL_ALREADY_EXISTS_CODE,
-    field: 'email',
-    message: EMAIL_ALREADY_EXISTS_MESSAGE,
-};
+function emailAlreadyExistsError(): RegisterUserError {
+    return {
+        code: EMAIL_ALREADY_EXISTS_CODE,
+        field: 'email',
+        message: EMAIL_ALREADY_EXISTS_MESSAGE,
+    };
+}
 
 /**
  * Register a new user with email and password.
  *
  * Validates email format and password strength before checking for duplicates.
  * Email is normalized (trimmed, lowercased) before validation and storage.
+ * Optional `name` and `avatarUrl` are trimmed before persistence.
  *
  * @param input - Registration data: email, password, and optional name/avatarUrl.
  * @param repository - User persistence interface for duplicate checks and account creation.
@@ -36,7 +39,7 @@ const EMAIL_ALREADY_EXISTS_ERROR: RegisterUserError = {
  * const result = await registerUser(
  *     { email: 'user@example.com', password: 'Secret1!' },
  *     drizzleUserRepository,
- *     bcryptPasswordHasher,
+ *     bcryptHasher,
  * );
  * if (result.ok) {
  *     console.log('Created user:', result.user.id);
@@ -45,8 +48,7 @@ const EMAIL_ALREADY_EXISTS_ERROR: RegisterUserError = {
  * }
  * ```
  *
- * @see {@link UserRepository} for the persistence interface contract.
- * @see {@link PasswordHasher} for the hashing interface contract.
+ * @see {@link RegisterUserResult} for the discriminated union shape.
  */
 export async function registerUser(
     input: RegisterUserInput,
@@ -62,7 +64,7 @@ export async function registerUser(
 
     const existingUser = await repository.findByEmail(email);
     if (existingUser !== null) {
-        return { ok: false, error: EMAIL_ALREADY_EXISTS_ERROR };
+        return { ok: false, error: emailAlreadyExistsError() };
     }
 
     const passwordHash = await passwordHasher.hashPassword(input.password);
@@ -74,6 +76,6 @@ export async function registerUser(
     });
 
     return user === null
-        ? { ok: false, error: EMAIL_ALREADY_EXISTS_ERROR }
+        ? { ok: false, error: emailAlreadyExistsError() }
         : { ok: true, user };
 }

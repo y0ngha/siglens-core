@@ -10,3 +10,17 @@ export interface PasswordHasher {
      */
     hashPassword(password: string): Promise<string>;
 }
+
+/**
+ * Interface for comparing a plain-text password against a stored password hash.
+ */
+export interface PasswordVerifier {
+    /**
+     * Compare a plain-text password with a stored password hash.
+     *
+     * @param password - Plain-text password supplied by the user.
+     * @param passwordHash - Stored password hash for the account.
+     * @returns Whether the password matches the hash.
+     */
+    verifyPassword(password: string, passwordHash: string): Promise<boolean>;
+}

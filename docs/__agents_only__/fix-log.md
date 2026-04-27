@@ -41,6 +41,11 @@
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
 
+## [Issue #8 | feat/8/user-tier-system | 2026-04-27]
+- Violation: `calculateIchimokuFutureCloud` allowed negative/out-of-range source indexes to produce NaN instead of null
+- Rule: Domain indicator warm-up and unavailable values must return null, never NaN
+- Context: Short non-empty Ichimoku inputs now keep future cloud values null when the source window is unavailable
+
 ## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
 - Violation: Drizzle migration metadata was not regenerated after changing `assetTranslations.symbol` from table-level primary key metadata to inline primary key metadata
 - Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
@@ -51,24 +56,10 @@
 - Rule: CONVENTIONS.md — every file must end with a newline character
 - Context: Migration SQL file generated without trailing newline; added manually
 
-- Violation: Missing @example and @see JSDoc tags on Tier 1 export registerUser in application/auth/registerUser.ts
-- Rule: CONVENTIONS.md Tier 1 recommended JSDoc tags — @example and @see are recommended for Tier 1 exports to aid IDE hover documentation for library consumers
-- Context: registerUser had @param and @returns but no usage example or cross-references to its dependency injection interfaces
-
 ## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
 - Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
 - Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
 - Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
-
-- Violation: DrizzleUserRepository class-level JSDoc missing @see {@link UserRepository} cross-reference
-- Rule: CONVENTIONS.md JSDoc Tier 3 recommended tags — @see is recommended for Tier 3 implementations to link consumers to the interface contract
-- Context: DrizzleUserRepository implements UserRepository but the JSDoc did not point to the interface, leaving consumers without a direct link to the contract
-
-## [PR #33 Round 3 | feat/5/email-signup | 2026-04-27]
-- Violation: Two separate `import type` blocks from the same `'./types'` path in `userRepository.ts`
-- Rule: CONVENTIONS.md Import style — merge all imports from the same specifier into a single statement
-- Context: `SiglensDatabase` was imported in a separate block from `AuthUserRecord`, `CreateEmailUserInput`, `UserRepository`; merged into one block
-
 
 ## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
 - Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
@@ -78,3 +69,52 @@
 - Violation: 26 individual indicator functions (`calculateATR`, `calculateBollinger`, etc.) exported as Tier 2 public API
 - Rule: ARCHITECTURE.md / PUBLIC_API.md — individual indicator calculators are classified as internal and must not appear in `src/index.ts`
 - Context: Export block for 26 functions removed from Tier 2 section; only the aggregate `calculateIndicators` is exported
+
+## [PR #34 | feat/6/email-login | 2026-04-27]
+- Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
+- Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
+- Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
+
+## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
+- Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
+- Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
+- Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
+
+- Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
+- Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
+- Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
+
+## [PR #35 | feat/7/social-login | 2026-04-27]
+- Violation: infrastructure/db imported types from infrastructure/auth, creating cross-module coupling between two infrastructure modules
+- Rule: MISTAKES.md Architecture #3 — each infrastructure module handles one external system; cross-module coordination belongs at the consumer level
+- Context: merge resolution moved auth interfaces (UserRepository, SessionRepository, OAuthUserRepository, etc.) into infrastructure/auth/types.ts and had db/sessionRepository.ts and db/userRepository.ts import them across the boundary
+
+## [PR #35 | feat/7/social-login | 2026-04-27]
+- Violation: module-internal exports (createSessionCookie, createExpiredSessionCookie, addSeconds, createAuthSession) missing `@internal` JSDoc tag
+- Rule: MISTAKES.md #9.5 — every function/constant exported from a module but not re-exported in src/index.ts must have `@internal`
+- Context: createAuthSession was newly introduced for the social-login flow without the tag; the existing helpers lost their tags during the merge
+
+## [PR #35 | feat/7/social-login | 2026-04-27]
+- Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
+- Rule: MISTAKES.md Predictability #1 — unrelated changes must be moved to a separate PR or reverted
+- Context: the merge accidentally dropped a large block of `export type { ... }` entries from src/index.ts that have nothing to do with the OAuth feature
+
+## [PR #35 | feat/7/social-login | 2026-04-27]
+- Violation: `LoginUserOptions` and `SocialLoginUserOptions` duplicated the same session and cookie option fields instead of sharing a base interface
+- Rule: CONVENTIONS.md TypeScript Rules — related interfaces with shared fields must use `extends`
+- Context: the social-login use case introduced an options interface identical to the existing email-login options shape; extracted `AuthSessionOptions` and had both use-case options extend it
+
+## [PR #35 | feat/7/social-login | 2026-04-27]
+- Violation: DB environment readers, cached singleton helpers, and raw `DatabaseClient` wrapper were exposed from the package entrypoint without a consumer-facing need
+- Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
+- Context: kept `createDatabaseClient` as the explicit DB construction entrypoint while removing `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig`, and `DatabaseClient` from `src/index.ts`
+
+## [PR #37 | feat/8/user-tier-system | 2026-04-28]
+- Violation: `UserTierContext` shared interface defined in `infrastructure/auth/types.ts` though it is consumed across application/tier and infrastructure/auth modules
+- Rule: MISTAKES.md Architecture #1 — shared domain types referenced by 2+ files must live in `domain/types.ts`
+- Context: moved `UserTierContext` to `domain/types.ts`, dropped the duplicate definition from `infrastructure/auth/types.ts`, and updated `src/index.ts` to re-export it from the domain block
+
+## [PR #37 Round 2 | feat/8/user-tier-system | 2026-04-28]
+- Violation: `application/tier/types.ts` imported `UserTierRepository` from the deep `@/infrastructure/db/types` path while sibling files import via the `@/infrastructure/db` module index
+- Rule: FF Coupling — consumers should import from a module's public index, not its internal implementation files, so internal restructuring stays non-breaking
+- Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`

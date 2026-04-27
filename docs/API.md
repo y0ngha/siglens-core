@@ -230,6 +230,27 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
 
+### 인증
+
+`application/auth`는 이메일 회원가입·로그인·로그아웃 및 OAuth 로그인
+유스케이스를 제공한다.
+
+- `registerUser`는 `UserRepository`와 `PasswordHasher`를 주입받아 이메일 중복 확인, 비밀번호 해시 생성, 사용자 생성을 수행한다.
+- `loginUser`는 `EmailAuthUserRepository`, `PasswordVerifier`, `SessionRepository`를 주입받아 자격증명을 검증하고 `sessions.id`를 세션 토큰으로 사용한다.
+- `socialLoginUser`는 `OAuthUserRepository`와 `SessionRepository`를 주입받아 Google/Kakao/Apple provider 계정 링크를 조회하고, 첫 로그인 시 `users`와 `oauth_accounts`를 생성한 뒤 동일한 세션 쿠키 메커니즘을 사용한다.
+- OAuth 이메일이 이미 이메일/비밀번호 계정으로 등록되어 있으면 자동 링크하지 않고 `email_already_exists` 충돌을 반환한다. 명시적 계정 연결 UI와 콜백 라우트는 consumer가 담당한다.
+- `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
+- HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
+
+### 사용자 티어
+
+`application/tier`는 사용자 등급 조회, 요청 컨텍스트 구성, 관리자 등급 변경 유스케이스를
+제공한다.
+
+- `getUserTier`는 `UserTierRepository.getUserTier()`로 `users.tier`를 조회하고, 대상 사용자가 없으면 `free`로 fallback한다.
+- `createUserTierContext`는 consumer의 미들웨어/서버 핸들러가 인증된 `userId`를 전달하면 `{ userId, tier }` 요청 컨텍스트를 반환한다. 익명 요청은 repository 접근 없이 `free`가 된다.
+- `setUserTier`는 관리자 화면 또는 운영 도구에서 `users.tier`를 수동 변경할 때 사용한다. 대상 사용자가 없으면 `user_not_found` 결과를 반환한다.
+
 ---
 
 ## 4. Filesystem (Skills)

@@ -1,1 +1,1 @@
-export type { PasswordHasher } from './types';
+export type { PasswordHasher, PasswordVerifier } from './types';

@@ -30,6 +30,10 @@ export default tseslint.config(
                     destructuredArrayIgnorePattern: '^_',
                 },
             ],
+            '@typescript-eslint/no-empty-object-type': [
+                'error',
+                { allowInterfaces: 'with-single-extends' },
+            ],
         },
     },
     // domain은 infrastructure, application을 import할 수 없다

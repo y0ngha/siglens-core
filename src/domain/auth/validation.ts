@@ -1,5 +1,5 @@
-import { INVALID_EMAIL_CODE, WEAK_PASSWORD_CODE } from './constants';
 import type { AuthValidationError } from '@/domain/types';
+import { INVALID_EMAIL_CODE, WEAK_PASSWORD_CODE } from './constants';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;

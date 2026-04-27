@@ -69,6 +69,20 @@ and have been removed from this file.
    → Also applies when external dependencies are removed: submitAnalysisAction + pollAnalysisAction are no longer Next.js server actions, should be renamed
    ✅ submitAnalysis + pollAnalysis when migrated to general infrastructure layer
 
+9.5. Module-internal exports missing @internal JSDoc tag
+   → Every function/constant exported from a module but not re-exported in src/index.ts must have /** @internal */ JSDoc
+   → Enables IDE tooling and consumers to distinguish public API from internal helpers
+   ❌ export function createSessionCookie(user) { ... }  // in sessionCookie.ts, not in src/index.ts
+   ❌ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;  // private constant, no @internal tag
+   ✅ /** @internal */ export function createSessionCookie(user) { ... }
+   ✅ /** @internal */ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;
+
+9.6. Bare @internal tag without descriptive comment
+   → Bare /** @internal */ is valid but a one-line role description is preferred for clarity
+   → Helps developers understand the module-internal helper's purpose without diving into implementation
+   ❌ export function createSessionCookie(user) { /** @internal */ ... }
+   ✅ /** @internal Helper to attach session cookie to response. */ export function createSessionCookie(user) { ... }
+
 10. Using .sort() instead of .toSorted()
     → .sort() mutates the original array and violates immutability
     ❌ arr.sort() // in-place mutation
@@ -152,6 +166,13 @@ and have been removed from this file.
 3. Unused/missing type imports
    → Remove unused type imports; add missing ones for explicit annotations
    → When TypeScript infers automatically, the import is unnecessary
+
+3.5. Multiple import blocks from the same module
+   → Merge all imports from a single specifier into one block
+   ❌ import type { SiglensDatabase } from './types';
+      // ... code ...
+      import type { AuthUserRecord, CreateEmailUserInput } from './types';
+   ✅ import type { SiglensDatabase, AuthUserRecord, CreateEmailUserInput } from './types';
 
 4. Interface field declaration does not match runtime behavior
    → Required fields marked `?` in the interface or absent fields declared as required
@@ -341,6 +362,13 @@ and have been removed from this file.
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → When changing function implementation, update related comments immediately
+
+4. Tier 1 public exports missing required JSDoc tags
+   → Tier 1 functions require @param and @returns tags for IDE hover documentation
+   → Recommended tags (@example, @see) improve consumer guidance
+   ❌ export function loginUser(input, deps) { ... }  // missing all JSDoc
+   ❌ export function registerUser(...) { /** description only */ }  // no @param/@returns/@example/@see
+   ✅ export function loginUser(...) { /** description. @param input deps. @returns result. @example usage. @see related */ }
 ```
 
 ---
