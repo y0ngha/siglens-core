@@ -225,19 +225,63 @@ Neon 이외의 Postgres (로컬, RDS 등)도 동일 인터페이스로 사용 �
 - **지속 저장이 필요한 데이터**에만 사용한다 (분석 이력, 사용자 메타데이터 등).
 - 단순 캐시 용도는 Redis를 사용한다 (PostgreSQL ≠ 캐시).
 - 연결은 라이브러리 모듈 레벨에서 재사용한다. 호출 단위 connection 생성을 피한다.
-- 쿼리는 파라미터 바인딩을 사용하고, 문자열 연결로 SQL을 조립하지 않는다.
+- 쿼리는 Drizzle ORM을 통해 실행하고, 문자열 연결로 SQL을 조립하지 않는다.
 
 ### 구현 위치
 
 ```
 infrastructure/db/
-├── types.ts     ← 저장소 인터페이스 (Repository 단위)
-├── client.ts    ← Postgres 클라이언트 초기화
-└── <entity>.ts  ← 각 엔티티 저장소 구현
+├── types.ts     ← DB config/client 타입과 enum literal 타입
+├── config.ts    ← DATABASE_URL 환경변수 reader
+├── schema.ts    ← Drizzle 테이블/enum 스키마
+├── client.ts    ← Neon serverless + Drizzle 클라이언트 초기화
+└── index.ts     ← DB 모듈 re-export
 ```
 
-인터페이스를 먼저 정의하고 구현체가 이를 만족하도록 한다.
-테스트는 저장소 인터페이스를 stub 구현으로 교체해 수행한다.
+인터페이스를 먼저 정의하고 구현체가 이를 만족하도록 한다. 테스트는 Neon/Drizzle 패키지를
+mock 처리해 실제 데이터베이스에 접속하지 않는다.
+
+### Drizzle 마이그레이션
+
+```bash
+yarn db:generate  # schema.ts → drizzle/ 마이그레이션 생성
+yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
+```
+
+`drizzle.config.ts`는 `DATABASE_URL`, `src/infrastructure/db/schema.ts`, `drizzle/`
+출력 경로를 사용한다.
+
+### 테이블
+
+| 테이블 | 목적 |
+|---|---|
+| `users` | 사용자 메타데이터, 이메일 로그인용 비밀번호 해시, 구독 tier (`free` / `member` / `pro`) |
+| `sessions` | 사용자 세션과 만료 시각 |
+| `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot`) |
+| `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
+| `korean_tickers` | 한국어 티커 이름 매핑 |
+| `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
+
+### 인증
+
+`application/auth`는 이메일 회원가입·로그인·로그아웃 및 OAuth 로그인
+유스케이스를 제공한다.
+
+- `registerUser`는 `UserRepository`와 `PasswordHasher`를 주입받아 이메일 중복 확인, 비밀번호 해시 생성, 사용자 생성을 수행한다.
+- `loginUser`는 `EmailAuthUserRepository`, `PasswordVerifier`, `SessionRepository`를 주입받아 자격증명을 검증하고 `sessions.id`를 세션 토큰으로 사용한다.
+- `socialLoginUser`는 `OAuthUserRepository`와 `SessionRepository`를 주입받아 Google/Kakao/Apple provider 계정 링크를 조회하고, 첫 로그인 시 `users`와 `oauth_accounts`를 생성한 뒤 동일한 세션 쿠키 메커니즘을 사용한다.
+- OAuth 이메일이 이미 이메일/비밀번호 계정으로 등록되어 있으면 자동 링크하지 않고 `email_already_exists` 충돌을 반환한다. 명시적 계정 연결 UI와 콜백 라우트는 consumer가 담당한다.
+- `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
+- HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
+
+### 사용자 티어
+
+`application/tier`는 사용자 등급 조회, 요청 컨텍스트 구성, 관리자 등급 변경 유스케이스를
+제공한다.
+
+- `getUserTier`는 `UserTierRepository.getUserTier()`로 `users.tier`를 조회하고, 대상 사용자가 없으면 `free`로 fallback한다.
+- `createUserTierContext`는 consumer의 미들웨어/서버 핸들러가 인증된 `userId`를 전달하면 `{ userId, tier }` 요청 컨텍스트를 반환한다. 익명 요청은 repository 접근 없이 `free`가 된다.
+- `setUserTier`는 관리자 화면 또는 운영 도구에서 `users.tier`를 수동 변경할 때 사용한다. 대상 사용자가 없으면 `user_not_found` 결과를 반환한다.
 
 ---
 

@@ -29,6 +29,19 @@ export {
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 
+// Auth
+export {
+    loginUser,
+    logoutUser,
+    registerUser,
+    socialLoginUser,
+} from './application/auth';
+export {
+    createUserTierContext,
+    getUserTier,
+    setUserTier,
+} from './application/tier';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -192,6 +205,16 @@ export {
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
 
+// Tier gating
+export {
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
+
 // Ticker validation utilities
 export {
     deduplicateResults,
@@ -244,6 +267,13 @@ export { FileSkillsLoader } from './infrastructure/skills/loader';
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 
+// Database
+export {
+    createDatabaseClient,
+    DrizzleSessionRepository,
+    DrizzleUserRepository,
+} from './infrastructure/db';
+
 // Job queue (worker-side primitives)
 export {
     setJobMeta,
@@ -269,6 +299,33 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Auth session cookie constants
+export {
+    AUTH_SESSION_COOKIE_NAME,
+    DEFAULT_AUTH_COOKIE_PATH,
+    DEFAULT_AUTH_COOKIE_SAME_SITE,
+    DEFAULT_SESSION_TTL_SECONDS,
+} from './application/auth';
+
+// Database schema objects / enum values
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+    assetTranslations,
+    koreanTickers,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    usageActionTypeEnum,
+    usageLogs,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
+
+// Tier gating constants
+export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
 
 // Dashboard tickers / sectors
 export {
@@ -375,6 +432,61 @@ export type {
     GeminiPart,
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
+export type {
+    DatabaseConfig,
+    OAuthProvider,
+    SiglensDatabase,
+    UsageActionType,
+    UserTierRepository,
+    UserTier,
+} from './infrastructure/db';
+export type {
+    AuthSessionCookie,
+    AuthSessionOptions,
+    LoginUserDependencies,
+    LoginUserError,
+    LoginUserErrorCode,
+    LoginUserInput,
+    LoginUserOptions,
+    LoginUserResult,
+    LogoutUserDependencies,
+    LogoutUserInput,
+    LogoutUserOptions,
+    LogoutUserResult,
+    RegisterUserError,
+    RegisterUserErrorCode,
+    RegisterUserErrorField,
+    RegisterUserInput,
+    RegisterUserResult,
+    SocialLoginUserDependencies,
+    SocialLoginUserError,
+    SocialLoginUserErrorCode,
+    SocialLoginUserInput,
+    SocialLoginUserOptions,
+    SocialLoginUserResult,
+} from './application/auth';
+export type {
+    CreateUserTierContextInput,
+    GetUserTierInput,
+    SetUserTierError,
+    SetUserTierErrorCode,
+    SetUserTierInput,
+    SetUserTierResult,
+    UserTierDependencies,
+} from './application/tier';
+export type {
+    AuthSessionRecord,
+    AuthUserRecord,
+    CreateEmailUserInput,
+    CreateOAuthUserInput,
+    CreateSessionInput,
+    EmailAuthUserRecord,
+    EmailAuthUserRepository,
+    OAuthUserRepository,
+    SessionRepository,
+    UserRepository,
+} from './infrastructure/db';
+export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 
 // Application types
 export type {
@@ -387,6 +499,14 @@ export type {
 export type {
     AnalysisSignalType,
     Timeframe,
+    Tier,
+    TierConfig,
+    TierFeatureFlags,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,
@@ -483,11 +603,11 @@ export type {
     TickerBase,
     KoreanTickerEntry,
     TickerSearchResult,
+    SkillCounts,
+    SkillShowcaseItem,
     AssetInfo,
     TickerCategory,
     CategoryId,
-    SkillCounts,
-    SkillShowcaseItem,
     IndexTicker,
     SectorEtf,
     SectorGroupDef,

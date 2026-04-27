@@ -129,6 +129,46 @@ export function isValidTimeframe(value: string | undefined | null): value is Tim
 
 ---
 
+## 티어 제한 설정
+
+```typescript
+// domain/tier.ts
+
+export type Tier = 'free' | 'member' | 'pro';
+
+export const TIER_CONFIG = {
+  limits: {
+    analysisPerDay: { free: Infinity, member: Infinity, pro: Infinity },
+    chatbotPerDay: { free: Infinity, member: Infinity, pro: Infinity },
+  },
+  timeframes: {
+    free: ['1Day'],
+    member: ['1Day', '1Hour', '4Hour'],
+    pro: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
+  },
+  infoDepth: {
+    free: ['direction', 'summary'],
+    member: ['direction', 'summary', 'partial_detail'],
+    pro: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
+  },
+  models: {
+    free: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    member: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4'],
+    pro: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4', 'claude-opus-4'],
+  },
+  featureFlags: {
+    enableTierRestrictions: false,
+  },
+};
+```
+
+`enableTierRestrictions`가 `false`이면 `isAllowed`, `isTimeframeAllowed`,
+`isInfoDepthAllowed`, `isModelAllowed`는 항상 허용 결과를 반환한다. 플래그가
+`true`이면 `TIER_CONFIG`의 각 tier별 값만 허용한다. 기본 제한값은 모두
+`Infinity`라서 초기 배포 상태는 fully open이다.
+
+---
+
 ## 인디케이터 상수
 
 ```typescript
