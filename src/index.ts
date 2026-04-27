@@ -195,24 +195,12 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 
 // Database factories & config
 export {
-    assetTranslations,
     createDatabaseClient,
     DrizzleUserRepository,
     getDatabaseClient,
-    koreanTickers,
-    OAUTH_PROVIDER_VALUES,
-    oauthAccounts,
-    oauthProviderEnum,
     readDatabaseConfig,
-    sessions,
     tryGetDatabaseClient,
     tryReadDatabaseConfig,
-    USAGE_ACTION_TYPE_VALUES,
-    usageActionTypeEnum,
-    usageLogs,
-    USER_TIER_VALUES,
-    users,
-    userTierEnum,
 } from './infrastructure/db';
 
 // Job queue (worker-side primitives)
@@ -240,6 +228,22 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Database schema & constants
+export {
+    assetTranslations,
+    koreanTickers,
+    OAUTH_PROVIDER_VALUES,
+    oauthAccounts,
+    oauthProviderEnum,
+    sessions,
+    USAGE_ACTION_TYPE_VALUES,
+    usageActionTypeEnum,
+    usageLogs,
+    USER_TIER_VALUES,
+    users,
+    userTierEnum,
+} from './infrastructure/db';
 
 // Dashboard tickers / sectors
 export {
@@ -343,20 +347,17 @@ export type {
     GeminiPart,
     GeminiRole,
 } from './infrastructure/ai/types';
-export type {
-    AuthUserRecord,
-    AuthUserTier,
-    CreateEmailUserInput,
-    PasswordHasher,
-    UserRepository,
-} from './infrastructure/auth';
+export type { PasswordHasher } from './infrastructure/auth';
 export type { CacheProvider } from './infrastructure/cache/types';
 export type {
+    AuthUserRecord,
+    CreateEmailUserInput,
     DatabaseClient,
     DatabaseConfig,
     OAuthProvider,
     SiglensDatabase,
     UsageActionType,
+    UserRepository,
     UserTier,
 } from './infrastructure/db';
 export type { FmpConfig } from './infrastructure/fmp/types';

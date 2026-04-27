@@ -1,4 +1,4 @@
-import type { AuthUserRecord } from '@/infrastructure/auth/types';
+import type { AuthUserRecord } from '@/infrastructure/db/types';
 
 /**
  * Error codes returned when user registration fails.

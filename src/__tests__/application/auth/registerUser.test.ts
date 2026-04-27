@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerUser } from '@/application/auth/registerUser';
-import type { AuthUserRecord } from '@/infrastructure/auth/types';
-import type { PasswordHasher, UserRepository } from '@/infrastructure/auth';
+import type { AuthUserRecord, UserRepository } from '@/infrastructure/db';
+import type { PasswordHasher } from '@/infrastructure/auth';
 
 const createdAt = new Date('2026-04-26T00:00:00.000Z');
 const updatedAt = new Date('2026-04-26T00:00:01.000Z');

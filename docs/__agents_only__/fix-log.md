@@ -51,10 +51,14 @@
 - Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
 - Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes
 
-## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: Tier 4 schema objects (users, sessions, usageLogs, etc.) and constants (USER_TIER_VALUES, OAUTH_PROVIDER_VALUES, USAGE_ACTION_TYPE_VALUES) exported in Tier 3 (Infrastructure Factories & Config) block in src/index.ts
-- Rule: ARCHITECTURE.md Tier grouping — Tier 3 is for factories/config, Tier 4 is for public types/constants
-- Context: Database export block mixed Tier 3 factory functions with Tier 4 schema objects in a single export statement; split into separate Tier 3 (factories) and Tier 4 (schema & constants) blocks
+## [PR #33 | feat/5/email-signup | 2026-04-27]
+- Violation: Missing EOF newline in drizzle/0001_sharp_triathlon.sql
+- Rule: CONVENTIONS.md — every file must end with a newline character
+- Context: Migration SQL file generated without trailing newline; added manually
+
+- Violation: Missing @example and @see JSDoc tags on Tier 1 export registerUser in application/auth/registerUser.ts
+- Rule: CONVENTIONS.md Tier 1 recommended JSDoc tags — @example and @see are recommended for Tier 1 exports to aid IDE hover documentation for library consumers
+- Context: registerUser had @param and @returns but no usage example or cross-references to its dependency injection interfaces
 
 - Violation: JSDoc @param for createDatabaseClient duplicated the parameter type name without adding information beyond what the type signature already conveys
 - Rule: CONVENTIONS.md JSDoc Rules — do not duplicate type info the parameter type already conveys; explain the why, edge cases, or side effects the type cannot express

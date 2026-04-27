@@ -5,7 +5,7 @@ import type {
     AuthUserRecord,
     CreateEmailUserInput,
     UserRepository,
-} from '@/infrastructure/auth/types';
+} from './types';
 
 const DEFAULT_USER_TIER = 'free';
 

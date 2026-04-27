@@ -101,7 +101,7 @@ describe('public API exports', () => {
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 
-    it('exports auth interfaces from package entrypoint', () => {
+    it('registerUser rejects an invalid email via exported interfaces', async () => {
         const repository: UserRepository = {
             findByEmail: async () => null,
             createEmailUser: async input => ({
@@ -118,7 +118,15 @@ describe('public API exports', () => {
             hashPassword: async password => `hashed:${password}`,
         };
 
-        expect(repository).toHaveProperty('findByEmail');
-        expect(passwordHasher).toHaveProperty('hashPassword');
+        const result = await registerUser(
+            { email: 'not-an-email', password: 'Password1' },
+            repository,
+            passwordHasher
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            error: expect.objectContaining({ code: 'invalid_email' }),
+        });
     });
 });

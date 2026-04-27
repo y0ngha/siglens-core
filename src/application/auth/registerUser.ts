@@ -1,4 +1,5 @@
-import type { PasswordHasher, UserRepository } from '@/infrastructure/auth';
+import type { PasswordHasher } from '@/infrastructure/auth';
+import type { UserRepository } from '@/infrastructure/db';
 import type {
     RegisterUserError,
     RegisterUserInput,
@@ -55,6 +56,23 @@ function validatePassword(password: string): RegisterUserError | null {
  * @param repository - User persistence interface for duplicate checks and account creation.
  * @param passwordHasher - Password hashing interface; invoked only after validation passes.
  * @returns `{ ok: true, user }` on success, or `{ ok: false, error }` with a typed error code.
+ *
+ * @example
+ * ```typescript
+ * const result = await registerUser(
+ *     { email: 'user@example.com', password: 'Secret1!' },
+ *     drizzleUserRepository,
+ *     bcryptPasswordHasher,
+ * );
+ * if (result.ok) {
+ *     console.log('Created user:', result.user.id);
+ * } else {
+ *     console.error('Registration failed:', result.error.code);
+ * }
+ * ```
+ *
+ * @see {@link UserRepository} for the persistence interface contract.
+ * @see {@link PasswordHasher} for the hashing interface contract.
  */
 export async function registerUser(
     input: RegisterUserInput,

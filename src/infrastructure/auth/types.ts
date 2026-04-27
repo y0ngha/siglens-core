@@ -1,45 +1,4 @@
 /**
- * Mirrors USER_TIER_VALUES in infrastructure/db/constants.ts.
- * Keep this union in sync with the database enum without importing across
- * infrastructure module boundaries.
- */
-export type AuthUserTier = 'free' | 'member' | 'pro';
-
-/**
- * A persisted user account record returned from the database.
- */
-export interface AuthUserRecord {
-    /** Unique user identifier (UUID). */
-    id: string;
-    /** Normalized (lowercased, trimmed) email address. */
-    email: string;
-    /** Optional display name; null when not provided at registration. */
-    name: string | null;
-    /** Optional avatar image URL; null when not provided at registration. */
-    avatarUrl: string | null;
-    /** Subscription tier assigned to the user. */
-    tier: AuthUserTier;
-    /** Timestamp when the account was created. */
-    createdAt: Date;
-    /** Timestamp when the account was last updated. */
-    updatedAt: Date;
-}
-
-/**
- * Input for creating a new email-based user account.
- */
-export interface CreateEmailUserInput {
-    /** Normalized email address (lowercased, trimmed). */
-    email: string;
-    /** Hashed password produced by {@link PasswordHasher.hashPassword}. */
-    passwordHash: string;
-    /** Optional display name. */
-    name?: string;
-    /** Optional avatar image URL. */
-    avatarUrl?: string;
-}
-
-/**
  * Interface for hashing plain-text passwords before storage.
  */
 export interface PasswordHasher {
@@ -50,27 +9,4 @@ export interface PasswordHasher {
      * @returns Hashed password string safe for storage.
      */
     hashPassword(password: string): Promise<string>;
-}
-
-/**
- * Interface for user persistence operations required by the auth use-cases.
- */
-export interface UserRepository {
-    /**
-     * Find a user by their normalized email address.
-     *
-     * @param email - Normalized (lowercased, trimmed) email to look up.
-     * @returns The matching {@link AuthUserRecord}, or null if not found.
-     */
-    findByEmail(email: string): Promise<AuthUserRecord | null>;
-
-    /**
-     * Create a new email-based user account.
-     *
-     * @param input - Registration data including email, password hash, and optional profile fields.
-     * @returns The created {@link AuthUserRecord}, or null if the email already exists.
-     */
-    createEmailUser(
-        input: CreateEmailUserInput
-    ): Promise<AuthUserRecord | null>;
 }
