@@ -13,6 +13,7 @@ export const TIER_VALUES = [
     'member',
     'pro',
 ] as const satisfies readonly Tier[];
+const TIER_VALUE_STRINGS: readonly string[] = TIER_VALUES;
 
 const FREE_TIMEFRAMES: readonly Timeframe[] = ['1Day'];
 const MEMBER_TIMEFRAMES: readonly Timeframe[] = [
@@ -88,6 +89,10 @@ export const TIER_CONFIG = {
  * @param feature - The daily-limited feature to check.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
  * @returns `true` if the feature is permitted for the tier, `false` otherwise.
+ * @example
+ * ```typescript
+ * isAllowed('member', 'analysisPerDay');
+ * ```
  */
 export function isAllowed(
     tier: Tier,
@@ -182,5 +187,5 @@ export function isModelAllowed(
  * @returns `true` if `value` is a known {@link Tier}, narrowing the type.
  */
 export function isTier(value: string): value is Tier {
-    return TIER_VALUES.some(tier => tier === value);
+    return TIER_VALUE_STRINGS.includes(value);
 }
