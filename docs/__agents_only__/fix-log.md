@@ -55,18 +55,18 @@
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
 - Context: Drizzle `.unique()` already creates a PostgreSQL index for email lookup; removed the extra `users_email_idx`
 
-## [PR #32 Round 3 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: `assetTranslations` used table-level `primaryKey({ columns: [...] })` while `koreanTickers` used inline `.primaryKey()` for the same single-column PK pattern
-- Rule: MISTAKES.md Coding Paradigm #6.5 — state/code divergence; same pattern in the same module must use a consistent approach
-- Context: Unified to inline `.primaryKey()` for both tables; removed `primaryKey` import from `drizzle-orm/pg-core`
-
-## [PR #32 Round 2 | feat/3/neon-drizzle-db-schema | 2026-04-27]
-- Violation: `schema.test.ts` index test omitted `koreanTickers` from the multi-table index assertion block
-- Rule: Test coverage must be complete for all tables asserted in the same test — partial table coverage creates silent gaps
-- Context: `'defines table indexes for lookup paths'` test verified indexes for `users`, `sessions`, `usageLogs`, `oauthAccounts`, `assetTranslations` but skipped `koreanTickers`; added `expect(getTableConfig(koreanTickers).indexes).toEqual([])`
 
 ## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
 - Violation: Drizzle migration metadata was not regenerated after changing `assetTranslations.symbol` from table-level primary key metadata to inline primary key metadata
 - Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
 - Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes
 
+
+## [PR #32 | feat/3/neon-drizzle-db-schema | 2026-04-27]
+- Violation: Tier 4 schema objects (users, sessions, usageLogs, etc.) and constants (USER_TIER_VALUES, OAUTH_PROVIDER_VALUES, USAGE_ACTION_TYPE_VALUES) exported in Tier 3 (Infrastructure Factories & Config) block in src/index.ts
+- Rule: ARCHITECTURE.md Tier grouping — Tier 3 is for factories/config, Tier 4 is for public types/constants
+- Context: Database export block mixed Tier 3 factory functions with Tier 4 schema objects in a single export statement; split into separate Tier 3 (factories) and Tier 4 (schema & constants) blocks
+
+- Violation: JSDoc @param for createDatabaseClient duplicated the parameter type name without adding information beyond what the type signature already conveys
+- Rule: CONVENTIONS.md JSDoc Rules — do not duplicate type info the parameter type already conveys; explain the why, edge cases, or side effects the type cannot express
+- Context: @param config described as "Database connection configuration" which merely restates the type; updated to reference readDatabaseConfig as the canonical constructor
