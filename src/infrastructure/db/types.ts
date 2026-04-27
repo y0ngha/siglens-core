@@ -254,6 +254,14 @@ export interface KoreanTickerRepository {
     findAll(): Promise<KoreanTickerEntry[]>;
 
     /**
+     * Load Korean ticker entries for the requested symbols only.
+     *
+     * @param symbols - Canonical ticker symbols (uppercase); empty input returns `[]`.
+     * @returns Matching rows in `korean_tickers`.
+     */
+    findBySymbols(symbols: readonly string[]): Promise<KoreanTickerEntry[]>;
+
+    /**
      * Upsert one or more Korean ticker entries by symbol. Existing rows are
      * overwritten with the new field values.
      *

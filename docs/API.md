@@ -272,11 +272,11 @@ Upstash Redis는 hot cache로 동작한다. 호출자는 다음 패턴을 따라
 
 핵심 진입점:
 
-- `DrizzleKoreanTickerRepository` — `korean_tickers` 의 `findAll` / `upsertMany`
+- `DrizzleKoreanTickerRepository` — `korean_tickers` 의 `findAll` / `findBySymbols` / `upsertMany`
 - `DrizzleAssetTranslationRepository` — `asset_translations` 의 `findBySymbol` / `upsert`
-- `infrastructure/ticker/koreanNameStore` 와 `application/ticker/getAssetInfo`
-  는 위 repository 와 `CacheProvider` 를 함께 사용한다. DB 클라이언트가 없으면
-  Redis-only 로 graceful degradation 하고, 둘 다 없으면 빈 결과/스킵으로 떨어진다.
+- `application/ticker/koreanNameStore` 와 `application/ticker/getAssetInfo` 는 위
+  repository 와 `CacheProvider` 를 함께 사용한다. DB 클라이언트가 없으면 Redis-only 로
+  graceful degradation 하고, 둘 다 없으면 빈 결과/스킵으로 떨어진다.
 
 ### 인증
 

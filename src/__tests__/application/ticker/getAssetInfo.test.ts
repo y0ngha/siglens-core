@@ -33,7 +33,7 @@ const repositoryFactoryMock =
 const searchBySymbolMock = vi.fn<(q: string) => Promise<FmpSearchResult[]>>();
 const getKoreanNamesMock =
     vi.fn<(symbols: string[]) => Promise<Record<string, string>>>();
-const setKoreanTickersMock = vi.fn<() => Promise<void>>();
+const setKoreanTickersMock = vi.fn<(entries: unknown[]) => Promise<void>>();
 const translateCompanyNamesMock =
     vi.fn<() => Promise<Record<string, string>>>();
 
@@ -59,9 +59,9 @@ vi.mock('@/infrastructure/ticker/fmpTickerApi', async () => {
         searchBySymbol: (q: string) => searchBySymbolMock(q),
     };
 });
-vi.mock('@/infrastructure/ticker/koreanNameStore', () => ({
+vi.mock('@/application/ticker/koreanNameStore', () => ({
     getKoreanNames: (symbols: string[]) => getKoreanNamesMock(symbols),
-    setKoreanTickers: () => setKoreanTickersMock(),
+    setKoreanTickers: (entries: unknown[]) => setKoreanTickersMock(entries),
 }));
 vi.mock('@/infrastructure/ticker/koreanTranslator', () => ({
     translateCompanyNames: () => translateCompanyNamesMock(),
@@ -207,6 +207,7 @@ describe('getAssetInfo', () => {
             koreanName: '애플',
             fmpSymbol: 'AAPL',
         });
+        expect(setKoreanTickersMock).not.toHaveBeenCalled();
         expect(mockCache.set).toHaveBeenCalledWith(
             'asset-info:AAPL',
             { symbol: 'AAPL', name: 'Apple Inc.', koreanName: '애플' },
@@ -288,12 +289,37 @@ describe('getAssetInfo', () => {
         expect(mockCache.set).toHaveBeenCalled();
     });
 
-    it('FMP 결과 중 정확히 일치하지 않으면 첫 번째 결과 사용', async () => {
+    it('FMP 결과 중 정확히 일치하지 않으면 첫 번째 결과와 FMP symbol 을 사용', async () => {
         mockCache.get.mockResolvedValue(null);
         mockRepository.findBySymbol.mockResolvedValue(null);
         searchBySymbolMock.mockResolvedValue([{ ...apple, symbol: 'AAPL.MX' }]);
         const result = await getAssetInfo('AAPL');
-        expect(result?.symbol).toBe('AAPL');
-        expect(result?.name).toBe('Apple Inc.');
+        expect(result).toEqual({
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            fmpSymbol: 'AAPL.MX',
+        });
+    });
+
+    it('번역 저장 시 canonical symbol 과 FMP symbol 을 함께 보존한다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        mockRepository.findBySymbol.mockResolvedValue(null);
+        searchBySymbolMock.mockResolvedValue([{ ...apple, symbol: 'AAPL.MX' }]);
+        getKoreanNamesMock.mockResolvedValue({ AAPL: '애플' });
+
+        const result = await getAssetInfo('AAPL');
+        expect(result).toEqual({
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            koreanName: '애플',
+            fmpSymbol: 'AAPL.MX',
+        });
+        await new Promise(resolve => setImmediate(resolve));
+        expect(mockRepository.upsert).toHaveBeenCalledWith({
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            koreanName: '애플',
+            fmpSymbol: 'AAPL.MX',
+        });
     });
 });

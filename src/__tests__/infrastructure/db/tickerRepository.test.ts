@@ -47,6 +47,17 @@ function makeFindBySymbolDb(rows: unknown[]): {
     return { db: { select } as unknown as SiglensDatabase, limit };
 }
 
+function makeFindBySymbolsDb(rows: unknown[]): {
+    db: SiglensDatabase;
+    where: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+} {
+    const where = vi.fn().mockResolvedValue(rows);
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    return { db: { select } as unknown as SiglensDatabase, where, select };
+}
+
 function makeUpsertDb(): {
     db: SiglensDatabase;
     insert: ReturnType<typeof vi.fn>;
@@ -77,6 +88,20 @@ describe('DrizzleKoreanTickerRepository', () => {
         await expect(repo.findAll()).resolves.toEqual([]);
     });
 
+    it('findBySymbols 는 빈 입력에서 select 를 호출하지 않는다', async () => {
+        const { db, select } = makeFindBySymbolsDb([apple]);
+        const repo = new DrizzleKoreanTickerRepository(db);
+        await expect(repo.findBySymbols([])).resolves.toEqual([]);
+        expect(select).not.toHaveBeenCalled();
+    });
+
+    it('findBySymbols 는 요청한 symbol 조건으로 row 를 조회한다', async () => {
+        const { db, where } = makeFindBySymbolsDb([apple]);
+        const repo = new DrizzleKoreanTickerRepository(db);
+        await expect(repo.findBySymbols(['AAPL'])).resolves.toEqual([apple]);
+        expect(where).toHaveBeenCalledTimes(1);
+    });
+
     it('upsertMany 는 빈 입력에서 insert 를 호출하지 않는다', async () => {
         const { db, insert } = makeUpsertDb();
         const repo = new DrizzleKoreanTickerRepository(db);
@@ -92,7 +117,15 @@ describe('DrizzleKoreanTickerRepository', () => {
         const passed = values.mock.calls[0][0] as KoreanTickerEntry[];
         expect(passed).toHaveLength(2);
         expect(passed[0]).toMatchObject({ symbol: 'AAPL', koreanName: '애플' });
-        expect(onConflictDoUpdate).toHaveBeenCalledTimes(1);
+        expect(onConflictDoUpdate).toHaveBeenCalledWith({
+            target: expect.anything(),
+            set: {
+                name: expect.anything(),
+                koreanName: expect.anything(),
+                exchange: expect.anything(),
+                exchangeFullName: expect.anything(),
+            },
+        });
     });
 });
 
@@ -122,6 +155,13 @@ describe('DrizzleAssetTranslationRepository', () => {
         await repo.upsert(record);
         expect(insert).toHaveBeenCalledTimes(1);
         expect(values).toHaveBeenCalledWith(record);
-        expect(onConflictDoUpdate).toHaveBeenCalledTimes(1);
+        expect(onConflictDoUpdate).toHaveBeenCalledWith({
+            target: expect.anything(),
+            set: {
+                name: expect.anything(),
+                koreanName: expect.anything(),
+                fmpSymbol: expect.anything(),
+            },
+        });
     });
 });

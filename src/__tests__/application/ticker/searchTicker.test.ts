@@ -20,7 +20,7 @@ const searchByKoreanNameMock =
     vi.fn<(q: string) => Promise<TickerSearchResult[]>>();
 const getKoreanNamesMock =
     vi.fn<(s: string[]) => Promise<Record<string, string>>>();
-const setKoreanTickersMock = vi.fn<() => Promise<void>>();
+const setKoreanTickersMock = vi.fn<(entries: unknown[]) => Promise<void>>();
 const translateCompanyNamesMock =
     vi.fn<() => Promise<Record<string, string>>>();
 
@@ -37,10 +37,10 @@ vi.mock('@/infrastructure/ticker/fmpTickerApi', async () => {
         searchByName: (q: string) => searchByNameMock(q),
     };
 });
-vi.mock('@/infrastructure/ticker/koreanNameStore', () => ({
+vi.mock('@/application/ticker/koreanNameStore', () => ({
     searchByKoreanName: (q: string) => searchByKoreanNameMock(q),
     getKoreanNames: (s: string[]) => getKoreanNamesMock(s),
-    setKoreanTickers: () => setKoreanTickersMock(),
+    setKoreanTickers: (entries: unknown[]) => setKoreanTickersMock(entries),
 }));
 vi.mock('@/infrastructure/ticker/koreanTranslator', () => ({
     translateCompanyNames: () => translateCompanyNamesMock(),

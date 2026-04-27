@@ -17,9 +17,11 @@ const mockCache: {
 
 const mockRepository: {
     findAll: ReturnType<typeof vi.fn>;
+    findBySymbols: ReturnType<typeof vi.fn>;
     upsertMany: ReturnType<typeof vi.fn>;
 } = {
     findAll: vi.fn(),
+    findBySymbols: vi.fn(),
     upsertMany: vi.fn(),
 };
 
@@ -45,7 +47,7 @@ import {
     getKoreanNames,
     searchByKoreanName,
     setKoreanTickers,
-} from '@/infrastructure/ticker/koreanNameStore';
+} from '@/application/ticker/koreanNameStore';
 import type { KoreanTickerEntry } from '@/domain/types';
 
 const apple: KoreanTickerEntry = {
@@ -75,6 +77,8 @@ function resetMocks(): void {
     mockCache.set.mockResolvedValue(undefined);
     mockCache.delete.mockReset();
     mockRepository.findAll.mockReset();
+    mockRepository.findBySymbols.mockReset();
+    mockRepository.findBySymbols.mockResolvedValue([]);
     mockRepository.upsertMany.mockReset();
     mockRepository.upsertMany.mockResolvedValue(undefined);
     createCacheProviderMock.mockReset();
@@ -123,6 +127,13 @@ describe('searchByKoreanName', () => {
         expect(mockCache.set).not.toHaveBeenCalled();
     });
 
+    it('cache miss 후 DB 조회 실패 시 빈 배열로 degrade 한다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        mockRepository.findAll.mockRejectedValue(new Error('db down'));
+        await expect(searchByKoreanName('애')).resolves.toEqual([]);
+        expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
     it('DB 클라이언트 없고 cache 도 없으면 빈 배열', async () => {
         createCacheProviderMock.mockReturnValue(null);
         tryGetDatabaseClientMock.mockReturnValue(null);
@@ -162,9 +173,17 @@ describe('getKoreanNames', () => {
 
     it('cache miss 시 DB 결과를 매핑한다', async () => {
         mockCache.get.mockResolvedValue(null);
-        mockRepository.findAll.mockResolvedValue([microsoft]);
+        mockRepository.findBySymbols.mockResolvedValue([microsoft]);
         const result = await getKoreanNames(['MSFT']);
         expect(result).toEqual({ MSFT: '마이크로소프트' });
+        expect(mockRepository.findBySymbols).toHaveBeenCalledWith(['MSFT']);
+        expect(mockRepository.findAll).not.toHaveBeenCalled();
+    });
+
+    it('cache miss 후 DB symbol 조회 실패 시 빈 객체로 degrade 한다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        mockRepository.findBySymbols.mockRejectedValue(new Error('db down'));
+        await expect(getKoreanNames(['MSFT'])).resolves.toEqual({});
     });
 });
 

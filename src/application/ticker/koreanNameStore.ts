@@ -52,22 +52,64 @@ async function writeToCache(
     }
 }
 
-async function loadAllEntries(): Promise<KoreanTickerEntry[]> {
+async function loadEntriesFromCache(): Promise<KoreanTickerEntry[] | null> {
     const cache = createCacheProvider();
+    if (!cache) return null;
 
-    if (cache) {
-        const cached = await readFromCache(cache);
-        if (cached !== null) return cached;
+    return readFromCache(cache);
+}
+
+async function loadAllEntries(): Promise<KoreanTickerEntry[]> {
+    const cached = await loadEntriesFromCache();
+    if (cached !== null) return cached;
+
+    const repository = tryGetRepository();
+    if (!repository) return [];
+
+    const entries = await readAllFromDatabase(repository);
+    const cache = createCacheProvider();
+    if (cache && entries.length > 0) {
+        await writeToCache(cache, entries);
+    }
+    return entries;
+}
+
+async function loadEntriesBySymbols(
+    symbols: readonly string[]
+): Promise<KoreanTickerEntry[]> {
+    const cached = await loadEntriesFromCache();
+    if (cached !== null) {
+        const symbolSet = new Set(symbols);
+        return cached.filter(entry => symbolSet.has(entry.symbol));
     }
 
     const repository = tryGetRepository();
     if (!repository) return [];
 
-    const entries = await repository.findAll();
-    if (cache && entries.length > 0) {
-        await writeToCache(cache, entries);
+    return readBySymbolsFromDatabase(repository, symbols);
+}
+
+async function readAllFromDatabase(
+    repository: KoreanTickerRepository
+): Promise<KoreanTickerEntry[]> {
+    try {
+        return await repository.findAll();
+    } catch (e) {
+        console.warn('[koreanNameStore] DB read failed', e);
+        return [];
     }
-    return entries;
+}
+
+async function readBySymbolsFromDatabase(
+    repository: KoreanTickerRepository,
+    symbols: readonly string[]
+): Promise<KoreanTickerEntry[]> {
+    try {
+        return await repository.findBySymbols(symbols);
+    } catch (e) {
+        console.warn('[koreanNameStore] DB read failed', e);
+        return [];
+    }
 }
 
 /** @internal Korean-name substring lookup over the cached/persisted ticker store. */
@@ -89,7 +131,7 @@ export async function getKoreanNames(
 ): Promise<Record<string, string>> {
     if (symbols.length === 0) return {};
 
-    const entries = await loadAllEntries();
+    const entries = await loadEntriesBySymbols(symbols);
     const symbolMap = new Map(entries.map(e => [e.symbol, e.koreanName]));
 
     const pairs = symbols.flatMap<readonly [string, string]>(symbol => {
@@ -121,8 +163,8 @@ export async function setKoreanTickers(
     if (repository) {
         try {
             await repository.upsertMany(newEntries);
-        } catch {
-            // Graceful degradation: DB write failure should not propagate.
+        } catch (e) {
+            console.warn('[koreanNameStore] DB upsert failed', e);
             return;
         }
     }

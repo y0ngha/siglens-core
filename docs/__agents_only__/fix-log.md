@@ -109,3 +109,8 @@
 - Violation: `application/tier/types.ts` imported `UserTierRepository` from the deep `@/infrastructure/db/types` path while sibling files import via the `@/infrastructure/db` module index
 - Rule: FF Coupling — consumers should import from a module's public index, not its internal implementation files, so internal restructuring stays non-breaking
 - Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`
+
+## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
+- Violation: Drizzle `onConflictDoUpdate` set clauses referenced target table columns instead of inserted row values
+- Rule: DB upsert semantics — conflict updates must use the `excluded` row when replacing existing values
+- Context: `DrizzleKoreanTickerRepository.upsertMany` and `DrizzleAssetTranslationRepository.upsert` now update rows from `excluded.*` values instead of preserving existing column values

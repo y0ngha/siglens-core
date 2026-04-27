@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { KoreanTickerEntry } from '@/domain/types';
 import { assetTranslations, koreanTickers } from './schema';
 import type {
@@ -36,6 +36,17 @@ export class DrizzleKoreanTickerRepository implements KoreanTickerRepository {
         return this.db.select(koreanTickerColumns).from(koreanTickers);
     }
 
+    async findBySymbols(
+        symbols: readonly string[]
+    ): Promise<KoreanTickerEntry[]> {
+        if (symbols.length === 0) return [];
+
+        return this.db
+            .select(koreanTickerColumns)
+            .from(koreanTickers)
+            .where(inArray(koreanTickers.symbol, [...symbols]));
+    }
+
     async upsertMany(entries: readonly KoreanTickerEntry[]): Promise<void> {
         if (entries.length === 0) return;
 
@@ -45,10 +56,16 @@ export class DrizzleKoreanTickerRepository implements KoreanTickerRepository {
             .onConflictDoUpdate({
                 target: koreanTickers.symbol,
                 set: {
-                    name: koreanTickers.name,
-                    koreanName: koreanTickers.koreanName,
-                    exchange: koreanTickers.exchange,
-                    exchangeFullName: koreanTickers.exchangeFullName,
+                    name: sql.raw(`excluded.${koreanTickers.name.name}`),
+                    koreanName: sql.raw(
+                        `excluded.${koreanTickers.koreanName.name}`
+                    ),
+                    exchange: sql.raw(
+                        `excluded.${koreanTickers.exchange.name}`
+                    ),
+                    exchangeFullName: sql.raw(
+                        `excluded.${koreanTickers.exchangeFullName.name}`
+                    ),
                 },
             });
     }
@@ -80,14 +97,19 @@ export class DrizzleAssetTranslationRepository implements AssetTranslationReposi
             .onConflictDoUpdate({
                 target: assetTranslations.symbol,
                 set: {
-                    name: assetTranslations.name,
-                    koreanName: assetTranslations.koreanName,
-                    fmpSymbol: assetTranslations.fmpSymbol,
+                    name: sql.raw(`excluded.${assetTranslations.name.name}`),
+                    koreanName: sql.raw(
+                        `excluded.${assetTranslations.koreanName.name}`
+                    ),
+                    fmpSymbol: sql.raw(
+                        `excluded.${assetTranslations.fmpSymbol.name}`
+                    ),
                 },
             });
     }
 }
 
+/** Select DB row fields explicitly so future KoreanTickerEntry fields are not persisted accidentally. */
 function toKoreanTickerRow(entry: KoreanTickerEntry): {
     symbol: string;
     name: string;

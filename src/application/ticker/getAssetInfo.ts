@@ -21,7 +21,7 @@ import {
 import {
     getKoreanNames,
     setKoreanTickers,
-} from '@/infrastructure/ticker/koreanNameStore';
+} from '@/application/ticker/koreanNameStore';
 import { translateCompanyNames } from '@/infrastructure/ticker/koreanTranslator';
 
 function tryGetRepository(): AssetTranslationRepository | null {
@@ -35,6 +35,9 @@ function recordToAssetInfo(record: AssetTranslationRecord): AssetInfo {
         symbol: record.symbol,
         name: record.name,
         koreanName: record.koreanName,
+        ...(record.fmpSymbol !== record.symbol && {
+            fmpSymbol: record.fmpSymbol,
+        }),
     };
 }
 
@@ -53,6 +56,7 @@ async function readFromDatabase(symbol: string): Promise<AssetInfo | null> {
 
 async function persistTranslation(
     symbol: string,
+    fmpSymbol: string,
     name: string,
     koreanName: string,
     cache: CacheProvider | null
@@ -64,7 +68,7 @@ async function persistTranslation(
                 symbol,
                 name,
                 koreanName,
-                fmpSymbol: symbol,
+                fmpSymbol,
             });
         } catch (e) {
             console.warn('[getAssetInfo] DB upsert failed', e);
@@ -75,7 +79,12 @@ async function persistTranslation(
     try {
         await cache.set(
             buildAssetInfoCacheKey(symbol),
-            { symbol, name, koreanName },
+            {
+                symbol,
+                name,
+                koreanName,
+                ...(fmpSymbol !== symbol && { fmpSymbol }),
+            },
             ASSET_INFO_CACHE_TTL_WITH_KOREAN
         );
     } catch (e) {
@@ -102,7 +111,13 @@ async function translateAndPersist(
         exchangeFullName: match.exchangeFullName,
     };
     await setKoreanTickers([entry]);
-    await persistTranslation(symbol, match.name, koreanName, cache);
+    await persistTranslation(
+        symbol,
+        match.symbol,
+        match.name,
+        koreanName,
+        cache
+    );
 }
 
 /**
@@ -169,7 +184,7 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
     const match = usResults.find(r => r.symbol === upper) ?? usResults[0];
     if (!match) return null;
 
-    const { name, exchange, exchangeFullName } = match;
+    const { symbol: fmpSymbol, name, exchange, exchangeFullName } = match;
 
     const koreanNames = await getKoreanNames([upper]);
     const koreanName = koreanNames[upper];
@@ -177,11 +192,12 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
     const info: AssetInfo = {
         symbol: upper,
         name,
+        ...(fmpSymbol !== upper && { fmpSymbol }),
         ...(koreanName && { koreanName }),
     };
 
     if (koreanName) {
-        persistTranslation(upper, name, koreanName, cache).catch(e =>
+        persistTranslation(upper, fmpSymbol, name, koreanName, cache).catch(e =>
             console.warn('[getAssetInfo] persist failed', e)
         );
         return info;
@@ -189,7 +205,7 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
 
     translateAndPersist(
         upper,
-        { name, exchange, exchangeFullName },
+        { symbol: fmpSymbol, name, exchange, exchangeFullName },
         cache
     ).catch(e =>
         console.warn('[getAssetInfo] background translation failed', e)
