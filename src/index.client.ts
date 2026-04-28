@@ -172,8 +172,6 @@ export {
 } from './domain/analysis/actionRecommendation';
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
-    DEFAULT_TIER,
-    TIER_CONFIG,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -199,6 +197,9 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Tier gating constants
+export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
 
 // Dashboard tickers / sectors
 export {

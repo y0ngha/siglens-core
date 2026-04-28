@@ -45,7 +45,7 @@ function isDepthAllowed(
 function getLockedInfoDepth(
     allowedDepth: readonly TierInfoDepth[],
     allDepth: readonly TierInfoDepth[]
-): TierInfoDepth[] {
+): readonly TierInfoDepth[] {
     return allDepth.filter(depth => !allowedDepth.includes(depth));
 }
 

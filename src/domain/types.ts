@@ -797,7 +797,10 @@ export interface ReconciledActionLineData {
 }
 
 /** Long-position recommendation after tier-based field filtering. */
-export interface FilteredActionRecommendation {
+export interface FilteredActionRecommendation extends Omit<
+    ActionRecommendation,
+    'positionAnalysis' | 'entry' | 'exit' | 'riskReward'
+> {
     /** Korean prose: current price position vs key levels. */
     positionAnalysis: string | null;
     /** Korean prose: long entry strategy with specific price ranges. */
@@ -806,16 +809,6 @@ export interface FilteredActionRecommendation {
     exit: string | null;
     /** Korean prose: risk-reward ratio summary. */
     riskReward: string | null;
-    /** Verdict used by the UI to enable / disable the entry CTA. */
-    entryRecommendation?: EntryRecommendation;
-    /** Entry price range `[low, high]` or single `[price]`. */
-    entryPrices?: number[];
-    /** Stop-loss price (single value). */
-    stopLoss?: number;
-    /** Take-profit price targets in ascending order. */
-    takeProfitPrices?: number[];
-    /** Domain-derived fallback levels visible only when stop-loss and target fragments are allowed. */
-    reconciledLevels?: ReconciledActionLevels;
 }
 
 /** Long-position trading recommendation produced by the AI analyst. */
@@ -908,7 +901,7 @@ export interface FilteredAnalysisResult {
     /** Filtered analysis data safe to expose to the current tier. */
     result: AnalysisResponse | FilteredAnalysisResponse;
     /** Info-depth fragments hidden from the current tier. */
-    lockedInfoDepth: TierInfoDepth[];
+    lockedInfoDepth: readonly TierInfoDepth[];
 }
 
 /** Bars + computed indicator suite — see {@link fetchBarsWithIndicators}. */

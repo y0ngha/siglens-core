@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
     CANDLE_PATTERN_DETECTION_BARS,
+    DEFAULT_TIER,
     detectGoldenCross,
     EMA_DEFAULT_PERIODS,
     filterAnalysisResult,
     GEMINI_2_5_FLASH_MODEL,
+    getTierLimit,
     HIGH_CONFIDENCE_WEIGHT,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
     normalizeTrend,
+    TIER_CONFIG,
     VALID_CHAT_MODELS,
 } from '@/index.client';
 import * as clientApi from '@/index.client';
@@ -22,6 +30,14 @@ describe('browser public API exports', () => {
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
         expect(HIGH_CONFIDENCE_WEIGHT).toBe(0.8);
         expect(typeof filterAnalysisResult).toBe('function');
+        expect(typeof DEFAULT_TIER).toBe('string');
+        expect(typeof TIER_CONFIG).toBe('object');
+        expect(typeof getTierLimit).toBe('function');
+        expect(typeof isAllowed).toBe('function');
+        expect(typeof isInfoDepthAllowed).toBe('function');
+        expect(typeof isModelAllowed).toBe('function');
+        expect(typeof isTier).toBe('function');
+        expect(typeof isTimeframeAllowed).toBe('function');
         expect(typeof detectGoldenCross).toBe('function');
         expect(normalizeTrend('bullish')).toBe('bullish');
         expect(skillType).toBe('indicator_guide');
