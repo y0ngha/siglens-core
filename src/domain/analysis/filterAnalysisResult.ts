@@ -154,6 +154,16 @@ function filterActionRecommendation(
  * @param tier - Subscription tier that controls field visibility.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
  * @returns Filtered analysis data and the info-depth fragments hidden from the tier.
+ *
+ * @example
+ * ```ts
+ * const { result, lockedInfoDepth } = filterAnalysisResult(
+ *     analysis,
+ *     'member',
+ *     config
+ * );
+ * const shouldShowEntryPaywall = lockedInfoDepth.includes('entry');
+ * ```
  */
 export function filterAnalysisResult(
     result: AnalysisResponse,
