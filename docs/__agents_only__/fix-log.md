@@ -126,3 +126,12 @@
 - Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
 - Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
 - Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
+
+## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
+- Violation: `src/index.ts` re-exported `DrizzleUserRepository` from the DB barrel, but `src/infrastructure/db/index.ts` no longer exported that symbol
+- Rule: PUBLIC_API.md — public entrypoint exports must stay synchronized with module barrels they depend on
+- Context: Restored the DB barrel re-export so the package entrypoint compiles and public repository exports remain available
+
+- Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
+- Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
+- Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order

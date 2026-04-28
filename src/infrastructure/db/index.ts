@@ -21,6 +21,7 @@ export {
     userTierEnum,
 } from './schema';
 export { DrizzleSessionRepository } from './sessionRepository';
+export { DrizzleUserRepository } from './userRepository';
 export type {
     AuthSessionRecord,
     AuthUserRecord,

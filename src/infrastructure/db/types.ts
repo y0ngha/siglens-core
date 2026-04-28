@@ -1,4 +1,4 @@
-import type { Tier, TierModel } from '@/domain/types';
+import type { ModelId, Tier } from '@/domain/types';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import type {
@@ -110,7 +110,7 @@ export interface CreateUsageLogInput {
     /** Usage action being tracked. */
     actionType: UsageActionType;
     /** AI model used by the request. */
-    modelUsed: TierModel;
+    modelUsed: ModelId;
     /** Calendar date bucket in `YYYY-MM-DD` format. */
     date: string;
 }

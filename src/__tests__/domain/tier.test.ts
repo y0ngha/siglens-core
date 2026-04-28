@@ -13,11 +13,11 @@ import {
 import type { ModelId, TierConfig } from '@/domain/types';
 
 const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
+    'claude-opus-4',
+    'claude-sonnet-4',
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
     'gemini-2.5-pro',
-    'claude-sonnet-4',
-    'claude-opus-4',
 ];
 
 const restrictedConfig: TierConfig = {
