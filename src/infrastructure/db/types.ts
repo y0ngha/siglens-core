@@ -60,6 +60,24 @@ export interface AuthSessionRecord {
 }
 
 /**
+ * Persisted one-time password reset credential.
+ */
+export interface PasswordResetRecord {
+    /** Reset token row identifier. */
+    id: string;
+    /** User that requested the password reset. */
+    userId: string;
+    /** Hashed reset token. Raw tokens are never persisted. */
+    tokenHash: string;
+    /** Fixed expiration timestamp. */
+    expiresAt: Date;
+    /** Timestamp when the reset token was consumed; null while active. */
+    usedAt: Date | null;
+    /** Timestamp when the reset token was created. */
+    createdAt: Date;
+}
+
+/**
  * Input for creating a new email-based user account.
  */
 export interface CreateEmailUserInput {
@@ -97,6 +115,32 @@ export interface CreateSessionInput {
     userId: string;
     /** Fixed expiration timestamp. */
     expiresAt: Date;
+}
+
+/**
+ * Input for creating a new password reset token row.
+ */
+export interface CreatePasswordResetInput {
+    /** User that owns the reset token. */
+    userId: string;
+    /** Hashed reset token. */
+    tokenHash: string;
+    /** Fixed expiration timestamp. */
+    expiresAt: Date;
+}
+
+/**
+ * Input for completing a password reset.
+ */
+export interface CompletePasswordResetInput {
+    /** Password reset row identifier. */
+    resetId: string;
+    /** User whose password hash should be replaced. */
+    userId: string;
+    /** New password hash produced by {@link PasswordHasher.hashPassword}. */
+    passwordHash: string;
+    /** Timestamp recorded on the consumed reset token. */
+    usedAt: Date;
 }
 
 /**
@@ -219,6 +263,41 @@ export interface SessionRepository {
      * @returns Whether a session row was deleted.
      */
     deleteSession(sessionToken: string): Promise<boolean>;
+}
+
+/**
+ * Interface for password reset persistence operations.
+ */
+export interface PasswordResetRepository {
+    /**
+     * Create a password reset token row.
+     *
+     * @param input - Token hash, target user, and expiration timestamp.
+     * @returns The created {@link PasswordResetRecord}.
+     */
+    createPasswordReset(
+        input: CreatePasswordResetInput
+    ): Promise<PasswordResetRecord>;
+
+    /**
+     * Find a password reset token row by hashed token.
+     *
+     * Expiration and one-time-use checks are enforced by the application layer.
+     *
+     * @param tokenHash - Hashed reset token.
+     * @returns The matching reset row, or null when no row exists.
+     */
+    findPasswordResetByTokenHash(
+        tokenHash: string
+    ): Promise<PasswordResetRecord | null>;
+
+    /**
+     * Persist the new user password hash and mark the reset token as consumed.
+     *
+     * @param input - Reset id, user id, new password hash, and consumed timestamp.
+     * @returns Whether both updates completed.
+     */
+    completePasswordReset(input: CompletePasswordResetInput): Promise<boolean>;
 }
 
 /** Connection configuration required to instantiate a database client. */

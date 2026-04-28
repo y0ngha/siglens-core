@@ -116,3 +116,12 @@
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
 - Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
+
+## [Issue #42 | feat/42/password-reset-use-cases | 2026-04-28]
+- Violation: password reset completion changed `users.passwordHash` before proving the reset token row could be consumed
+- Rule: Transactional state transitions must validate and reserve the one-time credential before applying dependent account mutations
+- Context: `completePasswordReset` now consumes the reset row first with a `usedAt IS NULL` guard, then updates the user password inside the same transaction
+
+- Violation: password reset requests used broad user lookup and included OAuth-only accounts
+- Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
+- Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
