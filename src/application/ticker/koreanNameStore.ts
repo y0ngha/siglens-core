@@ -154,7 +154,7 @@ async function invalidateCache(cache: CacheProvider): Promise<void> {
 
 /** @internal Upsert ticker entries to the DB and invalidate the Redis cache. */
 export async function setKoreanTickers(
-    newEntries: KoreanTickerEntry[]
+    newEntries: readonly KoreanTickerEntry[]
 ): Promise<void> {
     if (newEntries.length === 0) return;
 

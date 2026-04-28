@@ -16,6 +16,11 @@ const koreanTickerColumns = {
     exchangeFullName: koreanTickers.exchangeFullName,
 };
 
+type KoreanTickerRow = Pick<
+    KoreanTickerEntry,
+    'symbol' | 'name' | 'koreanName' | 'exchange' | 'exchangeFullName'
+>;
+
 const assetTranslationColumns = {
     symbol: assetTranslations.symbol,
     name: assetTranslations.name,
@@ -100,13 +105,7 @@ export class DrizzleAssetTranslationRepository implements AssetTranslationReposi
 }
 
 /** Select DB row fields explicitly so future KoreanTickerEntry fields are not persisted accidentally. */
-function toKoreanTickerRow(entry: KoreanTickerEntry): {
-    symbol: string;
-    name: string;
-    koreanName: string;
-    exchange: string;
-    exchangeFullName: string;
-} {
+function toKoreanTickerRow(entry: KoreanTickerEntry): KoreanTickerRow {
     return {
         symbol: entry.symbol,
         name: entry.name,
