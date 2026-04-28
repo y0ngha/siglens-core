@@ -72,6 +72,7 @@ async function persistTranslation(
             });
         } catch (e) {
             console.warn('[getAssetInfo] DB upsert failed', e);
+            return;
         }
     }
 
