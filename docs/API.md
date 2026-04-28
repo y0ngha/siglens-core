@@ -262,6 +262,13 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
 
+### 사용량 트래킹
+
+`DrizzleUsageRepository`는 `usage_logs`에 분석/챗봇 사용 이벤트를 기록하고 UTC 날짜 기준
+일일 집계를 조회한다. `recordUsage()`는 원본 IP를 저장하지 않고
+`SHA-256(IP + UTC 일자 salt)` 값만 `ip_hash`에 저장한다. 제한 기능이 비활성화되어도
+호출자가 이 저장소를 호출하면 사용량은 분석 목적 로그로 남는다.
+
 ### 인증
 
 `application/auth`는 이메일 회원가입·로그인·로그아웃 및 OAuth 로그인

@@ -1,14 +1,14 @@
 export {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-} from './constants';
-export {
     createDatabaseClient,
     getDatabaseClient,
     tryGetDatabaseClient,
 } from './client';
 export { readDatabaseConfig, tryReadDatabaseConfig } from './config';
+export {
+    OAUTH_PROVIDER_VALUES,
+    USAGE_ACTION_TYPE_VALUES,
+    USER_TIER_VALUES,
+} from './constants';
 export {
     assetTranslations,
     koreanTickers,
@@ -21,8 +21,6 @@ export {
     userTierEnum,
 } from './schema';
 export { DrizzleSessionRepository } from './sessionRepository';
-export { DrizzleUsageLogRepository } from './usageLogRepository';
-export { DrizzleUserRepository } from './userRepository';
 export type {
     AuthSessionRecord,
     AuthUserRecord,
@@ -36,11 +34,17 @@ export type {
     EmailAuthUserRepository,
     OAuthProvider,
     OAuthUserRepository,
+    RecordUsageInput,
     SessionRepository,
     SiglensDatabase,
     UsageActionType,
+    UsageCounts,
+    UsageLogRecord,
     UsageLogRepository,
+    UsageRepository,
     UserRepository,
     UserTier,
     UserTierRepository,
 } from './types';
+export { DrizzleUsageLogRepository } from './usageLogRepository';
+export { DrizzleUsageRepository, hashUsageIp } from './usageRepository';
