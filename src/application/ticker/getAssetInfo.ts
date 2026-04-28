@@ -41,6 +41,18 @@ function recordToAssetInfo(record: AssetTranslationRecord): AssetInfo {
     };
 }
 
+function setCacheBestEffort(
+    cache: CacheProvider | null,
+    cacheKey: string,
+    info: AssetInfo,
+    ttlSeconds: number
+): void {
+    if (!cache) return;
+    cache
+        .set(cacheKey, info, ttlSeconds)
+        .catch(e => console.warn('[getAssetInfo] cache write failed', e));
+}
+
 async function readFromDatabase(symbol: string): Promise<AssetInfo | null> {
     const repository = tryGetRepository();
     if (!repository) return null;
@@ -76,21 +88,17 @@ async function persistTranslation(
         }
     }
 
-    if (!cache) return;
-    try {
-        await cache.set(
-            buildAssetInfoCacheKey(symbol),
-            {
-                symbol,
-                name,
-                koreanName,
-                ...(fmpSymbol !== symbol && { fmpSymbol }),
-            },
-            ASSET_INFO_CACHE_TTL_WITH_KOREAN
-        );
-    } catch (e) {
-        console.warn('[getAssetInfo] cache write failed', e);
-    }
+    setCacheBestEffort(
+        cache,
+        buildAssetInfoCacheKey(symbol),
+        {
+            symbol,
+            name,
+            koreanName,
+            ...(fmpSymbol !== symbol && { fmpSymbol }),
+        },
+        ASSET_INFO_CACHE_TTL_WITH_KOREAN
+    );
 }
 
 async function translateAndPersist(
@@ -170,13 +178,12 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
 
     const fromDb = await readFromDatabase(upper);
     if (fromDb) {
-        if (cache) {
-            cache
-                .set(cacheKey, fromDb, ASSET_INFO_CACHE_TTL_WITH_KOREAN)
-                .catch(e =>
-                    console.warn('[getAssetInfo] cache write failed', e)
-                );
-        }
+        setCacheBestEffort(
+            cache,
+            cacheKey,
+            fromDb,
+            ASSET_INFO_CACHE_TTL_WITH_KOREAN
+        );
         return fromDb;
     }
 
@@ -212,11 +219,12 @@ export async function getAssetInfo(symbol: string): Promise<AssetInfo | null> {
         console.warn('[getAssetInfo] background translation failed', e)
     );
 
-    if (cache) {
-        cache
-            .set(cacheKey, info, ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN)
-            .catch(e => console.warn('[getAssetInfo] cache write failed', e));
-    }
+    setCacheBestEffort(
+        cache,
+        cacheKey,
+        info,
+        ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN
+    );
 
     return info;
 }

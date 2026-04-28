@@ -205,49 +205,36 @@ describe('setKoreanTickers', () => {
         expect(mockCache.set).not.toHaveBeenCalled();
     });
 
-    it('DB upsert 후 기존 cache 와 머지하여 cache 갱신', async () => {
-        const oldApple: KoreanTickerEntry = { ...apple, koreanName: '구버전' };
-        mockCache.get.mockResolvedValue([oldApple, microsoft]);
+    it('DB upsert 후 전체 cache 를 무효화한다', async () => {
         await setKoreanTickers([apple]);
         expect(mockRepository.upsertMany).toHaveBeenCalledWith([apple]);
-        expect(mockCache.set).toHaveBeenCalledTimes(1);
-        const [, mergedValue] = mockCache.set.mock.calls[0];
-        expect(mergedValue).toEqual([microsoft, apple]);
+        expect(mockCache.delete).toHaveBeenCalledWith('korean:tickers');
+        expect(mockCache.set).not.toHaveBeenCalled();
     });
 
-    it('cache 가 비어있을 때도 신규 entry 만 저장한다', async () => {
-        mockCache.get.mockResolvedValue(null);
-        await setKoreanTickers([apple]);
-        expect(mockCache.set).toHaveBeenCalledWith(
-            'korean:tickers',
-            [apple],
-            expect.any(Number)
-        );
+    it('DB upsert 후 cache 삭제 실패는 흡수한다', async () => {
+        mockCache.delete.mockRejectedValue(new Error('cache down'));
+        await expect(setKoreanTickers([apple])).resolves.toBeUndefined();
+        expect(mockRepository.upsertMany).toHaveBeenCalledWith([apple]);
     });
 
-    it('DB 클라이언트 없으면 DB 호출 없이 cache 만 갱신', async () => {
+    it('DB 클라이언트 없으면 DB / cache 호출 없이 종료', async () => {
         tryGetDatabaseClientMock.mockReturnValue(null);
-        mockCache.get.mockResolvedValue(null);
         await setKoreanTickers([apple]);
         expect(mockRepository.upsertMany).not.toHaveBeenCalled();
-        expect(mockCache.set).toHaveBeenCalledTimes(1);
+        expect(mockCache.delete).not.toHaveBeenCalled();
     });
 
     it('DB upsert 실패 시 cache 도 건드리지 않고 종료', async () => {
         mockRepository.upsertMany.mockRejectedValue(new Error('db down'));
         await setKoreanTickers([apple]);
-        expect(mockCache.set).not.toHaveBeenCalled();
+        expect(mockCache.delete).not.toHaveBeenCalled();
     });
 
     it('cache provider 가 null 이면 DB 만 갱신', async () => {
         createCacheProviderMock.mockReturnValue(null);
         await setKoreanTickers([apple]);
         expect(mockRepository.upsertMany).toHaveBeenCalledTimes(1);
-        expect(mockCache.set).not.toHaveBeenCalled();
-    });
-
-    it('cache 실패는 흡수한다', async () => {
-        mockCache.get.mockRejectedValue(new Error('cache down'));
-        await expect(setKoreanTickers([apple])).resolves.toBeUndefined();
+        expect(mockCache.delete).not.toHaveBeenCalled();
     });
 });

@@ -144,46 +144,32 @@ export async function getKoreanNames(
     return Object.fromEntries(pairs) as Record<string, string>;
 }
 
-function mergeEntries(
-    existing: readonly KoreanTickerEntry[],
-    incoming: readonly KoreanTickerEntry[]
-): KoreanTickerEntry[] {
-    const incomingSymbols = new Set(incoming.map(e => e.symbol));
-    return [
-        ...existing.filter(e => !incomingSymbols.has(e.symbol)),
-        ...incoming,
-    ];
+async function invalidateCache(cache: CacheProvider): Promise<void> {
+    try {
+        await cache.delete(KOREAN_TICKERS_CACHE_KEY);
+    } catch {
+        // Graceful degradation: cache invalidation failure should not propagate.
+    }
 }
 
-/** @internal Upsert ticker entries to the DB and refresh the Redis cache. */
+/** @internal Upsert ticker entries to the DB and invalidate the Redis cache. */
 export async function setKoreanTickers(
     newEntries: KoreanTickerEntry[]
 ): Promise<void> {
     if (newEntries.length === 0) return;
 
     const repository = tryGetRepository();
-    if (repository) {
-        try {
-            await repository.upsertMany(newEntries);
-        } catch (e) {
-            console.warn('[koreanNameStore] DB upsert failed', e);
-            return;
-        }
+    if (!repository) return;
+
+    try {
+        await repository.upsertMany(newEntries);
+    } catch (e) {
+        console.warn('[koreanNameStore] DB upsert failed', e);
+        return;
     }
 
     const cache = createCacheProvider();
     if (!cache) return;
 
-    try {
-        const existing =
-            (await cache.get<KoreanTickerEntry[]>(KOREAN_TICKERS_CACHE_KEY)) ??
-            [];
-        await cache.set(
-            KOREAN_TICKERS_CACHE_KEY,
-            mergeEntries(existing, newEntries),
-            KOREAN_NAMES_CACHE_TTL
-        );
-    } catch {
-        // Graceful degradation: persistence failure should not propagate.
-    }
+    await invalidateCache(cache);
 }

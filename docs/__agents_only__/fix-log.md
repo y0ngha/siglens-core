@@ -107,6 +107,11 @@
 - Rule: DB upsert semantics — conflict updates must use the `excluded` row when replacing existing values
 - Context: `DrizzleKoreanTickerRepository.upsertMany` and `DrizzleAssetTranslationRepository.upsert` now update rows from `excluded.*` values instead of preserving existing column values
 
+## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
+- Violation: Redis cache update used read-modify-write merge after DB upsert, allowing concurrent writes to overwrite each other
+- Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
+- Context: `setKoreanTickers` now deletes `korean:tickers` after successful DB upsert so the next read rebuilds cache from the database
+
 ## [PR #43 | feat/40-41/auth-helpers-and-delete-account | 2026-04-28]
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
