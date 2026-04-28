@@ -90,6 +90,24 @@ function resolveAllowedTimeframes(
         : TIMEFRAMES;
 }
 
+function resolveAllowedInfoDepths(
+    tier: Tier,
+    config: TierConfig
+): readonly TierInfoDepth[] {
+    return config.featureFlags.enableTierRestrictions
+        ? config.infoDepth[tier]
+        : PRO_INFO_DEPTH;
+}
+
+function resolveAllowedModels(
+    tier: Tier,
+    config: TierConfig
+): readonly TierModel[] {
+    return config.featureFlags.enableTierRestrictions
+        ? config.models[tier]
+        : PRO_MODELS;
+}
+
 /**
  * Return whether a daily usage-limited feature is enabled for the tier.
  *
@@ -180,9 +198,7 @@ export function isInfoDepthAllowed(
     infoDepth: TierInfoDepth,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return config.featureFlags.enableTierRestrictions
-        ? config.infoDepth[tier].includes(infoDepth)
-        : true;
+    return resolveAllowedInfoDepths(tier, config).includes(infoDepth);
 }
 
 /**
@@ -200,9 +216,7 @@ export function isModelAllowed(
     model: TierModel,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return config.featureFlags.enableTierRestrictions
-        ? config.models[tier].includes(model)
-        : true;
+    return resolveAllowedModels(tier, config).includes(model);
 }
 
 /**

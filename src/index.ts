@@ -514,6 +514,7 @@ export type {
 export type {
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
+    TierGateErrorResult,
     TierTimeframeAccessError,
 } from './application/market/types';
 

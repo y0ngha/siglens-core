@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     asArray,
     assetTranslations,
@@ -63,6 +64,7 @@ import type {
     PasswordVerifier,
     PatternTrend,
     SessionRepository,
+    TierGateErrorResult,
     UserRepository,
 } from '@/index';
 
@@ -95,22 +97,27 @@ describe('public API exports', () => {
     });
 
     it('exports tier gating helpers from package entrypoint', () => {
+        const gateError: TierGateErrorResult = {
+            status: 'error',
+            error: {
+                code: 'timeframe_not_allowed',
+                message: 'Timeframe 5Min is not available for free tier.',
+                tier: 'free',
+                timeframe: '5Min',
+                allowedTimeframes: getAllowedTimeframes('free'),
+            },
+        };
+
         expect(DEFAULT_TIER).toBe('free');
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
         expect(isAllowed('free', 'analysisPerDay')).toBe(true);
-        expect(getAllowedTimeframes('free')).toEqual([
-            '5Min',
-            '15Min',
-            '30Min',
-            '1Hour',
-            '4Hour',
-            '1Day',
-        ]);
+        expect(getAllowedTimeframes('free')).toEqual([...TIMEFRAMES]);
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
         expect(isTimeframeAllowed('free', '5Min')).toBe(true);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
         expect(isTier('member')).toBe(true);
+        expect(gateError.status).toBe('error');
     });
 
     it('exports auth application entrypoints from package entrypoint', () => {

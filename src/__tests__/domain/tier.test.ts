@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
@@ -75,20 +76,13 @@ describe('tier', () => {
             };
 
             expect(getAllowedTimeframes('free', config)).toEqual([
-                '5Min',
-                '15Min',
-                '30Min',
-                '1Hour',
-                '4Hour',
-                '1Day',
+                ...TIMEFRAMES,
             ]);
         });
 
         it('returns the configured timeframe list when restrictions are enabled', () => {
             expect(getAllowedTimeframes('member', restrictedConfig)).toEqual([
-                '1Day',
-                '1Hour',
-                '4Hour',
+                ...restrictedConfig.timeframes.member,
             ]);
         });
     });

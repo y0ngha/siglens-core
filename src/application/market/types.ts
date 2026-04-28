@@ -29,7 +29,13 @@ export interface TierTimeframeAccessError {
     allowedTimeframes: Timeframe[];
 }
 
+/** Submit analysis outcome for application tier gate denials. */
+export interface TierGateErrorResult {
+    status: 'error';
+    error: TierTimeframeAccessError;
+}
+
 /** Submit analysis outcome including application-level tier gate errors. */
 export type SubmitAnalysisGatedResult =
     | SubmitAnalysisResult
-    | { status: 'error'; error: TierTimeframeAccessError };
+    | TierGateErrorResult;
