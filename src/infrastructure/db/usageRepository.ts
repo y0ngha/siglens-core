@@ -24,14 +24,14 @@ function toUtcDateString(date: Date): string {
 }
 
 function toUsageCounts(
-    rows: readonly { actionType: UsageActionType; count: number }[]
+    rows: readonly { actionType: UsageActionType; count: number | string }[]
 ): UsageCounts {
     return rows.reduce(
         (counts, row) => ({
             ...counts,
-            [row.actionType]: row.count,
+            [row.actionType]: Number(row.count),
         }),
-        EMPTY_USAGE_COUNTS
+        { ...EMPTY_USAGE_COUNTS }
     );
 }
 
