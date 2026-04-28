@@ -5,6 +5,7 @@ import type {
     ChatErrorCode,
     ChatModel,
     ChatPromptPayload,
+    Tier,
     TierConfig,
 } from '@/domain/types';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
@@ -25,6 +26,7 @@ import type {
 
 const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
+const FREE_USAGE_UNTRACKED_TIER = 'free' as const satisfies Tier;
 
 const COMPENSATED_CHAT_ERRORS = [
     'server_busy',
@@ -80,21 +82,13 @@ function shouldRefundConsumedToken(result: ChatActionResult): boolean {
     );
 }
 
-async function refundConsumedTokenSafely(
-    refund: () => Promise<void>
-): Promise<void> {
-    try {
-        await refund();
-    } catch {
-        return;
-    }
+function isPremiumUsageTrackedTier(tier: Tier): boolean {
+    return tier !== FREE_USAGE_UNTRACKED_TIER;
 }
 
-async function recordPremiumModelUsageSafely(
-    recordUsage: () => Promise<void>
-): Promise<void> {
+async function callSafely(action: () => Promise<void>): Promise<void> {
     try {
-        await recordUsage();
+        await action();
     } catch {
         return;
     }
@@ -158,22 +152,22 @@ export async function requestChatCompletion(
         const remainingTokens =
             await tokenStore.getRemainingTokens(hashedClientId);
         const usageLogs = dependencies.usageLogs;
+        const getCurrentDate =
+            dependencies.getCurrentDate ?? (() => new Date());
         if (
             tierContext.userId !== null &&
-            tierContext.tier === 'member' &&
+            isPremiumUsageTrackedTier(tierContext.tier) &&
             isPremiumChatModel(model, tierConfig) &&
             usageLogs !== undefined
         ) {
             const userId = tierContext.userId;
-            await recordPremiumModelUsageSafely(() =>
+            await callSafely(() =>
                 usageLogs.recordUsage({
                     userId,
                     ipHash: hashedClientId,
                     actionType: PREMIUM_MODEL_USAGE_ACTION,
                     modelUsed: model,
-                    date: toUsageDate(
-                        (dependencies.getCurrentDate ?? (() => new Date()))()
-                    ),
+                    date: toUsageDate(getCurrentDate()),
                 })
             );
         }
@@ -182,7 +176,7 @@ export async function requestChatCompletion(
     } catch (error) {
         const result = toChatErrorResult(error);
         if (shouldRefundConsumedToken(result)) {
-            await refundConsumedTokenSafely(() =>
+            await callSafely(() =>
                 tokenStore.refundConsumedToken(hashedClientId)
             );
         }

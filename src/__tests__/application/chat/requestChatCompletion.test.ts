@@ -203,6 +203,54 @@ describe('requestChatCompletion', () => {
         });
     });
 
+    it('records pro premium model usage after a successful response', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'pro' },
+            }),
+            {
+                tokenStore,
+                callGemini,
+                usageLogs,
+                getCurrentDate: () => new Date('2026-04-28T12:34:56.000Z'),
+            }
+        );
+
+        expect(result.ok).toBe(true);
+        expect(recordUsage).toHaveBeenCalledWith({
+            userId: 'user-1',
+            ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
+            actionType: 'premium_model',
+            modelUsed: GEMINI_2_5_PRO_MODEL,
+            date: '2026-04-28',
+        });
+    });
+
+    it('does not record premium model usage for anonymous users', async () => {
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: null, tier: 'member' },
+            }),
+            { tokenStore, callGemini, usageLogs }
+        );
+
+        expect(recordUsage).not.toHaveBeenCalled();
+    });
+
+    it('does not record premium model usage for free tier users', async () => {
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'free' },
+            }),
+            { tokenStore, callGemini, usageLogs }
+        );
+
+        expect(recordUsage).not.toHaveBeenCalled();
+    });
+
     it('does not record free model usage for members', async () => {
         await requestChatCompletion(
             createParams({
@@ -212,6 +260,23 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
+        expect(recordUsage).not.toHaveBeenCalled();
+    });
+
+    it('returns successful response when premium usage tracking is not provided', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            { tokenStore, callGemini }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
         expect(recordUsage).not.toHaveBeenCalled();
     });
 

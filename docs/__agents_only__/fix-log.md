@@ -121,3 +121,8 @@
 - Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
 - Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
 - Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint
+
+## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
+- Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
+- Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
+- Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies

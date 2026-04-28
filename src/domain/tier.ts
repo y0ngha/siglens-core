@@ -130,6 +130,15 @@ export function getTierLimit(
  * @param tier - The user's subscription tier.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
  * @returns A new array containing the model ids available to the tier.
+ * @example
+ * ```typescript
+ * getAllowedModels('free');
+ * // => every configured model when tier restrictions are disabled
+ *
+ * getAllowedModels('member', restrictedConfig);
+ * // => models configured for the member tier when restrictions are enabled
+ * ```
+ * @see isModelAllowed
  */
 export function getAllowedModels(
     tier: Tier,
@@ -137,13 +146,7 @@ export function getAllowedModels(
 ): ModelId[] {
     return config.featureFlags.enableTierRestrictions
         ? [...config.models[tier]]
-        : Array.from(
-              new Set([
-                  ...config.models.free,
-                  ...config.models.member,
-                  ...config.models.pro,
-              ])
-          );
+        : Array.from(new Set(Object.values(config.models).flat()));
 }
 
 /**

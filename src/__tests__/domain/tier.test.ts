@@ -23,6 +23,10 @@ const restrictedConfig: TierConfig = {
     },
 };
 
+function getEveryConfiguredModel(config: TierConfig): string[] {
+    return Array.from(new Set(Object.values(config.models).flat()));
+}
+
 describe('tier', () => {
     it('defines fully-open default tier configuration', () => {
         expect(DEFAULT_TIER).toBe('free');
@@ -69,21 +73,14 @@ describe('tier', () => {
 
     describe('getAllowedModels', () => {
         it('returns every configured model when restrictions are disabled', () => {
-            expect(getAllowedModels('free')).toEqual([
-                'gemini-2.5-flash',
-                'gemini-2.5-flash-lite',
-                'gemini-2.5-pro',
-                'claude-sonnet-4',
-                'claude-opus-4',
-            ]);
+            expect(getAllowedModels('free')).toEqual(
+                getEveryConfiguredModel(TIER_CONFIG)
+            );
         });
 
         it('returns tier-specific models when restrictions are enabled', () => {
             expect(getAllowedModels('member', restrictedConfig)).toEqual([
-                'gemini-2.5-flash',
-                'gemini-2.5-flash-lite',
-                'gemini-2.5-pro',
-                'claude-sonnet-4',
+                ...restrictedConfig.models.member,
             ]);
         });
     });
