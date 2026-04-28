@@ -125,12 +125,7 @@ export async function requestChatCompletion(
 
         return {
             ok: false,
-            error: {
-                code: 'chatbot_limit_exceeded',
-                message: error.message,
-                feature: 'chatbotPerDay',
-                tier: error.tier,
-            },
+            error,
         };
     }
 

@@ -121,3 +121,8 @@
 - Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
 - Rule: Issue completion criteria — limit-exceeded responses must be structured and consistent across analysis and chatbot gates
 - Context: Preserved `code`, `message`, `feature`, and `tier` in public analysis/chatbot result types and return values
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Feature-specific usage-limit errors were manually remapped at call sites because the shared builder returned a broad union type
+- Rule: TypeScript type safety — shared helpers should preserve discriminated literal types so callers can reuse results without duplicating field mappings
+- Context: Converted `UsageLimitError` to a discriminated union and added overloads to `buildUsageLimitError` for analysis and chatbot features

@@ -30,12 +30,7 @@ function toSubmitAnalysisLimitError(
 
     return {
         status: 'error',
-        error: {
-            code: 'analysis_limit_exceeded',
-            message: error.message,
-            feature: 'analysisPerDay',
-            tier: error.tier,
-        },
+        error,
     };
 }
 

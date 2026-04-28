@@ -1,6 +1,8 @@
 import { getTierLimit, TIER_CONFIG } from '@/domain/tier';
 import type { TierLimitedFeature } from '@/domain/types';
 import type {
+    AnalysisUsageLimitError,
+    ChatbotUsageLimitError,
     UsageLimitDependencies,
     UsageLimitError,
     UsageLimitInput,
@@ -11,10 +13,12 @@ const FEATURE_COUNT_KEY: Record<TierLimitedFeature, 'analysis' | 'chatbot'> = {
     chatbotPerDay: 'chatbot',
 };
 
-const USAGE_LIMIT_ERROR: Record<
-    TierLimitedFeature,
-    Omit<UsageLimitError, 'tier'>
-> = {
+interface UsageLimitErrorTemplate {
+    analysisPerDay: Omit<AnalysisUsageLimitError, 'tier'>;
+    chatbotPerDay: Omit<ChatbotUsageLimitError, 'tier'>;
+}
+
+const USAGE_LIMIT_ERROR: UsageLimitErrorTemplate = {
     analysisPerDay: {
         code: 'analysis_limit_exceeded',
         message: 'Daily analysis usage limit exceeded.',
@@ -65,8 +69,18 @@ export async function checkChatbotLimit(
 
 /** Build a structured error for a blocked daily usage-limited feature. */
 export function buildUsageLimitError(
+    feature: 'analysisPerDay',
+    tier: UsageLimitInput['tier']
+): AnalysisUsageLimitError;
+export function buildUsageLimitError(
+    feature: 'chatbotPerDay',
+    tier: UsageLimitInput['tier']
+): ChatbotUsageLimitError;
+export function buildUsageLimitError(
     feature: TierLimitedFeature,
     tier: UsageLimitInput['tier']
 ): UsageLimitError {
-    return { ...USAGE_LIMIT_ERROR[feature], tier };
+    return feature === 'analysisPerDay'
+        ? { ...USAGE_LIMIT_ERROR.analysisPerDay, tier }
+        : { ...USAGE_LIMIT_ERROR.chatbotPerDay, tier };
 }
