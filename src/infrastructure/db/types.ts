@@ -100,6 +100,50 @@ export interface CreateSessionInput {
 }
 
 /**
+ * Input for recording one analysis or chatbot usage event.
+ */
+export interface RecordUsageInput {
+    /** User UUID when the caller is authenticated; null/undefined for anonymous usage. */
+    userId?: string | null;
+    /** Raw client IP address. This value is hashed before persistence and is never stored. */
+    ipAddress: string;
+    /** Usage action to record. */
+    actionType: UsageActionType;
+    /** AI model or backend path used by the request. */
+    modelUsed: string;
+    /** Event timestamp; defaults to the current time in the infrastructure layer. */
+    occurredAt?: Date;
+}
+
+/**
+ * Persisted usage log record returned after insertion.
+ */
+export interface UsageLogRecord {
+    /** Unique usage log identifier. */
+    id: string;
+    /** User UUID when authenticated, otherwise null. */
+    userId: string | null;
+    /** SHA-256 hash of IP plus UTC daily salt. */
+    ipHash: string;
+    /** Usage action that was recorded. */
+    actionType: UsageActionType;
+    /** AI model or backend path used by the request. */
+    modelUsed: string;
+    /** UTC date bucket used for daily resets. */
+    date: string;
+    /** Timestamp when the row was created. */
+    createdAt: Date;
+}
+
+/** Daily usage counts grouped by action type. */
+export interface UsageCounts {
+    /** Number of analysis requests recorded for the UTC day. */
+    analysis: number;
+    /** Number of chatbot requests recorded for the UTC day. */
+    chatbot: number;
+}
+
+/**
  * Interface for user persistence operations required by the auth use-cases.
  */
 export interface UserRepository {
@@ -265,4 +309,25 @@ export interface UserTierRepository {
      * @returns The updated tier, or null when the user does not exist.
      */
     updateUserTier(userId: string, tier: Tier): Promise<Tier | null>;
+}
+
+/** Persistence operations required by usage tracking and analytics. */
+export interface UsageRepository {
+    /**
+     * Record one usage event. Implementations must persist only an IP hash,
+     * never the raw client IP.
+     *
+     * @param input - Usage event metadata.
+     * @returns The inserted usage log row.
+     */
+    recordUsage(input: RecordUsageInput): Promise<UsageLogRecord>;
+
+    /**
+     * Count today's usage for an IP hash using the UTC date bucket.
+     *
+     * @param ipHash - SHA-256 IP hash for the UTC day.
+     * @param now - Optional clock injection for tests.
+     * @returns Counts for analysis and chatbot usage.
+     */
+    getUsageToday(ipHash: string, now?: Date): Promise<UsageCounts>;
 }
