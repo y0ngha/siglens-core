@@ -278,6 +278,13 @@ Upstash Redis는 hot cache로 동작한다. 호출자는 다음 패턴을 따라
   repository 와 `CacheProvider` 를 함께 사용한다. DB 클라이언트가 없으면 Redis-only 로
   graceful degradation 하고, 둘 다 없으면 빈 결과/스킵으로 떨어진다.
 
+### 사용량 트래킹
+
+`DrizzleUsageRepository`는 `usage_logs`에 분석/챗봇 사용 이벤트를 기록하고 UTC 날짜 기준
+일일 집계를 조회한다. `recordUsage()`는 원본 IP를 저장하지 않고
+`SHA-256(IP + UTC 일자 salt)` 값만 `ip_hash`에 저장한다. 제한 기능이 비활성화되어도
+호출자가 이 저장소를 호출하면 사용량은 분석 목적 로그로 남는다.
+
 ### 인증
 
 `application/auth`는 이메일 회원가입·로그인·로그아웃 및 OAuth 로그인
