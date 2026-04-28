@@ -190,6 +190,29 @@ describe('submitAnalysis 함수는', () => {
             });
         });
 
+        it('사용량 기록이 실패해도 캐시 결과를 반환한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+            mockRecordUsage.mockRejectedValueOnce(new Error('usage db failed'));
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        tier: 'free',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result).toEqual({ status: 'cached', result: mockResult });
+        });
+
         it('force가 true이면 캐시를 건너뛰고 Worker에 요청을 보낸다', async () => {
             const result = await submitAnalysis(
                 mockSymbol,
@@ -270,6 +293,29 @@ describe('submitAnalysis 함수는', () => {
                 modelUsed: 'analysis-worker',
                 occurredAt,
             });
+        });
+
+        it('사용량 기록이 실패해도 제출 성공 결과를 반환한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            mockRecordUsage.mockRejectedValueOnce(new Error('usage db failed'));
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        tier: 'free',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalled();
         });
 
         it('분석 사용량 제한을 넘으면 구조화된 error를 반환하고 Worker 요청을 건너뛴다', async () => {

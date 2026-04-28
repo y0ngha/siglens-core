@@ -1,4 +1,9 @@
-import type { Tier, TierConfig } from '@/domain/types';
+import type {
+    ChatUsageLimitError,
+    SubmitAnalysisError,
+    Tier,
+    TierConfig,
+} from '@/domain/types';
 import type { UsageRepository } from '@/infrastructure/db';
 
 /** Dependencies required by daily usage limit checks. */
@@ -21,32 +26,8 @@ export interface UsageLimitInput {
 
 /** Error code returned when a daily usage limit blocks a request. */
 export type UsageLimitErrorCode =
-    | 'analysis_limit_exceeded'
-    | 'chatbot_limit_exceeded';
-
-/** Structured analysis usage-limit error payload. */
-export interface AnalysisUsageLimitError {
-    /** Machine-readable error code. */
-    code: 'analysis_limit_exceeded';
-    /** Human-readable message for API/UI surfaces. */
-    message: string;
-    /** Feature whose daily limit was exceeded. */
-    feature: 'analysisPerDay';
-    /** Resolved tier used for the check. */
-    tier: Tier;
-}
-
-/** Structured chatbot usage-limit error payload. */
-export interface ChatbotUsageLimitError {
-    /** Machine-readable error code. */
-    code: 'chatbot_limit_exceeded';
-    /** Human-readable message for API/UI surfaces. */
-    message: string;
-    /** Feature whose daily limit was exceeded. */
-    feature: 'chatbotPerDay';
-    /** Resolved tier used for the check. */
-    tier: Tier;
-}
+    | SubmitAnalysisError['code']
+    | ChatUsageLimitError['code'];
 
 /** Structured usage-limit error payload. */
-export type UsageLimitError = AnalysisUsageLimitError | ChatbotUsageLimitError;
+export type UsageLimitError = SubmitAnalysisError | ChatUsageLimitError;

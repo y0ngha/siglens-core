@@ -126,3 +126,16 @@
 - Violation: Feature-specific usage-limit errors were manually remapped at call sites because the shared builder returned a broad union type
 - Rule: TypeScript type safety — shared helpers should preserve discriminated literal types so callers can reuse results without duplicating field mappings
 - Context: Converted `UsageLimitError` to a discriminated union and added overloads to `buildUsageLimitError` for analysis and chatbot features
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Tier 1 usage-limit exports had description-only JSDoc without `@param` and `@returns`
+- Rule: CONVENTIONS.md JSDoc Rules — Tier 1 public functions require description, `@param`, and `@returns`
+- Context: Added full JSDoc tags to `checkAnalysisLimit` and `checkChatbotLimit` because both are re-exported from the package entrypoint
+
+- Violation: Best-effort usage recording failures could discard already-successful chat and analysis results
+- Rule: ARCHITECTURE.md Graceful Degradation — external system failures must not break the primary library flow when degradation is possible
+- Context: Wrapped chatbot and analysis usage recording in isolated best-effort helpers so DB write failures no longer turn successful responses into errors
+
+- Violation: Application usage-limit tests did not directly cover all feature branches
+- Rule: application/CLAUDE.md — application use-cases require 100% branch coverage
+- Context: Added direct coverage for the analysis error builder branch and the chatbot restrictions-disabled branch

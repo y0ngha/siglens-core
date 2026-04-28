@@ -210,6 +210,25 @@ describe('requestChatCompletion', () => {
         });
     });
 
+    it('keeps a successful chat response when usage recording fails', async () => {
+        recordUsage.mockRejectedValueOnce(new Error('usage db failed'));
+
+        const result = await requestChatCompletion(
+            createParams({
+                tier: 'free',
+                tierConfig: restrictedTierConfig,
+            }),
+            { tokenStore, usageRepository, callGemini }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
+        expect(refundConsumedToken).not.toHaveBeenCalled();
+    });
+
     it('uses the default Gemini chat model when no model is provided', async () => {
         await requestChatCompletion(createParams(), {
             tokenStore,

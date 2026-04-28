@@ -55,6 +55,22 @@ describe('usage limit checks', () => {
         expect(dependencies.usage.getUsageToday).not.toHaveBeenCalled();
     });
 
+    it('allows chatbot usage when tier restrictions are disabled without reading usage', async () => {
+        const dependencies = createDependencies({ analysis: 0, chatbot: 999 });
+
+        const result = await checkChatbotLimit(
+            {
+                ipHash: 'hashed-ip',
+                tier: 'free',
+                config: unrestrictedConfig,
+            },
+            dependencies
+        );
+
+        expect(result).toBe(true);
+        expect(dependencies.usage.getUsageToday).not.toHaveBeenCalled();
+    });
+
     it('allows analysis while today usage is below the tier limit', async () => {
         const dependencies = createDependencies({ analysis: 1, chatbot: 0 });
         const now = new Date('2026-04-29T00:00:00.000Z');
@@ -151,12 +167,21 @@ describe('usage limit checks', () => {
         expect(result).toBe(false);
     });
 
-    it('returns a structured usage limit error for the requested tier', () => {
+    it('returns a structured chatbot usage limit error for the requested tier', () => {
         expect(buildUsageLimitError('chatbotPerDay', 'member')).toEqual({
             code: 'chatbot_limit_exceeded',
             message: 'Daily chatbot usage limit exceeded.',
             feature: 'chatbotPerDay',
             tier: 'member',
+        });
+    });
+
+    it('returns a structured analysis usage limit error for the requested tier', () => {
+        expect(buildUsageLimitError('analysisPerDay', 'free')).toEqual({
+            code: 'analysis_limit_exceeded',
+            message: 'Daily analysis usage limit exceeded.',
+            feature: 'analysisPerDay',
+            tier: 'free',
         });
     });
 });

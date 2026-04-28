@@ -1,5 +1,8 @@
 import { fireAndForget } from '@/application/background';
-import type { SubmitAnalysisOptions } from '@/application/types';
+import type {
+    AnalysisUsageOptions,
+    SubmitAnalysisOptions,
+} from '@/application/types';
 import { buildUsageLimitError, checkAnalysisLimit } from '@/application/usage';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -20,8 +23,6 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
-
-type AnalysisUsageOptions = NonNullable<SubmitAnalysisOptions['usage']>;
 
 function toSubmitAnalysisLimitError(
     tier: AnalysisUsageOptions['tier']
@@ -64,6 +65,17 @@ async function recordAnalysisUsage(
         modelUsed: usage.modelUsed ?? DEFAULT_ANALYSIS_MODEL_USED,
         occurredAt,
     });
+}
+
+async function recordAnalysisUsageSafely(
+    usage: SubmitAnalysisOptions['usage'],
+    occurredAt?: Date
+): Promise<void> {
+    try {
+        await recordAnalysisUsage(usage, occurredAt);
+    } catch {
+        return;
+    }
 }
 
 /**
@@ -132,7 +144,7 @@ export async function submitAnalysis(
         try {
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
-                await recordAnalysisUsage(usage, usageOccurredAt);
+                await recordAnalysisUsageSafely(usage, usageOccurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -194,7 +206,7 @@ export async function submitAnalysis(
     });
     fireAndForget(dispatch, options);
 
-    await recordAnalysisUsage(usage, usageOccurredAt);
+    await recordAnalysisUsageSafely(usage, usageOccurredAt);
 
     return { status: 'submitted', jobId };
 }

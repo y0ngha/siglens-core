@@ -1,8 +1,10 @@
 import { getTierLimit, TIER_CONFIG } from '@/domain/tier';
-import type { TierLimitedFeature } from '@/domain/types';
 import type {
-    AnalysisUsageLimitError,
-    ChatbotUsageLimitError,
+    ChatUsageLimitError,
+    SubmitAnalysisError,
+    TierLimitedFeature,
+} from '@/domain/types';
+import type {
     UsageLimitDependencies,
     UsageLimitError,
     UsageLimitInput,
@@ -14,8 +16,8 @@ const FEATURE_COUNT_KEY: Record<TierLimitedFeature, 'analysis' | 'chatbot'> = {
 };
 
 interface UsageLimitErrorTemplate {
-    analysisPerDay: Omit<AnalysisUsageLimitError, 'tier'>;
-    chatbotPerDay: Omit<ChatbotUsageLimitError, 'tier'>;
+    analysisPerDay: Omit<SubmitAnalysisError, 'tier'>;
+    chatbotPerDay: Omit<ChatUsageLimitError, 'tier'>;
 }
 
 const USAGE_LIMIT_ERROR: UsageLimitErrorTemplate = {
@@ -51,7 +53,13 @@ async function checkUsageLimit(
     return counts[countKey] < limit;
 }
 
-/** Check whether an IP/tier pair may submit another analysis request today. */
+/**
+ * Check whether an IP/tier pair may submit another analysis request today.
+ *
+ * @param input - Hashed IP, tier, optional clock, and config override.
+ * @param dependencies - Repository that reads today's usage count.
+ * @returns `true` if the request is allowed; `false` if the daily limit is reached.
+ */
 export async function checkAnalysisLimit(
     input: UsageLimitInput,
     dependencies: UsageLimitDependencies
@@ -59,7 +67,13 @@ export async function checkAnalysisLimit(
     return checkUsageLimit('analysisPerDay', input, dependencies);
 }
 
-/** Check whether an IP/tier pair may send another chatbot request today. */
+/**
+ * Check whether an IP/tier pair may send another chatbot request today.
+ *
+ * @param input - Hashed IP, tier, optional clock, and config override.
+ * @param dependencies - Repository that reads today's usage count.
+ * @returns `true` if the request is allowed; `false` if the daily limit is reached.
+ */
 export async function checkChatbotLimit(
     input: UsageLimitInput,
     dependencies: UsageLimitDependencies
@@ -67,15 +81,15 @@ export async function checkChatbotLimit(
     return checkUsageLimit('chatbotPerDay', input, dependencies);
 }
 
-/** Build a structured error for a blocked daily usage-limited feature. */
+/** @internal Build a structured error for a blocked daily usage-limited feature. */
 export function buildUsageLimitError(
     feature: 'analysisPerDay',
     tier: UsageLimitInput['tier']
-): AnalysisUsageLimitError;
+): SubmitAnalysisError;
 export function buildUsageLimitError(
     feature: 'chatbotPerDay',
     tier: UsageLimitInput['tier']
-): ChatbotUsageLimitError;
+): ChatUsageLimitError;
 export function buildUsageLimitError(
     feature: TierLimitedFeature,
     tier: UsageLimitInput['tier']

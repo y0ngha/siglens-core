@@ -1,5 +1,14 @@
-import { constants } from 'node:http2';
+import {
+    GEMINI_2_5_FLASH_MODEL,
+    VALID_CHAT_MODELS,
+} from '@/application/chat/constants';
+import type {
+    RequestChatCompletionDependencies,
+    RequestChatCompletionParams,
+} from '@/application/chat/types';
+import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
+import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     ChatActionResult,
     ChatErrorCode,
@@ -12,17 +21,9 @@ import {
     createChatTokenStore,
     hashClientIp,
 } from '@/infrastructure/chat/tokenStore';
-import {
-    GEMINI_2_5_FLASH_MODEL,
-    VALID_CHAT_MODELS,
-} from '@/application/chat/constants';
-import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
-import { DEFAULT_TIER } from '@/domain/tier';
-import type {
-    RequestChatCompletionDependencies,
-    RequestChatCompletionParams,
-} from '@/application/chat/types';
+import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import { hashUsageIp } from '@/infrastructure/db';
+import { constants } from 'node:http2';
 
 const COMPENSATED_CHAT_ERRORS = [
     'server_busy',
@@ -77,6 +78,58 @@ async function refundConsumedTokenSafely(
         await refund();
     } catch {
         return;
+    }
+}
+
+async function recordChatUsageSafely(
+    usageRepository: RequestChatCompletionDependencies['usageRepository'],
+    params: RequestChatCompletionParams,
+    model: ChatModel,
+    usageOccurredAt: Date
+): Promise<void> {
+    try {
+        await usageRepository?.recordUsage({
+            userId: params.userId ?? null,
+            ipAddress: params.clientIp,
+            actionType: 'chatbot',
+            modelUsed: model,
+            occurredAt: usageOccurredAt,
+        });
+    } catch {
+        return;
+    }
+}
+
+async function requestGeminiChatCompletion(
+    freeApiKey: RequestChatCompletionParams['freeApiKey'],
+    paidApiKey: RequestChatCompletionParams['paidApiKey'],
+    tokenStore: ChatTokenStore,
+    callGemini: NonNullable<RequestChatCompletionDependencies['callGemini']>,
+    model: ChatModel,
+    hashedClientId: string,
+    prompt: ChatPromptPayload
+): Promise<ChatActionResult> {
+    try {
+        const message = await callGemini({
+            freeApiKey,
+            paidApiKey,
+            model,
+            contents: toGeminiContents(prompt),
+            systemInstruction: prompt.systemPrompt,
+        });
+        const remainingTokens =
+            await tokenStore.getRemainingTokens(hashedClientId);
+
+        return { ok: true, message, remainingTokens };
+    } catch (error) {
+        const result = toChatErrorResult(error);
+        if (shouldRefundConsumedToken(result)) {
+            await refundConsumedTokenSafely(() =>
+                tokenStore.refundConsumedToken(hashedClientId)
+            );
+        }
+
+        return result;
     }
 }
 
@@ -144,33 +197,28 @@ export async function requestChatCompletion(
         params.userMessage
     );
 
-    try {
-        const message = await callGemini({
-            freeApiKey: params.freeApiKey,
-            paidApiKey: params.paidApiKey,
-            model,
-            contents: toGeminiContents(prompt),
-            systemInstruction: prompt.systemPrompt,
-        });
-        const remainingTokens =
-            await tokenStore.getRemainingTokens(hashedClientId);
-        await usageRepository?.recordUsage({
-            userId: params.userId ?? null,
-            ipAddress: params.clientIp,
-            actionType: 'chatbot',
-            modelUsed: model,
-            occurredAt: usageOccurredAt,
-        });
+    const { freeApiKey, paidApiKey } = params;
 
-        return { ok: true, message, remainingTokens };
-    } catch (error) {
-        const result = toChatErrorResult(error);
-        if (shouldRefundConsumedToken(result)) {
-            await refundConsumedTokenSafely(() =>
-                tokenStore.refundConsumedToken(hashedClientId)
-            );
-        }
+    const geminiResult = await requestGeminiChatCompletion(
+        freeApiKey,
+        paidApiKey,
+        tokenStore,
+        callGemini,
+        model,
+        hashedClientId,
+        prompt
+    );
 
-        return result;
+    if (!geminiResult.ok) {
+        return geminiResult;
     }
+
+    await recordChatUsageSafely(
+        usageRepository,
+        params,
+        model,
+        usageOccurredAt
+    );
+
+    return geminiResult;
 }
