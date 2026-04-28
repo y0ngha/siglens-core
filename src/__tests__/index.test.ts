@@ -11,6 +11,7 @@ import {
     detectBollingerSqueezeBearish,
     detectGoldenCross,
     DrizzleSessionRepository,
+    DrizzleUsageRepository,
     DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
@@ -20,6 +21,7 @@ import {
     extendTrendline,
     HIGH_CONFIDENCE_WEIGHT,
     getTierLimit,
+    hashUsageIp,
     isAllowed,
     isInfoDepthAllowed,
     isModelAllowed,
@@ -62,6 +64,7 @@ import type {
     PasswordVerifier,
     PatternTrend,
     SessionRepository,
+    UsageRepository,
     UserRepository,
 } from '@/index';
 
@@ -125,6 +128,8 @@ describe('public API exports', () => {
     it('exports database repository classes from package entrypoint', () => {
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
+        expect(typeof DrizzleUsageRepository).toBe('function');
+        expect(typeof hashUsageIp).toBe('function');
     });
 
     it('exports database schema objects from package entrypoint', () => {
@@ -185,6 +190,21 @@ describe('public API exports', () => {
             findSession: async () => null,
             deleteSession: async () => true,
         };
+        const usageRepository: UsageRepository = {
+            recordUsage: async input => ({
+                id: 'usage-1',
+                userId: input.userId ?? null,
+                ipHash: hashUsageIp(
+                    input.ipAddress,
+                    new Date('2026-04-28T00:00:00.000Z')
+                ),
+                actionType: input.actionType,
+                modelUsed: input.modelUsed,
+                date: '2026-04-28',
+                createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            }),
+            getUsageToday: async () => ({ analysis: 0, chatbot: 0 }),
+        };
         const passwordVerifier: PasswordVerifier = {
             verifyPassword: async () => true,
         };
@@ -194,6 +214,7 @@ describe('public API exports', () => {
         expect(emailAuthRepository).toHaveProperty('findEmailAuthUserByEmail');
         expect(oauthRepository).toHaveProperty('findByOAuthAccount');
         expect(sessionRepository).toHaveProperty('createSession');
+        expect(usageRepository).toHaveProperty('recordUsage');
         expect(passwordVerifier).toHaveProperty('verifyPassword');
     });
 

@@ -275,7 +275,9 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 export {
     createDatabaseClient,
     DrizzleSessionRepository,
+    DrizzleUsageRepository,
     DrizzleUserRepository,
+    hashUsageIp,
 } from './infrastructure/db';
 
 // Password adapters
@@ -446,8 +448,12 @@ export type {
 export type {
     DatabaseConfig,
     OAuthProvider,
+    RecordUsageInput,
     SiglensDatabase,
     UsageActionType,
+    UsageCounts,
+    UsageLogRecord,
+    UsageRepository,
     UserTierRepository,
     UserTier,
 } from './infrastructure/db';
