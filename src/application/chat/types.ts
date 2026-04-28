@@ -1,6 +1,5 @@
 import type {
     AnalysisResponse,
-    ChatActionResult,
     ChatMessage,
     ChatModel,
     TierConfig,
@@ -31,5 +30,18 @@ export interface RequestChatCompletionDependencies {
     tierConfig?: TierConfig;
     getCurrentDate?: () => Date;
 }
+
+/** Error code returned by the chat completion use-case. */
+export type ChatErrorCode =
+    | 'token_exhausted'
+    | 'model_not_allowed'
+    | 'rate_limited'
+    | 'server_error'
+    | 'server_busy';
+
+/** Result returned by the chat completion use-case. */
+export type ChatActionResult =
+    | { ok: true; message: string; remainingTokens: number }
+    | { ok: false; error: ChatErrorCode };
 
 export type RequestChatCompletionResult = ChatActionResult;

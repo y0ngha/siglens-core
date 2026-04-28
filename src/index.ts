@@ -511,6 +511,8 @@ export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 
 // Application types
 export type {
+    ChatActionResult,
+    ChatErrorCode,
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
@@ -604,8 +606,6 @@ export type {
     ReconciledActionLineData,
     ValidatedActionPrices,
     ChatMessage,
-    ChatActionResult,
-    ChatErrorCode,
     ChatLoadingPhase,
     ChatModel,
     ChatPromptPayload,

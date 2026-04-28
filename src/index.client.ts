@@ -309,6 +309,8 @@ export type {
 } from './infrastructure/ai/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
+    ChatActionResult,
+    ChatErrorCode,
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
@@ -402,8 +404,6 @@ export type {
     ReconciledActionLineData,
     ValidatedActionPrices,
     ChatMessage,
-    ChatActionResult,
-    ChatErrorCode,
     ChatLoadingPhase,
     ChatModel,
     ChatPromptPayload,

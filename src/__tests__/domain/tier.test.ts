@@ -10,7 +10,15 @@ import {
     isTier,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { TierConfig } from '@/domain/types';
+import type { ModelId, TierConfig } from '@/domain/types';
+
+const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+    'claude-sonnet-4',
+    'claude-opus-4',
+];
 
 const restrictedConfig: TierConfig = {
     ...TIER_CONFIG,
@@ -22,10 +30,6 @@ const restrictedConfig: TierConfig = {
         enableTierRestrictions: true,
     },
 };
-
-function getEveryConfiguredModel(config: TierConfig): string[] {
-    return Array.from(new Set(Object.values(config.models).flat()));
-}
 
 describe('tier', () => {
     it('defines fully-open default tier configuration', () => {
@@ -73,9 +77,7 @@ describe('tier', () => {
 
     describe('getAllowedModels', () => {
         it('returns every configured model when restrictions are disabled', () => {
-            expect(getAllowedModels('free')).toEqual(
-                getEveryConfiguredModel(TIER_CONFIG)
-            );
+            expect(getAllowedModels('free')).toEqual(ALL_CONFIGURED_MODELS);
         });
 
         it('returns tier-specific models when restrictions are enabled', () => {

@@ -1,8 +1,6 @@
 import { constants } from 'node:http2';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import type {
-    ChatActionResult,
-    ChatErrorCode,
     ChatModel,
     ChatPromptPayload,
     Tier,
@@ -20,13 +18,14 @@ import {
     VALID_CHAT_MODELS,
 } from '@/application/chat/constants';
 import type {
+    ChatActionResult,
+    ChatErrorCode,
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
 
 const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
-const FREE_USAGE_UNTRACKED_TIER = 'free' as const satisfies Tier;
 
 const COMPENSATED_CHAT_ERRORS = [
     'server_busy',
@@ -83,14 +82,14 @@ function shouldRefundConsumedToken(result: ChatActionResult): boolean {
 }
 
 function isPremiumUsageTrackedTier(tier: Tier): boolean {
-    return tier !== FREE_USAGE_UNTRACKED_TIER;
+    return tier !== DEFAULT_TIER;
 }
 
 async function callSafely(action: () => Promise<void>): Promise<void> {
     try {
         await action();
-    } catch {
-        return;
+    } catch (error) {
+        console.warn('[requestChatCompletion] background action failed', error);
     }
 }
 
@@ -154,12 +153,13 @@ export async function requestChatCompletion(
         const usageLogs = dependencies.usageLogs;
         const getCurrentDate =
             dependencies.getCurrentDate ?? (() => new Date());
-        if (
+        const shouldRecordPremiumUsage =
             tierContext.userId !== null &&
             isPremiumUsageTrackedTier(tierContext.tier) &&
             isPremiumChatModel(model, tierConfig) &&
-            usageLogs !== undefined
-        ) {
+            usageLogs !== undefined;
+
+        if (shouldRecordPremiumUsage) {
             const userId = tierContext.userId;
             await callSafely(() =>
                 usageLogs.recordUsage({

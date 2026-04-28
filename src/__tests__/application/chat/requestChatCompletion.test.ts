@@ -1,5 +1,5 @@
 import { constants } from 'node:http2';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import {
     GEMINI_2_5_FLASH_LITE_MODEL,
@@ -68,6 +68,7 @@ describe('requestChatCompletion', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         tryConsumeToken.mockResolvedValue(true);
         refundConsumedToken.mockResolvedValue(undefined);
         getRemainingTokens.mockResolvedValue(4);
@@ -75,6 +76,10 @@ describe('requestChatCompletion', () => {
         callGemini.mockResolvedValue(
             '분석 기준으로는 조금 기다리는 편이 좋아요.'
         );
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('returns token_exhausted when token consumption is denied', async () => {
@@ -296,6 +301,10 @@ describe('requestChatCompletion', () => {
             message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
             remainingTokens: 4,
         });
+        expect(console.warn).toHaveBeenCalledWith(
+            '[requestChatCompletion] background action failed',
+            expect.any(Error)
+        );
     });
 
     it('maps Gemini rate limit errors to rate_limited', async () => {
@@ -373,5 +382,9 @@ describe('requestChatCompletion', () => {
         });
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(console.warn).toHaveBeenCalledWith(
+            '[requestChatCompletion] background action failed',
+            expect.any(Error)
+        );
     });
 });
