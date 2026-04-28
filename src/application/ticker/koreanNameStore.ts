@@ -52,22 +52,23 @@ async function writeToCache(
     }
 }
 
-async function loadEntriesFromCache(): Promise<KoreanTickerEntry[] | null> {
-    const cache = createCacheProvider();
+async function loadEntriesFromCache(
+    cache: CacheProvider | null
+): Promise<KoreanTickerEntry[] | null> {
     if (!cache) return null;
 
     return readFromCache(cache);
 }
 
 async function loadAllEntries(): Promise<KoreanTickerEntry[]> {
-    const cached = await loadEntriesFromCache();
+    const cache = createCacheProvider();
+    const cached = await loadEntriesFromCache(cache);
     if (cached !== null) return cached;
 
     const repository = tryGetRepository();
     if (!repository) return [];
 
     const entries = await readAllFromDatabase(repository);
-    const cache = createCacheProvider();
     if (cache && entries.length > 0) {
         await writeToCache(cache, entries);
     }
@@ -77,7 +78,8 @@ async function loadAllEntries(): Promise<KoreanTickerEntry[]> {
 async function loadEntriesBySymbols(
     symbols: readonly string[]
 ): Promise<KoreanTickerEntry[]> {
-    const cached = await loadEntriesFromCache();
+    const cache = createCacheProvider();
+    const cached = await loadEntriesFromCache(cache);
     if (cached !== null) {
         const symbolSet = new Set(symbols);
         return cached.filter(entry => symbolSet.has(entry.symbol));

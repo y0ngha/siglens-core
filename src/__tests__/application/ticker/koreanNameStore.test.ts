@@ -106,6 +106,7 @@ describe('searchByKoreanName', () => {
         mockRepository.findAll.mockResolvedValue([apple]);
         const result = await searchByKoreanName('애');
         expect(result[0].symbol).toBe('AAPL');
+        expect(createCacheProviderMock).toHaveBeenCalledTimes(1);
         expect(mockCache.set).toHaveBeenCalledWith(
             'korean:tickers',
             [apple],
@@ -184,6 +185,13 @@ describe('getKoreanNames', () => {
         mockCache.get.mockResolvedValue(null);
         mockRepository.findBySymbols.mockRejectedValue(new Error('db down'));
         await expect(getKoreanNames(['MSFT'])).resolves.toEqual({});
+    });
+
+    it('cache miss + DB 클라이언트 없으면 빈 객체 반환', async () => {
+        mockCache.get.mockResolvedValue(null);
+        tryGetDatabaseClientMock.mockReturnValue(null);
+        await expect(getKoreanNames(['AAPL'])).resolves.toEqual({});
+        expect(mockRepository.findBySymbols).not.toHaveBeenCalled();
     });
 });
 

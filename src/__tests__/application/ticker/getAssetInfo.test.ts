@@ -290,6 +290,18 @@ describe('getAssetInfo', () => {
         expect(mockCache.set).toHaveBeenCalled();
     });
 
+    it('한국명 보유 + DB 정상 + cache provider 없으면 cache 갱신 건너뜀', async () => {
+        createCacheProviderMock.mockReturnValue(null);
+        searchBySymbolMock.mockResolvedValue([apple]);
+        getKoreanNamesMock.mockResolvedValue({ AAPL: '애플' });
+
+        const result = await getAssetInfo('AAPL');
+        expect(result?.koreanName).toBe('애플');
+        await new Promise(resolve => setImmediate(resolve));
+        expect(mockRepository.upsert).toHaveBeenCalledTimes(1);
+        expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
     it('FMP 결과 중 정확히 일치하지 않으면 첫 번째 결과와 FMP symbol 을 사용', async () => {
         mockCache.get.mockResolvedValue(null);
         mockRepository.findBySymbol.mockResolvedValue(null);

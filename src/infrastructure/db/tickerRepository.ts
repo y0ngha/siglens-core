@@ -56,16 +56,10 @@ export class DrizzleKoreanTickerRepository implements KoreanTickerRepository {
             .onConflictDoUpdate({
                 target: koreanTickers.symbol,
                 set: {
-                    name: sql.raw(`excluded.${koreanTickers.name.name}`),
-                    koreanName: sql.raw(
-                        `excluded.${koreanTickers.koreanName.name}`
-                    ),
-                    exchange: sql.raw(
-                        `excluded.${koreanTickers.exchange.name}`
-                    ),
-                    exchangeFullName: sql.raw(
-                        `excluded.${koreanTickers.exchangeFullName.name}`
-                    ),
+                    name: sql`excluded.name`,
+                    koreanName: sql`excluded.korean_name`,
+                    exchange: sql`excluded.exchange`,
+                    exchangeFullName: sql`excluded.exchange_full_name`,
                 },
             });
     }
@@ -97,13 +91,9 @@ export class DrizzleAssetTranslationRepository implements AssetTranslationReposi
             .onConflictDoUpdate({
                 target: assetTranslations.symbol,
                 set: {
-                    name: sql.raw(`excluded.${assetTranslations.name.name}`),
-                    koreanName: sql.raw(
-                        `excluded.${assetTranslations.koreanName.name}`
-                    ),
-                    fmpSymbol: sql.raw(
-                        `excluded.${assetTranslations.fmpSymbol.name}`
-                    ),
+                    name: sql`excluded.name`,
+                    koreanName: sql`excluded.korean_name`,
+                    fmpSymbol: sql`excluded.fmp_symbol`,
                 },
             });
     }
