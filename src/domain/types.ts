@@ -962,8 +962,7 @@ export interface RawAnalysisResponse {
 /** Outcome of {@link submitAnalysis}: cached result or a `jobId` to poll. */
 export type SubmitAnalysisResult =
     | { status: 'cached'; result: AnalysisResponse }
-    | { status: 'submitted'; jobId: string }
-    | { status: 'error'; error: TierTimeframeAccessError };
+    | { status: 'submitted'; jobId: string };
 
 /** Outcome of {@link pollAnalysis}: still processing, finished, or errored. */
 export type PollAnalysisResult =
@@ -1181,20 +1180,6 @@ export interface UserTierContext {
     userId: string | null;
     /** Resolved subscription tier for this request. */
     tier: Tier;
-}
-
-/** Error returned when tier restrictions block a timeframe request. */
-export interface TierTimeframeAccessError {
-    /** Machine-readable reason for the denial. */
-    code: 'timeframe_not_allowed';
-    /** Human-readable explanation suitable for API responses. */
-    message: string;
-    /** Tier used for the access decision. */
-    tier: Tier;
-    /** Timeframe requested by the caller. */
-    timeframe: Timeframe;
-    /** Timeframes available to the tier under the active config. */
-    allowedTimeframes: Timeframe[];
 }
 
 // ─── Backtesting ──────────────────────────────────────────────────────────────

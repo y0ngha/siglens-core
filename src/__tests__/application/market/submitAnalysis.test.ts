@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
-import { TIER_CONFIG } from '@/domain/tier';
+import { TIER_CONFIG, getAllowedTimeframes } from '@/domain/tier';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -138,7 +138,10 @@ describe('submitAnalysis 함수는', () => {
                     message: 'Timeframe 5Min is not available for free tier.',
                     tier: 'free',
                     timeframe: '5Min',
-                    allowedTimeframes: ['1Day'],
+                    allowedTimeframes: getAllowedTimeframes(
+                        'free',
+                        restrictedTierConfig
+                    ),
                 },
             });
             expect(mockCacheGet).not.toHaveBeenCalled();

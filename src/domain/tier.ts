@@ -81,6 +81,15 @@ export const TIER_CONFIG = {
     },
 } as const satisfies TierConfig;
 
+function resolveAllowedTimeframes(
+    tier: Tier,
+    config: TierConfig
+): readonly Timeframe[] {
+    return config.featureFlags.enableTierRestrictions
+        ? config.timeframes[tier]
+        : TIMEFRAMES;
+}
+
 /**
  * Return whether a daily usage-limited feature is enabled for the tier.
  *
@@ -135,9 +144,7 @@ export function getAllowedTimeframes(
     tier: Tier,
     config: TierConfig = TIER_CONFIG
 ): Timeframe[] {
-    return config.featureFlags.enableTierRestrictions
-        ? [...config.timeframes[tier]]
-        : [...TIMEFRAMES];
+    return [...resolveAllowedTimeframes(tier, config)];
 }
 
 /**
@@ -155,9 +162,7 @@ export function isTimeframeAllowed(
     timeframe: Timeframe,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return config.featureFlags.enableTierRestrictions
-        ? getAllowedTimeframes(tier, config).includes(timeframe)
-        : true;
+    return resolveAllowedTimeframes(tier, config).includes(timeframe);
 }
 
 /**

@@ -1,6 +1,9 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
-import type { SubmitAnalysisOptions } from '@/application/market/types';
+import type {
+    SubmitAnalysisGatedResult,
+    SubmitAnalysisOptions,
+} from '@/application/market/types';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
@@ -10,12 +13,7 @@ import {
     getAllowedTimeframes,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type {
-    AnalysisResponse,
-    Skill,
-    SubmitAnalysisResult,
-    Timeframe,
-} from '@/domain/types';
+import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -27,13 +25,14 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 /**
  * Submit an analysis job for a given symbol/timeframe.
  *
- * Resolves to one of two outcomes:
+ * Resolves to one of three outcomes:
  * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
  *   by `symbol` + `timeframe`).
  * - `submitted`: the bars + indicators were fetched, the prompt was built, a
  *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
  *   POST was sent to the configured worker. Poll the result with
  *   {@link pollAnalysis}.
+ * - `error`: application tier gates blocked access to the requested timeframe.
  *
  * Skill loading is best-effort — if it fails, the analysis proceeds with
  * `skillsDegraded: true` recorded on the job meta so consumers can warn the
@@ -51,8 +50,7 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  *   Vercel's `waitUntil` so the worker dispatch can continue after the
  *   response.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
- *   see {@link SubmitAnalysisResult}. Returns `status: "error"` when the
- *   request's tier cannot access the timeframe.
+ *   see {@link SubmitAnalysisGatedResult}.
  *
  * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
  *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
@@ -61,6 +59,7 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  * ```ts
  * const submission = await submitAnalysis('AAPL', '1Day');
  * if (submission.status === 'cached') return submission.result;
+ * if (submission.status === 'error') return submission.error;
  * const polled = await pollAnalysis(submission.jobId);
  * ```
  *
@@ -73,7 +72,7 @@ export async function submitAnalysis(
     force: boolean = false,
     fmpSymbol?: string,
     options: SubmitAnalysisOptions = {}
-): Promise<SubmitAnalysisResult> {
+): Promise<SubmitAnalysisGatedResult> {
     const tier = options.tierContext?.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
