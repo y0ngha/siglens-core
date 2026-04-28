@@ -1,5 +1,6 @@
 import { fireAndForget } from '@/application/background';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { SubmitAnalysisOptions } from '@/application/types';
+import { buildUsageLimitError, checkAnalysisLimit } from '@/application/usage';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
@@ -12,11 +13,63 @@ import type {
 } from '@/domain/types';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { hashUsageIp } from '@/infrastructure/db';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
+
+type AnalysisUsageOptions = NonNullable<SubmitAnalysisOptions['usage']>;
+
+function toSubmitAnalysisLimitError(
+    tier: AnalysisUsageOptions['tier']
+): SubmitAnalysisResult {
+    const error = buildUsageLimitError('analysisPerDay', tier);
+
+    return {
+        status: 'error',
+        error: {
+            code: 'analysis_limit_exceeded',
+            message: error.message,
+            feature: 'analysisPerDay',
+            tier: error.tier,
+        },
+    };
+}
+
+async function checkAnalysisUsageAllowed(
+    usage: AnalysisUsageOptions,
+    occurredAt: Date
+): Promise<boolean> {
+    const ipHash = hashUsageIp(usage.clientIp, occurredAt);
+
+    return checkAnalysisLimit(
+        {
+            ipHash,
+            tier: usage.tier,
+            now: occurredAt,
+            config: usage.tierConfig,
+        },
+        { usage: usage.usageRepository }
+    );
+}
+
+async function recordAnalysisUsage(
+    usage: SubmitAnalysisOptions['usage'],
+    occurredAt?: Date
+): Promise<void> {
+    if (usage === undefined) return;
+
+    await usage.usageRepository.recordUsage({
+        userId: usage.userId ?? null,
+        ipAddress: usage.clientIp,
+        actionType: 'analysis',
+        modelUsed: usage.modelUsed ?? DEFAULT_ANALYSIS_MODEL_USED,
+        occurredAt,
+    });
+}
 
 /**
  * Submit an analysis job for a given symbol/timeframe.
@@ -64,8 +117,19 @@ export async function submitAnalysis(
     timeframe: Timeframe,
     force: boolean = false,
     fmpSymbol?: string,
-    options?: BackgroundTaskOptions
+    options?: SubmitAnalysisOptions
 ): Promise<SubmitAnalysisResult> {
+    const usage = options?.usage;
+    const usageOccurredAt =
+        usage === undefined ? undefined : (usage.occurredAt ?? new Date());
+    if (usage !== undefined) {
+        const occurredAt = usageOccurredAt!;
+        const allowed = await checkAnalysisUsageAllowed(usage, occurredAt);
+        if (!allowed) {
+            return toSubmitAnalysisLimitError(usage.tier);
+        }
+    }
+
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe);
 
@@ -73,6 +137,7 @@ export async function submitAnalysis(
         try {
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
+                await recordAnalysisUsage(usage, usageOccurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -133,6 +198,8 @@ export async function submitAnalysis(
         console.error('[Submit] Worker request failed:', error);
     });
     fireAndForget(dispatch, options);
+
+    await recordAnalysisUsage(usage, usageOccurredAt);
 
     return { status: 'submitted', jobId };
 }

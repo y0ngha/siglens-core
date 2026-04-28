@@ -16,10 +16,13 @@ import {
     GEMINI_2_5_FLASH_MODEL,
     VALID_CHAT_MODELS,
 } from '@/application/chat/constants';
+import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
+import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
+import { hashUsageIp } from '@/infrastructure/db';
 
 const COMPENSATED_CHAT_ERRORS = [
     'server_busy',
@@ -100,6 +103,37 @@ export async function requestChatCompletion(
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
     const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
+    const usageRepository = dependencies.usageRepository;
+    const tier = params.tier ?? DEFAULT_TIER;
+    const usageOccurredAt = params.usageOccurredAt ?? new Date();
+    const usageIpHash = hashUsageIp(params.clientIp, usageOccurredAt);
+    const usageAllowed =
+        usageRepository === undefined
+            ? true
+            : await checkChatbotLimit(
+                  {
+                      ipHash: usageIpHash,
+                      tier,
+                      now: usageOccurredAt,
+                      config: params.tierConfig,
+                  },
+                  { usage: usageRepository }
+              );
+
+    if (!usageAllowed) {
+        const error = buildUsageLimitError('chatbotPerDay', tier);
+
+        return {
+            ok: false,
+            error: {
+                code: 'chatbot_limit_exceeded',
+                message: error.message,
+                feature: 'chatbotPerDay',
+                tier: error.tier,
+            },
+        };
+    }
+
     const hashedClientId = hashClientIp(params.clientIp);
     const allowed = await tokenStore.tryConsumeToken(hashedClientId);
 
@@ -125,6 +159,13 @@ export async function requestChatCompletion(
         });
         const remainingTokens =
             await tokenStore.getRemainingTokens(hashedClientId);
+        await usageRepository?.recordUsage({
+            userId: params.userId ?? null,
+            ipAddress: params.clientIp,
+            actionType: 'chatbot',
+            modelUsed: model,
+            occurredAt: usageOccurredAt,
+        });
 
         return { ok: true, message, remainingTokens };
     } catch (error) {

@@ -19,7 +19,11 @@ export { getSectorSignals } from './application/dashboard/sectorSignals';
 // Ticker
 export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
-export type { BackgroundTaskOptions } from './application/types';
+export type {
+    AnalysisUsageOptions,
+    BackgroundTaskOptions,
+    SubmitAnalysisOptions,
+} from './application/types';
 
 // Chat
 export { requestChatCompletion } from './application/chat/requestChatCompletion';
@@ -43,6 +47,7 @@ export {
     getUserTier,
     setUserTier,
 } from './application/tier';
+export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -497,6 +502,12 @@ export type {
     UserTierDependencies,
 } from './application/tier';
 export type {
+    UsageLimitDependencies,
+    UsageLimitError,
+    UsageLimitErrorCode,
+    UsageLimitInput,
+} from './application/usage';
+export type {
     AuthSessionRecord,
     AuthUserRecord,
     CreateEmailUserInput,
@@ -606,6 +617,7 @@ export type {
     ChatMessage,
     ChatActionResult,
     ChatErrorCode,
+    ChatUsageLimitError,
     ChatLoadingPhase,
     ChatModel,
     ChatPromptPayload,
@@ -644,6 +656,8 @@ export type {
     MarketSummaryData,
     MarketSummaryWithBriefing,
     BarsData,
+    SubmitAnalysisError,
+    SubmitAnalysisErrorCode,
     SubmitAnalysisResult,
     PollAnalysisResult,
     SubmitBriefingResult,

@@ -167,6 +167,12 @@ export const TIER_CONFIG = {
 `true`이면 `TIER_CONFIG`의 각 tier별 값만 허용한다. 기본 제한값은 모두
 `Infinity`라서 초기 배포 상태는 fully open이다.
 
+일일 사용량 제한은 `application/usage`의 `checkAnalysisLimit`와
+`checkChatbotLimit`에서 `UsageRepository.getUsageToday()` 결과와
+`TIER_CONFIG.limits`를 비교한다. 플래그가 꺼져 있어도 `submitAnalysis`와
+`requestChatCompletion`에 usage 옵션/저장소를 주입하면 성공한 요청은
+`usage_logs`에 사용량 집계 목적 로그로 기록된다.
+
 ---
 
 ## 인디케이터 상수

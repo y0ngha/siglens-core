@@ -116,3 +116,8 @@
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
 - Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
+
+## [Issue #10/#11 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
+- Rule: Issue completion criteria — limit-exceeded responses must be structured and consistent across analysis and chatbot gates
+- Context: Preserved `code`, `message`, `feature`, and `tier` in public analysis/chatbot result types and return values

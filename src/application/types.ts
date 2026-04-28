@@ -1,4 +1,5 @@
-import type { WaitUntil } from '@/domain/types';
+import type { Tier, TierConfig, WaitUntil } from '@/domain/types';
+import type { UsageRepository } from '@/infrastructure/db';
 
 /** Runtime hooks for background tasks started by application use-cases. */
 export interface BackgroundTaskOptions {
@@ -10,4 +11,28 @@ export interface BackgroundTaskOptions {
      * the response is returned.
      */
     waitUntil?: WaitUntil;
+}
+
+/** Usage tracking and daily limit options for analysis submissions. */
+export interface AnalysisUsageOptions {
+    /** Repository used to check today's count and record successful usage. */
+    usageRepository: UsageRepository;
+    /** Raw client IP. It is hashed before persistence and never stored. */
+    clientIp: string;
+    /** Resolved subscription tier for the request. */
+    tier: Tier;
+    /** Authenticated user UUID, or null/undefined for anonymous usage. */
+    userId?: string | null;
+    /** Model/backend identifier stored in usage_logs.model_used. */
+    modelUsed?: string;
+    /** Clock injection for UTC-day tests. Defaults to infrastructure time. */
+    occurredAt?: Date;
+    /** Optional tier configuration override for tests or controlled rollout. */
+    tierConfig?: TierConfig;
+}
+
+/** Runtime hooks and usage controls for analysis submissions. */
+export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
+    /** Optional usage tracking. Omitted callers keep the previous behavior. */
+    usage?: AnalysisUsageOptions;
 }
