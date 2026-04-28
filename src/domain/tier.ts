@@ -157,6 +157,10 @@ export function getTierLimit(
  * @param tier - The user's subscription tier.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
  * @returns A new array of allowed timeframes for the active restriction mode.
+ * @example
+ * ```typescript
+ * const allowedTimeframes = getAllowedTimeframes('free');
+ * ```
  */
 export function getAllowedTimeframes(
     tier: Tier,
