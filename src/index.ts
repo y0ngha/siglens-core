@@ -573,7 +573,6 @@ export type {
     FilteredActionRecommendation,
     FilteredAnalysisResponse,
     FilteredAnalysisResult,
-    FilteredResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,

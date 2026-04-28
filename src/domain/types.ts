@@ -898,7 +898,7 @@ export interface FilteredAnalysisResponse {
     /** Diagonal trendlines visible on the full chart. */
     trendlines: Trendline[] | null;
     /** Long-position trading recommendation with gated subfields. */
-    actionRecommendation?: FilteredActionRecommendation | null;
+    actionRecommendation: FilteredActionRecommendation | null;
     /** ISO 8601 timestamp of when this analysis was performed. */
     analyzedAt?: string;
 }
@@ -910,9 +910,6 @@ export interface FilteredAnalysisResult {
     /** Info-depth fragments hidden from the current tier. */
     lockedInfoDepth: TierInfoDepth[];
 }
-
-/** Backward-compatible short alias for tier-filtered analysis results. */
-export type FilteredResult = FilteredAnalysisResult;
 
 /** Bars + computed indicator suite — see {@link fetchBarsWithIndicators}. */
 export interface BarsData {

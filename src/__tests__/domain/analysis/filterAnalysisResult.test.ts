@@ -296,6 +296,41 @@ describe('filterAnalysisResult', () => {
         });
     });
 
+    it('omits absent optional reconciled levels', () => {
+        const filtered = filterAnalysisResult(
+            makeAnalysisResponse({
+                actionRecommendation: {
+                    positionAnalysis: '현재 위치',
+                    entry: '진입 전략',
+                    exit: '청산 전략',
+                    riskReward: '손익비',
+                    stopLoss: 95,
+                    takeProfitPrices: [130, 140],
+                    reconciledLevels: {
+                        exit: '보정 청산',
+                        riskReward: '보정 손익비',
+                        reason: '보정 사유',
+                    },
+                },
+            }),
+            'pro',
+            restrictedConfig
+        );
+        const result = expectFilteredResult(filtered);
+
+        expect(result.actionRecommendation?.reconciledLevels).toEqual({
+            exit: '보정 청산',
+            riskReward: '보정 손익비',
+            reason: '보정 사유',
+        });
+        expect(
+            result.actionRecommendation?.reconciledLevels
+        ).not.toHaveProperty('stopLoss');
+        expect(
+            result.actionRecommendation?.reconciledLevels
+        ).not.toHaveProperty('takeProfitPrices');
+    });
+
     it('uses null action recommendation when the source analysis has no recommendation', () => {
         const filtered = filterAnalysisResult(
             makeAnalysisResponse({ actionRecommendation: undefined }),
@@ -329,5 +364,18 @@ describe('filterAnalysisResult', () => {
             'target',
             'confidence',
         ]);
+    });
+
+    it('calculates locked depths from custom pro config', () => {
+        const filtered = filterAnalysisResult(makeAnalysisResponse(), 'free', {
+            ...restrictedConfig,
+            infoDepth: {
+                ...restrictedConfig.infoDepth,
+                free: [],
+                pro: ['direction', 'summary'],
+            },
+        });
+
+        expect(filtered.lockedInfoDepth).toEqual(['direction', 'summary']);
     });
 });

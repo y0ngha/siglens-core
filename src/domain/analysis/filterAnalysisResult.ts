@@ -4,14 +4,36 @@ import type {
     AnalysisResponse,
     FilteredActionRecommendation,
     FilteredAnalysisResponse,
-    FilteredResult,
+    FilteredAnalysisResult,
     ReconciledActionLevels,
     Tier,
     TierConfig,
     TierInfoDepth,
 } from '@/domain/types';
 
-const ALL_INFO_DEPTH: readonly TierInfoDepth[] = TIER_CONFIG.infoDepth.pro;
+type OptionalActionFieldKey =
+    | 'entryRecommendation'
+    | 'entryPrices'
+    | 'stopLoss'
+    | 'takeProfitPrices';
+
+type OptionalActionField =
+    | readonly [
+          'entryRecommendation',
+          NonNullable<FilteredActionRecommendation['entryRecommendation']>,
+      ]
+    | readonly [
+          'entryPrices',
+          NonNullable<FilteredActionRecommendation['entryPrices']>,
+      ]
+    | readonly [
+          'stopLoss',
+          NonNullable<FilteredActionRecommendation['stopLoss']>,
+      ]
+    | readonly [
+          'takeProfitPrices',
+          NonNullable<FilteredActionRecommendation['takeProfitPrices']>,
+      ];
 
 function isDepthAllowed(
     allowedDepth: readonly TierInfoDepth[],
@@ -21,9 +43,52 @@ function isDepthAllowed(
 }
 
 function getLockedInfoDepth(
-    allowedDepth: readonly TierInfoDepth[]
+    allowedDepth: readonly TierInfoDepth[],
+    allDepth: readonly TierInfoDepth[]
 ): TierInfoDepth[] {
-    return ALL_INFO_DEPTH.filter(depth => !allowedDepth.includes(depth));
+    return allDepth.filter(depth => !allowedDepth.includes(depth));
+}
+
+function optionalActionField<Key extends OptionalActionFieldKey>(
+    allowed: boolean,
+    key: Key,
+    value: FilteredActionRecommendation[Key] | undefined
+): OptionalActionField | undefined {
+    if (!allowed || value === undefined) return undefined;
+
+    // Key and value are paired by the generic signature; TypeScript widens the
+    // tuple when returning it as the explicit union used by Object.fromEntries.
+    return [key, value] as OptionalActionField;
+}
+
+function filterOptionalActionFields(
+    recommendation: ActionRecommendation,
+    allowEntry: boolean,
+    allowStoploss: boolean,
+    allowTarget: boolean
+): Partial<FilteredActionRecommendation> {
+    const fields = [
+        optionalActionField(
+            allowEntry,
+            'entryRecommendation',
+            recommendation.entryRecommendation
+        ),
+        optionalActionField(
+            allowEntry,
+            'entryPrices',
+            recommendation.entryPrices
+        ),
+        optionalActionField(allowStoploss, 'stopLoss', recommendation.stopLoss),
+        optionalActionField(
+            allowTarget,
+            'takeProfitPrices',
+            recommendation.takeProfitPrices
+        ),
+    ].filter((field): field is OptionalActionField => field !== undefined);
+
+    // Object.fromEntries widens keys, but optionalActionField restricts every key
+    // to OptionalActionFieldKey and every value to that key's declared type.
+    return Object.fromEntries(fields) as Partial<FilteredActionRecommendation>;
 }
 
 function filterReconciledLevels(
@@ -58,6 +123,12 @@ function filterActionRecommendation(
         recommendation.reconciledLevels,
         allowStoplossAndTarget
     );
+    const optionalFields = filterOptionalActionFields(
+        recommendation,
+        allowEntry,
+        allowStoploss,
+        allowTarget
+    );
 
     return {
         positionAnalysis: allowFullDetail
@@ -66,18 +137,7 @@ function filterActionRecommendation(
         entry: allowEntry ? recommendation.entry : null,
         exit: allowStoplossAndTarget ? recommendation.exit : null,
         riskReward: allowStoplossAndTarget ? recommendation.riskReward : null,
-        ...(allowEntry && recommendation.entryRecommendation !== undefined
-            ? { entryRecommendation: recommendation.entryRecommendation }
-            : {}),
-        ...(allowEntry && recommendation.entryPrices !== undefined
-            ? { entryPrices: recommendation.entryPrices }
-            : {}),
-        ...(allowStoploss && recommendation.stopLoss !== undefined
-            ? { stopLoss: recommendation.stopLoss }
-            : {}),
-        ...(allowTarget && recommendation.takeProfitPrices !== undefined
-            ? { takeProfitPrices: recommendation.takeProfitPrices }
-            : {}),
+        ...optionalFields,
         ...(reconciledLevels ? { reconciledLevels } : {}),
     };
 }
@@ -99,7 +159,7 @@ export function filterAnalysisResult(
     result: AnalysisResponse,
     tier: Tier,
     config: TierConfig = TIER_CONFIG
-): FilteredResult {
+): FilteredAnalysisResult {
     const allowedDepth = config.infoDepth[tier];
     if (!config.featureFlags.enableTierRestrictions) {
         return { result, lockedInfoDepth: [] };
@@ -146,6 +206,6 @@ export function filterAnalysisResult(
 
     return {
         result: filtered,
-        lockedInfoDepth: getLockedInfoDepth(allowedDepth),
+        lockedInfoDepth: getLockedInfoDepth(allowedDepth, config.infoDepth.pro),
     };
 }
