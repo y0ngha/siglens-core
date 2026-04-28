@@ -699,4 +699,19 @@ describe('DrizzleUserRepository', () => {
 
         expect(result).toBe(false);
     });
+
+    it('rethrows unexpected password reset completion failures', async () => {
+        const error = new Error('database unavailable');
+        const { db } = makeFailingTransactionDb(error);
+        const repository = new DrizzleUserRepository(db);
+
+        await expect(
+            repository.completePasswordReset({
+                resetId: 'reset-1',
+                userId: 'user-1',
+                passwordHash: 'new-password-hash',
+                usedAt: new Date('2026-04-28T00:10:00.000Z'),
+            })
+        ).rejects.toThrow(error);
+    });
 });

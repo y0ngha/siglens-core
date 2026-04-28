@@ -48,7 +48,8 @@ const passwordResetColumns = {
 
 /**
  * Drizzle ORM implementation of {@link UserRepository}, {@link EmailAuthUserRepository},
- * and {@link OAuthUserRepository} backed by a Neon PostgreSQL database.
+ * {@link OAuthUserRepository}, {@link PasswordResetRepository}, and
+ * {@link UserTierRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */

@@ -163,4 +163,31 @@ describe('requestPasswordReset', () => {
         });
         expect(result).toEqual({ ok: true, token: 'raw-token', expiresAt });
     });
+
+    it('uses the current system time when no runtime override is provided', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+
+        try {
+            const { dependencies, createPasswordReset } = makeDependencies();
+
+            const result = await requestPasswordReset(
+                { email: 'user@example.com' },
+                dependencies
+            );
+
+            expect(createPasswordReset).toHaveBeenCalledWith({
+                userId: 'user-1',
+                tokenHash: 'hashed-token',
+                expiresAt,
+            });
+            expect(result).toEqual({
+                ok: true,
+                token: 'raw-token',
+                expiresAt,
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

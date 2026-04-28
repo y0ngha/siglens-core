@@ -185,6 +185,30 @@ describe('confirmPasswordReset', () => {
         expect(result).toEqual({ ok: true });
     });
 
+    it('uses the current system time when no runtime override is provided', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+
+        try {
+            const { dependencies, completePasswordReset } = makeDependencies();
+
+            const result = await confirmPasswordReset(
+                { token: 'raw-token', newPassword: 'Password1' },
+                dependencies
+            );
+
+            expect(completePasswordReset).toHaveBeenCalledWith({
+                resetId: 'reset-1',
+                userId: 'user-1',
+                passwordHash: 'new-password-hash',
+                usedAt: now,
+            });
+            expect(result).toEqual({ ok: true });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('returns invalid token when completion fails', async () => {
         const { dependencies } = makeDependencies({ completed: false });
 
