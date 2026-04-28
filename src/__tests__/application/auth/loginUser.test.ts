@@ -68,7 +68,7 @@ function makeDependencies(options?: {
     return {
         dependencies: {
             users: { findEmailAuthUserByEmail },
-            sessions: { createSession, deleteSession },
+            sessions: { createSession, findSession: vi.fn(), deleteSession },
             passwordVerifier: { verifyPassword },
         },
         findEmailAuthUserByEmail,

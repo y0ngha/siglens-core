@@ -4,6 +4,8 @@ export {
     DEFAULT_AUTH_COOKIE_SAME_SITE,
     DEFAULT_SESSION_TTL_SECONDS,
 } from './sessionCookie';
+export { deleteAccount } from './deleteAccount';
+export { findUserBySessionToken } from './findUserBySessionToken';
 export { loginUser } from './loginUser';
 export { logoutUser } from './logoutUser';
 export { registerUser } from './registerUser';
@@ -11,6 +13,14 @@ export { socialLoginUser } from './socialLoginUser';
 export type {
     AuthSessionCookie,
     AuthSessionOptions,
+    DeleteAccountDependencies,
+    DeleteAccountError,
+    DeleteAccountErrorCode,
+    DeleteAccountInput,
+    DeleteAccountOptions,
+    DeleteAccountResult,
+    FindUserBySessionTokenDependencies,
+    FindUserBySessionTokenOptions,
     LoginUserDependencies,
     LoginUserError,
     LoginUserErrorCode,

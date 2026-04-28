@@ -1,6 +1,6 @@
 {
     "name": "@y0ngha/siglens-core",
-    "version": "0.1.10",
+    "version": "0.1.12",
     "description": "Pure TypeScript core library for the Siglens stock analysis platform — indicators, candle patterns, analysis prompt builder, and thin infrastructure wrappers.",
     "license": "UNLICENSED",
     "main": "dist/index.js",
@@ -80,5 +80,8 @@
             "browser": "./dist/index.client.js",
             "default": "./dist/index.js"
         }
+    },
+    "dependencies": {
+        "bcryptjs": "^3.0.3"
     }
 }

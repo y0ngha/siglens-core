@@ -12,6 +12,7 @@ function makeDependencies(sessionInvalidated: boolean): {
         dependencies: {
             sessions: {
                 createSession: vi.fn(),
+                findSession: vi.fn(),
                 deleteSession,
             },
         },

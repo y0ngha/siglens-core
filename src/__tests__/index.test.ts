@@ -26,6 +26,10 @@ import {
     isTier,
     isTimeframeAllowed,
     koreanTickers,
+    bcryptPasswordHasher,
+    bcryptPasswordVerifier,
+    deleteAccount,
+    findUserBySessionToken,
     loginUser,
     logoutUser,
     requestChatCompletion,
@@ -105,6 +109,13 @@ describe('public API exports', () => {
         expect(typeof loginUser).toBe('function');
         expect(typeof socialLoginUser).toBe('function');
         expect(typeof logoutUser).toBe('function');
+        expect(typeof findUserBySessionToken).toBe('function');
+        expect(typeof deleteAccount).toBe('function');
+    });
+
+    it('exports bcrypt password adapters from package entrypoint', () => {
+        expect(typeof bcryptPasswordHasher.hashPassword).toBe('function');
+        expect(typeof bcryptPasswordVerifier.verifyPassword).toBe('function');
     });
 
     it('exports database client factory from package entrypoint', () => {
@@ -141,6 +152,7 @@ describe('public API exports', () => {
     it('exports auth interfaces from package entrypoint', () => {
         const repository: UserRepository = {
             findByEmail: async () => null,
+            findById: async () => null,
             createEmailUser: async input => ({
                 id: 'user-1',
                 email: input.email,
@@ -150,6 +162,7 @@ describe('public API exports', () => {
                 createdAt: new Date('2026-04-26T00:00:00.000Z'),
                 updatedAt: new Date('2026-04-26T00:00:00.000Z'),
             }),
+            deleteUser: async () => true,
         };
         const passwordHasher: PasswordHasher = {
             hashPassword: async password => `hashed:${password}`,
@@ -169,6 +182,7 @@ describe('public API exports', () => {
                 expiresAt: input.expiresAt,
                 createdAt: new Date('2026-04-26T00:00:00.000Z'),
             }),
+            findSession: async () => null,
             deleteSession: async () => true,
         };
         const passwordVerifier: PasswordVerifier = {
@@ -191,6 +205,7 @@ describe('public API exports', () => {
                 expiresAt: input.expiresAt,
                 createdAt: new Date('2026-04-26T00:00:00.000Z'),
             }),
+            findSession: async () => null,
             deleteSession: async () => true,
         };
 

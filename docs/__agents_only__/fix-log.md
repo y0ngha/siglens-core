@@ -61,14 +61,6 @@
 - Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
 - Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
 
-## [PR #33 Round 4 | feat/5/email-signup | 2026-04-27]
-- Violation: `EMAIL_ALREADY_EXISTS_CODE` and `'email_already_exists'` literal defined in domain/ layer despite being produced only by application-layer duplicate-check logic
-- Rule: ARCHITECTURE.md — types and constants must be defined in the layer that produces them; infrastructure-concern error codes must not appear in domain/
-- Context: Moved `EMAIL_ALREADY_EXISTS_CODE` from `domain/auth/constants.ts` to new `application/auth/constants.ts`; narrowed `AuthValidationErrorCode` to `'invalid_email' | 'weak_password'`; defined independent `RegisterUserError` interface in `application/auth/types.ts` with `RegisterUserErrorCode = AuthValidationErrorCode | 'email_already_exists'`
-
-- Violation: 26 individual indicator functions (`calculateATR`, `calculateBollinger`, etc.) exported as Tier 2 public API
-- Rule: ARCHITECTURE.md / PUBLIC_API.md — individual indicator calculators are classified as internal and must not appear in `src/index.ts`
-- Context: Export block for 26 functions removed from Tier 2 section; only the aggregate `calculateIndicators` is exported
 
 ## [PR #34 | feat/6/email-login | 2026-04-27]
 - Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
@@ -114,3 +106,8 @@
 - Violation: Drizzle `onConflictDoUpdate` set clauses referenced target table columns instead of inserted row values
 - Rule: DB upsert semantics — conflict updates must use the `excluded` row when replacing existing values
 - Context: `DrizzleKoreanTickerRepository.upsertMany` and `DrizzleAssetTranslationRepository.upsert` now update rows from `excluded.*` values instead of preserving existing column values
+
+## [PR #43 | feat/40-41/auth-helpers-and-delete-account | 2026-04-28]
+- Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
+- Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
+- Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
