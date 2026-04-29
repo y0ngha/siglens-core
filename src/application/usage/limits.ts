@@ -7,6 +7,7 @@ import type {
 import type {
     UsageLimitDependencies,
     UsageLimitError,
+    UsageLimitErrorTemplate,
     UsageLimitInput,
 } from './types';
 
@@ -14,11 +15,6 @@ const FEATURE_COUNT_KEY: Record<TierLimitedFeature, 'analysis' | 'chatbot'> = {
     analysisPerDay: 'analysis',
     chatbotPerDay: 'chatbot',
 };
-
-interface UsageLimitErrorTemplate {
-    analysisPerDay: Omit<SubmitAnalysisError, 'tier'>;
-    chatbotPerDay: Omit<ChatUsageLimitError, 'tier'>;
-}
 
 const USAGE_LIMIT_ERROR: UsageLimitErrorTemplate = {
     analysisPerDay: {

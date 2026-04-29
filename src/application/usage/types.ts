@@ -31,3 +31,9 @@ export type UsageLimitErrorCode =
 
 /** Structured usage-limit error payload. */
 export type UsageLimitError = SubmitAnalysisError | ChatUsageLimitError;
+
+/** @internal Error payload templates before the request tier is attached. */
+export interface UsageLimitErrorTemplate {
+    analysisPerDay: Omit<SubmitAnalysisError, 'tier'>;
+    chatbotPerDay: Omit<ChatUsageLimitError, 'tier'>;
+}

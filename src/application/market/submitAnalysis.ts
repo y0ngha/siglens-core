@@ -81,13 +81,15 @@ async function recordAnalysisUsageSafely(
 /**
  * Submit an analysis job for a given symbol/timeframe.
  *
- * Resolves to one of two outcomes:
+ * Resolves to one of three outcomes:
  * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
  *   by `symbol` + `timeframe`).
  * - `submitted`: the bars + indicators were fetched, the prompt was built, a
  *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
  *   POST was sent to the configured worker. Poll the result with
  *   {@link pollAnalysis}.
+ * - `error`: the daily analysis usage limit rejected the request before cache,
+ *   market data, or worker dispatch work started.
  *
  * Skill loading is best-effort — if it fails, the analysis proceeds with
  * `skillsDegraded: true` recorded on the job meta so consumers can warn the
@@ -101,10 +103,12 @@ async function recordAnalysisUsageSafely(
  *   Defaults to `false`.
  * @param fmpSymbol - Optional override symbol forwarded to the market data
  *   provider when FMP uses a different identifier.
- * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
- *   so the worker dispatch can continue after the response.
- * @returns Either a cached analysis or a freshly submitted job descriptor —
- *   see {@link SubmitAnalysisResult}.
+ * @param options - Optional background-task hooks and usage tracking config.
+ *   Pass Vercel's `waitUntil` so the worker dispatch can continue after the
+ *   response; pass `usage` to enforce daily analysis limits and record
+ *   successful analysis usage best-effort.
+ * @returns A cached analysis, a freshly submitted job descriptor, or a
+ *   structured daily usage-limit error; see {@link SubmitAnalysisResult}.
  *
  * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
  *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
@@ -112,6 +116,7 @@ async function recordAnalysisUsageSafely(
  * @example
  * ```ts
  * const submission = await submitAnalysis('AAPL', '1Day');
+ * if (submission.status === 'error') return submission.error;
  * if (submission.status === 'cached') return submission.result;
  * const polled = await pollAnalysis(submission.jobId);
  * ```

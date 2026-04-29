@@ -82,13 +82,15 @@ async function refundConsumedTokenSafely(
 }
 
 async function recordChatUsageSafely(
-    usageRepository: RequestChatCompletionDependencies['usageRepository'],
+    usageRepository: NonNullable<
+        RequestChatCompletionDependencies['usageRepository']
+    >,
     params: RequestChatCompletionParams,
     model: ChatModel,
     usageOccurredAt: Date
 ): Promise<void> {
     try {
-        await usageRepository?.recordUsage({
+        await usageRepository.recordUsage({
             userId: params.userId ?? null,
             ipAddress: params.clientIp,
             actionType: 'chatbot',
@@ -102,7 +104,7 @@ async function recordChatUsageSafely(
 
 async function requestGeminiChatCompletion(
     freeApiKey: RequestChatCompletionParams['freeApiKey'],
-    paidApiKey: RequestChatCompletionParams['paidApiKey'],
+    paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
     tokenStore: ChatTokenStore,
     callGemini: NonNullable<RequestChatCompletionDependencies['callGemini']>,
     model: ChatModel,
@@ -138,19 +140,33 @@ async function requestGeminiChatCompletion(
  *
  * The caller owns runtime-specific request handling such as reading Next.js
  * headers and environment variables. This use-case owns SigLens chat policy:
- * IP hashing, token consumption, prompt construction, Gemini payload mapping,
- * key fallback invocation, remaining-token lookup, and UI-facing error codes.
+ * IP hashing, daily usage-limit checking when `usageRepository` is provided,
+ * token consumption, prompt construction, Gemini payload mapping, key fallback
+ * invocation, remaining-token lookup, best-effort usage recording, and
+ * UI-facing error codes.
  *
  * Token consumption is compensated when Gemini failures map to server-owned
  * errors (`server_busy` or `server_error`). User/quota outcomes
- * (`token_exhausted` and `rate_limited`) are not refunded.
+ * (`token_exhausted`, `rate_limited`, and daily usage-limit errors) are not
+ * refunded.
+ *
+ * @param params - Chat request payload, including symbol/timeframe analysis
+ *   context, message history, user input, client IP, `paidApiKey`, optional
+ *   `freeApiKey`, optional `tier`, optional `userId`, optional
+ *   `usageOccurredAt`, and optional `tierConfig` override for daily limits.
+ * @param dependencies - Optional infrastructure overrides. Pass
+ *   `usageRepository` to enable daily chatbot limit checks and best-effort
+ *   usage recording; pass `tokenStore` or `callGemini` for tests/custom wiring.
+ * @returns Chat result with a Gemini message and remaining token count, or a
+ *   UI-facing error code / structured daily usage-limit error.
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,
     dependencies: RequestChatCompletionDependencies = {}
 ): Promise<ChatActionResult> {
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
-    if (!isValidChatModel(model) || !params.paidApiKey) {
+    const paidApiKey = params.paidApiKey;
+    if (!isValidChatModel(model) || !paidApiKey) {
         return { ok: false, error: 'server_error' };
     }
 
@@ -158,19 +174,27 @@ export async function requestChatCompletion(
     const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
     const usageRepository = dependencies.usageRepository;
     const tier = params.tier ?? DEFAULT_TIER;
-    const usageOccurredAt = params.usageOccurredAt ?? new Date();
-    const usageIpHash = hashUsageIp(params.clientIp, usageOccurredAt);
-    const usageAllowed =
+    const usageTracking =
         usageRepository === undefined
+            ? undefined
+            : {
+                  repository: usageRepository,
+                  occurredAt: params.usageOccurredAt ?? new Date(),
+              };
+    const usageAllowed =
+        usageTracking === undefined
             ? true
             : await checkChatbotLimit(
                   {
-                      ipHash: usageIpHash,
+                      ipHash: hashUsageIp(
+                          params.clientIp,
+                          usageTracking.occurredAt
+                      ),
                       tier,
-                      now: usageOccurredAt,
+                      now: usageTracking.occurredAt,
                       config: params.tierConfig,
                   },
-                  { usage: usageRepository }
+                  { usage: usageTracking.repository }
               );
 
     if (!usageAllowed) {
@@ -197,7 +221,7 @@ export async function requestChatCompletion(
         params.userMessage
     );
 
-    const { freeApiKey, paidApiKey } = params;
+    const { freeApiKey } = params;
 
     const geminiResult = await requestGeminiChatCompletion(
         freeApiKey,
@@ -213,12 +237,14 @@ export async function requestChatCompletion(
         return geminiResult;
     }
 
-    await recordChatUsageSafely(
-        usageRepository,
-        params,
-        model,
-        usageOccurredAt
-    );
+    if (usageTracking !== undefined) {
+        await recordChatUsageSafely(
+            usageTracking.repository,
+            params,
+            model,
+            usageTracking.occurredAt
+        );
+    }
 
     return geminiResult;
 }

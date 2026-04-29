@@ -139,3 +139,8 @@
 - Violation: Application usage-limit tests did not directly cover all feature branches
 - Rule: application/CLAUDE.md — application use-cases require 100% branch coverage
 - Context: Added direct coverage for the analysis error builder branch and the chatbot restrictions-disabled branch
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Internal Gemini helper accepted the public optional `paidApiKey` type even after the entrypoint had validated the key
+- Rule: TypeScript type safety — internal helper signatures should represent narrowed invariants established by the caller instead of reintroducing optionality
+- Context: `requestChatCompletion` returned `server_error` when `paidApiKey` was missing, but `requestGeminiChatCompletion` still typed the value as `string | undefined`, causing `CallGeminiWithKeyFallbackOptions.paidApiKey` assignment to fail typecheck
