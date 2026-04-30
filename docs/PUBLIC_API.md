@@ -124,9 +124,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
 | `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
 
-**티어 제한 함수 (7)**
+**티어 제한 함수 (8)**
 | Symbol | Source |
 |---|---|
+| `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
 | `isAllowed` / `getTierLimit` / `getAllowedTimeframes` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
 | `isTier` | `domain/tier.ts` |
@@ -159,10 +160,11 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeStockSignalResult` | `domain/dashboard.ts` |
 | `lookbackIsoFromNow` | `domain/dashboard.ts` |
 
-**티어 게이트 (9)**
+**티어 게이트 (10)**
 | Symbol | Source |
 |---|---|
 | `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
+| `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
 | `isAllowed` / `getTierLimit` / `getAllowedTimeframes` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` | `domain/tier.ts` |
 | `isModelAllowed` / `isTier` | `domain/tier.ts` |

@@ -121,3 +121,18 @@
 - Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
 - Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
 - Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
+
+## [PR #45 | feat/12/info-depth-filter | 2026-04-28]
+- Violation: `filterAnalysisResult` calculated locked info depths from the module-level default `TIER_CONFIG` instead of the injected tier config
+- Rule: FF.md — Predictability (function output must derive from explicit inputs, not a cached default that conflicts with a provided parameter)
+- Context: custom `TierConfig.infoDepth.pro` values were ignored when computing `lockedInfoDepth`; the function now passes the active config's pro depth list into the helper
+
+## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
+- Violation: `FilteredActionRecommendation` duplicated optional fields from `ActionRecommendation` instead of extending the shared base shape
+- Rule: CONVENTIONS.md — Related interfaces with shared fields must use extends
+- Context: the filtered action recommendation type now inherits unchanged optional fields while overriding only gated prose fields with nullable variants
+
+## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
+- Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
+- Rule: CONVENTIONS.md — Functional Programming / immutability
+- Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract

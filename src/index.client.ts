@@ -170,6 +170,15 @@ export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
+export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
+export {
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
 
 // Ticker validation utilities
 export {
@@ -188,6 +197,9 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// Tier gating constants
+export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
 
 // Dashboard tickers / sectors
 export {
@@ -304,6 +316,14 @@ export type {
 export type {
     AnalysisSignalType,
     Timeframe,
+    Tier,
+    TierConfig,
+    TierFeatureFlags,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,
@@ -350,6 +370,9 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
+    FilteredActionRecommendation,
+    FilteredAnalysisResponse,
+    FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,

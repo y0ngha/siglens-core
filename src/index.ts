@@ -208,6 +208,7 @@ export {
 } from './domain/analysis/actionRecommendation';
 
 // Tier gating
+export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
     getAllowedTimeframes,
     getTierLimit,
@@ -587,6 +588,9 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
+    FilteredActionRecommendation,
+    FilteredAnalysisResponse,
+    FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,

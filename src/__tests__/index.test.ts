@@ -34,6 +34,7 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extendTrendline,
     extractReconciledActionLines,
+    filterAnalysisResult,
     findUserBySessionToken,
     GEMINI_2_5_FLASH_MODEL,
     getAllowedTimeframes,
@@ -121,6 +122,7 @@ describe('public API exports', () => {
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
         expect(isTier('member')).toBe(true);
         expect(gateError.status).toBe('error');
+        expect(typeof filterAnalysisResult).toBe('function');
     });
 
     it('exports auth application entrypoints from package entrypoint', () => {
