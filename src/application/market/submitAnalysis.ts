@@ -148,13 +148,13 @@ export async function submitAnalysis(
     }
 
     const usage = options.usage;
+    const usageOccurredAt = usage?.occurredAt ?? new Date();
 
     if (usage !== undefined) {
-        const occurredAt = usage.occurredAt ?? new Date();
         const allowed = await checkAnalysisUsageAllowed(
             usage,
             tier,
-            occurredAt,
+            usageOccurredAt,
             tierConfig
         );
         if (!allowed) {
@@ -172,7 +172,7 @@ export async function submitAnalysis(
         try {
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
-                await recordAnalysisUsageSafely(usage, usage?.occurredAt);
+                await recordAnalysisUsageSafely(usage, usageOccurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -232,7 +232,7 @@ export async function submitAnalysis(
     });
     fireAndForget(dispatch, options);
 
-    await recordAnalysisUsageSafely(usage, usage?.occurredAt);
+    await recordAnalysisUsageSafely(usage, usageOccurredAt);
 
     return { status: 'submitted', jobId };
 }

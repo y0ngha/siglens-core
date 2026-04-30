@@ -142,6 +142,7 @@ describe('submitAnalysis 함수는', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllGlobals();
         process.env = originalEnv;
     });
@@ -347,6 +348,34 @@ describe('submitAnalysis 함수는', () => {
                 modelUsed: 'analysis-worker',
                 occurredAt,
             });
+        });
+
+        it('사용량 발생 시각이 없으면 제한 확인과 기록에 같은 현재 시각을 사용한다', async () => {
+            const currentTime = new Date('2026-04-29T23:59:59.999Z');
+            vi.useFakeTimers();
+            vi.setSystemTime(currentTime);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                    },
+                }
+            );
+
+            const checkedAt = mockGetUsageToday.mock.calls[0][1];
+            const recordedAt = mockRecordUsage.mock.calls[0][0].occurredAt;
+
+            expect(result.status).toBe('submitted');
+            expect(checkedAt).toEqual(currentTime);
+            expect(recordedAt).toBe(checkedAt);
         });
 
         it('사용량 기록이 실패해도 제출 성공 결과를 반환한다', async () => {
