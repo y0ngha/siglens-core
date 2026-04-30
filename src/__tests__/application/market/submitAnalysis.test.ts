@@ -440,7 +440,7 @@ describe('submitAnalysis 함수는', () => {
 
             expect(result.status).toBe('submitted');
             expect(consoleWarn).toHaveBeenCalledWith(
-                '[checkAnalysisUsageAllowed] Usage check failed, allowing request:',
+                '[checkUsageLimit] Usage check failed, allowing request:',
                 expect.any(Error)
             );
             consoleWarn.mockRestore();

@@ -18,6 +18,7 @@ import {
 import type {
     AnalysisResponse,
     Skill,
+    Tier,
     TierConfig,
     Timeframe,
 } from '@/domain/types';
@@ -33,6 +34,7 @@ const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
 
 async function checkAnalysisUsageAllowed(
     usage: AnalysisUsageOptions,
+    tier: Tier,
     occurredAt: Date,
     tierConfig: TierConfig
 ): Promise<boolean> {
@@ -42,7 +44,7 @@ async function checkAnalysisUsageAllowed(
         return await checkAnalysisLimit(
             {
                 ipHash,
-                tier: usage.tier,
+                tier,
                 now: occurredAt,
                 config: tierConfig,
             },
@@ -162,13 +164,14 @@ export async function submitAnalysis(
         const occurredAt = usageOccurredAt!;
         const allowed = await checkAnalysisUsageAllowed(
             usage,
+            tier,
             occurredAt,
             tierConfig
         );
         if (!allowed) {
             return {
                 status: 'error',
-                error: buildUsageLimitError('analysisPerDay', usage.tier),
+                error: buildUsageLimitError('analysisPerDay', tier),
             };
         }
     }

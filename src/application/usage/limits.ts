@@ -38,13 +38,21 @@ async function checkUsageLimit(
     }
 
     const limit = getTierLimit(input.tier, feature, config);
-    const counts = await dependencies.usage.getUsageToday(
-        input.ipHash,
-        input.now
-    );
-    const countKey = FEATURE_COUNT_KEY[feature];
+    try {
+        const counts = await dependencies.usage.getUsageToday(
+            input.ipHash,
+            input.now
+        );
+        const countKey = FEATURE_COUNT_KEY[feature];
 
-    return counts[countKey] < limit;
+        return counts[countKey] < limit;
+    } catch (error) {
+        console.warn(
+            '[checkUsageLimit] Usage check failed, allowing request:',
+            error
+        );
+        return true;
+    }
 }
 
 /**
@@ -53,6 +61,9 @@ async function checkUsageLimit(
  * @param input - Hashed IP, tier, optional clock, and config override.
  * @param dependencies - Repository that reads today's usage count.
  * @returns `true` if the request is allowed; `false` if the daily limit is reached.
+ * @example
+ * const allowed = await checkAnalysisLimit({ ipHash, tier: 'free' }, { usage: repo });
+ * @see checkChatbotLimit
  */
 export async function checkAnalysisLimit(
     input: UsageLimitInput,
@@ -67,6 +78,9 @@ export async function checkAnalysisLimit(
  * @param input - Hashed IP, tier, optional clock, and config override.
  * @param dependencies - Repository that reads today's usage count.
  * @returns `true` if the request is allowed; `false` if the daily limit is reached.
+ * @example
+ * const allowed = await checkChatbotLimit({ ipHash, tier: 'free' }, { usage: repo });
+ * @see checkAnalysisLimit
  */
 export async function checkChatbotLimit(
     input: UsageLimitInput,

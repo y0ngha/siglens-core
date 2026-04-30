@@ -123,10 +123,14 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 tierContext: { userId: null, tier: 'free' },
-                tierConfig: restrictedTierConfig,
                 usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
-            { tokenStore, usageRepository, callGemini }
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
         );
 
         expect(result).toEqual({
@@ -152,10 +156,14 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 tierContext: { userId: null, tier: 'free' },
-                tierConfig: restrictedTierConfig,
                 usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
-            { tokenStore, usageRepository, callGemini }
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
         );
 
         expect(result).toEqual({
@@ -164,7 +172,7 @@ describe('requestChatCompletion', () => {
             remainingTokens: 4,
         });
         expect(consoleWarn).toHaveBeenCalledWith(
-            '[checkChatbotUsageAllowed] Usage check failed, allowing request:',
+            '[checkUsageLimit] Usage check failed, allowing request:',
             expect.any(Error)
         );
         consoleWarn.mockRestore();
@@ -218,9 +226,13 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
                 usageOccurredAt,
-                tierConfig: restrictedTierConfig,
             }),
-            { tokenStore, usageRepository, callGemini }
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
         );
 
         expect(result).toEqual({
@@ -274,10 +286,14 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 tierContext: { userId: null, tier: 'free' },
-                tierConfig: restrictedTierConfig,
                 usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
-            { tokenStore, usageRepository, callGemini }
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
         );
 
         expect(result).toEqual({

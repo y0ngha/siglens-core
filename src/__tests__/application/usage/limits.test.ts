@@ -182,6 +182,60 @@ describe('usage limit checks', () => {
         expect(result).toBe(false);
     });
 
+    it('allows analysis when usage repository throws (fail-open)', async () => {
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        const dependencies: UsageLimitDependencies = {
+            usage: {
+                getUsageToday: vi.fn().mockRejectedValue(new Error('DB error')),
+            },
+        };
+
+        const result = await checkAnalysisLimit(
+            {
+                ipHash: 'hashed-ip',
+                tier: 'free',
+                config: restrictedConfig,
+            },
+            dependencies
+        );
+
+        expect(result).toBe(true);
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[checkUsageLimit] Usage check failed, allowing request:',
+            expect.any(Error)
+        );
+        consoleWarn.mockRestore();
+    });
+
+    it('allows chatbot usage when usage repository throws (fail-open)', async () => {
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        const dependencies: UsageLimitDependencies = {
+            usage: {
+                getUsageToday: vi.fn().mockRejectedValue(new Error('DB error')),
+            },
+        };
+
+        const result = await checkChatbotLimit(
+            {
+                ipHash: 'hashed-ip',
+                tier: 'free',
+                config: restrictedConfig,
+            },
+            dependencies
+        );
+
+        expect(result).toBe(true);
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[checkUsageLimit] Usage check failed, allowing request:',
+            expect.any(Error)
+        );
+        consoleWarn.mockRestore();
+    });
+
     it('returns a structured chatbot usage limit error for the requested tier', () => {
         expect(buildUsageLimitError('chatbotPerDay', 'member')).toEqual({
             code: 'chatbot_limit_exceeded',

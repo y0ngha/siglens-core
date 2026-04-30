@@ -55,7 +55,7 @@ export interface TierGateErrorResult {
     error: TierTimeframeAccessError;
 }
 
-/** Submit analysis outcome for usage-limit denials. */
+/** @internal Submit analysis outcome for usage-limit denials. */
 export interface UsageLimitErrorResult {
     status: 'error';
     error: SubmitAnalysisError;

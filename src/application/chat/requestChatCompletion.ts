@@ -98,14 +98,15 @@ async function callSafely(action: () => Promise<void>): Promise<void> {
 
 async function recordChatUsageSafely(
     usageRepository: UsageRepository,
-    params: RequestChatCompletionParams,
+    userId: string | null,
+    clientIp: string,
     model: ChatModel,
     usageOccurredAt: Date
 ): Promise<void> {
     try {
         await usageRepository.recordUsage({
-            userId: params.tierContext?.userId ?? null,
-            ipAddress: params.clientIp,
+            userId,
+            ipAddress: clientIp,
             actionType: 'chatbot',
             modelUsed: model,
             occurredAt: usageOccurredAt,
@@ -200,8 +201,7 @@ export async function requestChatCompletion(
         userId: null,
         tier: DEFAULT_TIER,
     };
-    const tierConfig =
-        dependencies.tierConfig ?? params.tierConfig ?? TIER_CONFIG;
+    const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
     if (!isModelAllowed(tierContext.tier, model, tierConfig)) {
         return { ok: false, error: 'model_not_allowed' };
     }
@@ -265,7 +265,8 @@ export async function requestChatCompletion(
     if (usageTracking !== undefined) {
         await recordChatUsageSafely(
             usageTracking.repository,
-            params,
+            tierContext.userId,
+            params.clientIp,
             model,
             usageTracking.occurredAt
         );

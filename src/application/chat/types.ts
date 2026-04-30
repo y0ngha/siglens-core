@@ -30,7 +30,6 @@ export interface RequestChatCompletionParams {
     freeApiKey?: string;
     paidApiKey?: string;
     usageOccurredAt?: Date;
-    tierConfig?: TierConfig;
     tierContext?: UserTierContext;
 }
 
