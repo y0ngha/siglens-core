@@ -25,17 +25,6 @@
 - Rule: API 대칭성 — `getJobStatus`/`getJobResult`/`getJobError`가 있으면 대응하는 set 함수도 있어야 함
 - Context: `queue.ts`에 3개 write 함수 추가; 각각 `job:{id}:status/result/error` 키에 TTL 1시간으로 저장
 
-## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
-
-- Violation: `AcquireReanalyzeCooldownResult` 타입이 `reanalyzeCooldown.ts` 구현 파일 내부에만 정의됨
-- Rule: MISTAKES.md Architecture #4 — infrastructure 모듈의 public interface는 `types.ts`에 위치해야 함
-- Context: `infrastructure/market/types.ts`로 이동하고 구현 파일에서 import하도록 수정
-
-## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `submitAnalysis.ts`와 `pollAnalysis.ts`에서 `Awaited<ReturnType<typeof skillsLoader.loadSkills>>` 복잡한 유틸리티 타입 추론 사용
-- Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
-- Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
-
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
@@ -133,12 +122,7 @@
 - Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
 - Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
 
-## [Issue #42 | feat/42/password-reset-use-cases | 2026-04-28]
-- Violation: password reset completion changed `users.passwordHash` before proving the reset token row could be consumed
-- Rule: Transactional state transitions must validate and reserve the one-time credential before applying dependent account mutations
-- Context: `completePasswordReset` now consumes the reset row first with a `usedAt IS NULL` guard, then updates the user password inside the same transaction
-
-- Violation: password reset requests used broad user lookup and included OAuth-only accounts
-- Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
-- Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
-
+## [PR #51 | feat/50/oauth-token-revocation | 2026-04-30]
+- Violation: OAuth token revocation loaded provider tokens in an unawaited background task immediately before deleting the user row, allowing cascade deletion to remove the tokens before lookup.
+- Rule: FF.md — Predictability; destructive dependent writes must not race ahead of prerequisite reads needed for the same use-case.
+- Context: `deleteAccount` now awaits OAuth account lookup before deleting the user, while keeping provider revocation calls fire-and-forget after the tokens are captured.
