@@ -157,6 +157,18 @@ and have been removed from this file.
 ## TypeScript
 
 ```
+0. Pre-computing a conditional value outside its guard block causes type narrowing loss
+   → When a value is only valid inside a conditional branch, compute it inside that branch
+   → TypeScript cannot narrow the type to the non-null/non-undefined value outside the block
+   ❌ const usageOccurredAt = usage !== undefined ? new Date(usage.occurredAt) : new Date();
+      if (usage !== undefined) {
+        recordUsage(usageOccurredAt);  // TS cannot narrow usageOccurredAt to Date without `!`
+      }
+   ✅ if (usage !== undefined) {
+        const usageOccurredAt = new Date(usage.occurredAt);
+        recordUsage(usageOccurredAt);  // TS knows usageOccurredAt is Date
+      }
+
 1. Object.fromEntries return type mismatch
    → Type assertion required: Object.fromEntries(pairs) as Record<K, V>
 

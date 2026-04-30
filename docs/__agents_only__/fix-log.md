@@ -173,10 +173,6 @@
 - Context: Removed `tier` from `AnalysisUsageOptions`; `tier` is now derived exclusively from `options.tierContext?.tier ?? DEFAULT_TIER` in `submitAnalysis.ts`
 
 ## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: Pre-computing a conditional value outside an `if` block caused TypeScript to lose the narrowed type, requiring a `!` non-null assertion inside the block
-- Rule: TypeScript type safety — when a value is only valid inside a conditional branch, compute it inside that branch so the type is naturally narrowed without assertions
-- Context: `usageOccurredAt` was computed before `if (usage !== undefined)` as a ternary; TypeScript could not narrow it to `Date` inside the block, so `!` was needed. Fixed by moving the `occurredAt` computation inside the `if` block.
-
 - Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
 - Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
 - Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
