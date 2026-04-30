@@ -19,9 +19,7 @@ export { getSectorSignals } from './application/dashboard/sectorSignals';
 // Ticker
 export { getAssetInfo } from './application/ticker/getAssetInfo';
 export { searchTicker } from './application/ticker/searchTicker';
-export type {
-    BackgroundTaskOptions,
-} from './application/types';
+export type { BackgroundTaskOptions } from './application/types';
 
 // Chat
 export {

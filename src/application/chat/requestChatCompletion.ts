@@ -176,7 +176,8 @@ export async function requestChatCompletion(
         userId: params.userId ?? null,
         tier: params.tier ?? DEFAULT_TIER,
     };
-    const tierConfig = dependencies.tierConfig ?? params.tierConfig ?? TIER_CONFIG;
+    const tierConfig =
+        dependencies.tierConfig ?? params.tierConfig ?? TIER_CONFIG;
     if (!isModelAllowed(tierContext.tier, model, tierConfig)) {
         return { ok: false, error: 'model_not_allowed' };
     }
@@ -260,7 +261,8 @@ export async function requestChatCompletion(
         usageLogs !== undefined;
 
     if (shouldRecordPremiumUsage) {
-        const getCurrentDate = dependencies.getCurrentDate ?? (() => new Date());
+        const getCurrentDate =
+            dependencies.getCurrentDate ?? (() => new Date());
         const userId = tierContext.userId;
         await callSafely(() =>
             usageLogs.recordUsage({

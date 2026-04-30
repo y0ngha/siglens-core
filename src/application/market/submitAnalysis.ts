@@ -96,7 +96,8 @@ export async function submitAnalysis(
     fmpSymbol?: string,
     options: SubmitAnalysisOptions = {}
 ): Promise<SubmitAnalysisGatedResult> {
-    const tier = options.tierContext?.tier ?? options.usage?.tier ?? DEFAULT_TIER;
+    const tier =
+        options.tierContext?.tier ?? options.usage?.tier ?? DEFAULT_TIER;
     const tierConfig =
         options.tierConfig ?? options.usage?.tierConfig ?? TIER_CONFIG;
 
