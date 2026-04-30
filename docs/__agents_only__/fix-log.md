@@ -67,17 +67,6 @@
 - Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
 
-## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
-- Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
-- Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
-- Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
-
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
-- Rule: MISTAKES.md Predictability #1 — unrelated changes must be moved to a separate PR or reverted
-- Context: the merge accidentally dropped a large block of `export type { ... }` entries from src/index.ts that have nothing to do with the OAuth feature
-
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: DB environment readers, cached singleton helpers, and raw `DatabaseClient` wrapper were exposed from the package entrypoint without a consumer-facing need
 - Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
@@ -139,11 +128,6 @@
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
 
-## [Issue #14 | feat/14/ai-model-tier-separation | 2026-04-28]
-- Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
-- Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
-- Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint
-
 ## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
 - Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
 - Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
@@ -168,9 +152,23 @@
 - Rule: Each test fixture should have exactly one canonical name; aliasing creates ambiguity with no benefit
 - Context: `requestChatCompletion.test.ts` originally declared `RESTRICTED_TIER_CONFIG` but a camelCase version was added later without removing the alias; alias removed, all usages unified to `restrictedTierConfig`
 
+## [PR #49 Round 4 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `checkUsageLimit` called `getUsageToday` without try-catch, exposing DB failures to public API callers even though sibling `recordUsage` was already protected
+- Rule: MISTAKES.md I/O & Error Handling #1 — all I/O at the same call depth must be equivalently guarded
+- Context: Moved the fail-open try-catch into `checkUsageLimit` so both `checkAnalysisLimit` and `checkChatbotLimit` (public Tier 1 exports) consistently fail open on repository errors regardless of whether the caller uses an inner wrapper
+
 ## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
-## [PR #49 Round 3 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `ChatActionResult` error variants mixed a string literal union (`ChatErrorCode`) and an object type (`ChatUsageLimitError`) in a single discriminant field — `{ ok: false; error: ChatErrorCode | ChatUsageLimitError }`
-- Rule: Discriminated union branches must be separated at the top level so each `ok: false` variant narrows `error` to a single type; a single branch with a mixed-type field breaks string-method safety and prevents consumers from pattern-matching without a typeof guard
-- Context: `src/application/chat/types.ts` split into `| { ok: false; error: ChatErrorCode }` and `| { ok: false; error: ChatUsageLimitError }`
+## [PR #49 Round 4 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: outer try-catch in `checkAnalysisUsageAllowed` / `checkChatbotUsageAllowed` formed a dead branch — `checkUsageLimit` already catches all errors internally and returns `true` (fail-open)
+- Rule: MISTAKES.md Coding Paradigm #4 — "Leaving logic that has no effect → catch-all conditions that never execute"
+- Context: `src/application/market/submitAnalysis.ts` and `src/application/chat/requestChatCompletion.ts`; outer catch was unreachable because `checkUsageLimit` swallowed all `getUsageToday` errors
+
+- Violation: `'analysis' | 'chatbot'` inline union literal in `FEATURE_COUNT_KEY` type annotation not extracted to a named type
+- Rule: CONVENTIONS.md — "Extract union literals with 2+ members into a type alias"; replaced with `keyof UsageCounts` which ties the annotation to the source of truth
+- Context: `src/application/usage/limits.ts` FEATURE_COUNT_KEY constant
+
+## [PR #49 Round 5 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `tier` field accepted from both `AnalysisUsageOptions.tier` and `SubmitAnalysisOptions.tierContext.tier` simultaneously; caller could set conflicting tiers on the same request
+- Rule: MISTAKES.md Configuration & State Management #1 — a single configuration option must have exactly one authoritative source; outer/inner divergence creates hidden inconsistencies
+- Context: Removed `tier` from `AnalysisUsageOptions`; `tier` is now derived exclusively from `options.tierContext?.tier ?? DEFAULT_TIER` in `submitAnalysis.ts`
 
