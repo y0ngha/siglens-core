@@ -493,6 +493,7 @@ export type {
 export type {
     UsageLimitDependencies,
     ChatUsageLimitError,
+    ChatbotLimitErrorCode,
     SubmitAnalysisError,
     SubmitAnalysisErrorCode,
     UsageLimitError,

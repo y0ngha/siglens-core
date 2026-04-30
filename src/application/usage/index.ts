@@ -5,6 +5,7 @@ export {
 } from './limits';
 export type {
     ChatUsageLimitError,
+    ChatbotLimitErrorCode,
     SubmitAnalysisError,
     SubmitAnalysisErrorCode,
     UsageLimitDependencies,

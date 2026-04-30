@@ -1,5 +1,6 @@
 import { getTierLimit, TIER_CONFIG } from '@/domain/tier';
 import type { TierLimitedFeature } from '@/domain/types';
+import type { UsageCounts } from '@/infrastructure/db';
 import type {
     ChatUsageLimitError,
     SubmitAnalysisError,
@@ -9,7 +10,7 @@ import type {
     UsageLimitInput,
 } from './types';
 
-const FEATURE_COUNT_KEY: Record<TierLimitedFeature, 'analysis' | 'chatbot'> = {
+const FEATURE_COUNT_KEY: Record<TierLimitedFeature, keyof UsageCounts> = {
     analysisPerDay: 'analysis',
     chatbotPerDay: 'chatbot',
 };

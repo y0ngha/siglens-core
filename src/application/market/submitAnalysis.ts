@@ -39,24 +39,15 @@ async function checkAnalysisUsageAllowed(
     tierConfig: TierConfig
 ): Promise<boolean> {
     const ipHash = hashUsageIp(usage.clientIp, occurredAt);
-
-    try {
-        return await checkAnalysisLimit(
-            {
-                ipHash,
-                tier,
-                now: occurredAt,
-                config: tierConfig,
-            },
-            { usage: usage.usageRepository }
-        );
-    } catch (error) {
-        console.warn(
-            '[checkAnalysisUsageAllowed] Usage check failed, allowing request:',
-            error
-        );
-        return true;
-    }
+    return checkAnalysisLimit(
+        {
+            ipHash,
+            tier,
+            now: occurredAt,
+            config: tierConfig,
+        },
+        { usage: usage.usageRepository }
+    );
 }
 
 async function recordAnalysisUsage(

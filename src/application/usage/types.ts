@@ -22,6 +22,9 @@ export interface UsageLimitInput {
 /** Structured error code returned by analysis usage-limit checks. */
 export type SubmitAnalysisErrorCode = 'analysis_limit_exceeded';
 
+/** Structured error code returned by chatbot usage-limit checks. */
+export type ChatbotLimitErrorCode = 'chatbot_limit_exceeded';
+
 /** Structured error returned when analysis usage is blocked. */
 export interface SubmitAnalysisError {
     /** Machine-readable error code. */
@@ -37,7 +40,7 @@ export interface SubmitAnalysisError {
 /** Structured error returned when chatbot usage is blocked. */
 export interface ChatUsageLimitError {
     /** Machine-readable error code. */
-    code: 'chatbot_limit_exceeded';
+    code: ChatbotLimitErrorCode;
     /** Human-readable message for API/UI surfaces. */
     message: string;
     /** Feature whose daily limit was exceeded. */

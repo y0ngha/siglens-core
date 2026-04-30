@@ -125,23 +125,15 @@ async function checkChatbotUsageAllowed(
     usageTracking: { occurredAt: Date; repository: UsageRepository },
     tierConfig: TierConfig
 ): Promise<boolean> {
-    try {
-        return await checkChatbotLimit(
-            {
-                ipHash: hashUsageIp(clientIp, usageTracking.occurredAt),
-                tier,
-                now: usageTracking.occurredAt,
-                config: tierConfig,
-            },
-            { usage: usageTracking.repository }
-        );
-    } catch (error) {
-        console.warn(
-            '[checkChatbotUsageAllowed] Usage check failed, allowing request:',
-            error
-        );
-        return true;
-    }
+    return checkChatbotLimit(
+        {
+            ipHash: hashUsageIp(clientIp, usageTracking.occurredAt),
+            tier,
+            now: usageTracking.occurredAt,
+            config: tierConfig,
+        },
+        { usage: usageTracking.repository }
+    );
 }
 
 async function requestGeminiChatCompletion(
