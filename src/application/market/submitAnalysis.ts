@@ -131,8 +131,7 @@ export async function submitAnalysis(
     fmpSymbol?: string,
     options: SubmitAnalysisOptions = {}
 ): Promise<SubmitAnalysisGatedResult> {
-    const tier =
-        options.tierContext?.tier ?? options.usage?.tier ?? DEFAULT_TIER;
+    const tier = options.tierContext?.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {

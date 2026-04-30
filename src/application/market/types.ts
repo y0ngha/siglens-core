@@ -15,8 +15,6 @@ export interface AnalysisUsageOptions {
     usageRepository: UsageRepository;
     /** Raw client IP. It is hashed before persistence and never stored. */
     clientIp: string;
-    /** Resolved subscription tier for the request. */
-    tier: Tier;
     /** Authenticated user UUID, or null/undefined for anonymous usage. */
     userId?: string | null;
     /** Model/backend identifier stored in usage_logs.model_used. */

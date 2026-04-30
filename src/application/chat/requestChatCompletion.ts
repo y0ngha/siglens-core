@@ -178,6 +178,11 @@ async function requestGeminiChatCompletion(
  * `usageRepository` is provided, token consumption, prompt construction,
  * Gemini payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
+ *
+ * Token refund: when the result is `server_busy` or `server_error`, the
+ * consumed token is returned to the caller's bucket via a best-effort
+ * background call so server-side failures do not count against the daily
+ * allowance.
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,

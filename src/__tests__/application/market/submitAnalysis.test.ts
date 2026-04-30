@@ -215,10 +215,10 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierContext: { userId: 'user-1', tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
-                        tier: 'free',
                         userId: 'user-1',
                         modelUsed: 'cached-analysis',
                         occurredAt,
@@ -250,10 +250,10 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
-                        tier: 'free',
                         occurredAt,
                     },
                 }
@@ -326,10 +326,10 @@ describe('submitAnalysis 함수는', () => {
                 undefined,
                 {
                     tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
-                        tier: 'free',
                         occurredAt,
                     },
                 }
@@ -362,10 +362,10 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
-                        tier: 'free',
                         occurredAt,
                     },
                 }
@@ -381,6 +381,7 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('분석 사용량 제한을 넘으면 구조화된 error를 반환하고 Worker 요청을 건너뛴다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
             mockGetUsageToday.mockResolvedValueOnce({
                 analysis: 1,
                 chatbot: 0,
@@ -393,10 +394,11 @@ describe('submitAnalysis 함수는', () => {
                 undefined,
                 {
                     tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
-                        tier: 'free',
+                        occurredAt,
                     },
                 }
             );
@@ -416,6 +418,7 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('usage check DB 오류 발생 시 fail-open으로 분석을 허용한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
             const consoleWarn = vi
                 .spyOn(console, 'warn')
                 .mockImplementation(() => undefined);
@@ -430,10 +433,11 @@ describe('submitAnalysis 함수는', () => {
                 undefined,
                 {
                     tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
-                        tier: 'free',
+                        occurredAt,
                     },
                 }
             );
