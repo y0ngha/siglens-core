@@ -12,6 +12,7 @@ import type {
     PasswordHasher,
     PasswordVerifier,
 } from '@/infrastructure/auth/types';
+import type { EmailDispatcher } from '@/infrastructure/email/types';
 import type {
     AuthValidationErrorCode,
     AuthValidationErrorField,
@@ -385,6 +386,8 @@ export interface RequestPasswordResetDependencies {
     tokenGenerator: PasswordResetTokenGenerator;
     /** Token hashing service supplied by the consumer. */
     tokenHasher: PasswordResetTokenHasher;
+    /** Email delivery service supplied by the consumer. */
+    emailDispatcher: EmailDispatcher;
 }
 
 /**
@@ -393,6 +396,8 @@ export interface RequestPasswordResetDependencies {
 export interface RequestPasswordResetOptions {
     /** Current time used to calculate token expiration; defaults to `new Date()`. */
     now?: Date;
+    /** Base URL of the password reset page used to construct the reset link in the email. */
+    resetUrlBase: string;
 }
 
 /**
@@ -400,10 +405,11 @@ export interface RequestPasswordResetOptions {
  *
  * Missing accounts intentionally return `token: null` so consumers can choose
  * whether to reveal or hide account existence in their presentation layer.
+ * `emailDispatched` indicates whether the reset email was accepted for delivery.
  */
 export type RequestPasswordResetResult =
-    | { ok: true; token: string; expiresAt: Date }
-    | { ok: true; token: null; expiresAt: null };
+    | { ok: true; token: string; expiresAt: Date; emailDispatched: boolean }
+    | { ok: true; token: null; expiresAt: null; emailDispatched: false };
 
 /**
  * Input data required to confirm a password reset token.
