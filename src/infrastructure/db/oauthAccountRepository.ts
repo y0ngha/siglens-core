@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
+import { tryReadEncryptionKey } from './config';
 import { oauthAccounts } from './schema';
-import { decryptToken, tryReadEncryptionKey } from './tokenEncryption';
+import { decryptToken } from './tokenEncryption';
 import type {
     OAuthAccountRecord,
     OAuthAccountRepository,
