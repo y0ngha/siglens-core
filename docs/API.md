@@ -286,6 +286,12 @@ Upstash Redis는 hot cache로 동작한다. 호출자는 다음 패턴을 따라
 `SHA-256(IP + UTC 일자 salt)` 값만 `ip_hash`에 저장한다. 제한 기능이 비활성화되어도
 호출자가 이 저장소를 호출하면 사용량은 분석 목적 로그로 남는다.
 
+`application/usage`는 `checkAnalysisLimit()`와 `checkChatbotLimit()`로 일일 제한을
+확인한다. `submitAnalysis(..., { usage })`는 캐시 히트 또는 worker 제출 성공 후
+`action_type = 'analysis'`를 기록하고, `requestChatCompletion(..., { usageRepository })`는
+Gemini 응답 성공 후 `action_type = 'chatbot'`을 기록한다. 제한 초과 시 각각
+`analysis_limit_exceeded`, `chatbot_limit_exceeded` 구조화 오류를 반환한다.
+
 ### 인증
 
 `application/auth`는 이메일 회원가입·로그인·로그아웃 및 OAuth 로그인

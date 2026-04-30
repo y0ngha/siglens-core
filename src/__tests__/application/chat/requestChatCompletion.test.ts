@@ -11,7 +11,7 @@ import type { RequestChatCompletionParams } from '@/application/chat/types';
 import { TIER_CONFIG } from '@/domain/tier';
 import type { AnalysisResponse, ChatModel, TierConfig } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import type { UsageLogRepository } from '@/infrastructure/db';
+import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 
 const MINIMAL_ANALYSIS: AnalysisResponse = {
     summary: 'AAPL trending up.',
@@ -29,11 +29,20 @@ const MINIMAL_ANALYSIS: AnalysisResponse = {
     trendlines: [],
 };
 
-const RESTRICTED_TIER_CONFIG: TierConfig = {
-    ...TIER_CONFIG,
+const restrictedTierConfig: TierConfig = {
+    limits: {
+        analysisPerDay: { free: Infinity, member: Infinity, pro: Infinity },
+        chatbotPerDay: { free: 1, member: Infinity, pro: Infinity },
+    },
+    timeframes: TIER_CONFIG.timeframes,
+    infoDepth: TIER_CONFIG.infoDepth,
+    models: {
+        free: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+        member: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+        pro: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+    },
     featureFlags: { enableTierRestrictions: true },
 };
-
 function createParams(
     overrides: Partial<RequestChatCompletionParams> = {}
 ): RequestChatCompletionParams {
@@ -54,16 +63,22 @@ describe('requestChatCompletion', () => {
     const refundConsumedToken = vi.fn();
     const getRemainingTokens = vi.fn();
     const callGemini = vi.fn();
+    const getUsageToday = vi.fn();
     const recordUsage = vi.fn();
+    const recordPremiumUsage = vi.fn();
 
     const tokenStore: ChatTokenStore = {
         tryConsumeToken,
         refundConsumedToken,
         getRemainingTokens,
     };
+    const usageRepository: UsageRepository = {
+        getUsageToday,
+        recordUsage,
+    };
 
     const usageLogs: UsageLogRepository = {
-        recordUsage,
+        recordUsage: recordPremiumUsage,
     };
 
     beforeEach(() => {
@@ -72,7 +87,16 @@ describe('requestChatCompletion', () => {
         tryConsumeToken.mockResolvedValue(true);
         refundConsumedToken.mockResolvedValue(undefined);
         getRemainingTokens.mockResolvedValue(4);
-        recordUsage.mockResolvedValue(undefined);
+        getUsageToday.mockResolvedValue({ analysis: 0, chatbot: 0 });
+        recordUsage.mockResolvedValue({
+            id: 'usage-1',
+            userId: null,
+            ipHash: 'hashed-ip',
+            actionType: 'chatbot',
+            modelUsed: GEMINI_2_5_FLASH_MODEL,
+            date: '2026-04-29',
+            createdAt: new Date('2026-04-29T00:00:00.000Z'),
+        });
         callGemini.mockResolvedValue(
             '분석 기준으로는 조금 기다리는 편이 좋아요.'
         );
@@ -92,6 +116,67 @@ describe('requestChatCompletion', () => {
 
         expect(result).toEqual({ ok: false, error: 'token_exhausted' });
         expect(callGemini).not.toHaveBeenCalled();
+    });
+
+    it('returns chatbot_limit_exceeded before consuming a token when daily usage is exhausted', async () => {
+        getUsageToday.mockResolvedValueOnce({ analysis: 0, chatbot: 1 });
+
+        const result = await requestChatCompletion(
+            createParams({
+                tierContext: { userId: null, tier: 'free' },
+                occurredAt: new Date('2026-04-29T00:00:00.000Z'),
+            }),
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            error: {
+                code: 'chatbot_limit_exceeded',
+                message: 'Daily chatbot usage limit exceeded.',
+                feature: 'chatbotPerDay',
+                tier: 'free',
+            },
+        });
+        expect(tryConsumeToken).not.toHaveBeenCalled();
+        expect(callGemini).not.toHaveBeenCalled();
+        expect(recordUsage).not.toHaveBeenCalled();
+    });
+
+    it('allows the chat request when the usage check throws (fail-open)', async () => {
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        getUsageToday.mockRejectedValueOnce(new Error('DB connection failed'));
+
+        const result = await requestChatCompletion(
+            createParams({
+                tierContext: { userId: null, tier: 'free' },
+                occurredAt: new Date('2026-04-29T00:00:00.000Z'),
+            }),
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[checkUsageLimit] Usage check failed, allowing request:',
+            expect.any(Error)
+        );
+        consoleWarn.mockRestore();
     });
 
     it('returns server_error when the paid key is missing', async () => {
@@ -123,7 +208,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 callGemini,
-                tierConfig: RESTRICTED_TIER_CONFIG,
+                tierConfig: restrictedTierConfig,
             }
         );
 
@@ -133,14 +218,22 @@ describe('requestChatCompletion', () => {
     });
 
     it('builds a Gemini request and returns message with remaining tokens', async () => {
+        const occurredAt = new Date('2026-04-29T00:00:00.000Z');
         const result = await requestChatCompletion(
             createParams({
                 history: [{ role: 'model', content: '이전 답변입니다.' }],
                 userMessage: 'RSI도 설명해줘',
                 freeApiKey: 'free-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
+                tierContext: { userId: 'user-1', tier: 'free' },
+                occurredAt,
             }),
-            { tokenStore, callGemini }
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
         );
 
         expect(result).toEqual({
@@ -172,6 +265,49 @@ describe('requestChatCompletion', () => {
         expect(getRemainingTokens).toHaveBeenCalledWith(
             '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
         );
+        expect(getUsageToday).toHaveBeenCalledWith(
+            expect.any(String),
+            occurredAt
+        );
+        expect(recordUsage).toHaveBeenCalledWith({
+            userId: 'user-1',
+            ipAddress: '1.2.3.4',
+            actionType: 'chatbot',
+            modelUsed: GEMINI_2_5_FLASH_LITE_MODEL,
+            occurredAt: occurredAt,
+        });
+    });
+
+    it('keeps a successful chat response when usage recording fails', async () => {
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        recordUsage.mockRejectedValueOnce(new Error('usage db failed'));
+
+        const result = await requestChatCompletion(
+            createParams({
+                tierContext: { userId: null, tier: 'free' },
+                occurredAt: new Date('2026-04-29T00:00:00.000Z'),
+            }),
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                tierConfig: restrictedTierConfig,
+            }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
+        expect(refundConsumedToken).not.toHaveBeenCalled();
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[recordChatUsageSafely] Failed to record chatbot usage:',
+            expect.any(Error)
+        );
+        consoleWarn.mockRestore();
     });
 
     it('uses the default Gemini chat model when no model is provided', async () => {
@@ -199,7 +335,7 @@ describe('requestChatCompletion', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(recordUsage).toHaveBeenCalledWith({
+        expect(recordPremiumUsage).toHaveBeenCalledWith({
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
@@ -223,7 +359,7 @@ describe('requestChatCompletion', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(recordUsage).toHaveBeenCalledWith({
+        expect(recordPremiumUsage).toHaveBeenCalledWith({
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
@@ -241,7 +377,7 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
-        expect(recordUsage).not.toHaveBeenCalled();
+        expect(recordPremiumUsage).not.toHaveBeenCalled();
     });
 
     it('does not record premium model usage for free tier users', async () => {
@@ -253,7 +389,7 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
-        expect(recordUsage).not.toHaveBeenCalled();
+        expect(recordPremiumUsage).not.toHaveBeenCalled();
     });
 
     it('does not record free model usage for members', async () => {
@@ -265,7 +401,7 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
-        expect(recordUsage).not.toHaveBeenCalled();
+        expect(recordPremiumUsage).not.toHaveBeenCalled();
     });
 
     it('returns successful response when premium usage tracking is not provided', async () => {
@@ -286,7 +422,9 @@ describe('requestChatCompletion', () => {
     });
 
     it('keeps successful chat response when premium usage tracking fails', async () => {
-        recordUsage.mockRejectedValueOnce(new Error('database unavailable'));
+        recordPremiumUsage.mockRejectedValueOnce(
+            new Error('database unavailable')
+        );
 
         const result = await requestChatCompletion(
             createParams({
@@ -322,6 +460,7 @@ describe('requestChatCompletion', () => {
         expect(result).toEqual({ ok: false, error: 'rate_limited' });
         expect(refundConsumedToken).not.toHaveBeenCalled();
         expect(getRemainingTokens).not.toHaveBeenCalled();
+        expect(recordUsage).not.toHaveBeenCalled();
     });
 
     it('maps Gemini service unavailable errors to server_busy', async () => {

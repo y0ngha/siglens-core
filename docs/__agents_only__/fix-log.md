@@ -67,26 +67,6 @@
 - Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
 
-## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
-- Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
-- Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
-- Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
-
-- Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
-- Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
-- Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
-
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
-- Rule: MISTAKES.md Predictability #1 — unrelated changes must be moved to a separate PR or reverted
-- Context: the merge accidentally dropped a large block of `export type { ... }` entries from src/index.ts that have nothing to do with the OAuth feature
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: `LoginUserOptions` and `SocialLoginUserOptions` duplicated the same session and cookie option fields instead of sharing a base interface
-- Rule: CONVENTIONS.md TypeScript Rules — related interfaces with shared fields must use `extends`
-- Context: the social-login use case introduced an options interface identical to the existing email-login options shape; extracted `AuthSessionOptions` and had both use-case options extend it
-
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: DB environment readers, cached singleton helpers, and raw `DatabaseClient` wrapper were exposed from the package entrypoint without a consumer-facing need
 - Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
@@ -117,30 +97,36 @@
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
 - Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
 
+## [Issue #10/#11 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
+- Rule: Issue completion criteria — limit-exceeded responses must be structured and consistent across analysis and chatbot gates
+- Context: Preserved `code`, `message`, `feature`, and `tier` in public analysis/chatbot result types and return values
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Feature-specific usage-limit errors were manually remapped at call sites because the shared builder returned a broad union type
+- Rule: TypeScript type safety — shared helpers should preserve discriminated literal types so callers can reuse results without duplicating field mappings
+- Context: Converted `UsageLimitError` to a discriminated union and added overloads to `buildUsageLimitError` for analysis and chatbot features
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Application usage-limit tests did not directly cover all feature branches
+- Rule: application/CLAUDE.md — application use-cases require 100% branch coverage
+- Context: Added direct coverage for the analysis error builder branch and the chatbot restrictions-disabled branch
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Internal Gemini helper accepted the public optional `paidApiKey` type even after the entrypoint had validated the key
+- Rule: TypeScript type safety — internal helper signatures should represent narrowed invariants established by the caller instead of reintroducing optionality
+- Context: `requestChatCompletion` returned `server_error` when `paidApiKey` was missing, but `requestGeminiChatCompletion` still typed the value as `string | undefined`, causing `CallGeminiWithKeyFallbackOptions.paidApiKey` assignment to fail typecheck
+
 ## [PR #44 | feat/13/timeframe-restrictions | 2026-04-28]
 - Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
 - Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
 - Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
 
-## [PR #45 | feat/12/info-depth-filter | 2026-04-28]
-- Violation: `filterAnalysisResult` calculated locked info depths from the module-level default `TIER_CONFIG` instead of the injected tier config
-- Rule: FF.md — Predictability (function output must derive from explicit inputs, not a cached default that conflicts with a provided parameter)
-- Context: custom `TierConfig.infoDepth.pro` values were ignored when computing `lockedInfoDepth`; the function now passes the active config's pro depth list into the helper
-
-## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
-- Violation: `FilteredActionRecommendation` duplicated optional fields from `ActionRecommendation` instead of extending the shared base shape
-- Rule: CONVENTIONS.md — Related interfaces with shared fields must use extends
-- Context: the filtered action recommendation type now inherits unchanged optional fields while overriding only gated prose fields with nullable variants
 
 ## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
 - Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
-
-## [Issue #14 | feat/14/ai-model-tier-separation | 2026-04-28]
-- Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
-- Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
-- Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint
 
 ## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
 - Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
@@ -148,10 +134,6 @@
 - Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
 
 ## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
-- Violation: `src/index.ts` re-exported `DrizzleUserRepository` from the DB barrel, but `src/infrastructure/db/index.ts` no longer exported that symbol
-- Rule: PUBLIC_API.md — public entrypoint exports must stay synchronized with module barrels they depend on
-- Context: Restored the DB barrel re-export so the package entrypoint compiles and public repository exports remain available
-
 - Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
 - Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
 - Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
@@ -164,3 +146,42 @@
 - Violation: password reset requests used broad user lookup and included OAuth-only accounts
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
+
+## [PR #49 Round 2 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: Test constant declared twice under different casing — `restrictedTierConfig` (camelCase) and `const RESTRICTED_TIER_CONFIG = restrictedTierConfig` alias (UPPER_CASE), giving the same object two names in the same scope
+- Rule: Each test fixture should have exactly one canonical name; aliasing creates ambiguity with no benefit
+- Context: `requestChatCompletion.test.ts` originally declared `RESTRICTED_TIER_CONFIG` but a camelCase version was added later without removing the alias; alias removed, all usages unified to `restrictedTierConfig`
+
+## [PR #49 Round 4 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `checkUsageLimit` called `getUsageToday` without try-catch, exposing DB failures to public API callers even though sibling `recordUsage` was already protected
+- Rule: MISTAKES.md I/O & Error Handling #1 — all I/O at the same call depth must be equivalently guarded
+- Context: Moved the fail-open try-catch into `checkUsageLimit` so both `checkAnalysisLimit` and `checkChatbotLimit` (public Tier 1 exports) consistently fail open on repository errors regardless of whether the caller uses an inner wrapper
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
+## [PR #49 Round 4 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: outer try-catch in `checkAnalysisUsageAllowed` / `checkChatbotUsageAllowed` formed a dead branch — `checkUsageLimit` already catches all errors internally and returns `true` (fail-open)
+- Rule: MISTAKES.md Coding Paradigm #4 — "Leaving logic that has no effect → catch-all conditions that never execute"
+- Context: `src/application/market/submitAnalysis.ts` and `src/application/chat/requestChatCompletion.ts`; outer catch was unreachable because `checkUsageLimit` swallowed all `getUsageToday` errors
+
+- Violation: `'analysis' | 'chatbot'` inline union literal in `FEATURE_COUNT_KEY` type annotation not extracted to a named type
+- Rule: CONVENTIONS.md — "Extract union literals with 2+ members into a type alias"; replaced with `keyof UsageCounts` which ties the annotation to the source of truth
+- Context: `src/application/usage/limits.ts` FEATURE_COUNT_KEY constant
+
+## [PR #49 Round 5 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `tier` field accepted from both `AnalysisUsageOptions.tier` and `SubmitAnalysisOptions.tierContext.tier` simultaneously; caller could set conflicting tiers on the same request
+- Rule: MISTAKES.md Configuration & State Management #1 — a single configuration option must have exactly one authoritative source; outer/inner divergence creates hidden inconsistencies
+- Context: Removed `tier` from `AnalysisUsageOptions`; `tier` is now derived exclusively from `options.tierContext?.tier ?? DEFAULT_TIER` in `submitAnalysis.ts`
+
+## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: Pre-computing a conditional value outside an `if` block caused TypeScript to lose the narrowed type, requiring a `!` non-null assertion inside the block
+- Rule: TypeScript type safety — when a value is only valid inside a conditional branch, compute it inside that branch so the type is naturally narrowed without assertions
+- Context: `usageOccurredAt` was computed before `if (usage !== undefined)` as a ternary; TypeScript could not narrow it to `Date` inside the block, so `!` was needed. Fixed by moving the `occurredAt` computation inside the `if` block.
+
+- Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
+- Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
+- Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `submitAnalysis` used one timestamp for usage-limit checking but could pass an undefined timestamp to usage recording, allowing a second `new Date()` at the repository boundary
+- Rule: FF.md — Predictability; one request-scoped decision should use one authoritative timestamp across related limit-check and usage-record operations
+- Context: Reused a single `usageOccurredAt` value for `checkAnalysisUsageAllowed` and both cache-hit/submitted `recordAnalysisUsageSafely` paths, with a regression test for the no-`occurredAt` branch

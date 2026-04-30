@@ -1,3 +1,7 @@
+import type { ChatbotLimitError } from '@/application/usage/types';
+import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
+import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
     ChatMessage,
@@ -6,9 +10,14 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
-import type { UsageLogRepository } from '@/infrastructure/db';
+
+/** Error code produced by chat infrastructure or application policy. */
+export type ChatErrorCode =
+    | 'token_exhausted'
+    | 'model_not_allowed'
+    | 'rate_limited'
+    | 'server_error'
+    | 'server_busy';
 
 export interface RequestChatCompletionParams {
     symbol: string;
@@ -20,28 +29,23 @@ export interface RequestChatCompletionParams {
     model?: ChatModel;
     freeApiKey?: string;
     paidApiKey?: string;
+    occurredAt?: Date;
     tierContext?: UserTierContext;
 }
 
 export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
-    callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
+    usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
+    callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
     tierConfig?: TierConfig;
     getCurrentDate?: () => Date;
 }
 
-/** Error code returned by the chat completion use-case. */
-export type ChatErrorCode =
-    | 'token_exhausted'
-    | 'model_not_allowed'
-    | 'rate_limited'
-    | 'server_error'
-    | 'server_busy';
-
-/** Result returned by the chat completion use-case. */
+/** Result returned by {@link requestChatCompletion}. */
 export type ChatActionResult =
     | { ok: true; message: string; remainingTokens: number }
-    | { ok: false; error: ChatErrorCode };
+    | { ok: false; error: ChatErrorCode }
+    | { ok: false; error: ChatbotLimitError };
 
 export type RequestChatCompletionResult = ChatActionResult;

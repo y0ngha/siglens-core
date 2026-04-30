@@ -1010,11 +1010,6 @@ export interface RawAnalysisResponse {
 
 // --- Job Result Types (submit + poll 패턴) ---
 
-/** Outcome of {@link submitAnalysis}: cached result or a `jobId` to poll. */
-export type SubmitAnalysisResult =
-    | { status: 'cached'; result: AnalysisResponse }
-    | { status: 'submitted'; jobId: string };
-
 /** Outcome of {@link pollAnalysis}: still processing, finished, or errored. */
 export type PollAnalysisResult =
     | { status: 'processing' }

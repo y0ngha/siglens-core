@@ -317,6 +317,13 @@ export type {
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
 } from './application/chat/types';
+export type { SubmitAnalysisGatedResult } from './application/market/types';
+export type {
+    AnalysisLimitError,
+    AnalysisLimitErrorCode,
+    ChatbotLimitError,
+    ChatbotLimitErrorCode,
+} from './application/usage';
 
 // Domain types
 export type {
@@ -447,7 +454,6 @@ export type {
     MarketSummaryData,
     MarketSummaryWithBriefing,
     BarsData,
-    SubmitAnalysisResult,
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,
