@@ -124,6 +124,7 @@ describe('requestChatCompletion', () => {
             createParams({
                 tierContext: { userId: null, tier: 'free' },
                 tierConfig: restrictedTierConfig,
+                usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
             { tokenStore, usageRepository, callGemini }
         );
@@ -140,6 +141,33 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).not.toHaveBeenCalled();
         expect(callGemini).not.toHaveBeenCalled();
         expect(recordUsage).not.toHaveBeenCalled();
+    });
+
+    it('allows the chat request when the usage check throws (fail-open)', async () => {
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        getUsageToday.mockRejectedValueOnce(new Error('DB connection failed'));
+
+        const result = await requestChatCompletion(
+            createParams({
+                tierContext: { userId: null, tier: 'free' },
+                tierConfig: restrictedTierConfig,
+                usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
+            }),
+            { tokenStore, usageRepository, callGemini }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[checkChatbotUsageAllowed] Usage check failed, allowing request:',
+            expect.any(Error)
+        );
+        consoleWarn.mockRestore();
     });
 
     it('returns server_error when the paid key is missing', async () => {
@@ -247,6 +275,7 @@ describe('requestChatCompletion', () => {
             createParams({
                 tierContext: { userId: null, tier: 'free' },
                 tierConfig: restrictedTierConfig,
+                usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
             { tokenStore, usageRepository, callGemini }
         );

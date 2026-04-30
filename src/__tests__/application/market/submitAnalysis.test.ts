@@ -325,12 +325,12 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: restrictedTierConfig,
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
                         tier: 'free',
                         occurredAt,
-                        tierConfig: restrictedTierConfig,
                     },
                 }
             );
@@ -392,11 +392,11 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: restrictedTierConfig,
                     usage: {
                         usageRepository: mockUsageRepository,
                         clientIp: '203.0.113.10',
                         tier: 'free',
-                        tierConfig: restrictedTierConfig,
                     },
                 }
             );
@@ -413,6 +413,37 @@ describe('submitAnalysis 함수는', () => {
             expect(mockCacheGet).not.toHaveBeenCalled();
             expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
             expect(mockRecordUsage).not.toHaveBeenCalled();
+        });
+
+        it('usage check DB 오류 발생 시 fail-open으로 분석을 허용한다', async () => {
+            const consoleWarn = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+            mockGetUsageToday.mockRejectedValueOnce(
+                new Error('DB connection failed')
+            );
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        tier: 'free',
+                    },
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(consoleWarn).toHaveBeenCalledWith(
+                '[checkAnalysisUsageAllowed] Usage check failed, allowing request:',
+                expect.any(Error)
+            );
+            consoleWarn.mockRestore();
         });
 
         it('waitUntil이 제공되면 Worker 요청 promise를 등록한다', async () => {

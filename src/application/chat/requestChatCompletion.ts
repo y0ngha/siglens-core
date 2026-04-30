@@ -118,6 +118,31 @@ async function recordChatUsageSafely(
     }
 }
 
+async function checkChatbotUsageAllowed(
+    clientIp: string,
+    tier: Tier,
+    usageTracking: { occurredAt: Date; repository: UsageRepository },
+    tierConfig: TierConfig
+): Promise<boolean> {
+    try {
+        return await checkChatbotLimit(
+            {
+                ipHash: hashUsageIp(clientIp, usageTracking.occurredAt),
+                tier,
+                now: usageTracking.occurredAt,
+                config: tierConfig,
+            },
+            { usage: usageTracking.repository }
+        );
+    } catch (error) {
+        console.warn(
+            '[checkChatbotUsageAllowed] Usage check failed, allowing request:',
+            error
+        );
+        return true;
+    }
+}
+
 async function requestGeminiChatCompletion(
     freeApiKey: RequestChatCompletionParams['freeApiKey'],
     paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
@@ -194,17 +219,11 @@ export async function requestChatCompletion(
     const usageAllowed =
         usageTracking === undefined
             ? true
-            : await checkChatbotLimit(
-                  {
-                      ipHash: hashUsageIp(
-                          params.clientIp,
-                          usageTracking.occurredAt
-                      ),
-                      tier: tierContext.tier,
-                      now: usageTracking.occurredAt,
-                      config: tierConfig,
-                  },
-                  { usage: usageTracking.repository }
+            : await checkChatbotUsageAllowed(
+                  params.clientIp,
+                  tierContext.tier,
+                  usageTracking,
+                  tierConfig
               );
 
     if (!usageAllowed) {

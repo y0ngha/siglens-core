@@ -23,8 +23,6 @@ export interface AnalysisUsageOptions {
     modelUsed?: string;
     /** Clock injection for UTC-day tests. Defaults to infrastructure time. */
     occurredAt?: Date;
-    /** Optional tier configuration override for tests or controlled rollout. */
-    tierConfig?: TierConfig;
 }
 
 /** Options controlling analysis submission behavior. */

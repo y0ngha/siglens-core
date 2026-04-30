@@ -15,7 +15,12 @@ import {
     getAllowedTimeframes,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    Skill,
+    TierConfig,
+    Timeframe,
+} from '@/domain/types';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/db';
@@ -28,19 +33,28 @@ const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
 
 async function checkAnalysisUsageAllowed(
     usage: AnalysisUsageOptions,
-    occurredAt: Date
+    occurredAt: Date,
+    tierConfig: TierConfig
 ): Promise<boolean> {
     const ipHash = hashUsageIp(usage.clientIp, occurredAt);
 
-    return checkAnalysisLimit(
-        {
-            ipHash,
-            tier: usage.tier,
-            now: occurredAt,
-            config: usage.tierConfig,
-        },
-        { usage: usage.usageRepository }
-    );
+    try {
+        return await checkAnalysisLimit(
+            {
+                ipHash,
+                tier: usage.tier,
+                now: occurredAt,
+                config: tierConfig,
+            },
+            { usage: usage.usageRepository }
+        );
+    } catch (error) {
+        console.warn(
+            '[checkAnalysisUsageAllowed] Usage check failed, allowing request:',
+            error
+        );
+        return true;
+    }
 }
 
 async function recordAnalysisUsage(
@@ -126,8 +140,7 @@ export async function submitAnalysis(
 ): Promise<SubmitAnalysisGatedResult> {
     const tier =
         options.tierContext?.tier ?? options.usage?.tier ?? DEFAULT_TIER;
-    const tierConfig =
-        options.tierConfig ?? options.usage?.tierConfig ?? TIER_CONFIG;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
         return {
@@ -147,7 +160,11 @@ export async function submitAnalysis(
         usage === undefined ? undefined : (usage.occurredAt ?? new Date());
     if (usage !== undefined) {
         const occurredAt = usageOccurredAt!;
-        const allowed = await checkAnalysisUsageAllowed(usage, occurredAt);
+        const allowed = await checkAnalysisUsageAllowed(
+            usage,
+            occurredAt,
+            tierConfig
+        );
         if (!allowed) {
             return {
                 status: 'error',

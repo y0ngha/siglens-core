@@ -46,6 +46,7 @@ export interface RequestChatCompletionDependencies {
 /** Result returned by {@link requestChatCompletion}. */
 export type ChatActionResult =
     | { ok: true; message: string; remainingTokens: number }
-    | { ok: false; error: ChatErrorCode | ChatUsageLimitError };
+    | { ok: false; error: ChatErrorCode }
+    | { ok: false; error: ChatUsageLimitError };
 
 export type RequestChatCompletionResult = ChatActionResult;

@@ -68,10 +68,6 @@
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
 
 ## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
-- Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
-- Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
-- Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
-
 - Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
 - Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
 - Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
@@ -123,14 +119,6 @@
 - Context: Converted `UsageLimitError` to a discriminated union and added overloads to `buildUsageLimitError` for analysis and chatbot features
 
 ## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
-- Violation: Tier 1 usage-limit exports had description-only JSDoc without `@param` and `@returns`
-- Rule: CONVENTIONS.md JSDoc Rules — Tier 1 public functions require description, `@param`, and `@returns`
-- Context: Added full JSDoc tags to `checkAnalysisLimit` and `checkChatbotLimit` because both are re-exported from the package entrypoint
-
-- Violation: Best-effort usage recording failures could discard already-successful chat and analysis results
-- Rule: ARCHITECTURE.md Graceful Degradation — external system failures must not break the primary library flow when degradation is possible
-- Context: Wrapped chatbot and analysis usage recording in isolated best-effort helpers so DB write failures no longer turn successful responses into errors
-
 - Violation: Application usage-limit tests did not directly cover all feature branches
 - Rule: application/CLAUDE.md — application use-cases require 100% branch coverage
 - Context: Added direct coverage for the analysis error builder branch and the chatbot restrictions-disabled branch
@@ -145,10 +133,6 @@
 - Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
 - Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
 
-## [PR #45 | feat/12/info-depth-filter | 2026-04-28]
-- Violation: `filterAnalysisResult` calculated locked info depths from the module-level default `TIER_CONFIG` instead of the injected tier config
-- Rule: FF.md — Predictability (function output must derive from explicit inputs, not a cached default that conflicts with a provided parameter)
-- Context: custom `TierConfig.infoDepth.pro` values were ignored when computing `lockedInfoDepth`; the function now passes the active config's pro depth list into the helper
 
 ## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
 - Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
@@ -166,10 +150,6 @@
 - Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
 
 ## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
-- Violation: `src/index.ts` re-exported `DrizzleUserRepository` from the DB barrel, but `src/infrastructure/db/index.ts` no longer exported that symbol
-- Rule: PUBLIC_API.md — public entrypoint exports must stay synchronized with module barrels they depend on
-- Context: Restored the DB barrel re-export so the package entrypoint compiles and public repository exports remain available
-
 - Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
 - Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
 - Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
@@ -183,7 +163,14 @@
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
 
+## [PR #49 Round 2 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: Test constant declared twice under different casing — `restrictedTierConfig` (camelCase) and `const RESTRICTED_TIER_CONFIG = restrictedTierConfig` alias (UPPER_CASE), giving the same object two names in the same scope
+- Rule: Each test fixture should have exactly one canonical name; aliasing creates ambiguity with no benefit
+- Context: `requestChatCompletion.test.ts` originally declared `RESTRICTED_TIER_CONFIG` but a camelCase version was added later without removing the alias; alias removed, all usages unified to `restrictedTierConfig`
+
 ## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `index.client.ts` exported `SubmitAnalysisResult` (narrower type, missing `TierTimeframeAccessError` variant) instead of `SubmitAnalysisGatedResult` (actual return type of `submitAnalysis`)
-- Rule: Public entrypoint browser exports must match the function's actual return type to preserve type safety for browser consumers
-- Context: `SubmitAnalysisResult` in `application/types.ts` was dead code with only `SubmitAnalysisError`; `SubmitAnalysisGatedResult` from `application/market/types.ts` is the real return type including `TierTimeframeAccessError` — export corrected in `index.client.ts`
+## [PR #49 Round 3 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `ChatActionResult` error variants mixed a string literal union (`ChatErrorCode`) and an object type (`ChatUsageLimitError`) in a single discriminant field — `{ ok: false; error: ChatErrorCode | ChatUsageLimitError }`
+- Rule: Discriminated union branches must be separated at the top level so each `ok: false` variant narrows `error` to a single type; a single branch with a mixed-type field breaks string-method safety and prevents consumers from pattern-matching without a typeof guard
+- Context: `src/application/chat/types.ts` split into `| { ok: false; error: ChatErrorCode }` and `| { ok: false; error: ChatUsageLimitError }`
+
