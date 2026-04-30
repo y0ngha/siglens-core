@@ -76,9 +76,46 @@ async function recordAnalysisUsageSafely(
  * Submit an analysis job for a given symbol/timeframe.
  *
  * Resolves to one of three outcomes:
- * - `cached`: a recent analysis is reused.
- * - `submitted`: market data was fetched and a worker job was queued.
- * - `error`: a tier gate or daily analysis usage limit rejected the request.
+ * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
+ *   by `symbol` + `timeframe`).
+ * - `submitted`: the bars + indicators were fetched, the prompt was built, a
+ *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
+ *   POST was sent to the configured worker. Poll the result with
+ *   {@link pollAnalysis}.
+ * - `error`: application tier gates blocked access to the requested timeframe,
+ *   or the daily analysis usage limit was exceeded.
+ *
+ * Skill loading is best-effort — if it fails, the analysis proceeds with
+ * `skillsDegraded: true` recorded on the job meta so consumers can warn the
+ * user. The worker call uses a 5-minute `AbortSignal.timeout`; failures are
+ * logged but do not propagate to the caller (the job stays in `processing`
+ * until it times out naturally).
+ *
+ * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param timeframe - Bar resolution literal (`"5Min" | "15Min" | ... | "1Day"`).
+ * @param force - When `true`, bypass the cache and always submit a new job.
+ *   Defaults to `false`.
+ * @param fmpSymbol - Optional override symbol forwarded to the market data
+ *   provider when FMP uses a different identifier.
+ * @param options - Optional tier gating, usage limit tracking, and background-task
+ *   hooks. Pass Vercel's `waitUntil` so the worker dispatch can continue after
+ *   the response. Pass `usage` to enable daily usage limit checking and recording.
+ * @returns Either a cached analysis or a freshly submitted job descriptor —
+ *   see {@link SubmitAnalysisGatedResult}.
+ *
+ * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
+ *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
+ *
+ * @example
+ * ```ts
+ * const submission = await submitAnalysis('AAPL', '1Day');
+ * if (submission.status === 'cached') return submission.result;
+ * if (submission.status === 'error') return submission.error;
+ * const polled = await pollAnalysis(submission.jobId);
+ * ```
+ *
+ * @see pollAnalysis
+ * @see cancelAnalysisJob
  */
 export async function submitAnalysis(
     symbol: string,

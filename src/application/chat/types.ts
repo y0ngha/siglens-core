@@ -20,6 +20,14 @@ export type ChatErrorCode =
     | 'server_error'
     | 'server_busy';
 
+/**
+ * Parameters for {@link requestChatCompletion}.
+ *
+ * Tier resolution priority: `tierContext` takes precedence over the flat
+ * `tier` / `userId` fields. Prefer passing `tierContext` directly; the flat
+ * fields exist for backward-compatibility and will be removed in a future
+ * major version.
+ */
 export interface RequestChatCompletionParams {
     symbol: string;
     timeframe: Timeframe;

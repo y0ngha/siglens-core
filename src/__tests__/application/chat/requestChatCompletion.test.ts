@@ -43,8 +43,6 @@ const restrictedTierConfig: TierConfig = {
     },
     featureFlags: { enableTierRestrictions: true },
 };
-const RESTRICTED_TIER_CONFIG = restrictedTierConfig;
-
 function createParams(
     overrides: Partial<RequestChatCompletionParams> = {}
 ): RequestChatCompletionParams {
@@ -173,7 +171,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 callGemini,
-                tierConfig: RESTRICTED_TIER_CONFIG,
+                tierConfig: restrictedTierConfig,
             }
         );
 

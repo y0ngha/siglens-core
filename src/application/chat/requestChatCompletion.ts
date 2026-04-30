@@ -25,8 +25,7 @@ import {
     hashClientIp,
 } from '@/infrastructure/chat/tokenStore';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import { hashUsageIp } from '@/infrastructure/db';
-import type { UsageRepository } from '@/infrastructure/db';
+import { hashUsageIp, type UsageRepository } from '@/infrastructure/db';
 
 const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
