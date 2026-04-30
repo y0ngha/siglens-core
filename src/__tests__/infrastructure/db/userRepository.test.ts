@@ -529,12 +529,12 @@ describe('DrizzleUserRepository', () => {
             expect(callArg.refreshToken).not.toBe('plain-refresh-token');
             expect(callArg.tokenExpiresAt).toEqual(tokenExpiresAt);
 
-            expect(
-                decryptToken(callArg.accessToken!, VALID_KEY_HEX)
-            ).toBe('plain-access-token');
-            expect(
-                decryptToken(callArg.refreshToken!, VALID_KEY_HEX)
-            ).toBe('plain-refresh-token');
+            expect(decryptToken(callArg.accessToken!, VALID_KEY_HEX)).toBe(
+                'plain-access-token'
+            );
+            expect(decryptToken(callArg.refreshToken!, VALID_KEY_HEX)).toBe(
+                'plain-refresh-token'
+            );
         });
 
         it('stores null tokens when encryption key is absent', async () => {

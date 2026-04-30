@@ -15,9 +15,8 @@ vi.mock('@/infrastructure/oauth/kakao', () => ({
 
 describe('compositeOAuthRevoker', () => {
     it('delegates to the registered adapter for a known provider', async () => {
-        const { googleOAuthAdapter } = await import(
-            '@/infrastructure/oauth/google'
-        );
+        const { googleOAuthAdapter } =
+            await import('@/infrastructure/oauth/google');
 
         await compositeOAuthRevoker.revokeToken('google', {
             accessToken: 'access-token',
@@ -31,9 +30,8 @@ describe('compositeOAuthRevoker', () => {
     });
 
     it('delegates to the kakao adapter for kakao provider', async () => {
-        const { kakaoOAuthAdapter } = await import(
-            '@/infrastructure/oauth/kakao'
-        );
+        const { kakaoOAuthAdapter } =
+            await import('@/infrastructure/oauth/kakao');
 
         await compositeOAuthRevoker.revokeToken('kakao', {
             accessToken: 'kakao-access-token',
