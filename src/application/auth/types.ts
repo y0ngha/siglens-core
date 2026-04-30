@@ -4,10 +4,14 @@ import type {
     EmailAuthUserRepository,
     OAuthProvider,
     OAuthUserRepository,
+    PasswordResetRepository,
     SessionRepository,
     UserRepository,
 } from '@/infrastructure/db/types';
-import type { PasswordVerifier } from '@/infrastructure/auth/types';
+import type {
+    PasswordHasher,
+    PasswordVerifier,
+} from '@/infrastructure/auth/types';
 import type {
     AuthValidationErrorCode,
     AuthValidationErrorField,
@@ -335,3 +339,125 @@ export interface DeleteAccountError {
 export type DeleteAccountResult =
     | { ok: true; cookie: AuthSessionCookie }
     | { ok: false; error: DeleteAccountError };
+
+/**
+ * Input data required to request a password reset token.
+ */
+export interface RequestPasswordResetInput {
+    /** Email address for the account to recover; normalized before lookup. */
+    email: string;
+}
+
+/**
+ * Service that creates high-entropy password reset tokens.
+ */
+export interface PasswordResetTokenGenerator {
+    /**
+     * Generate a raw token that the consumer can deliver to the user by email.
+     *
+     * @returns A one-time reset token.
+     */
+    generatePasswordResetToken(): string | Promise<string>;
+}
+
+/**
+ * Service that hashes raw reset tokens before persistence or lookup.
+ */
+export interface PasswordResetTokenHasher {
+    /**
+     * Hash a raw password reset token.
+     *
+     * @param token - Raw reset token supplied by the generator or user.
+     * @returns Stable token hash used for database storage and lookup.
+     */
+    hashPasswordResetToken(token: string): string | Promise<string>;
+}
+
+/**
+ * Dependencies required to create a password reset token.
+ */
+export interface RequestPasswordResetDependencies {
+    /** Email-auth credential lookup repository. */
+    users: EmailAuthUserRepository;
+    /** Password reset persistence repository. */
+    passwordResets: PasswordResetRepository;
+    /** Raw token generator supplied by the consumer. */
+    tokenGenerator: PasswordResetTokenGenerator;
+    /** Token hashing service supplied by the consumer. */
+    tokenHasher: PasswordResetTokenHasher;
+}
+
+/**
+ * Runtime overrides for {@link requestPasswordReset}.
+ */
+export interface RequestPasswordResetOptions {
+    /** Current time used to calculate token expiration; defaults to `new Date()`. */
+    now?: Date;
+}
+
+/**
+ * Result of a {@link requestPasswordReset} call.
+ *
+ * Missing accounts intentionally return `token: null` so consumers can choose
+ * whether to reveal or hide account existence in their presentation layer.
+ */
+export type RequestPasswordResetResult =
+    | { ok: true; token: string; expiresAt: Date }
+    | { ok: true; token: null; expiresAt: null };
+
+/**
+ * Input data required to confirm a password reset token.
+ */
+export interface ConfirmPasswordResetInput {
+    /** Raw token received from the password reset link/form. */
+    token: string;
+    /** New plain-text password; validated before hashing. */
+    newPassword: string;
+}
+
+/**
+ * Error code returned when password reset confirmation fails.
+ */
+export type ConfirmPasswordResetErrorCode =
+    | AuthValidationErrorCode
+    | 'invalid_token'
+    | 'expired_token';
+
+/**
+ * Structured error returned when password reset confirmation fails.
+ */
+export interface ConfirmPasswordResetError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: ConfirmPasswordResetErrorCode;
+    /** Input field that caused the error when applicable. */
+    field?: AuthValidationErrorField | 'token';
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}
+
+/**
+ * Dependencies required to confirm a password reset.
+ */
+export interface ConfirmPasswordResetDependencies {
+    /** Password reset persistence repository. */
+    passwordResets: PasswordResetRepository;
+    /** Password hashing interface. */
+    passwordHasher: PasswordHasher;
+    /** Token hashing service supplied by the consumer. */
+    tokenHasher: PasswordResetTokenHasher;
+}
+
+/**
+ * Runtime overrides for {@link confirmPasswordReset}.
+ */
+export interface ConfirmPasswordResetOptions {
+    /** Current time used to evaluate token expiration; defaults to `new Date()`. */
+    now?: Date;
+}
+
+/**
+ * Discriminated union result of a {@link confirmPasswordReset} call.
+ */
+export type ConfirmPasswordResetResult =
+    | { ok: true }
+    | { ok: false; error: ConfirmPasswordResetError };

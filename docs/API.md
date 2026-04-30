@@ -257,10 +257,27 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 |---|---|
 | `users` | 사용자 메타데이터, 이메일 로그인용 비밀번호 해시, 구독 tier (`free` / `member` / `pro`) |
 | `sessions` | 사용자 세션과 만료 시각 |
-| `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot`) |
+| `password_resets` | 비밀번호 재설정용 일회성 토큰 hash, 만료 시각, 사용 시각 |
+| `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot` / `premium_model`) |
 | `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
+
+### 티커 영속화 (DB ↔ Redis)
+
+`korean_tickers` / `asset_translations` 두 테이블은 DB가 source-of-truth이고
+Upstash Redis는 hot cache로 동작한다. 호출자는 다음 패턴을 따라야 한다.
+
+- READ — Redis hit → 반환 / Redis miss → DB 조회 → Redis 갱신 → 반환
+- WRITE — DB upsert 먼저 → Redis 갱신
+
+핵심 진입점:
+
+- `DrizzleKoreanTickerRepository` — `korean_tickers` 의 `findAll` / `findBySymbols` / `upsertMany`
+- `DrizzleAssetTranslationRepository` — `asset_translations` 의 `findBySymbol` / `upsert`
+- `application/ticker/koreanNameStore` 와 `application/ticker/getAssetInfo` 는 위
+  repository 와 `CacheProvider` 를 함께 사용한다. DB 클라이언트가 없으면 Redis-only 로
+  graceful degradation 하고, 둘 다 없으면 빈 결과/스킵으로 떨어진다.
 
 ### 사용량 트래킹
 
@@ -284,8 +301,11 @@ Gemini 응답 성공 후 `action_type = 'chatbot'`을 기록한다. 제한 초�
 - `loginUser`는 `EmailAuthUserRepository`, `PasswordVerifier`, `SessionRepository`를 주입받아 자격증명을 검증하고 `sessions.id`를 세션 토큰으로 사용한다.
 - `socialLoginUser`는 `OAuthUserRepository`와 `SessionRepository`를 주입받아 Google/Kakao/Apple provider 계정 링크를 조회하고, 첫 로그인 시 `users`와 `oauth_accounts`를 생성한 뒤 동일한 세션 쿠키 메커니즘을 사용한다.
 - OAuth 이메일이 이미 이메일/비밀번호 계정으로 등록되어 있으면 자동 링크하지 않고 `email_already_exists` 충돌을 반환한다. 명시적 계정 연결 UI와 콜백 라우트는 consumer가 담당한다.
+- `requestPasswordReset`는 `EmailAuthUserRepository`, `PasswordResetRepository`, token generator/hasher를 주입받아 이메일/비밀번호 계정에 대해서만 30분 만료 reset token을 생성한다. Raw token은 반환값으로만 노출하고 DB에는 `token_hash`만 저장한다.
+- `confirmPasswordReset`는 reset token hash 조회, 만료/사용 여부 확인, 비밀번호 강도 검증, 새 password hash 저장, token 사용 처리까지 수행한다.
 - `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
 - HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
+- 비밀번호 재설정 이메일 발송과 reset URL 구성은 consumer가 담당한다.
 
 ### 사용자 티어
 

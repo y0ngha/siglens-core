@@ -796,6 +796,21 @@ export interface ReconciledActionLineData {
     readonly takeProfitPrices: readonly ReconciledTpEntry[];
 }
 
+/** Long-position recommendation after tier-based field filtering. */
+export interface FilteredActionRecommendation extends Omit<
+    ActionRecommendation,
+    'positionAnalysis' | 'entry' | 'exit' | 'riskReward'
+> {
+    /** Korean prose: current price position vs key levels. */
+    positionAnalysis: string | null;
+    /** Korean prose: long entry strategy with specific price ranges. */
+    entry: string | null;
+    /** Korean prose: take-profit + stop-loss strategy. */
+    exit: string | null;
+    /** Korean prose: risk-reward ratio summary. */
+    riskReward: string | null;
+}
+
 /** Long-position trading recommendation produced by the AI analyst. */
 export interface ActionRecommendation {
     /** Korean prose: current price position vs key levels. */
@@ -851,6 +866,42 @@ export interface AnalysisResponse {
     actionRecommendation?: ActionRecommendation;
     /** ISO 8601 timestamp of when this analysis was performed. */
     analyzedAt?: string;
+}
+
+/** Analysis response after tier-based info-depth filtering. */
+export interface FilteredAnalysisResponse {
+    /** Korean multi-topic summary, or `null` when the summary fragment is locked. */
+    summary: string | null;
+    /** Overall directional bias, or `null` when the direction fragment is locked. */
+    trend: Trend | null;
+    /** Per-skill indicator guide interpretations. */
+    indicatorResults: IndicatorGuideResult[] | null;
+    /** Risk classification. */
+    riskLevel: RiskLevel | null;
+    /** Support / resistance levels with explanations. */
+    keyLevels: KeyLevels | null;
+    /** Bullish + bearish scenario price targets. */
+    priceTargets: PriceTargets | null;
+    /** Detected chart patterns with confidence-weighted output. */
+    patternSummaries: PatternResult[] | null;
+    /** Strategy skill verdicts. */
+    strategyResults: StrategyResult[] | null;
+    /** Detected single- and multi-bar candle patterns. */
+    candlePatterns: CandlePatternSummary[] | null;
+    /** Diagonal trendlines visible on the full chart. */
+    trendlines: Trendline[] | null;
+    /** Long-position trading recommendation with gated subfields. */
+    actionRecommendation: FilteredActionRecommendation | null;
+    /** ISO 8601 timestamp of when this analysis was performed. */
+    analyzedAt?: string;
+}
+
+/** Tier-filtered analysis payload plus fragments that should render as locked. */
+export interface FilteredAnalysisResult {
+    /** Filtered analysis data safe to expose to the current tier. */
+    result: AnalysisResponse | FilteredAnalysisResponse;
+    /** Info-depth fragments hidden from the current tier. */
+    lockedInfoDepth: readonly TierInfoDepth[];
 }
 
 /** Bars + computed indicator suite — see {@link fetchBarsWithIndicators}. */
@@ -1095,11 +1146,15 @@ export interface ChatSession {
 }
 
 /** Internal: chat model identifiers used by the worker. */
-export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-flash-lite';
+export type ChatModel =
+    | 'gemini-2.5-flash'
+    | 'gemini-2.5-flash-lite'
+    | 'gemini-2.5-pro';
 
 /** Internal: chat error code returned to the UI. */
 export type ChatErrorCode =
     | 'token_exhausted'
+    | 'model_not_allowed'
     | 'rate_limited'
     | 'server_error'
     | 'server_busy';
@@ -1143,6 +1198,9 @@ export type TierModel =
     | 'gemini-2.5-pro'
     | 'claude-sonnet-4'
     | 'claude-opus-4';
+
+/** Public model identifier used by tier model access helpers. */
+export type ModelId = TierModel;
 
 /** Usage limits keyed by feature for every tier. */
 export type TierFeatureLimits = Record<

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
+import { getAllowedTimeframes } from '@/domain/tier';
 import type { UsageRepository } from '@/infrastructure/db';
 
 vi.mock('@/infrastructure/cache/redis');
@@ -143,6 +144,51 @@ describe('submitAnalysis 함수는', () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         process.env = originalEnv;
+    });
+
+    describe('타임프레임 제한이 적용될 때', () => {
+        it('요청자 tier가 타임프레임에 접근할 수 없으면 에러 결과를 반환한다', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                '5Min',
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: 'user-1', tier: 'free' },
+                }
+            );
+
+            expect(result).toEqual({
+                status: 'error',
+                error: {
+                    code: 'timeframe_not_allowed',
+                    message: 'Timeframe 5Min is not available for free tier.',
+                    tier: 'free',
+                    timeframe: '5Min',
+                    allowedTimeframes: getAllowedTimeframes(
+                        'free',
+                        restrictedTierConfig
+                    ),
+                },
+            });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('제한이 꺼져 있으면 기본 free tier도 모든 타임프레임으로 요청할 수 있다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            const result = await submitAnalysis(mockSymbol, '5Min');
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                mockSymbol,
+                '5Min',
+                undefined
+            );
+        });
     });
 
     describe('캐시 히트일 때', () => {

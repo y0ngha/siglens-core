@@ -17,7 +17,7 @@ import {
     getKoreanNames,
     searchByKoreanName,
     setKoreanTickers,
-} from '@/infrastructure/ticker/koreanNameStore';
+} from '@/application/ticker/koreanNameStore';
 import { translateCompanyNames } from '@/infrastructure/ticker/koreanTranslator';
 
 const MAX_SEARCH_RESULTS = 10;

@@ -1,3 +1,4 @@
+import type { KoreanTickerEntry, ModelId, Tier } from '@/domain/types';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import type {
@@ -6,7 +7,6 @@ import type {
     USER_TIER_VALUES,
 } from './constants';
 import type * as schema from './schema';
-import type { Tier } from '@/domain/types';
 
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];
@@ -60,6 +60,24 @@ export interface AuthSessionRecord {
 }
 
 /**
+ * Persisted one-time password reset credential.
+ */
+export interface PasswordResetRecord {
+    /** Reset token row identifier. */
+    id: string;
+    /** User that requested the password reset. */
+    userId: string;
+    /** Hashed reset token. Raw tokens are never persisted. */
+    tokenHash: string;
+    /** Fixed expiration timestamp. */
+    expiresAt: Date;
+    /** Timestamp when the reset token was consumed; null while active. */
+    usedAt: Date | null;
+    /** Timestamp when the reset token was created. */
+    createdAt: Date;
+}
+
+/**
  * Input for creating a new email-based user account.
  */
 export interface CreateEmailUserInput {
@@ -97,6 +115,48 @@ export interface CreateSessionInput {
     userId: string;
     /** Fixed expiration timestamp. */
     expiresAt: Date;
+}
+
+/**
+ * Input for appending a usage log row.
+ */
+export interface CreateUsageLogInput {
+    /** Authenticated user UUID, or null for anonymous usage. */
+    userId: string | null;
+    /** Hashed client IP used for anonymous and abuse tracking. */
+    ipHash: string;
+    /** Usage action being tracked. */
+    actionType: UsageActionType;
+    /** AI model used by the request. */
+    modelUsed: ModelId;
+    /** Calendar date bucket in `YYYY-MM-DD` format. */
+    date: string;
+}
+
+/**
+ * Input for creating a new password reset token row.
+ */
+export interface CreatePasswordResetInput {
+    /** User that owns the reset token. */
+    userId: string;
+    /** Hashed reset token. */
+    tokenHash: string;
+    /** Fixed expiration timestamp. */
+    expiresAt: Date;
+}
+
+/**
+ * Input for completing a password reset.
+ */
+export interface CompletePasswordResetInput {
+    /** Password reset row identifier. */
+    resetId: string;
+    /** User whose password hash should be replaced. */
+    userId: string;
+    /** New password hash produced by {@link PasswordHasher.hashPassword}. */
+    passwordHash: string;
+    /** Timestamp recorded on the consumed reset token. */
+    usedAt: Date;
 }
 
 /**
@@ -265,6 +325,41 @@ export interface SessionRepository {
     deleteSession(sessionToken: string): Promise<boolean>;
 }
 
+/**
+ * Interface for password reset persistence operations.
+ */
+export interface PasswordResetRepository {
+    /**
+     * Create a password reset token row.
+     *
+     * @param input - Token hash, target user, and expiration timestamp.
+     * @returns The created {@link PasswordResetRecord}.
+     */
+    createPasswordReset(
+        input: CreatePasswordResetInput
+    ): Promise<PasswordResetRecord>;
+
+    /**
+     * Find a password reset token row by hashed token.
+     *
+     * Expiration and one-time-use checks are enforced by the application layer.
+     *
+     * @param tokenHash - Hashed reset token.
+     * @returns The matching reset row, or null when no row exists.
+     */
+    findPasswordResetByTokenHash(
+        tokenHash: string
+    ): Promise<PasswordResetRecord | null>;
+
+    /**
+     * Persist the new user password hash and mark the reset token as consumed.
+     *
+     * @param input - Reset id, user id, new password hash, and consumed timestamp.
+     * @returns Whether both updates completed.
+     */
+    completePasswordReset(input: CompletePasswordResetInput): Promise<boolean>;
+}
+
 /** Connection configuration required to instantiate a database client. */
 export interface DatabaseConfig {
     /** PostgreSQL connection string, including credentials and SSL mode. */
@@ -291,6 +386,79 @@ export interface DatabaseClient {
     sql: NeonSqlClient;
 }
 
+/**
+ * Persisted Korean→English asset translation record stored in
+ * `asset_translations`. Source-of-truth for {@link AssetInfo} when the Redis
+ * cache is cold or unavailable.
+ */
+export interface AssetTranslationRecord {
+    /** Canonical ticker symbol (uppercase). */
+    symbol: string;
+    /** English company / asset name. */
+    name: string;
+    /** Korean translation of {@link AssetTranslationRecord.name}. */
+    koreanName: string;
+    /**
+     * FMP API symbol used for upstream lookups. Equal to {@link symbol} for
+     * regular equities; uses provider-specific prefixes for indices
+     * (e.g. `^SPX`).
+     */
+    fmpSymbol: string;
+}
+
+/**
+ * Persistence operations for the Korean-ticker store backing
+ * {@link KoreanTickerEntry} lookups. The Redis cache layered above this
+ * repository is treated as a fast read path; the database is the source of
+ * truth.
+ */
+export interface KoreanTickerRepository {
+    /**
+     * Load every persisted Korean ticker entry.
+     *
+     * @returns All rows in `korean_tickers`; an empty array when the table is empty.
+     */
+    findAll(): Promise<KoreanTickerEntry[]>;
+
+    /**
+     * Load Korean ticker entries for the requested symbols only.
+     *
+     * @param symbols - Canonical ticker symbols (uppercase); empty input returns `[]`.
+     * @returns Matching rows in `korean_tickers`.
+     */
+    findBySymbols(symbols: readonly string[]): Promise<KoreanTickerEntry[]>;
+
+    /**
+     * Upsert one or more Korean ticker entries by symbol. Existing rows are
+     * overwritten with the new field values.
+     *
+     * @param entries - Entries to persist; a no-op when empty.
+     */
+    upsertMany(entries: readonly KoreanTickerEntry[]): Promise<void>;
+}
+
+/**
+ * Persistence operations for the asset-translation store backing
+ * {@link AssetTranslationRecord} lookups.
+ */
+export interface AssetTranslationRepository {
+    /**
+     * Find a persisted asset translation by canonical symbol.
+     *
+     * @param symbol - Canonical ticker symbol (uppercase).
+     * @returns The matching record, or `null` when absent.
+     */
+    findBySymbol(symbol: string): Promise<AssetTranslationRecord | null>;
+
+    /**
+     * Upsert an asset translation by symbol. Existing rows are overwritten
+     * with the new field values.
+     *
+     * @param record - Record to persist.
+     */
+    upsert(record: AssetTranslationRecord): Promise<void>;
+}
+
 /** Persistence operations required by tier-gating use-cases. */
 export interface UserTierRepository {
     /**
@@ -309,6 +477,17 @@ export interface UserTierRepository {
      * @returns The updated tier, or null when the user does not exist.
      */
     updateUserTier(userId: string, tier: Tier): Promise<Tier | null>;
+}
+
+/** Persistence operations for request usage accounting. */
+export interface UsageLogRepository {
+    /**
+     * Append a usage log row for daily accounting and analytics.
+     *
+     * @param input - Usage event data to persist.
+     * @returns Resolves when the row has been queued by the database adapter.
+     */
+    recordUsage(input: CreateUsageLogInput): Promise<void>;
 }
 
 /** Persistence operations required by usage tracking and analytics. */

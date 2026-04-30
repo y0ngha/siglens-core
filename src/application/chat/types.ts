@@ -1,3 +1,7 @@
+import type { ChatUsageLimitError } from '@/application/usage/types';
+import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
+import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
     ChatErrorCode,
@@ -6,11 +10,8 @@ import type {
     Tier,
     TierConfig,
     Timeframe,
+    UserTierContext,
 } from '@/domain/types';
-import type { ChatUsageLimitError } from '@/application/usage/types';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
-import type { UsageRepository } from '@/infrastructure/db';
 
 export interface RequestChatCompletionParams {
     symbol: string;
@@ -26,12 +27,16 @@ export interface RequestChatCompletionParams {
     paidApiKey?: string;
     usageOccurredAt?: Date;
     tierConfig?: TierConfig;
+    tierContext?: UserTierContext;
 }
 
 export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;
+    usageLogs?: UsageLogRepository;
     callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
+    tierConfig?: TierConfig;
+    getCurrentDate?: () => Date;
 }
 
 /** Result returned by {@link requestChatCompletion}. */

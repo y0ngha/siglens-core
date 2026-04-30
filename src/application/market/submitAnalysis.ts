@@ -1,14 +1,20 @@
 import { fireAndForget } from '@/application/background';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import type {
     AnalysisUsageOptions,
+    SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
-    SubmitAnalysisResult,
-} from '@/application/types';
+} from '@/application/market/types';
 import { buildUsageLimitError, checkAnalysisLimit } from '@/application/usage';
-import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
+import {
+    DEFAULT_TIER,
+    TIER_CONFIG,
+    getAllowedTimeframes,
+    isTimeframeAllowed,
+} from '@/domain/tier';
 import type { AnalysisResponse, Skill, Tier, Timeframe } from '@/domain/types';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -20,12 +26,12 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
 
-function toSubmitAnalysisLimitError(tier: Tier): SubmitAnalysisResult {
-    const error = buildUsageLimitError('analysisPerDay', tier);
-
+function toSubmitAnalysisLimitError(
+    tier: Tier
+): Extract<SubmitAnalysisGatedResult, { status: 'error' }> {
     return {
         status: 'error',
-        error,
+        error: buildUsageLimitError('analysisPerDay', tier),
     };
 }
 
@@ -79,56 +85,35 @@ async function recordAnalysisUsageSafely(
  * Submit an analysis job for a given symbol/timeframe.
  *
  * Resolves to one of three outcomes:
- * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
- *   by `symbol` + `timeframe`).
- * - `submitted`: the bars + indicators were fetched, the prompt was built, a
- *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
- *   POST was sent to the configured worker. Poll the result with
- *   {@link pollAnalysis}.
- * - `error`: the daily analysis usage limit rejected the request before cache,
- *   market data, or worker dispatch work started.
- *
- * Skill loading is best-effort — if it fails, the analysis proceeds with
- * `skillsDegraded: true` recorded on the job meta so consumers can warn the
- * user. The worker call uses a 5-minute `AbortSignal.timeout`; failures are
- * logged but do not propagate to the caller (the job stays in `processing`
- * until it times out naturally).
- *
- * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
- * @param timeframe - Bar resolution literal (`"5Min" | "15Min" | ... | "1Day"`).
- * @param force - When `true`, bypass the cache and always submit a new job.
- *   Defaults to `false`.
- * @param fmpSymbol - Optional override symbol forwarded to the market data
- *   provider when FMP uses a different identifier.
- * @param options - Optional background-task hooks and usage tracking config.
- *   Pass Vercel's `waitUntil` so the worker dispatch can continue after the
- *   response; pass `usage` to enforce daily analysis limits and record
- *   successful analysis usage best-effort.
- * @returns A cached analysis, a freshly submitted job descriptor, or a
- *   structured daily usage-limit error; see {@link SubmitAnalysisResult}.
- *
- * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
- *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
- *
- * @example
- * ```ts
- * const submission = await submitAnalysis('AAPL', '1Day');
- * if (submission.status === 'error') return submission.error;
- * if (submission.status === 'cached') return submission.result;
- * const polled = await pollAnalysis(submission.jobId);
- * ```
- *
- * @see pollAnalysis
- * @see cancelAnalysisJob
+ * - `cached`: a recent analysis is reused.
+ * - `submitted`: market data was fetched and a worker job was queued.
+ * - `error`: a tier gate or daily analysis usage limit rejected the request.
  */
 export async function submitAnalysis(
     symbol: string,
     timeframe: Timeframe,
     force: boolean = false,
     fmpSymbol?: string,
-    options?: SubmitAnalysisOptions
-): Promise<SubmitAnalysisResult> {
-    const usage = options?.usage;
+    options: SubmitAnalysisOptions = {}
+): Promise<SubmitAnalysisGatedResult> {
+    const tier = options.tierContext?.tier ?? options.usage?.tier ?? DEFAULT_TIER;
+    const tierConfig =
+        options.tierConfig ?? options.usage?.tierConfig ?? TIER_CONFIG;
+
+    if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
+        return {
+            status: 'error',
+            error: {
+                code: 'timeframe_not_allowed',
+                message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
+                tier,
+                timeframe,
+                allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
+            },
+        };
+    }
+
+    const usage = options.usage;
     const usageOccurredAt =
         usage === undefined ? undefined : (usage.occurredAt ?? new Date());
     if (usage !== undefined) {
@@ -193,8 +178,6 @@ export async function submitAnalysis(
         atr,
     });
 
-    // fire-and-forget: caller에게 jobId만 반환하고 worker dispatch는 백그라운드 처리.
-    // serverless 환경(Vercel)에서는 options.waitUntil이 응답 후 promise 종료를 보장한다.
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {

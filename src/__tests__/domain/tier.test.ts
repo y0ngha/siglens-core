@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
+    getAllowedModels,
+    getAllowedTimeframes,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -9,7 +12,15 @@ import {
     isTier,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { TierConfig } from '@/domain/types';
+import type { ModelId, TierConfig } from '@/domain/types';
+
+const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
+    'claude-opus-4',
+    'claude-sonnet-4',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+];
 
 const restrictedConfig: TierConfig = {
     ...TIER_CONFIG,
@@ -66,6 +77,36 @@ describe('tier', () => {
         });
     });
 
+    describe('getAllowedTimeframes', () => {
+        it('returns every timeframe when restrictions are disabled', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: false },
+            };
+
+            expect(getAllowedTimeframes('free', config)).toEqual([
+                ...TIMEFRAMES,
+            ]);
+        });
+
+        it('returns the configured timeframe list when restrictions are enabled', () => {
+            expect(getAllowedTimeframes('member', restrictedConfig)).toEqual([
+                ...restrictedConfig.timeframes.member,
+            ]);
+        });
+    });
+
+    describe('getAllowedModels', () => {
+        it('returns every configured model when restrictions are disabled', () => {
+            expect(getAllowedModels('free')).toEqual(ALL_CONFIGURED_MODELS);
+        });
+
+        it('returns tier-specific models when restrictions are enabled', () => {
+            expect(getAllowedModels('member', restrictedConfig)).toEqual([
+                ...restrictedConfig.models.member,
+            ]);
+        });
+    });
     describe('isTimeframeAllowed', () => {
         it('allows all timeframes when restrictions are disabled', () => {
             expect(isTimeframeAllowed('free', '5Min')).toBe(true);

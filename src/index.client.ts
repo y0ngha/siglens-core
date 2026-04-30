@@ -57,8 +57,23 @@ export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export {
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
+    GEMINI_2_5_PRO_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
+
+// Tier gating
+export {
+    DEFAULT_TIER,
+    TIER_CONFIG,
+    getAllowedModels,
+    getAllowedTimeframes,
+    getTierLimit,
+    isAllowed,
+    isInfoDepthAllowed,
+    isModelAllowed,
+    isTier,
+    isTimeframeAllowed,
+} from './domain/tier';
 
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
@@ -170,6 +185,7 @@ export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
+export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 
 // Ticker validation utilities
 export {
@@ -295,10 +311,10 @@ export type {
 } from './infrastructure/ai/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
+    ChatActionResult,
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
-    ChatActionResult,
 } from './application/chat/types';
 export type { SubmitAnalysisResult } from './application/types';
 export type {
@@ -310,7 +326,16 @@ export type {
 // Domain types
 export type {
     AnalysisSignalType,
+    ModelId,
     Timeframe,
+    Tier,
+    TierConfig,
+    TierFeatureFlags,
+    TierFeatureLimits,
+    TierInfoDepth,
+    TierLimitedFeature,
+    TierModel,
+    UserTierContext,
     Bar,
     IndicatorResult,
     MACDResult,
@@ -357,6 +382,9 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
+    FilteredActionRecommendation,
+    FilteredAnalysisResponse,
+    FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,

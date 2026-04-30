@@ -163,9 +163,12 @@ export const TIER_CONFIG = {
 ```
 
 `enableTierRestrictions`가 `false`이면 `isAllowed`, `isTimeframeAllowed`,
-`isInfoDepthAllowed`, `isModelAllowed`는 항상 허용 결과를 반환한다. 플래그가
-`true`이면 `TIER_CONFIG`의 각 tier별 값만 허용한다. 기본 제한값은 모두
-`Infinity`라서 초기 배포 상태는 fully open이다.
+`isInfoDepthAllowed`, `isModelAllowed`는 항상 허용 결과를 반환하고
+`getAllowedTimeframes(tier)`는 전체 `Timeframe[]`을, `getAllowedModels`는 모든
+tier에 설정된 모델의 합집합을 반환한다. 플래그가 `true`이면 `TIER_CONFIG`의 각
+tier별 값만 허용하며, `submitAnalysis`는 요청자의 tier가 잠긴 타임프레임에 접근할
+때 `status: 'error'`와 `code: 'timeframe_not_allowed'`를 반환한다. 기본 제한값은
+모두 `Infinity`라서 초기 배포 상태는 fully open이다.
 
 일일 사용량 제한은 `application/usage`의 `checkAnalysisLimit`와
 `checkChatbotLimit`에서 `UsageRepository.getUsageToday()` 결과와
@@ -1125,6 +1128,33 @@ interface AnalysisResponse {
     actionRecommendation?: ActionRecommendation; // 매매 전략 추천 (optional)
 }
 ```
+
+### 티어별 분석 결과 필터링
+
+`filterAnalysisResult(result, tier)`는 `TIER_CONFIG.infoDepth[tier]`를 기준으로
+`AnalysisResponse`의 공개 가능한 조각만 남기는 순수 함수다. 기본 설정처럼
+`enableTierRestrictions`가 `false`이면 `{ result, lockedInfoDepth: [] }`를 반환하며
+원본 `result` 객체를 그대로 보존한다.
+
+제한이 켜진 경우 허용되지 않은 필드는 `null`로 대체한다. 예외적으로
+`confidenceWeight`는 기존 숫자 타입을 유지하기 위해 `0`으로 대체한다. consumer는
+`lockedInfoDepth`를 보고 잠금 표시를 렌더링할 수 있다. 기본 매핑은 다음과 같다.
+
+```
+direction       → trend
+summary         → summary
+partial_detail  → indicatorResults, riskLevel, keyLevels, candlePatterns
+full_detail     → patternSummaries, strategyResults, trendlines,
+                  actionRecommendation.positionAnalysis
+entry           → actionRecommendation.entry, entryRecommendation, entryPrices
+stoploss        → actionRecommendation.stopLoss
+target          → priceTargets, actionRecommendation.takeProfitPrices
+confidence      → patternSummaries[].confidenceWeight,
+                  strategyResults[].confidenceWeight
+```
+
+`actionRecommendation.exit`, `riskReward`, `reconciledLevels`는 손절과 목표가를
+함께 설명하는 필드이므로 `stoploss`와 `target`이 모두 허용될 때만 공개한다.
 
 ### 필드별 의미
 

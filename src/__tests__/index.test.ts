@@ -1,45 +1,61 @@
-import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
+import type {
+    ChatUsageLimitError,
+    EmailAuthUserRepository,
+    OAuthUserRepository,
+    PasswordHasher,
+    PasswordVerifier,
+    PatternTrend,
+    SessionRepository,
+    TierGateErrorResult,
+    UsageLimitError,
+    UsageRepository,
+    UserRepository,
+} from '@/index';
 import {
     asArray,
     assetTranslations,
+    bcryptPasswordHasher,
+    bcryptPasswordVerifier,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     checkAnalysisLimit,
     checkChatbotLimit,
     clusterKeyLevels,
+    createChatTokenStore,
     createDatabaseClient,
     CROSS_LOOKBACK_BARS,
     DEFAULT_TIER,
+    deleteAccount,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
     DrizzleSessionRepository,
+    DrizzleUsageLogRepository,
     DrizzleUsageRepository,
     DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
     EXCLUDED_SINGLE_PATTERNS,
-    extractReconciledActionLines,
     extendTrendline,
-    HIGH_CONFIDENCE_WEIGHT,
+    extractReconciledActionLines,
+    filterAnalysisResult,
+    findUserBySessionToken,
+    GEMINI_2_5_FLASH_MODEL,
+    GEMINI_2_5_PRO_MODEL,
+    getAllowedModels,
+    getAllowedTimeframes,
     getTierLimit,
     hashUsageIp,
+    HIGH_CONFIDENCE_WEIGHT,
     isAllowed,
     isInfoDepthAllowed,
     isModelAllowed,
     isTier,
     isTimeframeAllowed,
     koreanTickers,
-    bcryptPasswordHasher,
-    bcryptPasswordVerifier,
-    deleteAccount,
-    findUserBySessionToken,
     loginUser,
     logoutUser,
-    requestChatCompletion,
-    createChatTokenStore,
-    GEMINI_2_5_FLASH_MODEL,
-    VALID_CHAT_MODELS,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
@@ -47,6 +63,7 @@ import {
     oauthProviderEnum,
     postProcessAnalysisWithReconcile,
     registerUser,
+    requestChatCompletion,
     RSI_DEFAULT_PERIOD,
     sessions,
     socialLoginUser,
@@ -54,23 +71,13 @@ import {
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
-    users,
     USER_TIER_VALUES,
+    users,
     userTierEnum,
+    VALID_CHAT_MODELS,
     validateActionPrices,
 } from '@/index';
-import type {
-    EmailAuthUserRepository,
-    OAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
-    PatternTrend,
-    SessionRepository,
-    ChatUsageLimitError,
-    UsageLimitError,
-    UsageRepository,
-    UserRepository,
-} from '@/index';
+import { describe, expect, it } from 'vitest';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -113,19 +120,33 @@ describe('public API exports', () => {
             feature: 'chatbotPerDay',
             tier: 'free',
         };
+        const gateError: TierGateErrorResult = {
+            status: 'error',
+            error: {
+                code: 'timeframe_not_allowed',
+                message: 'Timeframe 5Min is not available for free tier.',
+                tier: 'free',
+                timeframe: '5Min',
+                allowedTimeframes: getAllowedTimeframes('free'),
+            },
+        };
 
         expect(DEFAULT_TIER).toBe('free');
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
         expect(isAllowed('free', 'analysisPerDay')).toBe(true);
+        expect(getAllowedTimeframes('free')).toEqual([...TIMEFRAMES]);
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
         expect(isTimeframeAllowed('free', '5Min')).toBe(true);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
+        expect(getAllowedModels('free')).toContain('claude-opus-4');
         expect(isTier('member')).toBe(true);
         expect(typeof checkAnalysisLimit).toBe('function');
         expect(typeof checkChatbotLimit).toBe('function');
         expect(usageLimitError.code).toBe('analysis_limit_exceeded');
         expect(chatUsageLimitError.feature).toBe('chatbotPerDay');
+        expect(gateError.status).toBe('error');
+        expect(typeof filterAnalysisResult).toBe('function');
     });
 
     it('exports auth application entrypoints from package entrypoint', () => {
@@ -149,6 +170,7 @@ describe('public API exports', () => {
     it('exports database repository classes from package entrypoint', () => {
         expect(typeof DrizzleUserRepository).toBe('function');
         expect(typeof DrizzleSessionRepository).toBe('function');
+        expect(typeof DrizzleUsageLogRepository).toBe('function');
         expect(typeof DrizzleUsageRepository).toBe('function');
         expect(typeof hashUsageIp).toBe('function');
     });
@@ -171,7 +193,11 @@ describe('public API exports', () => {
 
     it('exports database enum values from package entrypoint', () => {
         expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
-        expect(USAGE_ACTION_TYPE_VALUES).toEqual(['analysis', 'chatbot']);
+        expect(USAGE_ACTION_TYPE_VALUES).toEqual([
+            'analysis',
+            'chatbot',
+            'premium_model',
+        ]);
         expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
     });
 
@@ -265,6 +291,7 @@ describe('public API exports', () => {
         expect(typeof requestChatCompletion).toBe('function');
         expect(typeof createChatTokenStore).toBe('function');
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
+        expect(GEMINI_2_5_PRO_MODEL).toBe('gemini-2.5-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
     });
 });

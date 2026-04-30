@@ -1,21 +1,26 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { Tier } from '@/domain/types';
-import { oauthAccounts, users } from './schema';
+import { oauthAccounts, passwordResets, users } from './schema';
 import type {
     AuthUserRecord,
+    CompletePasswordResetInput,
     CreateEmailUserInput,
     CreateOAuthUserInput,
+    CreatePasswordResetInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     OAuthProvider,
     OAuthUserRepository,
+    PasswordResetRecord,
+    PasswordResetRepository,
     SiglensDatabase,
     UserRepository,
     UserTierRepository,
 } from './types';
 
 class OAuthAccountConflictError extends Error {}
+class PasswordResetCompletionConflictError extends Error {}
 
 const authUserColumns = {
     id: users.id,
@@ -32,9 +37,19 @@ const emailAuthUserColumns = {
     passwordHash: users.passwordHash,
 };
 
+const passwordResetColumns = {
+    id: passwordResets.id,
+    userId: passwordResets.userId,
+    tokenHash: passwordResets.tokenHash,
+    expiresAt: passwordResets.expiresAt,
+    usedAt: passwordResets.usedAt,
+    createdAt: passwordResets.createdAt,
+};
+
 /**
  * Drizzle ORM implementation of {@link UserRepository}, {@link EmailAuthUserRepository},
- * and {@link OAuthUserRepository} backed by a Neon PostgreSQL database.
+ * {@link OAuthUserRepository}, {@link PasswordResetRepository}, and
+ * {@link UserTierRepository} backed by a Neon PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
@@ -43,6 +58,7 @@ export class DrizzleUserRepository
         UserRepository,
         EmailAuthUserRepository,
         OAuthUserRepository,
+        PasswordResetRepository,
         UserTierRepository
 {
     constructor(private readonly db: SiglensDatabase) {}
@@ -194,5 +210,74 @@ export class DrizzleUserRepository
             .returning({ tier: users.tier });
 
         return user?.tier ?? null;
+    }
+
+    async createPasswordReset(
+        input: CreatePasswordResetInput
+    ): Promise<PasswordResetRecord> {
+        const [passwordReset] = await this.db
+            .insert(passwordResets)
+            .values({
+                userId: input.userId,
+                tokenHash: input.tokenHash,
+                expiresAt: input.expiresAt,
+            })
+            .returning(passwordResetColumns);
+
+        return passwordReset!;
+    }
+
+    async findPasswordResetByTokenHash(
+        tokenHash: string
+    ): Promise<PasswordResetRecord | null> {
+        const [passwordReset] = await this.db
+            .select(passwordResetColumns)
+            .from(passwordResets)
+            .where(eq(passwordResets.tokenHash, tokenHash))
+            .limit(1);
+
+        return passwordReset ?? null;
+    }
+
+    async completePasswordReset(
+        input: CompletePasswordResetInput
+    ): Promise<boolean> {
+        try {
+            return await this.db.transaction(async tx => {
+                const [passwordReset] = await tx
+                    .update(passwordResets)
+                    .set({ usedAt: input.usedAt })
+                    .where(
+                        and(
+                            eq(passwordResets.id, input.resetId),
+                            eq(passwordResets.userId, input.userId),
+                            isNull(passwordResets.usedAt)
+                        )
+                    )
+                    .returning({ id: passwordResets.id });
+
+                if (passwordReset === undefined) {
+                    return false;
+                }
+
+                const [user] = await tx
+                    .update(users)
+                    .set({ passwordHash: input.passwordHash })
+                    .where(eq(users.id, input.userId))
+                    .returning({ id: users.id });
+
+                if (user === undefined) {
+                    throw new PasswordResetCompletionConflictError();
+                }
+
+                return true;
+            });
+        } catch (error) {
+            if (error instanceof PasswordResetCompletionConflictError) {
+                return false;
+            }
+
+            throw error;
+        }
     }
 }

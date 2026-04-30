@@ -76,15 +76,6 @@
 - Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
 - Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
 
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: infrastructure/db imported types from infrastructure/auth, creating cross-module coupling between two infrastructure modules
-- Rule: MISTAKES.md Architecture #3 — each infrastructure module handles one external system; cross-module coordination belongs at the consumer level
-- Context: merge resolution moved auth interfaces (UserRepository, SessionRepository, OAuthUserRepository, etc.) into infrastructure/auth/types.ts and had db/sessionRepository.ts and db/userRepository.ts import them across the boundary
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: module-internal exports (createSessionCookie, createExpiredSessionCookie, addSeconds, createAuthSession) missing `@internal` JSDoc tag
-- Rule: MISTAKES.md #9.5 — every function/constant exported from a module but not re-exported in src/index.ts must have `@internal`
-- Context: createAuthSession was newly introduced for the social-login flow without the tag; the existing helpers lost their tags during the merge
 
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
@@ -111,6 +102,15 @@
 - Rule: FF Coupling — consumers should import from a module's public index, not its internal implementation files, so internal restructuring stays non-breaking
 - Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`
 
+## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
+- Violation: Drizzle `onConflictDoUpdate` set clauses referenced target table columns instead of inserted row values
+- Rule: DB upsert semantics — conflict updates must use the `excluded` row when replacing existing values
+- Context: `DrizzleKoreanTickerRepository.upsertMany` and `DrizzleAssetTranslationRepository.upsert` now update rows from `excluded.*` values instead of preserving existing column values
+
+## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
+- Violation: Redis cache update used read-modify-write merge after DB upsert, allowing concurrent writes to overwrite each other
+- Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
+- Context: `setKoreanTickers` now deletes `korean:tickers` after successful DB upsert so the next read rebuilds cache from the database
 
 ## [PR #43 | feat/40-41/auth-helpers-and-delete-account | 2026-04-28]
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
@@ -144,3 +144,51 @@
 - Violation: Internal Gemini helper accepted the public optional `paidApiKey` type even after the entrypoint had validated the key
 - Rule: TypeScript type safety — internal helper signatures should represent narrowed invariants established by the caller instead of reintroducing optionality
 - Context: `requestChatCompletion` returned `server_error` when `paidApiKey` was missing, but `requestGeminiChatCompletion` still typed the value as `string | undefined`, causing `CallGeminiWithKeyFallbackOptions.paidApiKey` assignment to fail typecheck
+
+## [PR #44 | feat/13/timeframe-restrictions | 2026-04-28]
+- Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
+- Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
+- Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
+
+## [PR #45 | feat/12/info-depth-filter | 2026-04-28]
+- Violation: `filterAnalysisResult` calculated locked info depths from the module-level default `TIER_CONFIG` instead of the injected tier config
+- Rule: FF.md — Predictability (function output must derive from explicit inputs, not a cached default that conflicts with a provided parameter)
+- Context: custom `TierConfig.infoDepth.pro` values were ignored when computing `lockedInfoDepth`; the function now passes the active config's pro depth list into the helper
+
+## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
+- Violation: `FilteredActionRecommendation` duplicated optional fields from `ActionRecommendation` instead of extending the shared base shape
+- Rule: CONVENTIONS.md — Related interfaces with shared fields must use extends
+- Context: the filtered action recommendation type now inherits unchanged optional fields while overriding only gated prose fields with nullable variants
+
+## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
+- Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
+- Rule: CONVENTIONS.md — Functional Programming / immutability
+- Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
+
+## [Issue #14 | feat/14/ai-model-tier-separation | 2026-04-28]
+- Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
+- Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
+- Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint
+
+## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
+- Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
+- Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
+- Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
+
+## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
+- Violation: `src/index.ts` re-exported `DrizzleUserRepository` from the DB barrel, but `src/infrastructure/db/index.ts` no longer exported that symbol
+- Rule: PUBLIC_API.md — public entrypoint exports must stay synchronized with module barrels they depend on
+- Context: Restored the DB barrel re-export so the package entrypoint compiles and public repository exports remain available
+
+- Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
+- Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
+- Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
+
+## [Issue #42 | feat/42/password-reset-use-cases | 2026-04-28]
+- Violation: password reset completion changed `users.passwordHash` before proving the reset token row could be consumed
+- Rule: Transactional state transitions must validate and reserve the one-time credential before applying dependent account mutations
+- Context: `completePasswordReset` now consumes the reset row first with a `usedAt IS NULL` guard, then updates the user password inside the same transaction
+
+- Violation: password reset requests used broad user lookup and included OAuth-only accounts
+- Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
+- Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
