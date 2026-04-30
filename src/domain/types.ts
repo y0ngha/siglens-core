@@ -1315,3 +1315,27 @@ export interface AuthValidationError {
  * On long-lived runtimes (Cloud Run worker), the default is sufficient.
  */
 export type WaitUntil = (promise: Promise<unknown>) => void;
+
+/** Email message payload passed to an {@link EmailDispatcher} implementation. */
+export interface EmailMessage {
+    /** Recipient email address. */
+    to: string;
+    /** Email subject line. */
+    subject: string;
+    /** HTML body of the email. */
+    html: string;
+    /** Plain-text body of the email. */
+    text: string;
+}
+
+/** Input for {@link buildPasswordResetEmail}. */
+export interface BuildPasswordResetEmailInput {
+    /** Recipient email address. */
+    to: string;
+    /** Raw password reset token to embed in the reset URL. */
+    token: string;
+    /** Token expiration timestamp displayed in the email body. */
+    expiresAt: Date;
+    /** Base URL of the password reset page (e.g. `https://example.com/reset-password`). */
+    baseUrl: string;
+}

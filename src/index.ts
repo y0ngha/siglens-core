@@ -100,6 +100,9 @@ export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPromp
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 
+// Email template builders
+export { buildPasswordResetEmail } from './domain/auth/emailTemplates';
+
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
@@ -435,6 +438,9 @@ export {
     WILLIAMS_R_DEFAULT_PERIOD,
 } from './domain/indicators/constants';
 
+// Email
+export type { EmailDispatcher } from './infrastructure/email/types';
+
 // Infrastructure interfaces
 export type {
     AuthSessionCookie,
@@ -569,6 +575,7 @@ export type {
 
 // Domain types
 export type {
+    BuildPasswordResetEmailInput,
     ActionRecommendation,
     AnalysisResponse,
     AnalysisSignal,
@@ -614,6 +621,7 @@ export type {
     ExpectedSignalType,
     IchimokuFuturePoint,
     IchimokuResult,
+    EmailMessage,
     IndexTicker,
     IndicatorGuideResult,
     IndicatorResult,
