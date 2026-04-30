@@ -122,7 +122,7 @@ describe('requestChatCompletion', () => {
 
         const result = await requestChatCompletion(
             createParams({
-                tier: 'free',
+                tierContext: { userId: null, tier: 'free' },
                 tierConfig: restrictedTierConfig,
             }),
             { tokenStore, usageRepository, callGemini }
@@ -188,8 +188,7 @@ describe('requestChatCompletion', () => {
                 userMessage: 'RSI도 설명해줘',
                 freeApiKey: 'free-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
-                tier: 'free',
-                userId: 'user-1',
+                tierContext: { userId: 'user-1', tier: 'free' },
                 usageOccurredAt,
                 tierConfig: restrictedTierConfig,
             }),
@@ -246,7 +245,7 @@ describe('requestChatCompletion', () => {
 
         const result = await requestChatCompletion(
             createParams({
-                tier: 'free',
+                tierContext: { userId: null, tier: 'free' },
                 tierConfig: restrictedTierConfig,
             }),
             { tokenStore, usageRepository, callGemini }

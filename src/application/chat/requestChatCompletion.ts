@@ -104,7 +104,7 @@ async function recordChatUsageSafely(
 ): Promise<void> {
     try {
         await usageRepository.recordUsage({
-            userId: params.userId ?? params.tierContext?.userId ?? null,
+            userId: params.tierContext?.userId ?? null,
             ipAddress: params.clientIp,
             actionType: 'chatbot',
             modelUsed: model,
@@ -172,8 +172,8 @@ export async function requestChatCompletion(
     }
 
     const tierContext = params.tierContext ?? {
-        userId: params.userId ?? null,
-        tier: params.tier ?? DEFAULT_TIER,
+        userId: null,
+        tier: DEFAULT_TIER,
     };
     const tierConfig =
         dependencies.tierConfig ?? params.tierConfig ?? TIER_CONFIG;

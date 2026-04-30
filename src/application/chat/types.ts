@@ -6,7 +6,6 @@ import type {
     AnalysisResponse,
     ChatMessage,
     ChatModel,
-    Tier,
     TierConfig,
     Timeframe,
     UserTierContext,
@@ -20,14 +19,6 @@ export type ChatErrorCode =
     | 'server_error'
     | 'server_busy';
 
-/**
- * Parameters for {@link requestChatCompletion}.
- *
- * Tier resolution priority: `tierContext` takes precedence over the flat
- * `tier` / `userId` fields. Prefer passing `tierContext` directly; the flat
- * fields exist for backward-compatibility and will be removed in a future
- * major version.
- */
 export interface RequestChatCompletionParams {
     symbol: string;
     timeframe: Timeframe;
@@ -35,8 +26,6 @@ export interface RequestChatCompletionParams {
     history: ChatMessage[];
     userMessage: string;
     clientIp: string;
-    tier?: Tier;
-    userId?: string | null;
     model?: ChatModel;
     freeApiKey?: string;
     paidApiKey?: string;
