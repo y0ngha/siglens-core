@@ -76,15 +76,6 @@
 - Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
 - Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
 
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: infrastructure/db imported types from infrastructure/auth, creating cross-module coupling between two infrastructure modules
-- Rule: MISTAKES.md Architecture #3 — each infrastructure module handles one external system; cross-module coordination belongs at the consumer level
-- Context: merge resolution moved auth interfaces (UserRepository, SessionRepository, OAuthUserRepository, etc.) into infrastructure/auth/types.ts and had db/sessionRepository.ts and db/userRepository.ts import them across the boundary
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: module-internal exports (createSessionCookie, createExpiredSessionCookie, addSeconds, createAuthSession) missing `@internal` JSDoc tag
-- Rule: MISTAKES.md #9.5 — every function/constant exported from a module but not re-exported in src/index.ts must have `@internal`
-- Context: createAuthSession was newly introduced for the social-login flow without the tag; the existing helpers lost their tags during the merge
 
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
@@ -111,6 +102,15 @@
 - Rule: FF Coupling — consumers should import from a module's public index, not its internal implementation files, so internal restructuring stays non-breaking
 - Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`
 
+## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
+- Violation: Drizzle `onConflictDoUpdate` set clauses referenced target table columns instead of inserted row values
+- Rule: DB upsert semantics — conflict updates must use the `excluded` row when replacing existing values
+- Context: `DrizzleKoreanTickerRepository.upsertMany` and `DrizzleAssetTranslationRepository.upsert` now update rows from `excluded.*` values instead of preserving existing column values
+
+## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
+- Violation: Redis cache update used read-modify-write merge after DB upsert, allowing concurrent writes to overwrite each other
+- Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
+- Context: `setKoreanTickers` now deletes `korean:tickers` after successful DB upsert so the next read rebuilds cache from the database
 
 ## [PR #43 | feat/40-41/auth-helpers-and-delete-account | 2026-04-28]
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth

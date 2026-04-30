@@ -6,7 +6,7 @@ import type {
     USER_TIER_VALUES,
 } from './constants';
 import type * as schema from './schema';
-import type { Tier } from '@/domain/types';
+import type { KoreanTickerEntry, Tier } from '@/domain/types';
 
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];
@@ -289,6 +289,79 @@ export interface DatabaseClient {
     db: SiglensDatabase;
     /** Raw Neon serverless SQL client for template-literal queries. */
     sql: NeonSqlClient;
+}
+
+/**
+ * Persisted Korean→English asset translation record stored in
+ * `asset_translations`. Source-of-truth for {@link AssetInfo} when the Redis
+ * cache is cold or unavailable.
+ */
+export interface AssetTranslationRecord {
+    /** Canonical ticker symbol (uppercase). */
+    symbol: string;
+    /** English company / asset name. */
+    name: string;
+    /** Korean translation of {@link AssetTranslationRecord.name}. */
+    koreanName: string;
+    /**
+     * FMP API symbol used for upstream lookups. Equal to {@link symbol} for
+     * regular equities; uses provider-specific prefixes for indices
+     * (e.g. `^SPX`).
+     */
+    fmpSymbol: string;
+}
+
+/**
+ * Persistence operations for the Korean-ticker store backing
+ * {@link KoreanTickerEntry} lookups. The Redis cache layered above this
+ * repository is treated as a fast read path; the database is the source of
+ * truth.
+ */
+export interface KoreanTickerRepository {
+    /**
+     * Load every persisted Korean ticker entry.
+     *
+     * @returns All rows in `korean_tickers`; an empty array when the table is empty.
+     */
+    findAll(): Promise<KoreanTickerEntry[]>;
+
+    /**
+     * Load Korean ticker entries for the requested symbols only.
+     *
+     * @param symbols - Canonical ticker symbols (uppercase); empty input returns `[]`.
+     * @returns Matching rows in `korean_tickers`.
+     */
+    findBySymbols(symbols: readonly string[]): Promise<KoreanTickerEntry[]>;
+
+    /**
+     * Upsert one or more Korean ticker entries by symbol. Existing rows are
+     * overwritten with the new field values.
+     *
+     * @param entries - Entries to persist; a no-op when empty.
+     */
+    upsertMany(entries: readonly KoreanTickerEntry[]): Promise<void>;
+}
+
+/**
+ * Persistence operations for the asset-translation store backing
+ * {@link AssetTranslationRecord} lookups.
+ */
+export interface AssetTranslationRepository {
+    /**
+     * Find a persisted asset translation by canonical symbol.
+     *
+     * @param symbol - Canonical ticker symbol (uppercase).
+     * @returns The matching record, or `null` when absent.
+     */
+    findBySymbol(symbol: string): Promise<AssetTranslationRecord | null>;
+
+    /**
+     * Upsert an asset translation by symbol. Existing rows are overwritten
+     * with the new field values.
+     *
+     * @param record - Record to persist.
+     */
+    upsert(record: AssetTranslationRecord): Promise<void>;
 }
 
 /** Persistence operations required by tier-gating use-cases. */

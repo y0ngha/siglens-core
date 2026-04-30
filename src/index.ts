@@ -272,6 +272,8 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 // Database
 export {
     createDatabaseClient,
+    DrizzleAssetTranslationRepository,
+    DrizzleKoreanTickerRepository,
     DrizzleSessionRepository,
     DrizzleUsageRepository,
     DrizzleUserRepository,
@@ -497,6 +499,8 @@ export type {
     UserTierDependencies,
 } from './application/tier';
 export type {
+    AssetTranslationRecord,
+    AssetTranslationRepository,
     AuthSessionRecord,
     AuthUserRecord,
     CreateEmailUserInput,
@@ -504,6 +508,7 @@ export type {
     CreateSessionInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    KoreanTickerRepository,
     OAuthUserRepository,
     SessionRepository,
     UserRepository,

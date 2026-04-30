@@ -262,6 +262,22 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
 
+### 티커 영속화 (DB ↔ Redis)
+
+`korean_tickers` / `asset_translations` 두 테이블은 DB가 source-of-truth이고
+Upstash Redis는 hot cache로 동작한다. 호출자는 다음 패턴을 따라야 한다.
+
+- READ — Redis hit → 반환 / Redis miss → DB 조회 → Redis 갱신 → 반환
+- WRITE — DB upsert 먼저 → Redis 갱신
+
+핵심 진입점:
+
+- `DrizzleKoreanTickerRepository` — `korean_tickers` 의 `findAll` / `findBySymbols` / `upsertMany`
+- `DrizzleAssetTranslationRepository` — `asset_translations` 의 `findBySymbol` / `upsert`
+- `application/ticker/koreanNameStore` 와 `application/ticker/getAssetInfo` 는 위
+  repository 와 `CacheProvider` 를 함께 사용한다. DB 클라이언트가 없으면 Redis-only 로
+  graceful degradation 하고, 둘 다 없으면 빈 결과/스킵으로 떨어진다.
+
 ### 사용량 트래킹
 
 `DrizzleUsageRepository`는 `usage_logs`에 분석/챗봇 사용 이벤트를 기록하고 UTC 날짜 기준
