@@ -31,11 +31,6 @@
 - Rule: MISTAKES.md Architecture #4 — infrastructure 모듈의 public interface는 `types.ts`에 위치해야 함
 - Context: `infrastructure/market/types.ts`로 이동하고 구현 파일에서 import하도록 수정
 
-## [PR #26 Round 2 | feat/18/infrastructure-market-이전 | 2026-04-26]
-- Violation: `submitAnalysis.ts`와 `pollAnalysis.ts`에서 `Awaited<ReturnType<typeof skillsLoader.loadSkills>>` 복잡한 유틸리티 타입 추론 사용
-- Rule: 직접 임포트 가능한 구체 타입이 있을 때 복잡한 `Awaited<ReturnType<...>>` 체인 대신 해당 타입을 명시적으로 사용
-- Context: `SkillsProvider.loadSkills()`의 반환 타입은 `Promise<Skill[]>`이므로 `Awaited<...>`는 `Skill[]`; `Skill` 타입을 직접 import해 사용하면 더 명확하고 인터페이스 타입과도 일치
-
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
 - Rule: Schema design — avoid duplicate indexes that add storage/write overhead without a new lookup path
@@ -101,11 +96,6 @@
 - Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
 - Rule: Issue completion criteria — limit-exceeded responses must be structured and consistent across analysis and chatbot gates
 - Context: Preserved `code`, `message`, `feature`, and `tier` in public analysis/chatbot result types and return values
-
-## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
-- Violation: Feature-specific usage-limit errors were manually remapped at call sites because the shared builder returned a broad union type
-- Rule: TypeScript type safety — shared helpers should preserve discriminated literal types so callers can reuse results without duplicating field mappings
-- Context: Converted `UsageLimitError` to a discriminated union and added overloads to `buildUsageLimitError` for analysis and chatbot features
 
 ## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
 - Violation: Application usage-limit tests did not directly cover all feature branches
@@ -181,3 +171,8 @@
 - Violation: `submitAnalysis` used one timestamp for usage-limit checking but could pass an undefined timestamp to usage recording, allowing a second `new Date()` at the repository boundary
 - Rule: FF.md — Predictability; one request-scoped decision should use one authoritative timestamp across related limit-check and usage-record operations
 - Context: Reused a single `usageOccurredAt` value for `checkAnalysisUsageAllowed` and both cache-hit/submitted `recordAnalysisUsageSafely` paths, with a regression test for the no-`occurredAt` branch
+
+## [Issue #55 | feat/55/email-verification-redis-migration | 2026-05-01]
+- Violation: `users.emailVerified` DB column default (`true`) did not match application-layer default (`?? false` in `createEmailUser`)
+- Rule: FF.md — Predictability; DB schema defaults must align with application-layer defaults so callers reading the schema get the same behavior as raw SQL inserts and code paths.
+- Context: Initial migration 0004 used `DEFAULT true` to backfill existing rows. Added migration 0005 to change the column default to `false` going forward, matching the application-layer fallback. Existing-row backfill (`true`) is preserved per user directive while future inserts default to `false`.

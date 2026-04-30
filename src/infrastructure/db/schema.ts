@@ -1,4 +1,5 @@
 import {
+    boolean,
     date,
     index,
     pgEnum,
@@ -45,6 +46,7 @@ export const users = pgTable('users', {
     name: text('name'),
     avatarUrl: text('avatar_url'),
     tier: userTierEnum('tier').notNull().default('free'),
+    emailVerified: boolean('email_verified').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
@@ -70,27 +72,6 @@ export const sessions = pgTable(
     table => [
         index('sessions_user_id_idx').on(table.userId),
         index('sessions_expires_at_idx').on(table.expiresAt),
-    ]
-);
-
-/** Password reset tokens — one-time email recovery credentials. */
-export const passwordResets = pgTable(
-    'password_resets',
-    {
-        id: uuid('id').primaryKey().defaultRandom(),
-        userId: uuid('user_id')
-            .notNull()
-            .references(() => users.id, { onDelete: 'cascade' }),
-        tokenHash: text('token_hash').notNull().unique(),
-        expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-        usedAt: timestamp('used_at', { withTimezone: true }),
-        createdAt: timestamp('created_at', { withTimezone: true })
-            .notNull()
-            .defaultNow(),
-    },
-    table => [
-        index('password_resets_user_id_idx').on(table.userId),
-        index('password_resets_expires_at_idx').on(table.expiresAt),
     ]
 );
 

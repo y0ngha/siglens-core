@@ -237,6 +237,17 @@ and have been removed from this file.
    ❌ { ok: false; error: ChatErrorCode | ChatUsageLimitError }  // error field accepts both; callers must typeof-guard
    ✅ Split into separate union branches:
       { ok: false; error: ChatErrorCode } | { ok: false; error: ChatUsageLimitError }
+
+9. Complex type inference chains instead of importing direct types
+   → When a function's return type can be expressed as an imported concrete type, prefer direct import over inference chains
+   → Inference chains (Awaited<ReturnType<typeof fn>>, Omit<T, K>, etc.) prevent type narrowing and obscure the actual contract
+   ❌ type SkillProvider = Awaited<ReturnType<typeof skillsLoader.loadSkills>>;  // infers Promise<Skill[]> → Skill[]
+      → but then helper is called with `SkillProvider | undefined` — caller cannot narrow through destructuring
+   ❌ UsageLimitError builder preserves union { code: 'analysis' | 'chatbot'; ... } instead of discriminated { code: 'analysis'; ... } | { code: 'chatbot'; ... }
+      → caller receives union type and must runtime-check even though builder could narrow
+   ✅ type SkillProvider = Skill[];  // import Skill directly; explicit and preserves narrowing
+   ✅ UsageLimitError as discriminated union: type AnalysisLimitError { code: 'analysis'; ... } | type ChatbotLimitError { code: 'chatbot'; ... }
+      → callers can now narrow with type discriminator without runtime typeof/field checks
 ```
 
 ---

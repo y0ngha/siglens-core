@@ -1,149 +1,119 @@
 import { describe, expect, it, vi } from 'vitest';
 import { confirmPasswordReset } from '@/application/auth';
 import type { ConfirmPasswordResetDependencies } from '@/application/auth';
-import type { PasswordResetRecord } from '@/infrastructure/db/types';
+import { hashEmailToken } from '@/infrastructure/auth/tokenUtils';
+import type {
+    EmailTokenPurpose,
+    EmailTokenValue,
+} from '@/infrastructure/email/types';
+import type { EmailAuthUserRecord } from '@/infrastructure/db/types';
 
-const now = new Date('2026-04-28T00:00:00.000Z');
-const future = new Date('2026-04-28T00:30:00.000Z');
-const past = new Date('2026-04-27T23:59:59.000Z');
+const RAW_TOKEN = 'raw-token-value';
+const STORED_TOKEN_HASH = hashEmailToken(RAW_TOKEN);
+const NEW_PASSWORD = 'NewSecret1';
 
-function makePasswordReset(overrides?: {
-    expiresAt?: Date;
-    usedAt?: Date | null;
-}): PasswordResetRecord {
-    return {
-        id: 'reset-1',
-        userId: 'user-1',
-        tokenHash: 'hashed-token',
-        expiresAt: overrides?.expiresAt ?? future,
-        usedAt: overrides?.usedAt ?? null,
-        createdAt: new Date('2026-04-27T23:30:00.000Z'),
-    };
-}
+const user: EmailAuthUserRecord = {
+    id: 'user-1',
+    email: 'user@example.com',
+    passwordHash: 'old-hash',
+    name: null,
+    avatarUrl: null,
+    tier: 'free',
+    emailVerified: true,
+    createdAt: new Date('2026-04-27T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-27T00:00:01.000Z'),
+};
 
 function makeDependencies(options?: {
-    passwordReset?: PasswordResetRecord | null;
-    completed?: boolean;
+    storedToken?: EmailTokenValue | null;
+    user?: EmailAuthUserRecord | null;
+    updatePasswordResult?: boolean;
+    hashedNewPassword?: string;
 }): {
     dependencies: ConfirmPasswordResetDependencies;
-    hashPasswordResetToken: ReturnType<typeof vi.fn>;
-    findPasswordResetByTokenHash: ReturnType<typeof vi.fn>;
+    getToken: ReturnType<typeof vi.fn>;
+    deleteToken: ReturnType<typeof vi.fn>;
+    findEmailAuthUserByEmail: ReturnType<typeof vi.fn>;
+    updatePassword: ReturnType<typeof vi.fn>;
     hashPassword: ReturnType<typeof vi.fn>;
-    completePasswordReset: ReturnType<typeof vi.fn>;
 } {
-    const passwordReset =
-        options && 'passwordReset' in options
-            ? options.passwordReset
-            : makePasswordReset();
-    const completed =
-        options && 'completed' in options ? options.completed : true;
-    const hashPasswordResetToken = vi.fn().mockResolvedValue('hashed-token');
-    const findPasswordResetByTokenHash = vi
-        .fn()
-        .mockResolvedValue(passwordReset);
-    const hashPassword = vi.fn().mockResolvedValue('new-password-hash');
-    const completePasswordReset = vi.fn().mockResolvedValue(completed);
+    const defaultStored: EmailTokenValue = {
+        status: 'pending',
+        tokenHash: STORED_TOKEN_HASH,
+    };
+    const storedToken: EmailTokenValue | null =
+        options && 'storedToken' in options
+            ? (options.storedToken ?? null)
+            : defaultStored;
+    const foundUser = options && 'user' in options ? options.user : user;
+    const updateResult = options?.updatePasswordResult ?? true;
+    const hashed = options?.hashedNewPassword ?? 'new-hashed-password';
+
+    const getToken = vi
+        .fn<
+            (
+                purpose: EmailTokenPurpose,
+                email: string
+            ) => Promise<EmailTokenValue | null>
+        >()
+        .mockResolvedValue(storedToken);
+    const deleteToken = vi.fn().mockResolvedValue(undefined);
+    const findEmailAuthUserByEmail = vi.fn().mockResolvedValue(foundUser);
+    const updatePassword = vi.fn().mockResolvedValue(updateResult);
+    const hashPassword = vi.fn().mockResolvedValue(hashed);
 
     return {
         dependencies: {
-            passwordResets: {
-                createPasswordReset: vi.fn(),
-                findPasswordResetByTokenHash,
-                completePasswordReset,
+            users: { findEmailAuthUserByEmail },
+            userRepository: {
+                findByEmail: vi.fn(),
+                findById: vi.fn(),
+                createEmailUser: vi.fn(),
+                deleteUser: vi.fn(),
+                updatePassword,
+            },
+            emailTokens: {
+                set: vi.fn(),
+                get: getToken,
+                delete: deleteToken,
             },
             passwordHasher: { hashPassword },
-            tokenHasher: { hashPasswordResetToken },
         },
-        hashPasswordResetToken,
-        findPasswordResetByTokenHash,
+        getToken,
+        deleteToken,
+        findEmailAuthUserByEmail,
+        updatePassword,
         hashPassword,
-        completePasswordReset,
     };
 }
 
 describe('confirmPasswordReset', () => {
-    it('rejects weak passwords before token lookup', async () => {
-        const {
-            dependencies,
-            hashPasswordResetToken,
-            findPasswordResetByTokenHash,
-            hashPassword,
-        } = makeDependencies();
+    it('returns weak_password error when password fails validation', async () => {
+        const { dependencies, getToken, updatePassword } = makeDependencies();
 
         const result = await confirmPasswordReset(
-            { token: 'raw-token', newPassword: 'password' },
-            dependencies,
-            { now }
+            { email: 'user@example.com', token: RAW_TOKEN, newPassword: 'abc' },
+            dependencies
         );
 
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'weak_password',
-                field: 'password',
-                message:
-                    'Password must be at least 8 characters and include letters and numbers',
-            },
-        });
-        expect(hashPasswordResetToken).not.toHaveBeenCalled();
-        expect(findPasswordResetByTokenHash).not.toHaveBeenCalled();
-        expect(hashPassword).not.toHaveBeenCalled();
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('weak_password');
+        expect(getToken).not.toHaveBeenCalled();
+        expect(updatePassword).not.toHaveBeenCalled();
     });
 
-    it('rejects unknown tokens', async () => {
-        const { dependencies, hashPasswordResetToken, hashPassword } =
-            makeDependencies({ passwordReset: null });
-
-        const result = await confirmPasswordReset(
-            { token: 'raw-token', newPassword: 'Password1' },
-            dependencies,
-            { now }
-        );
-
-        expect(hashPasswordResetToken).toHaveBeenCalledWith('raw-token');
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'invalid_token',
-                field: 'token',
-                message: 'Password reset token is invalid',
-            },
-        });
-        expect(hashPassword).not.toHaveBeenCalled();
-    });
-
-    it('rejects already used tokens', async () => {
-        const { dependencies, hashPassword } = makeDependencies({
-            passwordReset: makePasswordReset({ usedAt: past }),
+    it('returns expired_token error when no Redis entry exists', async () => {
+        const { dependencies, updatePassword } = makeDependencies({
+            storedToken: null,
         });
 
         const result = await confirmPasswordReset(
-            { token: 'raw-token', newPassword: 'Password1' },
-            dependencies,
-            { now }
-        );
-
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'invalid_token',
-                field: 'token',
-                message: 'Password reset token is invalid',
+            {
+                email: 'user@example.com',
+                token: RAW_TOKEN,
+                newPassword: NEW_PASSWORD,
             },
-        });
-        expect(hashPassword).not.toHaveBeenCalled();
-    });
-
-    it('rejects expired tokens', async () => {
-        const { dependencies, hashPassword, completePasswordReset } =
-            makeDependencies({
-                passwordReset: makePasswordReset({ expiresAt: past }),
-            });
-
-        const result = await confirmPasswordReset(
-            { token: 'raw-token', newPassword: 'Password1' },
-            dependencies,
-            { now }
+            dependencies
         );
 
         expect(result).toEqual({
@@ -154,77 +124,110 @@ describe('confirmPasswordReset', () => {
                 message: 'Password reset token has expired',
             },
         });
-        expect(hashPassword).not.toHaveBeenCalled();
-        expect(completePasswordReset).not.toHaveBeenCalled();
+        expect(updatePassword).not.toHaveBeenCalled();
     });
 
-    it('hashes the new password and consumes a valid token', async () => {
+    it('returns invalid_token error when stored entry is in verified state', async () => {
+        const { dependencies } = makeDependencies({
+            storedToken: { status: 'verified' },
+        });
+
+        const result = await confirmPasswordReset(
+            {
+                email: 'user@example.com',
+                token: RAW_TOKEN,
+                newPassword: NEW_PASSWORD,
+            },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('invalid_token');
+    });
+
+    it('returns invalid_token error when the supplied token does not match', async () => {
+        const { dependencies, deleteToken } = makeDependencies();
+
+        const result = await confirmPasswordReset(
+            {
+                email: 'user@example.com',
+                token: 'wrong-token',
+                newPassword: NEW_PASSWORD,
+            },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('invalid_token');
+        expect(deleteToken).not.toHaveBeenCalled();
+    });
+
+    it('returns invalid_token error when the user no longer exists', async () => {
+        const { dependencies } = makeDependencies({ user: null });
+
+        const result = await confirmPasswordReset(
+            {
+                email: 'user@example.com',
+                token: RAW_TOKEN,
+                newPassword: NEW_PASSWORD,
+            },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('invalid_token');
+    });
+
+    it('returns invalid_token when updatePassword fails', async () => {
+        const { dependencies, deleteToken } = makeDependencies({
+            updatePasswordResult: false,
+        });
+
+        const result = await confirmPasswordReset(
+            {
+                email: 'user@example.com',
+                token: RAW_TOKEN,
+                newPassword: NEW_PASSWORD,
+            },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('invalid_token');
+        expect(deleteToken).not.toHaveBeenCalled();
+    });
+
+    it('updates the password hash and deletes the Redis entry on success', async () => {
         const {
             dependencies,
-            findPasswordResetByTokenHash,
+            getToken,
+            deleteToken,
+            updatePassword,
             hashPassword,
-            completePasswordReset,
         } = makeDependencies();
 
         const result = await confirmPasswordReset(
-            { token: 'raw-token', newPassword: 'Password1' },
-            dependencies,
-            { now }
-        );
-
-        expect(findPasswordResetByTokenHash).toHaveBeenCalledWith(
-            'hashed-token'
-        );
-        expect(hashPassword).toHaveBeenCalledWith('Password1');
-        expect(completePasswordReset).toHaveBeenCalledWith({
-            resetId: 'reset-1',
-            userId: 'user-1',
-            passwordHash: 'new-password-hash',
-            usedAt: now,
-        });
-        expect(result).toEqual({ ok: true });
-    });
-
-    it('uses the current system time when no runtime override is provided', async () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(now);
-
-        try {
-            const { dependencies, completePasswordReset } = makeDependencies();
-
-            const result = await confirmPasswordReset(
-                { token: 'raw-token', newPassword: 'Password1' },
-                dependencies
-            );
-
-            expect(completePasswordReset).toHaveBeenCalledWith({
-                resetId: 'reset-1',
-                userId: 'user-1',
-                passwordHash: 'new-password-hash',
-                usedAt: now,
-            });
-            expect(result).toEqual({ ok: true });
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it('returns invalid token when completion fails', async () => {
-        const { dependencies } = makeDependencies({ completed: false });
-
-        const result = await confirmPasswordReset(
-            { token: 'raw-token', newPassword: 'Password1' },
-            dependencies,
-            { now }
-        );
-
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'invalid_token',
-                field: 'token',
-                message: 'Password reset token is invalid',
+            {
+                email: ' User@Example.COM ',
+                token: RAW_TOKEN,
+                newPassword: NEW_PASSWORD,
             },
-        });
+            dependencies
+        );
+
+        expect(result).toEqual({ ok: true });
+        expect(getToken).toHaveBeenCalledWith(
+            'password_reset',
+            'user@example.com'
+        );
+        expect(hashPassword).toHaveBeenCalledWith(NEW_PASSWORD);
+        expect(updatePassword).toHaveBeenCalledWith(
+            'user-1',
+            'new-hashed-password'
+        );
+        expect(deleteToken).toHaveBeenCalledWith(
+            'password_reset',
+            'user@example.com'
+        );
     });
 });

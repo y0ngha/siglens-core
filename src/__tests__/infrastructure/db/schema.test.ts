@@ -8,7 +8,6 @@ import {
     koreanTickers,
     oauthAccounts,
     oauthProviderEnum,
-    passwordResets,
     sessions,
     usageActionTypeEnum,
     usageLogs,
@@ -51,6 +50,7 @@ describe('database schema tables', () => {
             'name',
             'avatar_url',
             'tier',
+            'email_verified',
             'created_at',
             'updated_at',
         ]);
@@ -62,18 +62,6 @@ describe('database schema tables', () => {
             'id',
             'user_id',
             'expires_at',
-            'created_at',
-        ]);
-    });
-
-    it('defines password reset table columns', () => {
-        expect(getTableName(passwordResets)).toBe('password_resets');
-        expect(columnNames(passwordResets)).toEqual([
-            'id',
-            'user_id',
-            'token_hash',
-            'expires_at',
-            'used_at',
             'created_at',
         ]);
     });
@@ -135,17 +123,6 @@ describe('database schema tables', () => {
         ).toEqual(['sessions_user_id_idx', 'sessions_expires_at_idx']);
     });
 
-    it('defines lookup indexes for password reset table', () => {
-        expect(
-            getTableConfig(passwordResets).indexes.map(
-                index => index.config.name
-            )
-        ).toEqual([
-            'password_resets_user_id_idx',
-            'password_resets_expires_at_idx',
-        ]);
-    });
-
     it('defines lookup indexes for usage logs table', () => {
         expect(
             getTableConfig(usageLogs).indexes.map(index => index.config.name)
@@ -183,7 +160,7 @@ describe('database schema tables', () => {
         expect(getTableColumns(users).email.isUnique).toBe(true);
     });
 
-    it('enforces unique constraint on password reset token hash', () => {
-        expect(getTableColumns(passwordResets).tokenHash.isUnique).toBe(true);
+    it('defines email_verified column on users with default true', () => {
+        expect(columnNames(users)).toContain('email_verified');
     });
 });

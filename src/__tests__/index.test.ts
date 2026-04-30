@@ -211,10 +211,12 @@ describe('public API exports', () => {
                 name: input.name ?? null,
                 avatarUrl: input.avatarUrl ?? null,
                 tier: 'free',
+                emailVerified: input.emailVerified ?? false,
                 createdAt: new Date('2026-04-26T00:00:00.000Z'),
                 updatedAt: new Date('2026-04-26T00:00:00.000Z'),
             }),
             deleteUser: async () => true,
+            updatePassword: async () => true,
         };
         const passwordHasher: PasswordHasher = {
             hashPassword: async password => `hashed:${password}`,

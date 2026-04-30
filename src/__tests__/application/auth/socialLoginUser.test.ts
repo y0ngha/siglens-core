@@ -30,6 +30,8 @@ function makeUser(id: string): AuthUserRecord {
         name: null,
         avatarUrl: null,
         tier: 'free',
+
+        emailVerified: true,
         createdAt,
         updatedAt,
     };

@@ -4,7 +4,6 @@ import type {
     EmailAuthUserRepository,
     OAuthProvider,
     OAuthUserRepository,
-    PasswordResetRepository,
     SessionRepository,
     UserRepository,
 } from '@/infrastructure/db/types';
@@ -12,10 +11,14 @@ import type {
     PasswordHasher,
     PasswordVerifier,
 } from '@/infrastructure/auth/types';
-import type { EmailDispatcher } from '@/infrastructure/email/types';
+import type {
+    EmailDispatcher,
+    EmailTokenStore,
+} from '@/infrastructure/email/types';
 import type {
     AuthValidationErrorCode,
     AuthValidationErrorField,
+    EmailMessage,
 } from '@/domain/types';
 
 /**
@@ -24,10 +27,13 @@ import type {
  * - `invalid_email` — the provided email does not match a valid format.
  * - `weak_password` — the password is too short or lacks required character types.
  * - `email_already_exists` — the email is already registered.
+ * - `email_not_verified` — `requestEmailVerification` and `verifyEmail` must be
+ *   completed before `registerUser` can create the account.
  */
 export type RegisterUserErrorCode =
     | AuthValidationErrorCode
-    | 'email_already_exists';
+    | 'email_already_exists'
+    | 'email_not_verified';
 
 /**
  * The input field associated with a registration validation error.
@@ -69,6 +75,20 @@ export interface RegisterUserError {
 export type RegisterUserResult =
     | { ok: true; user: AuthUserRecord }
     | { ok: false; error: RegisterUserError };
+
+/**
+ * Dependencies required to register a new email-auth user. The caller must
+ * complete the email-verification flow ({@link requestEmailVerification} →
+ * {@link verifyEmail}) before invoking {@link registerUser}.
+ */
+export interface RegisterUserDependencies {
+    /** User persistence repository. */
+    users: UserRepository;
+    /** Password hashing service. */
+    passwordHasher: PasswordHasher;
+    /** Email-token store used to confirm prior email verification. */
+    emailTokens: EmailTokenStore;
+}
 
 /**
  * Error code returned when email login fails.
@@ -350,71 +370,45 @@ export interface RequestPasswordResetInput {
 }
 
 /**
- * Service that creates high-entropy password reset tokens.
- */
-export interface PasswordResetTokenGenerator {
-    /**
-     * Generate a raw token that the consumer can deliver to the user by email.
-     *
-     * @returns A one-time reset token.
-     */
-    generatePasswordResetToken(): string | Promise<string>;
-}
-
-/**
- * Service that hashes raw reset tokens before persistence or lookup.
- */
-export interface PasswordResetTokenHasher {
-    /**
-     * Hash a raw password reset token.
-     *
-     * @param token - Raw reset token supplied by the generator or user.
-     * @returns Stable token hash used for database storage and lookup.
-     */
-    hashPasswordResetToken(token: string): string | Promise<string>;
-}
-
-/**
  * Dependencies required to create a password reset token.
  */
 export interface RequestPasswordResetDependencies {
     /** Email-auth credential lookup repository. */
     users: EmailAuthUserRepository;
-    /** Password reset persistence repository. */
-    passwordResets: PasswordResetRepository;
-    /** Raw token generator supplied by the consumer. */
-    tokenGenerator: PasswordResetTokenGenerator;
-    /** Token hashing service supplied by the consumer. */
-    tokenHasher: PasswordResetTokenHasher;
+    /** Redis-backed email-token store for password reset tokens. */
+    emailTokens: EmailTokenStore;
     /** Email delivery service supplied by the consumer. */
     emailDispatcher: EmailDispatcher;
 }
 
 /**
- * Runtime overrides for {@link requestPasswordReset}.
+ * Runtime options for {@link requestPasswordReset}.
  */
 export interface RequestPasswordResetOptions {
-    /** Current time used to calculate token expiration; defaults to `new Date()`. */
-    now?: Date;
-    /** Base URL of the password reset page used to construct the reset link in the email. */
-    resetUrlBase: string;
+    /**
+     * Build the password-reset email message for the given raw token.
+     * Invoked only after the token has been generated and persisted.
+     */
+    buildMessage: (token: string) => EmailMessage;
 }
 
 /**
  * Result of a {@link requestPasswordReset} call.
  *
- * Missing accounts intentionally return `token: null` so consumers can choose
- * whether to reveal or hide account existence in their presentation layer.
- * `emailDispatched` indicates whether the reset email was accepted for delivery.
+ * Missing accounts intentionally return `tokenIssued: false` without leaking
+ * whether the email is registered. `emailDispatched` indicates whether the
+ * reset email was accepted for delivery.
  */
 export type RequestPasswordResetResult =
-    | { ok: true; token: string; expiresAt: Date; emailDispatched: boolean }
-    | { ok: true; token: null; expiresAt: null; emailDispatched: false };
+    | { ok: true; tokenIssued: true; emailDispatched: boolean }
+    | { ok: true; tokenIssued: false; emailDispatched: false };
 
 /**
  * Input data required to confirm a password reset token.
  */
 export interface ConfirmPasswordResetInput {
+    /** Email address of the account whose password is being reset. */
+    email: string;
     /** Raw token received from the password reset link/form. */
     token: string;
     /** New plain-text password; validated before hashing. */
@@ -442,28 +436,105 @@ export interface ConfirmPasswordResetError {
 }
 
 /**
- * Dependencies required to confirm a password reset.
- */
-export interface ConfirmPasswordResetDependencies {
-    /** Password reset persistence repository. */
-    passwordResets: PasswordResetRepository;
-    /** Password hashing interface. */
-    passwordHasher: PasswordHasher;
-    /** Token hashing service supplied by the consumer. */
-    tokenHasher: PasswordResetTokenHasher;
-}
-
-/**
- * Runtime overrides for {@link confirmPasswordReset}.
- */
-export interface ConfirmPasswordResetOptions {
-    /** Current time used to evaluate token expiration; defaults to `new Date()`. */
-    now?: Date;
-}
-
-/**
  * Discriminated union result of a {@link confirmPasswordReset} call.
  */
 export type ConfirmPasswordResetResult =
     | { ok: true }
     | { ok: false; error: ConfirmPasswordResetError };
+
+/**
+ * Dependencies required to confirm a password reset.
+ */
+export interface ConfirmPasswordResetDependencies {
+    /** Email-auth credential lookup repository. */
+    users: EmailAuthUserRepository;
+    /** User persistence repository for password update. */
+    userRepository: UserRepository;
+    /** Redis-backed email-token store containing the reset token hash. */
+    emailTokens: EmailTokenStore;
+    /** Password hashing interface. */
+    passwordHasher: PasswordHasher;
+}
+
+/**
+ * Input data required to start the email verification flow.
+ */
+export interface RequestEmailVerificationInput {
+    /** Email address to verify; normalized before lookup and dispatch. */
+    email: string;
+}
+
+/**
+ * Dependencies required to request an email verification code.
+ */
+export interface RequestEmailVerificationDependencies {
+    /** Redis-backed email-token store. */
+    emailTokens: EmailTokenStore;
+    /** Email delivery service supplied by the consumer. */
+    emailDispatcher: EmailDispatcher;
+}
+
+/**
+ * Runtime options for {@link requestEmailVerification}.
+ */
+export interface RequestEmailVerificationOptions {
+    /**
+     * Build the verification email message for the given numeric code.
+     * Invoked only after the code has been generated and persisted.
+     */
+    buildMessage: (code: string) => EmailMessage;
+}
+
+/**
+ * Result of a {@link requestEmailVerification} call. The email-validation
+ * branch always reports `codeIssued: false` so the caller cannot use the
+ * response to enumerate which addresses are syntactically valid.
+ */
+export type RequestEmailVerificationResult =
+    | { ok: true; codeIssued: true; emailDispatched: boolean }
+    | { ok: true; codeIssued: false; emailDispatched: false };
+
+/**
+ * Input data required to verify an emailed code.
+ */
+export interface VerifyEmailInput {
+    /** Email address being verified. */
+    email: string;
+    /** Verification code entered by the user. */
+    code: string;
+}
+
+/**
+ * Error code returned when email verification fails.
+ *
+ * - `invalid_verification_code` — no pending code matches, or the code is wrong.
+ * - `expired_verification_code` — no entry was found, possibly due to TTL.
+ */
+export type VerifyEmailErrorCode =
+    | 'invalid_verification_code'
+    | 'expired_verification_code';
+
+/**
+ * Structured error returned when email verification fails.
+ */
+export interface VerifyEmailError {
+    /** Machine-readable error code identifying the failure reason. */
+    code: VerifyEmailErrorCode;
+    /** Human-readable error message suitable for display to the user. */
+    message: string;
+}
+
+/**
+ * Dependencies required to verify an emailed code.
+ */
+export interface VerifyEmailDependencies {
+    /** Redis-backed email-token store. */
+    emailTokens: EmailTokenStore;
+}
+
+/**
+ * Discriminated union result of a {@link verifyEmail} call.
+ */
+export type VerifyEmailResult =
+    | { ok: true }
+    | { ok: false; error: VerifyEmailError };

@@ -38,8 +38,10 @@ export {
     loginUser,
     logoutUser,
     registerUser,
+    requestEmailVerification,
     requestPasswordReset,
     socialLoginUser,
+    verifyEmail,
 } from './application/auth';
 export {
     createUserTierContext,
@@ -99,9 +101,6 @@ export { classifyTrend, detectSignals } from './domain/signals';
 export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
-
-// Email template builders
-export { buildPasswordResetEmail } from './domain/auth/emailTemplates';
 
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
@@ -338,7 +337,6 @@ export {
     OAUTH_PROVIDER_VALUES,
     oauthAccounts,
     oauthProviderEnum,
-    passwordResets,
     sessions,
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
@@ -439,7 +437,13 @@ export {
 } from './domain/indicators/constants';
 
 // Email
-export type { EmailDispatcher } from './infrastructure/email/types';
+export { createEmailTokenStore } from './infrastructure/email/redis';
+export type {
+    EmailDispatcher,
+    EmailTokenPurpose,
+    EmailTokenStore,
+    EmailTokenValue,
+} from './infrastructure/email/types';
 
 // Infrastructure interfaces
 export type {
@@ -449,7 +453,6 @@ export type {
     ConfirmPasswordResetError,
     ConfirmPasswordResetErrorCode,
     ConfirmPasswordResetInput,
-    ConfirmPasswordResetOptions,
     ConfirmPasswordResetResult,
     DeleteAccountDependencies,
     DeleteAccountError,
@@ -469,13 +472,16 @@ export type {
     LogoutUserInput,
     LogoutUserOptions,
     LogoutUserResult,
-    PasswordResetTokenGenerator,
-    PasswordResetTokenHasher,
+    RegisterUserDependencies,
     RegisterUserError,
     RegisterUserErrorCode,
     RegisterUserErrorField,
     RegisterUserInput,
     RegisterUserResult,
+    RequestEmailVerificationDependencies,
+    RequestEmailVerificationInput,
+    RequestEmailVerificationOptions,
+    RequestEmailVerificationResult,
     RequestPasswordResetDependencies,
     RequestPasswordResetInput,
     RequestPasswordResetOptions,
@@ -486,6 +492,11 @@ export type {
     SocialLoginUserInput,
     SocialLoginUserOptions,
     SocialLoginUserResult,
+    VerifyEmailDependencies,
+    VerifyEmailError,
+    VerifyEmailErrorCode,
+    VerifyEmailInput,
+    VerifyEmailResult,
 } from './application/auth';
 export type {
     CreateUserTierContextInput,
@@ -521,10 +532,8 @@ export type {
     AssetTranslationRepository,
     AuthSessionRecord,
     AuthUserRecord,
-    CompletePasswordResetInput,
     CreateEmailUserInput,
     CreateOAuthUserInput,
-    CreatePasswordResetInput,
     CreateSessionInput,
     CreateUsageLogInput,
     DatabaseConfig,
@@ -533,8 +542,6 @@ export type {
     KoreanTickerRepository,
     OAuthProvider,
     OAuthUserRepository,
-    PasswordResetRecord,
-    PasswordResetRepository,
     RecordUsageInput,
     SessionRepository,
     SiglensDatabase,
@@ -575,7 +582,6 @@ export type {
 
 // Domain types
 export type {
-    BuildPasswordResetEmailInput,
     ActionRecommendation,
     AnalysisResponse,
     AnalysisSignal,

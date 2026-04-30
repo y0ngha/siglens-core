@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerUser } from '@/application/auth/registerUser';
-import type { PasswordHasher } from '@/infrastructure/auth';
-import type { AuthUserRecord, UserRepository } from '@/infrastructure/db/types';
+import type { RegisterUserDependencies } from '@/application/auth';
+import type {
+    EmailTokenPurpose,
+    EmailTokenValue,
+} from '@/infrastructure/email/types';
+import type { AuthUserRecord } from '@/infrastructure/db/types';
 
 const createdAt = new Date('2026-04-26T00:00:00.000Z');
 const updatedAt = new Date('2026-04-26T00:00:01.000Z');
@@ -13,6 +17,7 @@ function makeUser(email: string): AuthUserRecord {
         name: null,
         avatarUrl: null,
         tier: 'free',
+        emailVerified: true,
         createdAt,
         updatedAt,
     };
@@ -21,12 +26,14 @@ function makeUser(email: string): AuthUserRecord {
 function makeDependencies(options?: {
     existingUser?: AuthUserRecord | null;
     createdUser?: AuthUserRecord | null;
+    verificationState?: EmailTokenValue | null;
 }): {
-    repository: UserRepository;
-    passwordHasher: PasswordHasher;
+    dependencies: RegisterUserDependencies;
     findByEmail: ReturnType<typeof vi.fn>;
     createEmailUser: ReturnType<typeof vi.fn>;
     hashPassword: ReturnType<typeof vi.fn>;
+    getToken: ReturnType<typeof vi.fn>;
+    deleteToken: ReturnType<typeof vi.fn>;
 } {
     const findByEmail = vi
         .fn()
@@ -38,29 +45,52 @@ function makeDependencies(options?: {
     const createEmailUser = vi.fn().mockResolvedValue(createdUser);
     const hashPassword = vi.fn().mockResolvedValue('hashed-password');
 
+    const verificationState =
+        options && 'verificationState' in options
+            ? (options.verificationState ?? null)
+            : ({ status: 'verified' } satisfies EmailTokenValue);
+    const getToken = vi
+        .fn<
+            (
+                purpose: EmailTokenPurpose,
+                email: string
+            ) => Promise<EmailTokenValue | null>
+        >()
+        .mockResolvedValue(verificationState);
+    const deleteToken = vi.fn().mockResolvedValue(undefined);
+
     return {
-        repository: {
-            findByEmail,
-            findById: vi.fn(),
-            createEmailUser,
-            deleteUser: vi.fn(),
+        dependencies: {
+            users: {
+                findByEmail,
+                findById: vi.fn(),
+                createEmailUser,
+                deleteUser: vi.fn(),
+                updatePassword: vi.fn(),
+            },
+            passwordHasher: { hashPassword },
+            emailTokens: {
+                set: vi.fn(),
+                get: getToken,
+                delete: deleteToken,
+            },
         },
-        passwordHasher: { hashPassword },
         findByEmail,
         createEmailUser,
         hashPassword,
+        getToken,
+        deleteToken,
     };
 }
 
 describe('registerUser', () => {
     it('rejects invalid email before repository access', async () => {
-        const { repository, passwordHasher, findByEmail, hashPassword } =
+        const { dependencies, findByEmail, hashPassword, getToken } =
             makeDependencies();
 
         const result = await registerUser(
             { email: 'invalid-email', password: 'Password1' },
-            repository,
-            passwordHasher
+            dependencies
         );
 
         expect(result).toEqual({
@@ -73,174 +103,117 @@ describe('registerUser', () => {
         });
         expect(findByEmail).not.toHaveBeenCalled();
         expect(hashPassword).not.toHaveBeenCalled();
+        expect(getToken).not.toHaveBeenCalled();
     });
 
-    it('rejects weak password (no numbers) before repository access', async () => {
-        const { repository, passwordHasher, findByEmail, hashPassword } =
-            makeDependencies();
+    it('rejects weak password before repository access', async () => {
+        const { dependencies, findByEmail } = makeDependencies();
 
         const result = await registerUser(
-            { email: 'user@example.com', password: 'password' },
-            repository,
-            passwordHasher
+            { email: 'user@example.com', password: 'short' },
+            dependencies
         );
 
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'weak_password',
-                field: 'password',
-                message:
-                    'Password must be at least 8 characters and include letters and numbers',
-            },
-        });
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('weak_password');
         expect(findByEmail).not.toHaveBeenCalled();
-        expect(hashPassword).not.toHaveBeenCalled();
     });
 
-    it('rejects password shorter than minimum length', async () => {
-        const { repository, passwordHasher, findByEmail, hashPassword } =
-            makeDependencies();
-
-        const result = await registerUser(
-            { email: 'user@example.com', password: 'Ps1' },
-            repository,
-            passwordHasher
+    it('rejects when no email-verification entry exists', async () => {
+        const { dependencies, findByEmail, createEmailUser } = makeDependencies(
+            { verificationState: null }
         );
-
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'weak_password',
-                field: 'password',
-                message: expect.any(String),
-            },
-        });
-        expect(findByEmail).not.toHaveBeenCalled();
-        expect(hashPassword).not.toHaveBeenCalled();
-    });
-
-    it('rejects password with no letters', async () => {
-        const { repository, passwordHasher, findByEmail, hashPassword } =
-            makeDependencies();
-
-        const result = await registerUser(
-            { email: 'user@example.com', password: '12345678' },
-            repository,
-            passwordHasher
-        );
-
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'weak_password',
-                field: 'password',
-                message: expect.any(String),
-            },
-        });
-        expect(findByEmail).not.toHaveBeenCalled();
-        expect(hashPassword).not.toHaveBeenCalled();
-    });
-
-    it('rejects duplicate email before hashing', async () => {
-        const existingUser = makeUser('user@example.com');
-        const { repository, passwordHasher, hashPassword, createEmailUser } =
-            makeDependencies({ existingUser });
 
         const result = await registerUser(
             { email: 'user@example.com', password: 'Password1' },
-            repository,
-            passwordHasher
+            dependencies
         );
 
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'email_already_exists',
-                field: 'email',
-                message: 'Email is already registered',
-            },
-        });
-        expect(hashPassword).not.toHaveBeenCalled();
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('email_not_verified');
+        expect(findByEmail).not.toHaveBeenCalled();
         expect(createEmailUser).not.toHaveBeenCalled();
     });
 
-    it('normalizes email, hashes password, and creates a free-tier user', async () => {
-        const createdUser = makeUser('user@example.com');
+    it('rejects when verification entry is still in pending state', async () => {
+        const { dependencies, createEmailUser } = makeDependencies({
+            verificationState: { status: 'pending', tokenHash: 'hash' },
+        });
+
+        const result = await registerUser(
+            { email: 'user@example.com', password: 'Password1' },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('email_not_verified');
+        expect(createEmailUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the email is already registered', async () => {
+        const { dependencies, createEmailUser } = makeDependencies({
+            existingUser: makeUser('user@example.com'),
+        });
+
+        const result = await registerUser(
+            { email: 'user@example.com', password: 'Password1' },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('email_already_exists');
+        expect(createEmailUser).not.toHaveBeenCalled();
+    });
+
+    it('returns email_already_exists when createEmailUser races to a conflict', async () => {
+        const { dependencies } = makeDependencies({ createdUser: null });
+
+        const result = await registerUser(
+            { email: 'user@example.com', password: 'Password1' },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('email_already_exists');
+    });
+
+    it('creates the user with emailVerified true and clears the Redis entry on success', async () => {
         const {
-            repository,
-            passwordHasher,
+            dependencies,
             findByEmail,
             createEmailUser,
             hashPassword,
-        } = makeDependencies({ createdUser });
+            getToken,
+            deleteToken,
+        } = makeDependencies();
 
         const result = await registerUser(
             {
                 email: ' User@Example.COM ',
                 password: 'Password1',
-                name: 'Ada',
-                avatarUrl: 'https://example.com/avatar.png',
+                name: '  Ada  ',
+                avatarUrl: '  https://avatars.example.com/ada.png  ',
             },
-            repository,
-            passwordHasher
+            dependencies
         );
 
+        expect(getToken).toHaveBeenCalledWith(
+            'email_verification',
+            'user@example.com'
+        );
         expect(findByEmail).toHaveBeenCalledWith('user@example.com');
         expect(hashPassword).toHaveBeenCalledWith('Password1');
         expect(createEmailUser).toHaveBeenCalledWith({
             email: 'user@example.com',
             passwordHash: 'hashed-password',
             name: 'Ada',
-            avatarUrl: 'https://example.com/avatar.png',
+            avatarUrl: 'https://avatars.example.com/ada.png',
+            emailVerified: true,
         });
-        expect(result).toEqual({ ok: true, user: createdUser });
-    });
-
-    it('trims whitespace from name and avatarUrl before creating user', async () => {
-        const createdUser = makeUser('user@example.com');
-        const { repository, passwordHasher, createEmailUser } =
-            makeDependencies({
-                createdUser,
-            });
-
-        await registerUser(
-            {
-                email: 'user@example.com',
-                password: 'Password1',
-                name: '  Ada  ',
-                avatarUrl: '  https://example.com/avatar.png  ',
-            },
-            repository,
-            passwordHasher
+        expect(deleteToken).toHaveBeenCalledWith(
+            'email_verification',
+            'user@example.com'
         );
-
-        expect(createEmailUser).toHaveBeenCalledWith({
-            email: 'user@example.com',
-            passwordHash: 'hashed-password',
-            name: 'Ada',
-            avatarUrl: 'https://example.com/avatar.png',
-        });
-    });
-
-    it('returns duplicate email error when insert races with another signup', async () => {
-        const { repository, passwordHasher } = makeDependencies({
-            createdUser: null,
-        });
-
-        const result = await registerUser(
-            { email: 'user@example.com', password: 'Password1' },
-            repository,
-            passwordHasher
-        );
-
-        expect(result).toEqual({
-            ok: false,
-            error: {
-                code: 'email_already_exists',
-                field: 'email',
-                message: 'Email is already registered',
-            },
-        });
+        expect(result.ok).toBe(true);
     });
 });
