@@ -46,6 +46,7 @@ export {
     getUserTier,
     setUserTier,
 } from './application/tier';
+export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -494,6 +495,16 @@ export type {
     UserTierDependencies,
 } from './application/tier';
 export type {
+    AnalysisLimitError,
+    AnalysisLimitErrorCode,
+    ChatbotLimitError,
+    ChatbotLimitErrorCode,
+    UsageLimitDependencies,
+    UsageLimitError,
+    UsageLimitErrorCode,
+    UsageLimitInput,
+} from './application/usage';
+export type {
     CallGeminiWithKeyFallbackOptions,
     GeminiContent,
     GeminiContents,
@@ -559,8 +570,10 @@ export type {
     RequestChatCompletionResult,
 } from './application/chat/types';
 export type {
+    AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
+    SubmitAnalysisErrorResult,
     TierGateErrorResult,
     TierTimeframeAccessError,
 } from './application/market/types';
@@ -687,7 +700,6 @@ export type {
     StockSignalResult,
     StockWithConflict,
     StrategyResult,
-    SubmitAnalysisResult,
     SubmitBriefingResult,
     SupertrendResult,
     TickerBase,

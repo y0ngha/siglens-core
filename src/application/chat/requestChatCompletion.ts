@@ -1,18 +1,4 @@
 import { constants } from 'node:http2';
-import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
-import type {
-    ChatModel,
-    ChatPromptPayload,
-    Tier,
-    TierConfig,
-} from '@/domain/types';
-import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
-import { callGeminiWithKeyFallback } from '@/infrastructure/ai/gemini';
-import type { GeminiContent } from '@/infrastructure/ai/types';
-import {
-    createChatTokenStore,
-    hashClientIp,
-} from '@/infrastructure/chat/tokenStore';
 import {
     GEMINI_2_5_FLASH_MODEL,
     VALID_CHAT_MODELS,
@@ -23,6 +9,23 @@ import type {
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
+import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
+import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
+import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
+import type {
+    ChatModel,
+    ChatPromptPayload,
+    Tier,
+    TierConfig,
+} from '@/domain/types';
+import { callGeminiWithKeyFallback } from '@/infrastructure/ai/gemini';
+import type { GeminiContent } from '@/infrastructure/ai/types';
+import {
+    createChatTokenStore,
+    hashClientIp,
+} from '@/infrastructure/chat/tokenStore';
+import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import { hashUsageIp, type UsageRepository } from '@/infrastructure/db';
 
 const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
@@ -93,24 +96,101 @@ async function callSafely(action: () => Promise<void>): Promise<void> {
     }
 }
 
+async function recordChatUsageSafely(
+    usageRepository: UsageRepository,
+    userId: string | null,
+    clientIp: string,
+    model: ChatModel,
+    usageOccurredAt: Date
+): Promise<void> {
+    try {
+        await usageRepository.recordUsage({
+            userId,
+            ipAddress: clientIp,
+            actionType: 'chatbot',
+            modelUsed: model,
+            occurredAt: usageOccurredAt,
+        });
+    } catch (error) {
+        console.warn(
+            '[recordChatUsageSafely] Failed to record chatbot usage:',
+            error
+        );
+    }
+}
+
+async function checkChatbotUsageAllowed(
+    clientIp: string,
+    tier: Tier,
+    usageTracking: { occurredAt: Date; repository: UsageRepository },
+    tierConfig: TierConfig
+): Promise<boolean> {
+    return checkChatbotLimit(
+        {
+            ipHash: hashUsageIp(clientIp, usageTracking.occurredAt),
+            tier,
+            now: usageTracking.occurredAt,
+            config: tierConfig,
+        },
+        { usage: usageTracking.repository }
+    );
+}
+
+async function requestGeminiChatCompletion(
+    freeApiKey: RequestChatCompletionParams['freeApiKey'],
+    paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
+    tokenStore: ChatTokenStore,
+    callGemini: NonNullable<RequestChatCompletionDependencies['callGemini']>,
+    model: ChatModel,
+    hashedClientId: string,
+    prompt: ChatPromptPayload
+): Promise<ChatActionResult> {
+    try {
+        const message = await callGemini({
+            freeApiKey,
+            paidApiKey,
+            model,
+            contents: toGeminiContents(prompt),
+            systemInstruction: prompt.systemPrompt,
+        });
+        const remainingTokens =
+            await tokenStore.getRemainingTokens(hashedClientId);
+
+        return { ok: true, message, remainingTokens };
+    } catch (error) {
+        const result = toChatErrorResult(error);
+        if (shouldRefundConsumedToken(result)) {
+            await callSafely(() =>
+                tokenStore.refundConsumedToken(hashedClientId)
+            );
+        }
+
+        return result;
+    }
+}
+
 /**
  * Request a Gemini chat completion for an existing analysis.
  *
  * The caller owns runtime-specific request handling such as reading Next.js
  * headers and environment variables. This use-case owns SigLens chat policy:
- * IP hashing, token consumption, prompt construction, Gemini payload mapping,
- * key fallback invocation, remaining-token lookup, and UI-facing error codes.
+ * model tier gating, IP hashing, daily usage-limit checking when
+ * `usageRepository` is provided, token consumption, prompt construction,
+ * Gemini payload mapping, key fallback invocation, remaining-token lookup,
+ * best-effort usage recording, and UI-facing error codes.
  *
- * Token consumption is compensated when Gemini failures map to server-owned
- * errors (`server_busy` or `server_error`). User/quota outcomes
- * (`token_exhausted` and `rate_limited`) are not refunded.
+ * Token refund: when the result is `server_busy` or `server_error`, the
+ * consumed token is returned to the caller's bucket via a best-effort
+ * background call so server-side failures do not count against the daily
+ * allowance.
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,
     dependencies: RequestChatCompletionDependencies = {}
 ): Promise<ChatActionResult> {
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
-    if (!isValidChatModel(model) || !params.paidApiKey) {
+    const paidApiKey = params.paidApiKey;
+    if (!isValidChatModel(model) || !paidApiKey) {
         return { ok: false, error: 'server_error' };
     }
 
@@ -125,6 +205,31 @@ export async function requestChatCompletion(
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
     const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
+    const usageRepository = dependencies.usageRepository;
+    const usageTracking =
+        usageRepository === undefined
+            ? undefined
+            : {
+                  repository: usageRepository,
+                  occurredAt: params.occurredAt ?? new Date(),
+              };
+    const usageAllowed =
+        usageTracking === undefined
+            ? true
+            : await checkChatbotUsageAllowed(
+                  params.clientIp,
+                  tierContext.tier,
+                  usageTracking,
+                  tierConfig
+              );
+
+    if (!usageAllowed) {
+        return {
+            ok: false,
+            error: buildUsageLimitError('chatbotPerDay', tierContext.tier),
+        };
+    }
+
     const hashedClientId = hashClientIp(params.clientIp);
     const allowed = await tokenStore.tryConsumeToken(hashedClientId);
 
@@ -140,47 +245,51 @@ export async function requestChatCompletion(
         params.userMessage
     );
 
-    try {
-        const message = await callGemini({
-            freeApiKey: params.freeApiKey,
-            paidApiKey: params.paidApiKey,
+    const geminiResult = await requestGeminiChatCompletion(
+        params.freeApiKey,
+        paidApiKey,
+        tokenStore,
+        callGemini,
+        model,
+        hashedClientId,
+        prompt
+    );
+
+    if (!geminiResult.ok) {
+        return geminiResult;
+    }
+
+    if (usageTracking !== undefined) {
+        await recordChatUsageSafely(
+            usageTracking.repository,
+            tierContext.userId,
+            params.clientIp,
             model,
-            contents: toGeminiContents(prompt),
-            systemInstruction: prompt.systemPrompt,
-        });
-        const remainingTokens =
-            await tokenStore.getRemainingTokens(hashedClientId);
-        const usageLogs = dependencies.usageLogs;
+            usageTracking.occurredAt
+        );
+    }
+
+    const usageLogs = dependencies.usageLogs;
+    const shouldRecordPremiumUsage =
+        tierContext.userId !== null &&
+        isPremiumUsageTrackedTier(tierContext.tier) &&
+        isPremiumChatModel(model, tierConfig) &&
+        usageLogs !== undefined;
+
+    if (shouldRecordPremiumUsage) {
         const getCurrentDate =
             dependencies.getCurrentDate ?? (() => new Date());
-        const shouldRecordPremiumUsage =
-            tierContext.userId !== null &&
-            isPremiumUsageTrackedTier(tierContext.tier) &&
-            isPremiumChatModel(model, tierConfig) &&
-            usageLogs !== undefined;
-
-        if (shouldRecordPremiumUsage) {
-            const userId = tierContext.userId;
-            await callSafely(() =>
-                usageLogs.recordUsage({
-                    userId,
-                    ipHash: hashedClientId,
-                    actionType: PREMIUM_MODEL_USAGE_ACTION,
-                    modelUsed: model,
-                    date: toUsageDate(getCurrentDate()),
-                })
-            );
-        }
-
-        return { ok: true, message, remainingTokens };
-    } catch (error) {
-        const result = toChatErrorResult(error);
-        if (shouldRefundConsumedToken(result)) {
-            await callSafely(() =>
-                tokenStore.refundConsumedToken(hashedClientId)
-            );
-        }
-
-        return result;
+        const userId = tierContext.userId;
+        await callSafely(() =>
+            usageLogs.recordUsage({
+                userId,
+                ipHash: hashedClientId,
+                actionType: PREMIUM_MODEL_USAGE_ACTION,
+                modelUsed: model,
+                date: toUsageDate(getCurrentDate()),
+            })
+        );
     }
+
+    return geminiResult;
 }

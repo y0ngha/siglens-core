@@ -102,6 +102,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `getUserTier` | `application/tier/getUserTier.ts` |
 | `createUserTierContext` | `application/tier/createUserTierContext.ts` |
 | `setUserTier` | `application/tier/setUserTier.ts` |
+| `checkAnalysisLimit` | `application/usage/limits.ts` |
+| `checkChatbotLimit` | `application/usage/limits.ts` |
 | `requestChatCompletion` | `application/chat/requestChatCompletion.ts` |
 
 ### Tier 2 — Domain Building Blocks
@@ -253,7 +255,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선/티어 설정 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, `RequestPasswordReset*`, `ConfirmPasswordReset*`, `UsageCounts`, `UsageLogRepository`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `PasswordResetTokenGenerator`, `PasswordResetTokenHasher`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`, `PasswordResetRepository`, `UsageRepository`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`), market application 타입(`SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), 채팅 application 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, `RequestPasswordReset*`, `ConfirmPasswordReset*`, `UsageCounts`, `UsageLogRepository`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `PasswordResetTokenGenerator`, `PasswordResetTokenHasher`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`, `PasswordResetRepository`, `UsageRepository`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), 채팅 application 타입.
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 

@@ -1,5 +1,6 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
 import type {
+    ChatbotLimitError,
     EmailAuthUserRepository,
     OAuthUserRepository,
     PasswordHasher,
@@ -7,6 +8,7 @@ import type {
     PatternTrend,
     SessionRepository,
     TierGateErrorResult,
+    UsageLimitError,
     UsageRepository,
     UserRepository,
 } from '@/index';
@@ -17,6 +19,8 @@ import {
     bcryptPasswordVerifier,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
+    checkAnalysisLimit,
+    checkChatbotLimit,
     clusterKeyLevels,
     createChatTokenStore,
     createDatabaseClient,
@@ -104,6 +108,18 @@ describe('public API exports', () => {
     });
 
     it('exports tier gating helpers from package entrypoint', () => {
+        const usageLimitError: UsageLimitError = {
+            code: 'analysis_limit_exceeded',
+            message: 'Daily analysis usage limit exceeded.',
+            feature: 'analysisPerDay',
+            tier: 'free',
+        };
+        const chatUsageLimitError: ChatbotLimitError = {
+            code: 'chatbot_limit_exceeded',
+            message: 'Daily chatbot usage limit exceeded.',
+            feature: 'chatbotPerDay',
+            tier: 'free',
+        };
         const gateError: TierGateErrorResult = {
             status: 'error',
             error: {
@@ -125,6 +141,10 @@ describe('public API exports', () => {
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
         expect(getAllowedModels('free')).toContain('claude-opus-4');
         expect(isTier('member')).toBe(true);
+        expect(typeof checkAnalysisLimit).toBe('function');
+        expect(typeof checkChatbotLimit).toBe('function');
+        expect(usageLimitError.code).toBe('analysis_limit_exceeded');
+        expect(chatUsageLimitError.feature).toBe('chatbotPerDay');
         expect(gateError.status).toBe('error');
         expect(typeof filterAnalysisResult).toBe('function');
     });

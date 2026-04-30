@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
-import { TIER_CONFIG, getAllowedTimeframes } from '@/domain/tier';
+import { getAllowedTimeframes } from '@/domain/tier';
+import type { UsageRepository } from '@/infrastructure/db';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -29,13 +30,15 @@ const mockCacheProvider = {
 
 const mockLoadSkills = vi.fn();
 const mockFetch = vi.fn();
+const mockRecordUsage = vi.fn();
+const mockGetUsageToday = vi.fn();
+const mockUsageRepository: UsageRepository = {
+    recordUsage: mockRecordUsage,
+    getUsageToday: mockGetUsageToday,
+};
 
 const mockSymbol = 'AAPL';
 const mockTimeframe: Timeframe = '1Day';
-const restrictedTierConfig: TierConfig = {
-    ...TIER_CONFIG,
-    featureFlags: { enableTierRestrictions: true },
-};
 
 const mockBarsData = {
     bars: [
@@ -92,6 +95,21 @@ const mockResult: AnalysisResponse = {
     trendlines: [],
 };
 
+const restrictedTierConfig: TierConfig = {
+    limits: {
+        analysisPerDay: { free: 1, member: Infinity, pro: Infinity },
+        chatbotPerDay: { free: Infinity, member: Infinity, pro: Infinity },
+    },
+    timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
+    infoDepth: { free: ['summary'], member: ['summary'], pro: ['summary'] },
+    models: {
+        free: ['gemini-2.5-flash'],
+        member: ['gemini-2.5-flash'],
+        pro: ['gemini-2.5-flash'],
+    },
+    featureFlags: { enableTierRestrictions: true },
+};
+
 describe('submitAnalysis 함수는', () => {
     const originalEnv = process.env;
 
@@ -111,9 +129,20 @@ describe('submitAnalysis 함수는', () => {
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
+        mockGetUsageToday.mockResolvedValue({ analysis: 0, chatbot: 0 });
+        mockRecordUsage.mockResolvedValue({
+            id: 'usage-1',
+            userId: null,
+            ipHash: 'hashed-ip',
+            actionType: 'analysis',
+            modelUsed: 'analysis-worker',
+            date: '2026-04-29',
+            createdAt: new Date('2026-04-29T00:00:00.000Z'),
+        });
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllGlobals();
         process.env = originalEnv;
     });
@@ -177,6 +206,68 @@ describe('submitAnalysis 함수는', () => {
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
+        it('사용량 옵션이 있으면 캐시 결과 반환 후 분석 사용량을 기록한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { userId: 'user-1', tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        userId: 'user-1',
+                        modelUsed: 'cached-analysis',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result.status).toBe('cached');
+            expect(mockRecordUsage).toHaveBeenCalledWith({
+                userId: 'user-1',
+                ipAddress: '203.0.113.10',
+                actionType: 'analysis',
+                modelUsed: 'cached-analysis',
+                occurredAt,
+            });
+        });
+
+        it('사용량 기록이 실패해도 캐시 결과를 반환한다', async () => {
+            const consoleWarn = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+            mockRecordUsage.mockRejectedValueOnce(new Error('usage db failed'));
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result).toEqual({ status: 'cached', result: mockResult });
+            expect(consoleWarn).toHaveBeenCalledWith(
+                '[recordAnalysisUsageSafely] Failed to record analysis usage:',
+                expect.any(Error)
+            );
+            consoleWarn.mockRestore();
+        });
+
         it('force가 true이면 캐시를 건너뛰고 Worker에 요청을 보낸다', async () => {
             const result = await submitAnalysis(
                 mockSymbol,
@@ -224,6 +315,168 @@ describe('submitAnalysis 함수는', () => {
                     },
                 })
             );
+        });
+
+        it('사용량 옵션이 있으면 제한 확인 후 제출 성공 사용량을 기록한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockGetUsageToday).toHaveBeenCalledWith(
+                expect.any(String),
+                occurredAt
+            );
+            expect(mockRecordUsage).toHaveBeenCalledWith({
+                userId: null,
+                ipAddress: '203.0.113.10',
+                actionType: 'analysis',
+                modelUsed: 'analysis-worker',
+                occurredAt,
+            });
+        });
+
+        it('사용량 발생 시각이 없으면 제한 확인과 기록에 같은 현재 시각을 사용한다', async () => {
+            const currentTime = new Date('2026-04-29T23:59:59.999Z');
+            vi.useFakeTimers();
+            vi.setSystemTime(currentTime);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                    },
+                }
+            );
+
+            const checkedAt = mockGetUsageToday.mock.calls[0][1];
+            const recordedAt = mockRecordUsage.mock.calls[0][0].occurredAt;
+
+            expect(result.status).toBe('submitted');
+            expect(checkedAt).toEqual(currentTime);
+            expect(recordedAt).toBe(checkedAt);
+        });
+
+        it('사용량 기록이 실패해도 제출 성공 결과를 반환한다', async () => {
+            const consoleWarn = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            mockRecordUsage.mockRejectedValueOnce(new Error('usage db failed'));
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalled();
+            expect(consoleWarn).toHaveBeenCalledWith(
+                '[recordAnalysisUsageSafely] Failed to record analysis usage:',
+                expect.any(Error)
+            );
+            consoleWarn.mockRestore();
+        });
+
+        it('분석 사용량 제한을 넘으면 구조화된 error를 반환하고 Worker 요청을 건너뛴다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            mockGetUsageToday.mockResolvedValueOnce({
+                analysis: 1,
+                chatbot: 0,
+            });
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result).toEqual({
+                status: 'error',
+                error: {
+                    code: 'analysis_limit_exceeded',
+                    message: 'Daily analysis usage limit exceeded.',
+                    feature: 'analysisPerDay',
+                    tier: 'free',
+                },
+            });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockRecordUsage).not.toHaveBeenCalled();
+        });
+
+        it('usage check DB 오류 발생 시 fail-open으로 분석을 허용한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+            const consoleWarn = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+            mockGetUsageToday.mockRejectedValueOnce(
+                new Error('DB connection failed')
+            );
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: null, tier: 'free' },
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(consoleWarn).toHaveBeenCalledWith(
+                '[checkUsageLimit] Usage check failed, allowing request:',
+                expect.any(Error)
+            );
+            consoleWarn.mockRestore();
         });
 
         it('waitUntil이 제공되면 Worker 요청 promise를 등록한다', async () => {

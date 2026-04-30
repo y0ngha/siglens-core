@@ -213,6 +213,18 @@ and have been removed from this file.
       Test stubs intentionally implement only the subset of an interface exercised by the test;
       adding a comment to every stub cast adds noise without safety value.
       ✅ `}) as unknown as Dirent;` — no comment needed in test files
+
+8. Sibling types in the same error/result shape follow inconsistent declaration patterns
+   → When multiple related type fields appear in the same interface, they must all use the same strategy (domain alias or inline literal)
+   → Inconsistency creates maintenance burden and breaks pattern-matching across siblings
+   ❌ interface ErrorShape { code: DomainErrorCode; field: 'email' | 'password' }  // code uses alias, field uses inline
+   ✅ interface ErrorShape { code: RegisterErrorCode; field: RegisterErrorField }  // both use named aliases
+   ✅ interface Result { ok: boolean; error: ChatErrorCode | ChatUsageLimitError }  // discriminated at top-level; each branch narrows error type
+   → When return types have discriminated union branches, each branch must have its own distinct error type annotation
+   → Mixing multiple error types in a single discriminant field prevents type narrowing and pattern-matching
+   ❌ { ok: false; error: ChatErrorCode | ChatUsageLimitError }  // error field accepts both; callers must typeof-guard
+   ✅ Split into separate union branches:
+      { ok: false; error: ChatErrorCode } | { ok: false; error: ChatUsageLimitError }
 ```
 
 ---
@@ -369,6 +381,12 @@ and have been removed from this file.
    ❌ export function loginUser(input, deps) { ... }  // missing all JSDoc
    ❌ export function registerUser(...) { /** description only */ }  // no @param/@returns/@example/@see
    ✅ export function loginUser(...) { /** description. @param input deps. @returns result. @example usage. @see related */ }
+
+5. JSDoc tags reference specific call-sites instead of describing timeless purpose
+   → @internal, @param, @returns must describe the function's role independent of any caller
+   → JSDoc is documentation for all consumers, not a call-site comment
+   ❌ /** @internal session expiry calculation used in loginUser */ export function addSeconds(...) { ... }
+   ✅ /** @internal Helper to add seconds to a Date. */ export function addSeconds(...) { ... }
 ```
 
 ---
@@ -417,6 +435,51 @@ and have been removed from this file.
 5. Repeated literal values in the same module across multiple locations
    → Extract to a named constant; prevents silent divergence when updating
    → Applies to descriptions, messages, configuration values, and metadata strings
+```
+
+---
+
+## I/O & Error Handling
+
+```
+1. Unguarded I/O operations at different call depths
+   → When one I/O operation in a module is protected with try-catch, all I/O operations at the same call depth must be equivalently protected
+   → Prevents asymmetric failure modes where some operations degrade gracefully while others throw uncaught
+   ❌ recordUsage wrapped in safe-try helper, but checkUsageAllowed calls getUsageToday without guard
+   ✅ Add try-catch (fail-open) to checkUsageAllowed; protect all I/O at the same call depth
+```
+
+---
+
+## Configuration & State Management
+
+```
+1. Configuration parameter accepted from multiple sources with divergent fallback chains
+   → A single configuration option should have exactly one authoritative source
+   → When the same config is accepted from both outer and inner function options, callers can set conflicting values
+   ❌ SubmitAnalysisOptions.tierConfig and AnalysisUsageOptions.tierConfig both accepted; outer/inner could differ
+   ✅ Accept tierConfig once at the entry point; pass it into all downstream helpers
+   → Prevents hidden inconsistencies between gating decisions that should use the same config
+```
+
+---
+
+## Public API & Module Exports
+
+```
+1. Public entrypoint exports become stale when module barrels are refactored
+   → src/index.ts re-exports must stay synchronized with the module barrels they depend on
+   ❌ src/index.ts exports DrizzleUserRepository, but infrastructure/db/index.ts later removes it
+   ✅ After refactoring module barrels, verify all re-exports still exist in the barrel
+   → src/index.client.ts must export the actual return type of functions, not a narrower/dead-code type
+   ❌ src/index.client.ts exports SubmitAnalysisResult (missing TierTimeframeAccessError variant)
+   ✅ Export SubmitAnalysisGatedResult (actual function return type) instead
+
+2. New features add exports to one entrypoint but not to paired entrypoints
+   → When adding a new feature's public API to src/index.ts, check if sibling entrypoints (src/index.client.ts, etc.) need the same exports
+   → Different runtimes must have consistent public API coverage for stable tier model access
+   ❌ Added tier model helpers to src/index.ts but omitted them from src/index.client.ts; browser consumers cannot render model choices
+   ✅ After adding feature helpers to main entrypoint, verify all target-runtime entrypoints export them consistently
 ```
 
 ---

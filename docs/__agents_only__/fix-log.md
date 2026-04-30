@@ -62,26 +62,6 @@
 - Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
 - Context: Gemini review identified that if `AuthUserRecord` gains a new field, the manual mapping would silently exclude it from the returned record
 
-## [PR #34 Round 4 | feat/6/email-login | 2026-04-27]
-- Violation: `@internal` JSDoc on `addSeconds` referenced caller (`loginUser session expiry calculation`)
-- Rule: CONVENTIONS.md JSDoc Don'ts — "Don't reference the current PR/issue/caller — write timeless docs"
-- Context: A pure date utility documented its purpose by naming a specific call site instead of describing the function's role
-
-- Violation: `RegisterUserErrorField` defined as inline literal `'email' | 'password'` while sibling `RegisterUserErrorCode` references the domain alias `AuthValidationErrorCode`
-- Rule: FF — Predictability & Cohesion — sibling types in the same error shape should share a single source-of-truth strategy (domain alias vs inline literal)
-- Context: `RegisterUserErrorField` and `RegisterUserErrorCode` together define the registration error structure; the field type was inlined while the code type referenced domain, creating inconsistency
-
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: PR removed unrelated public Tier 4 type exports (BacktestCase/BacktestMeta/ChatActionResult/SkillCounts/QuadrantKey and others) creating an undocumented breaking change
-- Rule: MISTAKES.md Predictability #1 — unrelated changes must be moved to a separate PR or reverted
-- Context: the merge accidentally dropped a large block of `export type { ... }` entries from src/index.ts that have nothing to do with the OAuth feature
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: `LoginUserOptions` and `SocialLoginUserOptions` duplicated the same session and cookie option fields instead of sharing a base interface
-- Rule: CONVENTIONS.md TypeScript Rules — related interfaces with shared fields must use `extends`
-- Context: the social-login use case introduced an options interface identical to the existing email-login options shape; extracted `AuthSessionOptions` and had both use-case options extend it
-
 ## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: DB environment readers, cached singleton helpers, and raw `DatabaseClient` wrapper were exposed from the package entrypoint without a consumer-facing need
 - Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
@@ -112,30 +92,36 @@
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
 - Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
 
+## [Issue #10/#11 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
+- Rule: Issue completion criteria — limit-exceeded responses must be structured and consistent across analysis and chatbot gates
+- Context: Preserved `code`, `message`, `feature`, and `tier` in public analysis/chatbot result types and return values
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Feature-specific usage-limit errors were manually remapped at call sites because the shared builder returned a broad union type
+- Rule: TypeScript type safety — shared helpers should preserve discriminated literal types so callers can reuse results without duplicating field mappings
+- Context: Converted `UsageLimitError` to a discriminated union and added overloads to `buildUsageLimitError` for analysis and chatbot features
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Application usage-limit tests did not directly cover all feature branches
+- Rule: application/CLAUDE.md — application use-cases require 100% branch coverage
+- Context: Added direct coverage for the analysis error builder branch and the chatbot restrictions-disabled branch
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-29]
+- Violation: Internal Gemini helper accepted the public optional `paidApiKey` type even after the entrypoint had validated the key
+- Rule: TypeScript type safety — internal helper signatures should represent narrowed invariants established by the caller instead of reintroducing optionality
+- Context: `requestChatCompletion` returned `server_error` when `paidApiKey` was missing, but `requestGeminiChatCompletion` still typed the value as `string | undefined`, causing `CallGeminiWithKeyFallbackOptions.paidApiKey` assignment to fail typecheck
+
 ## [PR #44 | feat/13/timeframe-restrictions | 2026-04-28]
 - Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
 - Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
 - Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
 
-## [PR #45 | feat/12/info-depth-filter | 2026-04-28]
-- Violation: `filterAnalysisResult` calculated locked info depths from the module-level default `TIER_CONFIG` instead of the injected tier config
-- Rule: FF.md — Predictability (function output must derive from explicit inputs, not a cached default that conflicts with a provided parameter)
-- Context: custom `TierConfig.infoDepth.pro` values were ignored when computing `lockedInfoDepth`; the function now passes the active config's pro depth list into the helper
-
-## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
-- Violation: `FilteredActionRecommendation` duplicated optional fields from `ActionRecommendation` instead of extending the shared base shape
-- Rule: CONVENTIONS.md — Related interfaces with shared fields must use extends
-- Context: the filtered action recommendation type now inherits unchanged optional fields while overriding only gated prose fields with nullable variants
 
 ## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
 - Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
-
-## [Issue #14 | feat/14/ai-model-tier-separation | 2026-04-28]
-- Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
-- Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
-- Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint
 
 ## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
 - Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
@@ -143,10 +129,6 @@
 - Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
 
 ## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
-- Violation: `src/index.ts` re-exported `DrizzleUserRepository` from the DB barrel, but `src/infrastructure/db/index.ts` no longer exported that symbol
-- Rule: PUBLIC_API.md — public entrypoint exports must stay synchronized with module barrels they depend on
-- Context: Restored the DB barrel re-export so the package entrypoint compiles and public repository exports remain available
-
 - Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
 - Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
 - Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order

@@ -1,14 +1,32 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { AnalysisLimitError } from '@/application/usage/types';
 import type {
-    SubmitAnalysisResult,
+    AnalysisResponse,
     Tier,
     TierConfig,
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
+import type { UsageRepository } from '@/infrastructure/db';
+
+/** Usage tracking and daily limit options for analysis submissions. */
+export interface AnalysisUsageOptions {
+    /** Repository used to check today's count and record successful usage. */
+    usageRepository: UsageRepository;
+    /** Raw client IP. It is hashed before persistence and never stored. */
+    clientIp: string;
+    /** Authenticated user UUID, or null/undefined for anonymous usage. */
+    userId?: string | null;
+    /** Model/backend identifier stored in usage_logs.model_used. */
+    modelUsed?: string;
+    /** Clock injection for UTC-day tests. Defaults to infrastructure time. */
+    occurredAt?: Date;
+}
 
 /** Options controlling analysis submission behavior. */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
+    /** Optional usage tracking. Omitted callers keep the previous behavior. */
+    usage?: AnalysisUsageOptions;
     /** Request-scoped tier context used to enforce timeframe access. */
     tierContext?: UserTierContext;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
@@ -29,13 +47,19 @@ export interface TierTimeframeAccessError {
     allowedTimeframes: Timeframe[];
 }
 
-/** Submit analysis outcome for application tier gate denials. */
+/** Analysis error result when tier timeframe access is denied. */
 export interface TierGateErrorResult {
     status: 'error';
     error: TierTimeframeAccessError;
 }
 
-/** Submit analysis outcome including application-level tier gate errors. */
-export type SubmitAnalysisGatedResult =
-    | SubmitAnalysisResult
+/** Analysis error result: usage limit exceeded or tier timeframe denied. */
+export type SubmitAnalysisErrorResult =
+    | { status: 'error'; error: AnalysisLimitError }
     | TierGateErrorResult;
+
+/** Submit analysis outcome including application-level gate errors. */
+export type SubmitAnalysisGatedResult =
+    | { status: 'cached'; result: AnalysisResponse }
+    | { status: 'submitted'; jobId: string }
+    | SubmitAnalysisErrorResult;
