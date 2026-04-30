@@ -4,6 +4,7 @@ export {
     tryGetDatabaseClient,
 } from './client';
 export { readDatabaseConfig, tryReadDatabaseConfig } from './config';
+export type { OAuthProvider } from '@/domain/types';
 export {
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
@@ -46,7 +47,6 @@ export type {
     KoreanTickerRepository,
     OAuthAccountRecord,
     OAuthAccountRepository,
-    OAuthProvider,
     OAuthUserRepository,
     PasswordResetRecord,
     PasswordResetRepository,

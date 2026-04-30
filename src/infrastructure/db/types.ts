@@ -1,13 +1,13 @@
-import type { KoreanTickerEntry, ModelId, OAuthProvider, Tier } from '@/domain/types';
+import type {
+    KoreanTickerEntry,
+    ModelId,
+    OAuthProvider,
+    Tier,
+} from '@/domain/types';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
-import type {
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-} from './constants';
+import type { USAGE_ACTION_TYPE_VALUES, USER_TIER_VALUES } from './constants';
 import type * as schema from './schema';
-
-export type { OAuthProvider };
 
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];

@@ -3,7 +3,6 @@ import type {
     AuthUserRecord,
     EmailAuthUserRepository,
     OAuthAccountRepository,
-    OAuthProvider,
     OAuthUserRepository,
     PasswordResetRepository,
     SessionRepository,
@@ -17,6 +16,7 @@ import type {
 import type {
     AuthValidationErrorCode,
     AuthValidationErrorField,
+    OAuthProvider,
 } from '@/domain/types';
 
 /**

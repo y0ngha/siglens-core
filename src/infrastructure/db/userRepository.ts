@@ -1,8 +1,9 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { DEFAULT_TIER } from '@/domain/tier';
-import type { Tier } from '@/domain/types';
+import type { OAuthProvider, Tier } from '@/domain/types';
+import { tryReadEncryptionKey } from './config';
 import { oauthAccounts, passwordResets, users } from './schema';
-import { encryptToken, tryReadEncryptionKey } from './tokenEncryption';
+import { encryptToken } from './tokenEncryption';
 import type {
     AuthUserRecord,
     CompletePasswordResetInput,
@@ -11,7 +12,6 @@ import type {
     CreatePasswordResetInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
-    OAuthProvider,
     OAuthUserRepository,
     PasswordResetRecord,
     PasswordResetRepository,
@@ -181,8 +181,14 @@ export class DrizzleUserRepository
                         userId: user.id,
                         provider: input.provider,
                         providerAccountId: input.providerAccountId,
-                        accessToken: encryptOptional(input.accessToken, encryptionKey),
-                        refreshToken: encryptOptional(input.refreshToken, encryptionKey),
+                        accessToken: encryptOptional(
+                            input.accessToken,
+                            encryptionKey
+                        ),
+                        refreshToken: encryptOptional(
+                            input.refreshToken,
+                            encryptionKey
+                        ),
                         tokenExpiresAt: input.tokenExpiresAt ?? null,
                     })
                     .onConflictDoNothing({
