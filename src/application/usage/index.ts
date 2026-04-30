@@ -4,10 +4,10 @@ export {
     checkChatbotLimit,
 } from './limits';
 export type {
-    ChatUsageLimitError,
+    AnalysisLimitError,
+    AnalysisLimitErrorCode,
+    ChatbotLimitError,
     ChatbotLimitErrorCode,
-    SubmitAnalysisError,
-    SubmitAnalysisErrorCode,
     UsageLimitDependencies,
     UsageLimitError,
     UsageLimitErrorCode,

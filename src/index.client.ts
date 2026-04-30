@@ -319,9 +319,10 @@ export type {
 } from './application/chat/types';
 export type { SubmitAnalysisGatedResult } from './application/market/types';
 export type {
-    ChatUsageLimitError,
-    SubmitAnalysisError,
-    SubmitAnalysisErrorCode,
+    AnalysisLimitError,
+    AnalysisLimitErrorCode,
+    ChatbotLimitError,
+    ChatbotLimitErrorCode,
 } from './application/usage';
 
 // Domain types

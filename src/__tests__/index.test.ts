@@ -1,6 +1,6 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
 import type {
-    ChatUsageLimitError,
+    ChatbotLimitError,
     EmailAuthUserRepository,
     OAuthUserRepository,
     PasswordHasher,
@@ -114,7 +114,7 @@ describe('public API exports', () => {
             feature: 'analysisPerDay',
             tier: 'free',
         };
-        const chatUsageLimitError: ChatUsageLimitError = {
+        const chatUsageLimitError: ChatbotLimitError = {
             code: 'chatbot_limit_exceeded',
             message: 'Daily chatbot usage limit exceeded.',
             feature: 'chatbotPerDay',

@@ -211,7 +211,7 @@ export async function requestChatCompletion(
             ? undefined
             : {
                   repository: usageRepository,
-                  occurredAt: params.usageOccurredAt ?? new Date(),
+                  occurredAt: params.occurredAt ?? new Date(),
               };
     const usageAllowed =
         usageTracking === undefined

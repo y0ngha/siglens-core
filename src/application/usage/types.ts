@@ -20,15 +20,15 @@ export interface UsageLimitInput {
 }
 
 /** Structured error code returned by analysis usage-limit checks. */
-export type SubmitAnalysisErrorCode = 'analysis_limit_exceeded';
+export type AnalysisLimitErrorCode = 'analysis_limit_exceeded';
 
 /** Structured error code returned by chatbot usage-limit checks. */
 export type ChatbotLimitErrorCode = 'chatbot_limit_exceeded';
 
 /** Structured error returned when analysis usage is blocked. */
-export interface SubmitAnalysisError {
+export interface AnalysisLimitError {
     /** Machine-readable error code. */
-    code: SubmitAnalysisErrorCode;
+    code: AnalysisLimitErrorCode;
     /** Human-readable message for API/UI surfaces. */
     message: string;
     /** Feature whose daily limit was exceeded. */
@@ -38,7 +38,7 @@ export interface SubmitAnalysisError {
 }
 
 /** Structured error returned when chatbot usage is blocked. */
-export interface ChatUsageLimitError {
+export interface ChatbotLimitError {
     /** Machine-readable error code. */
     code: ChatbotLimitErrorCode;
     /** Human-readable message for API/UI surfaces. */
@@ -51,14 +51,14 @@ export interface ChatUsageLimitError {
 
 /** Error code returned when a daily usage limit blocks a request. */
 export type UsageLimitErrorCode =
-    | SubmitAnalysisError['code']
-    | ChatUsageLimitError['code'];
+    | AnalysisLimitError['code']
+    | ChatbotLimitError['code'];
 
 /** Structured usage-limit error payload. */
-export type UsageLimitError = SubmitAnalysisError | ChatUsageLimitError;
+export type UsageLimitError = AnalysisLimitError | ChatbotLimitError;
 
 /** @internal Error payload templates before the request tier is attached. */
 export interface UsageLimitErrorTemplate {
-    analysisPerDay: Omit<SubmitAnalysisError, 'tier'>;
-    chatbotPerDay: Omit<ChatUsageLimitError, 'tier'>;
+    analysisPerDay: Omit<AnalysisLimitError, 'tier'>;
+    chatbotPerDay: Omit<ChatbotLimitError, 'tier'>;
 }

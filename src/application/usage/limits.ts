@@ -2,8 +2,8 @@ import { getTierLimit, TIER_CONFIG } from '@/domain/tier';
 import type { TierLimitedFeature } from '@/domain/types';
 import type { UsageCounts } from '@/infrastructure/db';
 import type {
-    ChatUsageLimitError,
-    SubmitAnalysisError,
+    AnalysisLimitError,
+    ChatbotLimitError,
     UsageLimitDependencies,
     UsageLimitError,
     UsageLimitErrorTemplate,
@@ -94,11 +94,11 @@ export async function checkChatbotLimit(
 export function buildUsageLimitError(
     feature: 'analysisPerDay',
     tier: UsageLimitInput['tier']
-): SubmitAnalysisError;
+): AnalysisLimitError;
 export function buildUsageLimitError(
     feature: 'chatbotPerDay',
     tier: UsageLimitInput['tier']
-): ChatUsageLimitError;
+): ChatbotLimitError;
 export function buildUsageLimitError(
     feature: TierLimitedFeature,
     tier: UsageLimitInput['tier']

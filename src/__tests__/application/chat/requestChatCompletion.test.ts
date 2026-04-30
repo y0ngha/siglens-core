@@ -65,6 +65,7 @@ describe('requestChatCompletion', () => {
     const callGemini = vi.fn();
     const getUsageToday = vi.fn();
     const recordUsage = vi.fn();
+    const recordPremiumUsage = vi.fn();
 
     const tokenStore: ChatTokenStore = {
         tryConsumeToken,
@@ -77,7 +78,7 @@ describe('requestChatCompletion', () => {
     };
 
     const usageLogs: UsageLogRepository = {
-        recordUsage,
+        recordUsage: recordPremiumUsage,
     };
 
     beforeEach(() => {
@@ -123,7 +124,7 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 tierContext: { userId: null, tier: 'free' },
-                usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
+                occurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
             {
                 tokenStore,
@@ -156,7 +157,7 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 tierContext: { userId: null, tier: 'free' },
-                usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
+                occurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
             {
                 tokenStore,
@@ -217,7 +218,7 @@ describe('requestChatCompletion', () => {
     });
 
     it('builds a Gemini request and returns message with remaining tokens', async () => {
-        const usageOccurredAt = new Date('2026-04-29T00:00:00.000Z');
+        const occurredAt = new Date('2026-04-29T00:00:00.000Z');
         const result = await requestChatCompletion(
             createParams({
                 history: [{ role: 'model', content: '이전 답변입니다.' }],
@@ -225,7 +226,7 @@ describe('requestChatCompletion', () => {
                 freeApiKey: 'free-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
-                usageOccurredAt,
+                occurredAt,
             }),
             {
                 tokenStore,
@@ -266,14 +267,14 @@ describe('requestChatCompletion', () => {
         );
         expect(getUsageToday).toHaveBeenCalledWith(
             expect.any(String),
-            usageOccurredAt
+            occurredAt
         );
         expect(recordUsage).toHaveBeenCalledWith({
             userId: 'user-1',
             ipAddress: '1.2.3.4',
             actionType: 'chatbot',
             modelUsed: GEMINI_2_5_FLASH_LITE_MODEL,
-            occurredAt: usageOccurredAt,
+            occurredAt: occurredAt,
         });
     });
 
@@ -286,7 +287,7 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 tierContext: { userId: null, tier: 'free' },
-                usageOccurredAt: new Date('2026-04-29T00:00:00.000Z'),
+                occurredAt: new Date('2026-04-29T00:00:00.000Z'),
             }),
             {
                 tokenStore,
@@ -334,7 +335,7 @@ describe('requestChatCompletion', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(recordUsage).toHaveBeenCalledWith({
+        expect(recordPremiumUsage).toHaveBeenCalledWith({
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
@@ -358,7 +359,7 @@ describe('requestChatCompletion', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(recordUsage).toHaveBeenCalledWith({
+        expect(recordPremiumUsage).toHaveBeenCalledWith({
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
@@ -376,7 +377,7 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
-        expect(recordUsage).not.toHaveBeenCalled();
+        expect(recordPremiumUsage).not.toHaveBeenCalled();
     });
 
     it('does not record premium model usage for free tier users', async () => {
@@ -388,7 +389,7 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
-        expect(recordUsage).not.toHaveBeenCalled();
+        expect(recordPremiumUsage).not.toHaveBeenCalled();
     });
 
     it('does not record free model usage for members', async () => {
@@ -400,7 +401,7 @@ describe('requestChatCompletion', () => {
             { tokenStore, callGemini, usageLogs }
         );
 
-        expect(recordUsage).not.toHaveBeenCalled();
+        expect(recordPremiumUsage).not.toHaveBeenCalled();
     });
 
     it('returns successful response when premium usage tracking is not provided', async () => {
@@ -421,7 +422,9 @@ describe('requestChatCompletion', () => {
     });
 
     it('keeps successful chat response when premium usage tracking fails', async () => {
-        recordUsage.mockRejectedValueOnce(new Error('database unavailable'));
+        recordPremiumUsage.mockRejectedValueOnce(
+            new Error('database unavailable')
+        );
 
         const result = await requestChatCompletion(
             createParams({

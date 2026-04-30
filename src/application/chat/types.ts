@@ -1,4 +1,4 @@
-import type { ChatUsageLimitError } from '@/application/usage/types';
+import type { ChatbotLimitError } from '@/application/usage/types';
 import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
@@ -29,7 +29,7 @@ export interface RequestChatCompletionParams {
     model?: ChatModel;
     freeApiKey?: string;
     paidApiKey?: string;
-    usageOccurredAt?: Date;
+    occurredAt?: Date;
     tierContext?: UserTierContext;
 }
 
@@ -46,6 +46,6 @@ export interface RequestChatCompletionDependencies {
 export type ChatActionResult =
     | { ok: true; message: string; remainingTokens: number }
     | { ok: false; error: ChatErrorCode }
-    | { ok: false; error: ChatUsageLimitError };
+    | { ok: false; error: ChatbotLimitError };
 
 export type RequestChatCompletionResult = ChatActionResult;

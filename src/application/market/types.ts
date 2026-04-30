@@ -1,5 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
-import type { SubmitAnalysisError } from '@/application/usage/types';
+import type { AnalysisLimitError } from '@/application/usage/types';
 import type {
     AnalysisResponse,
     Tier,
@@ -47,15 +47,15 @@ export interface TierTimeframeAccessError {
     allowedTimeframes: Timeframe[];
 }
 
-/** Submit analysis outcome for application-level denials. */
+/** Analysis error result when tier timeframe access is denied. */
 export interface TierGateErrorResult {
     status: 'error';
     error: TierTimeframeAccessError;
 }
 
-/** Submit analysis outcome for application-level denials. */
+/** Analysis error result: usage limit exceeded or tier timeframe denied. */
 export type SubmitAnalysisErrorResult =
-    | { status: 'error'; error: SubmitAnalysisError }
+    | { status: 'error'; error: AnalysisLimitError }
     | TierGateErrorResult;
 
 /** Submit analysis outcome including application-level gate errors. */
