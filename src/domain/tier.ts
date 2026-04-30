@@ -6,6 +6,7 @@ import type {
     TierModel,
     Timeframe,
 } from '@/domain/types';
+import { TIMEFRAMES } from '@/domain/constants/market';
 
 /** @internal All supported subscription tiers, ordered free -> member -> pro. */
 export const TIER_VALUES = [
@@ -80,6 +81,33 @@ export const TIER_CONFIG = {
     },
 } as const satisfies TierConfig;
 
+function resolveAllowedTimeframes(
+    tier: Tier,
+    config: TierConfig
+): readonly Timeframe[] {
+    return config.featureFlags.enableTierRestrictions
+        ? config.timeframes[tier]
+        : TIMEFRAMES;
+}
+
+function resolveAllowedInfoDepths(
+    tier: Tier,
+    config: TierConfig
+): readonly TierInfoDepth[] {
+    return config.featureFlags.enableTierRestrictions
+        ? config.infoDepth[tier]
+        : PRO_INFO_DEPTH;
+}
+
+function resolveAllowedModels(
+    tier: Tier,
+    config: TierConfig
+): readonly TierModel[] {
+    return config.featureFlags.enableTierRestrictions
+        ? config.models[tier]
+        : PRO_MODELS;
+}
+
 /**
  * Return whether a daily usage-limited feature is enabled for the tier.
  *
@@ -121,6 +149,27 @@ export function getTierLimit(
 }
 
 /**
+ * Return the timeframes available to a tier.
+ *
+ * Always returns every known timeframe when
+ * `config.featureFlags.enableTierRestrictions` is `false`.
+ *
+ * @param tier - The user's subscription tier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns A new array of allowed timeframes for the active restriction mode.
+ * @example
+ * ```typescript
+ * const allowedTimeframes = getAllowedTimeframes('free');
+ * ```
+ */
+export function getAllowedTimeframes(
+    tier: Tier,
+    config: TierConfig = TIER_CONFIG
+): Timeframe[] {
+    return [...resolveAllowedTimeframes(tier, config)];
+}
+
+/**
  * Return whether a timeframe is available to the tier.
  *
  * Always returns `true` when `config.featureFlags.enableTierRestrictions` is `false`.
@@ -135,9 +184,7 @@ export function isTimeframeAllowed(
     timeframe: Timeframe,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return config.featureFlags.enableTierRestrictions
-        ? config.timeframes[tier].includes(timeframe)
-        : true;
+    return resolveAllowedTimeframes(tier, config).includes(timeframe);
 }
 
 /**
@@ -155,9 +202,7 @@ export function isInfoDepthAllowed(
     infoDepth: TierInfoDepth,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return config.featureFlags.enableTierRestrictions
-        ? config.infoDepth[tier].includes(infoDepth)
-        : true;
+    return resolveAllowedInfoDepths(tier, config).includes(infoDepth);
 }
 
 /**
@@ -175,9 +220,7 @@ export function isModelAllowed(
     model: TierModel,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return config.featureFlags.enableTierRestrictions
-        ? config.models[tier].includes(model)
-        : true;
+    return resolveAllowedModels(tier, config).includes(model);
 }
 
 /**

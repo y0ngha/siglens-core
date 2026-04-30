@@ -1,13 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
+import type {
+    EmailAuthUserRepository,
+    OAuthUserRepository,
+    PasswordHasher,
+    PasswordVerifier,
+    PatternTrend,
+    SessionRepository,
+    TierGateErrorResult,
+    UsageRepository,
+    UserRepository,
+} from '@/index';
 import {
     asArray,
     assetTranslations,
+    bcryptPasswordHasher,
+    bcryptPasswordVerifier,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     clusterKeyLevels,
+    createChatTokenStore,
     createDatabaseClient,
     CROSS_LOOKBACK_BARS,
     DEFAULT_TIER,
+    deleteAccount,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
     DrizzleSessionRepository,
@@ -17,27 +32,22 @@ import {
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
     EXCLUDED_SINGLE_PATTERNS,
-    extractReconciledActionLines,
     extendTrendline,
-    HIGH_CONFIDENCE_WEIGHT,
+    extractReconciledActionLines,
+    findUserBySessionToken,
+    GEMINI_2_5_FLASH_MODEL,
+    getAllowedTimeframes,
     getTierLimit,
     hashUsageIp,
+    HIGH_CONFIDENCE_WEIGHT,
     isAllowed,
     isInfoDepthAllowed,
     isModelAllowed,
     isTier,
     isTimeframeAllowed,
     koreanTickers,
-    bcryptPasswordHasher,
-    bcryptPasswordVerifier,
-    deleteAccount,
-    findUserBySessionToken,
     loginUser,
     logoutUser,
-    requestChatCompletion,
-    createChatTokenStore,
-    GEMINI_2_5_FLASH_MODEL,
-    VALID_CHAT_MODELS,
     normalizeActionRecommendation,
     normalizeTrend,
     OAUTH_PROVIDER_VALUES,
@@ -45,6 +55,7 @@ import {
     oauthProviderEnum,
     postProcessAnalysisWithReconcile,
     registerUser,
+    requestChatCompletion,
     RSI_DEFAULT_PERIOD,
     sessions,
     socialLoginUser,
@@ -52,21 +63,13 @@ import {
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
-    users,
     USER_TIER_VALUES,
+    users,
     userTierEnum,
+    VALID_CHAT_MODELS,
     validateActionPrices,
 } from '@/index';
-import type {
-    EmailAuthUserRepository,
-    OAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
-    PatternTrend,
-    SessionRepository,
-    UsageRepository,
-    UserRepository,
-} from '@/index';
+import { describe, expect, it } from 'vitest';
 
 describe('public API exports', () => {
     it('exports indicator constants from package entrypoint', () => {
@@ -97,14 +100,27 @@ describe('public API exports', () => {
     });
 
     it('exports tier gating helpers from package entrypoint', () => {
+        const gateError: TierGateErrorResult = {
+            status: 'error',
+            error: {
+                code: 'timeframe_not_allowed',
+                message: 'Timeframe 5Min is not available for free tier.',
+                tier: 'free',
+                timeframe: '5Min',
+                allowedTimeframes: getAllowedTimeframes('free'),
+            },
+        };
+
         expect(DEFAULT_TIER).toBe('free');
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
         expect(isAllowed('free', 'analysisPerDay')).toBe(true);
+        expect(getAllowedTimeframes('free')).toEqual([...TIMEFRAMES]);
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
         expect(isTimeframeAllowed('free', '5Min')).toBe(true);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
         expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
         expect(isTier('member')).toBe(true);
+        expect(gateError.status).toBe('error');
     });
 
     it('exports auth application entrypoints from package entrypoint', () => {

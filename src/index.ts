@@ -209,6 +209,7 @@ export {
 
 // Tier gating
 export {
+    getAllowedTimeframes,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -521,6 +522,12 @@ export type {
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
 } from './application/chat/types';
+export type {
+    SubmitAnalysisGatedResult,
+    SubmitAnalysisOptions,
+    TierGateErrorResult,
+    TierTimeframeAccessError,
+} from './application/market/types';
 
 // Domain types
 export type {

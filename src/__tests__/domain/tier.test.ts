@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
+    getAllowedTimeframes,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -63,6 +65,25 @@ describe('tier', () => {
 
         it('returns Infinity for uncapped tiers with default config', () => {
             expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
+        });
+    });
+
+    describe('getAllowedTimeframes', () => {
+        it('returns every timeframe when restrictions are disabled', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: false },
+            };
+
+            expect(getAllowedTimeframes('free', config)).toEqual([
+                ...TIMEFRAMES,
+            ]);
+        });
+
+        it('returns the configured timeframe list when restrictions are enabled', () => {
+            expect(getAllowedTimeframes('member', restrictedConfig)).toEqual([
+                ...restrictedConfig.timeframes.member,
+            ]);
         });
     });
 

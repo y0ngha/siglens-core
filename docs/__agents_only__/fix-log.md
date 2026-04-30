@@ -116,3 +116,8 @@
 - Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
 - Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
 - Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
+
+## [PR #44 | feat/13/timeframe-restrictions | 2026-04-28]
+- Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
+- Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
+- Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
