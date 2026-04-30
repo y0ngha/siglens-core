@@ -98,6 +98,9 @@ describe('database schema tables', () => {
             'user_id',
             'provider',
             'provider_account_id',
+            'access_token',
+            'refresh_token',
+            'token_expires_at',
             'created_at',
         ]);
     });

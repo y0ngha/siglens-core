@@ -30,6 +30,22 @@ describe('compositeOAuthRevoker', () => {
         });
     });
 
+    it('delegates to the kakao adapter for kakao provider', async () => {
+        const { kakaoOAuthAdapter } = await import(
+            '@/infrastructure/oauth/kakao'
+        );
+
+        await compositeOAuthRevoker.revokeToken('kakao', {
+            accessToken: 'kakao-access-token',
+            refreshToken: null,
+        });
+
+        expect(kakaoOAuthAdapter.revokeToken).toHaveBeenCalledWith({
+            accessToken: 'kakao-access-token',
+            refreshToken: null,
+        });
+    });
+
     it('skips silently when no adapter is registered for the provider', async () => {
         await expect(
             compositeOAuthRevoker.revokeToken('apple', {

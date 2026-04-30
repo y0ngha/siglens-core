@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { Tier } from '@/domain/types';
 import { oauthAccounts, passwordResets, users } from './schema';
+import { encryptToken, tryReadEncryptionKey } from './tokenEncryption';
 import type {
     AuthUserRecord,
     CompletePasswordResetInput,
@@ -21,6 +22,16 @@ import type {
 
 class OAuthAccountConflictError extends Error {}
 class PasswordResetCompletionConflictError extends Error {}
+
+function encryptOptional(
+    token: string | undefined,
+    encryptionKey: string | null
+): string | null {
+    if (token === undefined || encryptionKey === null) {
+        return null;
+    }
+    return encryptToken(token, encryptionKey);
+}
 
 const authUserColumns = {
     id: users.id,
@@ -162,12 +173,17 @@ export class DrizzleUserRepository
                     return null;
                 }
 
+                const encryptionKey = tryReadEncryptionKey();
+
                 const [account] = await tx
                     .insert(oauthAccounts)
                     .values({
                         userId: user.id,
                         provider: input.provider,
                         providerAccountId: input.providerAccountId,
+                        accessToken: encryptOptional(input.accessToken, encryptionKey),
+                        refreshToken: encryptOptional(input.refreshToken, encryptionKey),
+                        tokenExpiresAt: input.tokenExpiresAt ?? null,
                     })
                     .onConflictDoNothing({
                         target: [

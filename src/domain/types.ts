@@ -1,3 +1,6 @@
+/** OAuth provider used to authenticate a user. */
+export type OAuthProvider = 'google' | 'kakao' | 'apple';
+
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 

@@ -7,6 +7,28 @@ import type {
     DeleteAccountResult,
 } from './types';
 
+function revokeOAuthTokensFireAndForget(
+    userId: string,
+    dependencies: Pick<DeleteAccountDependencies, 'oauthAccounts' | 'oauthRevoker'>
+): void {
+    dependencies.oauthAccounts
+        .findByUserId(userId)
+        .then(accounts => {
+            for (const account of accounts) {
+                if (account.accessToken === null) {
+                    continue;
+                }
+                dependencies.oauthRevoker
+                    .revokeToken(account.provider, {
+                        accessToken: account.accessToken,
+                        refreshToken: account.refreshToken,
+                    })
+                    .catch(() => undefined);
+            }
+        })
+        .catch(() => undefined);
+}
+
 const USER_NOT_FOUND_MESSAGE = 'User account does not exist';
 
 function userNotFoundError(): DeleteAccountError {
@@ -51,6 +73,8 @@ export async function deleteAccount(
     dependencies: DeleteAccountDependencies,
     options: DeleteAccountOptions = {}
 ): Promise<DeleteAccountResult> {
+    revokeOAuthTokensFireAndForget(input.userId, dependencies);
+
     const deleted = await dependencies.users.deleteUser(input.userId);
 
     if (!deleted) {

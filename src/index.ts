@@ -280,12 +280,16 @@ export {
     createDatabaseClient,
     DrizzleAssetTranslationRepository,
     DrizzleKoreanTickerRepository,
+    DrizzleOAuthAccountRepository,
     DrizzleSessionRepository,
     DrizzleUsageLogRepository,
     DrizzleUsageRepository,
     DrizzleUserRepository,
     hashUsageIp,
 } from './infrastructure/db';
+
+// OAuth token revocation
+export { compositeOAuthRevoker } from './infrastructure/oauth/revoker';
 
 // Password adapters
 export {
@@ -514,6 +518,8 @@ export type {
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     KoreanTickerRepository,
+    OAuthAccountRecord,
+    OAuthAccountRepository,
     OAuthProvider,
     OAuthUserRepository,
     PasswordResetRecord,
@@ -530,6 +536,11 @@ export type {
     UserTier,
     UserTierRepository,
 } from './infrastructure/db';
+export type {
+    OAuthProviderAdapter,
+    OAuthRevoker,
+    RevokeTokenParams,
+} from './infrastructure/oauth/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {

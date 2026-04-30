@@ -2,12 +2,14 @@ import type {
     AuthSessionRecord,
     AuthUserRecord,
     EmailAuthUserRepository,
+    OAuthAccountRepository,
     OAuthProvider,
     OAuthUserRepository,
     PasswordResetRepository,
     SessionRepository,
     UserRepository,
 } from '@/infrastructure/db/types';
+import type { OAuthRevoker } from '@/infrastructure/oauth/types';
 import type {
     PasswordHasher,
     PasswordVerifier,
@@ -184,6 +186,12 @@ export interface SocialLoginUserInput {
     name?: string;
     /** Optional avatar image URL from provider profile. */
     avatarUrl?: string;
+    /** Optional plain-text access token issued by the provider; encrypted before storage. */
+    accessToken?: string;
+    /** Optional plain-text refresh token issued by the provider; encrypted before storage. */
+    refreshToken?: string;
+    /** Optional token expiration timestamp reported by the provider. */
+    tokenExpiresAt?: Date;
 }
 
 /**
@@ -302,6 +310,10 @@ export interface DeleteAccountInput {
 export interface DeleteAccountDependencies {
     /** User persistence repository providing id-based deletion. */
     users: UserRepository;
+    /** OAuth account repository used to look up linked provider accounts before deletion. */
+    oauthAccounts: OAuthAccountRepository;
+    /** Provider-agnostic OAuth revoker used to invalidate tokens before deletion. */
+    oauthRevoker: OAuthRevoker;
 }
 
 /**

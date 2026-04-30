@@ -126,6 +126,9 @@ export const oauthAccounts = pgTable(
             .references(() => users.id, { onDelete: 'cascade' }),
         provider: oauthProviderEnum('provider').notNull(),
         providerAccountId: text('provider_account_id').notNull(),
+        accessToken: text('access_token'),
+        refreshToken: text('refresh_token'),
+        tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
         createdAt: timestamp('created_at', { withTimezone: true })
             .notNull()
             .defaultNow(),

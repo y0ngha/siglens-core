@@ -56,11 +56,6 @@
 - Rule: CONVENTIONS.md — every file must end with a newline character
 - Context: Migration SQL file generated without trailing newline; added manually
 
-## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
-- Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
-- Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
-- Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
-
 
 ## [PR #34 | feat/6/email-login | 2026-04-27]
 - Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
@@ -164,3 +159,4 @@
 - Violation: password reset requests used broad user lookup and included OAuth-only accounts
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
+
