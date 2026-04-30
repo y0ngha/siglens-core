@@ -155,3 +155,12 @@
 - Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
 - Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
 - Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
+
+## [Issue #42 | feat/42/password-reset-use-cases | 2026-04-28]
+- Violation: password reset completion changed `users.passwordHash` before proving the reset token row could be consumed
+- Rule: Transactional state transitions must validate and reserve the one-time credential before applying dependent account mutations
+- Context: `completePasswordReset` now consumes the reset row first with a `usedAt IS NULL` guard, then updates the user password inside the same transaction
+
+- Violation: password reset requests used broad user lookup and included OAuth-only accounts
+- Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
+- Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash

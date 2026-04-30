@@ -78,7 +78,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (19)
+### Tier 1 — Application Entrypoints (21)
 
 | Symbol | Source |
 |---|---|
@@ -97,6 +97,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `loginUser` | `application/auth/loginUser.ts` |
 | `socialLoginUser` | `application/auth/socialLoginUser.ts` |
 | `logoutUser` | `application/auth/logoutUser.ts` |
+| `requestPasswordReset` | `application/auth/requestPasswordReset.ts` |
+| `confirmPasswordReset` | `application/auth/confirmPasswordReset.ts` |
 | `getUserTier` | `application/tier/getUserTier.ts` |
 | `createUserTierContext` | `application/tier/createUserTierContext.ts` |
 | `setUserTier` | `application/tier/setUserTier.ts` |
@@ -218,15 +220,16 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `createDatabaseClient` | `infrastructure/db/client.ts` |
 | `DrizzleUserRepository` / `DrizzleSessionRepository` / `DrizzleUsageRepository` | `infrastructure/db/*Repository.ts` |
 | `hashUsageIp` | `infrastructure/db/usageRepository.ts` |
-| `users` / `sessions` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
+| `users` / `sessions` / `passwordResets` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
 | `koreanTickers` / `assetTranslations` | `infrastructure/db/schema.ts` |
 | `userTierEnum` / `usageActionTypeEnum` / `oauthProviderEnum` | `infrastructure/db/schema.ts` |
 | `USER_TIER_VALUES` / `USAGE_ACTION_TYPE_VALUES` / `OAUTH_PROVIDER_VALUES` | `infrastructure/db/constants.ts` |
 
-**Auth application (4 use-cases + cookie constants)**
+**Auth application (6 use-cases + cookie constants)**
 | Symbol | Source |
 |---|---|
 | `registerUser` / `loginUser` / `socialLoginUser` / `logoutUser` | `application/auth` |
+| `requestPasswordReset` / `confirmPasswordReset` | `application/auth` |
 | `AUTH_SESSION_COOKIE_NAME` / `DEFAULT_SESSION_TTL_SECONDS` | `application/auth/sessionCookie.ts` |
 | `DEFAULT_AUTH_COOKIE_PATH` / `DEFAULT_AUTH_COOKIE_SAME_SITE` | `application/auth/sessionCookie.ts` |
 
@@ -250,7 +253,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선/티어 설정 타입 일체) — `domain/types.ts`에서 일괄 export.
 
-**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, `UsageCounts`, `UsageLogRepository`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`, `UsageRepository`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`), market application 타입(`SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), 채팅 application 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, `RequestPasswordReset*`, `ConfirmPasswordReset*`, `UsageCounts`, `UsageLogRepository`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `PasswordResetTokenGenerator`, `PasswordResetTokenHasher`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`, `PasswordResetRepository`, `UsageRepository`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`), market application 타입(`SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), 채팅 application 타입.
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
