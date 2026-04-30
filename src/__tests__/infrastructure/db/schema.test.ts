@@ -30,6 +30,7 @@ describe('database enums', () => {
         expect(usageActionTypeEnum.enumValues).toEqual([
             ...USAGE_ACTION_TYPE_VALUES,
         ]);
+        expect(USAGE_ACTION_TYPE_VALUES).toContain('premium_model');
     });
 
     it('defines OAuth provider values', () => {

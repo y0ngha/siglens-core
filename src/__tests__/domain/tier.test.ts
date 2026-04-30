@@ -3,6 +3,7 @@ import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
+    getAllowedModels,
     getAllowedTimeframes,
     getTierLimit,
     isAllowed,
@@ -11,7 +12,15 @@ import {
     isTier,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { TierConfig } from '@/domain/types';
+import type { ModelId, TierConfig } from '@/domain/types';
+
+const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
+    'claude-opus-4',
+    'claude-sonnet-4',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+];
 
 const restrictedConfig: TierConfig = {
     ...TIER_CONFIG,
@@ -87,6 +96,17 @@ describe('tier', () => {
         });
     });
 
+    describe('getAllowedModels', () => {
+        it('returns every configured model when restrictions are disabled', () => {
+            expect(getAllowedModels('free')).toEqual(ALL_CONFIGURED_MODELS);
+        });
+
+        it('returns tier-specific models when restrictions are enabled', () => {
+            expect(getAllowedModels('member', restrictedConfig)).toEqual([
+                ...restrictedConfig.models.member,
+            ]);
+        });
+    });
     describe('isTimeframeAllowed', () => {
         it('allows all timeframes when restrictions are disabled', () => {
             expect(isTimeframeAllowed('free', '5Min')).toBe(true);

@@ -257,7 +257,7 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 |---|---|
 | `users` | 사용자 메타데이터, 이메일 로그인용 비밀번호 해시, 구독 tier (`free` / `member` / `pro`) |
 | `sessions` | 사용자 세션과 만료 시각 |
-| `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot`) |
+| `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot` / `premium_model`) |
 | `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |

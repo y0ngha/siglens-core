@@ -136,3 +136,22 @@
 - Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
+
+## [Issue #14 | feat/14/ai-model-tier-separation | 2026-04-28]
+- Violation: Browser entrypoint did not export the new browser-safe tier model API exposed from the server entrypoint
+- Rule: PUBLIC_API.md — package entrypoints must expose intended public symbols consistently for the target runtime
+- Context: Added `getAllowedModels`, tier gate helpers, and tier model types to `src/index.client.ts` so browser consumers can render model choices without importing the server entrypoint
+
+## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
+- Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
+- Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
+- Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
+
+## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
+- Violation: `src/index.ts` re-exported `DrizzleUserRepository` from the DB barrel, but `src/infrastructure/db/index.ts` no longer exported that symbol
+- Rule: PUBLIC_API.md — public entrypoint exports must stay synchronized with module barrels they depend on
+- Context: Restored the DB barrel re-export so the package entrypoint compiles and public repository exports remain available
+
+- Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
+- Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
+- Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order

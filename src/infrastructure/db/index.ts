@@ -25,6 +25,7 @@ export {
     DrizzleAssetTranslationRepository,
     DrizzleKoreanTickerRepository,
 } from './tickerRepository';
+export { DrizzleUserRepository } from './userRepository';
 export type {
     AssetTranslationRecord,
     AssetTranslationRepository,
@@ -33,6 +34,7 @@ export type {
     CreateEmailUserInput,
     CreateOAuthUserInput,
     CreateSessionInput,
+    CreateUsageLogInput,
     DatabaseClient,
     DatabaseConfig,
     EmailAuthUserRecord,
@@ -46,10 +48,11 @@ export type {
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
+    UsageLogRepository,
     UsageRepository,
     UserRepository,
     UserTier,
     UserTierRepository,
 } from './types';
+export { DrizzleUsageLogRepository } from './usageLogRepository';
 export { DrizzleUsageRepository, hashUsageIp } from './usageRepository';
-export { DrizzleUserRepository } from './userRepository';

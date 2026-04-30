@@ -1,3 +1,4 @@
+import type { KoreanTickerEntry, ModelId, Tier } from '@/domain/types';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import type {
@@ -6,7 +7,6 @@ import type {
     USER_TIER_VALUES,
 } from './constants';
 import type * as schema from './schema';
-import type { KoreanTickerEntry, Tier } from '@/domain/types';
 
 /** Subscription tier for a registered user. */
 export type UserTier = (typeof USER_TIER_VALUES)[number];
@@ -97,6 +97,22 @@ export interface CreateSessionInput {
     userId: string;
     /** Fixed expiration timestamp. */
     expiresAt: Date;
+}
+
+/**
+ * Input for appending a usage log row.
+ */
+export interface CreateUsageLogInput {
+    /** Authenticated user UUID, or null for anonymous usage. */
+    userId: string | null;
+    /** Hashed client IP used for anonymous and abuse tracking. */
+    ipHash: string;
+    /** Usage action being tracked. */
+    actionType: UsageActionType;
+    /** AI model used by the request. */
+    modelUsed: ModelId;
+    /** Calendar date bucket in `YYYY-MM-DD` format. */
+    date: string;
 }
 
 /**
@@ -382,6 +398,17 @@ export interface UserTierRepository {
      * @returns The updated tier, or null when the user does not exist.
      */
     updateUserTier(userId: string, tier: Tier): Promise<Tier | null>;
+}
+
+/** Persistence operations for request usage accounting. */
+export interface UsageLogRepository {
+    /**
+     * Append a usage log row for daily accounting and analytics.
+     *
+     * @param input - Usage event data to persist.
+     * @returns Resolves when the row has been queued by the database adapter.
+     */
+    recordUsage(input: CreateUsageLogInput): Promise<void>;
 }
 
 /** Persistence operations required by usage tracking and analytics. */

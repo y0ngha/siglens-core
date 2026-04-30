@@ -1151,19 +1151,10 @@ export interface ChatSession {
 }
 
 /** Internal: chat model identifiers used by the worker. */
-export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-flash-lite';
-
-/** Internal: chat error code returned to the UI. */
-export type ChatErrorCode =
-    | 'token_exhausted'
-    | 'rate_limited'
-    | 'server_error'
-    | 'server_busy';
-
-/** Internal: server-action result for chat sends. */
-export type ChatActionResult =
-    | { ok: true; message: string; remainingTokens: number }
-    | { ok: false; error: ChatErrorCode };
+export type ChatModel =
+    | 'gemini-2.5-flash'
+    | 'gemini-2.5-flash-lite'
+    | 'gemini-2.5-pro';
 
 /** Chat prompt payload returned by {@link buildChatPrompt}. */
 export interface ChatPromptPayload {
@@ -1204,6 +1195,9 @@ export type TierModel =
     | 'gemini-2.5-pro'
     | 'claude-sonnet-4'
     | 'claude-opus-4';
+
+/** Public model identifier used by tier model access helpers. */
+export type ModelId = TierModel;
 
 /** Usage limits keyed by feature for every tier. */
 export type TierFeatureLimits = Record<
