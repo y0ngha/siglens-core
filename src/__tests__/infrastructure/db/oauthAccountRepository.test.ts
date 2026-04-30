@@ -98,6 +98,29 @@ describe('DrizzleOAuthAccountRepository.findByUserId', () => {
         expect(result[0]?.tokenExpiresAt).toBeNull();
     });
 
+    it('returns null tokens when the ciphertext cannot be decrypted with the stored key', async () => {
+        const differentKey = 'f'.repeat(64);
+        const encryptedWithDifferentKey = encryptToken('secret', differentKey);
+
+        const { db } = makeSelectDb([
+            {
+                id: 'account-4',
+                userId: 'user-1',
+                provider: 'google',
+                providerAccountId: 'google-uid-4',
+                accessToken: encryptedWithDifferentKey,
+                refreshToken: null,
+                tokenExpiresAt: null,
+                createdAt,
+            },
+        ]);
+
+        const repo = new DrizzleOAuthAccountRepository(db);
+        const result = await repo.findByUserId('user-1');
+
+        expect(result[0]?.accessToken).toBeNull();
+    });
+
     it('returns null tokens when the encryption key is missing', async () => {
         delete process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
         const { db } = makeSelectDb([

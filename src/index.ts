@@ -531,7 +531,6 @@ export type {
     KoreanTickerRepository,
     OAuthAccountRecord,
     OAuthAccountRepository,
-    OAuthProvider,
     OAuthUserRepository,
     PasswordResetRecord,
     PasswordResetRepository,
@@ -548,7 +547,6 @@ export type {
     UserTierRepository,
 } from './infrastructure/db';
 export type {
-    OAuthProviderAdapter,
     OAuthRevoker,
     RevokeTokenParams,
 } from './infrastructure/oauth/types';
@@ -646,6 +644,7 @@ export type {
     ModelId,
     MultiCandlePattern,
     MultiCandlePatternEntry,
+    OAuthProvider,
     ParabolicSARResult,
     PatternLine,
     PatternResult,

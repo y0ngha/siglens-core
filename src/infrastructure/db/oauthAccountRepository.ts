@@ -43,6 +43,7 @@ export class DrizzleOAuthAccountRepository implements OAuthAccountRepository {
             .from(oauthAccounts)
             .where(eq(oauthAccounts.userId, userId));
 
+        // Read per-call so tests can override process.env between invocations.
         const encryptionKey = tryReadEncryptionKey();
 
         return rows.map(row => ({
