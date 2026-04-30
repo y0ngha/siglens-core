@@ -15,7 +15,7 @@ import {
     getAllowedTimeframes,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { AnalysisResponse, Skill, Tier, Timeframe } from '@/domain/types';
+import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/db';
@@ -25,15 +25,6 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
-
-function toSubmitAnalysisLimitError(
-    tier: Tier
-): Extract<SubmitAnalysisGatedResult, { status: 'error' }> {
-    return {
-        status: 'error',
-        error: buildUsageLimitError('analysisPerDay', tier),
-    };
-}
 
 async function checkAnalysisUsageAllowed(
     usage: AnalysisUsageOptions,
@@ -121,7 +112,10 @@ export async function submitAnalysis(
         const occurredAt = usageOccurredAt!;
         const allowed = await checkAnalysisUsageAllowed(usage, occurredAt);
         if (!allowed) {
-            return toSubmitAnalysisLimitError(usage.tier);
+            return {
+                status: 'error',
+                error: buildUsageLimitError('analysisPerDay', usage.tier),
+            };
         }
     }
 

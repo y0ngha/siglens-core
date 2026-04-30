@@ -4,7 +4,6 @@ import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
-    ChatErrorCode,
     ChatMessage,
     ChatModel,
     Tier,
@@ -12,6 +11,14 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
+
+/** Error code produced by chat infrastructure or application policy. */
+export type ChatErrorCode =
+    | 'token_exhausted'
+    | 'model_not_allowed'
+    | 'rate_limited'
+    | 'server_error'
+    | 'server_busy';
 
 export interface RequestChatCompletionParams {
     symbol: string;

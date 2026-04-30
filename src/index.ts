@@ -552,6 +552,7 @@ export type { SkillsProvider } from './infrastructure/skills/types';
 // Application types
 export type {
     ChatActionResult,
+    ChatErrorCode,
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
     RequestChatCompletionResult,
@@ -591,7 +592,6 @@ export type {
     CandlePatternSummary,
     CategoryId,
     ChartDisplayType,
-    ChatErrorCode,
     ChatLoadingPhase,
     ChatMessage,
     ChatModel,

@@ -312,11 +312,12 @@ export type {
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
     ChatActionResult,
+    ChatErrorCode,
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
 } from './application/chat/types';
-export type { SubmitAnalysisResult } from './application/types';
+export type { SubmitAnalysisGatedResult } from './application/market/types';
 export type {
     ChatUsageLimitError,
     SubmitAnalysisError,
@@ -414,7 +415,6 @@ export type {
     ReconciledActionLineData,
     ValidatedActionPrices,
     ChatMessage,
-    ChatErrorCode,
     ChatLoadingPhase,
     ChatModel,
     ChatPromptPayload,

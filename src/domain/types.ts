@@ -1151,14 +1151,6 @@ export type ChatModel =
     | 'gemini-2.5-flash-lite'
     | 'gemini-2.5-pro';
 
-/** Internal: chat error code returned to the UI. */
-export type ChatErrorCode =
-    | 'token_exhausted'
-    | 'model_not_allowed'
-    | 'rate_limited'
-    | 'server_error'
-    | 'server_busy';
-
 /** Chat prompt payload returned by {@link buildChatPrompt}. */
 export interface ChatPromptPayload {
     /** System instruction grounding the AI to the analysis. */

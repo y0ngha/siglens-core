@@ -83,11 +83,6 @@
 - Context: the merge accidentally dropped a large block of `export type { ... }` entries from src/index.ts that have nothing to do with the OAuth feature
 
 ## [PR #35 | feat/7/social-login | 2026-04-27]
-- Violation: `LoginUserOptions` and `SocialLoginUserOptions` duplicated the same session and cookie option fields instead of sharing a base interface
-- Rule: CONVENTIONS.md TypeScript Rules — related interfaces with shared fields must use `extends`
-- Context: the social-login use case introduced an options interface identical to the existing email-login options shape; extracted `AuthSessionOptions` and had both use-case options extend it
-
-## [PR #35 | feat/7/social-login | 2026-04-27]
 - Violation: DB environment readers, cached singleton helpers, and raw `DatabaseClient` wrapper were exposed from the package entrypoint without a consumer-facing need
 - Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
 - Context: kept `createDatabaseClient` as the explicit DB construction entrypoint while removing `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig`, and `DatabaseClient` from `src/index.ts`
@@ -156,11 +151,6 @@
 - Context: custom `TierConfig.infoDepth.pro` values were ignored when computing `lockedInfoDepth`; the function now passes the active config's pro depth list into the helper
 
 ## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
-- Violation: `FilteredActionRecommendation` duplicated optional fields from `ActionRecommendation` instead of extending the shared base shape
-- Rule: CONVENTIONS.md — Related interfaces with shared fields must use extends
-- Context: the filtered action recommendation type now inherits unchanged optional fields while overriding only gated prose fields with nullable variants
-
-## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
 - Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
@@ -192,3 +182,8 @@
 - Violation: password reset requests used broad user lookup and included OAuth-only accounts
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
+
+## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
+- Violation: `index.client.ts` exported `SubmitAnalysisResult` (narrower type, missing `TierTimeframeAccessError` variant) instead of `SubmitAnalysisGatedResult` (actual return type of `submitAnalysis`)
+- Rule: Public entrypoint browser exports must match the function's actual return type to preserve type safety for browser consumers
+- Context: `SubmitAnalysisResult` in `application/types.ts` was dead code with only `SubmitAnalysisError`; `SubmitAnalysisGatedResult` from `application/market/types.ts` is the real return type including `TierTimeframeAccessError` — export corrected in `index.client.ts`

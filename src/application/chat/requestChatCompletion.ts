@@ -5,6 +5,7 @@ import {
 } from '@/application/chat/constants';
 import type {
     ChatActionResult,
+    ChatErrorCode,
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
@@ -12,7 +13,6 @@ import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import type {
-    ChatErrorCode,
     ChatModel,
     ChatPromptPayload,
     Tier,
