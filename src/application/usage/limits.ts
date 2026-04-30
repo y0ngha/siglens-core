@@ -1,10 +1,8 @@
 import { getTierLimit, TIER_CONFIG } from '@/domain/tier';
+import type { TierLimitedFeature } from '@/domain/types';
 import type {
     ChatUsageLimitError,
     SubmitAnalysisError,
-    TierLimitedFeature,
-} from '@/domain/types';
-import type {
     UsageLimitDependencies,
     UsageLimitError,
     UsageLimitErrorTemplate,

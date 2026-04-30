@@ -211,6 +211,9 @@ describe('requestChatCompletion', () => {
     });
 
     it('keeps a successful chat response when usage recording fails', async () => {
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
         recordUsage.mockRejectedValueOnce(new Error('usage db failed'));
 
         const result = await requestChatCompletion(
@@ -227,6 +230,11 @@ describe('requestChatCompletion', () => {
             remainingTokens: 4,
         });
         expect(refundConsumedToken).not.toHaveBeenCalled();
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[recordChatUsageSafely] Failed to record chatbot usage:',
+            expect.any(Error)
+        );
+        consoleWarn.mockRestore();
     });
 
     it('uses the default Gemini chat model when no model is provided', async () => {

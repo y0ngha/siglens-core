@@ -71,6 +71,21 @@ describe('usage limit checks', () => {
         expect(dependencies.usage.getUsageToday).not.toHaveBeenCalled();
     });
 
+    it('uses package default config when config is omitted', async () => {
+        const dependencies = createDependencies({ analysis: 0, chatbot: 0 });
+
+        const result = await checkAnalysisLimit(
+            {
+                ipHash: 'hashed-ip',
+                tier: 'free',
+            },
+            dependencies
+        );
+
+        expect(result).toBe(true);
+        expect(dependencies.usage.getUsageToday).not.toHaveBeenCalled();
+    });
+
     it('allows analysis while today usage is below the tier limit', async () => {
         const dependencies = createDependencies({ analysis: 1, chatbot: 0 });
         const now = new Date('2026-04-29T00:00:00.000Z');

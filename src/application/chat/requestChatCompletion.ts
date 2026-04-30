@@ -3,6 +3,7 @@ import {
     VALID_CHAT_MODELS,
 } from '@/application/chat/constants';
 import type {
+    ChatActionResult,
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
 } from '@/application/chat/types';
@@ -10,7 +11,6 @@ import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
-    ChatActionResult,
     ChatErrorCode,
     ChatModel,
     ChatPromptPayload,
@@ -23,6 +23,7 @@ import {
 } from '@/infrastructure/chat/tokenStore';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import { hashUsageIp } from '@/infrastructure/db';
+import type { UsageRepository } from '@/infrastructure/db';
 import { constants } from 'node:http2';
 
 const COMPENSATED_CHAT_ERRORS = [
@@ -82,9 +83,7 @@ async function refundConsumedTokenSafely(
 }
 
 async function recordChatUsageSafely(
-    usageRepository: NonNullable<
-        RequestChatCompletionDependencies['usageRepository']
-    >,
+    usageRepository: UsageRepository,
     params: RequestChatCompletionParams,
     model: ChatModel,
     usageOccurredAt: Date
@@ -97,8 +96,11 @@ async function recordChatUsageSafely(
             modelUsed: model,
             occurredAt: usageOccurredAt,
         });
-    } catch {
-        return;
+    } catch (error) {
+        console.warn(
+            '[recordChatUsageSafely] Failed to record chatbot usage:',
+            error
+        );
     }
 }
 

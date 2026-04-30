@@ -298,7 +298,14 @@ export type {
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
+    ChatActionResult,
 } from './application/chat/types';
+export type { SubmitAnalysisResult } from './application/types';
+export type {
+    ChatUsageLimitError,
+    SubmitAnalysisError,
+    SubmitAnalysisErrorCode,
+} from './application/usage';
 
 // Domain types
 export type {
@@ -379,9 +386,7 @@ export type {
     ReconciledActionLineData,
     ValidatedActionPrices,
     ChatMessage,
-    ChatActionResult,
     ChatErrorCode,
-    ChatUsageLimitError,
     ChatLoadingPhase,
     ChatModel,
     ChatPromptPayload,
@@ -420,9 +425,6 @@ export type {
     MarketSummaryData,
     MarketSummaryWithBriefing,
     BarsData,
-    SubmitAnalysisError,
-    SubmitAnalysisErrorCode,
-    SubmitAnalysisResult,
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,

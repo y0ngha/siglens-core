@@ -959,27 +959,6 @@ export interface RawAnalysisResponse {
 
 // --- Job Result Types (submit + poll 패턴) ---
 
-/** Outcome of {@link submitAnalysis}: cached result or a `jobId` to poll. */
-export type SubmitAnalysisResult =
-    | { status: 'cached'; result: AnalysisResponse }
-    | { status: 'submitted'; jobId: string }
-    | { status: 'error'; error: SubmitAnalysisError };
-
-/** Structured error code returned by {@link submitAnalysis}. */
-export type SubmitAnalysisErrorCode = 'analysis_limit_exceeded';
-
-/** Structured error returned by {@link submitAnalysis}. */
-export interface SubmitAnalysisError {
-    /** Machine-readable error code. */
-    code: SubmitAnalysisErrorCode;
-    /** Human-readable message for API/UI surfaces. */
-    message: string;
-    /** Feature whose daily limit was exceeded. */
-    feature: 'analysisPerDay';
-    /** Resolved tier used for the check. */
-    tier: Tier;
-}
-
 /** Outcome of {@link pollAnalysis}: still processing, finished, or errored. */
 export type PollAnalysisResult =
     | { status: 'processing' }
@@ -1124,23 +1103,6 @@ export type ChatErrorCode =
     | 'rate_limited'
     | 'server_error'
     | 'server_busy';
-
-/** Structured daily chatbot limit error returned to the UI. */
-export interface ChatUsageLimitError {
-    /** Machine-readable error code. */
-    code: 'chatbot_limit_exceeded';
-    /** Human-readable message for API/UI surfaces. */
-    message: string;
-    /** Feature whose daily limit was exceeded. */
-    feature: 'chatbotPerDay';
-    /** Resolved tier used for the check. */
-    tier: Tier;
-}
-
-/** Internal: server-action result for chat sends. */
-export type ChatActionResult =
-    | { ok: true; message: string; remainingTokens: number }
-    | { ok: false; error: ChatErrorCode | ChatUsageLimitError };
 
 /** Chat prompt payload returned by {@link buildChatPrompt}. */
 export interface ChatPromptPayload {

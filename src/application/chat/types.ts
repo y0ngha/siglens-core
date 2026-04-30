@@ -1,12 +1,13 @@
 import type {
     AnalysisResponse,
-    ChatActionResult,
+    ChatErrorCode,
     ChatMessage,
     ChatModel,
     Tier,
     TierConfig,
     Timeframe,
 } from '@/domain/types';
+import type { ChatUsageLimitError } from '@/application/usage/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
 import type { UsageRepository } from '@/infrastructure/db';
@@ -32,5 +33,10 @@ export interface RequestChatCompletionDependencies {
     usageRepository?: UsageRepository;
     callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
 }
+
+/** Result returned by {@link requestChatCompletion}. */
+export type ChatActionResult =
+    | { ok: true; message: string; remainingTokens: number }
+    | { ok: false; error: ChatErrorCode | ChatUsageLimitError };
 
 export type RequestChatCompletionResult = ChatActionResult;

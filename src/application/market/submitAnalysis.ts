@@ -2,18 +2,14 @@ import { fireAndForget } from '@/application/background';
 import type {
     AnalysisUsageOptions,
     SubmitAnalysisOptions,
+    SubmitAnalysisResult,
 } from '@/application/types';
 import { buildUsageLimitError, checkAnalysisLimit } from '@/application/usage';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
-import type {
-    AnalysisResponse,
-    Skill,
-    SubmitAnalysisResult,
-    Timeframe,
-} from '@/domain/types';
+import type { AnalysisResponse, Skill, Tier, Timeframe } from '@/domain/types';
 import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/db';
@@ -24,9 +20,7 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
 
-function toSubmitAnalysisLimitError(
-    tier: AnalysisUsageOptions['tier']
-): SubmitAnalysisResult {
+function toSubmitAnalysisLimitError(tier: Tier): SubmitAnalysisResult {
     const error = buildUsageLimitError('analysisPerDay', tier);
 
     return {
@@ -73,8 +67,11 @@ async function recordAnalysisUsageSafely(
 ): Promise<void> {
     try {
         await recordAnalysisUsage(usage, occurredAt);
-    } catch {
-        return;
+    } catch (error) {
+        console.warn(
+            '[recordAnalysisUsageSafely] Failed to record analysis usage:',
+            error
+        );
     }
 }
 

@@ -23,6 +23,7 @@ export type {
     AnalysisUsageOptions,
     BackgroundTaskOptions,
     SubmitAnalysisOptions,
+    SubmitAnalysisResult,
 } from './application/types';
 
 // Chat
@@ -503,6 +504,9 @@ export type {
 } from './application/tier';
 export type {
     UsageLimitDependencies,
+    ChatUsageLimitError,
+    SubmitAnalysisError,
+    SubmitAnalysisErrorCode,
     UsageLimitError,
     UsageLimitErrorCode,
     UsageLimitInput,
@@ -526,6 +530,7 @@ export type {
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
+    ChatActionResult,
 } from './application/chat/types';
 
 // Domain types
@@ -615,9 +620,7 @@ export type {
     ReconciledActionLineData,
     ValidatedActionPrices,
     ChatMessage,
-    ChatActionResult,
     ChatErrorCode,
-    ChatUsageLimitError,
     ChatLoadingPhase,
     ChatModel,
     ChatPromptPayload,
@@ -656,9 +659,6 @@ export type {
     MarketSummaryData,
     MarketSummaryWithBriefing,
     BarsData,
-    SubmitAnalysisError,
-    SubmitAnalysisErrorCode,
-    SubmitAnalysisResult,
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,

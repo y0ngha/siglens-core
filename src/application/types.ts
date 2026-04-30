@@ -1,4 +1,10 @@
-import type { Tier, TierConfig, WaitUntil } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    Tier,
+    TierConfig,
+    WaitUntil,
+} from '@/domain/types';
+import type { SubmitAnalysisError } from '@/application/usage/types';
 import type { UsageRepository } from '@/infrastructure/db';
 
 /** Runtime hooks for background tasks started by application use-cases. */
@@ -36,3 +42,9 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     /** Optional usage tracking. Omitted callers keep the previous behavior. */
     usage?: AnalysisUsageOptions;
 }
+
+/** Outcome of {@link submitAnalysis}: cached result, queued job, or usage error. */
+export type SubmitAnalysisResult =
+    | { status: 'cached'; result: AnalysisResponse }
+    | { status: 'submitted'; jobId: string }
+    | { status: 'error'; error: SubmitAnalysisError };
