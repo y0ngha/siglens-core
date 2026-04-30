@@ -1,7 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const KEY_BYTE_LENGTH = 32;
 const IV_BYTE_LENGTH = 12;
 const SEPARATOR = ':';
 const PARTS_COUNT = 3;
@@ -43,21 +42,11 @@ export function decryptToken(encrypted: string, keyHex: string): string | null {
         const tag = Buffer.from(parts[2]!, 'base64');
         const decipher = createDecipheriv(ALGORITHM, key, iv);
         decipher.setAuthTag(tag);
-        return decipher.update(ciphertext) + decipher.final('utf8');
+        return Buffer.concat([
+            decipher.update(ciphertext),
+            decipher.final(),
+        ]).toString('utf8');
     } catch {
         return null;
     }
-}
-
-/**
- * @internal Read and validate the OAuth token encryption key from the environment.
- * Returns the hex key string when valid, or null when absent or incorrectly sized.
- */
-export function tryReadEncryptionKey(): string | null {
-    const raw = process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
-    if (!raw) {
-        return null;
-    }
-    const bytes = Buffer.from(raw, 'hex');
-    return bytes.length === KEY_BYTE_LENGTH ? raw : null;
 }
