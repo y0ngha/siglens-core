@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.1.14](https://github.com/y0ngha/siglens-core/compare/v0.1.12...v0.1.14) (2026-04-30)
+
+
+### Bug Fixes
+
+* address AI model tier PR review comments ([390aa28](https://github.com/y0ngha/siglens-core/commit/390aa28d76c694eb0bbd2c611e16fec048c4d5dd))
+* address timeframe restriction PR review ([af33517](https://github.com/y0ngha/siglens-core/commit/af33517fe770ed5371f84b17ad2b44ac4d6415b0))
+* address usage limit PR review ([b48e139](https://github.com/y0ngha/siglens-core/commit/b48e139300b6304e4bb0f7121c6dc2cc85dff7ff))
+* address usage limit review comments ([42edc8d](https://github.com/y0ngha/siglens-core/commit/42edc8d6f1b0eb25c9cf785fff1797c2275f0a43))
+* asset-info DB 실패 시 캐시 갱신 중단 ([45b4a30](https://github.com/y0ngha/siglens-core/commit/45b4a303f2b977d4d1d5cb8d1afaaed40f1021bd))
+* PR [#49](https://github.com/y0ngha/siglens-core/issues/49) 리뷰 코멘트 반영 - 사용 제한 게이트 에러 처리 개선 ([8b74c4b](https://github.com/y0ngha/siglens-core/commit/8b74c4b792eb0d084e5524928d6b9c293c155bf3))
+* PR [#49](https://github.com/y0ngha/siglens-core/issues/49) 리뷰 코멘트 반영 - 사용 제한 게이트 에러 처리 개선 ([7c1daa0](https://github.com/y0ngha/siglens-core/commit/7c1daa084af17d3a1bf1129a680369518547624e))
+* PR [#49](https://github.com/y0ngha/siglens-core/issues/49) 리뷰 코멘트 반영 - 사용 제한 게이트 에러 처리 개선 ([931ceee](https://github.com/y0ngha/siglens-core/commit/931ceeeaa66690b82abf211c1b5233b44fe262fa))
+* PR [#49](https://github.com/y0ngha/siglens-core/issues/49) 리뷰 코멘트 반영 - 사용 제한 게이트 에러 처리 개선 ([508d31e](https://github.com/y0ngha/siglens-core/commit/508d31e1b2996695dffd77ed8c32f0bf7cbaa94f))
+* PR [#49](https://github.com/y0ngha/siglens-core/issues/49) 리뷰 코멘트 반영 - 사용 제한 게이트 타입 및 에러 메시지 개선 ([8780160](https://github.com/y0ngha/siglens-core/commit/8780160dee1f55d568e6de7984785234d71be497))
+* PR 45 리뷰 코멘트 반영 ([fffdbbd](https://github.com/y0ngha/siglens-core/commit/fffdbbd7b915e2fbcb196a7cdb4fcdfd60c9e3e2))
+* PR 45 review comments ([a31488f](https://github.com/y0ngha/siglens-core/commit/a31488fc332241eb31169c92bb11646ee1ffd828))
+* PR 46 리뷰 코멘트 반영 ([11d7d52](https://github.com/y0ngha/siglens-core/commit/11d7d5241624d29d80e6e5c4bdfdbc6c258abaf3))
+* PR 46 리뷰 코멘트 반영 ([369375e](https://github.com/y0ngha/siglens-core/commit/369375ecb6946e8c935f385d0877ef4a5ff72d47))
+* PR 리뷰 코멘트 반영 ([d762e0a](https://github.com/y0ngha/siglens-core/commit/d762e0a4adf33cc92cc710c47280a39e74b2cf9d))
+* PR 리뷰 코멘트 반영 ([dd515fd](https://github.com/y0ngha/siglens-core/commit/dd515fdccb6cdcc1b432ef3249b41615fb5f9629))
+* PR 리뷰 코멘트 반영 ([7a95119](https://github.com/y0ngha/siglens-core/commit/7a951194914de3f46c1d49394b0aa8a15b1a2ced))
+* PR 리뷰 코멘트 반영 ([d93326d](https://github.com/y0ngha/siglens-core/commit/d93326d59238d9fc7a2f8956a8f6cab65b3aa047))
+* preserve usage limit error types ([947d972](https://github.com/y0ngha/siglens-core/commit/947d972ca4c44f57ee080fb39142e1dda7fd0d44))
+* reuse analysis usage timestamp ([0fbff9b](https://github.com/y0ngha/siglens-core/commit/0fbff9b6680f2df82b545e308b734637cb7b5cc2))
+* Update src/infrastructure/db/usageRepository.ts ([ddecc62](https://github.com/y0ngha/siglens-core/commit/ddecc624f4d4f9e0b2f45db155000f6cc3bfb053))
+
+
+### Features
+
+* 정보 깊이 제한 필터 구현 ([d68bfd5](https://github.com/y0ngha/siglens-core/commit/d68bfd595693366ccbb7f6dce7617882cb28c043))
+* 타임프레임 티어 제한 구현 ([58c12bf](https://github.com/y0ngha/siglens-core/commit/58c12bf6b3b25547c325555766fa942ce0ad36ce))
+* add AI model tier gating ([01671cc](https://github.com/y0ngha/siglens-core/commit/01671cc6bce96fc3a675cb77e6ba37895d8204cb))
+* add usage limit gates ([31022b9](https://github.com/y0ngha/siglens-core/commit/31022b953522d870d2e97f9d2ac95f69c19fc22b))
+* **auth:** add password reset use cases ([f2081b3](https://github.com/y0ngha/siglens-core/commit/f2081b31a8b20c177ff0d8f02cdf5e78343a90b8))
+* implement usage tracking repository ([cb816cd](https://github.com/y0ngha/siglens-core/commit/cb816cd5e677e07d77ac64b34edd7e03aa2fe1ed))
+
 ## [0.1.12](https://github.com/y0ngha/siglens-core/compare/v0.1.10...v0.1.12) (2026-04-27)
 
 
