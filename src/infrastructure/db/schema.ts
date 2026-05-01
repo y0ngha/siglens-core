@@ -11,6 +11,7 @@ import {
     varchar,
 } from 'drizzle-orm/pg-core';
 import {
+    LLM_PROVIDER_VALUES,
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
     USER_TIER_VALUES,
@@ -37,6 +38,9 @@ export const oauthProviderEnum = pgEnum(
     'oauth_provider',
     OAUTH_PROVIDER_VALUES
 );
+
+/** Postgres enum for supported LLM providers whose API keys are stored per user. */
+export const llmProviderEnum = pgEnum('llm_provider', LLM_PROVIDER_VALUES);
 
 /** Registered users — one row per account, keyed by UUID. */
 export const users = pgTable('users', {
@@ -119,6 +123,38 @@ export const oauthAccounts = pgTable(
         uniqueIndex('oauth_accounts_provider_account_uidx').on(
             table.provider,
             table.providerAccountId
+        ),
+    ]
+);
+
+/**
+ * User-supplied LLM API keys — at most one row per (user, provider) pair.
+ *
+ * The `encrypted_api_key` column stores AES-256-GCM ciphertext produced by
+ * the `tokenEncryption` helper; the plaintext key is never persisted.
+ */
+export const userApiKeys = pgTable(
+    'user_api_keys',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        userId: uuid('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        provider: llmProviderEnum('provider').notNull(),
+        encryptedApiKey: text('encrypted_api_key').notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true })
+            .notNull()
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true })
+            .notNull()
+            .defaultNow()
+            .$onUpdateFn(nowFn),
+    },
+    table => [
+        index('user_api_keys_user_id_idx').on(table.userId),
+        uniqueIndex('user_api_keys_user_provider_uidx').on(
+            table.userId,
+            table.provider
         ),
     ]
 );
