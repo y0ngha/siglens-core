@@ -13,17 +13,19 @@ vi.mock('@upstash/redis', () => {
 });
 
 import { Redis } from '@upstash/redis';
-import {
-    buildEmailTokenKey,
-    createEmailTokenStore,
-    resetEmailTokenStoreForTests,
-} from '@/infrastructure/email/redis';
 import type { EmailTokenValue } from '@/infrastructure/email/types';
 
 const MockRedis = Redis as unknown as ReturnType<typeof vi.fn>;
 
+async function loadEmailRedisModule(): Promise<
+    typeof import('@/infrastructure/email/redis')
+> {
+    return import('@/infrastructure/email/redis');
+}
+
 describe('buildEmailTokenKey', () => {
-    it('namespaces password reset and email verification keys separately', () => {
+    it('namespaces password reset and email verification keys separately', async () => {
+        const { buildEmailTokenKey } = await loadEmailRedisModule();
         const email = 'user@example.com';
         expect(buildEmailTokenKey('password_reset', email)).toBe(
             'email_token:password_reset:user@example.com'
@@ -37,23 +39,26 @@ describe('buildEmailTokenKey', () => {
 describe('createEmailTokenStore', () => {
     beforeEach(() => {
         vi.unstubAllEnvs();
-        resetEmailTokenStoreForTests();
+        vi.resetModules();
         MockRedis.mockClear();
     });
 
-    it('returns null when UPSTASH_REDIS_REST_URL is missing', () => {
+    it('returns null when UPSTASH_REDIS_REST_URL is missing', async () => {
+        const { createEmailTokenStore } = await loadEmailRedisModule();
         vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
         expect(createEmailTokenStore()).toBeNull();
     });
 
-    it('returns null when UPSTASH_REDIS_REST_TOKEN is missing', () => {
+    it('returns null when UPSTASH_REDIS_REST_TOKEN is missing', async () => {
+        const { createEmailTokenStore } = await loadEmailRedisModule();
         vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
         expect(createEmailTokenStore()).toBeNull();
     });
 
-    it('returns an EmailTokenStore when env vars are present (no readonly token)', () => {
+    it('returns an EmailTokenStore when env vars are present (no readonly token)', async () => {
+        const { createEmailTokenStore } = await loadEmailRedisModule();
         vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
         vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
@@ -62,7 +67,8 @@ describe('createEmailTokenStore', () => {
         expect(MockRedis).toHaveBeenCalledTimes(1);
     });
 
-    it('creates a separate reader when readonly token is provided', () => {
+    it('creates a separate reader when readonly token is provided', async () => {
+        const { createEmailTokenStore } = await loadEmailRedisModule();
         vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
         vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');
@@ -71,7 +77,8 @@ describe('createEmailTokenStore', () => {
         expect(MockRedis).toHaveBeenCalledTimes(2);
     });
 
-    it('reuses Redis clients for repeated calls with the same configuration', () => {
+    it('reuses Redis clients for repeated calls with the same configuration', async () => {
+        const { createEmailTokenStore } = await loadEmailRedisModule();
         vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
         vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');
@@ -92,6 +99,7 @@ describe('createEmailTokenStore', () => {
         });
 
         it('set delegates to writer.set with the namespaced key, value, and TTL', async () => {
+            const { createEmailTokenStore } = await loadEmailRedisModule();
             const mockSet = vi.fn().mockResolvedValue('OK');
             MockRedis.mockImplementation(() => ({
                 get: vi.fn(),
@@ -118,6 +126,7 @@ describe('createEmailTokenStore', () => {
         });
 
         it('get delegates to reader.get with the namespaced key', async () => {
+            const { createEmailTokenStore } = await loadEmailRedisModule();
             const stored: EmailTokenValue = { status: 'verified' };
             const mockGet = vi.fn().mockResolvedValue(stored);
             MockRedis.mockImplementation(() => ({
@@ -138,6 +147,7 @@ describe('createEmailTokenStore', () => {
         });
 
         it('delete delegates to writer.del with the namespaced key', async () => {
+            const { createEmailTokenStore } = await loadEmailRedisModule();
             const mockDel = vi.fn().mockResolvedValue(1);
             MockRedis.mockImplementation(() => ({
                 get: vi.fn(),
@@ -154,6 +164,7 @@ describe('createEmailTokenStore', () => {
     });
 
     it('reader uses readonly client when readonly token is set', async () => {
+        const { createEmailTokenStore } = await loadEmailRedisModule();
         vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
         vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');

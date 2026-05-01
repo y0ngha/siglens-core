@@ -65,7 +65,7 @@ function makeDependencies(options?: {
     return {
         dependencies: {
             emailAuthUsers: { findEmailAuthUserByEmail },
-            userRepository: {
+            users: {
                 findByEmail: vi.fn(),
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),

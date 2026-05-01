@@ -43,12 +43,6 @@ function getRedisPair(config: {
     return cachedRedisPair;
 }
 
-/** @internal Test helper to clear the module-level Redis client cache. */
-export function resetEmailTokenStoreForTests(): void {
-    cachedRedisPair = null;
-    cachedConfigKey = null;
-}
-
 /**
  * Construct an {@link EmailTokenStore} backed by Upstash Redis.
  *

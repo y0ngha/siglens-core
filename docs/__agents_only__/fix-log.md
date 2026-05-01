@@ -181,3 +181,16 @@
 - Violation: `safeCompareTokenHashes` accepted 64-character non-hex strings and could throw during malformed Redis token-state comparison
 - Rule: FF.md — Predictability; malformed persisted token state must produce the same invalid-token result as other bad token inputs, not an uncaught runtime exception
 - Context: Email verification and password reset compare Redis-stored token hashes with submitted hashes; malformed stored hash strings now fail validation before `timingSafeEqual`
+
+## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
+- Violation: `ConfirmPasswordResetDependencies` named the same `UserRepository` dependency differently from sibling auth dependency objects
+- Rule: FF.md — Predictability; dependency field names should stay consistent across related use-cases so consumers can predict contracts
+- Context: Renamed `ConfirmPasswordResetDependencies.userRepository` to `users`, matching `RegisterUserDependencies.users` while keeping `emailAuthUsers` for credential lookup.
+
+- Violation: A test-only Redis cache reset helper was exported from production infrastructure code
+- Rule: Cohesion — test orchestration should live in test code instead of widening production module exports
+- Context: Removed `resetEmailTokenStoreForTests()` from `infrastructure/email/redis.ts`; Redis tests now reset module state with `vi.resetModules()` and dynamically import the subject.
+
+- Violation: Public auth API breaking changes were not reflected in release metadata
+- Rule: docs/PUBLIC_API.md — Tier 1 function signature changes require a major version, with 0.x.y applying the change as a minor version bump
+- Context: Added `CHANGELOG.md` breaking-change notes and bumped `package.json` from `0.1.14` to `0.2.0`.

@@ -51,7 +51,7 @@ function expiredTokenError(): ConfirmPasswordResetError {
  * ```typescript
  * const result = await confirmPasswordReset(
  *     { email: 'user@example.com', token, newPassword: 'Password1' },
- *     { emailAuthUsers, userRepository, emailTokens, passwordHasher }
+ *     { emailAuthUsers, users, emailTokens, passwordHasher }
  * );
  * ```
  */
@@ -90,7 +90,7 @@ export async function confirmPasswordReset(
     const passwordHash = await dependencies.passwordHasher.hashPassword(
         input.newPassword
     );
-    const updated = await dependencies.userRepository.updatePassword(
+    const updated = await dependencies.users.updatePassword(
         user.id,
         passwordHash
     );

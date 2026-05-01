@@ -449,7 +449,7 @@ export interface ConfirmPasswordResetDependencies {
     /** Email-auth credential lookup repository. */
     emailAuthUsers: EmailAuthUserRepository;
     /** User persistence repository for password update. */
-    userRepository: UserRepository;
+    users: UserRepository;
     /** Redis-backed email-token store containing the reset token hash. */
     emailTokens: EmailTokenStore;
     /** Password hashing interface. */
