@@ -5,7 +5,7 @@ import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
     ChatMessage,
-    ChatModel,
+    ModelId,
     TierConfig,
     Timeframe,
     UserTierContext,
@@ -26,7 +26,7 @@ export interface RequestChatCompletionParams {
     history: ChatMessage[];
     userMessage: string;
     clientIp: string;
-    model?: ChatModel;
+    model?: ModelId;
     freeApiKey?: string;
     paidApiKey?: string;
     occurredAt?: Date;

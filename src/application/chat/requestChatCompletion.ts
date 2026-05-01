@@ -13,8 +13,8 @@ import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import type {
-    ChatModel,
     ChatPromptPayload,
+    ModelId,
     Tier,
     TierConfig,
 } from '@/domain/types';
@@ -58,11 +58,11 @@ function toChatErrorResult(error: unknown): ChatActionResult {
     return { ok: false, error: 'server_error' };
 }
 
-function isValidChatModel(model: ChatModel): boolean {
+function isValidChatModel(model: ModelId): boolean {
     return VALID_CHAT_MODELS.some(validModel => validModel === model);
 }
 
-function isPremiumChatModel(model: ChatModel, config: TierConfig): boolean {
+function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
     return !config.models.free.includes(model);
 }
 
@@ -100,7 +100,7 @@ async function recordChatUsageSafely(
     usageRepository: UsageRepository,
     userId: string | null,
     clientIp: string,
-    model: ChatModel,
+    model: ModelId,
     usageOccurredAt: Date
 ): Promise<void> {
     try {
@@ -141,7 +141,7 @@ async function requestGeminiChatCompletion(
     paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
     tokenStore: ChatTokenStore,
     callGemini: NonNullable<RequestChatCompletionDependencies['callGemini']>,
-    model: ChatModel,
+    model: ModelId,
     hashedClientId: string,
     prompt: ChatPromptPayload
 ): Promise<ChatActionResult> {

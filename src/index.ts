@@ -618,7 +618,6 @@ export type {
     ChartDisplayType,
     ChatLoadingPhase,
     ChatMessage,
-    ChatModel,
     ChatPromptPayload,
     ChatSession,
     ClusteredKeyLevel,

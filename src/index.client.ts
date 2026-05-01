@@ -417,7 +417,6 @@ export type {
     ValidatedActionPrices,
     ChatMessage,
     ChatLoadingPhase,
-    ChatModel,
     ChatPromptPayload,
     ChatSession,
     MarketIndexData,
