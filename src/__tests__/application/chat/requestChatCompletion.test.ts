@@ -9,7 +9,7 @@ import {
 import { requestChatCompletion } from '@/application/chat/requestChatCompletion';
 import type { RequestChatCompletionParams } from '@/application/chat/types';
 import { TIER_CONFIG } from '@/domain/tier';
-import type { AnalysisResponse, ChatModel, TierConfig } from '@/domain/types';
+import type { AnalysisResponse, ModelId, TierConfig } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 
@@ -194,7 +194,7 @@ describe('requestChatCompletion', () => {
 
     it('returns server_error when the model is invalid at runtime', async () => {
         const result = await requestChatCompletion(
-            createParams({ model: 'invalid-model' as ChatModel }),
+            createParams({ model: 'invalid-model' as ModelId }),
             { tokenStore, callGemini }
         );
 

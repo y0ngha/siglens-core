@@ -15,11 +15,17 @@ import {
 import type { ModelId, TierConfig } from '@/domain/types';
 
 const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
-    'claude-opus-4',
-    'claude-sonnet-4',
+    'claude-haiku-3-5',
+    'claude-opus-4-7',
+    'claude-sonnet-4-6',
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
     'gemini-2.5-pro',
+    'gemini-3-flash-preview',
+    'gemini-3.1-pro-preview',
+    'gpt-5-mini',
+    'gpt-5.4',
+    'gpt-5.5',
 ];
 
 const restrictedConfig: TierConfig = {
@@ -139,15 +145,15 @@ describe('tier', () => {
 
     describe('isModelAllowed', () => {
         it('allows all models when restrictions are disabled', () => {
-            expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
+            expect(isModelAllowed('free', 'claude-opus-4-7')).toBe(true);
         });
 
         it('checks models when restrictions are enabled', () => {
             expect(
-                isModelAllowed('member', 'claude-sonnet-4', restrictedConfig)
+                isModelAllowed('member', 'claude-sonnet-4-6', restrictedConfig)
             ).toBe(true);
             expect(
-                isModelAllowed('member', 'claude-opus-4', restrictedConfig)
+                isModelAllowed('member', 'claude-opus-4-7', restrictedConfig)
             ).toBe(false);
         });
     });
