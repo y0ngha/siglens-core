@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.1](https://github.com/y0ngha/siglens-core/compare/v0.1.14...v0.2.1) (2026-05-01)
+
+
+### Bug Fixes
+
+* 리뷰 코멘트 반영 - race condition, logging, type imports 정리 ([4047393](https://github.com/y0ngha/siglens-core/commit/4047393f73e94c078ea3d64fccca0b9c5a2139cf))
+* address PR 56 follow-up comments ([7688d75](https://github.com/y0ngha/siglens-core/commit/7688d75cf690361f157d40f0b35f1c29668faf96))
+* address PR 56 review comments ([2fe2e51](https://github.com/y0ngha/siglens-core/commit/2fe2e51e437f72db15a2be23c34d9d45fdeada4c))
+* import error fix ([29bfeab](https://github.com/y0ngha/siglens-core/commit/29bfeab2300208580032b8928e1cbeb553f7f7d8))
+* PR [#49](https://github.com/y0ngha/siglens-core/issues/49) 리뷰 코멘트 반영 - OAuth 타입 구조 개선, 테스트 추가, 타임아웃 상수 통합 ([dacc5e0](https://github.com/y0ngha/siglens-core/commit/dacc5e0e4318373c63080bc7876304b52d3149fb))
+* PR [#51](https://github.com/y0ngha/siglens-core/issues/51) 리뷰 코멘트 반영 - OAuth 토큰 폐기 기능 오류 수정 ([1716120](https://github.com/y0ngha/siglens-core/commit/171612088c47e903a7a4b079b086488fa5cb7a17))
+* PR 51 리뷰 코멘트 반영 ([ed3f6c4](https://github.com/y0ngha/siglens-core/commit/ed3f6c4e083c411e92d614d7ed02721d0a09ba9d))
+
+
+### Features
+
+* 도메인 타입 및 public API 업데이트 ([f20d04a](https://github.com/y0ngha/siglens-core/commit/f20d04aaebd97074ba36c0efb81d9eb5b44dd6c6))
+* 이메일 인증 통합 + 비밀번호 재설정 Redis 마이그레이션 ([db5c9fa](https://github.com/y0ngha/siglens-core/commit/db5c9fa06c77201b806ab2ddb67000e5d6544c21))
+* add OAuth token revocation on account deletion ([#50](https://github.com/y0ngha/siglens-core/issues/50)) ([db1ae78](https://github.com/y0ngha/siglens-core/commit/db1ae78ff41d359fc348dc84424f7ecf3dab39c5))
+* EmailDispatcher 및 email 템플릿 구현 ([7a1b209](https://github.com/y0ngha/siglens-core/commit/7a1b2099cd3126d58dcfc878471afebae84e99d5))
+* requestPasswordReset에 EmailDispatcher 통합 ([3df579f](https://github.com/y0ngha/siglens-core/commit/3df579feec1f9ec812256f1bd9bdc9e5a2b6b904))
+
 ## [0.2.0](https://github.com/y0ngha/siglens-core/compare/v0.1.14...v0.2.0) (2026-05-01)
 
 ### BREAKING CHANGES
