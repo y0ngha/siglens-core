@@ -654,6 +654,7 @@ export type {
     MarketSectorData,
     MarketSummaryData,
     MarketSummaryWithBriefing,
+    ChatModel,
     ModelId,
     MultiCandlePattern,
     MultiCandlePatternEntry,

@@ -328,6 +328,7 @@ export type {
 // Domain types
 export type {
     AnalysisSignalType,
+    ChatModel,
     ModelId,
     Timeframe,
     Tier,

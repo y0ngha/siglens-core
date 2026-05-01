@@ -1200,6 +1200,12 @@ export type TierModel =
 /** Public model identifier used by tier model access helpers. */
 export type ModelId = TierModel;
 
+/**
+ * @deprecated Use {@link ModelId} instead. `ChatModel` was a subset of `ModelId` (Gemini models only).
+ * Will be removed in the next major version.
+ */
+export type ChatModel = ModelId;
+
 /** Usage limits keyed by feature for every tier. */
 export type TierFeatureLimits = Record<
     TierLimitedFeature,

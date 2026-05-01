@@ -37,7 +37,9 @@ export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
-    callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
+    callAiProvider?: (
+        options: CallGeminiWithKeyFallbackOptions
+    ) => Promise<string>;
     tierConfig?: TierConfig;
     /**
      * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.

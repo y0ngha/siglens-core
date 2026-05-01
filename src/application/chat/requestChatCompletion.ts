@@ -140,13 +140,15 @@ async function requestGeminiChatCompletion(
     freeApiKey: RequestChatCompletionParams['freeApiKey'],
     paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
     tokenStore: ChatTokenStore,
-    callGemini: NonNullable<RequestChatCompletionDependencies['callGemini']>,
+    callAiProvider: NonNullable<
+        RequestChatCompletionDependencies['callAiProvider']
+    >,
     model: ModelId,
     hashedClientId: string,
     prompt: ChatPromptPayload
 ): Promise<ChatActionResult> {
     try {
-        const message = await callGemini({
+        const message = await callAiProvider({
             freeApiKey,
             paidApiKey,
             model,
@@ -204,7 +206,8 @@ export async function requestChatCompletion(
     }
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
-    const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
+    const callAiProvider =
+        dependencies.callAiProvider ?? callGeminiWithKeyFallback;
     const occurredAt =
         params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date();
     const usageRepository = dependencies.usageRepository;
@@ -251,7 +254,7 @@ export async function requestChatCompletion(
         params.freeApiKey,
         paidApiKey,
         tokenStore,
-        callGemini,
+        callAiProvider,
         model,
         hashedClientId,
         prompt

@@ -105,3 +105,16 @@
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
+
+## [PR #65 | feat/60/AI-모델-티어-확대 | 2026-05-01]
+- Violation: `@internal` JSDoc tag applied to a Tier 4 public symbol (`VALID_CHAT_MODELS`) re-exported from `src/index.ts` and `src/index.client.ts`
+- Rule: MISTAKES.md #9.5 — `@internal` is only for symbols NOT re-exported in `src/index.ts`; applying it to public symbols causes IDE hover warnings that discourage consumers from using the API
+- Context: `VALID_CHAT_MODELS` in `src/application/chat/constants.ts` was wrongly tagged `@internal` despite being a public Tier 4 export
+
+- Violation: `isValidChatModel` derived from `getAllowedModels('free')`, creating a semantic mismatch between "is this a known model?" and "is this model allowed for the free tier?"
+- Rule: Functions must correctly represent their intent; `isValidChatModel` checks system recognition, not tier allowance — using `free` tier as the validation set silently excludes valid models when `enableTierRestrictions: true`
+- Context: `VALID_CHAT_MODELS` in `src/application/chat/constants.ts` changed to `getAllowedModels('pro')` to represent the full superset of valid models
+
+- Violation: Tier 4 public type `ChatModel` deleted without a `@deprecated` transition period
+- Rule: MISTAKES.md (Public API & Module Exports) / PR #63 선례 — public types must be marked `@deprecated` before removal; direct deletion is a breaking change
+- Context: `ChatModel` in `domain/types.ts` was removed; restored as `export type ChatModel = ModelId` with `@deprecated` JSDoc and re-exported from `src/index.ts` and `src/index.client.ts`
