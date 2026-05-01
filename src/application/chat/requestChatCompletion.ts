@@ -205,7 +205,8 @@ export async function requestChatCompletion(
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
     const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
-    const occurredAt = params.occurredAt ?? new Date();
+    const occurredAt =
+        params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date();
     const usageRepository = dependencies.usageRepository;
     const usageTracking =
         usageRepository === undefined

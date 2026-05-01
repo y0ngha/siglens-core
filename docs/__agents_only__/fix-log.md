@@ -162,6 +162,11 @@
 - Rule: semver — removing a field from a public interface (even optional) is a breaking change; must be marked `@deprecated` first and removed only in the next major version
 - Context: `src/application/chat/types.ts`; `getCurrentDate` was a DI hook removed in favour of `params.occurredAt`; field restored with `@deprecated` JSDoc pointing consumers to the params alternative
 
+## [PR #63 Fix | refactor/52/requestChatCompletion-시간-주입-통일 | 2026-05-01]
+- Violation: `getCurrentDate` marked `@deprecated` but completely ignored in implementation, silently breaking existing consumers who pass it without `params.occurredAt`
+- Rule: semver — a `@deprecated` field must remain functional as a fallback during the deprecation period; ignoring it constitutes a functional breaking change even when the declaration is preserved
+- Context: `src/application/chat/requestChatCompletion.ts`; changed `params.occurredAt ?? new Date()` to `params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date()` so legacy consumers continue to receive their injected date until the next major version
+
 ## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift

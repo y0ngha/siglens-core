@@ -540,6 +540,50 @@ describe('requestChatCompletion', () => {
         );
     });
 
+    it('falls back to getCurrentDate when occurredAt is not in params (deprecated)', async () => {
+        const customDate = new Date('2025-12-01T00:00:00.000Z');
+
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            {
+                tokenStore,
+                callGemini,
+                usageLogs,
+                getCurrentDate: () => customDate,
+            }
+        );
+
+        expect(recordPremiumUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ date: '2025-12-01' })
+        );
+    });
+
+    it('prefers params.occurredAt over getCurrentDate (deprecated) when both are provided', async () => {
+        const paramsDate = new Date('2025-11-15T00:00:00.000Z');
+        const depsDate = new Date('2025-12-01T00:00:00.000Z');
+
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+                occurredAt: paramsDate,
+            }),
+            {
+                tokenStore,
+                callGemini,
+                usageLogs,
+                getCurrentDate: () => depsDate,
+            }
+        );
+
+        expect(recordPremiumUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ date: '2025-11-15' })
+        );
+    });
+
     it('keeps the original server_error when token refund fails', async () => {
         callGemini.mockRejectedValueOnce(new Error('network failed'));
         refundConsumedToken.mockRejectedValueOnce(new Error('refund failed'));

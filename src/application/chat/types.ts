@@ -41,7 +41,8 @@ export interface RequestChatCompletionDependencies {
     tierConfig?: TierConfig;
     /**
      * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.
-     * This field is ignored and will be removed in the next major version.
+     * During the deprecation period, this is used as a fallback when `occurredAt` is not provided.
+     * Will be removed in the next major version.
      */
     getCurrentDate?: () => Date;
 }
