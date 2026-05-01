@@ -555,5 +555,4 @@ describe('requestChatCompletion', () => {
             expect.any(Error)
         );
     });
-
 });
