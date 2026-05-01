@@ -156,6 +156,61 @@ describe('tier', () => {
                 isModelAllowed('member', 'claude-opus-4-7', restrictedConfig)
             ).toBe(false);
         });
+
+        it('places PR #65 free-tier models correctly', () => {
+            expect(
+                isModelAllowed('free', 'claude-haiku-3-5', restrictedConfig)
+            ).toBe(true);
+            expect(isModelAllowed('free', 'gpt-5-mini', restrictedConfig)).toBe(
+                true
+            );
+        });
+
+        it('places PR #65 member-tier models correctly', () => {
+            expect(isModelAllowed('member', 'gpt-5.4', restrictedConfig)).toBe(
+                true
+            );
+            expect(
+                isModelAllowed(
+                    'member',
+                    'gemini-3-flash-preview',
+                    restrictedConfig
+                )
+            ).toBe(true);
+            expect(isModelAllowed('free', 'gpt-5.4', restrictedConfig)).toBe(
+                false
+            );
+            expect(
+                isModelAllowed(
+                    'free',
+                    'gemini-3-flash-preview',
+                    restrictedConfig
+                )
+            ).toBe(false);
+        });
+
+        it('places PR #65 pro-only models correctly', () => {
+            expect(isModelAllowed('pro', 'gpt-5.5', restrictedConfig)).toBe(
+                true
+            );
+            expect(
+                isModelAllowed(
+                    'pro',
+                    'gemini-3.1-pro-preview',
+                    restrictedConfig
+                )
+            ).toBe(true);
+            expect(isModelAllowed('member', 'gpt-5.5', restrictedConfig)).toBe(
+                false
+            );
+            expect(
+                isModelAllowed(
+                    'member',
+                    'gemini-3.1-pro-preview',
+                    restrictedConfig
+                )
+            ).toBe(false);
+        });
     });
 
     describe('isTier', () => {
