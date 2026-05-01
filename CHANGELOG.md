@@ -1,17 +1,5 @@
 # Changelog
 
-## [0.3.0](https://github.com/y0ngha/siglens-core/compare/v0.2.1...v0.3.0) (2026-05-01)
-
-### BREAKING CHANGES
-
-* `ChatModel` type removed from `domain/types.ts`. Use `ModelId` instead. `ChatModel` is retained as a `@deprecated` alias for one major version.
-
-### Features
-
-* AI 모델 티어 확대: FREE 티어에 `claude-haiku-3-5`, `gpt-5-mini` 추가; MEMBER 티어에 `claude-sonnet-4-6`, `gpt-5.4` 추가; PRO 티어에 `claude-opus-4-7`, `gpt-5.5`, `gemini-3-flash-preview`, `gemini-3.1-pro-preview` 추가
-* `ModelId`를 `TierModel` 유니온 타입으로 통합하여 중복 `ChatModel` 타입 제거
-* `VALID_CHAT_MODELS`를 `getAllowedModels` 함수로 동적 파생 — 수동 유지보수 제거
-
 ## [0.2.1](https://github.com/y0ngha/siglens-core/compare/v0.1.14...v0.2.1) (2026-05-01)
 
 
