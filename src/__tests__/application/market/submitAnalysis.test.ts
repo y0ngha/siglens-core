@@ -373,6 +373,23 @@ describe('submitAnalysis 함수는', () => {
             });
         });
 
+        it('modelId가 있고 modelUsed가 없으면 effectiveModelId로 사용량을 기록한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                modelId: 'gemini-2.5-flash',
+                usage: {
+                    usageRepository: mockUsageRepository,
+                    clientIp: '203.0.113.10',
+                    occurredAt,
+                },
+            });
+
+            expect(mockRecordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({ modelUsed: 'gemini-2.5-flash' })
+            );
+        });
+
         it('사용량 발생 시각이 없으면 제한 확인과 기록에 같은 현재 시각을 사용한다', async () => {
             const currentTime = new Date('2026-04-29T23:59:59.999Z');
             vi.useFakeTimers();

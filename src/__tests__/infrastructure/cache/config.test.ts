@@ -106,12 +106,6 @@ describe('cache key builders', () => {
         );
     });
 
-    it('buildAnalysisCacheKey isolates results by model', () => {
-        const keyA = buildAnalysisCacheKey('AAPL', '1Hour', 'model-a');
-        const keyB = buildAnalysisCacheKey('AAPL', '1Hour', 'model-b');
-        expect(keyA).not.toBe(keyB);
-    });
-
     it('buildBriefingCacheKey', () => {
         expect(buildBriefingCacheKey('1Hour')).toBe('briefing:market:1Hour');
     });

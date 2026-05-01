@@ -82,10 +82,6 @@
 - Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
 - Context: `setKoreanTickers` now deletes `korean:tickers` after successful DB upsert so the next read rebuilds cache from the database
 
-## [PR #43 | feat/40-41/auth-helpers-and-delete-account | 2026-04-28]
-- Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
-- Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
-- Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
 
 ## [Issue #10/#11 | feat/10-11/usage-limit-gates | 2026-04-29]
 - Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
@@ -102,10 +98,6 @@
 - Rule: TypeScript type safety — internal helper signatures should represent narrowed invariants established by the caller instead of reintroducing optionality
 - Context: `requestChatCompletion` returned `server_error` when `paidApiKey` was missing, but `requestGeminiChatCompletion` still typed the value as `string | undefined`, causing `CallGeminiWithKeyFallbackOptions.paidApiKey` assignment to fail typecheck
 
-## [PR #44 | feat/13/timeframe-restrictions | 2026-04-28]
-- Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
-- Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
-- Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
 
 
 ## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
@@ -113,24 +105,7 @@
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
 
-## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
-- Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
-- Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
-- Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
 
-## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
-- Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
-- Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
-- Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
-
-## [PR #51 | feat/50/oauth-token-revocation | 2026-04-30]
-- Violation: OAuth token revocation loaded provider tokens in an unawaited background task immediately before deleting the user row, allowing cascade deletion to remove the tokens before lookup.
-- Rule: FF.md — Predictability; destructive dependent writes must not race ahead of prerequisite reads needed for the same use-case.
-- Context: `deleteAccount` now awaits OAuth account lookup before deleting the user, while keeping provider revocation calls fire-and-forget after the tokens are captured.
-
-- Violation: password reset requests used broad user lookup and included OAuth-only accounts
-- Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
-- Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
 
 ## [PR #49 Round 2 | feat/10-11/usage-limit-gates | 2026-04-30]
 - Violation: Test constant declared twice under different casing — `restrictedTierConfig` (camelCase) and `const RESTRICTED_TIER_CONFIG = restrictedTierConfig` alias (UPPER_CASE), giving the same object two names in the same scope
@@ -152,43 +127,13 @@
 - Rule: CONVENTIONS.md — "Extract union literals with 2+ members into a type alias"; replaced with `keyof UsageCounts` which ties the annotation to the source of truth
 - Context: `src/application/usage/limits.ts` FEATURE_COUNT_KEY constant
 
-## [PR #49 Round 5 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `tier` field accepted from both `AnalysisUsageOptions.tier` and `SubmitAnalysisOptions.tierContext.tier` simultaneously; caller could set conflicting tiers on the same request
-- Rule: MISTAKES.md Configuration & State Management #1 — a single configuration option must have exactly one authoritative source; outer/inner divergence creates hidden inconsistencies
-- Context: Removed `tier` from `AnalysisUsageOptions`; `tier` is now derived exclusively from `options.tierContext?.tier ?? DEFAULT_TIER` in `submitAnalysis.ts`
 
 ## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
 - Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
 - Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
 - Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
 
-## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `submitAnalysis` used one timestamp for usage-limit checking but could pass an undefined timestamp to usage recording, allowing a second `new Date()` at the repository boundary
-- Rule: FF.md — Predictability; one request-scoped decision should use one authoritative timestamp across related limit-check and usage-record operations
-- Context: Reused a single `usageOccurredAt` value for `checkAnalysisUsageAllowed` and both cache-hit/submitted `recordAnalysisUsageSafely` paths, with a regression test for the no-`occurredAt` branch
 
-## [Issue #55 | feat/55/email-verification-redis-migration | 2026-05-01]
-- Violation: `users.emailVerified` DB column default (`true`) did not match application-layer default (`?? false` in `createEmailUser`)
-- Rule: FF.md — Predictability; DB schema defaults must align with application-layer defaults so callers reading the schema get the same behavior as raw SQL inserts and code paths.
-- Context: Initial migration 0004 used `DEFAULT true` to backfill existing rows. Added migration 0005 to change the column default to `false` going forward, matching the application-layer fallback. Existing-row backfill (`true`) is preserved per user directive while future inserts default to `false`.
-
-## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
-- Violation: `safeCompareTokenHashes` accepted 64-character non-hex strings and could throw during malformed Redis token-state comparison
-- Rule: FF.md — Predictability; malformed persisted token state must produce the same invalid-token result as other bad token inputs, not an uncaught runtime exception
-- Context: Email verification and password reset compare Redis-stored token hashes with submitted hashes; malformed stored hash strings now fail validation before `timingSafeEqual`
-
-## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
-- Violation: `ConfirmPasswordResetDependencies` named the same `UserRepository` dependency differently from sibling auth dependency objects
-- Rule: FF.md — Predictability; dependency field names should stay consistent across related use-cases so consumers can predict contracts
-- Context: Renamed `ConfirmPasswordResetDependencies.userRepository` to `users`, matching `RegisterUserDependencies.users` while keeping `emailAuthUsers` for credential lookup.
-
-- Violation: A test-only Redis cache reset helper was exported from production infrastructure code
-- Rule: Cohesion — test orchestration should live in test code instead of widening production module exports
-- Context: Removed `resetEmailTokenStoreForTests()` from `infrastructure/email/redis.ts`; Redis tests now reset module state with `vi.resetModules()` and dynamically import the subject.
-
-- Violation: Public auth API breaking changes were not reflected in release metadata
-- Rule: docs/PUBLIC_API.md — Tier 1 function signature changes require a major version, with 0.x.y applying the change as a minor version bump
-- Context: Added `CHANGELOG.md` breaking-change notes and bumped `package.json` from `0.1.14` to `0.2.0`.
 
 ## [PR #64 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: `buildAnalysisCacheKey` (Tier 3 public API) added `modelId` as a required parameter, instantly breaking all existing callers that only passed `symbol` + `timeframe`
@@ -198,3 +143,4 @@
 - Violation: `DEFAULT_ANALYSIS_MODEL_USED` constant duplicated across `submitAnalysis.ts` and `pollAnalysis.ts` even though both files are in the same `application/market/` directory and can freely import each other
 - Rule: MISTAKES.md Coding Paradigm #6 — repeating identical values at multiple call sites; MISTAKES.md Rule 17 permits duplication only when import is impossible due to environment constraints (not the case here)
 - Context: moved the canonical constant to `infrastructure/cache/config.ts` as `DEFAULT_ANALYSIS_MODEL_ID` (`@internal`), then imported it in both application files and their tests
+

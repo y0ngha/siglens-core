@@ -54,6 +54,7 @@ async function checkAnalysisUsageAllowed(
 
 async function recordAnalysisUsage(
     usage: SubmitAnalysisOptions['usage'],
+    effectiveModelId: string,
     occurredAt?: Date
 ): Promise<void> {
     if (usage === undefined) return;
@@ -62,17 +63,18 @@ async function recordAnalysisUsage(
         userId: usage.userId ?? null,
         ipAddress: usage.clientIp,
         actionType: 'analysis',
-        modelUsed: usage.modelUsed ?? DEFAULT_ANALYSIS_MODEL_ID,
+        modelUsed: usage.modelUsed ?? effectiveModelId,
         occurredAt,
     });
 }
 
 async function recordAnalysisUsageSafely(
     usage: SubmitAnalysisOptions['usage'],
+    effectiveModelId: string,
     occurredAt?: Date
 ): Promise<void> {
     try {
-        await recordAnalysisUsage(usage, occurredAt);
+        await recordAnalysisUsage(usage, effectiveModelId, occurredAt);
     } catch (error) {
         console.warn(
             '[recordAnalysisUsageSafely] Failed to record analysis usage:',
@@ -86,7 +88,7 @@ async function recordAnalysisUsageSafely(
  *
  * Resolves to one of three outcomes:
  * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
- *   by `symbol` + `timeframe`).
+ *   by `symbol` + `timeframe` + `modelId`).
  * - `submitted`: the bars + indicators were fetched, the prompt was built, a
  *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
  *   POST was sent to the configured worker. Poll the result with
@@ -109,6 +111,7 @@ async function recordAnalysisUsageSafely(
  * @param options - Optional tier gating, usage limit tracking, and background-task
  *   hooks. Pass Vercel's `waitUntil` so the worker dispatch can continue after
  *   the response. Pass `usage` to enable daily usage limit checking and recording.
+ *   Pass `modelId` to scope the cache to a specific AI model identifier.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
  *   see {@link SubmitAnalysisGatedResult}.
  *
@@ -175,7 +178,11 @@ export async function submitAnalysis(
         try {
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
-                await recordAnalysisUsageSafely(usage, usageOccurredAt);
+                await recordAnalysisUsageSafely(
+                    usage,
+                    effectiveModelId,
+                    usageOccurredAt
+                );
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -236,7 +243,7 @@ export async function submitAnalysis(
     });
     fireAndForget(dispatch, options);
 
-    await recordAnalysisUsageSafely(usage, usageOccurredAt);
+    await recordAnalysisUsageSafely(usage, effectiveModelId, usageOccurredAt);
 
     return { status: 'submitted', jobId };
 }
