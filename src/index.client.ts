@@ -303,6 +303,7 @@ export type {
     AcquireReanalyzeCooldownResult,
 } from './infrastructure/market/types';
 export type {
+    AiContents,
     GeminiRole,
     GeminiContents,
     GeminiContent,

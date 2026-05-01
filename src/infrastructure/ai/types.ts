@@ -12,8 +12,13 @@ export interface GeminiContent {
     parts: GeminiPart[];
 }
 
-/** Gemini `contents` payload — accepts either a plain string or a turn array. */
-export type GeminiContents = string | GeminiContent[];
+/** Provider-neutral prompt payload — a plain string or a role-tagged turn list. */
+export type AiContents = string | GeminiContent[];
+
+/**
+ * @deprecated Use {@link AiContents} instead. Will be removed in the next major version.
+ */
+export type GeminiContents = AiContents;
 
 /** Options accepted by the AI provider call (currently Gemini; shape is provider-neutral). */
 export interface CallAiProviderOptions {
@@ -23,11 +28,8 @@ export interface CallAiProviderOptions {
     fallbackApiKey: string;
     /** Model identifier (e.g. `'gemini-2.5-flash'`, `'gpt-5.5'`, `'claude-opus-4-7'`). */
     model: string;
-    /**
-     * Prompt contents in Gemini format — string or role-tagged turn list.
-     * Consumers providing a non-Gemini `callAiProvider` must convert this format internally.
-     */
-    contents: GeminiContents;
+    /** Prompt contents — plain string or role-tagged turn list. */
+    contents: AiContents;
     /** Optional system instruction passed via `config.systemInstruction`. */
     systemInstruction?: string;
 }

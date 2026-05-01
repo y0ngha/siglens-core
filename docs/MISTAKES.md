@@ -422,6 +422,12 @@ and have been removed from this file.
    → JSDoc is documentation for all consumers, not a call-site comment
    ❌ /** @internal session expiry calculation used in loginUser */ export function addSeconds(...) { ... }
    ✅ /** @internal Helper to add seconds to a Date. */ export function addSeconds(...) { ... }
+
+6. @throws JSDoc tag missing error type annotation
+   → @throws must include type annotation: @throws {ErrorType} description
+   → Bare @throws description omits the type annotation needed by IDE tooling and consumers
+   ❌ /** @throws description of error */ export function doSomething() { ... }
+   ✅ /** @throws {Error} description of error */ export function doSomething() { ... }
 ```
 
 ---

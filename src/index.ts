@@ -528,6 +528,7 @@ export type {
     UsageLimitInput,
 } from './application/usage';
 export type {
+    AiContents,
     CallAiProviderOptions,
     CallGeminiWithKeyFallbackOptions,
     GeminiContent,
