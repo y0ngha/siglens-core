@@ -205,13 +205,14 @@ export async function requestChatCompletion(
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
     const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
+    const occurredAt = params.occurredAt ?? new Date();
     const usageRepository = dependencies.usageRepository;
     const usageTracking =
         usageRepository === undefined
             ? undefined
             : {
                   repository: usageRepository,
-                  occurredAt: params.occurredAt ?? new Date(),
+                  occurredAt,
               };
     const usageAllowed =
         usageTracking === undefined
@@ -277,8 +278,6 @@ export async function requestChatCompletion(
         usageLogs !== undefined;
 
     if (shouldRecordPremiumUsage) {
-        const getCurrentDate =
-            dependencies.getCurrentDate ?? (() => new Date());
         const userId = tierContext.userId;
         await callSafely(() =>
             usageLogs.recordUsage({
@@ -286,7 +285,7 @@ export async function requestChatCompletion(
                 ipHash: hashedClientId,
                 actionType: PREMIUM_MODEL_USAGE_ACTION,
                 modelUsed: model,
-                date: toUsageDate(getCurrentDate()),
+                date: toUsageDate(occurredAt),
             })
         );
     }

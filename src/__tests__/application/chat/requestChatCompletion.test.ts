@@ -325,12 +325,12 @@ describe('requestChatCompletion', () => {
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
+                occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
             {
                 tokenStore,
                 callGemini,
                 usageLogs,
-                getCurrentDate: () => new Date('2026-04-28T12:34:56.000Z'),
             }
         );
 
@@ -349,12 +349,12 @@ describe('requestChatCompletion', () => {
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'pro' },
+                occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
             {
                 tokenStore,
                 callGemini,
                 usageLogs,
-                getCurrentDate: () => new Date('2026-04-28T12:34:56.000Z'),
             }
         );
 
@@ -366,6 +366,32 @@ describe('requestChatCompletion', () => {
             modelUsed: GEMINI_2_5_PRO_MODEL,
             date: '2026-04-28',
         });
+    });
+
+    it('passes the same occurredAt to chatbot usage and premium model usage', async () => {
+        const occurredAt = new Date('2026-04-28T09:00:00.000Z');
+
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+                occurredAt,
+            }),
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                usageLogs,
+                tierConfig: restrictedTierConfig,
+            }
+        );
+
+        expect(recordUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ occurredAt })
+        );
+        expect(recordPremiumUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ date: '2026-04-28' })
+        );
     });
 
     it('does not record premium model usage for anonymous users', async () => {

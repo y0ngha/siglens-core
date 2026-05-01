@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AUTH_SESSION_COOKIE_NAME, deleteAccount } from '@/application/auth';
 import type {
     OAuthAccountRepository,
     UserRepository,
 } from '@/infrastructure/db/types';
 import type { OAuthRevoker } from '@/infrastructure/oauth/types';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 function makeDependencies(deleted: boolean): {
     dependencies: {

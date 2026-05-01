@@ -39,7 +39,6 @@ export interface RequestChatCompletionDependencies {
     usageLogs?: UsageLogRepository;
     callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
     tierConfig?: TierConfig;
-    getCurrentDate?: () => Date;
 }
 
 /** Result returned by {@link requestChatCompletion}. */
