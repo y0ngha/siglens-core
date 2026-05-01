@@ -39,12 +39,6 @@
 - Rule: Generated migration state must stay synchronized with schema changes to avoid future false-positive migrations
 - Context: Updated the initial migration and snapshot to match `schema.ts`, then verified `yarn db:generate` reports no schema changes
 
-## [PR #33 | feat/5/email-signup | 2026-04-27]
-- Violation: Missing EOF newline in drizzle/0001_sharp_triathlon.sql
-- Rule: CONVENTIONS.md — every file must end with a newline character
-- Context: Migration SQL file generated without trailing newline; added manually
-
-
 ## [PR #34 | feat/6/email-login | 2026-04-27]
 - Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
 - Rule: FF Readability/Predictability — manual field mapping silently drops new fields added to the interface; destructuring rest (`const { passwordHash: _passwordHash, ...safeUser } = user`) is more maintainable and prevents future field omission
@@ -168,3 +162,8 @@
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
+
+## [PR #66 | feat/inquiry-submission | 2026-05-01]
+- Violation: `@throws` JSDoc tag missing error type annotation
+- Rule: CONVENTIONS.md — `@throws {ErrorType} description` format required; bare `@throws description` omits the type annotation needed by IDE tooling and consumers
+- Context: `src/application/inquiry/submitInquiry.ts` `@throws` tag used bare string instead of `{Error}` type-annotated form
