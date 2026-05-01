@@ -603,4 +603,20 @@ describe('requestChatCompletion', () => {
             expect.any(Error)
         );
     });
+
+    it('falls back to deprecated callGemini when callAiProvider is not provided', async () => {
+        const legacyCallGemini = vi.fn().mockResolvedValue('legacy response');
+
+        const result = await requestChatCompletion(createParams(), {
+            tokenStore,
+            callGemini: legacyCallGemini,
+        });
+
+        expect(result).toEqual({
+            ok: true,
+            message: 'legacy response',
+            remainingTokens: 4,
+        });
+        expect(legacyCallGemini).toHaveBeenCalled();
+    });
 });

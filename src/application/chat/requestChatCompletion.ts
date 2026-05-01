@@ -71,7 +71,7 @@ function toUsageDate(date: Date): string {
     return date.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
-function toGeminiContents(payload: ChatPromptPayload): GeminiContent[] {
+function toAiContents(payload: ChatPromptPayload): GeminiContent[] {
     return payload.messages.map(message => ({
         role: message.role,
         parts: [{ text: message.content }],
@@ -153,7 +153,7 @@ async function requestAiChatCompletion(
             primaryApiKey,
             fallbackApiKey,
             model,
-            contents: toGeminiContents(prompt),
+            contents: toAiContents(prompt),
             systemInstruction: prompt.systemPrompt,
         });
         const remainingTokens =

@@ -21,9 +21,12 @@ export interface CallAiProviderOptions {
     primaryApiKey: string | undefined;
     /** Fallback key used when the primary attempt fails. */
     fallbackApiKey: string;
-    /** Gemini model name (e.g. `'gemini-2.5-flash'`). */
+    /** Model identifier (e.g. `'gemini-2.5-flash'`, `'gpt-5.5'`, `'claude-opus-4-7'`). */
     model: string;
-    /** Prompt contents — string or role-tagged turn list. */
+    /**
+     * Prompt contents in Gemini format — string or role-tagged turn list.
+     * Consumers providing a non-Gemini `callAiProvider` must convert this format internally.
+     */
     contents: GeminiContents;
     /** Optional system instruction passed via `config.systemInstruction`. */
     systemInstruction?: string;

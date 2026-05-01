@@ -37,6 +37,11 @@ export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
+    /**
+     * AI provider implementation.
+     * For non-Gemini models (gpt-*, claude-*), supply a custom implementation that
+     * routes to the appropriate provider. The default falls back to {@link callGeminiWithKeyFallback}.
+     */
     callAiProvider?: (options: CallAiProviderOptions) => Promise<string>;
     /**
      * @deprecated Use {@link callAiProvider} instead. Will be removed in the next major version.

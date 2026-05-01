@@ -189,7 +189,7 @@ describe('tier', () => {
             ).toBe(false);
         });
 
-        it('restricts pro-only models (gpt-5.5, gemini-3.1-pro-preview) from member and free tiers', () => {
+        it('restricts pro-only models (gpt-5.5, gemini-3.1-pro-preview, claude-opus-4-7) from member and free tiers', () => {
             expect(isModelAllowed('pro', 'gpt-5.5', restrictedConfig)).toBe(
                 true
             );
@@ -200,6 +200,9 @@ describe('tier', () => {
                     restrictedConfig
                 )
             ).toBe(true);
+            expect(
+                isModelAllowed('pro', 'claude-opus-4-7', restrictedConfig)
+            ).toBe(true);
             expect(isModelAllowed('member', 'gpt-5.5', restrictedConfig)).toBe(
                 false
             );
@@ -209,6 +212,18 @@ describe('tier', () => {
                     'gemini-3.1-pro-preview',
                     restrictedConfig
                 )
+            ).toBe(false);
+            expect(
+                isModelAllowed('member', 'claude-opus-4-7', restrictedConfig)
+            ).toBe(false);
+        });
+
+        it('restricts member-only models (claude-sonnet-4-6) from free tier', () => {
+            expect(
+                isModelAllowed('member', 'claude-sonnet-4-6', restrictedConfig)
+            ).toBe(true);
+            expect(
+                isModelAllowed('free', 'claude-sonnet-4-6', restrictedConfig)
             ).toBe(false);
         });
     });
