@@ -1583,3 +1583,26 @@ Anticipation signals are NOT gated at the domain level. The UI applies a strict-
 - Strict ON + `expected` bearish → only visible when `trend !== 'downtrend'`
 - Strict OFF → all signals visible
 - Confirmed signals → always visible
+
+---
+
+## LLM API Key Domain (`src/domain/llm/`)
+
+사용자별 LLM provider API key 저장 흐름에서 사용되는 순수 도메인 유틸.
+실제 저장/암호화/DB 접근은 `infrastructure/db/userApiKeyRepository.ts`가
+담당하며, 이 레이어는 단순 정규화와 enum 검증만 제공한다.
+
+### Types (`domain/llm/types.ts`)
+
+- `LlmProvider` — `'anthropic' | 'google' | 'openai'`
+- `LLM_PROVIDER_VALUES` — 위 union의 single source. `infrastructure/db/constants.ts`에서 그대로 re-export하여 Drizzle enum과 동기화한다.
+
+### Functions (`domain/llm/apiKey.ts`)
+
+- `normalizeLlmApiKey(apiKey: string): string | null` — 양 끝 공백 trim 후 빈 문자열이면 `null` 반환. 호출자가 "missing"과 "blank"를 동일 처리할 수 있도록 한다.
+- `isLlmProvider(value: string): value is LlmProvider` — `LLM_PROVIDER_VALUES` 멤버십 검증을 type guard로 노출.
+
+도메인 레이어는 provider별 prefix·길이 검증을 수행하지 않는다. 형식이
+시간이 지나며 변할 수 있고, 잘못된 키는 LLM provider 호출 시점에서 자연
+스럽게 실패하므로 라이브러리 레벨에서 미리 거부하지 않는다. 호출자(UI)
+가 필요하면 입력 폼에서 별도 검증한다.

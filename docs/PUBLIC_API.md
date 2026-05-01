@@ -157,6 +157,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `isKoreanInput` | `domain/ticker.ts` |
 | `isValidTickerFormat` | `domain/ticker.ts` |
 
+**LLM API key 유틸 (2)**
+| Symbol | Source |
+|---|---|
+| `isLlmProvider` | `domain/llm/apiKey.ts` |
+| `normalizeLlmApiKey` | `domain/llm/apiKey.ts` |
+
 **대시보드 헬퍼 (3)**
 | Symbol | Source |
 |---|---|
@@ -221,11 +227,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 |---|---|
 | `createDatabaseClient` | `infrastructure/db/client.ts` |
 | `DrizzleUserRepository` / `DrizzleSessionRepository` / `DrizzleUsageRepository` | `infrastructure/db/*Repository.ts` |
+| `DrizzleUserApiKeyRepository` | `infrastructure/db/userApiKeyRepository.ts` |
 | `hashUsageIp` | `infrastructure/db/usageRepository.ts` |
 | `users` / `sessions` / `passwordResets` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
-| `koreanTickers` / `assetTranslations` | `infrastructure/db/schema.ts` |
-| `userTierEnum` / `usageActionTypeEnum` / `oauthProviderEnum` | `infrastructure/db/schema.ts` |
-| `USER_TIER_VALUES` / `USAGE_ACTION_TYPE_VALUES` / `OAUTH_PROVIDER_VALUES` | `infrastructure/db/constants.ts` |
+| `koreanTickers` / `assetTranslations` / `userApiKeys` | `infrastructure/db/schema.ts` |
+| `userTierEnum` / `usageActionTypeEnum` / `oauthProviderEnum` / `llmProviderEnum` | `infrastructure/db/schema.ts` |
+| `USER_TIER_VALUES` / `USAGE_ACTION_TYPE_VALUES` / `OAUTH_PROVIDER_VALUES` / `LLM_PROVIDER_VALUES` | `infrastructure/db/constants.ts` |
 
 **Auth application (6 use-cases + cookie constants)**
 | Symbol | Source |

@@ -129,6 +129,7 @@ const key = process.env.API_KEY; // 금지
     │   ├── analysis
     │   ├── constants
     │   ├── indicators
+    │   ├── llm
     │   └── signals
     ├── infrastructure
     │   ├── ai

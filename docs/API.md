@@ -36,6 +36,7 @@ WORKER_SECRET=                      # worker 인증 시크릿
 # Neon / PostgreSQL (선택 — DB 레이어가 필요한 호출자에만)
 DATABASE_URL=                       # postgres://user:pass@host/db?sslmode=require
 OAUTH_TOKEN_ENCRYPTION_KEY=         # 선택 — OAuth access/refresh token 암호화용 32-byte hex key
+LLM_API_KEY_ENCRYPTION_KEY=         # 사용자 LLM API key 저장 시 필수 — 32-byte hex key (OAuth 키와 격리)
 ```
 
 환경변수는 **infrastructure 레이어 내부에서만 읽는다.** domain은 환경에 의존하지 않는다.
@@ -291,6 +292,7 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 | `sessions` | 사용자 세션과 만료 시각 |
 | `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot` / `premium_model`) |
 | `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
+| `user_api_keys` | 사용자별 LLM provider API key (AES-256-GCM 암호화 저장, `(user_id, provider)` UNIQUE) |
 | `korean_tickers` | 한국어 티커 이름 매핑 |
 | `asset_translations` | FMP 심볼 기반 자산명 번역 캐시 |
 
@@ -339,6 +341,26 @@ Gemini 응답 성공 후 `action_type = 'chatbot'`을 기록한다. 제한 초�
 - `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
 - HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
 - 인증 이메일 문구와 비밀번호 재설정 URL 구성은 consumer가 담당한다.
+
+### 사용자 LLM API Key 저장
+
+`application/auth`와 별개로 사용자가 직접 등록한 LLM provider API key를
+저장한다. 호출자(siglens 앱)는 `DrizzleUserApiKeyRepository`를 사용해
+`user_api_keys` 테이블에 키를 영속화한 뒤 LLM 호출 직전에 plaintext를
+조회해 사용한다. `siglens-core`는 LLM 호출 자체를 수행하지 않는다.
+
+- 저장 시 `LLM_API_KEY_ENCRYPTION_KEY`(32-byte hex)로 AES-256-GCM 암호화한
+  ciphertext만 `encrypted_api_key` 컬럼에 저장한다. 키가 없거나 길이가
+  맞지 않으면 `upsert`와 row가 존재할 때의 `findByUserAndProvider`는
+  명시적으로 throw한다 — 평문을 저장하거나 빈 값으로 노출하지 않는다.
+- `findByUser`는 메타 정보(`UserApiKeyMetaRecord`)만 반환해 목록 조회
+  경로에서 plaintext가 노출되지 않는다.
+- `findByUserAndProvider`만 plaintext(`UserApiKeyRecord.apiKey`)를
+  반환한다. 복호화 실패(키 mismatch 등)는 `null`로 graceful 처리한다.
+- provider enum 값은 domain의 `LLM_PROVIDER_VALUES`를 single source로
+  사용한다 (현재: `anthropic`, `google`, `openai`).
+- OAuth 토큰 암호화 키와 별도 환경변수로 격리해, 한쪽 키 유출이 다른
+  비밀로 전파되지 않도록 한다.
 
 ### 사용자 티어
 
