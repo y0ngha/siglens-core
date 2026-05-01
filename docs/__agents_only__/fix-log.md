@@ -114,3 +114,4 @@
 - Violation: `getAllowedModels`가 `enableTierRestrictions: true`일 때 결과를 정렬하지 않음
 - Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
 - Context: `tier.ts`의 `getAllowedModels`는 `enableTierRestrictions: false`일 때만 `.toSorted()`를 적용했으나, `true`일 때도 동일한 안정 순서를 보장해야 함
+

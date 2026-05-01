@@ -138,8 +138,8 @@ async function checkChatbotUsageAllowed(
 }
 
 async function requestAiChatCompletion(
-    freeApiKey: RequestChatCompletionParams['freeApiKey'],
-    paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
+    primaryApiKey: RequestChatCompletionParams['freeApiKey'],
+    fallbackApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
     tokenStore: ChatTokenStore,
     callAiProvider: NonNullable<
         RequestChatCompletionDependencies['callAiProvider']
@@ -150,8 +150,8 @@ async function requestAiChatCompletion(
 ): Promise<ChatActionResult> {
     try {
         const message = await callAiProvider({
-            primaryApiKey: freeApiKey,
-            fallbackApiKey: paidApiKey,
+            primaryApiKey,
+            fallbackApiKey,
             model,
             contents: toGeminiContents(prompt),
             systemInstruction: prompt.systemPrompt,
@@ -208,7 +208,9 @@ export async function requestChatCompletion(
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
     const callAiProvider =
-        dependencies.callAiProvider ?? callGeminiWithKeyFallback;
+        dependencies.callAiProvider ??
+        dependencies.callGemini ??
+        callGeminiWithKeyFallback;
     const occurredAt =
         params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date();
     const usageRepository = dependencies.usageRepository;

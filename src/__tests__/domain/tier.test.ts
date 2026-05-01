@@ -157,7 +157,7 @@ describe('tier', () => {
             ).toBe(false);
         });
 
-        it('allows new free-tier models (claude-haiku-3-5, gpt-5-mini)', () => {
+        it('allows free-tier models (claude-haiku-3-5, gpt-5-mini)', () => {
             expect(
                 isModelAllowed('free', 'claude-haiku-3-5', restrictedConfig)
             ).toBe(true);
@@ -166,7 +166,7 @@ describe('tier', () => {
             );
         });
 
-        it('allows new member-tier models (gpt-5.4, gemini-3-flash-preview) and restricts them from free tier', () => {
+        it('allows member-tier models (gpt-5.4, gemini-3-flash-preview) and restricts them from free tier', () => {
             expect(isModelAllowed('member', 'gpt-5.4', restrictedConfig)).toBe(
                 true
             );

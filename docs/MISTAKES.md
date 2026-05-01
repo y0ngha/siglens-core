@@ -540,6 +540,17 @@ and have been removed from this file.
    → Different runtimes must have consistent public API coverage for stable tier model access
    ❌ Added tier model helpers to src/index.ts but omitted them from src/index.client.ts; browser consumers cannot render model choices
    ✅ After adding feature helpers to main entrypoint, verify all target-runtime entrypoints export them consistently
+
+3. Tier 4 interface/type rename or deletion without deprecated alias (major semver bump required)
+   → Renaming or deleting Tier 4 public types and interface fields breaks existing consumers at compile time (major version bump)
+   → Must provide deprecated alias or fallback to maintain backward compatibility
+   ❌ Rename RequestChatCompletionDependencies.callGemini → callAiProvider without @deprecated alias; consumers passing { callGemini: fn } silently fail
+   ❌ Hard rename CallGeminiWithKeyFallbackOptions → CallAiProviderOptions without re-export; existing imports error at compile
+   ❌ Delete TierModel union members without @deprecated; code depending on those literals breaks
+   ✅ Keep old field with @deprecated JSDoc; implement fallback: const fn = deps.callAiProvider ?? deps.callGemini
+   ✅ Export deprecated type alias: export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions
+   ✅ Add deleted union members back with @deprecated tag; type checkers warn but code doesn't break
+   → Also requires package.json version bump to 0.x.0 (major in 0.x semver) and CHANGELOG.md entry documenting BREAKING CHANGES
 ```
 
 ---

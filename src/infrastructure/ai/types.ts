@@ -28,3 +28,8 @@ export interface CallAiProviderOptions {
     /** Optional system instruction passed via `config.systemInstruction`. */
     systemInstruction?: string;
 }
+
+/**
+ * @deprecated Use {@link CallAiProviderOptions} instead. Will be removed in the next major version.
+ */
+export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions;

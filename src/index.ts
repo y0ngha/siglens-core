@@ -522,6 +522,7 @@ export type {
 } from './application/usage';
 export type {
     CallAiProviderOptions,
+    CallGeminiWithKeyFallbackOptions,
     GeminiContent,
     GeminiContents,
     GeminiPart,

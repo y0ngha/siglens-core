@@ -1195,7 +1195,11 @@ export type TierModel =
     | 'claude-opus-4-7'
     | 'gpt-5-mini'
     | 'gpt-5.4'
-    | 'gpt-5.5';
+    | 'gpt-5.5'
+    /** @deprecated Use `claude-sonnet-4-6` instead. Will be removed in the next major version. */
+    | 'claude-sonnet-4'
+    /** @deprecated Use `claude-opus-4-7` instead. Will be removed in the next major version. */
+    | 'claude-opus-4';
 
 /** Public model identifier used by tier model access helpers. */
 export type ModelId = TierModel;

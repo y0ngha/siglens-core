@@ -38,6 +38,10 @@ export interface RequestChatCompletionDependencies {
     usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
     callAiProvider?: (options: CallAiProviderOptions) => Promise<string>;
+    /**
+     * @deprecated Use {@link callAiProvider} instead. Will be removed in the next major version.
+     */
+    callGemini?: (options: CallAiProviderOptions) => Promise<string>;
     tierConfig?: TierConfig;
     /**
      * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.
