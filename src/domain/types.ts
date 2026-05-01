@@ -1151,12 +1151,6 @@ export interface ChatSession {
     savedAt: number; // Unix timestamp (ms)
 }
 
-/** Internal: chat model identifiers used by the worker. */
-export type ChatModel =
-    | 'gemini-2.5-flash'
-    | 'gemini-2.5-flash-lite'
-    | 'gemini-2.5-pro';
-
 /** Chat prompt payload returned by {@link buildChatPrompt}. */
 export interface ChatPromptPayload {
     /** System instruction grounding the AI to the analysis. */
@@ -1194,8 +1188,14 @@ export type TierModel =
     | 'gemini-2.5-flash'
     | 'gemini-2.5-flash-lite'
     | 'gemini-2.5-pro'
-    | 'claude-sonnet-4'
-    | 'claude-opus-4';
+    | 'gemini-3-flash-preview'
+    | 'gemini-3.1-pro-preview'
+    | 'claude-haiku-3-5'
+    | 'claude-sonnet-4-6'
+    | 'claude-opus-4-7'
+    | 'gpt-5-mini'
+    | 'gpt-5.4'
+    | 'gpt-5.5';
 
 /** Public model identifier used by tier model access helpers. */
 export type ModelId = TierModel;
