@@ -289,6 +289,7 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 export {
     createDatabaseClient,
     DrizzleAssetTranslationRepository,
+    DrizzleInquiryRepository,
     DrizzleKoreanTickerRepository,
     DrizzleOAuthAccountRepository,
     DrizzleSessionRepository,

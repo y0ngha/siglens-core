@@ -155,7 +155,7 @@ export const inquiries = pgTable('inquiries', {
     id: uuid('id').primaryKey().defaultRandom(),
     title: text('title').notNull(),
     content: text('content').notNull(),
-    email: varchar('email', { length: 320 }).notNull(),
+    email: varchar('email', { length: EMAIL_MAX_LENGTH }).notNull(),
     answered: boolean('answered').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()
