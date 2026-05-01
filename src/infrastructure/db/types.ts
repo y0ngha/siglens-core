@@ -1,3 +1,4 @@
+import type { LlmProvider } from '@/domain/llm';
 import type {
     KoreanTickerEntry,
     ModelId,
@@ -422,6 +423,92 @@ export interface AssetTranslationRepository {
      * @param record - Record to persist.
      */
     upsert(record: AssetTranslationRecord): Promise<void>;
+}
+
+/**
+ * Metadata for a stored user API key. Plaintext is intentionally omitted so
+ * list-style operations (`findByUser`) cannot leak secrets through logs or UI.
+ */
+export interface UserApiKeyMetaRecord {
+    /** Unique row identifier. */
+    id: string;
+    /** Owner of the stored key. */
+    userId: string;
+    /** LLM provider the key authenticates against. */
+    provider: LlmProvider;
+    /** Timestamp when the row was first created. */
+    createdAt: Date;
+    /** Timestamp when the encrypted key was last updated. */
+    updatedAt: Date;
+}
+
+/**
+ * A stored user API key including the decrypted plaintext value. Returned
+ * only by single-row lookups intended for outbound LLM calls.
+ */
+export interface UserApiKeyRecord extends UserApiKeyMetaRecord {
+    /** Decrypted plaintext API key, ready to forward to the LLM provider. */
+    apiKey: string;
+}
+
+/**
+ * Input for inserting or replacing a user's API key for one provider.
+ */
+export interface UpsertUserApiKeyInput {
+    /** Owner of the API key. */
+    userId: string;
+    /** LLM provider the key authenticates against. */
+    provider: LlmProvider;
+    /** Plaintext API key; the implementation encrypts it before storage. */
+    apiKey: string;
+}
+
+/**
+ * Persistence operations for user-supplied LLM API keys. Implementations are
+ * responsible for AES-256-GCM encryption on write and decryption on
+ * single-row read; plaintext keys must never be persisted or returned in
+ * list-style metadata results.
+ */
+export interface UserApiKeyRepository {
+    /**
+     * Insert a new key, or replace the existing key for `(userId, provider)`.
+     *
+     * @param input - Plaintext API key plus owner and provider.
+     * @returns Metadata for the stored row (no plaintext).
+     */
+    upsert(input: UpsertUserApiKeyInput): Promise<UserApiKeyMetaRecord>;
+
+    /**
+     * List all stored API key metadata for a single user.
+     *
+     * @param userId - Owner of the stored keys.
+     * @returns Metadata rows; empty array when none exist.
+     */
+    findByUser(userId: string): Promise<UserApiKeyMetaRecord[]>;
+
+    /**
+     * Look up the plaintext API key for one user/provider pair.
+     *
+     * @param userId - Owner of the stored key.
+     * @param provider - LLM provider the key authenticates against.
+     * @returns Decrypted record, or `null` when no row exists.
+     */
+    findByUserAndProvider(
+        userId: string,
+        provider: LlmProvider
+    ): Promise<UserApiKeyRecord | null>;
+
+    /**
+     * Delete the stored key for one user/provider pair.
+     *
+     * @param userId - Owner of the stored key.
+     * @param provider - LLM provider the key authenticates against.
+     * @returns Whether a row was deleted.
+     */
+    deleteByUserAndProvider(
+        userId: string,
+        provider: LlmProvider
+    ): Promise<boolean>;
 }
 
 /** Persistence operations required by tier-gating use-cases. */
