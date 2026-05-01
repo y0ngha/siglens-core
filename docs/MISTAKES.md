@@ -430,6 +430,31 @@ and have been removed from this file.
 3. Documentation examples contradict actual business logic
    → Skill documents must reflect actual system capabilities and conditions
    → Example scenarios must match the signal conditions they describe
+
+4. Destructive dependent writes racing ahead of prerequisite reads
+   → When multiple operations are part of the same use-case, prerequisite reads must complete before dependent destructive writes
+   ❌ await revokeOAuthTokens() (fire-and-forget) → await deleteUser() (user row deleted) → tokens no longer exist for lookup
+   ✅ const tokens = await loadOAuthAccounts(); await deleteUser(); await revokeTokens(tokens) (fire-and-forget);
+
+5. Related use-cases with the same lifecycle concept returning inconsistent shapes
+   → Session termination (logout, delete account) must return the same metadata shape
+   ❌ logoutUser returns { ok: true, cookie: AuthSessionCookie } but deleteAccount returns { ok: true }
+   ✅ Both return identical shape so callers can chain the same downstream logic
+
+6. Paid-tier analytics not covering all billable tiers
+   → Usage tracking must record every paid tier that has feature/model access, not just one tier
+   ❌ Premium model usage tracking records only 'member' tier, skips 'pro'
+   ✅ Record premium model usage for all non-free tiers (member, pro, enterprise)
+
+7. Public helper return ordering depends on container structure instead of stable order
+   → Lists returned from public APIs must maintain stable iteration order independent of underlying config structure
+   ❌ model list order depends on Record<string, ...> insertion order in tier config
+   ✅ Sort deduplicated results with toSorted() before returning
+
+8. Malformed persisted state handled inconsistently with other invalid inputs
+   → Persisted token state (Redis, cache) must validate before use, producing consistent invalid-token result as other bad inputs
+   ❌ safeCompareTokenHashes accepts non-hex 64-char string, throws during timingSafeEqual
+   ✅ Validate format (hex check, length) before comparison; return false/invalid on format error
 ```
 
 ---
