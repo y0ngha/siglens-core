@@ -29,13 +29,18 @@ domain/         Pure calculations
                   - Indicators (RSI, MACD, Bollinger, DMI, Stochastic, VWAP, MA/EMA, etc.)
                   - Candle pattern detection (single + multi)
                   - Analysis prompt construction for AI providers
+                  - Tier gating policies (analysis/chatbot usage limits)
                   - Shared types and market constants
 
-infrastructure/ I/O wrappers
-                  - AI provider clients (Claude, Gemini)
+infrastructure/ I/O wrappers + abstract interfaces
+                  - AI provider type contracts (consumers supply concrete SDK adapter)
                   - Skills loader (reads markdown skill files)
                   - Cache (Upstash Redis)
-                  - Database (Neon / PostgreSQL)
+                  - Job queue primitives (Upstash Redis)
+                  - Market data provider interface (consumers supply fetch impl)
+                  - Abstract repository interfaces (UsageRepository,
+                    UsageLogRepository, UserTierRepository) — consumers
+                    implement against their own database
 ```
 
 ## What This Library Does NOT Provide
@@ -45,6 +50,18 @@ infrastructure/ I/O wrappers
 ❌ Order / trade execution
 ❌ Real-time data feeds
 ❌ Investment advice or buy/sell recommendations
+
+❌ User authentication, session management, OAuth flows
+❌ Email delivery / verification token storage
+❌ Drizzle ORM schema, Neon/Postgres client, migrations
+❌ Concrete database adapters — only repository interfaces are exposed
+❌ Concrete AI provider SDK adapters (Gemini, Claude) — only types are exposed
+❌ Korean ticker translation / asset translation
+❌ BYOK (user-supplied LLM API key) storage and validation
+❌ User tier CRUD operations (read-only policy interface only)
+❌ Contact form / inquiry handling
+
+These all live in consumer applications (e.g. the `siglens` Next.js app).
 ```
 
 ---
@@ -64,12 +81,17 @@ Consumers import from the package's public entry:
 
 ```typescript
 import {
-    calculateRSI,
-    detectCandlePatterns,
+    calculateIndicators,
+    detectCandlePattern,
     buildAnalysisPrompt,
     createMarketDataProvider,
 } from '@y0ngha/siglens-core';
 ```
+
+`calculateIndicators` is the high-level Tier 2 entry point that returns a structured
+`IndicatorResult` with all indicators (RSI, MACD, Bollinger Bands, etc.) precomputed
+from a single OHLCV candle array. Prefer it over calling individual indicator
+calculators directly.
 
 The library targets **Node.js runtime**; it does not depend on DOM or React.
 

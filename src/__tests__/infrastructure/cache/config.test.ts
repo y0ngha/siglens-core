@@ -2,28 +2,19 @@ import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
-    SECONDS_PER_YEAR,
 } from '@/domain/constants/time';
 import {
     ANALYSIS_CACHE_TTL,
-    ASSET_INFO_CACHE_TTL_WITH_KOREAN,
-    ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN,
-    ASSET_INFO_HOURS_WITHOUT_KOREAN,
     buildAnalysisCacheKey,
-    buildAssetInfoCacheKey,
     buildBriefingCacheKey,
     buildSectorSignalsCacheKey,
-    buildTickerSearchCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
-    KOREAN_NAMES_CACHE_TTL,
-    KOREAN_TICKERS_CACHE_KEY,
     MARKET_BRIEFING_CACHE_TTL,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
-    TICKER_SEARCH_CACHE_TTL,
 } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import { describe, expect, it } from 'vitest';
@@ -48,28 +39,6 @@ describe('cache config constants', () => {
 
     it('ISO_DATE_HOUR_PREFIX_LENGTH', () => {
         expect(ISO_DATE_HOUR_PREFIX_LENGTH).toBe(13);
-    });
-
-    it('TICKER_SEARCH_CACHE_TTL', () => {
-        expect(TICKER_SEARCH_CACHE_TTL).toBe(SECONDS_PER_DAY);
-    });
-
-    it('KOREAN_NAMES_CACHE_TTL', () => {
-        expect(KOREAN_NAMES_CACHE_TTL).toBe(SECONDS_PER_YEAR);
-    });
-
-    it('ASSET_INFO_CACHE_TTL_WITH_KOREAN', () => {
-        expect(ASSET_INFO_CACHE_TTL_WITH_KOREAN).toBe(SECONDS_PER_YEAR);
-    });
-
-    it('ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN', () => {
-        expect(ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN).toBe(
-            ASSET_INFO_HOURS_WITHOUT_KOREAN * SECONDS_PER_HOUR
-        );
-    });
-
-    it('KOREAN_TICKERS_CACHE_KEY', () => {
-        expect(KOREAN_TICKERS_CACHE_KEY).toBe('korean:tickers');
     });
 });
 
@@ -108,16 +77,6 @@ describe('cache key builders', () => {
 
     it('buildBriefingCacheKey', () => {
         expect(buildBriefingCacheKey('1Hour')).toBe('briefing:market:1Hour');
-    });
-
-    it('buildTickerSearchCacheKey lowercases the query', () => {
-        expect(buildTickerSearchCacheKey('AAPL')).toBe('ticker:search:aapl');
-        expect(buildTickerSearchCacheKey('애플')).toBe('ticker:search:애플');
-    });
-
-    it('buildAssetInfoCacheKey uppercases the symbol', () => {
-        expect(buildAssetInfoCacheKey('aapl')).toBe('asset-info:AAPL');
-        expect(buildAssetInfoCacheKey('AAPL')).toBe('asset-info:AAPL');
     });
 
     it('buildSectorSignalsCacheKey composes timeframe and bucket', () => {

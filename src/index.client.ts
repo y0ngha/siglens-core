@@ -187,13 +187,6 @@ export {
 } from './domain/analysis/actionRecommendation';
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 
-// Ticker validation utilities
-export {
-    deduplicateResults,
-    isKoreanInput,
-    isValidTickerFormat,
-} from './domain/ticker';
-
 // Dashboard helpers
 export {
     bucketedTimestamp,
@@ -305,11 +298,9 @@ export type {
 export type {
     AiContents,
     GeminiRole,
-    GeminiContents,
     GeminiContent,
     GeminiPart,
     CallAiProviderOptions,
-    CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
@@ -434,12 +425,6 @@ export type {
     SingleCandlePatternEntry,
     MultiCandlePatternEntry,
     PromptConfig,
-    TickerBase,
-    KoreanTickerEntry,
-    TickerSearchResult,
-    AssetInfo,
-    TickerCategory,
-    CategoryId,
     SkillCounts,
     SkillShowcaseItem,
     IndexTicker,

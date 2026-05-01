@@ -38,30 +38,15 @@ export interface RequestChatCompletionDependencies {
     usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
     /**
-     * AI provider implementation.
+     * AI provider implementation. Required.
      *
-     * The default falls back to {@link callGeminiWithKeyFallback}, which only
-     * understands Gemini model identifiers. If the configured `tierConfig`
-     * grants access to non-Gemini models (e.g. `gpt-*`, `claude-*`) and a
-     * caller selects one, requests will reach the Gemini API with an
-     * unrecognised model and surface as a runtime `server_error` rather than
-     * an upfront validation failure.
-     *
-     * Supply a custom implementation that routes by `options.model` to the
-     * appropriate provider whenever non-Gemini models are enabled.
+     * Implementations must route by `options.model` to the appropriate
+     * upstream provider (Gemini, OpenAI, Anthropic, etc.) and return the
+     * generated text. The core library no longer ships a default adapter —
+     * callers wire up their own provider client and inject it here.
      */
-    callAiProvider?: (options: CallAiProviderOptions) => Promise<string>;
-    /**
-     * @deprecated Use {@link callAiProvider} instead. Will be removed in the next major version.
-     */
-    callGemini?: (options: CallAiProviderOptions) => Promise<string>;
+    callAiProvider: (options: CallAiProviderOptions) => Promise<string>;
     tierConfig?: TierConfig;
-    /**
-     * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.
-     * During the deprecation period, this is used as a fallback when `occurredAt` is not provided.
-     * Will be removed in the next major version.
-     */
-    getCurrentDate?: () => Date;
 }
 
 /** Result returned by {@link requestChatCompletion}. */

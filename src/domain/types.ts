@@ -1,6 +1,8 @@
 /**
  * OAuth provider used to authenticate a user.
- * Must stay in sync with OAUTH_PROVIDER_VALUES in infrastructure/db/constants.ts.
+ *
+ * Consumers (e.g. siglens) maintain a matching `OAUTH_PROVIDER_VALUES` array
+ * for their database enum and must keep it in sync with this union.
  */
 export type OAuthProvider = 'google' | 'kakao' | 'apple';
 
@@ -925,60 +927,6 @@ export interface PromptConfig {
     squeezeZeroCrossLookback: number;
 }
 
-/** Common ticker fields shared by listing/search results. */
-export interface TickerBase {
-    /** Canonical ticker symbol (uppercase). */
-    symbol: string;
-    /** English company name. */
-    name: string;
-    /** Short exchange code (e.g. `"NASDAQ"`). */
-    exchange: string;
-    /** Full exchange name (e.g. `"NASDAQ Global Select"`). */
-    exchangeFullName: string;
-}
-
-/** Ticker entry with a guaranteed Korean translation. */
-export interface KoreanTickerEntry extends TickerBase {
-    koreanName: string;
-}
-
-/** Ticker search hit; Korean translation may be missing for a brand-new symbol. */
-export interface TickerSearchResult extends TickerBase {
-    /** Korean company name; absent when no translation is in the store yet. */
-    koreanName?: string;
-}
-
-/** Asset metadata returned by {@link getAssetInfo}. */
-export interface AssetInfo {
-    /** Canonical ticker symbol (uppercase). */
-    symbol: string;
-    /** English company name. */
-    name: string;
-    /** Korean company name; absent when no translation is in the store yet. */
-    koreanName?: string;
-    /** FMP API 심볼 (지수의 경우 ^ 접두사 포함, 예: ^SPX). 일반 주식은 undefined. */
-    fmpSymbol?: string;
-}
-
-/** Curated category id used to group tickers in UI explorers. */
-export type CategoryId =
-    | 'megacap'
-    | 'ai-semiconductor'
-    | 'software-cloud'
-    | 'fintech-crypto'
-    | 'leveraged-etf'
-    | 'healthcare-bio'
-    | 'quantum-computing'
-    | 'ev-mobility'
-    | 'energy-industrial';
-
-/** Curated ticker category (id + label + member tickers). */
-export interface TickerCategory {
-    id: CategoryId;
-    label: string;
-    tickers: readonly string[];
-}
-
 /** Internal: input for run-analysis worker invocation. */
 export interface RunAnalysisInput {
     symbol: string;
@@ -1309,22 +1257,6 @@ export type QuadrantKey =
     | 'bearishExpected'
     | 'bearishConfirmed';
 
-/** Validation error code shared across auth use-cases. */
-export type AuthValidationErrorCode = 'invalid_email' | 'weak_password';
-
-/** Input field associated with an auth validation error. */
-export type AuthValidationErrorField = 'email' | 'password';
-
-/** Structured validation error produced by domain auth helpers. */
-export interface AuthValidationError {
-    /** Machine-readable error code identifying the failure reason. */
-    code: AuthValidationErrorCode;
-    /** Input field that caused the error. */
-    field: AuthValidationErrorField;
-    /** Human-readable error message suitable for display to the user. */
-    message: string;
-}
-
 /**
  * Fire-and-forget dispatcher. On Vercel serverless, pass `waitUntil` from
  * `@vercel/functions` so the runtime keeps the promise alive past the response.
@@ -1336,6 +1268,8 @@ export type WaitUntil = (promise: Promise<unknown>) => void;
 
 /**
  * Identifier of an LLM provider whose API key may be stored per user.
- * Must stay in sync with LLM_PROVIDER_VALUES in infrastructure/db/constants.ts.
+ *
+ * Consumers (e.g. siglens) maintain a matching `LLM_PROVIDER_VALUES` array
+ * for their database enum and must keep it in sync with this union.
  */
 export type LlmProvider = 'anthropic' | 'google' | 'openai';

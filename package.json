@@ -21,8 +21,6 @@
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
-        "db:generate": "drizzle-kit generate",
-        "db:migrate": "drizzle-kit migrate",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
@@ -36,34 +34,18 @@
         "release:major": "release-it major"
     },
     "peerDependencies": {
-        "@google/genai": "^1.50.1",
-        "@neondatabase/serverless": "^1.1.0",
-        "@upstash/redis": "^1.37.0",
-        "drizzle-orm": "^0.45.2"
+        "@upstash/redis": "^1.37.0"
     },
     "peerDependenciesMeta": {
-        "@google/genai": {
-            "optional": true
-        },
-        "@neondatabase/serverless": {
-            "optional": true
-        },
         "@upstash/redis": {
-            "optional": true
-        },
-        "drizzle-orm": {
             "optional": true
         }
     },
     "devDependencies": {
-        "@google/genai": "^1.50.1",
-        "@neondatabase/serverless": "^1.1.0",
         "@release-it/conventional-changelog": "^10.0.6",
         "@types/node": "^20.11.0",
         "@upstash/redis": "^1.37.0",
         "@vitest/coverage-v8": "^2.1.0",
-        "drizzle-kit": "^0.31.10",
-        "drizzle-orm": "^0.45.2",
         "eslint": "^9.18.0",
         "husky": "^9.1.7",
         "prettier": "^3.4.0",
@@ -80,8 +62,5 @@
             "browser": "./dist/index.client.js",
             "default": "./dist/index.js"
         }
-    },
-    "dependencies": {
-        "bcryptjs": "^3.0.3"
     }
 }

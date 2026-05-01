@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AI_SYSTEM_PROMPT } from '@/infrastructure/ai/utils';
+import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 
 describe('AI_SYSTEM_PROMPT', () => {
     it('is a non-empty string', () => {

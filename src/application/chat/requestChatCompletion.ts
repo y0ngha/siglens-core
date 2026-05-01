@@ -18,14 +18,14 @@ import type {
     Tier,
     TierConfig,
 } from '@/domain/types';
-import { callGeminiWithKeyFallback } from '@/infrastructure/ai/gemini';
 import type { AiContents } from '@/infrastructure/ai/types';
 import {
     createChatTokenStore,
     hashClientIp,
 } from '@/infrastructure/chat/tokenStore';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import { hashUsageIp, type UsageRepository } from '@/infrastructure/db';
+import { type UsageRepository } from '@/infrastructure/db';
+import { hashUsageIp } from '@/infrastructure/usage/hash';
 
 const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
@@ -141,9 +141,7 @@ async function requestAiChatCompletion(
     primaryApiKey: string | undefined,
     fallbackApiKey: string,
     tokenStore: ChatTokenStore,
-    callAiProvider: NonNullable<
-        RequestChatCompletionDependencies['callAiProvider']
-    >,
+    callAiProvider: RequestChatCompletionDependencies['callAiProvider'],
     model: ModelId,
     hashedClientId: string,
     prompt: ChatPromptPayload
@@ -190,10 +188,11 @@ async function requestAiChatCompletion(
  * @param params - Chat request parameters: symbol, timeframe, prior analysis,
  *   conversation history, user message, client IP, optional model and API keys,
  *   optional `occurredAt` timestamp, and optional `tierContext`.
- * @param dependencies - Optional injectable dependencies: token store,
- *   usage repository, premium usage logs, AI provider implementation,
- *   tier configuration, and a `getCurrentDate` fallback. Defaults wire up the
- *   built-in token store and Gemini fallback client.
+ * @param dependencies - Required `callAiProvider` plus optional injectable
+ *   dependencies: token store, usage repository, premium usage logs, and
+ *   tier configuration. The token store defaults to the built-in Redis-backed
+ *   implementation; `callAiProvider` must be supplied by the caller and is
+ *   responsible for routing by `options.model` to the upstream provider.
  * @returns A {@link ChatActionResult} — `{ ok: true, message, remainingTokens }`
  *   on success, or `{ ok: false, error }` with a typed error code
  *   (`token_exhausted`, `model_not_allowed`, `rate_limited`, `server_busy`,
@@ -208,7 +207,7 @@ async function requestAiChatCompletion(
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,
-    dependencies: RequestChatCompletionDependencies = {}
+    dependencies: RequestChatCompletionDependencies
 ): Promise<ChatActionResult> {
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
     const paidApiKey = params.paidApiKey;
@@ -226,12 +225,8 @@ export async function requestChatCompletion(
     }
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
-    const callAiProvider =
-        dependencies.callAiProvider ??
-        dependencies.callGemini ??
-        callGeminiWithKeyFallback;
-    const occurredAt =
-        params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date();
+    const callAiProvider = dependencies.callAiProvider;
+    const occurredAt = params.occurredAt ?? new Date();
     const usageRepository = dependencies.usageRepository;
     const usageTracking =
         usageRepository === undefined

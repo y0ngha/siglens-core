@@ -16,9 +16,7 @@ export { getMarketSummary } from './application/dashboard/getMarketSummary';
 export { getMarketSummaryWithBriefing } from './application/dashboard/getMarketSummaryWithBriefing';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
-// Ticker
-export { getAssetInfo } from './application/ticker/getAssetInfo';
-export { searchTicker } from './application/ticker/searchTicker';
+// Application background-task options (used by market / dashboard use-cases)
 export type { BackgroundTaskOptions } from './application/types';
 
 // Chat
@@ -30,28 +28,7 @@ export {
 } from './application/chat/constants';
 export { requestChatCompletion } from './application/chat/requestChatCompletion';
 
-// Auth
-export {
-    confirmPasswordReset,
-    deleteAccount,
-    findUserBySessionToken,
-    loginUser,
-    logoutUser,
-    registerUser,
-    requestEmailVerification,
-    requestPasswordReset,
-    socialLoginUser,
-    verifyEmail,
-} from './application/auth';
-export {
-    createUserTierContext,
-    getUserTier,
-    setUserTier,
-} from './application/tier';
 export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
-
-// Inquiry
-export { submitInquiry } from './application/inquiry';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -104,6 +81,7 @@ export { classifyTrend, detectSignals } from './domain/signals';
 export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
+export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
@@ -229,16 +207,6 @@ export {
     isTimeframeAllowed,
 } from './domain/tier';
 
-// LLM API key validation utilities
-export { isLlmProvider, normalizeLlmApiKey } from './domain/llm';
-
-// Ticker validation utilities
-export {
-    deduplicateResults,
-    isKoreanInput,
-    isValidTickerFormat,
-} from './domain/ticker';
-
 // Dashboard helpers
 export {
     bucketedTimestamp,
@@ -266,10 +234,6 @@ export { createCacheProvider } from './infrastructure/cache/redis';
 // Market data providers
 export { createMarketDataProvider } from './infrastructure/market/factory';
 
-// AI provider (Gemini)
-export { callGeminiWithKeyFallback } from './infrastructure/ai/gemini';
-export { AI_SYSTEM_PROMPT } from './infrastructure/ai/utils';
-
 // Chat token store
 export {
     CHAT_TOKEN_LIMIT,
@@ -278,9 +242,6 @@ export {
     hashClientIp,
 } from './infrastructure/chat/tokenStore';
 
-// Email token store
-export { createEmailTokenStore } from './infrastructure/email';
-
 // Skills loader
 export { FileSkillsLoader } from './infrastructure/skills/loader';
 
@@ -288,28 +249,7 @@ export { FileSkillsLoader } from './infrastructure/skills/loader';
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 
 // Database
-export {
-    createDatabaseClient,
-    DrizzleAssetTranslationRepository,
-    DrizzleInquiryRepository,
-    DrizzleKoreanTickerRepository,
-    DrizzleOAuthAccountRepository,
-    DrizzleSessionRepository,
-    DrizzleUsageLogRepository,
-    DrizzleUsageRepository,
-    DrizzleUserApiKeyRepository,
-    DrizzleUserRepository,
-    hashUsageIp,
-} from './infrastructure/db';
-
-// OAuth token revocation
-export { compositeOAuthRevoker } from './infrastructure/oauth/revoker';
-
-// Password adapters
-export {
-    bcryptPasswordHasher,
-    bcryptPasswordVerifier,
-} from './infrastructure/auth';
+export { hashUsageIp } from './infrastructure/usage/hash';
 
 // Job queue (worker-side primitives)
 export {
@@ -336,34 +276,6 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
-
-// Auth session cookie constants
-export {
-    AUTH_SESSION_COOKIE_NAME,
-    DEFAULT_AUTH_COOKIE_PATH,
-    DEFAULT_AUTH_COOKIE_SAME_SITE,
-    DEFAULT_SESSION_TTL_SECONDS,
-} from './application/auth';
-
-// Database schema objects / enum values
-export {
-    assetTranslations,
-    inquiries,
-    koreanTickers,
-    LLM_PROVIDER_VALUES,
-    llmProviderEnum,
-    OAUTH_PROVIDER_VALUES,
-    oauthAccounts,
-    oauthProviderEnum,
-    sessions,
-    USAGE_ACTION_TYPE_VALUES,
-    usageActionTypeEnum,
-    usageLogs,
-    userApiKeys,
-    USER_TIER_VALUES,
-    users,
-    userTierEnum,
-} from './infrastructure/db';
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
@@ -457,67 +369,6 @@ export {
 
 // Infrastructure interfaces
 export type {
-    AuthSessionCookie,
-    AuthSessionOptions,
-    ConfirmPasswordResetDependencies,
-    ConfirmPasswordResetError,
-    ConfirmPasswordResetErrorCode,
-    ConfirmPasswordResetInput,
-    ConfirmPasswordResetResult,
-    DeleteAccountDependencies,
-    DeleteAccountError,
-    DeleteAccountErrorCode,
-    DeleteAccountInput,
-    DeleteAccountOptions,
-    DeleteAccountResult,
-    FindUserBySessionTokenDependencies,
-    FindUserBySessionTokenOptions,
-    LoginUserDependencies,
-    LoginUserError,
-    LoginUserErrorCode,
-    LoginUserInput,
-    LoginUserOptions,
-    LoginUserResult,
-    LogoutUserDependencies,
-    LogoutUserInput,
-    LogoutUserOptions,
-    LogoutUserResult,
-    RegisterUserDependencies,
-    RegisterUserError,
-    RegisterUserErrorCode,
-    RegisterUserErrorField,
-    RegisterUserInput,
-    RegisterUserResult,
-    RequestEmailVerificationDependencies,
-    RequestEmailVerificationInput,
-    RequestEmailVerificationOptions,
-    RequestEmailVerificationResult,
-    RequestPasswordResetDependencies,
-    RequestPasswordResetInput,
-    RequestPasswordResetOptions,
-    RequestPasswordResetResult,
-    SocialLoginUserDependencies,
-    SocialLoginUserError,
-    SocialLoginUserErrorCode,
-    SocialLoginUserInput,
-    SocialLoginUserOptions,
-    SocialLoginUserResult,
-    VerifyEmailDependencies,
-    VerifyEmailError,
-    VerifyEmailErrorCode,
-    VerifyEmailInput,
-    VerifyEmailResult,
-} from './application/auth';
-export type {
-    CreateUserTierContextInput,
-    GetUserTierInput,
-    SetUserTierError,
-    SetUserTierErrorCode,
-    SetUserTierInput,
-    SetUserTierResult,
-    UserTierDependencies,
-} from './application/tier';
-export type {
     AnalysisLimitError,
     AnalysisLimitErrorCode,
     ChatbotLimitError,
@@ -530,60 +381,23 @@ export type {
 export type {
     AiContents,
     CallAiProviderOptions,
-    CallGeminiWithKeyFallbackOptions,
     GeminiContent,
-    GeminiContents,
     GeminiPart,
     GeminiRole,
 } from './infrastructure/ai/types';
-export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 export type { CacheProvider } from './infrastructure/cache/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
-    EmailDispatcher,
-    EmailMessage,
-    EmailTokenPurpose,
-    EmailTokenStore,
-    EmailTokenValue,
-} from './infrastructure/email';
-export type {
-    AssetTranslationRecord,
-    AssetTranslationRepository,
-    AuthSessionRecord,
-    AuthUserRecord,
-    CreateEmailUserInput,
-    CreateOAuthUserInput,
-    CreateSessionInput,
     CreateUsageLogInput,
-    DatabaseConfig,
-    EmailAuthUserRecord,
-    EmailAuthUserRepository,
-    InquiryInput,
-    InquiryRepository,
-    KoreanTickerRepository,
-    OAuthAccountRecord,
-    OAuthAccountRepository,
-    OAuthUserRepository,
     RecordUsageInput,
-    SessionRepository,
-    SiglensDatabase,
-    UpsertUserApiKeyInput,
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
     UsageLogRepository,
     UsageRepository,
-    UserApiKeyMetaRecord,
-    UserApiKeyRecord,
-    UserApiKeyRepository,
-    UserRepository,
     UserTier,
     UserTierRepository,
 } from './infrastructure/db';
-export type {
-    OAuthRevoker,
-    RevokeTokenParams,
-} from './infrastructure/oauth/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
@@ -601,7 +415,6 @@ export type {
     RequestChatCompletionParams,
     RequestChatCompletionResult,
 } from './application/chat/types';
-export type { SubmitInquiryDeps } from './application/inquiry';
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
@@ -617,7 +430,6 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     AnalysisSignalType,
-    AssetInfo,
     BacktestAiAnalysis,
     BacktestAiEntryRecommendation,
     BacktestAiPriceTarget,
@@ -635,7 +447,6 @@ export type {
     CandlePattern,
     CandlePatternEntry,
     CandlePatternSummary,
-    CategoryId,
     ChartDisplayType,
     ChatLoadingPhase,
     ChatMessage,
@@ -664,7 +475,6 @@ export type {
     KeyLevel,
     KeyLevels,
     KeyPrice,
-    KoreanTickerEntry,
     LevelSource,
     LlmProvider,
     MACDResult,
@@ -737,9 +547,6 @@ export type {
     StrategyResult,
     SubmitBriefingResult,
     SupertrendResult,
-    TickerBase,
-    TickerCategory,
-    TickerSearchResult,
     Tier,
     TierConfig,
     TierFeatureFlags,
