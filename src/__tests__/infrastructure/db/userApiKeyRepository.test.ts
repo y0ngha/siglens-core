@@ -83,6 +83,12 @@ function makeDeleteDb(rows: unknown[]): {
 }
 
 describe('DrizzleUserApiKeyRepository.upsert', () => {
+    const UPSERT_INPUT = {
+        userId: 'user-1',
+        provider: 'anthropic' as const,
+        apiKey: PLAINTEXT_API_KEY,
+    };
+
     beforeEach(() => {
         vi.stubEnv('LLM_API_KEY_ENCRYPTION_KEY', VALID_KEY_HEX);
     });
@@ -96,13 +102,7 @@ describe('DrizzleUserApiKeyRepository.upsert', () => {
         const { db } = makeUpsertDb([metaRow]);
         const repo = new DrizzleUserApiKeyRepository(db);
 
-        await expect(
-            repo.upsert({
-                userId: 'user-1',
-                provider: 'anthropic',
-                apiKey: PLAINTEXT_API_KEY,
-            })
-        ).rejects.toThrow(
+        await expect(repo.upsert(UPSERT_INPUT)).rejects.toThrow(
             'LLM_API_KEY_ENCRYPTION_KEY environment variable is required'
         );
     });
@@ -112,13 +112,7 @@ describe('DrizzleUserApiKeyRepository.upsert', () => {
         const { db } = makeUpsertDb([metaRow]);
         const repo = new DrizzleUserApiKeyRepository(db);
 
-        await expect(
-            repo.upsert({
-                userId: 'user-1',
-                provider: 'anthropic',
-                apiKey: PLAINTEXT_API_KEY,
-            })
-        ).rejects.toThrow(
+        await expect(repo.upsert(UPSERT_INPUT)).rejects.toThrow(
             'LLM_API_KEY_ENCRYPTION_KEY environment variable is required'
         );
     });
@@ -129,11 +123,7 @@ describe('DrizzleUserApiKeyRepository.upsert', () => {
         ]);
         const repo = new DrizzleUserApiKeyRepository(db);
 
-        const result = await repo.upsert({
-            userId: 'user-1',
-            provider: 'anthropic',
-            apiKey: PLAINTEXT_API_KEY,
-        });
+        const result = await repo.upsert(UPSERT_INPUT);
 
         expect(result).toEqual(metaRow);
         // Result must not expose the plaintext or ciphertext field.
@@ -154,10 +144,13 @@ describe('DrizzleUserApiKeyRepository.upsert', () => {
         // onConflictDoUpdate must use the same ciphertext as the insert path
         // so the update branch never silently writes a stale value.
         const [conflictArgs] = onConflictDoUpdate.mock.calls[0] ?? [];
-        expect(
-            (conflictArgs as { set: { encryptedApiKey: string } }).set
-                .encryptedApiKey
-        ).toBe(encryptedAtInsert);
+        const conflictSet = (
+            conflictArgs as {
+                set: { encryptedApiKey: string; updatedAt: unknown };
+            }
+        ).set;
+        expect(conflictSet.encryptedApiKey).toBe(encryptedAtInsert);
+        expect(conflictSet.updatedAt).toBeDefined();
         expect(returning).toHaveBeenCalledTimes(1);
     });
 
@@ -165,13 +158,9 @@ describe('DrizzleUserApiKeyRepository.upsert', () => {
         const { db } = makeUpsertDb([]);
         const repo = new DrizzleUserApiKeyRepository(db);
 
-        await expect(
-            repo.upsert({
-                userId: 'user-1',
-                provider: 'anthropic',
-                apiKey: PLAINTEXT_API_KEY,
-            })
-        ).rejects.toThrow('Failed to upsert user API key');
+        await expect(repo.upsert(UPSERT_INPUT)).rejects.toThrow(
+            'Failed to upsert user API key'
+        );
     });
 });
 

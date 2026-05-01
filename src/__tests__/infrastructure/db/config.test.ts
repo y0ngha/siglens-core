@@ -70,13 +70,19 @@ describe('tryReadEncryptionKey', () => {
     });
 
     it('returns null when the env var is too short', () => {
-        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '0'.repeat(62));
+        vi.stubEnv(
+            'OAUTH_TOKEN_ENCRYPTION_KEY',
+            '0'.repeat(VALID_KEY_HEX.length - 2)
+        );
 
         expect(tryReadEncryptionKey()).toBeNull();
     });
 
     it('returns null when the env var is too long', () => {
-        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '0'.repeat(66));
+        vi.stubEnv(
+            'OAUTH_TOKEN_ENCRYPTION_KEY',
+            '0'.repeat(VALID_KEY_HEX.length + 2)
+        );
 
         expect(tryReadEncryptionKey()).toBeNull();
     });
@@ -100,13 +106,19 @@ describe('tryReadLlmApiKeyEncryptionKey', () => {
     });
 
     it('returns null when the env var is too short', () => {
-        vi.stubEnv('LLM_API_KEY_ENCRYPTION_KEY', '0'.repeat(62));
+        vi.stubEnv(
+            'LLM_API_KEY_ENCRYPTION_KEY',
+            '0'.repeat(VALID_KEY_HEX.length - 2)
+        );
 
         expect(tryReadLlmApiKeyEncryptionKey()).toBeNull();
     });
 
     it('returns null when the env var is too long', () => {
-        vi.stubEnv('LLM_API_KEY_ENCRYPTION_KEY', '0'.repeat(66));
+        vi.stubEnv(
+            'LLM_API_KEY_ENCRYPTION_KEY',
+            '0'.repeat(VALID_KEY_HEX.length + 2)
+        );
 
         expect(tryReadLlmApiKeyEncryptionKey()).toBeNull();
     });
