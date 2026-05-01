@@ -107,10 +107,10 @@ describe('tier', () => {
             expect(getAllowedModels('free')).toEqual(ALL_CONFIGURED_MODELS);
         });
 
-        it('returns tier-specific models when restrictions are enabled', () => {
-            expect(getAllowedModels('member', restrictedConfig)).toEqual([
-                ...restrictedConfig.models.member,
-            ]);
+        it('returns tier-specific models in sorted order when restrictions are enabled', () => {
+            expect(getAllowedModels('member', restrictedConfig)).toEqual(
+                [...restrictedConfig.models.member].toSorted()
+            );
         });
     });
     describe('isTimeframeAllowed', () => {
