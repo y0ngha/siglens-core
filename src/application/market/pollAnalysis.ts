@@ -20,6 +20,9 @@ import {
 } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
+// Matches DEFAULT_ANALYSIS_MODEL_USED in submitAnalysis.ts; update both if changed
+const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
+
 /**
  * Poll the result of an analysis job submitted via {@link submitAnalysis}.
  *
@@ -123,7 +126,11 @@ export async function pollAnalysis(
     if (meta) {
         const cache = createCacheProvider();
         if (cache !== null) {
-            const cacheKey = buildAnalysisCacheKey(meta.symbol, meta.timeframe);
+            const cacheKey = buildAnalysisCacheKey(
+                meta.symbol,
+                meta.timeframe,
+                meta.modelId ?? DEFAULT_ANALYSIS_MODEL_USED
+            );
             const ttl = computeEffectiveTtl(meta.timeframe, now);
             fireAndForget(
                 cache

@@ -92,18 +92,21 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
 /**
  * Build the Redis key for a cached symbol analysis.
  *
- * Format: `analysis:<symbol>:<timeframe>`. Symbol is used verbatim — pass
- * the canonical uppercase form.
+ * Format: `analysis:<symbol>:<timeframe>:<modelId>`. Symbol is used verbatim
+ * — pass the canonical uppercase form. Including the model identifier ensures
+ * results from different AI models are cached independently.
  *
  * @param symbol - U.S. equity ticker.
  * @param timeframe - Bar resolution.
+ * @param modelId - LLM model identifier (e.g. `"gemini-2.5-flash"`).
  * @returns The cache key.
  */
 export function buildAnalysisCacheKey(
     symbol: string,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    modelId: string
 ): string {
-    return `analysis:${symbol}:${timeframe}`;
+    return `analysis:${symbol}:${timeframe}:${modelId}`;
 }
 
 /**

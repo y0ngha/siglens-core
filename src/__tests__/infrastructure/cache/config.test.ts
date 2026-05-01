@@ -93,10 +93,16 @@ describe('computeEffectiveTtl', () => {
 });
 
 describe('cache key builders', () => {
-    it('buildAnalysisCacheKey', () => {
-        expect(buildAnalysisCacheKey('AAPL', '1Hour')).toBe(
-            'analysis:AAPL:1Hour'
+    it('buildAnalysisCacheKey includes model identifier', () => {
+        expect(buildAnalysisCacheKey('AAPL', '1Hour', 'gemini-2.5-flash')).toBe(
+            'analysis:AAPL:1Hour:gemini-2.5-flash'
         );
+    });
+
+    it('buildAnalysisCacheKey isolates results by model', () => {
+        const keyA = buildAnalysisCacheKey('AAPL', '1Hour', 'model-a');
+        const keyB = buildAnalysisCacheKey('AAPL', '1Hour', 'model-b');
+        expect(keyA).not.toBe(keyB);
     });
 
     it('buildBriefingCacheKey', () => {

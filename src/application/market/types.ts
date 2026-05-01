@@ -31,6 +31,8 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     tierContext?: UserTierContext;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
     tierConfig?: TierConfig;
+    /** LLM model identifier used to isolate cached results per model. */
+    modelId?: string;
 }
 
 /** Error returned when application tier gates block a timeframe request. */

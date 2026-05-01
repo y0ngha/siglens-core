@@ -31,4 +31,6 @@ export interface JobMeta {
     lastClose?: number;
     /** Last ATR — used to derive fallback SL/TP levels; when absent the AI's original values are preserved. */
     atr?: number;
+    /** LLM model identifier used to isolate analysis results by model in the cache. */
+    modelId?: string;
 }

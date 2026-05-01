@@ -165,8 +165,9 @@ export async function submitAnalysis(
         }
     }
 
+    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_USED;
     const cache = createCacheProvider();
-    const cacheKey = buildAnalysisCacheKey(symbol, timeframe);
+    const cacheKey = buildAnalysisCacheKey(symbol, timeframe, effectiveModelId);
 
     if (!force && cache !== null) {
         try {
@@ -217,6 +218,7 @@ export async function submitAnalysis(
         skillsDegraded,
         lastClose,
         atr,
+        modelId: effectiveModelId,
     });
 
     const dispatch = fetch(`${workerUrl}/analyze`, {
