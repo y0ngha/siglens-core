@@ -12,6 +12,7 @@ export {
 } from './constants';
 export {
     assetTranslations,
+    inquiries,
     koreanTickers,
     llmProviderEnum,
     oauthAccounts,
@@ -44,6 +45,8 @@ export type {
     DatabaseConfig,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    InquiryInput,
+    InquiryRepository,
     KoreanTickerRepository,
     OAuthAccountRecord,
     OAuthAccountRepository,
@@ -66,3 +69,4 @@ export type {
 } from './types';
 export { DrizzleUsageLogRepository } from './usageLogRepository';
 export { DrizzleUsageRepository, hashUsageIp } from './usageRepository';
+export { DrizzleInquiryRepository } from './inquiryRepository';

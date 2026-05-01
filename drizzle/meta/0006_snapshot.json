@@ -1,5 +1,5 @@
 {
-    "id": "9fbf775b-221b-4328-9615-adc8eeda9128",
+    "id": "44c4f218-0ba6-40f4-8282-bd17d1d154eb",
     "prevId": "f06a715a-368a-4f18-bacb-bc7cdb342fc0",
     "version": "7",
     "dialect": "postgresql",
@@ -34,6 +34,58 @@
                 },
                 "updated_at": {
                     "name": "updated_at",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "now()"
+                }
+            },
+            "indexes": {},
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {},
+            "policies": {},
+            "checkConstraints": {},
+            "isRLSEnabled": false
+        },
+        "public.inquiries": {
+            "name": "inquiries",
+            "schema": "",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "uuid",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "default": "gen_random_uuid()"
+                },
+                "title": {
+                    "name": "title",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "content": {
+                    "name": "content",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "email": {
+                    "name": "email",
+                    "type": "varchar(320)",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "answered": {
+                    "name": "answered",
+                    "type": "boolean",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": false
+                },
+                "created_at": {
+                    "name": "created_at",
                     "type": "timestamp with time zone",
                     "primaryKey": false,
                     "notNull": true,
@@ -394,106 +446,6 @@
             "checkConstraints": {},
             "isRLSEnabled": false
         },
-        "public.user_api_keys": {
-            "name": "user_api_keys",
-            "schema": "",
-            "columns": {
-                "id": {
-                    "name": "id",
-                    "type": "uuid",
-                    "primaryKey": true,
-                    "notNull": true,
-                    "default": "gen_random_uuid()"
-                },
-                "user_id": {
-                    "name": "user_id",
-                    "type": "uuid",
-                    "primaryKey": false,
-                    "notNull": true
-                },
-                "provider": {
-                    "name": "provider",
-                    "type": "llm_provider",
-                    "typeSchema": "public",
-                    "primaryKey": false,
-                    "notNull": true
-                },
-                "encrypted_api_key": {
-                    "name": "encrypted_api_key",
-                    "type": "text",
-                    "primaryKey": false,
-                    "notNull": true
-                },
-                "created_at": {
-                    "name": "created_at",
-                    "type": "timestamp with time zone",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "default": "now()"
-                },
-                "updated_at": {
-                    "name": "updated_at",
-                    "type": "timestamp with time zone",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "default": "now()"
-                }
-            },
-            "indexes": {
-                "user_api_keys_user_id_idx": {
-                    "name": "user_api_keys_user_id_idx",
-                    "columns": [
-                        {
-                            "expression": "user_id",
-                            "isExpression": false,
-                            "asc": true,
-                            "nulls": "last"
-                        }
-                    ],
-                    "isUnique": false,
-                    "concurrently": false,
-                    "method": "btree",
-                    "with": {}
-                },
-                "user_api_keys_user_provider_uidx": {
-                    "name": "user_api_keys_user_provider_uidx",
-                    "columns": [
-                        {
-                            "expression": "user_id",
-                            "isExpression": false,
-                            "asc": true,
-                            "nulls": "last"
-                        },
-                        {
-                            "expression": "provider",
-                            "isExpression": false,
-                            "asc": true,
-                            "nulls": "last"
-                        }
-                    ],
-                    "isUnique": true,
-                    "concurrently": false,
-                    "method": "btree",
-                    "with": {}
-                }
-            },
-            "foreignKeys": {
-                "user_api_keys_user_id_users_id_fk": {
-                    "name": "user_api_keys_user_id_users_id_fk",
-                    "tableFrom": "user_api_keys",
-                    "tableTo": "users",
-                    "columnsFrom": ["user_id"],
-                    "columnsTo": ["id"],
-                    "onDelete": "cascade",
-                    "onUpdate": "no action"
-                }
-            },
-            "compositePrimaryKeys": {},
-            "uniqueConstraints": {},
-            "policies": {},
-            "checkConstraints": {},
-            "isRLSEnabled": false
-        },
         "public.users": {
             "name": "users",
             "schema": "",
@@ -575,11 +527,6 @@
         }
     },
     "enums": {
-        "public.llm_provider": {
-            "name": "llm_provider",
-            "schema": "public",
-            "values": ["anthropic", "google", "openai"]
-        },
         "public.oauth_provider": {
             "name": "oauth_provider",
             "schema": "public",

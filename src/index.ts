@@ -50,6 +50,9 @@ export {
 } from './application/tier';
 export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
+// Inquiry
+export { submitInquiry } from './application/inquiry';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -288,6 +291,7 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 export {
     createDatabaseClient,
     DrizzleAssetTranslationRepository,
+    DrizzleInquiryRepository,
     DrizzleKoreanTickerRepository,
     DrizzleOAuthAccountRepository,
     DrizzleSessionRepository,
@@ -344,6 +348,7 @@ export {
 // Database schema objects / enum values
 export {
     assetTranslations,
+    inquiries,
     koreanTickers,
     LLM_PROVIDER_VALUES,
     llmProviderEnum,
@@ -551,6 +556,8 @@ export type {
     DatabaseConfig,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    InquiryInput,
+    InquiryRepository,
     KoreanTickerRepository,
     OAuthAccountRecord,
     OAuthAccountRepository,
@@ -593,6 +600,7 @@ export type {
     RequestChatCompletionParams,
     RequestChatCompletionResult,
 } from './application/chat/types';
+export type { SubmitInquiryDeps } from './application/inquiry';
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
