@@ -39,7 +39,7 @@ describe('cache config constants', () => {
     });
 
     it('CACHE_EXPIRY_HOUR_KST', () => {
-        expect(CACHE_EXPIRY_HOUR_KST).toBe(17);
+        expect(CACHE_EXPIRY_HOUR_KST).toBe(5);
     });
 
     it('MARKET_BRIEFING_CACHE_TTL', () => {
@@ -75,19 +75,19 @@ describe('cache config constants', () => {
 
 describe('computeEffectiveTtl', () => {
     it('returns TTL when TTL < seconds until expiry', () => {
-        // KST 00:00 = UTC 15:00 prev day — 17 hours to expiry (61200s)
-        // 5Min TTL = 300s < 61200s
-        const now = new Date('2026-04-24T15:00:00.000Z');
+        // KST 04:00 = UTC 19:00 prev day — 1 hour to KST 05:00 expiry (3600s)
+        // 5Min TTL = 300s < 3600s → TTL wins
+        const now = new Date('2026-04-24T19:00:00.000Z');
         expect(computeEffectiveTtl('5Min', now)).toBe(
             ANALYSIS_CACHE_TTL['5Min']
         );
     });
 
     it('returns seconds until expiry when expiry < TTL', () => {
-        // KST 16:59:00 = UTC 07:59:00 — 60 seconds to KST 17:00 expiry
+        // KST 04:59:00 = UTC 19:59:00 prev day — 60 seconds to KST 05:00 expiry
         // 1Day TTL = 86400s > 60s → expiry wins
         const SECONDS_TO_EXPIRY = SECONDS_PER_MINUTE; // 1 minute = 60s
-        const now = new Date('2026-04-25T07:59:00.000Z');
+        const now = new Date('2026-04-24T19:59:00.000Z');
         const result = computeEffectiveTtl('1Day', now);
         expect(result).toBe(SECONDS_TO_EXPIRY);
     });

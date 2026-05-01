@@ -64,11 +64,11 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
 /**
  * Daily cache-expiry boundary in KST hours (24-hour clock).
  *
- * KST 17:00 = UTC 08:00 = EST 04:00 — chosen to flush cached analyses
- * just before the U.S. pre-market opens, so the next session starts
- * with fresh results.
+ * KST 05:00 = UTC 20:00 (prev day) = EDT 16:00 — aligned with U.S.
+ * regular-session close so cached analyses expire as the final price is
+ * printed, and the next request after close receives fresh results.
  */
-export const CACHE_EXPIRY_HOUR_KST = 17;
+export const CACHE_EXPIRY_HOUR_KST = 5;
 
 /**
  * Compute the effective analysis-cache TTL for a given timeframe at `now`.
