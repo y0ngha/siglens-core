@@ -39,8 +39,16 @@ export interface RequestChatCompletionDependencies {
     usageLogs?: UsageLogRepository;
     /**
      * AI provider implementation.
-     * For non-Gemini models (gpt-*, claude-*), supply a custom implementation that
-     * routes to the appropriate provider. The default falls back to {@link callGeminiWithKeyFallback}.
+     *
+     * The default falls back to {@link callGeminiWithKeyFallback}, which only
+     * understands Gemini model identifiers. If the configured `tierConfig`
+     * grants access to non-Gemini models (e.g. `gpt-*`, `claude-*`) and a
+     * caller selects one, requests will reach the Gemini API with an
+     * unrecognised model and surface as a runtime `server_error` rather than
+     * an upfront validation failure.
+     *
+     * Supply a custom implementation that routes by `options.model` to the
+     * appropriate provider whenever non-Gemini models are enabled.
      */
     callAiProvider?: (options: CallAiProviderOptions) => Promise<string>;
     /**

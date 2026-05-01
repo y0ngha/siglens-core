@@ -105,11 +105,6 @@
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
 
-## [PR #65 Round 5 | feat/60/AI-모델-티어-확대 | 2026-05-01]
-- Violation: `GeminiContents` 타입이 provider-neutral 인터페이스(`CallAiProviderOptions.contents`)에 Gemini 특화 이름으로 사용됨
-- Rule: MISTAKES.md #9 — 아키텍처 변경 후 이름이 부정확해지면 업데이트해야 함; 공통 타입은 provider-neutral 이름으로
-- Context: `infrastructure/ai/types.ts`에 `AiContents = string | GeminiContent[]` 추가, `CallAiProviderOptions.contents`를 `AiContents`로 변경; `GeminiContents`는 deprecated alias로 유지
-
 ## [PR #65 Round 2 | feat/60/AI-모델-티어-확대 | 2026-05-01]
 - Violation: `getAllowedModels`가 `enableTierRestrictions: true`일 때 결과를 정렬하지 않음
 - Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
@@ -119,4 +114,9 @@
 - Violation: `onConflictDoUpdate` SET 절에 `updatedAt` 누락
 - Rule: Drizzle ORM `$onUpdateFn`은 `db.update().set()` 호출에만 자동 적용됨; `insert().onConflictDoUpdate()`의 conflict resolution SET 절에는 적용되지 않으므로 명시적으로 `updatedAt: sql\`now()\``을 포함해야 함
 - Context: `src/infrastructure/db/userApiKeyRepository.ts` `upsert` 메서드의 conflict 경로에서 기존 키 교체 시 `updated_at` 컬럼이 갱신되지 않는 버그
+
+## [PR #65 Round 6 | feat/60/AI-모델-티어-확대 | 2026-05-02]
+- Violation: 폴백 경로 호환성 테스트가 호출 사실만 검증하고 새 필드명(`primaryApiKey`/`fallbackApiKey`)이 실제로 전달되는지 검증하지 않음
+- Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
+- Context: `requestChatCompletion.test.ts`의 `falls back to deprecated callGemini` 케이스에 `expect.objectContaining({ primaryApiKey, fallbackApiKey, model })` 단언 추가
 

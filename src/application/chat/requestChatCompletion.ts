@@ -19,7 +19,7 @@ import type {
     TierConfig,
 } from '@/domain/types';
 import { callGeminiWithKeyFallback } from '@/infrastructure/ai/gemini';
-import type { GeminiContent } from '@/infrastructure/ai/types';
+import type { AiContents } from '@/infrastructure/ai/types';
 import {
     createChatTokenStore,
     hashClientIp,
@@ -71,7 +71,7 @@ function toUsageDate(date: Date): string {
     return date.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
-function toAiContents(payload: ChatPromptPayload): GeminiContent[] {
+function toAiContents(payload: ChatPromptPayload): AiContents {
     return payload.messages.map(message => ({
         role: message.role,
         parts: [{ text: message.content }],
@@ -138,8 +138,8 @@ async function checkChatbotUsageAllowed(
 }
 
 async function requestAiChatCompletion(
-    primaryApiKey: RequestChatCompletionParams['freeApiKey'],
-    fallbackApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
+    primaryApiKey: string | undefined,
+    fallbackApiKey: string,
     tokenStore: ChatTokenStore,
     callAiProvider: NonNullable<
         RequestChatCompletionDependencies['callAiProvider']
@@ -186,6 +186,25 @@ async function requestAiChatCompletion(
  * consumed token is returned to the caller's bucket via a best-effort
  * background call so server-side failures do not count against the daily
  * allowance.
+ *
+ * @param params - Chat request parameters: symbol, timeframe, prior analysis,
+ *   conversation history, user message, client IP, optional model and API keys,
+ *   optional `occurredAt` timestamp, and optional `tierContext`.
+ * @param dependencies - Optional injectable dependencies: token store,
+ *   usage repository, premium usage logs, AI provider implementation,
+ *   tier configuration, and a `getCurrentDate` fallback. Defaults wire up the
+ *   built-in token store and Gemini fallback client.
+ * @returns A {@link ChatActionResult} — `{ ok: true, message, remainingTokens }`
+ *   on success, or `{ ok: false, error }` with a typed error code
+ *   (`token_exhausted`, `model_not_allowed`, `rate_limited`, `server_busy`,
+ *   `server_error`) or a {@link ChatbotLimitError}.
+ *
+ * @throws Never throws — all infrastructure failures are mapped to typed
+ *   error codes in the return value.
+ *
+ * @see ChatActionResult
+ * @see RequestChatCompletionParams
+ * @see RequestChatCompletionDependencies
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,
