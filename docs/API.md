@@ -91,9 +91,12 @@ Query parameter: key={GEMINI_API_KEY}
 
 채팅 completion use-case(`application/chat/requestChatCompletion.ts`)는
 consumer가 전달한 `paidApiKey`와 선택적 `freeApiKey`를
-`callGeminiWithKeyFallback()`에 주입한다. Next.js 같은 consumer는 자신의
-런타임에서 `GEMINI_API_KEY`와 `GEMINI_CHAT_FREE_API_KEY`를 읽고,
-`siglens-core`에는 문자열 config만 전달한다.
+`RequestChatCompletionDependencies.callAiProvider`로 주입한 구현체에 위임한다.
+기본값은 `callGeminiWithKeyFallback()`이므로 Gemini 모델만 지원하고 싶은 consumer는
+별도 주입 없이 사용할 수 있다. 비-Gemini 모델(gpt-*, claude-*)이 활성화된 경우
+`callAiProvider`에 멀티-프로바이더 라우팅 구현체를 주입해야 한다.
+Next.js 같은 consumer는 자신의 런타임에서 `GEMINI_API_KEY`와
+`GEMINI_CHAT_FREE_API_KEY`를 읽고, `siglens-core`에는 문자열 config만 전달한다.
 
 ### AI Provider 선택
 

@@ -58,7 +58,7 @@ function toChatErrorResult(error: unknown): ChatActionResult {
     return { ok: false, error: 'server_error' };
 }
 
-// Runtime guard against `as ModelId` casts from untrusted callers; TypeScript-safe callers always pass true.
+// Runtime guard against `as ModelId` casts; rejects model identifiers not present in the active tier configuration.
 function isValidChatModel(model: ModelId): boolean {
     return VALID_CHAT_MODELS.some(validModel => validModel === model);
 }
@@ -199,7 +199,7 @@ async function requestAiChatCompletion(
  *   (`token_exhausted`, `model_not_allowed`, `rate_limited`, `server_busy`,
  *   `server_error`) or a {@link ChatbotLimitError}.
  *
- * @throws Never throws — all infrastructure failures are mapped to typed
+ * @throws {never} Never throws — all infrastructure failures are mapped to typed
  *   error codes in the return value.
  *
  * @see ChatActionResult
