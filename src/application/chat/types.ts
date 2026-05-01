@@ -1,11 +1,11 @@
 import type { ChatbotLimitError } from '@/application/usage/types';
-import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
+import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
     ChatMessage,
-    ChatModel,
+    ModelId,
     TierConfig,
     Timeframe,
     UserTierContext,
@@ -26,7 +26,7 @@ export interface RequestChatCompletionParams {
     history: ChatMessage[];
     userMessage: string;
     clientIp: string;
-    model?: ChatModel;
+    model?: ModelId;
     freeApiKey?: string;
     paidApiKey?: string;
     occurredAt?: Date;
@@ -37,7 +37,24 @@ export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
-    callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
+    /**
+     * AI provider implementation.
+     *
+     * The default falls back to {@link callGeminiWithKeyFallback}, which only
+     * understands Gemini model identifiers. If the configured `tierConfig`
+     * grants access to non-Gemini models (e.g. `gpt-*`, `claude-*`) and a
+     * caller selects one, requests will reach the Gemini API with an
+     * unrecognised model and surface as a runtime `server_error` rather than
+     * an upfront validation failure.
+     *
+     * Supply a custom implementation that routes by `options.model` to the
+     * appropriate provider whenever non-Gemini models are enabled.
+     */
+    callAiProvider?: (options: CallAiProviderOptions) => Promise<string>;
+    /**
+     * @deprecated Use {@link callAiProvider} instead. Will be removed in the next major version.
+     */
+    callGemini?: (options: CallAiProviderOptions) => Promise<string>;
     tierConfig?: TierConfig;
     /**
      * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.

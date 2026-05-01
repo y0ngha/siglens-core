@@ -1151,12 +1151,6 @@ export interface ChatSession {
     savedAt: number; // Unix timestamp (ms)
 }
 
-/** Internal: chat model identifiers used by the worker. */
-export type ChatModel =
-    | 'gemini-2.5-flash'
-    | 'gemini-2.5-flash-lite'
-    | 'gemini-2.5-pro';
-
 /** Chat prompt payload returned by {@link buildChatPrompt}. */
 export interface ChatPromptPayload {
     /** System instruction grounding the AI to the analysis. */
@@ -1194,11 +1188,27 @@ export type TierModel =
     | 'gemini-2.5-flash'
     | 'gemini-2.5-flash-lite'
     | 'gemini-2.5-pro'
+    | 'gemini-3-flash-preview'
+    | 'gemini-3.1-pro-preview'
+    | 'claude-haiku-3-5'
+    | 'claude-sonnet-4-6'
+    | 'claude-opus-4-7'
+    | 'gpt-5-mini'
+    | 'gpt-5.4'
+    | 'gpt-5.5'
+    /** @deprecated Use `claude-sonnet-4-6` instead. Will be removed in the next major version. */
     | 'claude-sonnet-4'
+    /** @deprecated Use `claude-opus-4-7` instead. Will be removed in the next major version. */
     | 'claude-opus-4';
 
 /** Public model identifier used by tier model access helpers. */
 export type ModelId = TierModel;
+
+/**
+ * @deprecated Use {@link ModelId} instead. `ChatModel` was a subset of `ModelId` (Gemini models only).
+ * Will be removed in the next major version.
+ */
+export type ChatModel = ModelId;
 
 /** Usage limits keyed by feature for every tier. */
 export type TierFeatureLimits = Record<
@@ -1321,3 +1331,11 @@ export interface AuthValidationError {
  * On long-lived runtimes (Cloud Run worker), the default is sufficient.
  */
 export type WaitUntil = (promise: Promise<unknown>) => void;
+
+// ─── LLM ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Identifier of an LLM provider whose API key may be stored per user.
+ * Must stay in sync with LLM_PROVIDER_VALUES in infrastructure/db/constants.ts.
+ */
+export type LlmProvider = 'anthropic' | 'google' | 'openai';

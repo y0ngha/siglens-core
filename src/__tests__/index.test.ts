@@ -138,8 +138,8 @@ describe('public API exports', () => {
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
         expect(isTimeframeAllowed('free', '5Min')).toBe(true);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
-        expect(isModelAllowed('free', 'claude-opus-4')).toBe(true);
-        expect(getAllowedModels('free')).toContain('claude-opus-4');
+        expect(isModelAllowed('free', 'claude-opus-4-7')).toBe(true);
+        expect(getAllowedModels('free')).toContain('claude-opus-4-7');
         expect(isTier('member')).toBe(true);
         expect(typeof checkAnalysisLimit).toBe('function');
         expect(typeof checkChatbotLimit).toBe('function');

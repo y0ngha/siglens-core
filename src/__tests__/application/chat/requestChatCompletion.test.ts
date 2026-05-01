@@ -9,7 +9,7 @@ import {
 import { requestChatCompletion } from '@/application/chat/requestChatCompletion';
 import type { RequestChatCompletionParams } from '@/application/chat/types';
 import { TIER_CONFIG } from '@/domain/tier';
-import type { AnalysisResponse, ChatModel, TierConfig } from '@/domain/types';
+import type { AnalysisResponse, ModelId, TierConfig } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 
@@ -62,7 +62,7 @@ describe('requestChatCompletion', () => {
     const tryConsumeToken = vi.fn();
     const refundConsumedToken = vi.fn();
     const getRemainingTokens = vi.fn();
-    const callGemini = vi.fn();
+    const callAiProvider = vi.fn();
     const getUsageToday = vi.fn();
     const recordUsage = vi.fn();
     const recordPremiumUsage = vi.fn();
@@ -99,7 +99,7 @@ describe('requestChatCompletion', () => {
             date: '2026-04-29',
             createdAt: new Date('2026-04-29T00:00:00.000Z'),
         });
-        callGemini.mockResolvedValue(
+        callAiProvider.mockResolvedValue(
             '분석 기준으로는 조금 기다리는 편이 좋아요.'
         );
     });
@@ -114,11 +114,11 @@ describe('requestChatCompletion', () => {
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
         expect(result).toEqual({ ok: false, error: 'token_exhausted' });
-        expect(callGemini).not.toHaveBeenCalled();
+        expect(callAiProvider).not.toHaveBeenCalled();
     });
 
     it('returns chatbot_limit_exceeded before consuming a token when daily usage is exhausted', async () => {
@@ -132,7 +132,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 usageRepository,
-                callGemini,
+                callAiProvider,
                 tierConfig: restrictedTierConfig,
             }
         );
@@ -147,7 +147,7 @@ describe('requestChatCompletion', () => {
             },
         });
         expect(tryConsumeToken).not.toHaveBeenCalled();
-        expect(callGemini).not.toHaveBeenCalled();
+        expect(callAiProvider).not.toHaveBeenCalled();
         expect(recordUsage).not.toHaveBeenCalled();
     });
 
@@ -165,7 +165,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 usageRepository,
-                callGemini,
+                callAiProvider,
                 tierConfig: restrictedTierConfig,
             }
         );
@@ -185,7 +185,7 @@ describe('requestChatCompletion', () => {
     it('returns server_error when the paid key is missing', async () => {
         const result = await requestChatCompletion(
             createParams({ paidApiKey: undefined }),
-            { tokenStore, callGemini }
+            { tokenStore, callAiProvider }
         );
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
@@ -194,8 +194,8 @@ describe('requestChatCompletion', () => {
 
     it('returns server_error when the model is invalid at runtime', async () => {
         const result = await requestChatCompletion(
-            createParams({ model: 'invalid-model' as ChatModel }),
-            { tokenStore, callGemini }
+            createParams({ model: 'invalid-model' as ModelId }),
+            { tokenStore, callAiProvider }
         );
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
@@ -210,14 +210,14 @@ describe('requestChatCompletion', () => {
             }),
             {
                 tokenStore,
-                callGemini,
+                callAiProvider,
                 tierConfig: restrictedTierConfig,
             }
         );
 
         expect(result).toEqual({ ok: false, error: 'model_not_allowed' });
         expect(tryConsumeToken).not.toHaveBeenCalled();
-        expect(callGemini).not.toHaveBeenCalled();
+        expect(callAiProvider).not.toHaveBeenCalled();
     });
 
     it('builds a Gemini request and returns message with remaining tokens', async () => {
@@ -234,7 +234,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 usageRepository,
-                callGemini,
+                callAiProvider,
                 tierConfig: restrictedTierConfig,
             }
         );
@@ -247,10 +247,10 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).toHaveBeenCalledWith(
             '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
         );
-        expect(callGemini).toHaveBeenCalledWith(
+        expect(callAiProvider).toHaveBeenCalledWith(
             expect.objectContaining({
-                freeApiKey: 'free-key',
-                paidApiKey: 'paid-key',
+                primaryApiKey: 'free-key',
+                fallbackApiKey: 'paid-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 contents: [
                     {
@@ -295,7 +295,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 usageRepository,
-                callGemini,
+                callAiProvider,
                 tierConfig: restrictedTierConfig,
             }
         );
@@ -316,10 +316,10 @@ describe('requestChatCompletion', () => {
     it('uses the default Gemini chat model when no model is provided', async () => {
         await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
-        const firstCall = (callGemini as Mock).mock.calls[0]?.[0];
+        const firstCall = (callAiProvider as Mock).mock.calls[0]?.[0];
         expect(firstCall).toMatchObject({ model: GEMINI_2_5_FLASH_MODEL });
     });
 
@@ -332,7 +332,7 @@ describe('requestChatCompletion', () => {
             }),
             {
                 tokenStore,
-                callGemini,
+                callAiProvider,
                 usageLogs,
             }
         );
@@ -356,7 +356,7 @@ describe('requestChatCompletion', () => {
             }),
             {
                 tokenStore,
-                callGemini,
+                callAiProvider,
                 usageLogs,
             }
         );
@@ -383,7 +383,7 @@ describe('requestChatCompletion', () => {
             {
                 tokenStore,
                 usageRepository,
-                callGemini,
+                callAiProvider,
                 usageLogs,
                 tierConfig: restrictedTierConfig,
             }
@@ -403,7 +403,7 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: null, tier: 'member' },
             }),
-            { tokenStore, callGemini, usageLogs }
+            { tokenStore, callAiProvider, usageLogs }
         );
 
         expect(recordPremiumUsage).not.toHaveBeenCalled();
@@ -415,7 +415,7 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
             }),
-            { tokenStore, callGemini, usageLogs }
+            { tokenStore, callAiProvider, usageLogs }
         );
 
         expect(recordPremiumUsage).not.toHaveBeenCalled();
@@ -427,7 +427,7 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_FLASH_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
             }),
-            { tokenStore, callGemini, usageLogs }
+            { tokenStore, callAiProvider, usageLogs }
         );
 
         expect(recordPremiumUsage).not.toHaveBeenCalled();
@@ -439,7 +439,7 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
             }),
-            { tokenStore, callGemini }
+            { tokenStore, callAiProvider }
         );
 
         expect(result).toEqual({
@@ -460,7 +460,7 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
             }),
-            { tokenStore, callGemini, usageLogs }
+            { tokenStore, callAiProvider, usageLogs }
         );
 
         expect(result).toEqual({
@@ -475,7 +475,7 @@ describe('requestChatCompletion', () => {
     });
 
     it('maps Gemini rate limit errors to rate_limited', async () => {
-        callGemini.mockRejectedValueOnce(
+        callAiProvider.mockRejectedValueOnce(
             Object.assign(new Error('rate limit'), {
                 status: constants.HTTP_STATUS_TOO_MANY_REQUESTS,
             })
@@ -483,7 +483,7 @@ describe('requestChatCompletion', () => {
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
         expect(result).toEqual({ ok: false, error: 'rate_limited' });
@@ -493,7 +493,7 @@ describe('requestChatCompletion', () => {
     });
 
     it('maps Gemini service unavailable errors to server_busy', async () => {
-        callGemini.mockRejectedValueOnce(
+        callAiProvider.mockRejectedValueOnce(
             Object.assign(new Error('busy'), {
                 status: constants.HTTP_STATUS_SERVICE_UNAVAILABLE,
             })
@@ -501,7 +501,7 @@ describe('requestChatCompletion', () => {
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
         expect(result).toEqual({ ok: false, error: 'server_busy' });
@@ -511,13 +511,13 @@ describe('requestChatCompletion', () => {
     });
 
     it('maps Gemini errors without numeric status to server_error', async () => {
-        callGemini.mockRejectedValueOnce(
+        callAiProvider.mockRejectedValueOnce(
             Object.assign(new Error('bad status'), { status: '503' })
         );
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
@@ -527,11 +527,11 @@ describe('requestChatCompletion', () => {
     });
 
     it('maps non-object thrown values to server_error', async () => {
-        callGemini.mockRejectedValueOnce('string error');
+        callAiProvider.mockRejectedValueOnce('string error');
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
@@ -550,7 +550,7 @@ describe('requestChatCompletion', () => {
             }),
             {
                 tokenStore,
-                callGemini,
+                callAiProvider,
                 usageLogs,
                 usageRepository,
                 getCurrentDate: () => customDate,
@@ -577,7 +577,7 @@ describe('requestChatCompletion', () => {
             }),
             {
                 tokenStore,
-                callGemini,
+                callAiProvider,
                 usageLogs,
                 getCurrentDate: () => depsDate,
             }
@@ -589,18 +589,43 @@ describe('requestChatCompletion', () => {
     });
 
     it('keeps the original server_error when token refund fails', async () => {
-        callGemini.mockRejectedValueOnce(new Error('network failed'));
+        callAiProvider.mockRejectedValueOnce(new Error('network failed'));
         refundConsumedToken.mockRejectedValueOnce(new Error('refund failed'));
 
         const result = await requestChatCompletion(createParams(), {
             tokenStore,
-            callGemini,
+            callAiProvider,
         });
 
         expect(result).toEqual({ ok: false, error: 'server_error' });
         expect(console.warn).toHaveBeenCalledWith(
             '[requestChatCompletion] background action failed',
             expect.any(Error)
+        );
+    });
+
+    it('falls back to deprecated callGemini when callAiProvider is not provided', async () => {
+        const legacyCallGemini = vi.fn().mockResolvedValue('legacy response');
+
+        const result = await requestChatCompletion(
+            createParams({ freeApiKey: 'free-key' }),
+            {
+                tokenStore,
+                callGemini: legacyCallGemini,
+            }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: 'legacy response',
+            remainingTokens: 4,
+        });
+        expect(legacyCallGemini).toHaveBeenCalledWith(
+            expect.objectContaining({
+                primaryApiKey: 'free-key',
+                fallbackApiKey: 'paid-key',
+                model: GEMINI_2_5_FLASH_MODEL,
+            })
         );
     });
 });

@@ -35,7 +35,7 @@ describe('browser public API exports', () => {
         expect(GEMINI_2_5_PRO_MODEL).toBe('gemini-2.5-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
         expect(DEFAULT_TIER).toBe('free');
-        expect(getAllowedModels('free')).toContain('claude-opus-4');
+        expect(getAllowedModels('free')).toContain('claude-opus-4-7');
         expect(getAllowedTimeframes('free')).toContain('1Day');
         expect(isModelAllowed('free', modelId, tierConfig)).toBe(true);
         expect(HIGH_CONFIDENCE_WEIGHT).toBe(0.8);

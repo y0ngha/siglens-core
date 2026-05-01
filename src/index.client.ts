@@ -303,10 +303,12 @@ export type {
     AcquireReanalyzeCooldownResult,
 } from './infrastructure/market/types';
 export type {
+    AiContents,
     GeminiRole,
     GeminiContents,
     GeminiContent,
     GeminiPart,
+    CallAiProviderOptions,
     CallGeminiWithKeyFallbackOptions,
 } from './infrastructure/ai/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
@@ -328,6 +330,7 @@ export type {
 // Domain types
 export type {
     AnalysisSignalType,
+    ChatModel,
     ModelId,
     Timeframe,
     Tier,
@@ -417,7 +420,6 @@ export type {
     ValidatedActionPrices,
     ChatMessage,
     ChatLoadingPhase,
-    ChatModel,
     ChatPromptPayload,
     ChatSession,
     MarketIndexData,

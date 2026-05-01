@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import type {
-    CallGeminiWithKeyFallbackOptions,
+    CallAiProviderOptions,
     GeminiContents,
 } from '@/infrastructure/ai/types';
 
@@ -31,16 +31,16 @@ async function callGemini({
 /**
  * Call Google Gemini with automatic free→paid API key fallback.
  *
- * Tries `freeApiKey` first when provided; on any error (typically quota or
- * rate-limit rejection) falls through to `paidApiKey`. The `paidApiKey`
+ * Tries `primaryApiKey` first when provided; on any error (typically quota or
+ * rate-limit rejection) falls through to `fallbackApiKey`. The `fallbackApiKey`
  * call is awaited normally and any error from it propagates to the
  * caller.
  *
  * Prompts go through `models.generateContent`. When `systemInstruction` is
  * provided it is attached via the SDK's `config.systemInstruction` field.
  *
- * @param options - Free/paid keys, model name, prompt contents, and
- *   optional system instruction — see {@link CallGeminiWithKeyFallbackOptions}.
+ * @param options - Primary/fallback keys, model name, prompt contents, and
+ *   optional system instruction — see {@link CallAiProviderOptions}.
  * @returns The text content of the first successful Gemini response, or
  *   the empty string when the response is missing text.
  *
@@ -48,26 +48,26 @@ async function callGemini({
  *   swallowed by design).
  */
 export async function callGeminiWithKeyFallback({
-    freeApiKey,
-    paidApiKey,
+    primaryApiKey,
+    fallbackApiKey,
     model,
     contents,
     systemInstruction,
-}: CallGeminiWithKeyFallbackOptions): Promise<string> {
-    if (freeApiKey) {
+}: CallAiProviderOptions): Promise<string> {
+    if (primaryApiKey) {
         try {
             return await callGemini({
-                apiKey: freeApiKey,
+                apiKey: primaryApiKey,
                 model,
                 contents,
                 systemInstruction,
             });
         } catch {
-            // free key failed (quota/rate limit) — fall through to paid key
+            // primary key failed (quota/rate limit) — fall through to fallback key
         }
     }
     return callGemini({
-        apiKey: paidApiKey,
+        apiKey: fallbackApiKey,
         model,
         contents,
         systemInstruction,

@@ -27,8 +27,8 @@ export async function translateCompanyNames(
 
     try {
         const text = await callGeminiWithKeyFallback({
-            freeApiKey: config.freeApiKey,
-            paidApiKey: config.apiKey,
+            primaryApiKey: config.freeApiKey,
+            fallbackApiKey: config.apiKey,
             model: config.model,
             contents: buildTranslatePrompt(entries),
         });

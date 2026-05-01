@@ -43,8 +43,8 @@ describe('translateCompanyNames', () => {
         ]);
         expect(result).toEqual({ AAPL: '애플', NVDA: '엔비디아' });
         expect(callGeminiMock).toHaveBeenCalledWith({
-            freeApiKey: 'free-key',
-            paidApiKey: 'paid-key',
+            primaryApiKey: 'free-key',
+            fallbackApiKey: 'paid-key',
             model: 'gemini-test',
             contents: expect.stringContaining('AAPL: Apple Inc.'),
         });

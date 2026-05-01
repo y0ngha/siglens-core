@@ -13,13 +13,13 @@ import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import type {
-    ChatModel,
     ChatPromptPayload,
+    ModelId,
     Tier,
     TierConfig,
 } from '@/domain/types';
 import { callGeminiWithKeyFallback } from '@/infrastructure/ai/gemini';
-import type { GeminiContent } from '@/infrastructure/ai/types';
+import type { AiContents } from '@/infrastructure/ai/types';
 import {
     createChatTokenStore,
     hashClientIp,
@@ -58,11 +58,12 @@ function toChatErrorResult(error: unknown): ChatActionResult {
     return { ok: false, error: 'server_error' };
 }
 
-function isValidChatModel(model: ChatModel): boolean {
+// Runtime guard against `as ModelId` casts; rejects model identifiers not present in the active tier configuration.
+function isValidChatModel(model: ModelId): boolean {
     return VALID_CHAT_MODELS.some(validModel => validModel === model);
 }
 
-function isPremiumChatModel(model: ChatModel, config: TierConfig): boolean {
+function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
     return !config.models.free.includes(model);
 }
 
@@ -70,7 +71,7 @@ function toUsageDate(date: Date): string {
     return date.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
-function toGeminiContents(payload: ChatPromptPayload): GeminiContent[] {
+function toAiContents(payload: ChatPromptPayload): AiContents {
     return payload.messages.map(message => ({
         role: message.role,
         parts: [{ text: message.content }],
@@ -100,7 +101,7 @@ async function recordChatUsageSafely(
     usageRepository: UsageRepository,
     userId: string | null,
     clientIp: string,
-    model: ChatModel,
+    model: ModelId,
     usageOccurredAt: Date
 ): Promise<void> {
     try {
@@ -136,21 +137,23 @@ async function checkChatbotUsageAllowed(
     );
 }
 
-async function requestGeminiChatCompletion(
-    freeApiKey: RequestChatCompletionParams['freeApiKey'],
-    paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
+async function requestAiChatCompletion(
+    primaryApiKey: string | undefined,
+    fallbackApiKey: string,
     tokenStore: ChatTokenStore,
-    callGemini: NonNullable<RequestChatCompletionDependencies['callGemini']>,
-    model: ChatModel,
+    callAiProvider: NonNullable<
+        RequestChatCompletionDependencies['callAiProvider']
+    >,
+    model: ModelId,
     hashedClientId: string,
     prompt: ChatPromptPayload
 ): Promise<ChatActionResult> {
     try {
-        const message = await callGemini({
-            freeApiKey,
-            paidApiKey,
+        const message = await callAiProvider({
+            primaryApiKey,
+            fallbackApiKey,
             model,
-            contents: toGeminiContents(prompt),
+            contents: toAiContents(prompt),
             systemInstruction: prompt.systemPrompt,
         });
         const remainingTokens =
@@ -170,19 +173,38 @@ async function requestGeminiChatCompletion(
 }
 
 /**
- * Request a Gemini chat completion for an existing analysis.
+ * Request an AI provider chat completion for an existing analysis.
  *
- * The caller owns runtime-specific request handling such as reading Next.js
+ * The caller owns runtime-specific request handling such as reading
  * headers and environment variables. This use-case owns SigLens chat policy:
  * model tier gating, IP hashing, daily usage-limit checking when
  * `usageRepository` is provided, token consumption, prompt construction,
- * Gemini payload mapping, key fallback invocation, remaining-token lookup,
+ * AI provider payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
  *
  * Token refund: when the result is `server_busy` or `server_error`, the
  * consumed token is returned to the caller's bucket via a best-effort
  * background call so server-side failures do not count against the daily
  * allowance.
+ *
+ * @param params - Chat request parameters: symbol, timeframe, prior analysis,
+ *   conversation history, user message, client IP, optional model and API keys,
+ *   optional `occurredAt` timestamp, and optional `tierContext`.
+ * @param dependencies - Optional injectable dependencies: token store,
+ *   usage repository, premium usage logs, AI provider implementation,
+ *   tier configuration, and a `getCurrentDate` fallback. Defaults wire up the
+ *   built-in token store and Gemini fallback client.
+ * @returns A {@link ChatActionResult} — `{ ok: true, message, remainingTokens }`
+ *   on success, or `{ ok: false, error }` with a typed error code
+ *   (`token_exhausted`, `model_not_allowed`, `rate_limited`, `server_busy`,
+ *   `server_error`) or a {@link ChatbotLimitError}.
+ *
+ * @throws {never} Never throws — all infrastructure failures are mapped to typed
+ *   error codes in the return value.
+ *
+ * @see ChatActionResult
+ * @see RequestChatCompletionParams
+ * @see RequestChatCompletionDependencies
  */
 export async function requestChatCompletion(
     params: RequestChatCompletionParams,
@@ -204,7 +226,10 @@ export async function requestChatCompletion(
     }
 
     const tokenStore = dependencies.tokenStore ?? createChatTokenStore();
-    const callGemini = dependencies.callGemini ?? callGeminiWithKeyFallback;
+    const callAiProvider =
+        dependencies.callAiProvider ??
+        dependencies.callGemini ??
+        callGeminiWithKeyFallback;
     const occurredAt =
         params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date();
     const usageRepository = dependencies.usageRepository;
@@ -247,18 +272,18 @@ export async function requestChatCompletion(
         params.userMessage
     );
 
-    const geminiResult = await requestGeminiChatCompletion(
+    const aiResult = await requestAiChatCompletion(
         params.freeApiKey,
         paidApiKey,
         tokenStore,
-        callGemini,
+        callAiProvider,
         model,
         hashedClientId,
         prompt
     );
 
-    if (!geminiResult.ok) {
-        return geminiResult;
+    if (!aiResult.ok) {
+        return aiResult;
     }
 
     if (usageTracking !== undefined) {
@@ -291,5 +316,5 @@ export async function requestChatCompletion(
         );
     }
 
-    return geminiResult;
+    return aiResult;
 }

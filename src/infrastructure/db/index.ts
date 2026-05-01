@@ -5,6 +5,7 @@ export {
 } from './client';
 export { readDatabaseConfig, tryReadDatabaseConfig } from './config';
 export {
+    LLM_PROVIDER_VALUES,
     OAUTH_PROVIDER_VALUES,
     USAGE_ACTION_TYPE_VALUES,
     USER_TIER_VALUES,
@@ -13,11 +14,13 @@ export {
     assetTranslations,
     inquiries,
     koreanTickers,
+    llmProviderEnum,
     oauthAccounts,
     oauthProviderEnum,
     sessions,
     usageActionTypeEnum,
     usageLogs,
+    userApiKeys,
     users,
     userTierEnum,
 } from './schema';
@@ -27,6 +30,7 @@ export {
     DrizzleAssetTranslationRepository,
     DrizzleKoreanTickerRepository,
 } from './tickerRepository';
+export { DrizzleUserApiKeyRepository } from './userApiKeyRepository';
 export { DrizzleUserRepository } from './userRepository';
 export type {
     AssetTranslationRecord,
@@ -50,11 +54,15 @@ export type {
     RecordUsageInput,
     SessionRepository,
     SiglensDatabase,
+    UpsertUserApiKeyInput,
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
     UsageLogRepository,
     UsageRepository,
+    UserApiKeyMetaRecord,
+    UserApiKeyRecord,
+    UserApiKeyRepository,
     UserRepository,
     UserTier,
     UserTierRepository,

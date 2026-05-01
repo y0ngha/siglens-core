@@ -22,8 +22,8 @@ describe('callGeminiWithKeyFallback', () => {
         mockGenerateContent.mockResolvedValue({ text: 'free key response' });
 
         const result = await callGeminiWithKeyFallback({
-            freeApiKey: 'free-key',
-            paidApiKey: 'paid-key',
+            primaryApiKey: 'free-key',
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
         });
@@ -38,8 +38,8 @@ describe('callGeminiWithKeyFallback', () => {
             .mockResolvedValueOnce({ text: 'paid key response' });
 
         const result = await callGeminiWithKeyFallback({
-            freeApiKey: 'free-key',
-            paidApiKey: 'paid-key',
+            primaryApiKey: 'free-key',
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
         });
@@ -48,12 +48,12 @@ describe('callGeminiWithKeyFallback', () => {
         expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     });
 
-    it('uses paid key directly when freeApiKey is undefined', async () => {
+    it('uses fallback key directly when primaryApiKey is undefined', async () => {
         mockGenerateContent.mockResolvedValue({ text: 'paid response' });
 
         const result = await callGeminiWithKeyFallback({
-            freeApiKey: undefined,
-            paidApiKey: 'paid-key',
+            primaryApiKey: undefined,
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
         });
@@ -62,12 +62,12 @@ describe('callGeminiWithKeyFallback', () => {
         expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     });
 
-    it('uses paid key directly when freeApiKey is empty string', async () => {
+    it('uses fallback key directly when primaryApiKey is empty string', async () => {
         mockGenerateContent.mockResolvedValue({ text: 'paid response' });
 
         const result = await callGeminiWithKeyFallback({
-            freeApiKey: '',
-            paidApiKey: 'paid-key',
+            primaryApiKey: '',
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
         });
@@ -81,8 +81,8 @@ describe('callGeminiWithKeyFallback', () => {
 
         await expect(
             callGeminiWithKeyFallback({
-                freeApiKey: undefined,
-                paidApiKey: 'paid-key',
+                primaryApiKey: undefined,
+                fallbackApiKey: 'paid-key',
                 model: 'gemini-2.0-flash',
                 contents: 'Hello',
             })
@@ -93,8 +93,8 @@ describe('callGeminiWithKeyFallback', () => {
         mockGenerateContent.mockResolvedValue({ text: undefined });
 
         const result = await callGeminiWithKeyFallback({
-            freeApiKey: undefined,
-            paidApiKey: 'paid-key',
+            primaryApiKey: undefined,
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
         });
@@ -106,8 +106,8 @@ describe('callGeminiWithKeyFallback', () => {
         mockGenerateContent.mockResolvedValue({ text: 'ok' });
 
         await callGeminiWithKeyFallback({
-            freeApiKey: undefined,
-            paidApiKey: 'paid-key',
+            primaryApiKey: undefined,
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
             systemInstruction: 'Be concise.',
@@ -124,8 +124,8 @@ describe('callGeminiWithKeyFallback', () => {
         mockGenerateContent.mockResolvedValue({ text: 'ok' });
 
         await callGeminiWithKeyFallback({
-            freeApiKey: undefined,
-            paidApiKey: 'paid-key',
+            primaryApiKey: undefined,
+            fallbackApiKey: 'paid-key',
             model: 'gemini-2.0-flash',
             contents: 'Hello',
         });

@@ -12,19 +12,29 @@ export interface GeminiContent {
     parts: GeminiPart[];
 }
 
-/** Gemini `contents` payload — accepts either a plain string or a turn array. */
-export type GeminiContents = string | GeminiContent[];
+/** Provider-neutral prompt payload — a plain string or a role-tagged turn list. */
+export type AiContents = string | GeminiContent[];
 
-/** Options for {@link callGeminiWithKeyFallback}. */
-export interface CallGeminiWithKeyFallbackOptions {
-    /** Free-tier key tried first; pass `undefined` to skip the free attempt. */
-    freeApiKey: string | undefined;
-    /** Paid-tier key used as the fallback when the free attempt fails. */
-    paidApiKey: string;
-    /** Gemini model name (e.g. `'gemini-2.5-flash'`). */
+/**
+ * @deprecated Use {@link AiContents} instead. Will be removed in the next major version.
+ */
+export type GeminiContents = AiContents;
+
+/** Options accepted by the AI provider call (currently Gemini; shape is provider-neutral). */
+export interface CallAiProviderOptions {
+    /** Primary key tried first; pass `undefined` to skip the primary attempt and go straight to fallback. */
+    primaryApiKey: string | undefined;
+    /** Fallback key used when the primary attempt fails. */
+    fallbackApiKey: string;
+    /** Model identifier (e.g. `'gemini-2.5-flash'`, `'gpt-5.5'`, `'claude-opus-4-7'`). */
     model: string;
-    /** Prompt contents — string or role-tagged turn list. */
-    contents: GeminiContents;
+    /** Prompt contents — plain string or role-tagged turn list. */
+    contents: AiContents;
     /** Optional system instruction passed via `config.systemInstruction`. */
     systemInstruction?: string;
 }
+
+/**
+ * @deprecated Use {@link CallAiProviderOptions} instead. Will be removed in the next major version.
+ */
+export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions;
