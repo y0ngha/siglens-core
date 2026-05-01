@@ -72,7 +72,7 @@ export async function confirmPasswordReset(
         return { ok: false, error: expiredTokenError() };
     }
 
-    if (stored.status !== 'pending' || !('tokenHash' in stored)) {
+    if (stored.status !== 'pending') {
         return { ok: false, error: invalidTokenError() };
     }
 

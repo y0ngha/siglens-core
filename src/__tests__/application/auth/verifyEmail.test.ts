@@ -53,9 +53,14 @@ describe('verifyEmail', () => {
             dependencies
         );
 
-        expect(result.ok).toBe(false);
-        if (!result.ok)
-            expect(result.error.code).toBe('expired_verification_code');
+        expect(result).toEqual({
+            ok: false,
+            error: {
+                code: 'expired_verification_code',
+                field: 'code',
+                message: 'Verification code has expired',
+            },
+        });
         expect(setToken).not.toHaveBeenCalled();
     });
 
@@ -81,9 +86,34 @@ describe('verifyEmail', () => {
             dependencies
         );
 
-        expect(result.ok).toBe(false);
-        if (!result.ok)
-            expect(result.error.code).toBe('invalid_verification_code');
+        expect(result).toEqual({
+            ok: false,
+            error: {
+                code: 'invalid_verification_code',
+                field: 'code',
+                message: 'Verification code is invalid',
+            },
+        });
+        expect(setToken).not.toHaveBeenCalled();
+    });
+
+    it('returns invalid_verification_code without Redis lookup for malformed email', async () => {
+        const { dependencies, getToken, setToken } = makeDependencies();
+
+        const result = await verifyEmail(
+            { email: 'not-an-email', code: VALID_CODE },
+            dependencies
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            error: {
+                code: 'invalid_verification_code',
+                field: 'code',
+                message: 'Verification code is invalid',
+            },
+        });
+        expect(getToken).not.toHaveBeenCalled();
         expect(setToken).not.toHaveBeenCalled();
     });
 

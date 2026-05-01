@@ -1,4 +1,4 @@
-import { normalizeEmail } from '@/domain/auth/validation';
+import { normalizeEmail, validateEmail } from '@/domain/auth/validation';
 import {
     hashEmailToken,
     safeCompareTokenHashes,
@@ -59,6 +59,12 @@ export async function verifyEmail(
     dependencies: VerifyEmailDependencies
 ): Promise<VerifyEmailResult> {
     const email = normalizeEmail(input.email);
+    const emailError = validateEmail(email);
+
+    if (emailError !== null) {
+        return { ok: false, error: invalidCodeError() };
+    }
+
     const stored = await dependencies.emailTokens.get(PURPOSE, email);
 
     if (stored === null) {
