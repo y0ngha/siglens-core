@@ -381,6 +381,18 @@ and have been removed from this file.
 
 ---
 
+## File Format
+
+```
+1. Files missing EOF newline
+   → All files must end with a newline character (CONVENTIONS.md requirement)
+   → Generated files (migrations, configs) often omit the trailing newline
+   ❌ drizzle/0001_sharp_triathlon.sql missing newline at EOF
+   ✅ Add newline manually after generation; configure generator to emit EOF newline
+```
+
+---
+
 ## Documentation Sync
 
 ```
