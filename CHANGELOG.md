@@ -1,5 +1,54 @@
 # Changelog
 
+# [0.4.0](https://github.com/y0ngha/siglens-core/compare/v0.2.1...v0.4.0) (2026-05-01)
+
+
+### Bug Fixes
+
+* 분석 캐시 키에 모델 식별자 포함 및 사용량 기록 개선 ([f49d023](https://github.com/y0ngha/siglens-core/commit/f49d0230cd1cd0217ccdee47283191d8123655cb))
+* 분석 캐시 키에서 모델 식별자 통일 및 중복 제거 ([7e321fe](https://github.com/y0ngha/siglens-core/commit/7e321fe69c8ab1985b9145fad132ffd3226dff07))
+* 분석 캐시 TTL 만료 시간을 오후 5시에서 오전 5시로 변경 ([b501ca5](https://github.com/y0ngha/siglens-core/commit/b501ca5908b2af9750943fe87b08bd3a95de568d))
+* address PR 64 review comments ([7825261](https://github.com/y0ngha/siglens-core/commit/7825261715c86e5712077be6b14a31ee926f7fae))
+* deprecated getCurrentDate를 fallback으로 복원 ([2ecd7fa](https://github.com/y0ngha/siglens-core/commit/2ecd7fafc2d41c2404703e29c85b9180bc3d7803))
+* getAllowedModels 정렬 순서 일관성 확보 ([45518b8](https://github.com/y0ngha/siglens-core/commit/45518b88b144f0b3938a0f60c4f221139784f1db))
+* inquiry feature JSDoc, test cleanup, infrastructure tests, and public API exports ([30796d9](https://github.com/y0ngha/siglens-core/commit/30796d9790f13051ef6838b18fbf17308dbc20c1))
+* **inquiry:** use EMAIL_MAX_LENGTH constant, export DrizzleInquiryRepository, add [@returns](https://github.com/returns) JSDoc ([128e869](https://github.com/y0ngha/siglens-core/commit/128e869533f4dcb73e8a803d70d197e1eb93fcf6))
+* LlmProvider 타입을 도메인 공통 타입으로 이동 및 구조화 ([0650209](https://github.com/y0ngha/siglens-core/commit/065020979d93fc7b9eb7c1f72c6cd1c64e909fa2))
+* onConflictDoUpdate SET 절에 updatedAt 추가 및 JSDoc 역할 중심 변경 ([da6acab](https://github.com/y0ngha/siglens-core/commit/da6acaba1890563462762d93dd46f187e4119eee))
+* PR [#65](https://github.com/y0ngha/siglens-core/issues/65) 리뷰 코멘트 반영 — {never} JSDoc 타입, 테스트 분리, 문서 갱신 ([a4bc432](https://github.com/y0ngha/siglens-core/commit/a4bc432267d278047d40e46d0c464c626b565307))
+* PR [#65](https://github.com/y0ngha/siglens-core/issues/65) 리뷰 코멘트 반영 — 공개 API 하위 호환성 및 버전 메타데이터 ([ff8f8db](https://github.com/y0ngha/siglens-core/commit/ff8f8db26ea659b1d247a0e7a12be853a24aa18c))
+* PR [#65](https://github.com/y0ngha/siglens-core/issues/65) 리뷰 코멘트 반영 — GeminiContents를 AiContents로 전환 (provider-neutral) ([00e7183](https://github.com/y0ngha/siglens-core/commit/00e7183505572fd7bae8523225b7bd01b4972b60))
+* PR [#65](https://github.com/y0ngha/siglens-core/issues/65) 리뷰 코멘트 반영 — provider-neutral 문서 정정 및 누락 테스트 추가 ([4d74293](https://github.com/y0ngha/siglens-core/commit/4d74293b487a488f1e537260653c8c8de06547b4))
+* PR [#65](https://github.com/y0ngha/siglens-core/issues/65) 리뷰 코멘트 반영 — Tier 1 JSDoc 완성, provider-neutral 파라미터 타입 정정 ([9d9c816](https://github.com/y0ngha/siglens-core/commit/9d9c8168d9dd12510465d60f8d9d54b81d37a525))
+* PR [#65](https://github.com/y0ngha/siglens-core/issues/65) review comments 반영 ([38551ba](https://github.com/y0ngha/siglens-core/commit/38551ba451d6a1d2e12a4efb5dc88c8d8e628c0d))
+* PR [#68](https://github.com/y0ngha/siglens-core/issues/68) review comments 반영 ([69a7d42](https://github.com/y0ngha/siglens-core/commit/69a7d42cb97266a6827086671fb4ee090ce8c8f4))
+* requestChatCompletion 시간 주입 통일 ([b21e9f5](https://github.com/y0ngha/siglens-core/commit/b21e9f5289b467c832406aea9ba6038fdd211e47)), closes [#63](https://github.com/y0ngha/siglens-core/issues/63)
+* resolve PR [#65](https://github.com/y0ngha/siglens-core/issues/65) review comments ([e254cd2](https://github.com/y0ngha/siglens-core/commit/e254cd24a6dcd05a54ac9757853f4cf115638c93))
+
+
+### Features
+
+* 공개 API 내보내기 - LLM 도메인 및 저장소 ([3b834de](https://github.com/y0ngha/siglens-core/commit/3b834dee2fdc2581df2caf9957994c30cf21ebd6))
+* 분석 캐시 키에 모델 식별자 포함 ([3f52aba](https://github.com/y0ngha/siglens-core/commit/3f52abad85c97ea21768879a39a6c792db8e9a42))
+* 스키마 및 타입 - user_api_keys 정의 ([d26c0a1](https://github.com/y0ngha/siglens-core/commit/d26c0a117a6335673a0c40bb368ed8952e46b33f))
+* 암호화 키 설정 - LLM_API_KEY_ENCRYPTION_KEY 환경변수 ([35f7ecd](https://github.com/y0ngha/siglens-core/commit/35f7ecdf1091a8c9a712fb9a2261a75e18e49339))
+* 저장소 - DrizzleUserApiKeyRepository 구현 ([5bd2211](https://github.com/y0ngha/siglens-core/commit/5bd22110528610d1d7b6318cd0d1cf736902df43))
+* AI 모델 티어 확대 및 모델 업데이트 ([a08bed4](https://github.com/y0ngha/siglens-core/commit/a08bed40f5aa6cbd2396f2065fa8abba3c1fbcee))
+* DB 내보내기 - userApiKeyRepository 추가 ([223537b](https://github.com/y0ngha/siglens-core/commit/223537be77f0d407319af91b296e6232da80347f))
+* DB 마이그레이션 - user_api_keys 테이블 추가 ([138895b](https://github.com/y0ngha/siglens-core/commit/138895b87825797d2245a57c2c0291fbe350672d))
+* **db:** add DrizzleInquiryRepository ([74aed9f](https://github.com/y0ngha/siglens-core/commit/74aed9fc27f73a48fa1f814dd1efa81daa983040))
+* **db:** add inquiries migration ([05bca84](https://github.com/y0ngha/siglens-core/commit/05bca841d0cb17fbd878653a6d5faa54f98fc216))
+* **db:** add inquiries table schema and InquiryRepository interface ([25f59bd](https://github.com/y0ngha/siglens-core/commit/25f59bddb2d46fbef8c1252040ebaa2ee916a2a6))
+* Drizzle 메타데이터 - 마이그레이션 스냅샷 ([e5a075a](https://github.com/y0ngha/siglens-core/commit/e5a075afb5dd612db3d41fd546268309bb680be0))
+* **inquiry:** add submitInquiry use-case with tests ([45d63dc](https://github.com/y0ngha/siglens-core/commit/45d63dcd56820886ef0f5c0fc14ecdf813c09dd7))
+* **inquiry:** export submitInquiry and types from public API ([a958fbb](https://github.com/y0ngha/siglens-core/commit/a958fbb23bfbffd4653889767841877608705304))
+* LLM 도메인 - 제공자 타입 및 유효성 검증 ([eb817ab](https://github.com/y0ngha/siglens-core/commit/eb817abbda336fe0e41d62964e5d1a6d895c3030))
+
+
+### Reverts
+
+* change-log, package.json 롤백 ([8f3dcec](https://github.com/y0ngha/siglens-core/commit/8f3dcece29d466e12889a17816598724d16dadfc))
+
 ## [0.3.0](https://github.com/y0ngha/siglens-core/compare/v0.2.1...v0.3.0) (2026-05-01)
 
 ### BREAKING CHANGES
