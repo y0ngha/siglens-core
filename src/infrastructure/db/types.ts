@@ -486,3 +486,25 @@ export interface UsageRepository {
      */
     getUsageToday(ipHash: string, now?: Date): Promise<UsageCounts>;
 }
+
+/** Input required to create a new inquiry record. */
+export interface InquiryInput {
+    /** Short subject line for the inquiry. */
+    title: string;
+    /** Full body text of the inquiry. */
+    content: string;
+    /** Reply-to email address provided by the visitor. */
+    email: string;
+}
+
+/** Repository for persisting visitor inquiries. */
+export interface InquiryRepository {
+    /**
+     * Insert a new inquiry record.
+     * The `answered` flag defaults to `false` at the database level.
+     *
+     * @param input - The inquiry data to persist.
+     * @returns A promise that resolves when the record has been inserted.
+     */
+    create(input: InquiryInput): Promise<void>;
+}
