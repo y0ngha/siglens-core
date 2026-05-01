@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
 import { oauthAccounts, users } from '@/infrastructure/db/schema';
-import { DrizzleUserRepository } from '@/infrastructure/db/userRepository';
+import { decryptToken } from '@/infrastructure/db/tokenEncryption';
 import type { SiglensDatabase } from '@/infrastructure/db/types';
+import { DrizzleUserRepository } from '@/infrastructure/db/userRepository';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const VALID_KEY_HEX = 'a'.repeat(64);
 
 const userRecord = {
     id: 'user-1',
@@ -389,6 +392,9 @@ describe('DrizzleUserRepository', () => {
             userId: 'user-1',
             provider: 'google',
             providerAccountId: 'provider-user-1',
+            accessToken: null,
+            refreshToken: null,
+            tokenExpiresAt: null,
         });
         expect(accountOnConflictDoNothing).toHaveBeenCalledWith({
             target: [oauthAccounts.provider, oauthAccounts.providerAccountId],
@@ -416,6 +422,77 @@ describe('DrizzleUserRepository', () => {
             })
         );
         expect(result).toEqual(userRecord);
+    });
+
+    describe('token encryption in createOAuthUser', () => {
+        beforeEach(() => {
+            vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', VALID_KEY_HEX);
+        });
+
+        afterEach(() => {
+            vi.unstubAllEnvs();
+        });
+
+        it('encrypts access and refresh tokens before storage', async () => {
+            const { db, accountValues } = makeTransactionDb({
+                userRows: [userRecord],
+                accountRows: [{ id: 'oauth-account-1' }],
+            });
+            const repository = new DrizzleUserRepository(db);
+            const tokenExpiresAt = new Date('2026-06-01T00:00:00.000Z');
+
+            await repository.createOAuthUser({
+                email: 'user@example.com',
+                provider: 'google',
+                providerAccountId: 'provider-user-1',
+                accessToken: 'plain-access-token',
+                refreshToken: 'plain-refresh-token',
+                tokenExpiresAt,
+            });
+
+            const callArg = accountValues.mock.calls[0][0] as {
+                accessToken: string | null;
+                refreshToken: string | null;
+                tokenExpiresAt: Date | null;
+            };
+
+            expect(callArg.accessToken).not.toBeNull();
+            expect(callArg.accessToken).not.toBe('plain-access-token');
+            expect(callArg.refreshToken).not.toBeNull();
+            expect(callArg.refreshToken).not.toBe('plain-refresh-token');
+            expect(callArg.tokenExpiresAt).toEqual(tokenExpiresAt);
+
+            expect(decryptToken(callArg.accessToken!, VALID_KEY_HEX)).toBe(
+                'plain-access-token'
+            );
+            expect(decryptToken(callArg.refreshToken!, VALID_KEY_HEX)).toBe(
+                'plain-refresh-token'
+            );
+        });
+
+        it('stores null tokens when encryption key is absent', async () => {
+            vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '');
+            const { db, accountValues } = makeTransactionDb({
+                userRows: [userRecord],
+                accountRows: [{ id: 'oauth-account-1' }],
+            });
+            const repository = new DrizzleUserRepository(db);
+
+            await repository.createOAuthUser({
+                email: 'user@example.com',
+                provider: 'google',
+                providerAccountId: 'provider-user-1',
+                accessToken: 'plain-access-token',
+                refreshToken: 'plain-refresh-token',
+            });
+
+            expect(accountValues).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    accessToken: null,
+                    refreshToken: null,
+                })
+            );
+        });
     });
 
     it('returns null when OAuth user creation conflicts on email', async () => {

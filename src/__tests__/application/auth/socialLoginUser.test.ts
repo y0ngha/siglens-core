@@ -229,6 +229,9 @@ describe('socialLoginUser', () => {
             providerAccountId: 'google-account-1',
             name: 'Ada',
             avatarUrl: 'https://example.com/avatar.png',
+            accessToken: undefined,
+            refreshToken: undefined,
+            tokenExpiresAt: undefined,
         });
         expect(result).toEqual(
             expect.objectContaining({
@@ -260,6 +263,9 @@ describe('socialLoginUser', () => {
             providerAccountId: 'google-account-1',
             name: undefined,
             avatarUrl: undefined,
+            accessToken: undefined,
+            refreshToken: undefined,
+            tokenExpiresAt: undefined,
         });
         expect(result).toEqual(
             expect.objectContaining({
@@ -344,6 +350,35 @@ describe('socialLoginUser', () => {
                     expires: customExpiresAt,
                     maxAgeSeconds: 3600,
                 },
+            })
+        );
+    });
+
+    it('passes OAuth tokens to createOAuthUser when provided', async () => {
+        const createdUser = makeUser('user-1');
+        const { dependencies, createOAuthUser } = makeDependencies({
+            createdUser,
+        });
+        const tokenExpiresAt = new Date('2026-05-30T00:00:00.000Z');
+
+        await socialLoginUser(
+            {
+                provider: 'google',
+                providerAccountId: 'google-account-1',
+                email: 'user@example.com',
+                accessToken: 'access-token-123',
+                refreshToken: 'refresh-token-456',
+                tokenExpiresAt,
+            },
+            dependencies,
+            { now }
+        );
+
+        expect(createOAuthUser).toHaveBeenCalledWith(
+            expect.objectContaining({
+                accessToken: 'access-token-123',
+                refreshToken: 'refresh-token-456',
+                tokenExpiresAt,
             })
         );
     });

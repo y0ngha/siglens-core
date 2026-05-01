@@ -51,11 +51,6 @@
 - Rule: CONVENTIONS.md — every file must end with a newline character
 - Context: Migration SQL file generated without trailing newline; added manually
 
-## [PR #33 Round 2 | feat/5/email-signup | 2026-04-27]
-- Violation: name/avatarUrl trim behavior not tested — success test used name: 'Ada' (no whitespace) so trim() was never exercised
-- Rule: MISTAKES.md Tests #15 / coverage requirement — all branches and input normalizations must be verified; optional field trimming is a distinct behavior that requires a dedicated test case
-- Context: Added test case passing name: '  Ada  ' and avatarUrl with leading/trailing spaces; verifies createEmailUser is called with trimmed values
-
 
 ## [PR #34 | feat/6/email-login | 2026-04-27]
 - Violation: `omitPasswordHash` in `loginUser.ts` manually maps all `AuthUserRecord` fields instead of using destructuring with rest to omit `passwordHash`
@@ -128,10 +123,10 @@
 - Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
 - Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
 
-## [Issue #42 | feat/42/password-reset-use-cases | 2026-04-28]
-- Violation: password reset completion changed `users.passwordHash` before proving the reset token row could be consumed
-- Rule: Transactional state transitions must validate and reserve the one-time credential before applying dependent account mutations
-- Context: `completePasswordReset` now consumes the reset row first with a `usedAt IS NULL` guard, then updates the user password inside the same transaction
+## [PR #51 | feat/50/oauth-token-revocation | 2026-04-30]
+- Violation: OAuth token revocation loaded provider tokens in an unawaited background task immediately before deleting the user row, allowing cascade deletion to remove the tokens before lookup.
+- Rule: FF.md — Predictability; destructive dependent writes must not race ahead of prerequisite reads needed for the same use-case.
+- Context: `deleteAccount` now awaits OAuth account lookup before deleting the user, while keeping provider revocation calls fire-and-forget after the tokens are captured.
 
 - Violation: password reset requests used broad user lookup and included OAuth-only accounts
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email

@@ -1,11 +1,12 @@
-import type { KoreanTickerEntry, ModelId, Tier } from '@/domain/types';
+import type {
+    KoreanTickerEntry,
+    ModelId,
+    OAuthProvider,
+    Tier,
+} from '@/domain/types';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
-import type {
-    OAUTH_PROVIDER_VALUES,
-    USAGE_ACTION_TYPE_VALUES,
-    USER_TIER_VALUES,
-} from './constants';
+import type { USAGE_ACTION_TYPE_VALUES, USER_TIER_VALUES } from './constants';
 import type * as schema from './schema';
 
 /** Subscription tier for a registered user. */
@@ -13,9 +14,6 @@ export type UserTier = (typeof USER_TIER_VALUES)[number];
 
 /** Action type recorded in usage logs. */
 export type UsageActionType = (typeof USAGE_ACTION_TYPE_VALUES)[number];
-
-/** OAuth provider used to authenticate the user. */
-export type OAuthProvider = (typeof OAUTH_PROVIDER_VALUES)[number];
 
 /**
  * A persisted user account record returned from the database.
@@ -95,6 +93,35 @@ export interface CreateOAuthUserInput {
     name?: string;
     /** Optional avatar image URL. */
     avatarUrl?: string;
+    /** Optional plain-text access token to encrypt and store. */
+    accessToken?: string;
+    /** Optional plain-text refresh token to encrypt and store. */
+    refreshToken?: string;
+    /** Optional token expiration timestamp. */
+    tokenExpiresAt?: Date;
+}
+
+/**
+ * A persisted OAuth account record returned from the database.
+ * Tokens are decrypted from AES-256-GCM ciphertext before being returned.
+ */
+export interface OAuthAccountRecord {
+    /** Unique account row identifier. */
+    id: string;
+    /** User that owns this linked account. */
+    userId: string;
+    /** OAuth provider for the linked account. */
+    provider: OAuthProvider;
+    /** Stable provider-side account identifier. */
+    providerAccountId: string;
+    /** Plain-text access token; null when not stored or decryption key is absent. */
+    accessToken: string | null;
+    /** Plain-text refresh token; null when not stored or decryption key is absent. */
+    refreshToken: string | null;
+    /** Token expiration timestamp; null when not stored. */
+    tokenExpiresAt: Date | null;
+    /** Timestamp when the row was created. */
+    createdAt: Date;
 }
 
 /**
@@ -426,6 +453,17 @@ export interface UsageLogRepository {
      * @returns Resolves when the row has been queued by the database adapter.
      */
     recordUsage(input: CreateUsageLogInput): Promise<void>;
+}
+
+/** Persistence operations for the OAuth account store. */
+export interface OAuthAccountRepository {
+    /**
+     * Find all OAuth accounts linked to a user.
+     *
+     * @param userId - User UUID to look up.
+     * @returns All linked OAuth accounts with decrypted tokens; empty array when none exist.
+     */
+    findByUserId(userId: string): Promise<OAuthAccountRecord[]>;
 }
 
 /** Persistence operations required by usage tracking and analytics. */

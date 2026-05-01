@@ -1,9 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AUTH_SESSION_COOKIE_NAME, deleteAccount } from '@/application/auth';
-import type { UserRepository } from '@/infrastructure/db/types';
+import type {
+    OAuthAccountRepository,
+    UserRepository,
+} from '@/infrastructure/db/types';
+import type { OAuthRevoker } from '@/infrastructure/oauth/types';
 
 function makeDependencies(deleted: boolean): {
-    dependencies: { users: UserRepository };
+    dependencies: {
+        users: UserRepository;
+        oauthAccounts: OAuthAccountRepository;
+        oauthRevoker: OAuthRevoker;
+    };
     deleteUser: ReturnType<typeof vi.fn>;
 } {
     const deleteUser = vi.fn().mockResolvedValue(deleted);
@@ -17,12 +25,22 @@ function makeDependencies(deleted: boolean): {
                 deleteUser,
                 updatePassword: vi.fn(),
             },
+            oauthAccounts: {
+                findByUserId: vi.fn().mockResolvedValue([]),
+            },
+            oauthRevoker: {
+                revokeToken: vi.fn().mockResolvedValue(undefined),
+            },
         },
         deleteUser,
     };
 }
 
 describe('deleteAccount', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('deletes the user account and returns an expired HTTP-only cookie', async () => {
         const { dependencies, deleteUser } = makeDependencies(true);
 
@@ -83,6 +101,152 @@ describe('deleteAccount', () => {
                 code: 'user_not_found',
                 message: 'User account does not exist',
             },
+        });
+    });
+
+    it('loads OAuth tokens before deleting the user and revokes tokens in the background', async () => {
+        const revokeToken = vi.fn().mockResolvedValue(undefined);
+        const findByUserId = vi.fn().mockResolvedValue([
+            {
+                id: 'account-1',
+                userId: 'user-1',
+                provider: 'google',
+                providerAccountId: 'google-uid',
+                accessToken: 'access-token',
+                refreshToken: 'refresh-token',
+                tokenExpiresAt: null,
+                createdAt: new Date(),
+            },
+        ]);
+
+        const dependencies = {
+            users: {
+                findByEmail: vi.fn(),
+                findById: vi.fn(),
+                createEmailUser: vi.fn(),
+                deleteUser: vi.fn().mockResolvedValue(true),
+            },
+            oauthAccounts: { findByUserId },
+            oauthRevoker: { revokeToken },
+        };
+
+        await deleteAccount({ userId: 'user-1' }, dependencies);
+
+        expect(findByUserId.mock.invocationCallOrder[0]).toBeLessThan(
+            dependencies.users.deleteUser.mock.invocationCallOrder[0]!
+        );
+        expect(dependencies.users.deleteUser).toHaveBeenCalledWith('user-1');
+        await vi.waitFor(() => {
+            expect(revokeToken).toHaveBeenCalledWith('google', {
+                accessToken: 'access-token',
+                refreshToken: 'refresh-token',
+            });
+        });
+    });
+
+    it('skips revocation for accounts without an access token', async () => {
+        const revokeToken = vi.fn().mockResolvedValue(undefined);
+        const findByUserId = vi.fn().mockResolvedValue([
+            {
+                id: 'account-2',
+                userId: 'user-1',
+                provider: 'kakao',
+                providerAccountId: 'kakao-uid',
+                accessToken: null,
+                refreshToken: null,
+                tokenExpiresAt: null,
+                createdAt: new Date(),
+            },
+        ]);
+
+        const dependencies = {
+            users: {
+                findByEmail: vi.fn(),
+                findById: vi.fn(),
+                createEmailUser: vi.fn(),
+                deleteUser: vi.fn().mockResolvedValue(true),
+            },
+            oauthAccounts: { findByUserId },
+            oauthRevoker: { revokeToken },
+        };
+
+        await deleteAccount({ userId: 'user-1' }, dependencies);
+
+        await vi.waitFor(() =>
+            expect(findByUserId).toHaveBeenCalledWith('user-1')
+        );
+        expect(revokeToken).not.toHaveBeenCalled();
+    });
+
+    it('logs and continues deleting when OAuth account lookup fails', async () => {
+        const lookupError = new Error('lookup failed');
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        const dependencies = {
+            users: {
+                findByEmail: vi.fn(),
+                findById: vi.fn(),
+                createEmailUser: vi.fn(),
+                deleteUser: vi.fn().mockResolvedValue(true),
+            },
+            oauthAccounts: {
+                findByUserId: vi.fn().mockRejectedValue(lookupError),
+            },
+            oauthRevoker: {
+                revokeToken: vi.fn().mockResolvedValue(undefined),
+            },
+        };
+
+        const result = await deleteAccount({ userId: 'user-1' }, dependencies);
+
+        expect(consoleWarn).toHaveBeenCalledWith(
+            '[deleteAccount] findByUserId for OAuth revocation failed',
+            lookupError
+        );
+        expect(dependencies.users.deleteUser).toHaveBeenCalledWith('user-1');
+        expect(result.ok).toBe(true);
+    });
+
+    it('logs provider revocation failures without blocking deletion', async () => {
+        const revokeError = new Error('revoke failed');
+        const consoleWarn = vi
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+        const dependencies = {
+            users: {
+                findByEmail: vi.fn(),
+                findById: vi.fn(),
+                createEmailUser: vi.fn(),
+                deleteUser: vi.fn().mockResolvedValue(true),
+            },
+            oauthAccounts: {
+                findByUserId: vi.fn().mockResolvedValue([
+                    {
+                        id: 'account-1',
+                        userId: 'user-1',
+                        provider: 'google',
+                        providerAccountId: 'google-uid',
+                        accessToken: 'access-token',
+                        refreshToken: null,
+                        tokenExpiresAt: null,
+                        createdAt: new Date(),
+                    },
+                ]),
+            },
+            oauthRevoker: {
+                revokeToken: vi.fn().mockRejectedValue(revokeError),
+            },
+        };
+
+        const result = await deleteAccount({ userId: 'user-1' }, dependencies);
+
+        expect(result.ok).toBe(true);
+        await vi.waitFor(() => {
+            expect(consoleWarn).toHaveBeenCalledWith(
+                '[deleteAccount] OAuth revokeToken failed',
+                revokeError
+            );
         });
     });
 });

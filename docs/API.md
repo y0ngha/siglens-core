@@ -35,6 +35,7 @@ WORKER_SECRET=                      # worker 인증 시크릿
 
 # Neon / PostgreSQL (선택 — DB 레이어가 필요한 호출자에만)
 DATABASE_URL=                       # postgres://user:pass@host/db?sslmode=require
+OAUTH_TOKEN_ENCRYPTION_KEY=         # 선택 — OAuth access/refresh token 암호화용 32-byte hex key
 ```
 
 환경변수는 **infrastructure 레이어 내부에서만 읽는다.** domain은 환경에 의존하지 않는다.

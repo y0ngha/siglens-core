@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     readDatabaseConfig,
     tryReadDatabaseConfig,
+    tryReadEncryptionKey,
 } from '@/infrastructure/db/config';
 
 const TEST_DATABASE_URL =
     'postgres://user:pass@example.neon.tech/db?sslmode=require';
+const VALID_KEY_HEX = '0'.repeat(64);
 
 describe('readDatabaseConfig', () => {
     afterEach(() => {
@@ -46,5 +48,35 @@ describe('tryReadDatabaseConfig', () => {
         expect(tryReadDatabaseConfig()).toEqual({
             databaseUrl: TEST_DATABASE_URL,
         });
+    });
+});
+
+describe('tryReadEncryptionKey', () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it('returns null when the env var is absent', () => {
+        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '');
+
+        expect(tryReadEncryptionKey()).toBeNull();
+    });
+
+    it('returns the key when the env var is a valid 32-byte hex string', () => {
+        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', VALID_KEY_HEX);
+
+        expect(tryReadEncryptionKey()).toBe(VALID_KEY_HEX);
+    });
+
+    it('returns null when the env var is too short', () => {
+        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '0'.repeat(62));
+
+        expect(tryReadEncryptionKey()).toBeNull();
+    });
+
+    it('returns null when the env var is too long', () => {
+        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '0'.repeat(66));
+
+        expect(tryReadEncryptionKey()).toBeNull();
     });
 });
