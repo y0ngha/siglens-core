@@ -119,6 +119,9 @@ export async function socialLoginUser(
         providerAccountId,
         name: normalizeOptionalProfileValue(input.name),
         avatarUrl: normalizeOptionalProfileValue(input.avatarUrl),
+        accessToken: input.accessToken,
+        refreshToken: input.refreshToken,
+        tokenExpiresAt: input.tokenExpiresAt,
     });
     if (createdUser !== null) {
         return createSessionResult(createdUser, dependencies, options);

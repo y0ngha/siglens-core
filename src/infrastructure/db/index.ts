@@ -21,6 +21,7 @@ export {
     users,
     userTierEnum,
 } from './schema';
+export { DrizzleOAuthAccountRepository } from './oauthAccountRepository';
 export { DrizzleSessionRepository } from './sessionRepository';
 export {
     DrizzleAssetTranslationRepository,
@@ -43,7 +44,8 @@ export type {
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     KoreanTickerRepository,
-    OAuthProvider,
+    OAuthAccountRecord,
+    OAuthAccountRepository,
     OAuthUserRepository,
     PasswordResetRecord,
     PasswordResetRepository,

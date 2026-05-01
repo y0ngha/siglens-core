@@ -566,4 +566,12 @@ and have been removed from this file.
       export { createDatabaseClient, DrizzleUserRepository } from '@/infrastructure/db'
       // Tier 4: Database schema & constants
       export { users, sessions, assetTranslations, USER_TIER_VALUES } from '@/infrastructure/db'
+
+8. Transactional state transitions must validate and reserve one-time credentials before applying dependent account mutations
+   → Auth use-cases operating on one-time tokens (password reset, account deletion with prerequisites) must consume/guard the token before mutating the account
+   → Ensures cascade deletes or concurrent operations cannot invalidate the transaction mid-flight
+   ❌ `completePasswordReset` updates user password, then checks if reset token was used (usedAt check after update)
+   ❌ `deleteAccount` revokes OAuth tokens after user row is deleted; cascade delete removes tokens before lookup
+   ✅ `completePasswordReset` consumes reset row first (`usedAt IS NULL` guard in transaction), then updates user password
+   ✅ `deleteAccount` loads OAuth tokens before deleting user; keep revocation calls fire-and-forget after capture
 ```

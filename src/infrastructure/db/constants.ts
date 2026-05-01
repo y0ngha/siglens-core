@@ -1,4 +1,5 @@
 import { TIER_VALUES } from '@/domain/tier';
+import type { OAuthProvider } from '@/domain/types';
 
 /**
  * Database enum values for the user `tier` column.
@@ -16,4 +17,8 @@ export const USAGE_ACTION_TYPE_VALUES = [
 ] as const;
 
 /** All supported OAuth provider identifiers. */
-export const OAUTH_PROVIDER_VALUES = ['google', 'kakao', 'apple'] as const;
+export const OAUTH_PROVIDER_VALUES = [
+    'google',
+    'kakao',
+    'apple',
+] as const satisfies readonly OAuthProvider[];
