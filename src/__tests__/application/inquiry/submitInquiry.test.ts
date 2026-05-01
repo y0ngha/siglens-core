@@ -1,18 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { InquiryInput, InquiryRepository } from '@/infrastructure/db/types';
-
-// Import will fail until the module is created — that's expected at this step.
+import type {
+    InquiryInput,
+    InquiryRepository,
+} from '@/infrastructure/db/types';
 import { submitInquiry } from '@/application/inquiry/submitInquiry';
 import type { SubmitInquiryDeps } from '@/application/inquiry/types';
 
-function makeDeps(overrides?: Partial<SubmitInquiryDeps>): {
+function makeDeps(): {
     deps: SubmitInquiryDeps;
     create: ReturnType<typeof vi.fn>;
 } {
-    const create = vi.fn<InquiryRepository['create']>().mockResolvedValue(undefined);
+    const create = vi
+        .fn<InquiryRepository['create']>()
+        .mockResolvedValue(undefined);
     const inquiryRepository: InquiryRepository = { create };
     return {
-        deps: { inquiryRepository, ...overrides },
+        deps: { inquiryRepository },
         create,
     };
 }
@@ -35,11 +38,15 @@ describe('submitInquiry', () => {
 
     it('propagates repository errors to the caller', async () => {
         const dbError = new Error('db connection lost');
-        const create = vi.fn<InquiryRepository['create']>().mockRejectedValue(dbError);
+        const create = vi
+            .fn<InquiryRepository['create']>()
+            .mockRejectedValue(dbError);
         const deps: SubmitInquiryDeps = {
             inquiryRepository: { create },
         };
 
-        await expect(submitInquiry(validInput, deps)).rejects.toThrow('db connection lost');
+        await expect(submitInquiry(validInput, deps)).rejects.toThrow(
+            'db connection lost'
+        );
     });
 });

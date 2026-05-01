@@ -52,7 +52,6 @@ export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
 // Inquiry
 export { submitInquiry } from './application/inquiry';
-export type { SubmitInquiryDeps } from './application/inquiry';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -345,6 +344,7 @@ export {
 // Database schema objects / enum values
 export {
     assetTranslations,
+    inquiries,
     koreanTickers,
     OAUTH_PROVIDER_VALUES,
     oauthAccounts,
@@ -588,6 +588,7 @@ export type {
     RequestChatCompletionParams,
     RequestChatCompletionResult,
 } from './application/chat/types';
+export type { SubmitInquiryDeps } from './application/inquiry';
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
