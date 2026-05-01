@@ -39,6 +39,11 @@ export interface RequestChatCompletionDependencies {
     usageLogs?: UsageLogRepository;
     callGemini?: (options: CallGeminiWithKeyFallbackOptions) => Promise<string>;
     tierConfig?: TierConfig;
+    /**
+     * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.
+     * During the deprecation period, this is used as a fallback when `occurredAt` is not provided.
+     * Will be removed in the next major version.
+     */
     getCurrentDate?: () => Date;
 }
 

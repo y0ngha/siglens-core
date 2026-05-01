@@ -82,6 +82,8 @@ describe('requestChatCompletion', () => {
     };
 
     beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-29T00:00:00.000Z'));
         vi.clearAllMocks();
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         tryConsumeToken.mockResolvedValue(true);
@@ -103,6 +105,7 @@ describe('requestChatCompletion', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.restoreAllMocks();
     });
 
@@ -325,12 +328,12 @@ describe('requestChatCompletion', () => {
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
+                occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
             {
                 tokenStore,
                 callGemini,
                 usageLogs,
-                getCurrentDate: () => new Date('2026-04-28T12:34:56.000Z'),
             }
         );
 
@@ -349,12 +352,12 @@ describe('requestChatCompletion', () => {
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
                 tierContext: { userId: 'user-1', tier: 'pro' },
+                occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
             {
                 tokenStore,
                 callGemini,
                 usageLogs,
-                getCurrentDate: () => new Date('2026-04-28T12:34:56.000Z'),
             }
         );
 
@@ -366,6 +369,32 @@ describe('requestChatCompletion', () => {
             modelUsed: GEMINI_2_5_PRO_MODEL,
             date: '2026-04-28',
         });
+    });
+
+    it('passes the same occurredAt to chatbot usage and premium model usage', async () => {
+        const occurredAt = new Date('2026-04-28T09:00:00.000Z');
+
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+                occurredAt,
+            }),
+            {
+                tokenStore,
+                usageRepository,
+                callGemini,
+                usageLogs,
+                tierConfig: restrictedTierConfig,
+            }
+        );
+
+        expect(recordUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ occurredAt })
+        );
+        expect(recordPremiumUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ date: '2026-04-28' })
+        );
     });
 
     it('does not record premium model usage for anonymous users', async () => {
@@ -508,6 +537,54 @@ describe('requestChatCompletion', () => {
         expect(result).toEqual({ ok: false, error: 'server_error' });
         expect(refundConsumedToken).toHaveBeenCalledWith(
             '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
+        );
+    });
+
+    it('falls back to getCurrentDate when occurredAt is not in params (deprecated)', async () => {
+        const customDate = new Date('2025-12-01T00:00:00.000Z');
+
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            {
+                tokenStore,
+                callGemini,
+                usageLogs,
+                usageRepository,
+                getCurrentDate: () => customDate,
+            }
+        );
+
+        expect(recordPremiumUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ date: '2025-12-01' })
+        );
+        expect(recordUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ occurredAt: customDate })
+        );
+    });
+
+    it('prefers params.occurredAt over getCurrentDate (deprecated) when both are provided', async () => {
+        const paramsDate = new Date('2025-11-15T00:00:00.000Z');
+        const depsDate = new Date('2025-12-01T00:00:00.000Z');
+
+        await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'member' },
+                occurredAt: paramsDate,
+            }),
+            {
+                tokenStore,
+                callGemini,
+                usageLogs,
+                getCurrentDate: () => depsDate,
+            }
+        );
+
+        expect(recordPremiumUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ date: '2025-11-15' })
         );
     });
 
