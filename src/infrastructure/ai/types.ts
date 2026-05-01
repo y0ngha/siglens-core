@@ -17,10 +17,10 @@ export type GeminiContents = string | GeminiContent[];
 
 /** Options accepted by the AI provider call (currently Gemini; shape is provider-neutral). */
 export interface CallAiProviderOptions {
-    /** Free-tier key tried first; pass `undefined` to skip the free attempt. */
-    freeApiKey: string | undefined;
-    /** Paid-tier key used as the fallback when the free attempt fails. */
-    paidApiKey: string;
+    /** Primary key tried first; pass `undefined` to skip the primary attempt and go straight to fallback. */
+    primaryApiKey: string | undefined;
+    /** Fallback key used when the primary attempt fails. */
+    fallbackApiKey: string;
     /** Gemini model name (e.g. `'gemini-2.5-flash'`). */
     model: string;
     /** Prompt contents — string or role-tagged turn list. */

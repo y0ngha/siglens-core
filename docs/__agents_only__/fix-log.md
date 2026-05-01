@@ -101,6 +101,11 @@
 - Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
 - Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
 
+## [PR #65 | feat/60/AI-모델-티어-확대 | 2026-05-01]
+- Violation: 테스트 설명에 PR 번호 참조 포함 (`'places PR #65 free-tier models correctly'`)
+- Rule: CONVENTIONS.md JSDoc Don'ts — PR/이슈/콜사이트 참조를 테스트 설명에 포함하지 않음
+- Context: `tier.test.ts`의 `isModelAllowed` 관련 3개 it() 설명이 PR #65를 직접 참조; 비즈니스 규칙 중심의 영속적 설명으로 교체
+
 ## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift

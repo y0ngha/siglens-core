@@ -157,7 +157,7 @@ describe('tier', () => {
             ).toBe(false);
         });
 
-        it('places PR #65 free-tier models correctly', () => {
+        it('allows new free-tier models (claude-haiku-3-5, gpt-5-mini)', () => {
             expect(
                 isModelAllowed('free', 'claude-haiku-3-5', restrictedConfig)
             ).toBe(true);
@@ -166,7 +166,7 @@ describe('tier', () => {
             );
         });
 
-        it('places PR #65 member-tier models correctly', () => {
+        it('allows new member-tier models (gpt-5.4, gemini-3-flash-preview) and restricts them from free tier', () => {
             expect(isModelAllowed('member', 'gpt-5.4', restrictedConfig)).toBe(
                 true
             );
@@ -189,7 +189,7 @@ describe('tier', () => {
             ).toBe(false);
         });
 
-        it('places PR #65 pro-only models correctly', () => {
+        it('restricts pro-only models (gpt-5.5, gemini-3.1-pro-preview) from member and free tiers', () => {
             expect(isModelAllowed('pro', 'gpt-5.5', restrictedConfig)).toBe(
                 true
             );

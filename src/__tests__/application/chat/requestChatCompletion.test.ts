@@ -249,8 +249,8 @@ describe('requestChatCompletion', () => {
         );
         expect(callAiProvider).toHaveBeenCalledWith(
             expect.objectContaining({
-                freeApiKey: 'free-key',
-                paidApiKey: 'paid-key',
+                primaryApiKey: 'free-key',
+                fallbackApiKey: 'paid-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 contents: [
                     {

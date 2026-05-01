@@ -58,6 +58,7 @@ function toChatErrorResult(error: unknown): ChatActionResult {
     return { ok: false, error: 'server_error' };
 }
 
+// Runtime guard against `as ModelId` casts from untrusted callers; TypeScript-safe callers always pass true.
 function isValidChatModel(model: ModelId): boolean {
     return VALID_CHAT_MODELS.some(validModel => validModel === model);
 }
@@ -149,8 +150,8 @@ async function requestAiChatCompletion(
 ): Promise<ChatActionResult> {
     try {
         const message = await callAiProvider({
-            freeApiKey,
-            paidApiKey,
+            primaryApiKey: freeApiKey,
+            fallbackApiKey: paidApiKey,
             model,
             contents: toGeminiContents(prompt),
             systemInstruction: prompt.systemPrompt,
