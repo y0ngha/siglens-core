@@ -502,6 +502,9 @@ export interface InquiryRepository {
     /**
      * Insert a new inquiry record.
      * The `answered` flag defaults to `false` at the database level.
+     *
+     * @param input - The inquiry data to persist.
+     * @returns A promise that resolves when the record has been inserted.
      */
     create(input: InquiryInput): Promise<void>;
 }

@@ -10,7 +10,8 @@ export class DrizzleInquiryRepository implements InquiryRepository {
     constructor(private readonly db: SiglensDatabase) {}
 
     /**
-     * @returns A promise that resolves when the inquiry has been inserted.
+     * @param input - Title, content, and reply-to email for the inquiry record.
+     * @returns A promise that resolves when the inquiry has been persisted.
      */
     async create(input: InquiryInput): Promise<void> {
         await this.db.insert(inquiries).values({

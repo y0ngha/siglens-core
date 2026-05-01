@@ -7,7 +7,7 @@ import type { SubmitInquiryDeps } from './types';
  * @param input - Title, content, and reply-to email from the contact form.
  * @param deps - Injected repository dependency.
  * @returns A promise that resolves when the inquiry has been persisted.
- * @throws Repository errors (DB connection failure, constraint violation) propagate to the caller.
+ * @throws {Error} DB connection failure or constraint violation — propagates to the caller.
  *
  * @example
  * ```ts
