@@ -213,6 +213,7 @@ and is consumed by other projects through npm.
 
 | Document | Contents |
 |---|---|
+| `docs/SCOPE.md` | **siglens vs siglens-core 분담** — 결정 트리, 의존 방향, 안티 패턴 (양쪽 레포 공통 source-of-truth) |
 | `docs/SERVICE.md` | Library overview, consumers, tech stack, Skills system |
 | `docs/ARCHITECTURE.md` | Layer structure, dependency direction rules, folder layout |
 | `docs/PUBLIC_API.md` | Tier-based public/internal classification, export inventory, semver policy |
