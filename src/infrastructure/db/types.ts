@@ -1,6 +1,6 @@
-import type { LlmProvider } from '@/domain/llm';
 import type {
     KoreanTickerEntry,
+    LlmProvider,
     ModelId,
     OAuthProvider,
     Tier,

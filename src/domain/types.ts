@@ -1321,3 +1321,8 @@ export interface AuthValidationError {
  * On long-lived runtimes (Cloud Run worker), the default is sufficient.
  */
 export type WaitUntil = (promise: Promise<unknown>) => void;
+
+// ─── LLM ──────────────────────────────────────────────────────────────────────
+
+/** Identifier of an LLM provider whose API key may be stored per user. */
+export type LlmProvider = 'anthropic' | 'google' | 'openai';

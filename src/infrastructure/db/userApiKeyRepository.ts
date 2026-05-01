@@ -1,4 +1,4 @@
-import type { LlmProvider } from '@/domain/llm';
+import type { LlmProvider } from '@/domain/types';
 import { and, eq, sql } from 'drizzle-orm';
 import { tryReadLlmApiKeyEncryptionKey } from './config';
 import { userApiKeys } from './schema';
@@ -103,14 +103,8 @@ export class DrizzleUserApiKeyRepository implements UserApiKeyRepository {
             return null;
         }
 
-        return {
-            id: row.id,
-            userId: row.userId,
-            provider: row.provider,
-            apiKey,
-            createdAt: row.createdAt,
-            updatedAt: row.updatedAt,
-        };
+        const { encryptedApiKey: _, ...meta } = row;
+        return { ...meta, apiKey };
     }
 
     async deleteByUserAndProvider(

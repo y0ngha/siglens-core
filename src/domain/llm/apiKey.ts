@@ -1,4 +1,5 @@
-import { LLM_PROVIDER_VALUES, type LlmProvider } from './types';
+import { LLM_PROVIDER_VALUES } from './constants';
+import type { LlmProvider } from '@/domain/types';
 
 /**
  * Normalize a raw LLM API key string by trimming whitespace.
@@ -22,5 +23,7 @@ export function normalizeLlmApiKey(apiKey: string): string | null {
  * @returns `true` when `value` is one of {@link LLM_PROVIDER_VALUES}.
  */
 export function isLlmProvider(value: string): value is LlmProvider {
+    // TS limitation: ReadonlyArray<LlmProvider>.includes() does not accept `string`;
+    // widening to readonly string[] is safe because LLM_PROVIDER_VALUES is always string[].
     return (LLM_PROVIDER_VALUES as readonly string[]).includes(value);
 }

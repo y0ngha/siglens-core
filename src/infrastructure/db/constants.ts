@@ -13,7 +13,7 @@ export const USER_TIER_VALUES = TIER_VALUES;
 /**
  * Database enum values for the user API key `provider` column.
  *
- * Re-exported from `LLM_PROVIDER_VALUES` (`domain/llm/types.ts`) to enforce a
+ * Re-exported from `LLM_PROVIDER_VALUES` (`domain/llm/constants.ts`) to enforce a
  * single source of truth across the domain and database layers.
  */
 export const LLM_PROVIDER_VALUES = DOMAIN_LLM_PROVIDER_VALUES;

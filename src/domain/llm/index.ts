@@ -1,2 +1,3 @@
 export { isLlmProvider, normalizeLlmApiKey } from './apiKey';
-export { LLM_PROVIDER_VALUES, type LlmProvider } from './types';
+export { LLM_PROVIDER_VALUES } from './constants';
+export type { LlmProvider } from '@/domain/types';

@@ -578,7 +578,6 @@ export type {
     UserTier,
     UserTierRepository,
 } from './infrastructure/db';
-export type { LlmProvider } from './domain/llm';
 export type {
     OAuthRevoker,
     RevokeTokenParams,
@@ -666,6 +665,7 @@ export type {
     KeyPrice,
     KoreanTickerEntry,
     LevelSource,
+    LlmProvider,
     MACDResult,
     MarketBriefingResponse,
     MarketBriefingSectorAnalysis,
