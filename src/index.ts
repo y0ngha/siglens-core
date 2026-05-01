@@ -528,6 +528,8 @@ export type {
     UsageLimitInput,
 } from './application/usage';
 export type {
+    AiContents,
+    CallAiProviderOptions,
     CallGeminiWithKeyFallbackOptions,
     GeminiContent,
     GeminiContents,
@@ -637,7 +639,6 @@ export type {
     ChartDisplayType,
     ChatLoadingPhase,
     ChatMessage,
-    ChatModel,
     ChatPromptPayload,
     ChatSession,
     ClusteredKeyLevel,
@@ -675,6 +676,7 @@ export type {
     MarketSectorData,
     MarketSummaryData,
     MarketSummaryWithBriefing,
+    ChatModel,
     ModelId,
     MultiCandlePattern,
     MultiCandlePatternEntry,

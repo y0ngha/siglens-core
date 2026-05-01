@@ -45,13 +45,22 @@ const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
 const FREE_MODELS: readonly TierModel[] = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
+    'claude-haiku-3-5',
+    'gpt-5-mini',
 ];
 const MEMBER_MODELS: readonly TierModel[] = [
     ...FREE_MODELS,
     'gemini-2.5-pro',
-    'claude-sonnet-4',
+    'gemini-3-flash-preview',
+    'claude-sonnet-4-6',
+    'gpt-5.4',
 ];
-const PRO_MODELS: readonly TierModel[] = [...MEMBER_MODELS, 'claude-opus-4'];
+const PRO_MODELS: readonly TierModel[] = [
+    ...MEMBER_MODELS,
+    'gemini-3.1-pro-preview',
+    'claude-opus-4-7',
+    'gpt-5.5',
+];
 
 /** Default tier assigned to unauthenticated or newly-created users. */
 export const DEFAULT_TIER: Tier = 'free';
@@ -194,7 +203,7 @@ export function getAllowedModels(
     config: TierConfig = TIER_CONFIG
 ): ModelId[] {
     return config.featureFlags.enableTierRestrictions
-        ? [...config.models[tier]]
+        ? [...config.models[tier]].toSorted()
         : Array.from(new Set(Object.values(config.models).flat())).toSorted();
 }
 

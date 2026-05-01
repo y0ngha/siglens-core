@@ -90,89 +90,33 @@
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
 
-## [PR #49 Round 2 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: Test constant declared twice under different casing — `restrictedTierConfig` (camelCase) and `const RESTRICTED_TIER_CONFIG = restrictedTierConfig` alias (UPPER_CASE), giving the same object two names in the same scope
-- Rule: Each test fixture should have exactly one canonical name; aliasing creates ambiguity with no benefit
-- Context: `requestChatCompletion.test.ts` originally declared `RESTRICTED_TIER_CONFIG` but a camelCase version was added later without removing the alias; alias removed, all usages unified to `restrictedTierConfig`
-
-## [PR #49 Round 4 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `checkUsageLimit` called `getUsageToday` without try-catch, exposing DB failures to public API callers even though sibling `recordUsage` was already protected
-- Rule: MISTAKES.md I/O & Error Handling #1 — all I/O at the same call depth must be equivalently guarded
-- Context: Moved the fail-open try-catch into `checkUsageLimit` so both `checkAnalysisLimit` and `checkChatbotLimit` (public Tier 1 exports) consistently fail open on repository errors regardless of whether the caller uses an inner wrapper
-
-## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
-## [PR #49 Round 4 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: outer try-catch in `checkAnalysisUsageAllowed` / `checkChatbotUsageAllowed` formed a dead branch — `checkUsageLimit` already catches all errors internally and returns `true` (fail-open)
-- Rule: MISTAKES.md Coding Paradigm #4 — "Leaving logic that has no effect → catch-all conditions that never execute"
-- Context: `src/application/market/submitAnalysis.ts` and `src/application/chat/requestChatCompletion.ts`; outer catch was unreachable because `checkUsageLimit` swallowed all `getUsageToday` errors
-
-- Violation: `'analysis' | 'chatbot'` inline union literal in `FEATURE_COUNT_KEY` type annotation not extracted to a named type
-- Rule: CONVENTIONS.md — "Extract union literals with 2+ members into a type alias"; replaced with `keyof UsageCounts` which ties the annotation to the source of truth
-- Context: `src/application/usage/limits.ts` FEATURE_COUNT_KEY constant
-
-
 ## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
 - Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
 - Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
 - Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
 
-## [PR #64 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
-- Violation: `buildAnalysisCacheKey` (Tier 3 public API) added `modelId` as a required parameter, instantly breaking all existing callers that only passed `symbol` + `timeframe`
-- Rule: docs/PUBLIC_API.md — parameters added to public API functions must be optional with a default so callers do not need to update; required additions are breaking changes requiring a semver major bump
-- Context: `infrastructure/cache/config.ts` — fixed by introducing `DEFAULT_ANALYSIS_MODEL_ID` and assigning it as the parameter default (`modelId = DEFAULT_ANALYSIS_MODEL_ID`), restoring backward compatibility
-
-- Violation: `DEFAULT_ANALYSIS_MODEL_USED` constant duplicated across `submitAnalysis.ts` and `pollAnalysis.ts` even though both files are in the same `application/market/` directory and can freely import each other
-- Rule: MISTAKES.md Coding Paradigm #6 — repeating identical values at multiple call sites; MISTAKES.md Rule 17 permits duplication only when import is impossible due to environment constraints (not the case here)
-- Context: moved the canonical constant to `infrastructure/cache/config.ts` as `DEFAULT_ANALYSIS_MODEL_ID` (`@internal`), then imported it in both application files and their tests
-
-## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `submitAnalysis` used one timestamp for usage-limit checking but could pass an undefined timestamp to usage recording, allowing a second `new Date()` at the repository boundary
-- Rule: FF.md — Predictability; one request-scoped decision should use one authoritative timestamp across related limit-check and usage-record operations
-- Context: Reused a single `usageOccurredAt` value for `checkAnalysisUsageAllowed` and both cache-hit/submitted `recordAnalysisUsageSafely` paths, with a regression test for the no-`occurredAt` branch
-
-## [Issue #55 | feat/55/email-verification-redis-migration | 2026-05-01]
-- Violation: `users.emailVerified` DB column default (`true`) did not match application-layer default (`?? false` in `createEmailUser`)
-- Rule: FF.md — Predictability; DB schema defaults must align with application-layer defaults so callers reading the schema get the same behavior as raw SQL inserts and code paths.
-- Context: Initial migration 0004 used `DEFAULT true` to backfill existing rows. Added migration 0005 to change the column default to `false` going forward, matching the application-layer fallback. Existing-row backfill (`true`) is preserved per user directive while future inserts default to `false`.
-
-## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
-- Violation: `ConfirmPasswordResetDependencies` named the same `UserRepository` dependency differently from sibling auth dependency objects
-- Rule: FF.md — Predictability; dependency field names should stay consistent across related use-cases so consumers can predict contracts
-- Context: Renamed `ConfirmPasswordResetDependencies.userRepository` to `users`, matching `RegisterUserDependencies.users` while keeping `emailAuthUsers` for credential lookup.
-
-- Violation: A test-only Redis cache reset helper was exported from production infrastructure code
-- Rule: Cohesion — test orchestration should live in test code instead of widening production module exports
-- Context: Removed `resetEmailTokenStoreForTests()` from `infrastructure/email/redis.ts`; Redis tests now reset module state with `vi.resetModules()` and dynamically import the subject.
-
-- Violation: Public auth API breaking changes were not reflected in release metadata
-- Rule: docs/PUBLIC_API.md — Tier 1 function signature changes require a major version, with 0.x.y applying the change as a minor version bump
-- Context: Added `CHANGELOG.md` breaking-change notes and bumped `package.json` from `0.1.14` to `0.2.0`.
-
-## [PR #63 | refactor/52/requestChatCompletion-시간-주입-통일 | 2026-05-01]
-- Violation: Optional public API field (`getCurrentDate?`) removed from `RequestChatCompletionDependencies` without `@deprecated` transition period
-- Rule: semver — removing a field from a public interface (even optional) is a breaking change; must be marked `@deprecated` first and removed only in the next major version
-- Context: `src/application/chat/types.ts`; `getCurrentDate` was a DI hook removed in favour of `params.occurredAt`; field restored with `@deprecated` JSDoc pointing consumers to the params alternative
-
-## [PR #63 Fix | refactor/52/requestChatCompletion-시간-주입-통일 | 2026-05-01]
-- Violation: `getCurrentDate` marked `@deprecated` but completely ignored in implementation, silently breaking existing consumers who pass it without `params.occurredAt`
-- Rule: semver — a `@deprecated` field must remain functional as a fallback during the deprecation period; ignoring it constitutes a functional breaking change even when the declaration is preserved
-- Context: `src/application/chat/requestChatCompletion.ts`; changed `params.occurredAt ?? new Date()` to `params.occurredAt ?? dependencies.getCurrentDate?.() ?? new Date()` so legacy consumers continue to receive their injected date until the next major version
+## [PR #65 | feat/60/AI-모델-티어-확대 | 2026-05-01]
+- Violation: 테스트 설명에 PR 번호 참조 포함 (`'places PR #65 free-tier models correctly'`)
+- Rule: CONVENTIONS.md JSDoc Don'ts — PR/이슈/콜사이트 참조를 테스트 설명에 포함하지 않음
+- Context: `tier.test.ts`의 `isModelAllowed` 관련 3개 it() 설명이 PR #65를 직접 참조; 비즈니스 규칙 중심의 영속적 설명으로 교체
 
 ## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
 
-## [PR #66 | feat/inquiry-submission | 2026-05-01]
-- Violation: `@throws` JSDoc tag missing error type annotation
-- Rule: CONVENTIONS.md — `@throws {ErrorType} description` format required; bare `@throws description` omits the type annotation needed by IDE tooling and consumers
-- Context: `src/application/inquiry/submitInquiry.ts` `@throws` tag used bare string instead of `{Error}` type-annotated form
+## [PR #65 Round 2 | feat/60/AI-모델-티어-확대 | 2026-05-01]
+- Violation: `getAllowedModels`가 `enableTierRestrictions: true`일 때 결과를 정렬하지 않음
+- Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
+- Context: `tier.ts`의 `getAllowedModels`는 `enableTierRestrictions: false`일 때만 `.toSorted()`를 적용했으나, `true`일 때도 동일한 안정 순서를 보장해야 함
 
 ## [PR #68 | feat/58/llm-api-key-storage | 2026-05-01]
 - Violation: `onConflictDoUpdate` SET 절에 `updatedAt` 누락
 - Rule: Drizzle ORM `$onUpdateFn`은 `db.update().set()` 호출에만 자동 적용됨; `insert().onConflictDoUpdate()`의 conflict resolution SET 절에는 적용되지 않으므로 명시적으로 `updatedAt: sql\`now()\``을 포함해야 함
 - Context: `src/infrastructure/db/userApiKeyRepository.ts` `upsert` 메서드의 conflict 경로에서 기존 키 교체 시 `updated_at` 컬럼이 갱신되지 않는 버그
 
-- Violation: `UserApiKeyRepository` 인터페이스의 `upsert`, `findByUserAndProvider` 메서드에 `@throws` JSDoc 태그 누락
-- Rule: CONVENTIONS.md — Tier 3 인터페이스 메서드 JSDoc에 `@throws {Error} description` 포함 권장
-- Context: `src/infrastructure/db/types.ts` — 두 메서드 모두 `LLM_API_KEY_ENCRYPTION_KEY` 부재 시 throw하므로 태그 추가
+## [PR #65 Round 6 | feat/60/AI-모델-티어-확대 | 2026-05-02]
+- Violation: 폴백 경로 호환성 테스트가 호출 사실만 검증하고 새 필드명(`primaryApiKey`/`fallbackApiKey`)이 실제로 전달되는지 검증하지 않음
+- Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
+- Context: `requestChatCompletion.test.ts`의 `falls back to deprecated callGemini` 케이스에 `expect.objectContaining({ primaryApiKey, fallbackApiKey, model })` 단언 추가
+

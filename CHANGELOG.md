@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/y0ngha/siglens-core/compare/v0.2.1...v0.3.0) (2026-05-01)
+
+### BREAKING CHANGES
+
+* `RequestChatCompletionDependencies.callGemini` renamed to `callAiProvider`. The old field is retained as `@deprecated` and falls back to `callAiProvider` during the transition period.
+* `CallGeminiWithKeyFallbackOptions` renamed to `CallAiProviderOptions` with field renames (`freeApiKey` → `primaryApiKey`, `paidApiKey` → `fallbackApiKey`). The old type alias is retained as `@deprecated`.
+* `TierModel` union members `claude-sonnet-4` and `claude-opus-4` are `@deprecated` in favour of `claude-sonnet-4-6` and `claude-opus-4-7`. Both old identifiers remain in the union until the next major version.
+
+### Features
+
+* AI 모델 티어 확대 — FREE 티어에 claude-haiku-3-5·gpt-5-mini, MEMBER 티어에 claude-sonnet-4-6·gpt-5.4, PRO 티어에 claude-opus-4-7·gpt-5.5·gemini-3-flash-preview·gemini-3.1-pro-preview 추가
+* AI provider 추상화 — `callGemini` → `callAiProvider`, `CallGeminiWithKeyFallbackOptions` → `CallAiProviderOptions` (provider-neutral 이름으로 변경)
+* `VALID_CHAT_MODELS`를 tier 설정에서 파생하도록 변경 (`getAllowedModels`)
+
 ## [0.2.1](https://github.com/y0ngha/siglens-core/compare/v0.1.14...v0.2.1) (2026-05-01)
 
 
