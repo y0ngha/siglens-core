@@ -89,4 +89,12 @@ describe('safeCompareTokenHashes', () => {
         expect(safeCompareTokenHashes('too-short', valid)).toBe(false);
         expect(safeCompareTokenHashes('', '')).toBe(false);
     });
+
+    it('returns false when either input has the expected length but is not hex', () => {
+        const valid = hashEmailToken('value');
+        const malformed = 'z'.repeat(SHA256_HEX_LENGTH);
+
+        expect(safeCompareTokenHashes(valid, malformed)).toBe(false);
+        expect(safeCompareTokenHashes(malformed, valid)).toBe(false);
+    });
 });

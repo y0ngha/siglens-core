@@ -3,7 +3,7 @@ import { requestPasswordReset } from '@/application/auth';
 import type { RequestPasswordResetDependencies } from '@/application/auth';
 import { PASSWORD_RESET_TTL_SECONDS } from '@/application/auth/constants';
 import { hashEmailToken } from '@/infrastructure/auth/tokenUtils';
-import type { EmailMessage } from '@/domain/types';
+import type { EmailMessage } from '@/infrastructure/email/types';
 import type { EmailAuthUserRecord } from '@/infrastructure/db/types';
 
 const createdAt = new Date('2026-04-27T00:00:00.000Z');

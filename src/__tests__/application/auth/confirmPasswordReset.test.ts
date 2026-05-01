@@ -64,7 +64,7 @@ function makeDependencies(options?: {
 
     return {
         dependencies: {
-            users: { findEmailAuthUserByEmail },
+            emailAuthUsers: { findEmailAuthUserByEmail },
             userRepository: {
                 findByEmail: vi.fn(),
                 findById: vi.fn(),
@@ -164,6 +164,24 @@ describe('confirmPasswordReset', () => {
 
     it('returns invalid_token error when the user no longer exists', async () => {
         const { dependencies } = makeDependencies({ user: null });
+
+        const result = await confirmPasswordReset(
+            {
+                email: 'user@example.com',
+                token: RAW_TOKEN,
+                newPassword: NEW_PASSWORD,
+            },
+            dependencies
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe('invalid_token');
+    });
+
+    it('returns invalid_token error when the user has no password hash', async () => {
+        const { dependencies } = makeDependencies({
+            user: { ...user, passwordHash: null },
+        });
 
         const result = await confirmPasswordReset(
             {

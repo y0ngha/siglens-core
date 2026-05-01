@@ -16,6 +16,7 @@ import { Redis } from '@upstash/redis';
 import {
     buildEmailTokenKey,
     createEmailTokenStore,
+    resetEmailTokenStoreForTests,
 } from '@/infrastructure/email/redis';
 import type { EmailTokenValue } from '@/infrastructure/email/types';
 
@@ -36,6 +37,7 @@ describe('buildEmailTokenKey', () => {
 describe('createEmailTokenStore', () => {
     beforeEach(() => {
         vi.unstubAllEnvs();
+        resetEmailTokenStoreForTests();
         MockRedis.mockClear();
     });
 
@@ -66,6 +68,19 @@ describe('createEmailTokenStore', () => {
         vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');
         const store = createEmailTokenStore();
         expect(store).not.toBeNull();
+        expect(MockRedis).toHaveBeenCalledTimes(2);
+    });
+
+    it('reuses Redis clients for repeated calls with the same configuration', () => {
+        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
+        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');
+
+        const first = createEmailTokenStore();
+        const second = createEmailTokenStore();
+
+        expect(first).not.toBeNull();
+        expect(second).not.toBeNull();
         expect(MockRedis).toHaveBeenCalledTimes(2);
     });
 

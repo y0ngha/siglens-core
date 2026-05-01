@@ -1,11 +1,21 @@
-import type { EmailMessage } from '@/domain/types';
-
 /**
  * Purpose tag used to namespace email-token Redis keys so that a password
  * reset token never collides with an email-verification token for the same
  * email address.
  */
 export type EmailTokenPurpose = 'password_reset' | 'email_verification';
+
+/** Email message payload passed to an {@link EmailDispatcher} implementation. */
+export interface EmailMessage {
+    /** Recipient email address. */
+    to: string;
+    /** Email subject line. */
+    subject: string;
+    /** HTML body of the email. */
+    html: string;
+    /** Plain-text body of the email. */
+    text: string;
+}
 
 /**
  * Persisted Redis value for an email token.

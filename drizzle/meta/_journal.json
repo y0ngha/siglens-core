@@ -1,48 +1,48 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1777212624738,
-      "tag": "0000_absent_kid_colt",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1777213326343,
-      "tag": "0001_sharp_triathlon",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1777318357343,
-      "tag": "0002_add_premium_model_usage_action",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1777538914497,
-      "tag": "0003_dashing_cerise",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1777574598608,
-      "tag": "0004_petite_medusa",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1777575784767,
-      "tag": "0005_daffy_runaways",
-      "breakpoints": true
-    }
-  ]
+    "version": "7",
+    "dialect": "postgresql",
+    "entries": [
+        {
+            "idx": 0,
+            "version": "7",
+            "when": 1777212624738,
+            "tag": "0000_absent_kid_colt",
+            "breakpoints": true
+        },
+        {
+            "idx": 1,
+            "version": "7",
+            "when": 1777213326343,
+            "tag": "0001_sharp_triathlon",
+            "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1777318357343,
+            "tag": "0002_add_premium_model_usage_action",
+            "breakpoints": true
+        },
+        {
+            "idx": 3,
+            "version": "7",
+            "when": 1777538914497,
+            "tag": "0003_dashing_cerise",
+            "breakpoints": true
+        },
+        {
+            "idx": 4,
+            "version": "7",
+            "when": 1777574598608,
+            "tag": "0004_petite_medusa",
+            "breakpoints": true
+        },
+        {
+            "idx": 5,
+            "version": "7",
+            "when": 1777575784767,
+            "tag": "0005_daffy_runaways",
+            "breakpoints": true
+        }
+    ]
 }

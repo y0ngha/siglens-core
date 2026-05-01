@@ -3,7 +3,7 @@ import { requestEmailVerification } from '@/application/auth';
 import type { RequestEmailVerificationDependencies } from '@/application/auth';
 import { EMAIL_VERIFICATION_PENDING_TTL_SECONDS } from '@/application/auth/constants';
 import { hashEmailToken } from '@/infrastructure/auth/tokenUtils';
-import type { EmailMessage } from '@/domain/types';
+import type { EmailMessage } from '@/infrastructure/email/types';
 
 function makeBuildMessage(): {
     buildMessage: (code: string) => EmailMessage;

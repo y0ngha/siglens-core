@@ -6,7 +6,7 @@ import {
 } from 'node:crypto';
 
 const NUMERIC_CODE_RADIX = 10;
-const SHA256_HEX_LENGTH = 64;
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
 
 /**
  * @internal Generate a high-entropy URL-safe token suitable for embedding in email links.
@@ -60,7 +60,7 @@ export function hashEmailToken(rawToken: string): string {
  * @returns Whether the digests are byte-for-byte equal.
  */
 export function safeCompareTokenHashes(a: string, b: string): boolean {
-    if (a.length !== SHA256_HEX_LENGTH || b.length !== SHA256_HEX_LENGTH) {
+    if (!SHA256_HEX_PATTERN.test(a) || !SHA256_HEX_PATTERN.test(b)) {
         return false;
     }
     return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));

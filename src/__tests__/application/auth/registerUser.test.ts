@@ -216,4 +216,26 @@ describe('registerUser', () => {
         );
         expect(result.ok).toBe(true);
     });
+
+    it('normalizes blank optional profile fields to null', async () => {
+        const { dependencies, createEmailUser } = makeDependencies();
+
+        await registerUser(
+            {
+                email: 'user@example.com',
+                password: 'Password1',
+                name: '   ',
+                avatarUrl: '   ',
+            },
+            dependencies
+        );
+
+        expect(createEmailUser).toHaveBeenCalledWith({
+            email: 'user@example.com',
+            passwordHash: 'hashed-password',
+            name: null,
+            avatarUrl: null,
+            emailVerified: true,
+        });
+    });
 });

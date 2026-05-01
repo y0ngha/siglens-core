@@ -69,10 +69,10 @@ export interface CreateEmailUserInput {
     email: string;
     /** Hashed password produced by {@link PasswordHasher.hashPassword}. */
     passwordHash: string;
-    /** Optional display name. */
-    name?: string;
-    /** Optional avatar image URL. */
-    avatarUrl?: string;
+    /** Optional display name; `null` stores an explicit empty profile value. */
+    name?: string | null;
+    /** Optional avatar image URL; `null` stores an explicit empty profile value. */
+    avatarUrl?: string | null;
     /**
      * Whether the email address was verified prior to account creation.
      * Defaults to `false` when omitted; set to `true` when the verification

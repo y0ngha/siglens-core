@@ -13,12 +13,12 @@ import type {
 } from '@/infrastructure/auth/types';
 import type {
     EmailDispatcher,
+    EmailMessage,
     EmailTokenStore,
 } from '@/infrastructure/email/types';
 import type {
     AuthValidationErrorCode,
     AuthValidationErrorField,
-    EmailMessage,
 } from '@/domain/types';
 
 /**
@@ -447,7 +447,7 @@ export type ConfirmPasswordResetResult =
  */
 export interface ConfirmPasswordResetDependencies {
     /** Email-auth credential lookup repository. */
-    users: EmailAuthUserRepository;
+    emailAuthUsers: EmailAuthUserRepository;
     /** User persistence repository for password update. */
     userRepository: UserRepository;
     /** Redis-backed email-token store containing the reset token hash. */
@@ -520,6 +520,8 @@ export type VerifyEmailErrorCode =
 export interface VerifyEmailError {
     /** Machine-readable error code identifying the failure reason. */
     code: VerifyEmailErrorCode;
+    /** Input field that caused the error. */
+    field: 'code';
     /** Human-readable error message suitable for display to the user. */
     message: string;
 }

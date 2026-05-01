@@ -51,7 +51,7 @@ function expiredTokenError(): ConfirmPasswordResetError {
  * ```typescript
  * const result = await confirmPasswordReset(
  *     { email: 'user@example.com', token, newPassword: 'Password1' },
- *     { users, userRepository, emailTokens, passwordHasher }
+ *     { emailAuthUsers, userRepository, emailTokens, passwordHasher }
  * );
  * ```
  */
@@ -72,7 +72,7 @@ export async function confirmPasswordReset(
         return { ok: false, error: expiredTokenError() };
     }
 
-    if (stored.status !== 'pending') {
+    if (stored.status !== 'pending' || !('tokenHash' in stored)) {
         return { ok: false, error: invalidTokenError() };
     }
 
@@ -81,7 +81,8 @@ export async function confirmPasswordReset(
         return { ok: false, error: invalidTokenError() };
     }
 
-    const user = await dependencies.users.findEmailAuthUserByEmail(email);
+    const user =
+        await dependencies.emailAuthUsers.findEmailAuthUserByEmail(email);
     if (user === null || user.passwordHash === null) {
         return { ok: false, error: invalidTokenError() };
     }

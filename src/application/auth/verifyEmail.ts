@@ -16,11 +16,19 @@ const INVALID_CODE_MESSAGE = 'Verification code is invalid';
 const EXPIRED_CODE_MESSAGE = 'Verification code has expired';
 
 function invalidCodeError(): VerifyEmailError {
-    return { code: 'invalid_verification_code', message: INVALID_CODE_MESSAGE };
+    return {
+        code: 'invalid_verification_code',
+        field: 'code',
+        message: INVALID_CODE_MESSAGE,
+    };
 }
 
 function expiredCodeError(): VerifyEmailError {
-    return { code: 'expired_verification_code', message: EXPIRED_CODE_MESSAGE };
+    return {
+        code: 'expired_verification_code',
+        field: 'code',
+        message: EXPIRED_CODE_MESSAGE,
+    };
 }
 
 /**

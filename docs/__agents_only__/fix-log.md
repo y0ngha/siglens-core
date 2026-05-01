@@ -176,3 +176,8 @@
 - Violation: `users.emailVerified` DB column default (`true`) did not match application-layer default (`?? false` in `createEmailUser`)
 - Rule: FF.md — Predictability; DB schema defaults must align with application-layer defaults so callers reading the schema get the same behavior as raw SQL inserts and code paths.
 - Context: Initial migration 0004 used `DEFAULT true` to backfill existing rows. Added migration 0005 to change the column default to `false` going forward, matching the application-layer fallback. Existing-row backfill (`true`) is preserved per user directive while future inserts default to `false`.
+
+## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
+- Violation: `safeCompareTokenHashes` accepted 64-character non-hex strings and could throw during malformed Redis token-state comparison
+- Rule: FF.md — Predictability; malformed persisted token state must produce the same invalid-token result as other bad token inputs, not an uncaught runtime exception
+- Context: Email verification and password reset compare Redis-stored token hashes with submitted hashes; malformed stored hash strings now fail validation before `timingSafeEqual`

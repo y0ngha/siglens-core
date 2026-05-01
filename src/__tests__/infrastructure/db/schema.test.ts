@@ -160,7 +160,8 @@ describe('database schema tables', () => {
         expect(getTableColumns(users).email.isUnique).toBe(true);
     });
 
-    it('defines email_verified column on users with default true', () => {
+    it('defines email_verified column on users with default false', () => {
         expect(columnNames(users)).toContain('email_verified');
+        expect(getTableColumns(users).emailVerified.default).toBe(false);
     });
 });

@@ -88,8 +88,8 @@ export async function registerUser(
     const user = await dependencies.users.createEmailUser({
         email,
         passwordHash,
-        name: input.name?.trim(),
-        avatarUrl: input.avatarUrl?.trim(),
+        name: input.name?.trim() || null,
+        avatarUrl: input.avatarUrl?.trim() || null,
         emailVerified: true,
     });
 

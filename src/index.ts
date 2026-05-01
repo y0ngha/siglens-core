@@ -272,6 +272,9 @@ export {
     hashClientIp,
 } from './infrastructure/chat/tokenStore';
 
+// Email token store
+export { createEmailTokenStore } from './infrastructure/email';
+
 // Skills loader
 export { FileSkillsLoader } from './infrastructure/skills/loader';
 
@@ -436,15 +439,6 @@ export {
     WILLIAMS_R_DEFAULT_PERIOD,
 } from './domain/indicators/constants';
 
-// Email
-export { createEmailTokenStore } from './infrastructure/email/redis';
-export type {
-    EmailDispatcher,
-    EmailTokenPurpose,
-    EmailTokenStore,
-    EmailTokenValue,
-} from './infrastructure/email/types';
-
 // Infrastructure interfaces
 export type {
     AuthSessionCookie,
@@ -527,6 +521,13 @@ export type {
 export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 export type { CacheProvider } from './infrastructure/cache/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
+export type {
+    EmailDispatcher,
+    EmailMessage,
+    EmailTokenPurpose,
+    EmailTokenStore,
+    EmailTokenValue,
+} from './infrastructure/email';
 export type {
     AssetTranslationRecord,
     AssetTranslationRepository,
@@ -627,7 +628,6 @@ export type {
     ExpectedSignalType,
     IchimokuFuturePoint,
     IchimokuResult,
-    EmailMessage,
     IndexTicker,
     IndicatorGuideResult,
     IndicatorResult,
