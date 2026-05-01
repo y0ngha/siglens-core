@@ -110,8 +110,19 @@
 - Rule: CONVENTIONS.md — `@throws {ErrorType} description` format required; bare `@throws description` omits the type annotation needed by IDE tooling and consumers
 - Context: `src/application/inquiry/submitInquiry.ts` `@throws` tag used bare string instead of `{Error}` type-annotated form
 
+<<<<<<< feat/60/AI-모델-티어-확대
 ## [PR #65 Round 2 | feat/60/AI-모델-티어-확대 | 2026-05-01]
 - Violation: `getAllowedModels`가 `enableTierRestrictions: true`일 때 결과를 정렬하지 않음
 - Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
 - Context: `tier.ts`의 `getAllowedModels`는 `enableTierRestrictions: false`일 때만 `.toSorted()`를 적용했으나, `true`일 때도 동일한 안정 순서를 보장해야 함
 
+=======
+## [PR #68 | feat/58/llm-api-key-storage | 2026-05-01]
+- Violation: `onConflictDoUpdate` SET 절에 `updatedAt` 누락
+- Rule: Drizzle ORM `$onUpdateFn`은 `db.update().set()` 호출에만 자동 적용됨; `insert().onConflictDoUpdate()`의 conflict resolution SET 절에는 적용되지 않으므로 명시적으로 `updatedAt: sql\`now()\``을 포함해야 함
+- Context: `src/infrastructure/db/userApiKeyRepository.ts` `upsert` 메서드의 conflict 경로에서 기존 키 교체 시 `updated_at` 컬럼이 갱신되지 않는 버그
+
+- Violation: `UserApiKeyRepository` 인터페이스의 `upsert`, `findByUserAndProvider` 메서드에 `@throws` JSDoc 태그 누락
+- Rule: CONVENTIONS.md — Tier 3 인터페이스 메서드 JSDoc에 `@throws {Error} description` 포함 권장
+- Context: `src/infrastructure/db/types.ts` — 두 메서드 모두 `LLM_API_KEY_ENCRYPTION_KEY` 부재 시 throw하므로 태그 추가
+>>>>>>> main

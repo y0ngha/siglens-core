@@ -1,6 +1,6 @@
 import type { DatabaseConfig } from './types';
 
-const OAUTH_TOKEN_ENCRYPTION_KEY_BYTE_LENGTH = 32;
+const ENCRYPTION_KEY_BYTE_LENGTH = 32;
 
 /**
  * Reads `DATABASE_URL` from the environment and returns a `DatabaseConfig`.
@@ -26,14 +26,31 @@ export function tryReadDatabaseConfig(): DatabaseConfig | null {
 }
 
 /**
- * @internal Read and validate the OAuth token encryption key from the environment.
- * Returns the hex key string when valid, or null when absent or incorrectly sized.
+ * @internal Validate a 32-byte AES-256 key supplied as a hex string. Returns
+ * the raw hex string when the decoded byte length is exactly 32 bytes, or
+ * `null` when absent or incorrectly sized.
  */
-export function tryReadEncryptionKey(): string | null {
-    const raw = process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
+function tryParseEncryptionKey(raw: string | undefined): string | null {
     if (!raw) {
         return null;
     }
     const bytes = Buffer.from(raw, 'hex');
-    return bytes.length === OAUTH_TOKEN_ENCRYPTION_KEY_BYTE_LENGTH ? raw : null;
+    return bytes.length === ENCRYPTION_KEY_BYTE_LENGTH ? raw : null;
+}
+
+/**
+ * @internal Read and validate the OAuth token encryption key from the environment.
+ * Returns the hex key string when valid, or null when absent or incorrectly sized.
+ */
+export function tryReadEncryptionKey(): string | null {
+    return tryParseEncryptionKey(process.env.OAUTH_TOKEN_ENCRYPTION_KEY);
+}
+
+/**
+ * @internal Read and validate the LLM API key encryption key from the
+ * environment. Returns the hex key string when valid, or null when absent or
+ * incorrectly sized.
+ */
+export function tryReadLlmApiKeyEncryptionKey(): string | null {
+    return tryParseEncryptionKey(process.env.LLM_API_KEY_ENCRYPTION_KEY);
 }

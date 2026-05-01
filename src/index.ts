@@ -229,6 +229,9 @@ export {
     isTimeframeAllowed,
 } from './domain/tier';
 
+// LLM API key validation utilities
+export { isLlmProvider, normalizeLlmApiKey } from './domain/llm';
+
 // Ticker validation utilities
 export {
     deduplicateResults,
@@ -294,6 +297,7 @@ export {
     DrizzleSessionRepository,
     DrizzleUsageLogRepository,
     DrizzleUsageRepository,
+    DrizzleUserApiKeyRepository,
     DrizzleUserRepository,
     hashUsageIp,
 } from './infrastructure/db';
@@ -346,6 +350,8 @@ export {
     assetTranslations,
     inquiries,
     koreanTickers,
+    LLM_PROVIDER_VALUES,
+    llmProviderEnum,
     OAUTH_PROVIDER_VALUES,
     oauthAccounts,
     oauthProviderEnum,
@@ -353,6 +359,7 @@ export {
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
     usageLogs,
+    userApiKeys,
     USER_TIER_VALUES,
     users,
     userTierEnum,
@@ -559,11 +566,15 @@ export type {
     RecordUsageInput,
     SessionRepository,
     SiglensDatabase,
+    UpsertUserApiKeyInput,
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
     UsageLogRepository,
     UsageRepository,
+    UserApiKeyMetaRecord,
+    UserApiKeyRecord,
+    UserApiKeyRepository,
     UserRepository,
     UserTier,
     UserTierRepository,
@@ -654,6 +665,7 @@ export type {
     KeyPrice,
     KoreanTickerEntry,
     LevelSource,
+    LlmProvider,
     MACDResult,
     MarketBriefingResponse,
     MarketBriefingSectorAnalysis,
