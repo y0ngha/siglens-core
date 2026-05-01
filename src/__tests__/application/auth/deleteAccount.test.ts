@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AUTH_SESSION_COOKIE_NAME, deleteAccount } from '@/application/auth';
 import type {
     OAuthAccountRepository,
@@ -36,6 +36,10 @@ function makeDependencies(deleted: boolean): {
 }
 
 describe('deleteAccount', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('deletes the user account and returns an expired HTTP-only cookie', async () => {
         const { dependencies, deleteUser } = makeDependencies(true);
 
@@ -201,7 +205,6 @@ describe('deleteAccount', () => {
         );
         expect(dependencies.users.deleteUser).toHaveBeenCalledWith('user-1');
         expect(result.ok).toBe(true);
-        consoleWarn.mockRestore();
     });
 
     it('logs provider revocation failures without blocking deletion', async () => {
@@ -244,6 +247,5 @@ describe('deleteAccount', () => {
                 revokeError
             );
         });
-        consoleWarn.mockRestore();
     });
 });

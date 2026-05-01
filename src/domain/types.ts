@@ -1,4 +1,7 @@
-/** OAuth provider used to authenticate a user. */
+/**
+ * OAuth provider used to authenticate a user.
+ * Must stay in sync with OAUTH_PROVIDER_VALUES in infrastructure/db/constants.ts.
+ */
 export type OAuthProvider = 'google' | 'kakao' | 'apple';
 
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */

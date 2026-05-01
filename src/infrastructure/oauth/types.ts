@@ -9,7 +9,7 @@ export interface RevokeTokenParams {
 }
 
 /**
- * Per-provider adapter that revokes an OAuth grant at the provider side.
+ * @internal Per-provider adapter that revokes an OAuth grant at the provider side.
  */
 export interface OAuthProviderAdapter {
     /**

@@ -126,3 +126,8 @@
 - Violation: OAuth token revocation loaded provider tokens in an unawaited background task immediately before deleting the user row, allowing cascade deletion to remove the tokens before lookup.
 - Rule: FF.md — Predictability; destructive dependent writes must not race ahead of prerequisite reads needed for the same use-case.
 - Context: `deleteAccount` now awaits OAuth account lookup before deleting the user, while keeping provider revocation calls fire-and-forget after the tokens are captured.
+
+## [PR #51 | feat/50/oauth-token-revocation | 2026-05-01]
+- Violation: Tests manually restored `console.warn` spies at the end of individual test bodies, so an earlier assertion failure could leak the spy into later tests.
+- Rule: Test isolation — test doubles that mutate global objects must be restored from an `afterEach` guard.
+- Context: `deleteAccount.test.ts` now restores all Vitest mocks from `afterEach` and no longer relies on per-test `mockRestore()` calls.

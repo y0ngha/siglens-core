@@ -25,11 +25,11 @@ function makeSelectDb(rows: unknown[]): {
 
 describe('DrizzleOAuthAccountRepository.findByUserId', () => {
     beforeEach(() => {
-        process.env.OAUTH_TOKEN_ENCRYPTION_KEY = VALID_KEY_HEX;
+        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', VALID_KEY_HEX);
     });
 
     afterEach(() => {
-        delete process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
+        vi.unstubAllEnvs();
     });
 
     it('returns an empty array when no accounts exist for the user', async () => {
@@ -122,7 +122,7 @@ describe('DrizzleOAuthAccountRepository.findByUserId', () => {
     });
 
     it('returns null tokens when the encryption key is missing', async () => {
-        delete process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
+        vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '');
         const { db } = makeSelectDb([
             {
                 id: 'account-3',

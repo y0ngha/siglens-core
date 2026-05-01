@@ -493,11 +493,11 @@ describe('DrizzleUserRepository', () => {
 
     describe('token encryption in createOAuthUser', () => {
         beforeEach(() => {
-            process.env.OAUTH_TOKEN_ENCRYPTION_KEY = VALID_KEY_HEX;
+            vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', VALID_KEY_HEX);
         });
 
         afterEach(() => {
-            delete process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
+            vi.unstubAllEnvs();
         });
 
         it('encrypts access and refresh tokens before storage', async () => {
@@ -538,7 +538,7 @@ describe('DrizzleUserRepository', () => {
         });
 
         it('stores null tokens when encryption key is absent', async () => {
-            delete process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
+            vi.stubEnv('OAUTH_TOKEN_ENCRYPTION_KEY', '');
             const { db, accountValues } = makeTransactionDb({
                 userRows: [userRecord],
                 accountRows: [{ id: 'oauth-account-1' }],
