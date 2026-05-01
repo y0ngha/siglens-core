@@ -1324,5 +1324,8 @@ export type WaitUntil = (promise: Promise<unknown>) => void;
 
 // ─── LLM ──────────────────────────────────────────────────────────────────────
 
-/** Identifier of an LLM provider whose API key may be stored per user. */
+/**
+ * Identifier of an LLM provider whose API key may be stored per user.
+ * Must stay in sync with LLM_PROVIDER_VALUES in infrastructure/db/constants.ts.
+ */
 export type LlmProvider = 'anthropic' | 'google' | 'openai';

@@ -357,6 +357,9 @@ Gemini 응답 성공 후 `action_type = 'chatbot'`을 기록한다. 제한 초�
   경로에서 plaintext가 노출되지 않는다.
 - `findByUserAndProvider`만 plaintext(`UserApiKeyRecord.apiKey`)를
   반환한다. 복호화 실패(키 mismatch 등)는 `null`로 graceful 처리한다.
+- `deleteByUserAndProvider`는 해당 (user, provider) 조합의 row를 삭제하고
+  실제 row가 삭제됐으면 `true`, 존재하지 않으면 `false`를 반환한다.
+  삭제 경로에서는 암호화 키가 불필요하다.
 - provider enum 값은 domain의 `LLM_PROVIDER_VALUES`를 single source로
   사용한다 (현재: `anthropic`, `google`, `openai`).
 - OAuth 토큰 암호화 키와 별도 환경변수로 격리해, 한쪽 키 유출이 다른
