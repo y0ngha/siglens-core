@@ -171,6 +171,37 @@ infrastructure/chat/
 
 ---
 
+## 2-2. Upstash Redis (인증 이메일 토큰)
+
+이메일 인증 코드와 비밀번호 재설정 토큰은 PostgreSQL이 아니라 Upstash Redis에
+TTL이 있는 일회성 상태로 저장한다. 환경변수는 `infrastructure/upstash/config.ts`의
+`readUpstashConfig()`를 통해 읽는다.
+
+### Redis 키 구조
+
+| 키 패턴 | 값 타입 | 설명 |
+|---|---|---|
+| `email_token:{purpose}:{email}` | `{ status: 'pending'; tokenHash: string } \| { status: 'verified' }` | `purpose`는 `email_verification` 또는 `password_reset` |
+
+### 구현 위치
+
+```
+infrastructure/email/
+├── types.ts  ← EmailDispatcher, EmailTokenStore 인터페이스
+├── redis.ts  ← Upstash 기반 EmailTokenStore 구현체
+└── index.ts  ← email 모듈 re-export
+```
+
+`requestEmailVerification`는 숫자 인증 코드를 해시해 `email_verification` 토큰으로
+저장하고, `verifyEmail`이 성공하면 같은 키를 `verified` 상태로 바꾼다.
+`registerUser`는 이 `verified` 상태를 확인한 뒤 이메일 계정을 생성한다.
+
+`requestPasswordReset`는 raw reset token을 반환하되 Redis에는 `password_reset`
+토큰 hash만 저장한다. `confirmPasswordReset`는 입력 email로 Redis 엔트리를 조회하고,
+raw token을 다시 해시해 constant-time 비교 후 성공 시 Redis 엔트리를 삭제한다.
+
+---
+
 ## 3. Upstash Redis (Job 큐)
 
 동일한 Upstash Redis 인스턴스를 Job 큐로 재사용한다.
@@ -258,7 +289,6 @@ yarn db:migrate   # DATABASE_URL 대상 DB에 마이그레이션 적용
 |---|---|
 | `users` | 사용자 메타데이터, 이메일 로그인용 비밀번호 해시, 구독 tier (`free` / `member` / `pro`) |
 | `sessions` | 사용자 세션과 만료 시각 |
-| `password_resets` | 비밀번호 재설정용 일회성 토큰 hash, 만료 시각, 사용 시각 |
 | `usage_logs` | 비로그인/로그인 사용량 집계 (`analysis` / `chatbot` / `premium_model`) |
 | `oauth_accounts` | Google/Kakao/Apple OAuth 계정 연결 |
 | `korean_tickers` | 한국어 티커 이름 매핑 |
@@ -298,15 +328,17 @@ Gemini 응답 성공 후 `action_type = 'chatbot'`을 기록한다. 제한 초�
 `application/auth`는 이메일 회원가입·로그인·로그아웃 및 OAuth 로그인
 유스케이스를 제공한다.
 
-- `registerUser`는 `UserRepository`와 `PasswordHasher`를 주입받아 이메일 중복 확인, 비밀번호 해시 생성, 사용자 생성을 수행한다.
+- `requestEmailVerification`는 `EmailTokenStore`와 `EmailDispatcher`를 주입받아 이메일 인증 코드를 Redis에 저장하고 발송한다.
+- `verifyEmail`는 Redis의 `email_verification` 토큰 hash를 검증하고 성공 시 같은 키를 `verified` 상태로 갱신한다.
+- `registerUser`는 `UserRepository`, `PasswordHasher`, `EmailTokenStore`를 주입받아 이메일 인증 완료 여부, 이메일 중복, 비밀번호 강도를 확인한 뒤 사용자 생성을 수행한다.
 - `loginUser`는 `EmailAuthUserRepository`, `PasswordVerifier`, `SessionRepository`를 주입받아 자격증명을 검증하고 `sessions.id`를 세션 토큰으로 사용한다.
 - `socialLoginUser`는 `OAuthUserRepository`와 `SessionRepository`를 주입받아 Google/Kakao/Apple provider 계정 링크를 조회하고, 첫 로그인 시 `users`와 `oauth_accounts`를 생성한 뒤 동일한 세션 쿠키 메커니즘을 사용한다.
 - OAuth 이메일이 이미 이메일/비밀번호 계정으로 등록되어 있으면 자동 링크하지 않고 `email_already_exists` 충돌을 반환한다. 명시적 계정 연결 UI와 콜백 라우트는 consumer가 담당한다.
-- `requestPasswordReset`는 `EmailAuthUserRepository`, `PasswordResetRepository`, token generator/hasher를 주입받아 이메일/비밀번호 계정에 대해서만 30분 만료 reset token을 생성한다. Raw token은 반환값으로만 노출하고 DB에는 `token_hash`만 저장한다.
-- `confirmPasswordReset`는 reset token hash 조회, 만료/사용 여부 확인, 비밀번호 강도 검증, 새 password hash 저장, token 사용 처리까지 수행한다.
+- `requestPasswordReset`는 `EmailAuthUserRepository`, `EmailTokenStore`, `EmailDispatcher`를 주입받아 이메일/비밀번호 계정에 대해서만 30분 만료 reset token을 생성한다. Raw token은 반환값으로만 노출하고 Redis에는 token hash만 저장한다.
+- `confirmPasswordReset`는 email과 reset token으로 Redis token hash를 조회·검증하고, 비밀번호 강도 검증, 새 password hash 저장, Redis token 삭제까지 수행한다.
 - `logoutUser`는 `SessionRepository.deleteSession()`으로 세션을 무효화하고 브라우저 쿠키 제거용 만료 쿠키 메타데이터를 반환한다.
 - HTTP 응답 객체나 프레임워크 쿠키 API는 consumer가 담당한다. `siglens-core`는 HTTP-only 쿠키 메타데이터만 반환한다.
-- 비밀번호 재설정 이메일 발송과 reset URL 구성은 consumer가 담당한다.
+- 인증 이메일 문구와 비밀번호 재설정 URL 구성은 consumer가 담당한다.
 
 ### 사용자 티어
 

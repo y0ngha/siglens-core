@@ -1,16 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { requestPasswordReset } from '@/application/auth';
-import type {
-    RequestPasswordResetDependencies,
-    RequestPasswordResetResult,
-} from '@/application/auth';
-import type {
-    EmailAuthUserRecord,
-    PasswordResetRecord,
-} from '@/infrastructure/db/types';
+import type { RequestPasswordResetDependencies } from '@/application/auth';
+import { PASSWORD_RESET_TTL_SECONDS } from '@/application/auth/constants';
+import { hashEmailToken } from '@/infrastructure/auth/tokenUtils';
+import type { EmailMessage } from '@/infrastructure/email/types';
+import type { EmailAuthUserRecord } from '@/infrastructure/db/types';
 
-const now = new Date('2026-04-28T00:00:00.000Z');
-const expiresAt = new Date('2026-04-28T00:30:00.000Z');
 const createdAt = new Date('2026-04-27T00:00:00.000Z');
 const updatedAt = new Date('2026-04-27T00:00:01.000Z');
 
@@ -21,173 +16,203 @@ const user: EmailAuthUserRecord = {
     name: null,
     avatarUrl: null,
     tier: 'free',
+    emailVerified: true,
     createdAt,
     updatedAt,
 };
 
-function makePasswordResetRecord(): PasswordResetRecord {
+function makeBuildMessage(): {
+    buildMessage: (token: string) => EmailMessage;
+    calls: string[];
+} {
+    const calls: string[] = [];
     return {
-        id: 'reset-1',
-        userId: 'user-1',
-        tokenHash: 'hashed-token',
-        expiresAt,
-        usedAt: null,
-        createdAt: now,
+        buildMessage: (token: string) => {
+            calls.push(token);
+            return {
+                to: 'user@example.com',
+                subject: 'Reset your password',
+                html: `<a href="https://example.com/reset?token=${token}">Reset</a>`,
+                text: `Reset: https://example.com/reset?token=${token}`,
+            };
+        },
+        calls,
     };
 }
 
-function makeDependencies(options?: { user?: EmailAuthUserRecord | null }): {
+function makeDependencies(options?: {
+    user?: EmailAuthUserRecord | null;
+    sendEmailResolves?: boolean;
+    sendEmailThrows?: boolean;
+}): {
     dependencies: RequestPasswordResetDependencies;
     findEmailAuthUserByEmail: ReturnType<typeof vi.fn>;
-    generatePasswordResetToken: ReturnType<typeof vi.fn>;
-    hashPasswordResetToken: ReturnType<typeof vi.fn>;
-    createPasswordReset: ReturnType<typeof vi.fn>;
+    setToken: ReturnType<typeof vi.fn>;
+    sendEmail: ReturnType<typeof vi.fn>;
 } {
     const foundUser = options && 'user' in options ? options.user : user;
     const findEmailAuthUserByEmail = vi.fn().mockResolvedValue(foundUser);
-    const generatePasswordResetToken = vi.fn().mockResolvedValue('raw-token');
-    const hashPasswordResetToken = vi.fn().mockResolvedValue('hashed-token');
-    const createPasswordReset = vi
-        .fn()
-        .mockResolvedValue(makePasswordResetRecord());
+    const setToken = vi.fn().mockResolvedValue(undefined);
+
+    const sendEmailThrows = options?.sendEmailThrows ?? false;
+    const sendEmailResolves = options?.sendEmailResolves ?? true;
+    const sendEmail = sendEmailThrows
+        ? vi.fn().mockRejectedValue(new Error('smtp error'))
+        : vi.fn().mockResolvedValue(sendEmailResolves);
 
     return {
         dependencies: {
             users: { findEmailAuthUserByEmail },
-            passwordResets: {
-                createPasswordReset,
-                findPasswordResetByTokenHash: vi.fn(),
-                completePasswordReset: vi.fn(),
+            emailTokens: {
+                set: setToken,
+                get: vi.fn(),
+                delete: vi.fn(),
             },
-            tokenGenerator: { generatePasswordResetToken },
-            tokenHasher: { hashPasswordResetToken },
+            emailDispatcher: { sendEmail },
         },
         findEmailAuthUserByEmail,
-        generatePasswordResetToken,
-        hashPasswordResetToken,
-        createPasswordReset,
+        setToken,
+        sendEmail,
     };
 }
 
 describe('requestPasswordReset', () => {
-    it('returns no token for an invalid email without repository access', async () => {
-        const {
-            dependencies,
-            findEmailAuthUserByEmail,
-            generatePasswordResetToken,
-            createPasswordReset,
-        } = makeDependencies();
+    it('returns tokenIssued false for an invalid email without repository access', async () => {
+        const { dependencies, findEmailAuthUserByEmail, setToken, sendEmail } =
+            makeDependencies();
+        const { buildMessage, calls } = makeBuildMessage();
 
         const result = await requestPasswordReset(
             { email: 'not-an-email' },
             dependencies,
-            { now }
+            { buildMessage }
         );
 
-        expect(result).toEqual({ ok: true, token: null, expiresAt: null });
+        expect(result).toEqual({
+            ok: true,
+            tokenIssued: false,
+            emailDispatched: false,
+        });
         expect(findEmailAuthUserByEmail).not.toHaveBeenCalled();
-        expect(generatePasswordResetToken).not.toHaveBeenCalled();
-        expect(createPasswordReset).not.toHaveBeenCalled();
+        expect(setToken).not.toHaveBeenCalled();
+        expect(sendEmail).not.toHaveBeenCalled();
+        expect(calls).toHaveLength(0);
     });
 
-    it('returns no token when no account matches the email', async () => {
-        const {
-            dependencies,
-            findEmailAuthUserByEmail,
-            generatePasswordResetToken,
-            createPasswordReset,
-        } = makeDependencies({ user: null });
+    it('returns tokenIssued false when no account matches the email', async () => {
+        const { dependencies, findEmailAuthUserByEmail, setToken, sendEmail } =
+            makeDependencies({ user: null });
+        const { buildMessage } = makeBuildMessage();
 
         const result = await requestPasswordReset(
             { email: ' Missing@Example.COM ' },
             dependencies,
-            { now }
+            { buildMessage }
         );
 
-        expect(result).toEqual({ ok: true, token: null, expiresAt: null });
+        expect(result).toEqual({
+            ok: true,
+            tokenIssued: false,
+            emailDispatched: false,
+        });
         expect(findEmailAuthUserByEmail).toHaveBeenCalledWith(
             'missing@example.com'
         );
-        expect(generatePasswordResetToken).not.toHaveBeenCalled();
-        expect(createPasswordReset).not.toHaveBeenCalled();
+        expect(setToken).not.toHaveBeenCalled();
+        expect(sendEmail).not.toHaveBeenCalled();
     });
 
-    it('returns no token for OAuth-only accounts without a password hash', async () => {
-        const {
-            dependencies,
-            findEmailAuthUserByEmail,
-            generatePasswordResetToken,
-            createPasswordReset,
-        } = makeDependencies({
+    it('returns tokenIssued false for OAuth-only accounts without a password hash', async () => {
+        const { dependencies, setToken, sendEmail } = makeDependencies({
             user: { ...user, passwordHash: null },
         });
+        const { buildMessage } = makeBuildMessage();
 
         const result = await requestPasswordReset(
             { email: 'user@example.com' },
             dependencies,
-            { now }
+            { buildMessage }
         );
 
-        expect(result).toEqual({ ok: true, token: null, expiresAt: null });
-        expect(findEmailAuthUserByEmail).toHaveBeenCalledWith(
-            'user@example.com'
-        );
-        expect(generatePasswordResetToken).not.toHaveBeenCalled();
-        expect(createPasswordReset).not.toHaveBeenCalled();
+        expect(result).toEqual({
+            ok: true,
+            tokenIssued: false,
+            emailDispatched: false,
+        });
+        expect(setToken).not.toHaveBeenCalled();
+        expect(sendEmail).not.toHaveBeenCalled();
     });
 
-    it('creates a hashed reset token that expires after thirty minutes', async () => {
-        const {
-            dependencies,
-            findEmailAuthUserByEmail,
-            generatePasswordResetToken,
-            hashPasswordResetToken,
-            createPasswordReset,
-        } = makeDependencies();
+    it('persists a token hash, dispatches the email, and reports emailDispatched true', async () => {
+        const { dependencies, setToken, sendEmail } = makeDependencies();
+        const { buildMessage, calls } = makeBuildMessage();
 
-        const result: RequestPasswordResetResult = await requestPasswordReset(
+        const result = await requestPasswordReset(
             { email: ' User@Example.COM ' },
             dependencies,
-            { now }
+            { buildMessage }
         );
 
-        expect(findEmailAuthUserByEmail).toHaveBeenCalledWith(
-            'user@example.com'
+        expect(result.ok).toBe(true);
+        expect(result.tokenIssued).toBe(true);
+        expect(result.emailDispatched).toBe(true);
+
+        expect(setToken).toHaveBeenCalledTimes(1);
+        const [purpose, email, value, ttl] = setToken.mock.calls[0] as [
+            string,
+            string,
+            { status: 'pending'; tokenHash: string },
+            number,
+        ];
+        expect(purpose).toBe('password_reset');
+        expect(email).toBe('user@example.com');
+        expect(value.status).toBe('pending');
+        expect(value.tokenHash).toBe(hashEmailToken(calls[0]!));
+        expect(ttl).toBe(PASSWORD_RESET_TTL_SECONDS);
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        expect(sendEmail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'user@example.com',
+                subject: 'Reset your password',
+            })
         );
-        expect(generatePasswordResetToken).toHaveBeenCalledTimes(1);
-        expect(hashPasswordResetToken).toHaveBeenCalledWith('raw-token');
-        expect(createPasswordReset).toHaveBeenCalledWith({
-            userId: 'user-1',
-            tokenHash: 'hashed-token',
-            expiresAt,
-        });
-        expect(result).toEqual({ ok: true, token: 'raw-token', expiresAt });
     });
 
-    it('uses the current system time when no runtime override is provided', async () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(now);
+    it('reports emailDispatched false when the dispatcher resolves false', async () => {
+        const { dependencies } = makeDependencies({ sendEmailResolves: false });
+        const { buildMessage } = makeBuildMessage();
 
-        try {
-            const { dependencies, createPasswordReset } = makeDependencies();
+        const result = await requestPasswordReset(
+            { email: 'user@example.com' },
+            dependencies,
+            { buildMessage }
+        );
 
-            const result = await requestPasswordReset(
-                { email: 'user@example.com' },
-                dependencies
-            );
+        expect(result).toEqual({
+            ok: true,
+            tokenIssued: true,
+            emailDispatched: false,
+        });
+    });
 
-            expect(createPasswordReset).toHaveBeenCalledWith({
-                userId: 'user-1',
-                tokenHash: 'hashed-token',
-                expiresAt,
-            });
-            expect(result).toEqual({
-                ok: true,
-                token: 'raw-token',
-                expiresAt,
-            });
-        } finally {
-            vi.useRealTimers();
-        }
+    it('keeps tokenIssued true and reports emailDispatched false when the dispatcher throws', async () => {
+        const { dependencies, setToken } = makeDependencies({
+            sendEmailThrows: true,
+        });
+        const { buildMessage } = makeBuildMessage();
+
+        const result = await requestPasswordReset(
+            { email: 'user@example.com' },
+            dependencies,
+            { buildMessage }
+        );
+
+        expect(setToken).toHaveBeenCalledTimes(1);
+        expect(result).toEqual({
+            ok: true,
+            tokenIssued: true,
+            emailDispatched: false,
+        });
     });
 });

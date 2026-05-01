@@ -29,6 +29,8 @@ export interface AuthUserRecord {
     avatarUrl: string | null;
     /** Subscription tier assigned to the user. */
     tier: UserTier;
+    /** Whether the email address has been verified by the user. */
+    emailVerified: boolean;
     /** Timestamp when the account was created. */
     createdAt: Date;
     /** Timestamp when the account was last updated. */
@@ -58,24 +60,6 @@ export interface AuthSessionRecord {
 }
 
 /**
- * Persisted one-time password reset credential.
- */
-export interface PasswordResetRecord {
-    /** Reset token row identifier. */
-    id: string;
-    /** User that requested the password reset. */
-    userId: string;
-    /** Hashed reset token. Raw tokens are never persisted. */
-    tokenHash: string;
-    /** Fixed expiration timestamp. */
-    expiresAt: Date;
-    /** Timestamp when the reset token was consumed; null while active. */
-    usedAt: Date | null;
-    /** Timestamp when the reset token was created. */
-    createdAt: Date;
-}
-
-/**
  * Input for creating a new email-based user account.
  */
 export interface CreateEmailUserInput {
@@ -83,10 +67,16 @@ export interface CreateEmailUserInput {
     email: string;
     /** Hashed password produced by {@link PasswordHasher.hashPassword}. */
     passwordHash: string;
-    /** Optional display name. */
-    name?: string;
-    /** Optional avatar image URL. */
-    avatarUrl?: string;
+    /** Optional display name; `null` stores an explicit empty profile value. */
+    name?: string | null;
+    /** Optional avatar image URL; `null` stores an explicit empty profile value. */
+    avatarUrl?: string | null;
+    /**
+     * Whether the email address was verified prior to account creation.
+     * Defaults to `false` when omitted; set to `true` when the verification
+     * flow has confirmed ownership of the address.
+     */
+    emailVerified?: boolean;
 }
 
 /**
@@ -158,32 +148,6 @@ export interface CreateUsageLogInput {
     modelUsed: ModelId;
     /** Calendar date bucket in `YYYY-MM-DD` format. */
     date: string;
-}
-
-/**
- * Input for creating a new password reset token row.
- */
-export interface CreatePasswordResetInput {
-    /** User that owns the reset token. */
-    userId: string;
-    /** Hashed reset token. */
-    tokenHash: string;
-    /** Fixed expiration timestamp. */
-    expiresAt: Date;
-}
-
-/**
- * Input for completing a password reset.
- */
-export interface CompletePasswordResetInput {
-    /** Password reset row identifier. */
-    resetId: string;
-    /** User whose password hash should be replaced. */
-    userId: string;
-    /** New password hash produced by {@link PasswordHasher.hashPassword}. */
-    passwordHash: string;
-    /** Timestamp recorded on the consumed reset token. */
-    usedAt: Date;
 }
 
 /**
@@ -268,6 +232,15 @@ export interface UserRepository {
      * @returns Whether a user row was deleted.
      */
     deleteUser(userId: string): Promise<boolean>;
+
+    /**
+     * Replace a user's password hash. Used to complete a password reset.
+     *
+     * @param userId - User UUID whose password should be updated.
+     * @param passwordHash - New password hash produced by {@link PasswordHasher.hashPassword}.
+     * @returns Whether a user row was updated.
+     */
+    updatePassword(userId: string, passwordHash: string): Promise<boolean>;
 }
 
 /**
@@ -350,41 +323,6 @@ export interface SessionRepository {
      * @returns Whether a session row was deleted.
      */
     deleteSession(sessionToken: string): Promise<boolean>;
-}
-
-/**
- * Interface for password reset persistence operations.
- */
-export interface PasswordResetRepository {
-    /**
-     * Create a password reset token row.
-     *
-     * @param input - Token hash, target user, and expiration timestamp.
-     * @returns The created {@link PasswordResetRecord}.
-     */
-    createPasswordReset(
-        input: CreatePasswordResetInput
-    ): Promise<PasswordResetRecord>;
-
-    /**
-     * Find a password reset token row by hashed token.
-     *
-     * Expiration and one-time-use checks are enforced by the application layer.
-     *
-     * @param tokenHash - Hashed reset token.
-     * @returns The matching reset row, or null when no row exists.
-     */
-    findPasswordResetByTokenHash(
-        tokenHash: string
-    ): Promise<PasswordResetRecord | null>;
-
-    /**
-     * Persist the new user password hash and mark the reset token as consumed.
-     *
-     * @param input - Reset id, user id, new password hash, and consumed timestamp.
-     * @returns Whether both updates completed.
-     */
-    completePasswordReset(input: CompletePasswordResetInput): Promise<boolean>;
 }
 
 /** Connection configuration required to instantiate a database client. */

@@ -38,8 +38,10 @@ export {
     loginUser,
     logoutUser,
     registerUser,
+    requestEmailVerification,
     requestPasswordReset,
     socialLoginUser,
+    verifyEmail,
 } from './application/auth';
 export {
     createUserTierContext,
@@ -270,6 +272,9 @@ export {
     hashClientIp,
 } from './infrastructure/chat/tokenStore';
 
+// Email token store
+export { createEmailTokenStore } from './infrastructure/email';
+
 // Skills loader
 export { FileSkillsLoader } from './infrastructure/skills/loader';
 
@@ -339,7 +344,6 @@ export {
     OAUTH_PROVIDER_VALUES,
     oauthAccounts,
     oauthProviderEnum,
-    passwordResets,
     sessions,
     USAGE_ACTION_TYPE_VALUES,
     usageActionTypeEnum,
@@ -447,7 +451,6 @@ export type {
     ConfirmPasswordResetError,
     ConfirmPasswordResetErrorCode,
     ConfirmPasswordResetInput,
-    ConfirmPasswordResetOptions,
     ConfirmPasswordResetResult,
     DeleteAccountDependencies,
     DeleteAccountError,
@@ -467,13 +470,16 @@ export type {
     LogoutUserInput,
     LogoutUserOptions,
     LogoutUserResult,
-    PasswordResetTokenGenerator,
-    PasswordResetTokenHasher,
+    RegisterUserDependencies,
     RegisterUserError,
     RegisterUserErrorCode,
     RegisterUserErrorField,
     RegisterUserInput,
     RegisterUserResult,
+    RequestEmailVerificationDependencies,
+    RequestEmailVerificationInput,
+    RequestEmailVerificationOptions,
+    RequestEmailVerificationResult,
     RequestPasswordResetDependencies,
     RequestPasswordResetInput,
     RequestPasswordResetOptions,
@@ -484,6 +490,11 @@ export type {
     SocialLoginUserInput,
     SocialLoginUserOptions,
     SocialLoginUserResult,
+    VerifyEmailDependencies,
+    VerifyEmailError,
+    VerifyEmailErrorCode,
+    VerifyEmailInput,
+    VerifyEmailResult,
 } from './application/auth';
 export type {
     CreateUserTierContextInput,
@@ -515,14 +526,19 @@ export type { PasswordHasher, PasswordVerifier } from './infrastructure/auth';
 export type { CacheProvider } from './infrastructure/cache/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
+    EmailDispatcher,
+    EmailMessage,
+    EmailTokenPurpose,
+    EmailTokenStore,
+    EmailTokenValue,
+} from './infrastructure/email';
+export type {
     AssetTranslationRecord,
     AssetTranslationRepository,
     AuthSessionRecord,
     AuthUserRecord,
-    CompletePasswordResetInput,
     CreateEmailUserInput,
     CreateOAuthUserInput,
-    CreatePasswordResetInput,
     CreateSessionInput,
     CreateUsageLogInput,
     DatabaseConfig,
@@ -532,8 +548,6 @@ export type {
     OAuthAccountRecord,
     OAuthAccountRepository,
     OAuthUserRepository,
-    PasswordResetRecord,
-    PasswordResetRepository,
     RecordUsageInput,
     SessionRepository,
     SiglensDatabase,

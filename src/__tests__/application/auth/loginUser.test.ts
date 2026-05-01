@@ -25,6 +25,8 @@ function makeUser(passwordHash: string | null): EmailAuthUserRecord {
         name: null,
         avatarUrl: null,
         tier: 'free',
+
+        emailVerified: true,
         createdAt,
         updatedAt,
     };
@@ -200,6 +202,8 @@ describe('loginUser', () => {
                 name: null,
                 avatarUrl: null,
                 tier: 'free',
+
+                emailVerified: true,
                 createdAt,
                 updatedAt,
             },

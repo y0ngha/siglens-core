@@ -23,6 +23,7 @@ function makeDependencies(deleted: boolean): {
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),
                 deleteUser,
+                updatePassword: vi.fn(),
             },
             oauthAccounts: {
                 findByUserId: vi.fn().mockResolvedValue([]),

@@ -1,27 +1,22 @@
-import { and, eq, isNull } from 'drizzle-orm';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { OAuthProvider, Tier } from '@/domain/types';
+import { and, eq } from 'drizzle-orm';
 import { tryReadEncryptionKey } from './config';
-import { oauthAccounts, passwordResets, users } from './schema';
+import { oauthAccounts, users } from './schema';
 import { encryptToken } from './tokenEncryption';
 import type {
     AuthUserRecord,
-    CompletePasswordResetInput,
     CreateEmailUserInput,
     CreateOAuthUserInput,
-    CreatePasswordResetInput,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
     OAuthUserRepository,
-    PasswordResetRecord,
-    PasswordResetRepository,
     SiglensDatabase,
     UserRepository,
     UserTierRepository,
 } from './types';
 
 class OAuthAccountConflictError extends Error {}
-class PasswordResetCompletionConflictError extends Error {}
 
 function encryptOptional(
     token: string | undefined,
@@ -39,6 +34,7 @@ const authUserColumns = {
     name: users.name,
     avatarUrl: users.avatarUrl,
     tier: users.tier,
+    emailVerified: users.emailVerified,
     createdAt: users.createdAt,
     updatedAt: users.updatedAt,
 };
@@ -48,19 +44,10 @@ const emailAuthUserColumns = {
     passwordHash: users.passwordHash,
 };
 
-const passwordResetColumns = {
-    id: passwordResets.id,
-    userId: passwordResets.userId,
-    tokenHash: passwordResets.tokenHash,
-    expiresAt: passwordResets.expiresAt,
-    usedAt: passwordResets.usedAt,
-    createdAt: passwordResets.createdAt,
-};
-
 /**
  * Drizzle ORM implementation of {@link UserRepository}, {@link EmailAuthUserRepository},
- * {@link OAuthUserRepository}, {@link PasswordResetRepository}, and
- * {@link UserTierRepository} backed by a Neon PostgreSQL database.
+ * {@link OAuthUserRepository}, and {@link UserTierRepository} backed by a Neon
+ * PostgreSQL database.
  *
  * @param db - Drizzle-wrapped Neon database client; obtain via {@link createDatabaseClient}.
  */
@@ -69,7 +56,6 @@ export class DrizzleUserRepository
         UserRepository,
         EmailAuthUserRepository,
         OAuthUserRepository,
-        PasswordResetRepository,
         UserTierRepository
 {
     constructor(private readonly db: SiglensDatabase) {}
@@ -103,6 +89,19 @@ export class DrizzleUserRepository
         return deletedUsers.length > 0;
     }
 
+    async updatePassword(
+        userId: string,
+        passwordHash: string
+    ): Promise<boolean> {
+        const updatedUsers = await this.db
+            .update(users)
+            .set({ passwordHash })
+            .where(eq(users.id, userId))
+            .returning({ id: users.id });
+
+        return updatedUsers.length > 0;
+    }
+
     async findEmailAuthUserByEmail(
         email: string
     ): Promise<EmailAuthUserRecord | null> {
@@ -126,6 +125,7 @@ export class DrizzleUserRepository
                 name: input.name ?? null,
                 avatarUrl: input.avatarUrl ?? null,
                 tier: DEFAULT_TIER,
+                emailVerified: input.emailVerified ?? false,
             })
             .onConflictDoNothing({ target: users.email })
             .returning(authUserColumns);
@@ -165,6 +165,7 @@ export class DrizzleUserRepository
                         name: input.name ?? null,
                         avatarUrl: input.avatarUrl ?? null,
                         tier: DEFAULT_TIER,
+                        emailVerified: true,
                     })
                     .onConflictDoNothing({ target: users.email })
                     .returning(authUserColumns);
@@ -232,74 +233,5 @@ export class DrizzleUserRepository
             .returning({ tier: users.tier });
 
         return user?.tier ?? null;
-    }
-
-    async createPasswordReset(
-        input: CreatePasswordResetInput
-    ): Promise<PasswordResetRecord> {
-        const [passwordReset] = await this.db
-            .insert(passwordResets)
-            .values({
-                userId: input.userId,
-                tokenHash: input.tokenHash,
-                expiresAt: input.expiresAt,
-            })
-            .returning(passwordResetColumns);
-
-        return passwordReset!;
-    }
-
-    async findPasswordResetByTokenHash(
-        tokenHash: string
-    ): Promise<PasswordResetRecord | null> {
-        const [passwordReset] = await this.db
-            .select(passwordResetColumns)
-            .from(passwordResets)
-            .where(eq(passwordResets.tokenHash, tokenHash))
-            .limit(1);
-
-        return passwordReset ?? null;
-    }
-
-    async completePasswordReset(
-        input: CompletePasswordResetInput
-    ): Promise<boolean> {
-        try {
-            return await this.db.transaction(async tx => {
-                const [passwordReset] = await tx
-                    .update(passwordResets)
-                    .set({ usedAt: input.usedAt })
-                    .where(
-                        and(
-                            eq(passwordResets.id, input.resetId),
-                            eq(passwordResets.userId, input.userId),
-                            isNull(passwordResets.usedAt)
-                        )
-                    )
-                    .returning({ id: passwordResets.id });
-
-                if (passwordReset === undefined) {
-                    return false;
-                }
-
-                const [user] = await tx
-                    .update(users)
-                    .set({ passwordHash: input.passwordHash })
-                    .where(eq(users.id, input.userId))
-                    .returning({ id: users.id });
-
-                if (user === undefined) {
-                    throw new PasswordResetCompletionConflictError();
-                }
-
-                return true;
-            });
-        } catch (error) {
-            if (error instanceof PasswordResetCompletionConflictError) {
-                return false;
-            }
-
-            throw error;
-        }
     }
 }

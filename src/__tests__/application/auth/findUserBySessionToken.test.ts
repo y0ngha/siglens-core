@@ -18,6 +18,8 @@ const user: AuthUserRecord = {
     name: null,
     avatarUrl: null,
     tier: 'free',
+
+    emailVerified: true,
     createdAt: new Date('2026-04-01T00:00:00.000Z'),
     updatedAt: new Date('2026-04-01T00:00:00.000Z'),
 };
@@ -54,6 +56,7 @@ function makeDependencies(options: {
                 findById,
                 createEmailUser: vi.fn(),
                 deleteUser: vi.fn(),
+                updatePassword: vi.fn(),
             },
             sessions: {
                 createSession: vi.fn(),

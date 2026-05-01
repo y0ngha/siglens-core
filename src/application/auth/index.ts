@@ -10,8 +10,10 @@ export { findUserBySessionToken } from './findUserBySessionToken';
 export { loginUser } from './loginUser';
 export { logoutUser } from './logoutUser';
 export { registerUser } from './registerUser';
+export { requestEmailVerification } from './requestEmailVerification';
 export { requestPasswordReset } from './requestPasswordReset';
 export { socialLoginUser } from './socialLoginUser';
+export { verifyEmail } from './verifyEmail';
 export type {
     AuthSessionCookie,
     AuthSessionOptions,
@@ -19,7 +21,6 @@ export type {
     ConfirmPasswordResetError,
     ConfirmPasswordResetErrorCode,
     ConfirmPasswordResetInput,
-    ConfirmPasswordResetOptions,
     ConfirmPasswordResetResult,
     DeleteAccountDependencies,
     DeleteAccountError,
@@ -39,13 +40,16 @@ export type {
     LogoutUserInput,
     LogoutUserOptions,
     LogoutUserResult,
-    PasswordResetTokenGenerator,
-    PasswordResetTokenHasher,
+    RegisterUserDependencies,
     RegisterUserError,
     RegisterUserErrorCode,
     RegisterUserErrorField,
     RegisterUserInput,
     RegisterUserResult,
+    RequestEmailVerificationDependencies,
+    RequestEmailVerificationInput,
+    RequestEmailVerificationOptions,
+    RequestEmailVerificationResult,
     RequestPasswordResetDependencies,
     RequestPasswordResetInput,
     RequestPasswordResetOptions,
@@ -56,4 +60,9 @@ export type {
     SocialLoginUserInput,
     SocialLoginUserOptions,
     SocialLoginUserResult,
+    VerifyEmailDependencies,
+    VerifyEmailError,
+    VerifyEmailErrorCode,
+    VerifyEmailInput,
+    VerifyEmailResult,
 } from './types';

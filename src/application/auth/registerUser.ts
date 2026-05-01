@@ -3,16 +3,21 @@ import {
     validateEmail,
     validatePassword,
 } from '@/domain/auth/validation';
-import type { PasswordHasher } from '@/infrastructure/auth';
-import type { UserRepository } from '@/infrastructure/db/types';
-import { EMAIL_ALREADY_EXISTS_CODE } from './constants';
+import {
+    EMAIL_ALREADY_EXISTS_CODE,
+    EMAIL_NOT_VERIFIED_CODE,
+} from './constants';
 import type {
+    RegisterUserDependencies,
     RegisterUserError,
     RegisterUserInput,
     RegisterUserResult,
 } from './types';
 
+const PURPOSE = 'email_verification' as const;
 const EMAIL_ALREADY_EXISTS_MESSAGE = 'Email is already registered';
+const EMAIL_NOT_VERIFIED_MESSAGE =
+    'Email must be verified before registration. Complete the verification flow first.';
 
 function emailAlreadyExistsError(): RegisterUserError {
     return {
@@ -22,38 +27,43 @@ function emailAlreadyExistsError(): RegisterUserError {
     };
 }
 
+function emailNotVerifiedError(): RegisterUserError {
+    return {
+        code: EMAIL_NOT_VERIFIED_CODE,
+        field: 'email',
+        message: EMAIL_NOT_VERIFIED_MESSAGE,
+    };
+}
+
 /**
  * Register a new user with email and password.
  *
- * Validates email format and password strength before checking for duplicates.
+ * Validates email format and password strength, confirms that the caller has
+ * already completed the email-verification flow (the email must be in the
+ * `verified` state in the {@link EmailTokenStore}), creates the account with
+ * `emailVerified: true`, and clears the verification entry on success.
+ *
  * Email is normalized (trimmed, lowercased) before validation and storage.
  * Optional `name` and `avatarUrl` are trimmed before persistence.
  *
  * @param input - Registration data: email, password, and optional name/avatarUrl.
- * @param repository - User persistence interface for duplicate checks and account creation.
- * @param passwordHasher - Password hashing interface; invoked only after validation passes.
+ * @param dependencies - User persistence, password hashing, and email-token store.
  * @returns `{ ok: true, user }` on success, or `{ ok: false, error }` with a typed error code.
  *
  * @example
  * ```typescript
+ * // Caller must have completed requestEmailVerification + verifyEmail first.
  * const result = await registerUser(
  *     { email: 'user@example.com', password: 'Secret1!' },
- *     drizzleUserRepository,
- *     bcryptHasher,
+ *     { users, passwordHasher, emailTokens }
  * );
- * if (result.ok) {
- *     console.log('Created user:', result.user.id);
- * } else {
- *     console.error('Registration failed:', result.error.code);
- * }
  * ```
  *
  * @see {@link RegisterUserResult} for the discriminated union shape.
  */
 export async function registerUser(
     input: RegisterUserInput,
-    repository: UserRepository,
-    passwordHasher: PasswordHasher
+    dependencies: RegisterUserDependencies
 ): Promise<RegisterUserResult> {
     const email = normalizeEmail(input.email);
     const emailError = validateEmail(email);
@@ -62,20 +72,31 @@ export async function registerUser(
     const passwordError = validatePassword(input.password);
     if (passwordError !== null) return { ok: false, error: passwordError };
 
-    const existingUser = await repository.findByEmail(email);
+    const verification = await dependencies.emailTokens.get(PURPOSE, email);
+    if (verification === null || verification.status !== 'verified') {
+        return { ok: false, error: emailNotVerifiedError() };
+    }
+
+    const existingUser = await dependencies.users.findByEmail(email);
     if (existingUser !== null) {
         return { ok: false, error: emailAlreadyExistsError() };
     }
 
-    const passwordHash = await passwordHasher.hashPassword(input.password);
-    const user = await repository.createEmailUser({
+    const passwordHash = await dependencies.passwordHasher.hashPassword(
+        input.password
+    );
+    const user = await dependencies.users.createEmailUser({
         email,
         passwordHash,
-        name: input.name?.trim(),
-        avatarUrl: input.avatarUrl?.trim(),
+        name: input.name?.trim() || null,
+        avatarUrl: input.avatarUrl?.trim() || null,
+        emailVerified: true,
     });
 
-    return user === null
-        ? { ok: false, error: emailAlreadyExistsError() }
-        : { ok: true, user };
+    if (user === null) {
+        return { ok: false, error: emailAlreadyExistsError() };
+    }
+
+    await dependencies.emailTokens.delete(PURPOSE, email);
+    return { ok: true, user };
 }

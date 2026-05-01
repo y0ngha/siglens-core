@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/y0ngha/siglens-core/compare/v0.1.14...v0.2.0) (2026-05-01)
+
+### BREAKING CHANGES
+
+* `registerUser` now accepts a dependencies object containing `users`, `passwordHasher`, and `emailTokens`.
+* `requestPasswordReset` now requires `EmailTokenStore`, `EmailDispatcher`, and `buildMessage` options for Redis-backed token storage and dispatch.
+* `confirmPasswordReset` input now requires `email`, and its dependencies now use `emailAuthUsers`, `users`, `emailTokens`, and `passwordHasher`.
+* Password reset persistence moved from the PostgreSQL `password_resets` table to Redis keys under `email_token:{purpose}:{email}`.
+
+### Features
+
+* add Redis-backed email verification and password reset token flows.
+
 ## [0.1.14](https://github.com/y0ngha/siglens-core/compare/v0.1.12...v0.1.14) (2026-04-30)
 
 

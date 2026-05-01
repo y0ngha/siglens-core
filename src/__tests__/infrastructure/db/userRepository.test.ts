@@ -1,12 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-    oauthAccounts,
-    passwordResets,
-    users,
-} from '@/infrastructure/db/schema';
+import { oauthAccounts, users } from '@/infrastructure/db/schema';
 import { decryptToken } from '@/infrastructure/db/tokenEncryption';
-import { DrizzleUserRepository } from '@/infrastructure/db/userRepository';
 import type { SiglensDatabase } from '@/infrastructure/db/types';
+import { DrizzleUserRepository } from '@/infrastructure/db/userRepository';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const VALID_KEY_HEX = 'a'.repeat(64);
 
@@ -16,17 +12,9 @@ const userRecord = {
     name: 'Ada',
     avatarUrl: null,
     tier: 'free',
+    emailVerified: true,
     createdAt: new Date('2026-04-26T00:00:00.000Z'),
     updatedAt: new Date('2026-04-26T00:00:01.000Z'),
-};
-
-const passwordResetRecord = {
-    id: 'reset-1',
-    userId: 'user-1',
-    tokenHash: 'hashed-token',
-    expiresAt: new Date('2026-04-28T00:30:00.000Z'),
-    usedAt: null,
-    createdAt: new Date('2026-04-28T00:00:00.000Z'),
 };
 
 function makeSelectDb(rows: unknown[]): {
@@ -70,45 +58,6 @@ function makeInsertDb(rows: unknown[]): {
         insert,
         values,
         onConflictDoNothing,
-        returning,
-    };
-}
-
-function makeSimpleInsertDb(rows: unknown[]): {
-    db: SiglensDatabase;
-    insert: ReturnType<typeof vi.fn>;
-    values: ReturnType<typeof vi.fn>;
-    returning: ReturnType<typeof vi.fn>;
-} {
-    const returning = vi.fn().mockResolvedValue(rows);
-    const values = vi.fn(() => ({ returning }));
-    const insert = vi.fn(() => ({ values }));
-
-    return {
-        db: { insert } as unknown as SiglensDatabase,
-        insert,
-        values,
-        returning,
-    };
-}
-
-function makeUpdateDb(rows: unknown[]): {
-    db: SiglensDatabase;
-    update: ReturnType<typeof vi.fn>;
-    set: ReturnType<typeof vi.fn>;
-    where: ReturnType<typeof vi.fn>;
-    returning: ReturnType<typeof vi.fn>;
-} {
-    const returning = vi.fn().mockResolvedValue(rows);
-    const where = vi.fn(() => ({ returning }));
-    const set = vi.fn(() => ({ where }));
-    const update = vi.fn(() => ({ set }));
-
-    return {
-        db: { update } as unknown as SiglensDatabase,
-        update,
-        set,
-        where,
         returning,
     };
 }
@@ -189,43 +138,24 @@ function makeFailingTransactionDb(error: Error): {
     };
 }
 
-function makeCompletePasswordResetDb(options: {
-    userRows: unknown[];
-    resetRows: unknown[];
-}): {
+function makeUpdateDb(rows: unknown[]): {
     db: SiglensDatabase;
-    transaction: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
-    userSet: ReturnType<typeof vi.fn>;
-    resetSet: ReturnType<typeof vi.fn>;
-    userWhere: ReturnType<typeof vi.fn>;
-    resetWhere: ReturnType<typeof vi.fn>;
-    userReturning: ReturnType<typeof vi.fn>;
-    resetReturning: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    returning: ReturnType<typeof vi.fn>;
 } {
-    const userReturning = vi.fn().mockResolvedValue(options.userRows);
-    const resetReturning = vi.fn().mockResolvedValue(options.resetRows);
-    const userWhere = vi.fn(() => ({ returning: userReturning }));
-    const resetWhere = vi.fn(() => ({ returning: resetReturning }));
-    const userSet = vi.fn(() => ({ where: userWhere }));
-    const resetSet = vi.fn(() => ({ where: resetWhere }));
-    const update = vi
-        .fn()
-        .mockReturnValueOnce({ set: resetSet })
-        .mockReturnValueOnce({ set: userSet });
-    const tx = { update };
-    const transaction = vi.fn(async callback => callback(tx));
+    const returning = vi.fn().mockResolvedValue(rows);
+    const where = vi.fn(() => ({ returning }));
+    const set = vi.fn(() => ({ where }));
+    const update = vi.fn(() => ({ set }));
 
     return {
-        db: { transaction } as unknown as SiglensDatabase,
-        transaction,
+        db: { update } as unknown as SiglensDatabase,
         update,
-        userSet,
-        resetSet,
-        userWhere,
-        resetWhere,
-        userReturning,
-        resetReturning,
+        set,
+        where,
+        returning,
     };
 }
 
@@ -349,6 +279,7 @@ describe('DrizzleUserRepository', () => {
             name: 'Ada',
             avatarUrl: null,
             tier: 'free',
+            emailVerified: false,
         });
         expect(onConflictDoNothing).toHaveBeenCalledWith({
             target: users.email,
@@ -359,6 +290,7 @@ describe('DrizzleUserRepository', () => {
             name: users.name,
             avatarUrl: users.avatarUrl,
             tier: users.tier,
+            emailVerified: users.emailVerified,
             createdAt: users.createdAt,
             updatedAt: users.updatedAt,
         });
@@ -454,6 +386,7 @@ describe('DrizzleUserRepository', () => {
             name: 'Ada',
             avatarUrl: null,
             tier: 'free',
+            emailVerified: true,
         });
         expect(accountValues).toHaveBeenCalledWith({
             userId: 'user-1',
@@ -660,135 +593,30 @@ describe('DrizzleUserRepository', () => {
         expect(result).toBeNull();
     });
 
-    it('creates a password reset token row', async () => {
-        const { db, insert, values, returning } = makeSimpleInsertDb([
-            passwordResetRecord,
-        ]);
+    it('updates the password hash and returns true when a row matches', async () => {
+        const { db, update, set, where } = makeUpdateDb([{ id: 'user-1' }]);
         const repository = new DrizzleUserRepository(db);
 
-        const result = await repository.createPasswordReset({
-            userId: 'user-1',
-            tokenHash: 'hashed-token',
-            expiresAt: passwordResetRecord.expiresAt,
-        });
+        const result = await repository.updatePassword(
+            'user-1',
+            'new-password-hash'
+        );
 
-        expect(insert).toHaveBeenCalledWith(passwordResets);
-        expect(values).toHaveBeenCalledWith({
-            userId: 'user-1',
-            tokenHash: 'hashed-token',
-            expiresAt: passwordResetRecord.expiresAt,
-        });
-        expect(returning).toHaveBeenCalledWith({
-            id: passwordResets.id,
-            userId: passwordResets.userId,
-            tokenHash: passwordResets.tokenHash,
-            expiresAt: passwordResets.expiresAt,
-            usedAt: passwordResets.usedAt,
-            createdAt: passwordResets.createdAt,
-        });
-        expect(result).toEqual(passwordResetRecord);
-    });
-
-    it('returns a password reset found by token hash', async () => {
-        const { db, select, from, where, limit } = makeSelectDb([
-            passwordResetRecord,
-        ]);
-        const repository = new DrizzleUserRepository(db);
-
-        const result =
-            await repository.findPasswordResetByTokenHash('hashed-token');
-
-        expect(select).toHaveBeenCalledWith(expect.any(Object));
-        expect(from).toHaveBeenCalledWith(passwordResets);
+        expect(update).toHaveBeenCalledWith(users);
+        expect(set).toHaveBeenCalledWith({ passwordHash: 'new-password-hash' });
         expect(where).toHaveBeenCalledWith(expect.any(Object));
-        expect(limit).toHaveBeenCalledWith(1);
-        expect(result).toEqual(passwordResetRecord);
-    });
-
-    it('returns null when no password reset token matches', async () => {
-        const { db } = makeSelectDb([]);
-        const repository = new DrizzleUserRepository(db);
-
-        const result =
-            await repository.findPasswordResetByTokenHash('missing-token');
-
-        expect(result).toBeNull();
-    });
-
-    it('updates the password hash and consumes the reset token in one transaction', async () => {
-        const usedAt = new Date('2026-04-28T00:10:00.000Z');
-        const { db, transaction, update, userSet, resetSet, resetWhere } =
-            makeCompletePasswordResetDb({
-                userRows: [{ id: 'user-1' }],
-                resetRows: [{ id: 'reset-1' }],
-            });
-        const repository = new DrizzleUserRepository(db);
-
-        const result = await repository.completePasswordReset({
-            resetId: 'reset-1',
-            userId: 'user-1',
-            passwordHash: 'new-password-hash',
-            usedAt,
-        });
-
-        expect(transaction).toHaveBeenCalledTimes(1);
-        expect(update).toHaveBeenNthCalledWith(1, passwordResets);
-        expect(resetSet).toHaveBeenCalledWith({ usedAt });
-        expect(resetWhere).toHaveBeenCalledWith(expect.any(Object));
-        expect(update).toHaveBeenNthCalledWith(2, users);
-        expect(userSet).toHaveBeenCalledWith({
-            passwordHash: 'new-password-hash',
-        });
         expect(result).toBe(true);
     });
 
-    it('returns false when completing a password reset for a missing user', async () => {
-        const { db, update } = makeCompletePasswordResetDb({
-            userRows: [],
-            resetRows: [{ id: 'reset-1' }],
-        });
+    it('returns false when updatePassword finds no matching user', async () => {
+        const { db } = makeUpdateDb([]);
         const repository = new DrizzleUserRepository(db);
 
-        const result = await repository.completePasswordReset({
-            resetId: 'reset-1',
-            userId: 'missing-user',
-            passwordHash: 'new-password-hash',
-            usedAt: new Date('2026-04-28T00:10:00.000Z'),
-        });
-
-        expect(update).toHaveBeenCalledTimes(2);
-        expect(result).toBe(false);
-    });
-
-    it('returns false when completing a password reset for a missing token row', async () => {
-        const { db } = makeCompletePasswordResetDb({
-            userRows: [{ id: 'user-1' }],
-            resetRows: [],
-        });
-        const repository = new DrizzleUserRepository(db);
-
-        const result = await repository.completePasswordReset({
-            resetId: 'missing-reset',
-            userId: 'user-1',
-            passwordHash: 'new-password-hash',
-            usedAt: new Date('2026-04-28T00:10:00.000Z'),
-        });
+        const result = await repository.updatePassword(
+            'missing-user',
+            'new-password-hash'
+        );
 
         expect(result).toBe(false);
-    });
-
-    it('rethrows unexpected password reset completion failures', async () => {
-        const error = new Error('database unavailable');
-        const { db } = makeFailingTransactionDb(error);
-        const repository = new DrizzleUserRepository(db);
-
-        await expect(
-            repository.completePasswordReset({
-                resetId: 'reset-1',
-                userId: 'user-1',
-                passwordHash: 'new-password-hash',
-                usedAt: new Date('2026-04-28T00:10:00.000Z'),
-            })
-        ).rejects.toThrow(error);
     });
 });

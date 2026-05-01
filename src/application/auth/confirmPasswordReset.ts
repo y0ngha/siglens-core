@@ -1,4 +1,8 @@
-import { validatePassword } from '@/domain/auth/validation';
+import { normalizeEmail, validatePassword } from '@/domain/auth/validation';
+import {
+    hashEmailToken,
+    safeCompareTokenHashes,
+} from '@/infrastructure/auth/tokenUtils';
 import {
     PASSWORD_RESET_EXPIRED_TOKEN_CODE,
     PASSWORD_RESET_INVALID_TOKEN_CODE,
@@ -7,10 +11,10 @@ import type {
     ConfirmPasswordResetDependencies,
     ConfirmPasswordResetError,
     ConfirmPasswordResetInput,
-    ConfirmPasswordResetOptions,
     ConfirmPasswordResetResult,
 } from './types';
 
+const PURPOSE = 'password_reset' as const;
 const INVALID_TOKEN_MESSAGE = 'Password reset token is invalid';
 const EXPIRED_TOKEN_MESSAGE = 'Password reset token has expired';
 
@@ -31,31 +35,29 @@ function expiredTokenError(): ConfirmPasswordResetError {
 }
 
 /**
- * Confirm a password reset token and replace the user's password hash.
+ * Consume a password reset token and replace the user's password hash.
  *
- * Validates password strength before hashing, verifies the reset token, checks
- * expiration and one-time-use state, updates `users.passwordHash`, and marks
- * the token as consumed.
+ * Validates password strength, looks up the persisted reset token by
+ * `(email, password_reset)` in the {@link EmailTokenStore}, compares its hash
+ * against a fresh hash of the supplied raw token in constant time, and on
+ * success replaces the user's password hash and deletes the reset entry. TTL
+ * is enforced by Redis — an expired entry returns `null` from `get`.
  *
- * @param input - Raw reset token and new plain-text password.
- * @param dependencies - Reset persistence, password hashing, and token hashing services.
- * @param options - Runtime override for the current time.
+ * @param input - Email, raw reset token, and new plain-text password.
+ * @param dependencies - Email-auth lookup, user persistence, token store, and password hashing services.
  * @returns `{ ok: true }` on success, or a typed validation/token error.
  *
  * @example
  * ```typescript
  * const result = await confirmPasswordReset(
- *     { token, newPassword: 'Password1' },
- *     { passwordResets, passwordHasher, tokenHasher },
+ *     { email: 'user@example.com', token, newPassword: 'Password1' },
+ *     { emailAuthUsers, users, emailTokens, passwordHasher }
  * );
  * ```
- *
- * @see {@link ConfirmPasswordResetDependencies} for the dependency contract.
  */
 export async function confirmPasswordReset(
     input: ConfirmPasswordResetInput,
-    dependencies: ConfirmPasswordResetDependencies,
-    options: ConfirmPasswordResetOptions = {}
+    dependencies: ConfirmPasswordResetDependencies
 ): Promise<ConfirmPasswordResetResult> {
     const passwordError = validatePassword(input.newPassword);
 
@@ -63,33 +65,40 @@ export async function confirmPasswordReset(
         return { ok: false, error: passwordError };
     }
 
-    const tokenHash = await dependencies.tokenHasher.hashPasswordResetToken(
-        input.token
-    );
-    const passwordReset =
-        await dependencies.passwordResets.findPasswordResetByTokenHash(
-            tokenHash
-        );
+    const email = normalizeEmail(input.email);
+    const stored = await dependencies.emailTokens.get(PURPOSE, email);
 
-    if (passwordReset === null || passwordReset.usedAt !== null) {
+    if (stored === null) {
+        return { ok: false, error: expiredTokenError() };
+    }
+
+    if (stored.status !== 'pending') {
         return { ok: false, error: invalidTokenError() };
     }
 
-    const now = options.now ?? new Date();
+    const submittedHash = hashEmailToken(input.token);
+    if (!safeCompareTokenHashes(submittedHash, stored.tokenHash)) {
+        return { ok: false, error: invalidTokenError() };
+    }
 
-    if (passwordReset.expiresAt.getTime() <= now.getTime()) {
-        return { ok: false, error: expiredTokenError() };
+    const user =
+        await dependencies.emailAuthUsers.findEmailAuthUserByEmail(email);
+    if (user === null || user.passwordHash === null) {
+        return { ok: false, error: invalidTokenError() };
     }
 
     const passwordHash = await dependencies.passwordHasher.hashPassword(
         input.newPassword
     );
-    const completed = await dependencies.passwordResets.completePasswordReset({
-        resetId: passwordReset.id,
-        userId: passwordReset.userId,
-        passwordHash,
-        usedAt: now,
-    });
+    const updated = await dependencies.users.updatePassword(
+        user.id,
+        passwordHash
+    );
 
-    return completed ? { ok: true } : { ok: false, error: invalidTokenError() };
+    if (!updated) {
+        return { ok: false, error: invalidTokenError() };
+    }
+
+    await dependencies.emailTokens.delete(PURPOSE, email);
+    return { ok: true };
 }

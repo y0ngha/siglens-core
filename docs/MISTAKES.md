@@ -157,6 +157,18 @@ and have been removed from this file.
 ## TypeScript
 
 ```
+0. Pre-computing a conditional value outside its guard block causes type narrowing loss
+   → When a value is only valid inside a conditional branch, compute it inside that branch
+   → TypeScript cannot narrow the type to the non-null/non-undefined value outside the block
+   ❌ const usageOccurredAt = usage !== undefined ? new Date(usage.occurredAt) : new Date();
+      if (usage !== undefined) {
+        recordUsage(usageOccurredAt);  // TS cannot narrow usageOccurredAt to Date without `!`
+      }
+   ✅ if (usage !== undefined) {
+        const usageOccurredAt = new Date(usage.occurredAt);
+        recordUsage(usageOccurredAt);  // TS knows usageOccurredAt is Date
+      }
+
 1. Object.fromEntries return type mismatch
    → Type assertion required: Object.fromEntries(pairs) as Record<K, V>
 
@@ -225,6 +237,17 @@ and have been removed from this file.
    ❌ { ok: false; error: ChatErrorCode | ChatUsageLimitError }  // error field accepts both; callers must typeof-guard
    ✅ Split into separate union branches:
       { ok: false; error: ChatErrorCode } | { ok: false; error: ChatUsageLimitError }
+
+9. Complex type inference chains instead of importing direct types
+   → When a function's return type can be expressed as an imported concrete type, prefer direct import over inference chains
+   → Inference chains (Awaited<ReturnType<typeof fn>>, Omit<T, K>, etc.) prevent type narrowing and obscure the actual contract
+   ❌ type SkillProvider = Awaited<ReturnType<typeof skillsLoader.loadSkills>>;  // infers Promise<Skill[]> → Skill[]
+      → but then helper is called with `SkillProvider | undefined` — caller cannot narrow through destructuring
+   ❌ UsageLimitError builder preserves union { code: 'analysis' | 'chatbot'; ... } instead of discriminated { code: 'analysis'; ... } | { code: 'chatbot'; ... }
+      → caller receives union type and must runtime-check even though builder could narrow
+   ✅ type SkillProvider = Skill[];  // import Skill directly; explicit and preserves narrowing
+   ✅ UsageLimitError as discriminated union: type AnalysisLimitError { code: 'analysis'; ... } | type ChatbotLimitError { code: 'chatbot'; ... }
+      → callers can now narrow with type discriminator without runtime typeof/field checks
 ```
 
 ---
