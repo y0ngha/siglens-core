@@ -1,5 +1,5 @@
 import type { LlmProvider } from '@/domain/llm';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { tryReadLlmApiKeyEncryptionKey } from './config';
 import { userApiKeys } from './schema';
 import { decryptToken, encryptToken } from './tokenEncryption';
@@ -24,13 +24,7 @@ const userApiKeyRowColumns = {
     encryptedApiKey: userApiKeys.encryptedApiKey,
 };
 
-/**
- * @internal Resolve the LLM API key encryption key, throwing when it is
- * absent or invalid. Used by both the write path (`upsert`, before
- * encrypting plaintext) and the read path (`findByUserAndProvider`, before
- * decrypting a fetched ciphertext) so callers fail loudly instead of
- * persisting unencrypted data or returning blank plaintext.
- */
+/** @internal Resolves the LLM encryption key, throwing when absent or invalid, to prevent plaintext storage or blank decryption. */
 function requireLlmEncryptionKey(): string {
     const encryptionKey = tryReadLlmApiKeyEncryptionKey();
     if (encryptionKey === null) {
@@ -67,7 +61,7 @@ export class DrizzleUserApiKeyRepository implements UserApiKeyRepository {
             })
             .onConflictDoUpdate({
                 target: [userApiKeys.userId, userApiKeys.provider],
-                set: { encryptedApiKey },
+                set: { encryptedApiKey, updatedAt: sql`now()` },
             })
             .returning(userApiKeyMetaColumns);
 

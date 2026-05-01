@@ -475,6 +475,7 @@ export interface UserApiKeyRepository {
      *
      * @param input - Plaintext API key plus owner and provider.
      * @returns Metadata for the stored row (no plaintext).
+     * @throws {Error} If `LLM_API_KEY_ENCRYPTION_KEY` is absent or incorrectly sized.
      */
     upsert(input: UpsertUserApiKeyInput): Promise<UserApiKeyMetaRecord>;
 
@@ -492,6 +493,7 @@ export interface UserApiKeyRepository {
      * @param userId - Owner of the stored key.
      * @param provider - LLM provider the key authenticates against.
      * @returns Decrypted record, or `null` when no row exists.
+     * @throws {Error} If `LLM_API_KEY_ENCRYPTION_KEY` is absent or incorrectly sized.
      */
     findByUserAndProvider(
         userId: string,
