@@ -50,6 +50,10 @@ export {
 } from './application/tier';
 export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
+// Inquiry
+export { submitInquiry } from './application/inquiry';
+export type { SubmitInquiryDeps } from './application/inquiry';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -544,6 +548,8 @@ export type {
     DatabaseConfig,
     EmailAuthUserRecord,
     EmailAuthUserRepository,
+    InquiryInput,
+    InquiryRepository,
     KoreanTickerRepository,
     OAuthAccountRecord,
     OAuthAccountRepository,
