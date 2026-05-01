@@ -552,12 +552,16 @@ describe('requestChatCompletion', () => {
                 tokenStore,
                 callGemini,
                 usageLogs,
+                usageRepository,
                 getCurrentDate: () => customDate,
             }
         );
 
         expect(recordPremiumUsage).toHaveBeenCalledWith(
             expect.objectContaining({ date: '2025-12-01' })
+        );
+        expect(recordUsage).toHaveBeenCalledWith(
+            expect.objectContaining({ occurredAt: customDate })
         );
     });
 

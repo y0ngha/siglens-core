@@ -125,7 +125,7 @@ describe('deleteAccount', () => {
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),
                 deleteUser: vi.fn().mockResolvedValue(true),
-                updatePassword: vi.fn(),
+                updatePassword: vi.fn(), // UserRepository interface now requires updatePassword; mock synced for type compliance
             },
             oauthAccounts: { findByUserId },
             oauthRevoker: { revokeToken },
