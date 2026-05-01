@@ -11,6 +11,7 @@ vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/application/market/barsApi');
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
+import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
@@ -206,6 +207,28 @@ describe('submitAnalysis 함수는', () => {
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
+        it('modelId가 포함된 캐시 키로 조회한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                modelId: 'gemini-2.5-flash',
+            });
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                'analysis:AAPL:1Day:gemini-2.5-flash'
+            );
+        });
+
+        it('modelId가 없으면 기본 모델 ID를 포함한 캐시 키로 조회한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+
+            await submitAnalysis(mockSymbol, mockTimeframe);
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`
+            );
+        });
+
         it('사용량 옵션이 있으면 캐시 결과 반환 후 분석 사용량을 기록한다', async () => {
             const occurredAt = new Date('2026-04-29T00:00:00.000Z');
             mockCacheGet.mockResolvedValueOnce(mockResult);
@@ -345,9 +368,26 @@ describe('submitAnalysis 함수는', () => {
                 userId: null,
                 ipAddress: '203.0.113.10',
                 actionType: 'analysis',
-                modelUsed: 'analysis-worker',
+                modelUsed: DEFAULT_ANALYSIS_MODEL_ID,
                 occurredAt,
             });
+        });
+
+        it('modelId가 있고 modelUsed가 없으면 effectiveModelId로 사용량을 기록한다', async () => {
+            const occurredAt = new Date('2026-04-29T00:00:00.000Z');
+
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                modelId: 'gemini-2.5-flash',
+                usage: {
+                    usageRepository: mockUsageRepository,
+                    clientIp: '203.0.113.10',
+                    occurredAt,
+                },
+            });
+
+            expect(mockRecordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({ modelUsed: 'gemini-2.5-flash' })
+            );
         });
 
         it('사용량 발생 시각이 없으면 제한 확인과 기록에 같은 현재 시각을 사용한다', async () => {
@@ -554,6 +594,26 @@ describe('submitAnalysis 함수는', () => {
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
                 expect.objectContaining({ lastClose: 103 })
+            );
+        });
+
+        it('modelId가 제공되면 jobMeta에 저장한다', async () => {
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                modelId: 'gemini-2.5-flash',
+            });
+
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ modelId: 'gemini-2.5-flash' })
+            );
+        });
+
+        it('modelId가 없으면 기본값으로 jobMeta에 저장한다', async () => {
+            await submitAnalysis(mockSymbol, mockTimeframe);
+
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ modelId: DEFAULT_ANALYSIS_MODEL_ID })
             );
         });
 

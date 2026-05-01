@@ -123,7 +123,11 @@ export async function pollAnalysis(
     if (meta) {
         const cache = createCacheProvider();
         if (cache !== null) {
-            const cacheKey = buildAnalysisCacheKey(meta.symbol, meta.timeframe);
+            const cacheKey = buildAnalysisCacheKey(
+                meta.symbol,
+                meta.timeframe,
+                meta.modelId
+            );
             const ttl = computeEffectiveTtl(meta.timeframe, now);
             fireAndForget(
                 cache

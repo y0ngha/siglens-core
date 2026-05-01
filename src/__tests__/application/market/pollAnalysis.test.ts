@@ -15,6 +15,7 @@ vi.mock('@/infrastructure/cache/config', async () => {
 });
 
 import { pollAnalysis } from '@/application/market/pollAnalysis';
+import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
 import {
     getJobStatus,
     getJobError,
@@ -63,6 +64,7 @@ const mockMeta = {
     lastClose: 150,
     atr: 2.5,
     skillsDegraded: false,
+    modelId: 'gemini-2.5-flash',
 };
 
 describe('pollAnalysis 함수는', () => {
@@ -171,7 +173,7 @@ describe('pollAnalysis 함수는', () => {
             }
         });
 
-        it('meta가 있으면 캐시에 저장한다', async () => {
+        it('meta가 있으면 모델 ID 포함 캐시 키로 저장한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
             mockGetJobResult.mockResolvedValueOnce(rawResult);
@@ -179,7 +181,27 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                expect.any(String),
+                'analysis:AAPL:1Day:gemini-2.5-flash',
+                expect.objectContaining({
+                    analyzedAt: '2025-01-15T12:00:00.000Z',
+                }),
+                3600
+            );
+        });
+
+        it('meta에 modelId가 없으면 기본 모델 ID를 포함한 캐시 키로 저장한다', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                modelId: undefined,
+            });
+
+            await pollAnalysis('job-cache-no-model');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),

@@ -2,6 +2,7 @@ import type { BackgroundTaskOptions } from '@/application/types';
 import type { AnalysisLimitError } from '@/application/usage/types';
 import type {
     AnalysisResponse,
+    ModelId,
     Tier,
     TierConfig,
     Timeframe,
@@ -31,6 +32,8 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     tierContext?: UserTierContext;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
     tierConfig?: TierConfig;
+    /** LLM model identifier used to isolate cached results per model. */
+    modelId?: ModelId;
 }
 
 /** Error returned when application tier gates block a timeframe request. */

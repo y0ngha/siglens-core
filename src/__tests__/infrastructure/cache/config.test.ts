@@ -16,6 +16,7 @@ import {
     buildTickerSearchCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
+    DEFAULT_ANALYSIS_MODEL_ID,
     KOREAN_NAMES_CACHE_TTL,
     KOREAN_TICKERS_CACHE_KEY,
     MARKET_BRIEFING_CACHE_TTL,
@@ -93,9 +94,15 @@ describe('computeEffectiveTtl', () => {
 });
 
 describe('cache key builders', () => {
-    it('buildAnalysisCacheKey', () => {
-        expect(buildAnalysisCacheKey('AAPL', '1Hour')).toBe(
-            'analysis:AAPL:1Hour'
+    it('buildAnalysisCacheKey includes model identifier', () => {
+        expect(buildAnalysisCacheKey('AAPL', '1Hour', 'gemini-2.5-flash')).toBe(
+            'analysis:AAPL:1Hour:gemini-2.5-flash'
+        );
+    });
+
+    it('buildAnalysisCacheKey uses DEFAULT_ANALYSIS_MODEL_ID when modelId is omitted', () => {
+        expect(buildAnalysisCacheKey('AAPL', '1Day')).toBe(
+            `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`
         );
     });
 

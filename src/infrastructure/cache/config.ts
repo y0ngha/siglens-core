@@ -89,21 +89,34 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     );
 }
 
+/** @internal Fallback model identifier used in cache keys when no specific model is tracked. */
+export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
+
 /**
  * Build the Redis key for a cached symbol analysis.
  *
- * Format: `analysis:<symbol>:<timeframe>`. Symbol is used verbatim — pass
- * the canonical uppercase form.
+ * Format: `analysis:<symbol>:<timeframe>:<modelId>`. Symbol is used verbatim
+ * — pass the canonical uppercase form. Including the model identifier ensures
+ * results from different AI models are cached independently.
  *
  * @param symbol - U.S. equity ticker.
  * @param timeframe - Bar resolution.
+ * @param modelId - LLM model identifier. Defaults to {@link DEFAULT_ANALYSIS_MODEL_ID}
+ *   so existing callers that do not pass a model remain backward-compatible.
  * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash');
+ * // → 'analysis:AAPL:1Day:gemini-2.5-flash'
+ * ```
  */
 export function buildAnalysisCacheKey(
     symbol: string,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    modelId = DEFAULT_ANALYSIS_MODEL_ID
 ): string {
-    return `analysis:${symbol}:${timeframe}`;
+    return `analysis:${symbol}:${timeframe}:${modelId}`;
 }
 
 /**

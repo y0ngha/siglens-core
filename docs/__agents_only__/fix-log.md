@@ -9,7 +9,6 @@
 - Rule: CLAUDE.md — yarn must be used for all package operations; npm is prohibited
 - Context: publish.yml initially used `npm publish` and NODE_AUTH_TOKEN; corrected to `yarn npm publish` with YARN_NPM_AUTH_TOKEN and added npmScopes config to .yarnrc.yml for yarn 4 registry routing
 
-
 ## [PR #23 Round 2 | feat/1/서버-코드-분리-핵심-로직-npm-패키지 | 2026-04-25]
 - Violation: `[...arr].reverse().find()` used instead of `findLast` in `lastNonNull` helper in `prompt.ts`
 - Rule: Consistency with ES2023 APIs already used in the same PR — `candle-detection.ts` already uses `findLast`; `tsconfig.json` targets ES2023
@@ -24,7 +23,6 @@
 - Violation: `queue.ts`에 `setJobStatus`, `setJobResult`, `setJobError` 함수 누락
 - Rule: API 대칭성 — `getJobStatus`/`getJobResult`/`getJobError`가 있으면 대응하는 set 함수도 있어야 함
 - Context: `queue.ts`에 3개 write 함수 추가; 각각 `job:{id}:status/result/error` 키에 TTL 1시간으로 저장
-
 
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
@@ -88,12 +86,6 @@
 - Rule: TypeScript type safety — internal helper signatures should represent narrowed invariants established by the caller instead of reintroducing optionality
 - Context: `requestChatCompletion` returned `server_error` when `paidApiKey` was missing, but `requestGeminiChatCompletion` still typed the value as `string | undefined`, causing `CallGeminiWithKeyFallbackOptions.paidApiKey` assignment to fail typecheck
 
-## [PR #44 | feat/13/timeframe-restrictions | 2026-04-28]
-- Violation: `isTimeframeAllowed` duplicated restriction-flag branching and routed through `getAllowedTimeframes`, causing an unnecessary array copy for an internal boolean check
-- Rule: FF.md — Readability and cohesion; shared decision logic should live behind one helper while public copy-return APIs should not be reused where readonly access is enough
-- Context: Extracted `resolveAllowedTimeframes` so `getAllowedTimeframes` can keep returning a defensive copy while `isTimeframeAllowed` checks the shared readonly list directly
-
-
 ## [PR #45 Round 2 | feat/12/info-depth-filter | 2026-04-28]
 - Violation: `lockedInfoDepth` and its helper return type exposed a mutable array type despite deriving from readonly tier configuration
 - Rule: CONVENTIONS.md — Functional Programming / immutability
@@ -124,15 +116,20 @@
 - Rule: CONVENTIONS.md — "Extract union literals with 2+ members into a type alias"; replaced with `keyof UsageCounts` which ties the annotation to the source of truth
 - Context: `src/application/usage/limits.ts` FEATURE_COUNT_KEY constant
 
-## [PR #49 Round 5 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: `tier` field accepted from both `AnalysisUsageOptions.tier` and `SubmitAnalysisOptions.tierContext.tier` simultaneously; caller could set conflicting tiers on the same request
-- Rule: MISTAKES.md Configuration & State Management #1 — a single configuration option must have exactly one authoritative source; outer/inner divergence creates hidden inconsistencies
-- Context: Removed `tier` from `AnalysisUsageOptions`; `tier` is now derived exclusively from `options.tierContext?.tier ?? DEFAULT_TIER` in `submitAnalysis.ts`
 
 ## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
 - Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
 - Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
 - Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
+
+## [PR #64 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
+- Violation: `buildAnalysisCacheKey` (Tier 3 public API) added `modelId` as a required parameter, instantly breaking all existing callers that only passed `symbol` + `timeframe`
+- Rule: docs/PUBLIC_API.md — parameters added to public API functions must be optional with a default so callers do not need to update; required additions are breaking changes requiring a semver major bump
+- Context: `infrastructure/cache/config.ts` — fixed by introducing `DEFAULT_ANALYSIS_MODEL_ID` and assigning it as the parameter default (`modelId = DEFAULT_ANALYSIS_MODEL_ID`), restoring backward compatibility
+
+- Violation: `DEFAULT_ANALYSIS_MODEL_USED` constant duplicated across `submitAnalysis.ts` and `pollAnalysis.ts` even though both files are in the same `application/market/` directory and can freely import each other
+- Rule: MISTAKES.md Coding Paradigm #6 — repeating identical values at multiple call sites; MISTAKES.md Rule 17 permits duplication only when import is impossible due to environment constraints (not the case here)
+- Context: moved the canonical constant to `infrastructure/cache/config.ts` as `DEFAULT_ANALYSIS_MODEL_ID` (`@internal`), then imported it in both application files and their tests
 
 ## [PR #49 | feat/10-11/usage-limit-gates | 2026-04-30]
 - Violation: `submitAnalysis` used one timestamp for usage-limit checking but could pass an undefined timestamp to usage recording, allowing a second `new Date()` at the repository boundary
