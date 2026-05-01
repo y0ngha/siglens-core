@@ -25,11 +25,6 @@
 - Rule: API 대칭성 — `getJobStatus`/`getJobResult`/`getJobError`가 있으면 대응하는 set 함수도 있어야 함
 - Context: `queue.ts`에 3개 write 함수 추가; 각각 `job:{id}:status/result/error` 키에 TTL 1시간으로 저장
 
-## [PR #26 | feat/18/infrastructure-market-이전 | 2026-04-26]
-
-- Violation: `AcquireReanalyzeCooldownResult` 타입이 `reanalyzeCooldown.ts` 구현 파일 내부에만 정의됨
-- Rule: MISTAKES.md Architecture #4 — infrastructure 모듈의 public interface는 `types.ts`에 위치해야 함
-- Context: `infrastructure/market/types.ts`로 이동하고 구현 파일에서 import하도록 수정
 
 ## [Issue #3 | feat/3/neon-drizzle-db-schema | 2026-04-26]
 - Violation: `users.email` had both a unique constraint and a duplicate non-unique index
@@ -62,10 +57,6 @@
 - Rule: PUBLIC_API.md — public API should expose stable consumer contracts and avoid leaking infrastructure lifecycle or adapter details
 - Context: kept `createDatabaseClient` as the explicit DB construction entrypoint while removing `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig`, and `DatabaseClient` from `src/index.ts`
 
-## [PR #37 | feat/8/user-tier-system | 2026-04-28]
-- Violation: `UserTierContext` shared interface defined in `infrastructure/auth/types.ts` though it is consumed across application/tier and infrastructure/auth modules
-- Rule: MISTAKES.md Architecture #1 — shared domain types referenced by 2+ files must live in `domain/types.ts`
-- Context: moved `UserTierContext` to `domain/types.ts`, dropped the duplicate definition from `infrastructure/auth/types.ts`, and updated `src/index.ts` to re-export it from the domain block
 
 ## [PR #37 Round 2 | feat/8/user-tier-system | 2026-04-28]
 - Violation: `application/tier/types.ts` imported `UserTierRepository` from the deep `@/infrastructure/db/types` path while sibling files import via the `@/infrastructure/db` module index
@@ -81,11 +72,6 @@
 - Violation: Redis cache update used read-modify-write merge after DB upsert, allowing concurrent writes to overwrite each other
 - Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
 - Context: `setKoreanTickers` now deletes `korean:tickers` after successful DB upsert so the next read rebuilds cache from the database
-
-## [PR #43 | feat/40-41/auth-helpers-and-delete-account | 2026-04-28]
-- Violation: deleteAccount use-case returned `{ ok: true }` without cookie metadata while sibling logoutUser returned an expired AuthSessionCookie, breaking return-shape symmetry within application/auth
-- Rule: FF.md — Predictability (consistency with sibling use-cases that share the same lifecycle concept of session termination)
-- Context: deleteAccount terminates the same session lifecycle as logoutUser; consumers that previously chained logoutUser had to call createExpiredSessionCookie themselves after deleteAccount, while logoutUser callers did not
 
 ## [Issue #10/#11 | feat/10-11/usage-limit-gates | 2026-04-29]
 - Violation: Usage-limit failures returned only partial or string error data even though the feature introduced a structured `UsageLimitError` payload
@@ -113,21 +99,7 @@
 - Rule: CONVENTIONS.md — Functional Programming / immutability
 - Context: the filter result now exposes locked info-depth fragments as `readonly TierInfoDepth[]` to match the immutable tier config contract
 
-## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-28]
-- Violation: Premium model usage tracking only recorded `member` tier usage and skipped `pro` tier usage
-- Rule: FF.md — Predictability; paid-tier analytics must match the tier model access policy so cost tracking is complete
-- Context: Updated chat completion usage tracking to record premium model usage for every non-free tier and added branch coverage for anonymous, free, member, pro, and missing usage-log dependencies
-
-## [PR #46 | feat/14/ai-model-tier-separation | 2026-04-29]
-- Violation: unrestricted `getAllowedModels` returned a deduplicated model list whose order depended on tier config object insertion order
-- Rule: FF.md — Predictability; public helper return ordering should remain stable when configuration structure changes
-- Context: Sorted the unrestricted model union with `toSorted()` and updated the tier test expectation to assert the stable order
-
 ## [PR #51 | feat/50/oauth-token-revocation | 2026-04-30]
-- Violation: OAuth token revocation loaded provider tokens in an unawaited background task immediately before deleting the user row, allowing cascade deletion to remove the tokens before lookup.
-- Rule: FF.md — Predictability; destructive dependent writes must not race ahead of prerequisite reads needed for the same use-case.
-- Context: `deleteAccount` now awaits OAuth account lookup before deleting the user, while keeping provider revocation calls fire-and-forget after the tokens are captured.
-
 - Violation: password reset requests used broad user lookup and included OAuth-only accounts
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
@@ -173,11 +145,6 @@
 - Context: Initial migration 0004 used `DEFAULT true` to backfill existing rows. Added migration 0005 to change the column default to `false` going forward, matching the application-layer fallback. Existing-row backfill (`true`) is preserved per user directive while future inserts default to `false`.
 
 ## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
-- Violation: `safeCompareTokenHashes` accepted 64-character non-hex strings and could throw during malformed Redis token-state comparison
-- Rule: FF.md — Predictability; malformed persisted token state must produce the same invalid-token result as other bad token inputs, not an uncaught runtime exception
-- Context: Email verification and password reset compare Redis-stored token hashes with submitted hashes; malformed stored hash strings now fail validation before `timingSafeEqual`
-
-## [PR #56 | feat/55/email-verification-redis-migration | 2026-05-01]
 - Violation: `ConfirmPasswordResetDependencies` named the same `UserRepository` dependency differently from sibling auth dependency objects
 - Rule: FF.md — Predictability; dependency field names should stay consistent across related use-cases so consumers can predict contracts
 - Context: Renamed `ConfirmPasswordResetDependencies.userRepository` to `users`, matching `RegisterUserDependencies.users` while keeping `emailAuthUsers` for credential lookup.
@@ -189,3 +156,13 @@
 - Violation: Public auth API breaking changes were not reflected in release metadata
 - Rule: docs/PUBLIC_API.md — Tier 1 function signature changes require a major version, with 0.x.y applying the change as a minor version bump
 - Context: Added `CHANGELOG.md` breaking-change notes and bumped `package.json` from `0.1.14` to `0.2.0`.
+
+## [PR #63 | refactor/52/requestChatCompletion-시간-주입-통일 | 2026-05-01]
+- Violation: Optional public API field (`getCurrentDate?`) removed from `RequestChatCompletionDependencies` without `@deprecated` transition period
+- Rule: semver — removing a field from a public interface (even optional) is a breaking change; must be marked `@deprecated` first and removed only in the next major version
+- Context: `src/application/chat/types.ts`; `getCurrentDate` was a DI hook removed in favour of `params.occurredAt`; field restored with `@deprecated` JSDoc pointing consumers to the params alternative
+
+## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
+- Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
+- Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
+- Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements

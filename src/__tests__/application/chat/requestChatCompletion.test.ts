@@ -82,6 +82,8 @@ describe('requestChatCompletion', () => {
     };
 
     beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-29T00:00:00.000Z'));
         vi.clearAllMocks();
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         tryConsumeToken.mockResolvedValue(true);
@@ -103,6 +105,7 @@ describe('requestChatCompletion', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.restoreAllMocks();
     });
 
