@@ -1,5 +1,5 @@
 import type { ChatbotLimitError } from '@/application/usage/types';
-import type { CallGeminiWithKeyFallbackOptions } from '@/infrastructure/ai/types';
+import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
@@ -37,9 +37,7 @@ export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;
     usageLogs?: UsageLogRepository;
-    callAiProvider?: (
-        options: CallGeminiWithKeyFallbackOptions
-    ) => Promise<string>;
+    callAiProvider?: (options: CallAiProviderOptions) => Promise<string>;
     tierConfig?: TierConfig;
     /**
      * @deprecated Pass `occurredAt` via {@link RequestChatCompletionParams} instead.

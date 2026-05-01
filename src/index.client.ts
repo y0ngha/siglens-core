@@ -307,7 +307,7 @@ export type {
     GeminiContents,
     GeminiContent,
     GeminiPart,
-    CallGeminiWithKeyFallbackOptions,
+    CallAiProviderOptions,
 } from './infrastructure/ai/types';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {

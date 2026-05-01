@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import type {
-    CallGeminiWithKeyFallbackOptions,
+    CallAiProviderOptions,
     GeminiContents,
 } from '@/infrastructure/ai/types';
 
@@ -40,7 +40,7 @@ async function callGemini({
  * provided it is attached via the SDK's `config.systemInstruction` field.
  *
  * @param options - Free/paid keys, model name, prompt contents, and
- *   optional system instruction — see {@link CallGeminiWithKeyFallbackOptions}.
+ *   optional system instruction — see {@link CallAiProviderOptions}.
  * @returns The text content of the first successful Gemini response, or
  *   the empty string when the response is missing text.
  *
@@ -53,7 +53,7 @@ export async function callGeminiWithKeyFallback({
     model,
     contents,
     systemInstruction,
-}: CallGeminiWithKeyFallbackOptions): Promise<string> {
+}: CallAiProviderOptions): Promise<string> {
     if (freeApiKey) {
         try {
             return await callGemini({

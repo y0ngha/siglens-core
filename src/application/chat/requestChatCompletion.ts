@@ -136,7 +136,7 @@ async function checkChatbotUsageAllowed(
     );
 }
 
-async function requestGeminiChatCompletion(
+async function requestAiChatCompletion(
     freeApiKey: RequestChatCompletionParams['freeApiKey'],
     paidApiKey: NonNullable<RequestChatCompletionParams['paidApiKey']>,
     tokenStore: ChatTokenStore,
@@ -172,13 +172,13 @@ async function requestGeminiChatCompletion(
 }
 
 /**
- * Request a Gemini chat completion for an existing analysis.
+ * Request an AI provider chat completion for an existing analysis.
  *
- * The caller owns runtime-specific request handling such as reading Next.js
+ * The caller owns runtime-specific request handling such as reading
  * headers and environment variables. This use-case owns SigLens chat policy:
  * model tier gating, IP hashing, daily usage-limit checking when
  * `usageRepository` is provided, token consumption, prompt construction,
- * Gemini payload mapping, key fallback invocation, remaining-token lookup,
+ * AI provider payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
  *
  * Token refund: when the result is `server_busy` or `server_error`, the
@@ -250,7 +250,7 @@ export async function requestChatCompletion(
         params.userMessage
     );
 
-    const geminiResult = await requestGeminiChatCompletion(
+    const aiResult = await requestAiChatCompletion(
         params.freeApiKey,
         paidApiKey,
         tokenStore,
@@ -260,8 +260,8 @@ export async function requestChatCompletion(
         prompt
     );
 
-    if (!geminiResult.ok) {
-        return geminiResult;
+    if (!aiResult.ok) {
+        return aiResult;
     }
 
     if (usageTracking !== undefined) {
@@ -294,5 +294,5 @@ export async function requestChatCompletion(
         );
     }
 
-    return geminiResult;
+    return aiResult;
 }
