@@ -22,7 +22,10 @@ import type {
     TierConfig,
     Timeframe,
 } from '@/domain/types';
-import { buildAnalysisCacheKey } from '@/infrastructure/cache/config';
+import {
+    buildAnalysisCacheKey,
+    DEFAULT_ANALYSIS_MODEL_ID,
+} from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/db';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -30,7 +33,6 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
-const DEFAULT_ANALYSIS_MODEL_USED = 'analysis-worker';
 
 async function checkAnalysisUsageAllowed(
     usage: AnalysisUsageOptions,
@@ -60,7 +62,7 @@ async function recordAnalysisUsage(
         userId: usage.userId ?? null,
         ipAddress: usage.clientIp,
         actionType: 'analysis',
-        modelUsed: usage.modelUsed ?? DEFAULT_ANALYSIS_MODEL_USED,
+        modelUsed: usage.modelUsed ?? DEFAULT_ANALYSIS_MODEL_ID,
         occurredAt,
     });
 }
@@ -165,7 +167,7 @@ export async function submitAnalysis(
         }
     }
 
-    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_USED;
+    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe, effectiveModelId);
 

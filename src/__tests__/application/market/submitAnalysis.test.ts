@@ -11,6 +11,7 @@ vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/application/market/barsApi');
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
+import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
@@ -224,7 +225,7 @@ describe('submitAnalysis 함수는', () => {
             await submitAnalysis(mockSymbol, mockTimeframe);
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'analysis:AAPL:1Day:analysis-worker'
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`
             );
         });
 
@@ -367,7 +368,7 @@ describe('submitAnalysis 함수는', () => {
                 userId: null,
                 ipAddress: '203.0.113.10',
                 actionType: 'analysis',
-                modelUsed: 'analysis-worker',
+                modelUsed: DEFAULT_ANALYSIS_MODEL_ID,
                 occurredAt,
             });
         });
@@ -595,7 +596,7 @@ describe('submitAnalysis 함수는', () => {
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
-                expect.objectContaining({ modelId: 'analysis-worker' })
+                expect.objectContaining({ modelId: DEFAULT_ANALYSIS_MODEL_ID })
             );
         });
 

@@ -189,3 +189,12 @@
 - Violation: Public auth API breaking changes were not reflected in release metadata
 - Rule: docs/PUBLIC_API.md — Tier 1 function signature changes require a major version, with 0.x.y applying the change as a minor version bump
 - Context: Added `CHANGELOG.md` breaking-change notes and bumped `package.json` from `0.1.14` to `0.2.0`.
+
+## [PR #64 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
+- Violation: `buildAnalysisCacheKey` (Tier 3 public API) added `modelId` as a required parameter, instantly breaking all existing callers that only passed `symbol` + `timeframe`
+- Rule: docs/PUBLIC_API.md — parameters added to public API functions must be optional with a default so callers do not need to update; required additions are breaking changes requiring a semver major bump
+- Context: `infrastructure/cache/config.ts` — fixed by introducing `DEFAULT_ANALYSIS_MODEL_ID` and assigning it as the parameter default (`modelId = DEFAULT_ANALYSIS_MODEL_ID`), restoring backward compatibility
+
+- Violation: `DEFAULT_ANALYSIS_MODEL_USED` constant duplicated across `submitAnalysis.ts` and `pollAnalysis.ts` even though both files are in the same `application/market/` directory and can freely import each other
+- Rule: MISTAKES.md Coding Paradigm #6 — repeating identical values at multiple call sites; MISTAKES.md Rule 17 permits duplication only when import is impossible due to environment constraints (not the case here)
+- Context: moved the canonical constant to `infrastructure/cache/config.ts` as `DEFAULT_ANALYSIS_MODEL_ID` (`@internal`), then imported it in both application files and their tests

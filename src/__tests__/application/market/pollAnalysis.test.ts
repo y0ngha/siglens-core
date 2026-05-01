@@ -15,6 +15,7 @@ vi.mock('@/infrastructure/cache/config', async () => {
 });
 
 import { pollAnalysis } from '@/application/market/pollAnalysis';
+import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
 import {
     getJobStatus,
     getJobError,
@@ -200,7 +201,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache-no-model');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                'analysis:AAPL:1Day:analysis-worker',
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),
