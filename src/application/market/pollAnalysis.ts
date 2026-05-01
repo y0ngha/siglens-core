@@ -11,7 +11,6 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildAnalysisCacheKey,
     computeEffectiveTtl,
-    DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import {
     getJobError,
@@ -127,7 +126,7 @@ export async function pollAnalysis(
             const cacheKey = buildAnalysisCacheKey(
                 meta.symbol,
                 meta.timeframe,
-                meta.modelId ?? DEFAULT_ANALYSIS_MODEL_ID
+                meta.modelId
             );
             const ttl = computeEffectiveTtl(meta.timeframe, now);
             fireAndForget(

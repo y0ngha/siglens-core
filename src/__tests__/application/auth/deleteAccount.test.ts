@@ -125,6 +125,7 @@ describe('deleteAccount', () => {
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),
                 deleteUser: vi.fn().mockResolvedValue(true),
+                updatePassword: vi.fn(),
             },
             oauthAccounts: { findByUserId },
             oauthRevoker: { revokeToken },
@@ -165,6 +166,7 @@ describe('deleteAccount', () => {
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),
                 deleteUser: vi.fn().mockResolvedValue(true),
+                updatePassword: vi.fn(),
             },
             oauthAccounts: { findByUserId },
             oauthRevoker: { revokeToken },
@@ -189,6 +191,7 @@ describe('deleteAccount', () => {
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),
                 deleteUser: vi.fn().mockResolvedValue(true),
+                updatePassword: vi.fn(),
             },
             oauthAccounts: {
                 findByUserId: vi.fn().mockRejectedValue(lookupError),
@@ -219,6 +222,7 @@ describe('deleteAccount', () => {
                 findById: vi.fn(),
                 createEmailUser: vi.fn(),
                 deleteUser: vi.fn().mockResolvedValue(true),
+                updatePassword: vi.fn(),
             },
             oauthAccounts: {
                 findByUserId: vi.fn().mockResolvedValue([
