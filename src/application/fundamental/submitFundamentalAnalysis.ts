@@ -4,6 +4,8 @@ import { hashAnalysisInput } from '@/application/analysisInputHash';
 import type {
     SubmitFundamentalAnalysisOptions,
     SubmitFundamentalAnalysisResult,
+    SubmitFundamentalAnalysisLimitError,
+    SubmitFundamentalAnalysisFetchError,
 } from '@/application/fundamental/types';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
@@ -15,7 +17,7 @@ import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import type { FundamentalAnalysisResponse, Skill } from '@/domain/types';
+import type { FundamentalAnalysisResponse } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the fundamental analysis job. */
 const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -78,11 +80,12 @@ export async function submitFundamentalAnalysis(
             { usage: options.usage.usageRepository }
         );
         if (!allowed) {
-            return {
+            const limitError: SubmitFundamentalAnalysisLimitError = {
                 status: 'error',
                 code: 'usage_limit_exceeded',
                 error: buildUsageLimitError('analysisPerDay', tier),
             };
+            return limitError;
         }
     }
 
@@ -122,11 +125,12 @@ export async function submitFundamentalAnalysis(
         ]);
 
         if (profile === null) {
-            return {
+            const fetchError: SubmitFundamentalAnalysisFetchError = {
                 status: 'error',
                 code: 'fetch_failed',
                 error: `Profile not found for symbol: ${symbol}`,
             };
+            return fetchError;
         }
 
         const sectorName = profile.sector;
@@ -135,10 +139,8 @@ export async function submitFundamentalAnalysis(
             : [];
 
         const sectorToday =
-            sectorSnapshot.find(
-                (s: { sector: string; changesPercentage: number }) =>
-                    s.sector === sectorName
-            )?.changesPercentage ?? null;
+            sectorSnapshot.find(s => s.sector === sectorName)
+                ?.changesPercentage ?? null;
 
         snapshot = normalizeFundamentalSnapshot({
             profile,
@@ -164,7 +166,12 @@ export async function submitFundamentalAnalysis(
             '[submitFundamentalAnalysis] Provider fetch failed:',
             error
         );
-        return { status: 'error', code: 'fetch_failed', error: String(error) };
+        const fetchError: SubmitFundamentalAnalysisFetchError = {
+            status: 'error',
+            code: 'fetch_failed',
+            error: String(error),
+        };
+        return fetchError;
     }
 
     // ── 3. Hash snapshot → build cache key → check cache ──
@@ -189,7 +196,7 @@ export async function submitFundamentalAnalysis(
 
     // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const skills: Skill[] = await loadSkillsCached();
+    const { skills, skillsDegraded } = await loadSkillsCached();
     const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, skills);
     const jobId = crypto.randomUUID();
 
@@ -197,6 +204,7 @@ export async function submitFundamentalAnalysis(
         symbol,
         modelId,
         cacheKey,
+        ...(skillsDegraded && { skillsDegraded }),
     });
 
     const dispatch = fetch(`${workerUrl}/analyze`, {
