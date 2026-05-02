@@ -32,8 +32,10 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     tierContext?: UserTierContext;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
     tierConfig?: TierConfig;
-    /** LLM model identifier used to isolate cached results per model. */
+    /** LLM model identifier used to isolate cached results per model and for worker routing. */
     modelId?: ModelId;
+    /** User-supplied AI API key forwarded as `X-AI-API-KEY` to the worker. Must be provided when the selected model requires a user-supplied API key; omit for platform-managed models. */
+    userApiKey?: string;
 }
 
 /** Error returned when application tier gates block a timeframe request. */

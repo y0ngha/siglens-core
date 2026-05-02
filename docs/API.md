@@ -66,7 +66,7 @@ Header: Authorization: Bearer {UPSTASH_REDIS_REST_TOKEN}
 
 AI 분석 결과는 심볼·타임프레임별 TTL로 캐싱한다.
 
-- 캐시 키 예시: `analysis:{symbol}:{timeframe}` (예: `analysis:AAPL:1Day`)
+- 캐시 키 예시: `analysis:{symbol}:{timeframe}:{modelId}` (예: `analysis:AAPL:1Day:gemini-2.5-flash`)
 - TTL은 타임프레임에 따라 결정한다 (`infrastructure/cache/config.ts`에서 정의)
 - 환경변수 미설정 시 캐시 없이 정상 동작(graceful degradation)
 
@@ -148,6 +148,22 @@ infrastructure/jobs/
 
 `WORKER_URL` 미설정 시 worker 위임 경로는 비활성화되고, application layer는 호출자의
 캐시·로컬 처리 경로로 graceful degradation 한다.
+
+### Request Contract (`POST /analyze`)
+
+```
+Headers:
+  Content-Type: application/json
+  X-Worker-Secret: {WORKER_SECRET}
+  X-AI-API-KEY: {userApiKey}   ← 선택적. SubmitAnalysisOptions.userApiKey가 있을 때만 포함.
+                                  user-managed 모델 호출 시 필수.
+
+Body (JSON):
+  { jobId: string, prompt: string, model: TierModel }
+```
+
+- `model`: `SubmitAnalysisOptions.modelId ?? DEFAULT_ANALYSIS_MODEL_ID`로 결정된다. worker가 라우팅 및 provider 선택에 사용한다.
+- `X-AI-API-KEY`: `SubmitAnalysisOptions.userApiKey`가 설정되어 있을 때만 헤더에 포함한다. siglens(consumer) 레포는 caller 측에서 이 값을 주입한다.
 
 ---
 

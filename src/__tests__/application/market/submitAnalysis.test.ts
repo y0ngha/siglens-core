@@ -332,12 +332,16 @@ describe('submitAnalysis 함수는', () => {
                 'https://worker.test/analyze',
                 expect.objectContaining({
                     method: 'POST',
-                    headers: {
+                    headers: expect.objectContaining({
                         'Content-Type': 'application/json',
                         'X-Worker-Secret': 'test-secret',
-                    },
+                    }),
                 })
             );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
         });
 
         it('사용량 옵션이 있으면 제한 확인 후 제출 성공 사용량을 기록한다', async () => {
@@ -550,6 +554,42 @@ describe('submitAnalysis 함수는', () => {
             expect(result.status).toBe('submitted');
             expect(mockFetch).toHaveBeenCalled();
             consoleSpy.mockRestore();
+        });
+
+        it('Worker body에 model을 포함한다', async () => {
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                modelId: 'gemini-2.5-flash',
+            });
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.model).toBe('gemini-2.5-flash');
+        });
+
+        it('userApiKey가 있으면 X-AI-API-KEY 헤더를 포함한다', async () => {
+            await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
+                userApiKey: 'sk-user-key-123',
+            });
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        'X-AI-API-KEY': 'sk-user-key-123',
+                    }),
+                })
+            );
+        });
+
+        it('userApiKey가 없으면 X-AI-API-KEY 헤더를 포함하지 않는다', async () => {
+            await submitAnalysis(mockSymbol, mockTimeframe);
+
+            const headers = mockFetch.mock.calls[0][1].headers as Record<
+                string,
+                string
+            >;
+            expect(headers['X-AI-API-KEY']).toBeUndefined();
         });
     });
 
