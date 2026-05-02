@@ -1,5 +1,54 @@
 # Fix Log
 
+## [feat/fundamental-news-analysis | Phase 1 Tasks 1.1+1.2+1.3 | 2026-05-02]
+- Violation: Union literals `'up' | 'down'` in `FundamentalCategory` and other inline shapes
+- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
+- Context: Extracted `FundamentalCategory`, `GradesAction` to dedicated named types for reusability and consistency
+
+- Violation: 13 deeply nested inline shapes in `FundamentalSnapshot`
+- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — named interfaces required over inline return types
+- Context: Extracted 13 named interfaces (`FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalScore`, `FundamentalGradesSnapshot`, `NewsSentimentData`, `NewsCategory`, etc.)
+
+- Violation: `FundamentalSentiment` / `NewsSentiment` shape duplication with `Trend` type
+- Rule: MISTAKES.md TypeScript §6 — duplicated type structures must be cross-referenced or unified
+- Context: Added JSDoc cross-reference to document intentional separation per domain clarity spec
+
+- Violation: TTL constants computed via magic numbers (`24*60*60`) instead of importing `SECONDS_PER_DAY`
+- Rule: FF Principle 1-D / MISTAKES.md §13 — magic numbers must be extracted to named constants
+- Context: Replaced inline computation with imported `SECONDS_PER_DAY` constant
+
+- Violation: TTL test only checked sign (`toBeGreaterThan(0)`) without concrete value assertion
+- Rule: MISTAKES.md Tests §12 — concrete value checks required for computed constants
+- Context: Changed to `toBe(SECONDS_PER_DAY)` exact value assertion
+
+- Violation: Mixed `test()` and `it()` function names in same file
+- Rule: CONVENTIONS.md Test Rules — test function naming must be uniform within a file
+- Context: Standardized to `it()` throughout
+
+- Violation: Tautological test for pure function (testing signature behavior without meaningful assertion)
+- Rule: MISTAKES.md Tests §13 — remove tests that test nothing
+- Context: Removed tautological assertions; kept only format/regex validation tests
+
+- Violation: New `FundamentalSnapshot` interfaces missing JSDoc documentation
+- Rule: MISTAKES.md Documentation Sync §4 / §4.5 — all new exports require JSDoc tags
+- Context: Added one-line JSDoc on every new named interface export
+
+- Violation: Hardcoded `'gemini-2.5-flash-lite'` inside `buildNewsCardCacheKey` function
+- Rule: FF Principle 1-D / MISTAKES.md §13 — hardcoded literals must be extracted to module-level constants
+- Context: Extracted to `NEWS_CARD_MODEL_ID` constant
+
+- Violation: `toMatch(regex)` cache key tests inconsistent with `toBe(string)` pattern in other keys
+- Rule: FF Principle 2-B / CONVENTIONS.md — same-family return types must use uniform test assertions
+- Context: Switched fundamental/news cache key tests to `toBe(exact-string)` for consistency with sector signals tests
+
+- Violation: `NewsCategory` type missing JSDoc description
+- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 2 and Tier 4 types require JSDoc
+- Context: Added one-line JSDoc description
+
+- Violation: Round 2 discovery — `NewsCategory` JSDoc still missing
+- Rule: MISTAKES.md Documentation Sync §4.5 — all new types require JSDoc
+- Context: Added one-line description in Round 2 follow-up
+
 ## [Issue #2 | chore/2/초기-개발-환경-설정 | 2026-04-24]
 - Violation: release-it config used `${version}` (JS template literal) instead of `{{version}}` (Handlebars) for commitMessage, tagName, tagAnnotation
 - Rule: release-it interpolation uses `{{version}}` syntax — `${version}` is passed as a literal string and breaks tag push trigger matching
