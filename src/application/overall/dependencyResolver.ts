@@ -1,7 +1,7 @@
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
-import type { SubmitAnalysisOptions, SubmitAnalysisGatedResult } from '@/application/market/types';
+import type { SubmitAnalysisOptions } from '@/application/market/types';
 import type { SubmitFundamentalAnalysisOptions } from '@/application/fundamental/types';
 import type { SubmitNewsAnalysisOptions } from '@/application/news/types';
 import type {
@@ -95,11 +95,7 @@ export interface DependencyStateCached {
  */
 export interface DependencyStatePending {
     kind: 'pending';
-    pendingJobs: {
-        technical?: string;
-        fundamental?: string;
-        news?: string;
-    };
+    pendingJobs: Record<'technical' | 'fundamental' | 'news', string | undefined>;
 }
 
 /**
@@ -150,6 +146,7 @@ export type DependencyState = DependencyStateCached | DependencyStatePending;
  * ```
  *
  * @see submitOverallAnalysis
+ * @internal
  */
 export async function resolveOverallDependencies(
     inputs: OverallDependencyInputs
@@ -171,7 +168,7 @@ export async function resolveOverallDependencies(
         submitAnalysis(symbol, timeframe, false, undefined, {
             ...technicalOptions,
             modelId: technicalOptions.modelId ?? modelId,
-        }) as Promise<SubmitAnalysisGatedResult>,
+        }),
         submitFundamentalAnalysis({
             symbol,
             modelId,

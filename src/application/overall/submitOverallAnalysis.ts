@@ -42,6 +42,7 @@ const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  *
  * @see pollOverallAnalysis
  * @see cancelOverallAnalysisJob
+ * @internal
  */
 export async function submitOverallAnalysis(
     options: SubmitOverallAnalysisOptions
