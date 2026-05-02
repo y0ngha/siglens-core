@@ -207,6 +207,7 @@ let _cachedSkillsDegraded: boolean = false;
  *
  * @returns `{ skills, skillsDegraded }` — `skillsDegraded` is `true` when
  *   the filesystem load threw and the skills list is empty.
+ * @internal
  */
 export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
     if (_cachedSkills !== null) {
