@@ -106,5 +106,94 @@ describe('FileSkillsLoader', () => {
             expect(skills).toHaveLength(0);
             expect(mockReadFile).not.toHaveBeenCalled();
         });
+
+        it('fundamental 카테고리 스킬을 로드한다', async () => {
+            const fundamentalFrontmatter = `---
+name: Value Investing
+description: DCF-based value investing framework
+type: strategy
+category: fundamental
+indicators: []
+confidence_weight: 0.8
+---
+Focus on intrinsic value and margin of safety.`;
+
+            mockReaddir.mockResolvedValue([makeDirent('value-investing.md')]);
+            mockReadFile.mockResolvedValue(fundamentalFrontmatter);
+
+            const loader = new FileSkillsLoader();
+            const skills = await loader.loadSkills();
+            const fundamental = skills.filter(
+                (s) => s.category === 'fundamental',
+            );
+
+            expect(fundamental.length).toBeGreaterThanOrEqual(1);
+            expect(fundamental[0].category).toBe('fundamental');
+            expect(fundamental[0].name).toBe('Value Investing');
+        });
+
+        it('news 카테고리 스킬을 로드한다', async () => {
+            const newsFrontmatter = `---
+name: Event Driven
+description: Event-driven news reaction framework
+type: strategy
+category: news
+indicators: []
+confidence_weight: 0.7
+---
+Analyze market-moving news events and their impact on price.`;
+
+            mockReaddir.mockResolvedValue([makeDirent('event-driven.md')]);
+            mockReadFile.mockResolvedValue(newsFrontmatter);
+
+            const loader = new FileSkillsLoader();
+            const skills = await loader.loadSkills();
+            const news = skills.filter((s) => s.category === 'news');
+
+            expect(news.length).toBeGreaterThanOrEqual(1);
+            expect(news[0].category).toBe('news');
+            expect(news[0].name).toBe('Event Driven');
+        });
+
+        it('fundamental/news 카테고리가 기존 카테고리와 함께 로드된다', async () => {
+            const fundamentalFrontmatter = `---
+name: Quality Investing
+description: Quality factors framework
+type: strategy
+category: fundamental
+indicators: []
+confidence_weight: 0.9
+---
+Focus on high-quality businesses with durable competitive advantages.`;
+
+            const technicalFrontmatter = `---
+name: Reversal Pattern
+description: Bullish reversal pattern
+type: pattern
+category: reversal_bullish
+indicators: [RSI]
+confidence_weight: 0.8
+---
+Identifies bullish reversal setups.`;
+
+            mockReaddir.mockResolvedValue([
+                makeDirent('quality-investing.md'),
+                makeDirent('reversal.md'),
+            ]);
+            mockReadFile
+                .mockResolvedValueOnce(fundamentalFrontmatter)
+                .mockResolvedValueOnce(technicalFrontmatter);
+
+            const loader = new FileSkillsLoader();
+            const skills = await loader.loadSkills();
+
+            expect(skills).toHaveLength(2);
+            expect(
+                skills.some((s) => s.category === 'fundamental'),
+            ).toBe(true);
+            expect(
+                skills.some((s) => s.category === 'reversal_bullish'),
+            ).toBe(true);
+        });
     });
 });
