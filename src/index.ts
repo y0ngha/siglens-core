@@ -490,12 +490,17 @@ export type {
 } from './application/market/types';
 export type {
     PollNewsAnalysisResult,
+    PollNewsCardAnalysisResult,
     SubmitNewsAnalysisCached,
     SubmitNewsAnalysisLimitError,
     SubmitNewsAnalysisNoNewsError,
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
     SubmitNewsAnalysisSubmitted,
+    SubmitNewsCardAnalysisCached,
+    SubmitNewsCardAnalysisOptions,
+    SubmitNewsCardAnalysisResult,
+    SubmitNewsCardAnalysisSubmitted,
 } from './application/news/types';
 export type {
     PollOverallAnalysisResult,

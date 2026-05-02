@@ -56,26 +56,26 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     now?: Date;
 }
 
-/** @internal The caller receives a cached analysis — no new job was created. */
+/** The caller receives a cached analysis — no new job was created. */
 export interface SubmitNewsAnalysisCached {
     status: 'cached';
     result: NewsAnalysisResponse;
 }
 
-/** @internal A new analysis job was submitted; poll with `jobId` for the result. */
+/** A new analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitNewsAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** @internal Result variant when no news items were provided to analyze. */
+/** Result variant when no news items were provided to analyze. */
 export interface SubmitNewsAnalysisNoNewsError {
     status: 'error';
     code: 'no_news';
     error: string;
 }
 
-/** @internal Result variant when the daily analysis limit is exceeded. */
+/** Result variant when the daily analysis limit is exceeded. */
 export interface SubmitNewsAnalysisLimitError {
     status: 'error';
     code: 'usage_limit_exceeded';
@@ -103,19 +103,19 @@ export type PollNewsAnalysisResult =
 // Submit News Card Analysis
 // ─────────────────────────────────────────
 
-/** @internal Options controlling per-card news analysis submission behavior. */
+/** Options controlling per-card news analysis submission behavior. */
 export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     /** The raw news item to analyze. */
     item: NewsItem;
 }
 
-/** @internal The caller receives a cached card analysis — no new job was created. */
+/** The caller receives a cached card analysis — no new job was created. */
 export interface SubmitNewsCardAnalysisCached {
     status: 'cached';
     result: NewsCardAnalysis;
 }
 
-/** @internal A new card analysis job was submitted; poll with `jobId` for the result. */
+/** A new card analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitNewsCardAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
@@ -130,7 +130,7 @@ export type SubmitNewsCardAnalysisResult =
 // Poll News Card Analysis
 // ─────────────────────────────────────────
 
-/** @internal Outcome of {@link pollNewsCardAnalysis}: still processing, finished, or errored. */
+/** Outcome of {@link pollNewsCardAnalysis}: still processing, finished, or errored. */
 export type PollNewsCardAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: NewsCardAnalysis }

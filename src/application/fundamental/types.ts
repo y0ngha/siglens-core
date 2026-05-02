@@ -52,26 +52,26 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
     now?: Date;
 }
 
-/** @internal The caller receives a cached analysis — no new job was created. */
+/** The caller receives a cached analysis — no new job was created. */
 export interface SubmitFundamentalAnalysisCached {
     status: 'cached';
     result: FundamentalAnalysisResponse;
 }
 
-/** @internal A new analysis job was submitted; poll with `jobId` for the result. */
+/** A new analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitFundamentalAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** @internal Result variant when the daily analysis limit is exceeded. */
+/** Result variant when the daily analysis limit is exceeded. */
 export interface SubmitFundamentalAnalysisLimitError {
     status: 'error';
     code: 'usage_limit_exceeded';
     error: AnalysisLimitError;
 }
 
-/** @internal Result variant when the provider fetch or data normalization fails. */
+/** Result variant when the provider fetch or data normalization fails. */
 export interface SubmitFundamentalAnalysisFetchError {
     status: 'error';
     code: 'fetch_failed';
