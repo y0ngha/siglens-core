@@ -332,3 +332,41 @@
 - Violation: hashAnalysisInput internal helper exported without @internal JSDoc
 - Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
 - Context: @internal JSDoc added (S-6)
+
+## [PR #75 Round 2 | feat/fundamental-news-analysis | 2026-05-02]
+
+### Blockers (4 findings)
+
+- Violation: 14 Raw* (FMP-shaped) interfaces located in domain layer
+- Rule: MISTAKES.md Architecture §4 — Infrastructure-provided Raw types must not reside in domain/
+- Context: RawFundamentalSnapshot, RawEarningsReport, etc. moved from domain/analysis/types.ts to infrastructure/fundamental/types.ts; new domain-neutral FundamentalSnapshotInput interface added for provider handoff
+
+- Violation: resolveOverallDependencies typed public but return/parameter types not exported from src/index.ts
+- Rule: MISTAKES.md Architecture §6.5 — public function types must be exported to prevent caller type-safety loss
+- Context: OverallDependencyInputs, DependencyState, DependencyStateCached, DependencyStatePending, DependencyStateError added to src/index.ts Tier 4 exports
+
+- Violation: loadSkillsCached catch block silently swallows errors without console.error
+- Rule: MISTAKES.md Domain Functions §2 — degradation must be exposed to caller; silent fallback forbidden
+- Context: console.error added to error handler; loader.test.ts added coverage for error path with console.error spy verification
+
+- Violation: Test file inline dynamic type import (`) } as import('@/domain/types').TierConfig;`)
+- Rule: MISTAKES.md TypeScript §9.5 — dynamic type imports in generic arguments prohibited; must use top-level static import
+- Context: Top-level `import type { TierConfig }` added; inline dynamic import removed from test assertion
+
+### Suggestions (4 findings, already-documented patterns)
+
+- Violation: 14 Raw* types missing @internal JSDoc
+- Rule: MISTAKES.md §9.5 — module-internal infrastructure types require @internal tag
+- Context: @internal JSDoc added to all RawFundamental*, RawNews*, RawOverall* type exports
+
+- Violation: SubmitFundamental/SubmitNews/SubmitOverall error code and variant types missing @internal
+- Rule: MISTAKES.md §9.5 — internal type aliases require @internal tag
+- Context: @internal JSDoc added to SubmitFundamentalErrorCode, SubmitNewsErrorCode, SubmitOverallErrorCode, and all Cached/Submitted/Error variant types
+
+- Violation: New TTL constants (FUNDAMENTAL/NEWS/NEWS_CARD/OVERALL_TTL) JSDoc written in Korean
+- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
+- Context: All 4 TTL constant JSDoc comments translated to English per npm packaging standard
+
+- Violation: SkillCategory type has inline Korean comments on 'fundamental' and 'news' members
+- Rule: FF Principle 2-B Consistency — mixed comment patterns (some members documented, others not) break readability consistency
+- Context: Inline Korean comments removed; SkillCategory JSDoc relies on type name for clarity per existing pattern in domain/types.ts

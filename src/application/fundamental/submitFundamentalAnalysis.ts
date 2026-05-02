@@ -135,8 +135,10 @@ export async function submitFundamentalAnalysis(
             : [];
 
         const sectorToday =
-            sectorSnapshot.find(s => s.sector === sectorName)
-                ?.changesPercentage ?? null;
+            sectorSnapshot.find(
+                (s: { sector: string; changesPercentage: number }) =>
+                    s.sector === sectorName
+            )?.changesPercentage ?? null;
 
         snapshot = normalizeFundamentalSnapshot({
             profile,
