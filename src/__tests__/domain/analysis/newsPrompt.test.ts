@@ -1,0 +1,127 @@
+import { describe, it, expect } from 'vitest';
+import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
+import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
+import type { EarningsCalendarItem, NewsCardAnalysis, NewsItem, Skill } from '@/domain/types';
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+const TEST_SYMBOL = 'AAPL';
+
+type EnrichedNewsItem = NewsItem & { card: NewsCardAnalysis };
+
+const NEWS_ITEM_1: EnrichedNewsItem = {
+    id: 'n1',
+    symbol: 'AAPL',
+    source: 'Reuters',
+    url: 'https://reuters.com/aapl-earnings',
+    publishedAt: '2025-04-28T12:00:00Z',
+    titleEn: 'Apple reports record Q2 earnings beat',
+    bodyEn: 'Apple Inc. reported Q2 revenue of $95B, surpassing analyst estimates.',
+    card: {
+        titleKo: '애플 2분기 실적 어닝 서프라이즈',
+        bodyKo: '애플은 2분기 매출 950억 달러를 기록하며 예상치를 상회했습니다.',
+        summaryKo: '실적 발표에서 시장 예상을 웃도는 호실적 기록',
+        sentiment: 'bullish',
+        category: 'earnings',
+    },
+};
+
+const NEWS_ITEM_2: EnrichedNewsItem = {
+    id: 'n2',
+    symbol: 'AAPL',
+    source: 'Bloomberg',
+    url: 'https://bloomberg.com/aapl-antitrust',
+    publishedAt: '2025-04-27T09:30:00Z',
+    titleEn: 'EU opens antitrust probe into Apple App Store policies',
+    bodyEn: 'European regulators announced a formal investigation into Apple\'s App Store practices.',
+    card: {
+        titleKo: 'EU, 애플 앱스토어 정책 반독점 조사 개시',
+        bodyKo: '유럽 규제 당국이 애플 앱스토어 관행에 대한 공식 조사를 개시했습니다.',
+        summaryKo: 'EU 반독점 조사로 인한 규제 리스크 부각',
+        sentiment: 'bearish',
+        category: 'regulation',
+    },
+};
+
+const UPCOMING_EARNINGS: EarningsCalendarItem = {
+    symbol: 'AAPL',
+    earningsDate: '2025-07-30',
+    epsActual: null,
+    epsEstimated: 1.42,
+    revenueActual: null,
+    revenueEstimated: 94_000_000_000,
+    lastUpdated: '2025-04-28',
+};
+
+const NEWS_SKILL_HIGH: Skill = {
+    name: 'event-driven',
+    description: 'Event-driven news analysis framework.',
+    category: 'news',
+    indicators: [],
+    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    content: 'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
+};
+
+const NEWS_SKILL_LOW: Skill = {
+    name: 'low-weight-news',
+    description: 'Low confidence news skill.',
+    category: 'news',
+    indicators: [],
+    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
+    content: 'This content should not appear.',
+};
+
+const FUNDAMENTAL_SKILL: Skill = {
+    name: 'value-investing',
+    description: 'Fundamental analysis framework.',
+    category: 'fundamental',
+    indicators: [],
+    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    content: 'Not a news skill — should be filtered out.',
+};
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('buildNewsAnalysisPrompt', () => {
+    it('includes symbol, news titles, and upcoming calendar event', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [NEWS_ITEM_1, NEWS_ITEM_2],
+            [UPCOMING_EARNINGS],
+            [NEWS_SKILL_HIGH],
+        );
+
+        expect(prompt).toContain('AAPL');
+        // News titles
+        expect(prompt).toContain('Apple reports record Q2 earnings beat');
+        expect(prompt).toContain('EU opens antitrust probe into Apple App Store policies');
+        // Korean summaries from card analysis
+        expect(prompt).toContain('실적 발표에서 시장 예상을 웃도는 호실적 기록');
+        expect(prompt).toContain('EU 반독점 조사로 인한 규제 리스크 부각');
+        // Sentiment labels
+        expect(prompt).toContain('bullish');
+        expect(prompt).toContain('bearish');
+        // Upcoming earnings
+        expect(prompt).toContain('2025-07-30');
+        expect(prompt).toContain('1.42'); // EPS estimate
+    });
+
+    it('includes the qualifying news skill and filters out low-weight and non-news skills', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [NEWS_ITEM_1],
+            [],
+            [NEWS_SKILL_HIGH, NEWS_SKILL_LOW, FUNDAMENTAL_SKILL],
+        );
+
+        // High-weight news skill is included
+        expect(prompt).toContain('event-driven');
+        expect(prompt).toContain('Focus on catalyst events');
+        // Low-weight news skill is excluded
+        expect(prompt).not.toContain('low-weight-news');
+        expect(prompt).not.toContain('This content should not appear.');
+        // Fundamental skill is excluded (wrong category)
+        expect(prompt).not.toContain('value-investing');
+        expect(prompt).not.toContain('Not a news skill');
+    });
+});
