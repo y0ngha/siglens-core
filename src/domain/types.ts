@@ -467,6 +467,8 @@ export interface SkillCounts {
     patterns: number;
     strategies: number;
     supportResistance: number;
+    fundamental: number;
+    news: number;
 }
 
 /** Origin marker carried by AnalysisSignal (currently always `'skill'`). */

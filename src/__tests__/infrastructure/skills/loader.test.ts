@@ -5,7 +5,8 @@ vi.mock('node:fs/promises');
 
 import { readdir, readFile } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+import { FileSkillsLoader, countSkillFiles } from '@/infrastructure/skills/loader';
+import type { SkillCounts } from '@/domain/types';
 
 const mockReaddir = readdir as Mock;
 const mockReadFile = readFile as Mock;
@@ -195,5 +196,72 @@ Identifies bullish reversal setups.`;
                 skills.some((s) => s.category === 'reversal_bullish'),
             ).toBe(true);
         });
+    });
+});
+
+describe('countSkillFiles', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('모든 카테고리 디렉토리에서 파일 수를 합산한다', async () => {
+        // Each call to readdir returns a different set of files per subdirectory
+        mockReaddir
+            .mockResolvedValueOnce([makeDirent('rsi.md'), makeDirent('macd.md')]) // indicators — 2
+            .mockResolvedValueOnce([makeDirent('doji.md')])                        // candlesticks — 1
+            .mockResolvedValueOnce([makeDirent('head-shoulders.md')])              // patterns — 1
+            .mockResolvedValueOnce([makeDirent('breakout.md'), makeDirent('trend.md')]) // strategies — 2
+            .mockResolvedValueOnce([makeDirent('support.md')])                     // support-resistance — 1
+            .mockResolvedValueOnce([makeDirent('dcf.md'), makeDirent('ratio.md')]) // fundamental — 2
+            .mockResolvedValueOnce([makeDirent('earnings.md')]);                   // news — 1
+
+        const counts = await countSkillFiles();
+
+        expect(counts.indicators).toBe(2);
+        expect(counts.candlesticks).toBe(1);
+        expect(counts.patterns).toBe(1);
+        expect(counts.strategies).toBe(2);
+        expect(counts.supportResistance).toBe(1);
+        expect(counts.fundamental).toBe(2);
+        expect(counts.news).toBe(1);
+    });
+
+    it('SkillCounts 타입의 모든 필드를 반환한다', async () => {
+        // All directories empty
+        mockReaddir.mockResolvedValue([]);
+
+        const counts = await countSkillFiles();
+
+        // Regression test: if a field is missing from countSkillFiles, this assertion fails.
+        const expectedKeys: Array<keyof SkillCounts> = [
+            'indicators',
+            'candlesticks',
+            'patterns',
+            'strategies',
+            'supportResistance',
+            'fundamental',
+            'news',
+        ];
+        expect(Object.keys(counts).sort()).toEqual(expectedKeys.sort());
+    });
+
+    it('fundamental 디렉토리가 비어 있으면 0을 반환한다', async () => {
+        mockReaddir.mockResolvedValue([]);
+
+        const counts = await countSkillFiles();
+
+        expect(counts.fundamental).toBe(0);
+        expect(counts.news).toBe(0);
+    });
+
+    it('디렉토리 내 .md가 아닌 파일은 집계에서 제외한다', async () => {
+        // indicators dir has 1 md + 1 non-md; countMdFiles filters non-.md
+        mockReaddir
+            .mockResolvedValueOnce([makeDirent('rsi.md'), makeDirent('image.png')]) // indicators — only 1 md
+            .mockResolvedValue([]); // all other dirs empty
+
+        const counts = await countSkillFiles();
+
+        expect(counts.indicators).toBe(1);
     });
 });
