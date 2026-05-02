@@ -10,6 +10,8 @@ import type {
 } from '@/application/overall/types';
 
 /**
+ * @internal Called by {@link submitOverallAnalysis} — consumers should not call this directly.
+ *
  * Resolve the three dependency axes (technical, fundamental, news) for an
  * overall analysis submission.
  *

@@ -217,7 +217,7 @@ export function buildNewsCardCacheKey(newsId: string): string {
  */
 export function buildOverallCacheKey(
     symbol: string,
-    timeframe: string,
+    timeframe: Timeframe,
     modelId: string,
     inputHash: string
 ): string {

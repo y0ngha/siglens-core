@@ -128,9 +128,9 @@ describe('new analysis cache keys', () => {
     });
 
     it('buildOverallCacheKey includes timeframe', () => {
-        expect(buildOverallCacheKey('AAPL', '5m', 'gemini-2.5-pro', 'h3')).toBe(
-            'analysis:overall:AAPL:5m:gemini-2.5-pro:h3'
-        );
+        expect(
+            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3')
+        ).toBe('analysis:overall:AAPL:5Min:gemini-2.5-pro:h3');
     });
 
     it('TTL constants match SECONDS_PER_DAY', () => {

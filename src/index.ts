@@ -45,7 +45,6 @@ export { submitNewsCardAnalysis } from './application/news/submitNewsCardAnalysi
 // Overall analysis use-cases
 export { cancelOverallAnalysisJob } from './application/overall/cancelOverallAnalysisJob';
 export { pollOverallAnalysis } from './application/overall/pollOverallAnalysis';
-export { resolveOverallDependencies } from './application/overall/dependencyResolver';
 export { submitOverallAnalysis } from './application/overall/submitOverallAnalysis';
 
 // =============================================================================

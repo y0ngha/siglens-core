@@ -183,7 +183,6 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `submitOverallAnalysis` | `application/overall/submitOverallAnalysis.ts` |
 | `pollOverallAnalysis` | `application/overall/pollOverallAnalysis.ts` |
 | `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
-| `resolveOverallDependencies` | `application/overall/dependencyResolver.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
