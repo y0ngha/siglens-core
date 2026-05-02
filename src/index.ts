@@ -625,6 +625,7 @@ export type {
     RunAnalysisInput,
     SectorEtf,
     SectorGroupDef,
+    SectorHistoricalPoint,
     SectorSignalsResult,
     SectorStock,
     Signal,
