@@ -1,9 +1,8 @@
 /**
- * Cancel an in-flight overall analysis job.
+ * Cancels a pending or running overall analysis job.
  *
- * Delegates entirely to {@link cancelAnalysisJob} — the overall analysis
- * worker uses the same `/cancel` endpoint and Redis job state as the
- * technical analysis worker.
+ * @param jobId - The job ID returned by {@link submitOverallAnalysis}.
+ * @returns `true` if the job was cancelled successfully.
  *
  * @see cancelAnalysisJob
  * @see submitOverallAnalysis
