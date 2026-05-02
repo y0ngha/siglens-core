@@ -180,3 +180,87 @@
 - Violation: domain 테스트(`src/__tests__/domain/llm/providers.test.ts`)에서 application 레이어 상수(`@/application/chat/constants`) import
 - Rule: ARCHITECTURE.md — domain은 application에서 import 금지 (ESLint 강제); 동일 규칙이 domain 테스트에도 적용됨
 - Context: S1 Suggestion을 반영하면서 `GEMINI_2_5_FLASH_MODEL`을 application 레이어에서 import했으나, domain 테스트는 application 레이어 심볼에 의존해서는 안 됨
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 1 | 2026-05-02]
+- Violation: Inline union literals with 2+ members not extracted to named type aliases
+- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
+- Context: FundamentalCategory ('up' | 'down'), GradesAction ('upgrade' | 'downgrade' | 'maintain') extracted to dedicated named types for reusability
+
+- Violation: Deeply nested inline shapes in FundamentalSnapshot
+- Rule: MISTAKES.md TypeScript §5 — named interfaces required over inline return types
+- Context: 13 deeply nested interfaces extracted (FundamentalProfile, FundamentalValuation, FundamentalPeer, FundamentalScore, FundamentalGradesSnapshot, NewsSentimentData, NewsCategory, etc.)
+
+- Violation: Magic numbers in TTL calculations (24*60*60)
+- Rule: MISTAKES.md Coding Paradigm §13 — magic numbers must be extracted to named constants
+- Context: Replaced inline computation with imported SECONDS_PER_DAY constant
+
+- Violation: Missing JSDoc on new type exports
+- Rule: MISTAKES.md Documentation Sync §4.5 — all new types require JSDoc
+- Context: Added one-line JSDoc description on every new named interface export
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 2 | 2026-05-02]
+- Violation: Pure domain function placed in infrastructure layer
+- Rule: MISTAKES.md Architecture §2 — pure functions with no I/O belong in domain/
+- Context: normalizeFundamentalSnapshot moved from infrastructure/ to domain/fundamental/normalizers.ts
+
+- Violation: State/function divergence when adding to a whitelist
+- Rule: MISTAKES.md Coding Paradigm §6.5 — functions and state must stay synchronized
+- Context: SKILL_CATEGORIES whitelist and countSkillFiles function now both use same pattern
+
+- Violation: Missing @param/@returns JSDoc on Tier 4 interface methods
+- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 4 interface methods require @param and @returns
+- Context: Added per-method JSDoc with parameter and return type documentation
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 3 | 2026-05-02]
+- Violation: DRY violation — duplicated helpers (fmt formatter across prompt builders)
+- Rule: MISTAKES.md Coding Paradigm §6 — identical functions repeating across modules must be extracted
+- Context: Extracted fmt formatter to shared infrastructure/ai/utils.ts or domain/formatting/
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 4 | 2026-05-02]
+- Violation: Fire-and-forget fetch missing AbortSignal.timeout
+- Rule: MISTAKES.md Fire-and-Forget §1 — fire-and-forget fetch requests must have timeouts
+- Context: Background cancellation requests added 5min AbortSignal.timeout per submitAnalysis pattern
+
+- Violation: Bare new Date() bypasses injected clock parameter
+- Rule: MISTAKES.md Domain Functions §4 — all time reads must use passed parameter, never new Date()
+- Context: Replaced bare new Date() with occurredAt parameter for clock injection consistency
+
+- Violation: Dead code in narrowed guard (Math.max fallback after !== undefined check)
+- Rule: MISTAKES.md Dead Code §15 — unreachable fallback inside type narrowing guard must be removed
+- Context: Removed || fallback after narrowing guard made fallback unreachable
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 5 | 2026-05-02]
+- Violation: .sort() mutable instead of .toSorted()
+- Rule: MISTAKES.md Coding Paradigm §10 — .sort() mutates the original array; use .toSorted()
+- Context: Replaced .sort() with .toSorted() for immutability
+
+- Violation: DRY violation — duplicated hashing patterns (hashSnapshot vs hashNewsInput)
+- Rule: MISTAKES.md Coding Paradigm §6 — identical helper patterns must be extracted to shared utility
+- Context: Both hashSnapshot and hashNewsInput use same SHA-256+truncation pattern; extracted to domain/hash/
+
+- Violation: Inline dynamic type import in generic argument
+- Rule: MISTAKES.md TypeScript §9 — complex type inference chains instead of direct imports
+- Context: Replaced inline dynamic import('...').Type with top-level static import in type position
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 6 | 2026-05-02]
+- Violation: Test fixture duplication across multiple test files
+- Rule: MISTAKES.md Tests §8 — repeated test data must be extracted to shared fixtures.ts
+- Context: Created __fixtures__/newsFixtures.ts with reusable mock data, imported into all news test files
+
+- Violation: Sibling type shape inconsistency (Record<...> vs optional fields)
+- Rule: MISTAKES.md TypeScript §8 — sibling types must follow consistent declaration patterns
+- Context: Unified snapshot hashing result type shape across FundamentalResult and NewsResult
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 7 | 2026-05-02]
+- Violation: PUBLIC_API.md exports list stale — functions listed as internal but promoted to public
+- Rule: MISTAKES.md Public API & Module Exports §6.5 — PUBLIC_API.md document must stay synchronized with src/index.ts exports
+- Context: Updated PUBLIC_API.md document inventory to match actual promoted exports in Task 1.18
+
+- Violation: PUBLIC_API.md inventory drift — SectorHistoricalPoint listed but missing from src/index.ts
+- Rule: MISTAKES.md Public API & Module Exports §1 — src/index.ts re-exports must stay synchronized with documentation
+- Context: Verified all items in PUBLIC_API.md document are actually exported from src/index.ts; removed or added missing entries
+
+## [Fundamental & News Analysis Phase 1 | Task Batch 8 | 2026-05-02]
+- Violation: Validation logic incomplete — edge cases in shape validation not covered
+- Rule: MISTAKES.md Infrastructure Functions §2 — all branches and edge cases must be covered
+- Context: Added comprehensive test coverage for validation edge cases (deferred to Task 1.19 completion)
