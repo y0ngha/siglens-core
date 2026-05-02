@@ -525,56 +525,32 @@
 - Rule: ARCHITECTURE.md / Domain-Neutral Input Shapes §1 — domain input interfaces must use canonical domain names, not provider wire field names
 - Context: FundamentalProfileInput.mktCap renamed to marketCap; normalizeFundamentalSnapshot reads input.profile.marketCap; submitFundamentalAnalysis maps RawProfile.mktCap → marketCap explicitly
 
-## [PR #75 Round 5 | feat/fundamental-news-analysis | 2026-05-02]
+## [PR #75 Round 6 | feat/fundamental-news-analysis | 2026-05-02]
 
-### Blockers (5 findings)
+### Blockers (3 findings)
 
-- Violation: `node:crypto` (`createHash`) used inside `application/analysisInputHash.ts`
-- Rule: ARCHITECTURE.md — I/O and system modules (node:crypto, node:fs) belong in `infrastructure/`, not `application/`
-- Context: hashAnalysisInput moved to src/infrastructure/hash/analysisInput.ts; all callers updated; test mirrored to __tests__/infrastructure/hash/
+- Violation: LoadSkillsCachedResult interface defined in implementation file infrastructure/skills/loader.ts instead of types.ts
+- Rule: ARCHITECTURE.md #4 — infrastructure module public interfaces must be defined in types.ts, not implementation files
+- Context: LoadSkillsCachedResult moved to infrastructure/skills/types.ts; loader.ts imports and uses it
 
-- Violation: `EarningsReport.raw: unknown` field on a public domain type
-- Rule: MISTAKES.md Architecture §4 — raw provider payloads must not leak into domain types; domain shapes carry only domain-meaningful fields
-- Context: raw field removed from EarningsReport; no consumer reads it; infrastructure RawEarningsReport retains raw for FMP adapter use
+- Violation: FundamentalDataProvider return type has provider-specific field names (mktCap) while JSDoc claims "no mapping layer" exists; application layer forced to map mktCap → marketCap
+- Rule: Layer separation — provider interface should return domain-neutral input types; mapping belongs in infrastructure adapter, not application
+- Context: FundamentalProfileInput.mktCap renamed to marketCap; submitFundamentalAnalysis updated to map RawProfile.mktCap → input.marketCap
 
-- Violation: `FundamentalEarningsReportInput` dead type — never used as a function parameter
-- Rule: MISTAKES.md §15 — dead code (types with zero usage) must be deleted
-- Context: normalizeFundamentalSnapshot accepts nextEarningsAt: string | null directly; FundamentalEarningsReportInput deleted from domain/types.ts and src/index.ts
+- Violation: TIMEFRAME_LABEL and TIMEFRAME_CONTEXT constants separated but must be updated together
+- Rule: MISTAKES.md Design & Cohesion #1 — data that must be updated together should live in a single object/constant
+- Context: Unified to single TIMEFRAME_CONFIG object with structure { [Timeframe]: { label, context } }
 
-- Violation: `normalizeFundamentalSnapshot` took a 14-field inline object parameter instead of a named interface
-- Rule: MISTAKES.md TypeScript §5 — inline shapes with 3+ fields must be extracted to named interfaces
-- Context: NormalizeFundamentalSnapshotInput named interface defined in domain/types.ts; function signature updated; exported from src/index.ts (Tier 4)
+### Suggestions (3 findings)
 
-- Violation: `FundamentalPriceTargetSummaryInput` repeated `{ avgPriceTarget: number | null }` inline 3 times
-- Rule: MISTAKES.md TypeScript §5 — repeated inline shapes must be extracted to named type aliases
-- Context: PriceTargetAvg interface extracted; FundamentalPriceTargetSummaryInput updated to reference it; PriceTargetAvg exported from src/index.ts (Tier 4)
+- Violation: buildOverallCacheKey function parameter timeframe typed as string instead of Timeframe enum
+- Rule: TypeScript accuracy — type boundaries should match the codebase type system; mismatched types hide errors
+- Context: Parameter updated to timeframe: Timeframe; test cases updated to pass Timeframe enum values instead of string literals
 
-### Suggestions (7 findings)
+- Violation: FundamentalDataProvider.getGrades method is not used but marked as public interface
+- Rule: Interface Segregation / unused code — unexposed methods should be either removed or documented as reserved for future phases
+- Context: JSDoc added documenting the method as reserved for Phase 4 usage; method retained as interface spec
 
-- Violation: Re-export block in normalizeFundamentalSnapshot.ts with "existing consumers" comment for types introduced in this PR
-- Rule: FF Principle 2-A Predictability — comments must reflect current state; re-exports for non-existent consumers add dead weight
-- Context: Entire re-export block removed; imports now come from @/domain/types directly
-
-- Violation: Korean inline comment on public type field (NewsCardAnalysis.summaryKo)
-- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
-- Context: `// 한 줄 요약` → `// single-line summary`
-
-- Violation: Indexed access types (`FundamentalSnapshot['futureDirection']['gradesConsensus']`) used as parameter types in fundamentalPrompt.ts
-- Rule: CONVENTIONS.md — prefer direct named type imports over indexed access in function signatures
-- Context: Replaced with direct imports of GradesConsensus and PriceTargetConsensus from @/domain/types
-
-- Violation: Redundant `userApiKey: technicalOptions.userApiKey` after `...technicalOptions` spread in dependencyResolver.ts
-- Rule: MISTAKES.md Coding Paradigm §2 — identical values computed/set multiple times must be deduplicated
-- Context: Explicit line removed; spread already includes userApiKey
-
-- Violation: Module-level NOTE block in domain/tier.ts describing app-layer runtime behavior
-- Rule: FF Principle 1-D / CONVENTIONS.md — implementation notes about the consuming app must not pollute library module headers
-- Context: NOTE block removed; operational context belongs in PR description, not module code
-
-- Violation: FundamentalDataProvider.getGrades JSDoc referenced "News page" (UI consumer knowledge)
-- Rule: ARCHITECTURE.md / FF Coupling — library interface JSDoc must not reference UI layer consumers
-- Context: "Also used by the News page; exposed here to avoid a second provider." replaced with neutral interface description
-
-- Violation: `FundamentalProfileInput.mktCap` used the FMP wire field name instead of a domain-neutral name
-- Rule: ARCHITECTURE.md / Domain-Neutral Input Shapes §1 — domain input interfaces must use canonical domain names, not provider wire field names
-- Context: FundamentalProfileInput.mktCap renamed to marketCap; normalizeFundamentalSnapshot reads input.profile.marketCap; submitFundamentalAnalysis maps RawProfile.mktCap → marketCap explicitly
+- Violation: resolveOverallDependencies exposed in public API (src/index.ts) but is internal implementation detail of submitOverallAnalysis
+- Rule: API surface minimization — public API should not expose internal use-case orchestration; only top-level consumer functions should be exported
+- Context: resolveOverallDependencies removed from src/index.ts; remains internal infrastructure function
