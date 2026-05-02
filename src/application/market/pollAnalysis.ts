@@ -120,7 +120,7 @@ export async function pollAnalysis(
     const analyzedAt = now.toISOString();
     const result = { ...reconciled, analyzedAt };
 
-    if (meta) {
+    if (meta && meta.timeframe !== undefined) {
         const cache = createCacheProvider();
         if (cache !== null) {
             const cacheKey = buildAnalysisCacheKey(
