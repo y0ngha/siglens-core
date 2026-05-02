@@ -193,6 +193,19 @@ const countMdFiles = async (subdir: string): Promise<number> => {
 // ─────────────────────────────────────────
 
 let _cachedSkills: Skill[] | null = null;
+let _cachedSkillsDegraded: boolean = false;
+
+/** Result shape returned by {@link loadSkillsCached}. */
+export interface LoadSkillsCachedResult {
+    /** Parsed skills list; empty when load failed. */
+    skills: Skill[];
+    /**
+     * `true` when the loaded skills failed to read from disk and the analysis
+     * ran with an empty skills list. Used by the worker / consumer to surface
+     * a degraded warning.
+     */
+    skillsDegraded: boolean;
+}
 
 /**
  * Load all skills from disk, memoizing the result for the module lifetime.
@@ -204,17 +217,22 @@ let _cachedSkills: Skill[] | null = null;
  *
  * Use {@link clearSkillsCache} in test setup/teardown to reset memoization.
  *
- * @returns The full list of parsed skills (empty array on load failure).
+ * @returns `{ skills, skillsDegraded }` — `skillsDegraded` is `true` when
+ *   the filesystem load threw and the skills list is empty.
  */
-export async function loadSkillsCached(): Promise<Skill[]> {
-    if (_cachedSkills !== null) return _cachedSkills;
+export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
+    if (_cachedSkills !== null) {
+        return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
+    }
     try {
         _cachedSkills = await new FileSkillsLoader().loadSkills();
+        _cachedSkillsDegraded = false;
     } catch (error) {
         console.error('[loadSkillsCached] Skills load failed:', error);
         _cachedSkills = [];
+        _cachedSkillsDegraded = true;
     }
-    return _cachedSkills;
+    return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
 }
 
 /**
@@ -225,6 +243,7 @@ export async function loadSkillsCached(): Promise<Skill[]> {
  */
 export function clearSkillsCache(): void {
     _cachedSkills = null;
+    _cachedSkillsDegraded = false;
 }
 
 export async function countSkillFiles(): Promise<SkillCounts> {

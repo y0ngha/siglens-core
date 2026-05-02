@@ -320,14 +320,27 @@ describe('loadSkillsCached', () => {
         loadSkillsSpy.mockRestore();
     });
 
-    it('loadSkills 가 실패해도 빈 배열을 반환한다', async () => {
+    it('성공 시 skills 배열과 skillsDegraded: false 를 반환한다', async () => {
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockResolvedValue([]);
+
+        const result = await loadSkillsCached();
+
+        expect(result.skills).toEqual([]);
+        expect(result.skillsDegraded).toBe(false);
+        loadSkillsSpy.mockRestore();
+    });
+
+    it('loadSkills 가 실패하면 skills: [], skillsDegraded: true 를 반환한다', async () => {
         const loadSkillsSpy = vi
             .spyOn(FileSkillsLoader.prototype, 'loadSkills')
             .mockRejectedValue(new Error('ENOENT'));
 
-        const skills = await loadSkillsCached();
+        const result = await loadSkillsCached();
 
-        expect(skills).toEqual([]);
+        expect(result.skills).toEqual([]);
+        expect(result.skillsDegraded).toBe(true);
         loadSkillsSpy.mockRestore();
     });
 

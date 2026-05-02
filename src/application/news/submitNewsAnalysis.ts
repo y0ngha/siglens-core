@@ -2,6 +2,8 @@ import { fireAndForget } from '@/application/background';
 import { hashAnalysisInput } from '@/application/analysisInputHash';
 import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
 import type {
+    SubmitNewsAnalysisLimitError,
+    SubmitNewsAnalysisNoNewsError,
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
 } from '@/application/news/types';
@@ -78,11 +80,12 @@ export async function submitNewsAnalysis(
 
     // ── 1. Empty news guard (before tier/cache/prompt) ──
     if (news.length === 0) {
-        return {
+        const noNewsError: SubmitNewsAnalysisNoNewsError = {
             status: 'error',
             code: 'no_news',
             error: 'No news to analyze',
         };
+        return noNewsError;
     }
 
     // ── 2. Usage limit check (only when both tier and usage are provided) ──
@@ -95,11 +98,12 @@ export async function submitNewsAnalysis(
             { usage: options.usage.usageRepository }
         );
         if (!allowed) {
-            return {
+            const limitError: SubmitNewsAnalysisLimitError = {
                 status: 'error',
                 code: 'usage_limit_exceeded',
                 error: buildUsageLimitError('analysisPerDay', tier),
             };
+            return limitError;
         }
     }
 
@@ -122,7 +126,7 @@ export async function submitNewsAnalysis(
     }
 
     // ── 4. Load skills (best-effort, cached), build prompt, enqueue job, fire-and-forget ──
-    const skills = await loadSkillsCached();
+    const { skills, skillsDegraded } = await loadSkillsCached();
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildNewsAnalysisPrompt(
@@ -137,6 +141,7 @@ export async function submitNewsAnalysis(
         symbol,
         modelId,
         cacheKey,
+        ...(skillsDegraded && { skillsDegraded }),
     });
 
     const dispatch = fetch(`${workerUrl}/analyze`, {

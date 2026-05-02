@@ -81,7 +81,10 @@ describe('submitFundamentalAnalysis 함수는', () => {
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFireAndForget.mockImplementation(() => undefined);
-        mockLoadSkillsCached.mockResolvedValue([]);
+        mockLoadSkillsCached.mockResolvedValue({
+            skills: [],
+            skillsDegraded: false,
+        });
 
         // Reset provider mocks
         mockDataProvider.getProfile.mockResolvedValue(validProfile);
@@ -169,6 +172,43 @@ describe('submitFundamentalAnalysis 함수는', () => {
                     symbol: 'AAPL',
                     modelId: 'gemini-2.5-flash',
                     cacheKey: expect.any(String),
+                })
+            );
+        });
+
+        it('loadSkillsCached 실패 시 skillsDegraded: true 를 setJobMeta에 전달한다', async () => {
+            mockLoadSkillsCached.mockResolvedValueOnce({
+                skills: [],
+                skillsDegraded: true,
+            });
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    skillsDegraded: true,
+                })
+            );
+        });
+
+        it('loadSkillsCached 성공 시 skillsDegraded 를 setJobMeta에 포함하지 않는다', async () => {
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.not.objectContaining({
+                    skillsDegraded: expect.anything(),
                 })
             );
         });

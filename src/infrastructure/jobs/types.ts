@@ -29,8 +29,12 @@ export interface JobMeta {
      */
     timeframe?: Timeframe;
     /**
-     * `true` if skills failed to load when the job was submitted. Omitted for
-     * job types that do not load skills (fundamental, news, overall).
+     * Set to `true` when the loaded skills failed to read from disk and the
+     * analysis ran with an empty skills list. Used by the worker / consumer
+     * to surface a degraded warning.
+     *
+     * Applies to all job types that load skills (technical, fundamental,
+     * news, and overall analysis jobs).
      */
     skillsDegraded?: boolean;
     /** Last bar close — used as the reconciliation reference for SL/TP validation when the AI omits an entry price. */
