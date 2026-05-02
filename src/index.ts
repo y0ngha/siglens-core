@@ -448,7 +448,6 @@ export type {
 } from './application/market/types';
 
 // Domain types
-export type { LlmProvider } from './domain/llm/types';
 export { LLM_PROVIDER_VALUES } from './domain/llm/types';
 
 export type {
@@ -586,6 +585,7 @@ export type {
     TrendlinePoint,
     TrendState,
     UserTierContext,
+    LlmProvider,
     ValidatedActionPrices,
     VolumeProfileResult,
     VolumeProfileRow,

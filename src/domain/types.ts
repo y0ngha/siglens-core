@@ -1298,3 +1298,6 @@ export type QuadrantKey =
 export type WaitUntil = (promise: Promise<unknown>) => void;
 
 // ─── LLM ──────────────────────────────────────────────────────────────────────
+
+/** Canonical API key provider identifier. Single source of truth for key storage routing. */
+export type LlmProvider = 'anthropic' | 'google' | 'openai';

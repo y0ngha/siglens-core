@@ -63,7 +63,6 @@ export {
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
-export type { LlmProvider } from './domain/llm/types';
 export { LLM_PROVIDER_VALUES } from './domain/llm/types';
 
 // Tier gating
@@ -482,5 +481,6 @@ export type {
     BacktestAiEntryRecommendation,
     BacktestAiAnalysis,
     BacktestData,
+    LlmProvider,
     WaitUntil,
 } from './domain/types';

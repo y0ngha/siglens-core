@@ -1,5 +1,5 @@
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import type { LlmProvider } from '@/domain/llm/types';
+import type { LlmProvider } from '@/domain/types';
 import type { AIProvider, ActiveModelId, ModelId } from '@/domain/types';
 
 const AI_PROVIDER_TO_LLM_PROVIDER: Record<AIProvider, LlmProvider> = {

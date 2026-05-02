@@ -101,24 +101,6 @@
 - Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
 - Context: `requestChatCompletion.test.ts`의 `falls back to deprecated callGemini` 케이스에 `expect.objectContaining({ primaryApiKey, fallbackApiKey, model })` 단언 추가
 
-## [PR #70 | refactor/scope-realignment-phase-0 | 2026-05-02]
-- Violation: orphaned `types.ts` 파일이 ejection 후에도 `infrastructure/email/`, `infrastructure/oauth/` 디렉토리에 남아 있음
-- Rule: FF — Cohesion. consumer가 모두 제거된 모듈은 함께 삭제해야 dead code 누적을 막을 수 있음
-- Context: Phase 1에서 `email/{redis,index}.ts`, `oauth/{revoker,google,kakao}.ts`가 모두 ejection되었으나 type 파일만 남아 어떤 코드도 import하지 않는 상태였음
-
-- Violation: 단일 파일 내부에서만 사용되는 헬퍼 `toUtcDateString`이 `export` 되어 모듈 surface area를 불필요하게 넓힘
-- Rule: FF — Coupling. file-private helper는 모듈 외부에 노출하지 않아 의도치 않은 의존성을 차단
-- Context: `infrastructure/usage/hash.ts`의 `toUtcDateString`은 같은 파일의 `hashUsageIp`만 사용; export 제거 + JSDoc에 file-private 명시
-
-- Violation: schema enum과 손으로 동기화해야 하는 union 타입에 sync 의무 표기가 없음
-- Rule: FF — Predictability. consumer가 변경 의무를 추적할 수 있도록 hand-written 동기화 union에는 `@internal-sync` 같은 명시적 contract가 필요
-- Context: `infrastructure/db/types.ts`의 `UsageActionType`은 siglens 측 `USAGE_ACTION_TYPE_VALUES` enum과 동기화돼야 하지만 코드에 표시가 없었음
-
-- Violation: BREAKING change PR임에도 `package.json` `version` 및 `CHANGELOG.md`에 0.x 마이너 bump가 누락됨
-- Rule: MISTAKES.md "Public API & Module Exports #3" — 0.x semver에서 BREAKING은 minor bump
-- Context: 0.4.0 → 0.5.0 미반영, CHANGELOG에 신규 BREAKING/Phase 0~7 섹션 부재 (요약된 새 entry 추가)
-
-
 
 ## [PR #71 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Shared domain types (`ModelSpec`, `AIProvider`, `ActiveModelId`) were defined inside `domain/analysis/modelSpecs.ts` instead of `domain/types.ts`

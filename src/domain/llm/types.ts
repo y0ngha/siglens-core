@@ -1,7 +1,6 @@
-/** LLM API key provider identifier. Single source of truth for key storage routing. */
-export type LlmProvider = 'anthropic' | 'google' | 'openai';
+import type { LlmProvider } from '@/domain/types';
 
-/** All valid {@link LlmProvider} values. Used for membership checks and Drizzle enum sync. */
+/** All valid {@link LlmProvider} values. Useful for runtime membership checks. */
 export const LLM_PROVIDER_VALUES: readonly LlmProvider[] = [
     'anthropic',
     'google',

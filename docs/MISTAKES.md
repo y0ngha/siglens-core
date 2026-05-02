@@ -519,6 +519,15 @@ and have been removed from this file.
 5. Repeated literal values in the same module across multiple locations
    → Extract to a named constant; prevents silent divergence when updating
    → Applies to descriptions, messages, configuration values, and metadata strings
+
+6. Dead code and orphaned files left behind after module refactoring
+   → When code is ejected or refactored out, ALL related files and exports must be removed together
+   → Orphaned type files (types.ts) or unnecessary helper exports left in place cause ambiguity and waste maintenance effort
+   ❌ email/, oauth/ modules ejected but types.ts files left behind with no consumers
+   ❌ Single-file utility function exported from module even though only that one file imports it
+   ✅ Remove type files when consumers of those types are deleted
+   ✅ Don't export file-private helpers; keep them internal with no export keyword
+   → Also audit and remove unnecessary re-exports from public API and module barrels after refactoring
 ```
 
 ---

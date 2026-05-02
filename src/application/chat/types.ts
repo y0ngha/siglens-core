@@ -29,16 +29,18 @@ export interface RequestChatCompletionParams {
     clientIp: string;
     model?: ModelId;
     /**
-     * Server-owned API key used for free models and as a fallback for premium
-     * models. For `'pro'`-tier users without a `paidApiKey`, this key is the
-     * sole credential forwarded to the AI provider.
+     * Server-owned API key for all AI provider calls.
+     * When `paidApiKey` is also present, this key is the **primary** credential
+     * and `paidApiKey` is the fallback. For `'pro'`-tier users (who do not
+     * supply a `paidApiKey`), this is the sole credential forwarded to the AI
+     * provider.
      */
     freeApiKey?: string;
     /**
-     * User-registered API key for premium models. Must be provided when
-     * `model` is a premium model and `tierContext.tier` is not `'pro'`.
-     * Omitting this for a non-pro user requesting a premium model returns
-     * `user_api_key_required`.
+     * User-registered API key. Required for non-`'pro'`-tier users requesting
+     * a premium model. Omitting it in that case returns `user_api_key_required`.
+     * `'pro'`-tier users are exempt — the server covers all models via
+     * `freeApiKey` and never requires a personal key.
      */
     paidApiKey?: string;
     occurredAt?: Date;

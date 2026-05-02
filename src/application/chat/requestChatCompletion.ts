@@ -180,14 +180,13 @@ async function requestAiChatCompletion(
  * AI provider payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
  *
- * **API key routing:**
- * - Free models: always call with `freeApiKey` (server-owned key).
- * - Premium models + `paidApiKey` provided: call with `freeApiKey` as primary,
- *   `paidApiKey` as fallback.
- * - Premium models + `paidApiKey` absent + tier `'pro'`: server calls with
- *   `freeApiKey` only; no `paidApiKey` is required because the server holds the
- *   key for pro-tier users. `freeApiKey` must be provided in this case.
- * - Premium models + `paidApiKey` absent + tier below `'pro'`: returns
+ * **API key routing** (`freeApiKey` = server-owned key; `paidApiKey` = user-owned key):
+ * - `'pro'`-tier users: the server uses `freeApiKey` for **every** model,
+ *   including premium ones. No `paidApiKey` is required; the pro tier covers
+ *   all AI costs server-side. `freeApiKey` must be present → else `server_error`.
+ * - Non-pro users: both `freeApiKey` and `paidApiKey` must be provided by the
+ *   server. `freeApiKey` is the primary key; `paidApiKey` is the fallback.
+ *   Requesting a premium model without `paidApiKey` returns
  *   `user_api_key_required` so the caller can prompt the user to register a key.
  *
  * Token refund: when the result is `server_busy` or `server_error`, the
