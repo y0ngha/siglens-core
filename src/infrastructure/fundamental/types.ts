@@ -13,10 +13,7 @@
  * Consumer (siglens) implements `FundamentalDataProvider` using FMP `/stable/*`
  * endpoints. Core depends only on the interface — never on the concrete HTTP client.
  */
-import type {
-    FundamentalProfileInput,
-    GradesEvent,
-} from '@/domain/types';
+import type { FundamentalProfileInput, GradesEvent } from '@/domain/types';
 
 // ─────────────────────────────────────────
 // FMP-specific Raw* response shapes (infrastructure-owned)
