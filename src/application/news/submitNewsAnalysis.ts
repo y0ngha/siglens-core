@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import { fireAndForget } from '@/application/background';
+import { hashAnalysisInput } from '@/application/analysisInputHash';
 import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
 import type {
     SubmitNewsAnalysisOptions,
@@ -16,33 +16,28 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 import type { NewsAnalysisResponse, Skill } from '@/domain/types';
 
-/** Length of the hex input hash prefix used in the news cache key. */
-const INPUT_HASH_LENGTH = 16;
-
 /** Maximum time to wait for the worker to accept the news analysis job. */
 const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
  * Derive a short deterministic hash of the news set and upcoming calendar.
  *
- * SHA-256 of sorted news IDs joined with sorted earnings dates, truncated
- * to the first 16 hex characters. Deterministic across re-runs with the
+ * Sorted news IDs joined with sorted earnings dates, delegated to
+ * {@link hashAnalysisInput}. Deterministic across re-runs with the
  * same news set regardless of original ordering.
  *
  * @param newsIds - Array of news item IDs.
  * @param earningsDates - Array of earnings calendar date strings.
  * @returns 16-character lowercase hex string.
+ * @internal
  */
 function hashNewsInput(
     newsIds: readonly string[],
     earningsDates: readonly string[]
 ): string {
-    const sortedIds = [...newsIds].sort().join(',');
-    const sortedDates = [...earningsDates].sort().join(',');
-    return createHash('sha256')
-        .update(`${sortedIds}|${sortedDates}`)
-        .digest('hex')
-        .slice(0, INPUT_HASH_LENGTH);
+    const sortedIds = newsIds.toSorted().join(',');
+    const sortedDates = earningsDates.toSorted().join(',');
+    return hashAnalysisInput(`${sortedIds}|${sortedDates}`);
 }
 
 /**
@@ -73,7 +68,7 @@ function hashNewsInput(
  * ```
  *
  * @see pollNewsAnalysis
- * @see cancelFundamentalAnalysisJob
+ * @see cancelNewsAnalysisJob
  */
 export async function submitNewsAnalysis(
     options: SubmitNewsAnalysisOptions

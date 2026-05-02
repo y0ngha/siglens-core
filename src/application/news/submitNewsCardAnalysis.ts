@@ -3,7 +3,7 @@ import type { SubmitNewsCardAnalysisResult } from '@/application/news/types';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
-import type { NewsItem } from '@/domain/types';
+import type { NewsItem, NewsCardAnalysis } from '@/domain/types';
 import {
     buildNewsCardCacheKey,
     NEWS_CARD_CACHE_TTL_SECONDS,
@@ -71,7 +71,7 @@ export async function submitNewsCardAnalysis(
     // ── 1. Check permanent cache (no tier/usage gate for card analysis) ──
     if (cache !== null) {
         try {
-            const cached = await cache.get<import('@/domain/types').NewsCardAnalysis>(cacheKey);
+            const cached = await cache.get<NewsCardAnalysis>(cacheKey);
             if (cached !== null) {
                 return { status: 'cached', result: cached };
             }

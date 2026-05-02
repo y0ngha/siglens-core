@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import { fireAndForget } from '@/application/background';
 import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
+import { hashAnalysisInput } from '@/application/analysisInputHash';
 import type { SubmitFundamentalAnalysisOptions, SubmitFundamentalAnalysisResult } from '@/application/fundamental/types';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
@@ -13,27 +13,20 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import type { FundamentalAnalysisResponse } from '@/domain/types';
 
-/** Length of the hex input hash prefix used in the fundamental cache key. */
-const INPUT_HASH_LENGTH = 16;
-
 /** Maximum time to wait for the worker to accept the fundamental analysis job. */
 const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
  * Derive a short deterministic hash of the normalized snapshot.
  *
- * SHA-256 of the JSON-serialized snapshot, truncated to the first 16 hex
- * characters (~64 bits). Collision probability is negligible for the expected
- * symbol × vintage cardinality.
+ * Delegates to {@link hashAnalysisInput} with the JSON-serialized snapshot.
  *
  * @param snapshot - Normalized fundamental snapshot.
  * @returns 16-character lowercase hex string.
+ * @internal
  */
 function hashSnapshot(snapshot: object): string {
-    return createHash('sha256')
-        .update(JSON.stringify(snapshot))
-        .digest('hex')
-        .slice(0, INPUT_HASH_LENGTH);
+    return hashAnalysisInput(JSON.stringify(snapshot));
 }
 
 /**
