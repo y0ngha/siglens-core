@@ -1325,19 +1325,19 @@ export type FundamentalCategory =
 export interface FundamentalCategoryAssessment {
     category: FundamentalCategory;
     sentiment: FundamentalSentiment;
-    /** 한 단락 평가 (한국어). */
+    /** Per-category rationale paragraph (Korean output). */
     rationaleKo: string;
 }
 
 /** LLM-generated fundamental analysis result returned to the caller. */
 export interface FundamentalAnalysisResponse {
-    /** 종합 결론 (한 단락, 한국어). */
+    /** Overall conclusion paragraph (Korean output). */
     overallConclusionKo: string;
-    /** 카테고리별 평가. */
+    /** Per-category assessment list. */
     categoryAssessments: FundamentalCategoryAssessment[];
-    /** 위험 요인 bullets (한국어). */
+    /** Risk factor bullet points (Korean output). */
     riskFactorsKo: string[];
-    /** 종합 sentiment (강세/중립/약세). */
+    /** Aggregate sentiment (bullish / neutral / bearish). */
     overallSentiment: FundamentalSentiment;
 }
 
@@ -1439,7 +1439,7 @@ export interface FundamentalSectorDirection {
     historical: SectorHistoricalPoint[];
 }
 
-/** Fundamental 분석 prompt에 들어가는 정규화된 데이터. */
+/** Normalized fundamental data fed into the analysis prompt. */
 export interface FundamentalSnapshot {
     profile: FundamentalProfile;
     valuation: FundamentalValuation;
@@ -1630,11 +1630,11 @@ export type EnrichedNewsItem = NewsItem & { card: NewsCardAnalysis };
 
 /** LLM-generated aggregate news analysis result returned to the caller. */
 export interface NewsAnalysisResponse {
-    /** 종합 분석 첫 단락 (한국어): "현재 가격 흐름의 뉴스 원인". A 보강에서 인용. */
+    /** Opening paragraph explaining the news driver behind the current price action (Korean output). */
     currentDriverKo: string;
-    /** 핵심 이벤트 3-5개 bullets. */
+    /** Key event bullet points, 3–5 items (Korean output). */
     keyEventsKo: string[];
-    /** 향후 주의 이벤트 bullets. */
+    /** Upcoming events to watch, as bullet points (Korean output). */
     upcomingEventsKo: string[];
     overallSentiment: NewsSentiment;
 }
@@ -1691,19 +1691,19 @@ export interface OverallScenario {
 
 /** LLM-generated 3-axis (technical + fundamental + news) overall analysis result. */
 export interface OverallAnalysisResponse {
-    /** 한 줄 정의 + 현재 상태 1단락. */
+    /** One-line definition followed by a current-state paragraph (Korean output). */
     headlineKo: string;
-    /** 기술 분석 요약 bullets. */
+    /** Technical analysis summary bullet points (Korean output). */
     technicalBulletsKo: string[];
-    /** 펀더 요약 bullets. */
+    /** Fundamental analysis summary bullet points (Korean output). */
     fundamentalBulletsKo: string[];
-    /** 뉴스 요약 bullets. */
+    /** News analysis summary bullet points (Korean output). */
     newsBulletsKo: string[];
-    /** 3축 종합 결론 큰 박스 (한 단락 또는 두 단락). */
+    /** 3-axis synthesis conclusion block, one or two paragraphs (Korean output). */
     threeAxisConclusionKo: string;
-    /** 시나리오 분석. */
+    /** Scenario analysis (bullish / neutral / bearish). */
     scenarios: OverallScenario[];
-    /** 위험 요인 bullets. */
+    /** Risk factor bullet points (Korean output). */
     riskFactorsKo: string[];
 }
 
