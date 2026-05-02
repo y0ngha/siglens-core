@@ -264,3 +264,71 @@
 - Violation: Validation logic incomplete — edge cases in shape validation not covered
 - Rule: MISTAKES.md Infrastructure Functions §2 — all branches and edge cases must be covered
 - Context: Added comprehensive test coverage for validation edge cases (deferred to Task 1.19 completion)
+
+## [PR #75 | feat/fundamental-news-analysis | 2026-05-02]
+
+### Inline Comments & Blockers (16 findings) — Already documented or minor
+
+- Violation: userApiKey undefined passed to submitAnalysis
+- Rule: Domain semantic correctness / actionable error messages
+- Context: technicalOptions.userApiKey now passed (IC-1)
+
+- Violation: submitAnalysis error coerced silently to pending state
+- Rule: Error handling / UX — actionable error exposure
+- Context: DependencyState error branch added; submitOverallAnalysis error returns immediately (IC-2)
+
+- Violation: FMP ratios/growth/margins in decimal (0.15) passed to prompt without ×100 conversion
+- Rule: INFRASTRUCTURE.md — Unit consistency for third-party API adapters
+- Context: ROE/ROA/operatingMargin/netMargin/revenueYoy/epsYoy/debtRatio multiplied by 100 before normalization (IC-3)
+
+- Violation: FileSkillsLoader instantiated per submitNewsAnalysis call
+- Rule: MISTAKES.md Coding Paradigm §2 / Performance — avoid repeated resource creation
+- Context: loadSkillsCached() helper added; both submitFundamental/submitNews use memoized loader (IC-4)
+
+- Violation: JSON fence regex uses ^ and $ anchors → fails when LLM adds prose before fence
+- Rule: LLM robustness — multi-line fence matching must be flexible
+- Context: Fence matching + brace fallback two-stage extraction (IC-5)
+
+- Violation: 4 poll functions lacked unit tests
+- Rule: MISTAKES.md §15 / CONVENTIONS.md — 100% branch coverage required
+- Context: 4 test files created, 6 branches each covered (B-1)
+
+- Violation: SubmitNewsCardAnalysisOptions type vs function signature mismatch (dead type)
+- Rule: MISTAKES.md §15 — dead code
+- Context: Function signature unified to single options object (B-2)
+
+- Violation: UsageOptions dead fields (occurredAt/userId/modelUsed)
+- Rule: MISTAKES.md §15 — dead code / §4.5 clock injection parameter inconsistency
+- Context: 3 dead fields removed; SubmitXxxOptions.now standardized (B-3)
+
+- Violation: FundamentalDataProvider dead methods (getIncomeStatement/getBalanceSheetStatement)
+- Rule: MISTAKES.md §15 / Interface Segregation
+- Context: Removed from interface (B-4)
+
+- Violation: JobMeta.timeframe optional but pollAnalysis missing timeframe undefined guard
+- Rule: Type change requires test coverage
+- Context: Added timeframe undefined test case to pollAnalysis.test.ts (B-5)
+
+- Violation: Identical import/export from infrastructure/fundamental/types.ts
+- Rule: DRY / MISTAKES.md TypeScript §3.5 — single import + re-export
+- Context: Consolidated (S-1)
+
+- Violation: let result without explicit type annotation in poll files
+- Rule: CONVENTIONS.md — explicit type annotations required
+- Context: Type annotations added to all poll result variables (S-2)
+
+- Violation: OverallScenarioName JSDoc missing cross-reference to sibling types
+- Rule: MISTAKES.md Documentation Sync §3 / FF Readability — viewpoint shift
+- Context: Cross-link JSDoc added to FundamentalSentiment/NewsSentiment pattern (S-3)
+
+- Violation: RawEarningsReport.date vs earningsDate field name inconsistency
+- Rule: MISTAKES.md §8 — sibling type shape must be consistent
+- Context: Renamed date → earningsDate (S-4)
+
+- Violation: FundamentalValuation.sectorAverages dead optional field (not filled by normalizer)
+- Rule: MISTAKES.md §15 + dead branch
+- Context: Field + "Sector Averages" prompt branch removed (S-5)
+
+- Violation: hashAnalysisInput internal helper exported without @internal JSDoc
+- Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
+- Context: @internal JSDoc added (S-6)
