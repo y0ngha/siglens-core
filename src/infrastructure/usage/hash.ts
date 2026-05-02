@@ -5,10 +5,10 @@ const HEX_DIGEST_ENCODING = 'hex';
 const UTC_DATE_LENGTH = 10;
 
 /**
- * @internal
  * Shared UTC YYYY-MM-DD formatter used as the daily salt for usage hashing.
+ * File-private — only consumed by {@link hashUsageIp} in this module.
  */
-export function toUtcDateString(date: Date): string {
+function toUtcDateString(date: Date): string {
     return date.toISOString().slice(0, UTC_DATE_LENGTH);
 }
 

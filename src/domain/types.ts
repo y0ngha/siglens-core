@@ -1,11 +1,3 @@
-/**
- * OAuth provider used to authenticate a user.
- *
- * Consumers (e.g. siglens) maintain a matching `OAUTH_PROVIDER_VALUES` array
- * for their database enum and must keep it in sync with this union.
- */
-export type OAuthProvider = 'google' | 'kakao' | 'apple';
-
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 
@@ -1265,11 +1257,3 @@ export type QuadrantKey =
 export type WaitUntil = (promise: Promise<unknown>) => void;
 
 // ─── LLM ──────────────────────────────────────────────────────────────────────
-
-/**
- * Identifier of an LLM provider whose API key may be stored per user.
- *
- * Consumers (e.g. siglens) maintain a matching `LLM_PROVIDER_VALUES` array
- * for their database enum and must keep it in sync with this union.
- */
-export type LlmProvider = 'anthropic' | 'google' | 'openai';
