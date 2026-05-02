@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
+import type { TierConfig } from '@/domain/types';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -220,7 +221,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
                     pro: ['gemini-2.5-flash'],
                 },
                 featureFlags: { enableTierRestrictions: true },
-            } as import('@/domain/types').TierConfig;
+            } as TierConfig;
 
             const result = await submitFundamentalAnalysis({
                 symbol: 'AAPL',
