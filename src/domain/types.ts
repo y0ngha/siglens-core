@@ -1452,6 +1452,139 @@ export interface FundamentalSnapshot {
 }
 
 // ─────────────────────────────────────────
+// Fundamental snapshot input shapes
+// ─────────────────────────────────────────
+
+/**
+ * Domain-neutral input shapes consumed by `normalizeFundamentalSnapshot`.
+ *
+ * These interfaces describe the _domain role_ of each input to the pure
+ * normalization function — not the wire format of any concrete HTTP provider.
+ * Infrastructure adapters (e.g. FMP) return objects that structurally satisfy
+ * these interfaces; domain never imports from infrastructure.
+ *
+ * Naming convention: `Fundamental<Role>Input` — describes what the field
+ * represents in the business domain, not which API it comes from.
+ */
+
+/** Company identity and market classification fields required for snapshot normalization. */
+export interface FundamentalProfileInput {
+    symbol: string;
+    companyName: string;
+    sector: string;
+    industry: string;
+    mktCap: number;
+    ceo: string | null;
+    website: string | null;
+    description: string | null;
+}
+
+/** Valuation multiples and per-share earnings metrics (trailing-twelve-month). */
+export interface FundamentalValuationMetrics {
+    peRatioTTM: number | null;
+    priceToSalesRatioTTM: number | null;
+    pbRatioTTM: number | null;
+    pegRatioTTM: number | null;
+    enterpriseValueOverEBITDATTM: number | null;
+    epsTTM: number | null;
+}
+
+/** Profitability and financial health ratios (trailing-twelve-month). */
+export interface FundamentalRatiosInput {
+    returnOnEquityTTM: number | null;
+    returnOnAssetsTTM: number | null;
+    operatingProfitMarginTTM: number | null;
+    netProfitMarginTTM: number | null;
+    debtRatioTTM: number | null;
+    currentRatioTTM: number | null;
+}
+
+/** Year-over-year income statement growth rates. */
+export interface FundamentalGrowthInput {
+    growthRevenue: number | null;
+    growthEPS: number | null;
+}
+
+/** Composite financial health scores (Altman Z-score + Piotroski F-score). */
+export interface FundamentalFinancialScoresInput {
+    altmanZScore: number | null;
+    piotroskiScore: number | null;
+}
+
+/** Peer company entry used for the peer comparison table. */
+export interface FundamentalPeerInput {
+    symbol: string;
+    companyName: string;
+    marketCap: number;
+}
+
+/**
+ * Consensus analyst estimate for the next reporting quarter.
+ * `estimatedEpsAvg` and `estimatedRevenueAvg` are the mean values.
+ */
+export interface FundamentalAnalystEstimateInput {
+    estimatedEpsAvg: number | null;
+    estimatedRevenueAvg: number | null;
+}
+
+/** Buy/hold/sell grade consensus breakdown from analyst ratings. */
+export interface FundamentalGradesConsensusInput {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+}
+
+/**
+ * Analyst price target consensus (high / low / median / mean).
+ * Maps to domain {@link PriceTargetConsensus} via `normalizeFundamentalSnapshot`.
+ */
+export interface FundamentalPriceTargetConsensusInput {
+    targetHigh: number | null;
+    targetLow: number | null;
+    targetMedian: number | null;
+    targetConsensus: number | null;
+}
+
+/**
+ * Rolling average price targets grouped by lookback window.
+ * `lastMonth` → 1-month avg, `lastQuarter` → 3-month avg, `lastYear` → 12-month avg.
+ * Maps to domain {@link PriceTargetSummary} via `normalizeFundamentalSnapshot`.
+ */
+export interface FundamentalPriceTargetSummaryInput {
+    lastMonth: { avgPriceTarget: number | null };
+    lastQuarter: { avgPriceTarget: number | null };
+    lastYear: { avgPriceTarget: number | null };
+}
+
+/** Sector performance snapshot entry for a single trading date. */
+export interface FundamentalSectorPerformanceEntry {
+    sector: string;
+    changesPercentage: number;
+}
+
+/** Historical daily sector performance entry (one row per date per sector). */
+export interface FundamentalSectorHistoricalEntry {
+    date: string;
+    sector: string;
+    changesPercentage: number;
+}
+
+/** Cash flow statement input (subset — operating cash flow only). */
+export interface FundamentalCashFlowInput {
+    operatingCashFlow: number | null;
+}
+
+/** Earnings report entry for a symbol. `raw` preserves the full provider payload. */
+export interface FundamentalEarningsReportInput {
+    symbol: string;
+    /** ISO date of the earnings event. Named `earningsDate` to match {@link EarningsReport.earningsDate}. */
+    earningsDate: string;
+    raw: unknown;
+}
+
+// ─────────────────────────────────────────
 // News analysis
 // ─────────────────────────────────────────
 
