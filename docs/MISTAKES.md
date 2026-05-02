@@ -491,6 +491,14 @@ and have been removed from this file.
    → Persisted token state (Redis, cache) must validate before use, producing consistent invalid-token result as other bad inputs
    ❌ safeCompareTokenHashes accepts non-hex 64-char string, throws during timingSafeEqual
    ✅ Validate format (hex check, length) before comparison; return false/invalid on format error
+
+9. Optional JSDoc fields mislabeled with "Required" in JSDoc when the type is optional (?)
+   → Optional fields must use conditional language in JSDoc: "Must be provided when..." instead of "Required"
+   ❌ userApiKey?: string with JSDoc "Required for..." — type says optional but doc says required
+   ❌ paidApiKey?: string with JSDoc "Required for non-'pro'-tier users..." — contradicts optional type marker
+   ✅ userApiKey?: string with JSDoc "Must be provided when using user-managed models"
+   ✅ paidApiKey?: string with JSDoc "Must be provided when tier is not 'pro'"
+   → Clarifies that the field is optional at the type level but required under specific conditions
 ```
 
 ---

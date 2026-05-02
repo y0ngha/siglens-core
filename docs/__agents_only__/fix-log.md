@@ -108,11 +108,6 @@
 - Context: `isClaudeModel` / `isGeminiModel` / `isChatGPTModel` converted to `model is ClaudeModelId` etc. with derived subset types so callers can narrow `ActiveModelId` at the type level.
 
 
-## [Issue #69 | feat/69/submitAnalysis-model-userApiKey | 2026-05-02]
-- Violation: `userApiKey?: string` 필드의 JSDoc에 "Required when..." 표현 사용 — 타입은 optional인데 required로 오해할 소지
-- Rule: FF Predictability — optional 필드의 JSDoc은 조건부 의무를 명확히 기술해야 하며 "Required"는 non-optional 필드에만 사용
-- Context: `SubmitAnalysisOptions.userApiKey` JSDoc을 "Must be provided when..." 형식으로 수정해 user-managed 모델 사용 시의 책임을 명확화
-
 ## [PR #71 round 3 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Test comment "8192 deduped" did not accurately describe the algorithm — the value is skipped because it is `>=` the previous accepted entry, not because of exact-duplicate deduplication
 - Rule: CONVENTIONS.md / FF.md Readability — comments must accurately reflect the underlying logic
@@ -126,3 +121,8 @@
 - Violation: `isPremiumChatModel(model, tierConfig)` called twice in `requestChatCompletion` — once in the guard block and once in `shouldRecordPremiumUsage`
 - Rule: MISTAKES.md Coding Paradigm #2 — identical values computed multiple times must be extracted to a const
 - Context: `model` and `tierConfig` are immutable within the function; hoisted to `const isPremium` before the guard block
+
+## [PR #74 | feat/73/chat-provider-mapping-user-api-key-error | 2026-05-02]
+- Violation: Tier 4 상수 `LLM_PROVIDER_VALUES`가 `src/index.ts`, `src/index.client.ts`의 Tier 2 섹션에 export됨
+- Rule: ARCHITECTURE.md — Tier 분리 원칙; 런타임 상수 배열은 Tier 4 섹션에 위치해야 함
+- Context: LLM 모듈 추가 시 `getProviderForModel`(Tier 2)과 `LLM_PROVIDER_VALUES`(Tier 4)를 같은 export 블록에 묶어 Tier 2 섹션에 배치함
