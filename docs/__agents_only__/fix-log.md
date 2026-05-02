@@ -91,15 +91,7 @@
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
 
-## [PR #65 Round 2 | feat/60/AI-모델-티어-확대 | 2026-05-01]
-- Violation: `getAllowedModels`가 `enableTierRestrictions: true`일 때 결과를 정렬하지 않음
-- Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
-- Context: `tier.ts`의 `getAllowedModels`는 `enableTierRestrictions: false`일 때만 `.toSorted()`를 적용했으나, `true`일 때도 동일한 안정 순서를 보장해야 함
 
-## [PR #65 Round 6 | feat/60/AI-모델-티어-확대 | 2026-05-02]
-- Violation: 폴백 경로 호환성 테스트가 호출 사실만 검증하고 새 필드명(`primaryApiKey`/`fallbackApiKey`)이 실제로 전달되는지 검증하지 않음
-- Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
-- Context: `requestChatCompletion.test.ts`의 `falls back to deprecated callGemini` 케이스에 `expect.objectContaining({ primaryApiKey, fallbackApiKey, model })` 단언 추가
 
 
 ## [PR #71 | refactor/model-specs-consolidation | 2026-05-02]
@@ -125,3 +117,12 @@
 - Violation: Test comment "8192 deduped" did not accurately describe the algorithm — the value is skipped because it is `>=` the previous accepted entry, not because of exact-duplicate deduplication
 - Rule: CONVENTIONS.md / FF.md Readability — comments must accurately reflect the underlying logic
 - Context: First `getThinkingBudgetSequence` test comment rewrote to "8192 skipped, >= previous" to match the `if (result.length === 0 || budget < result[result.length - 1])` non-decreasing-skip rule.
+
+## [PR #74 Round 2 | main | 2026-05-02]
+- Violation: Two separate import blocks from the same `@/domain/types` specifier in `domain/llm/providers.ts`
+- Rule: MISTAKES.md TypeScript #3.5 — multiple import blocks from the same module must be merged into one
+- Context: `LlmProvider` was added in a separate import block from the existing `AIProvider, ActiveModelId, ModelId` block after the B3 fix moved the type to `domain/types`
+
+- Violation: `isPremiumChatModel(model, tierConfig)` called twice in `requestChatCompletion` — once in the guard block and once in `shouldRecordPremiumUsage`
+- Rule: MISTAKES.md Coding Paradigm #2 — identical values computed multiple times must be extracted to a const
+- Context: `model` and `tierConfig` are immutable within the function; hoisted to `const isPremium` before the guard block

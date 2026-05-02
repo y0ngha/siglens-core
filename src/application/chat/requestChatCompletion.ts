@@ -181,9 +181,9 @@ async function requestAiChatCompletion(
  * best-effort usage recording, and UI-facing error codes.
  *
  * **API key routing** (`freeApiKey` = server-owned key; `paidApiKey` = user-owned key):
- * - `'pro'`-tier users: the server uses `freeApiKey` for **every** model,
- *   including premium ones. No `paidApiKey` is required; the pro tier covers
- *   all AI costs server-side. `freeApiKey` must be present → else `server_error`.
+ * - `'pro'`-tier users: the server uses `freeApiKey` for premium models
+ *   without requiring a user-registered `paidApiKey`; the pro tier covers
+ *   premium AI costs server-side. `freeApiKey` must be present → else `server_error`.
  * - Non-pro users: both `freeApiKey` and `paidApiKey` must be provided by the
  *   server. `freeApiKey` is the primary key; `paidApiKey` is the fallback.
  *   Requesting a premium model without `paidApiKey` returns
@@ -236,9 +236,9 @@ export async function requestChatCompletion(
         userId: null,
         tier: DEFAULT_TIER,
     };
+    const isPremium = isPremiumChatModel(model, tierConfig);
 
     if (!paidApiKey) {
-        const isPremium = isPremiumChatModel(model, tierConfig);
         if (!isPremium) {
             return { ok: false, error: 'server_error' };
         }
@@ -331,7 +331,7 @@ export async function requestChatCompletion(
     const shouldRecordPremiumUsage =
         tierContext.userId !== null &&
         isPremiumUsageTrackedTier(tierContext.tier) &&
-        isPremiumChatModel(model, tierConfig) &&
+        isPremium &&
         usageLogs !== undefined;
 
     if (shouldRecordPremiumUsage) {
