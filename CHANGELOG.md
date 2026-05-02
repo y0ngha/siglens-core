@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0] - 2026-05-02
+
+### Features
+
+* **모델 스펙 단일 source of truth** — `domain/analysis/modelSpecs.ts` 신설. `siglens-worker`가 SDK 호출에 사용하던 per-model 파라미터(`CLAUDE_MODEL_MAX_TOKENS`, `CLAUDE_MODEL_THINKING_BUDGET`, `GEMINI_MODEL_MAX_TOKENS`, `GEMINI_MODEL_THINKING_BUDGET`, `CHATGPT_MODEL_MAX_TOKENS`, `temperature: 0`, `topP: 0.95`)와 `thinking-budget` 유틸을 core로 이전.
+* 신규 export — Tier 4: `MODEL_SPECS`, `THINKING_BUDGET_FALLBACK_STEPS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId`. `ModelSpec` / `AIProvider` / `ActiveModelId`는 `domain/types.ts`에 보관 (공용 도메인 타입 컨벤션).
+* 신규 export — Tier 2 헬퍼: `getProvider`, `isClaudeModel`, `isGeminiModel`, `isChatGPTModel`, `getThinkingBudgetSequence`. `is*Model` 3개는 TypeScript 타입 predicate로, 호출부에서 `ActiveModelId`를 provider별 subset(`ClaudeModelId` 등)으로 narrowing할 수 있다.
+* `ActiveModelId = Exclude<TierModel, 'claude-sonnet-4' | 'claude-opus-4'>` — `TierModel`에 backward-compat로 남은 deprecated 식별자를 제외한 active set. `MODEL_SPECS`는 `Record<ActiveModelId, ModelSpec>`로 정의되어 새 모델 누락 시 컴파일러가 알려준다.
+
+이번 릴리스는 additive 변경 — 기존 export는 영향 없음. AI SDK 호출자(워커, 서버 액션, UI)는 다음 publish에서 자체 하드코딩을 제거하고 core의 `MODEL_SPECS`를 참조하도록 전환된다.
+
 ## [0.5.0](https://github.com/y0ngha/siglens-core/compare/v0.4.0...v0.5.0) (2026-05-02)
 
 ### BREAKING CHANGES

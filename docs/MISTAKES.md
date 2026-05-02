@@ -298,6 +298,15 @@ and have been removed from this file.
 4. Environment variable reads scattered across infrastructure/ modules
    → Centralize each external system's env reads in a single config module
    → e.g. infrastructure/cache/config.ts reads UPSTASH_* vars; other modules import from config
+
+5. Drizzle onConflictDoUpdate must explicitly set updatedAt and use excluded values
+   → db.insert().onConflictDoUpdate() SET clauses must reference excluded.* for conflict values
+   → Drizzle's $onUpdateFn hook (auto-timestamp via updatedAt: sql`now()`) applies only to db.update().set(), NOT to onConflictDoUpdate()
+   → Conflict resolution must explicitly include updatedAt: sql`now()` in the SET clause and use excluded.* for all value columns
+   ❌ .onConflictDoUpdate({ target: [table.id], set: { symbol: table.symbol, name: table.name } })
+      → updatedAt not refreshed; symbol/name not replaced with new values (references old table columns)
+   ✅ .onConflictDoUpdate({ target: [table.id], set: { symbol: excluded.symbol, name: excluded.name, updatedAt: sql`now()` } })
+      → updatedAt refreshed on conflict; new values applied from excluded row
 ```
 
 ---

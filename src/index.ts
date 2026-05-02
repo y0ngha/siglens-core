@@ -87,6 +87,15 @@ export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
 
+// Model spec helpers
+export {
+    getProvider,
+    getThinkingBudgetSequence,
+    isChatGPTModel,
+    isClaudeModel,
+    isGeminiModel,
+} from './domain/analysis/modelSpecs';
+
 // Candle patterns (used by UI for rendering and by prompt builders)
 export {
     detectCandlePattern,
@@ -107,8 +116,8 @@ export {
     EXCLUDED_SINGLE_PATTERNS,
     getMultiPatternTrend,
     getSinglePatternTrend,
+    type PatternTrend,
 } from './domain/analysis/candle-trend';
-export type { PatternTrend } from './domain/analysis/candle-trend';
 
 // Signal constants / detectors
 export {
@@ -279,6 +288,17 @@ export {
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
+
+// Model specs (single source of truth for AI SDK call parameters)
+export {
+    DISABLED_THINKING_BUDGET,
+    MODEL_SPECS,
+    THINKING_BUDGET_FALLBACK_STEPS,
+    type ChatGPTModelId,
+    type ClaudeModelId,
+    type GeminiModelId,
+} from './domain/analysis/modelSpecs';
+export type { ActiveModelId, AIProvider, ModelSpec } from './domain/types';
 
 // Dashboard tickers / sectors
 export {
