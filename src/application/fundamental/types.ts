@@ -89,12 +89,6 @@ export type SubmitFundamentalAnalysisResult =
 // Poll
 // ─────────────────────────────────────────
 
-/** @internal Outcome status variants for fundamental analysis polling. */
-export type PollFundamentalAnalysisResultStatus =
-    | 'processing'
-    | 'done'
-    | 'error';
-
 /** Outcome of {@link pollFundamentalAnalysis}: still processing, finished, or errored. */
 export type PollFundamentalAnalysisResult =
     | { status: 'processing' }
