@@ -1,3 +1,8 @@
+/**
+ * NOTE: TIER_CONFIG.infoDepth는 기술적 분석에 더해 새로 추가된
+ * Fundamental / News / Overall 분석에도 동일하게 적용된다.
+ * siglens 측은 enforce 안 함 (Phase 4에서 master switch 켤 때 자동 적용).
+ */
 import type {
     Tier,
     TierConfig,
