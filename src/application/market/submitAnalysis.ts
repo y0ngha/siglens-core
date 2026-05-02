@@ -27,7 +27,7 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashUsageIp } from '@/infrastructure/db';
+import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';

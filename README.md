@@ -14,15 +14,17 @@ Node 20 or newer is required.
 
 ### Peer dependencies
 
-The package declares optional peer dependencies for the integrations it wraps. Install only what you actually use.
+The package declares an optional peer dependency for the only external system it wraps directly. Install it if you use cache / job queue / cooldown features.
 
 ```bash
-# If you use the Gemini AI provider
-yarn add @google/genai
-
-# If you use Upstash Redis (cache + job queue + cooldown)
 yarn add @upstash/redis
 ```
+
+> AI provider SDKs (Gemini, Claude, etc.) are no longer peer dependencies of
+> `siglens-core`. The library only exposes type contracts (`callAiProvider`,
+> `AiContents`); consumers supply a concrete adapter that calls their chosen
+> SDK. Database adapters (Drizzle/Neon, etc.) are likewise consumer-owned —
+> the library exposes only abstract repository interfaces.
 
 ## Quick start
 

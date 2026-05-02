@@ -1,5 +1,72 @@
 # Public API Boundary
 
+> 📊 **Post-refactor surface (Phase 0~6 완료)**: Tier 1 = 12, Tier 2 ≈ 80,
+> Tier 3 ≈ 30, Tier 4 ≈ 200+ (도메인/인프라 인터페이스, enum union, 상수 일체).
+> 인증/OAuth/이메일/문의(contact)/BYOK/Tier CRUD/한국어 티커/Drizzle/Neon/
+> Gemini SDK 코드는 모두 consumer 애플리케이션(`siglens`)으로 이전되어
+> core에서는 더 이상 export되지 않는다. core는 분석 도메인 + 분석 직결
+> infrastructure + Skills + 추상 repository 인터페이스만 보유한다.
+
+> ℹ️ core scope는 "분석 도메인 + 분석 직결 infrastructure + Skills"로
+> 좁혀졌으며, 인증/세션/OAuth/이메일/BYOK/문의/한국어 티커/`usage_logs`
+> 관련 export는 Phase 1~6에 걸쳐 순차적으로 제거되었다. 단계별 결과는
+> `docs/SCOPE.md` §7 ejection 로드맵 참조.
+>
+> Phase 1 완료: 다음 export가 `src/index.ts`에서 제거되고 siglens 로컬 모듈로 이전됨.
+> - Inquiry: `submitInquiry`, `SubmitInquiryDeps`, `DrizzleInquiryRepository`, `InquiryRepository`, `InquiryInput`
+> - Email Token Store: `createEmailTokenStore`, `EmailDispatcher`, `EmailMessage`, `EmailTokenPurpose`, `EmailTokenStore`, `EmailTokenValue`
+> - OAuth 토큰 폐기: `compositeOAuthRevoker`, `OAuthRevoker`, `RevokeTokenParams`
+>
+> Phase 2 완료: 다음 auth 관련 export가 `src/index.ts`에서 제거되고 siglens 로컬 모듈로 이전됨.
+> - Auth use-cases: `registerUser`, `loginUser`, `socialLoginUser`, `logoutUser`, `deleteAccount`, `findUserBySessionToken`, `requestEmailVerification`, `verifyEmail`, `requestPasswordReset`, `confirmPasswordReset`
+> - Cookie 상수/타입: `AUTH_SESSION_COOKIE_NAME`, `DEFAULT_SESSION_TTL_SECONDS`, `DEFAULT_AUTH_COOKIE_PATH`, `DEFAULT_AUTH_COOKIE_SAME_SITE`, `AuthSessionCookie`, `AuthSessionOptions`
+> - Password adapters: `bcryptPasswordHasher`, `bcryptPasswordVerifier`, `PasswordHasher`, `PasswordVerifier`
+> - DB repositories (auth-side): `DrizzleUserRepository`, `DrizzleSessionRepository`, `DrizzleOAuthAccountRepository`
+> - DB types (auth-side): `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`, `OAuthAccountRepository`, `AuthUserRecord`, `EmailAuthUserRecord`, `AuthSessionRecord`, `OAuthAccountRecord`, `CreateEmailUserInput`, `CreateOAuthUserInput`, `CreateSessionInput`
+> - Use-case input/result/error types: `RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `DeleteAccount*`, `RequestEmailVerification*`, `VerifyEmail*`, `RequestPasswordReset*`, `ConfirmPasswordReset*`, `FindUserBySessionToken*`
+>
+> Phase 3 완료: BYOK 및 Tier CRUD 관련 export가 `src/index.ts`에서 제거되고 siglens 로컬 모듈로 이전됨.
+> - Tier CRUD use-cases: `getUserTier`, `setUserTier`, `createUserTierContext`
+> - Tier CRUD types: `CreateUserTierContextInput`, `GetUserTierInput`, `SetUserTierError`, `SetUserTierErrorCode`, `SetUserTierInput`, `SetUserTierResult`, `UserTierDependencies`
+> - BYOK domain: `isLlmProvider`, `normalizeLlmApiKey`
+> - BYOK repository: `DrizzleUserApiKeyRepository`, `UpsertUserApiKeyInput`, `UserApiKeyMetaRecord`, `UserApiKeyRecord`, `UserApiKeyRepository`
+> - 정책(`domain/tier.ts`)과 `UserTierRepository`/`UserTierContext`는 분석 use-case가 옵션으로 받는 인터페이스이므로 core에 잔존.
+>
+> `users`, `sessions`, `oauthAccounts`, `userApiKeys` 테이블 정의와 `OAUTH_PROVIDER_VALUES`,
+> `oauthProviderEnum`, `userTierEnum`, `USER_TIER_VALUES`, `LLM_PROVIDER_VALUES`, `llmProviderEnum`
+> 등 enum/schema export는 Phase 6에서 다룰 때까지 유지(siglens DB repo가 schema를 소비).
+>
+> Phase 4.5 완료: AI provider SDK 어댑터(Gemini)가 siglens 로컬 모듈로 이전됨.
+> - `callGeminiWithKeyFallback` export 제거 (`infrastructure/ai/gemini.ts` 삭제).
+> - `AI_SYSTEM_PROMPT` export 위치 이동: `infrastructure/ai/utils.ts` → `domain/analysis/systemPrompt.ts`.
+> - 폐기 타입 alias 제거: `GeminiContents`, `CallGeminiWithKeyFallbackOptions`. (`AiContents`, `CallAiProviderOptions` 사용)
+> - `RequestChatCompletionDependencies`의 `callAiProvider` 필드가 **필수**로 승격되며, 폐기 필드 `callGemini`/`getCurrentDate`가 제거됨. **BREAKING**: 기존 `requestChatCompletion(params)` 호출은 두 번째 인자(deps)에 `callAiProvider`를 명시 전달해야 한다.
+> - core의 `peerDependencies`에서 `@google/genai` 제거. siglens가 자체 의존으로 보유.
+>
+> Phase 4 완료: 티커 검색/자산정보 도메인이 siglens 로컬 모듈로 이전됨.
+> - Tier 1 use-cases: `searchTicker`, `getAssetInfo`
+> - Tier 2 domain: `deduplicateResults`, `isKoreanInput`, `isValidTickerFormat`
+> - Tier 3 cache keys: `TICKER_SEARCH_CACHE_TTL`, `ASSET_INFO_CACHE_TTL_WITH_KOREAN`, `ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN`, `buildTickerSearchCacheKey`, `buildAssetInfoCacheKey`
+> - Tier 3 DB: `DrizzleAssetTranslationRepository`, `DrizzleKoreanTickerRepository`
+> - Tier 4 types: `KoreanTickerEntry`, `TickerSearchResult`, `AssetInfo`, `TickerCategory`, `CategoryId`, `TickerBase`, `AssetTranslationRecord`, `AssetTranslationRepository`, `KoreanTickerRepository`
+> - `koreanTickers`, `assetTranslations` 스키마 테이블은 Phase 6에서 다룰 때까지 유지.
+> - `koreanTranslator.ts`는 Phase 4.5에서 siglens 로컬 Gemini 어댑터로 재배선됨.
+>
+> Phase 5 완료: Drizzle usage repository 구현이 siglens 로컬 모듈로 이전됨.
+> - 제거된 export: `DrizzleUsageRepository`, `DrizzleUsageLogRepository` (Tier 3).
+> - 인터페이스(`UsageRepository`, `UsageLogRepository`)와 정책 함수(`checkAnalysisLimit`, `checkChatbotLimit`, `buildUsageLimitError`)는 core에 잔존 — 분석/챗봇 use-case가 DI로 인터페이스를 소비.
+> - `usageLogs` 테이블 정의, `usageActionTypeEnum`, `USAGE_ACTION_TYPE_VALUES`, `hashUsageIp`는 Phase 6까지 유지(siglens 로컬 repo가 의존).
+>
+> Phase 6 완료: 모든 Drizzle/Neon DB infrastructure가 siglens 로컬로 이전되며 core surface가 안정화됨.
+> - 제거된 export (Tier 3 Database factory): `createDatabaseClient`.
+> - 제거된 export (Tier 4 schema 테이블): `users`, `sessions`, `oauthAccounts`, `userApiKeys`, `usageLogs`, `inquiries`, `koreanTickers`, `assetTranslations`.
+> - 제거된 export (Tier 4 enum 객체): `userTierEnum`, `usageActionTypeEnum`, `oauthProviderEnum`, `llmProviderEnum`.
+> - 제거된 export (Tier 4 enum 값 배열): `USER_TIER_VALUES`, `USAGE_ACTION_TYPE_VALUES`, `OAUTH_PROVIDER_VALUES`, `LLM_PROVIDER_VALUES` — 각 union 타입은 그대로 유지되므로 consumer가 자체 배열을 정의해 `satisfies readonly Tier[]` 등으로 검증한다.
+> - 제거된 export (Tier 4 DB 핸들 타입): `SiglensDatabase`, `DatabaseConfig` (`NeonSqlClient`/`DatabaseClient`는 internal).
+> - core에 잔존 — 추상 repository 인터페이스 (`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), input/output record 타입 (`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입 (`UserTier`, `UsageActionType`), `UserTierContext`, `hashUsageIp`, 정책 함수 (`checkAnalysisLimit`, `checkChatbotLimit`, `buildUsageLimitError`).
+> - core `package.json`에서 `@neondatabase/serverless`/`drizzle-orm` peerDependency·devDependency 제거. `drizzle.config.ts`/`drizzle/` 마이그레이션도 siglens로 이전.
+> - 의의: core는 더 이상 어떤 DB infrastructure도 알지 못한다. siglens는 schema, client, config, constants, 마이그레이션을 모두 자체 소유한다.
+
 ## 개요
 
 `siglens-core`는 npm 패키지(`@y0ngha/siglens-core`)로 다른 프로젝트(현재는 `siglens`)에서 import해 사용하는 라이브러리다. 모든 외부 노출은 `src/index.ts`를 통해서만 이루어지며, deep import(`@y0ngha/siglens-core/src/...`)는 지원하지 않는다.
@@ -78,7 +145,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (21)
+### Tier 1 — Application Entrypoints (12)
 
 | Symbol | Source |
 |---|---|
@@ -91,17 +158,6 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `getMarketSummary` | `application/dashboard/getMarketSummary.ts` |
 | `getMarketSummaryWithBriefing` | `application/dashboard/getMarketSummaryWithBriefing.ts` |
 | `getSectorSignals` | `application/dashboard/sectorSignals.ts` |
-| `getAssetInfo` | `application/ticker/getAssetInfo.ts` |
-| `searchTicker` | `application/ticker/searchTicker.ts` |
-| `registerUser` | `application/auth/registerUser.ts` |
-| `loginUser` | `application/auth/loginUser.ts` |
-| `socialLoginUser` | `application/auth/socialLoginUser.ts` |
-| `logoutUser` | `application/auth/logoutUser.ts` |
-| `requestPasswordReset` | `application/auth/requestPasswordReset.ts` |
-| `confirmPasswordReset` | `application/auth/confirmPasswordReset.ts` |
-| `getUserTier` | `application/tier/getUserTier.ts` |
-| `createUserTierContext` | `application/tier/createUserTierContext.ts` |
-| `setUserTier` | `application/tier/setUserTier.ts` |
 | `checkAnalysisLimit` | `application/usage/limits.ts` |
 | `checkChatbotLimit` | `application/usage/limits.ts` |
 | `requestChatCompletion` | `application/chat/requestChatCompletion.ts` |
@@ -115,12 +171,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `detectSignals` | `domain/signals/index.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
-**프롬프트 빌더 (3)**
+**프롬프트 빌더 (3 + 1 상수)**
 | Symbol | Source |
 |---|---|
 | `buildAnalysisPrompt` | `domain/analysis/prompt.ts` |
 | `buildMarketBriefingPrompt` | `domain/analysis/marketBriefingPrompt.ts` |
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
+| `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
 
 **응답 정규화 (2)**
 | Symbol | Source |
@@ -128,13 +185,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
 | `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
 
-**티어 제한 함수 (9)**
+**티어 게이트 (Tier gating) (11)**
 | Symbol | Source |
 |---|---|
 | `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
 | `isAllowed` / `getTierLimit` / `getAllowedTimeframes` / `getAllowedModels` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
 | `isTier` | `domain/tier.ts` |
+| `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
 
 **캔들 패턴 (UI/프롬프트에서 사용) (10)**
 | Symbol | Source |
@@ -150,34 +208,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `getSinglePatternTrend` | `domain/analysis/candle-trend.ts` |
 | `getMultiPatternTrend` | `domain/analysis/candle-trend.ts` |
 
-**티커 유틸 (3)**
-| Symbol | Source |
-|---|---|
-| `deduplicateResults` | `domain/ticker.ts` |
-| `isKoreanInput` | `domain/ticker.ts` |
-| `isValidTickerFormat` | `domain/ticker.ts` |
-
-**LLM API key 유틸 (2)**
-| Symbol | Source |
-|---|---|
-| `isLlmProvider` | `domain/llm/apiKey.ts` |
-| `normalizeLlmApiKey` | `domain/llm/apiKey.ts` |
-
 **대시보드 헬퍼 (3)**
 | Symbol | Source |
 |---|---|
 | `bucketedTimestamp` | `domain/dashboard.ts` |
 | `computeStockSignalResult` | `domain/dashboard.ts` |
 | `lookbackIsoFromNow` | `domain/dashboard.ts` |
-
-**티어 게이트 (11)**
-| Symbol | Source |
-|---|---|
-| `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
-| `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
-| `isAllowed` / `getTierLimit` / `getAllowedTimeframes` / `getAllowedModels` | `domain/tier.ts` |
-| `isTimeframeAllowed` / `isInfoDepthAllowed` | `domain/tier.ts` |
-| `isModelAllowed` / `isTier` | `domain/tier.ts` |
 
 ### Tier 3 — Infrastructure Factories & Config
 
@@ -192,6 +228,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildBriefingCacheKey` | `infrastructure/cache/config.ts` |
 | `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
 
+> 티커 관련 캐시 키 — `TICKER_SEARCH_CACHE_TTL`, `ASSET_INFO_CACHE_TTL_WITH_KOREAN`,
+> `ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN`, `buildTickerSearchCacheKey`,
+> `buildAssetInfoCacheKey`는 Phase 4에서 siglens로 이전 완료.
+
 **채팅 토큰 저장소 (1 factory + 3 helper/const)**
 | Symbol | Source |
 |---|---|
@@ -205,12 +245,6 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 |---|---|
 | `createMarketDataProvider` | `infrastructure/market/factory.ts` |
 
-**AI provider (2)**
-| Symbol | Source |
-|---|---|
-| `callGeminiWithKeyFallback` | `infrastructure/ai/gemini.ts` |
-| `AI_SYSTEM_PROMPT` | `infrastructure/ai/utils.ts` |
-
 **Skills (1)**
 | Symbol | Source |
 |---|---|
@@ -222,25 +256,11 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `readFmpConfig` | `infrastructure/fmp/config.ts` |
 | `tryReadFmpConfig` | `infrastructure/fmp/config.ts` |
 
-**Database (1 factory + repositories + schema exports)**
+**Database (usage helpers only)**
 | Symbol | Source |
 |---|---|
-| `createDatabaseClient` | `infrastructure/db/client.ts` |
-| `DrizzleUserRepository` / `DrizzleSessionRepository` / `DrizzleUsageRepository` | `infrastructure/db/*Repository.ts` |
-| `DrizzleUserApiKeyRepository` | `infrastructure/db/userApiKeyRepository.ts` |
-| `hashUsageIp` | `infrastructure/db/usageRepository.ts` |
-| `users` / `sessions` / `passwordResets` / `usageLogs` / `oauthAccounts` | `infrastructure/db/schema.ts` |
-| `koreanTickers` / `assetTranslations` / `userApiKeys` | `infrastructure/db/schema.ts` |
-| `userTierEnum` / `usageActionTypeEnum` / `oauthProviderEnum` / `llmProviderEnum` | `infrastructure/db/schema.ts` |
-| `USER_TIER_VALUES` / `USAGE_ACTION_TYPE_VALUES` / `OAUTH_PROVIDER_VALUES` / `LLM_PROVIDER_VALUES` | `infrastructure/db/constants.ts` |
-
-**Auth application (6 use-cases + cookie constants)**
-| Symbol | Source |
-|---|---|
-| `registerUser` / `loginUser` / `socialLoginUser` / `logoutUser` | `application/auth` |
-| `requestPasswordReset` / `confirmPasswordReset` | `application/auth` |
-| `AUTH_SESSION_COOKIE_NAME` / `DEFAULT_SESSION_TTL_SECONDS` | `application/auth/sessionCookie.ts` |
-| `DEFAULT_AUTH_COOKIE_PATH` / `DEFAULT_AUTH_COOKIE_SAME_SITE` | `application/auth/sessionCookie.ts` |
+| `hashUsageIp` | `infrastructure/usage/hash.ts` |
+| (참고) `UsageRepository` / `UsageLogRepository` / `UserTierRepository` 인터페이스는 `infrastructure/db/types.ts`에 정의되어 분석 use-case가 DI로 소비. Drizzle/Neon 의존성은 Phase 6에서 모두 siglens로 이전됨. |
 
 **Job queue (worker용) (11)**
 | Symbol | Source |
@@ -260,13 +280,15 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 4 — Types & Constants
 
-**도메인 타입** (대시보드/티커/지표/신호/분석/캔들/추세선/티어 설정 타입 일체) — `domain/types.ts`에서 일괄 export.
+**도메인 타입** (대시보드/지표/신호/분석/캔들/추세선/티어 설정 타입 일체) — `domain/types.ts`에서 일괄 export. (티커 타입은 Phase 4에서 siglens로 이전)
 
-**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, DB 관련 타입(`DatabaseConfig`, `SiglensDatabase`, `OAuthProvider`, `UsageActionType`, `UserTier`, `RequestPasswordReset*`, `ConfirmPasswordReset*`, `UsageCounts`, `UsageLogRepository`, repository/input/record 타입), Gemini 관련 타입, auth 관련 타입(`RegisterUser*`, `LoginUser*`, `SocialLoginUser*`, `LogoutUser*`, `AuthSessionCookie`, `AuthSessionOptions`, `PasswordHasher`, `PasswordVerifier`, `PasswordResetTokenGenerator`, `PasswordResetTokenHasher`, `UserRepository`, `EmailAuthUserRepository`, `OAuthUserRepository`, `SessionRepository`, `PasswordResetRepository`, `UsageRepository`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`, `UserTierRepository`, `SetUserTier*`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), 채팅 application 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), `BackgroundTaskOptions`, 채팅 application 타입.
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
 **캔들 라벨 맵** — `CANDLE_PATTERN_LABELS`, `MULTI_CANDLE_PATTERN_LABELS`.
+
+**캔들 패턴 감지 상수** — `CANDLE_PATTERN_DETECTION_BARS`, `EXCLUDED_SINGLE_PATTERNS` (`domain/candles/`).
 
 **지표 상수** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `EMA_DEFAULT_PERIODS` 등 `src/domain/indicators/constants.ts`의 지표 계산 기본값과 임계값.
 
@@ -290,7 +312,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **액션/리스크 유틸** — `validateActionPrices`, `extractReconciledActionLines`, `isValidBullishStopLoss`, `isValidBullishTakeProfit`, `deriveFallbackStopLoss`, `deriveFallbackTakeProfit`, `resolveBullishStopLoss`, `resolveBullishTakeProfit`, `buildBullishExitText`, `buildBullishRiskRewardText`, `reconcileBullishActionRecommendation`.
 
-**내부 디테일 상수** — `ISO_DATE_HOUR_PREFIX_LENGTH`, `ISO_DATE_PREFIX_LENGTH`, `EXCLUDED_SINGLE_PATTERNS`, `PROMPT_CONFIG_BY_TIMEFRAME`, `CANDLE_PATTERN_DETECTION_BARS`, `MULTI_CANDLE_PATTERN_BUFFER` — 모두 public 함수의 동작 디테일이며 consumer가 직접 다루지 않는다.
+**내부 디테일 상수** — `ISO_DATE_HOUR_PREFIX_LENGTH`, `ISO_DATE_PREFIX_LENGTH`, `PROMPT_CONFIG_BY_TIMEFRAME`, `MULTI_CANDLE_PATTERN_BUFFER` — 모두 public 함수의 동작 디테일이며 consumer가 직접 다루지 않는다.
 
 **외부 LLM 응답 스키마** — `RawAnalysisResponse`. AI worker가 반환하는 원시 응답 구조이며, 외부 LLM 스키마에 직접 결합된다. consumer에 노출하면 LLM 변경 시 호환성이 깨지므로 internal로 유지한다. `enrichAnalysisWithConfidence`는 외부 경계에서 `unknown`을 받아 내부적으로 이 타입으로 cast한다.
 
@@ -390,3 +412,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 일자 | 변경 |
 |---|---|
 | 2026-04-26 | 최초 작성 — Tier 정의, 인벤토리, 워크플로우, 버전 정책. |
+| 2026-05-02 | Phase 0~6 완료. 인증/OAuth/이메일/문의/BYOK/Tier CRUD/한국어 티커/Drizzle·Neon DB/Gemini SDK 어댑터가 모두 siglens로 이전됨. core는 분석 도메인 + 분석 직결 infrastructure + Skills + 추상 repository 인터페이스만 보유. |

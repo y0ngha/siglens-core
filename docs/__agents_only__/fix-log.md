@@ -120,3 +120,35 @@
 - Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
 - Context: `requestChatCompletion.test.ts`의 `falls back to deprecated callGemini` 케이스에 `expect.objectContaining({ primaryApiKey, fallbackApiKey, model })` 단언 추가
 
+## [PR #70 | refactor/scope-realignment-phase-0 | 2026-05-02]
+- Violation: orphaned `types.ts` 파일이 ejection 후에도 `infrastructure/email/`, `infrastructure/oauth/` 디렉토리에 남아 있음
+- Rule: FF — Cohesion. consumer가 모두 제거된 모듈은 함께 삭제해야 dead code 누적을 막을 수 있음
+- Context: Phase 1에서 `email/{redis,index}.ts`, `oauth/{revoker,google,kakao}.ts`가 모두 ejection되었으나 type 파일만 남아 어떤 코드도 import하지 않는 상태였음
+
+- Violation: 단일 파일 내부에서만 사용되는 헬퍼 `toUtcDateString`이 `export` 되어 모듈 surface area를 불필요하게 넓힘
+- Rule: FF — Coupling. file-private helper는 모듈 외부에 노출하지 않아 의도치 않은 의존성을 차단
+- Context: `infrastructure/usage/hash.ts`의 `toUtcDateString`은 같은 파일의 `hashUsageIp`만 사용; export 제거 + JSDoc에 file-private 명시
+
+- Violation: schema enum과 손으로 동기화해야 하는 union 타입에 sync 의무 표기가 없음
+- Rule: FF — Predictability. consumer가 변경 의무를 추적할 수 있도록 hand-written 동기화 union에는 `@internal-sync` 같은 명시적 contract가 필요
+- Context: `infrastructure/db/types.ts`의 `UsageActionType`은 siglens 측 `USAGE_ACTION_TYPE_VALUES` enum과 동기화돼야 하지만 코드에 표시가 없었음
+
+- Violation: BREAKING change PR임에도 `package.json` `version` 및 `CHANGELOG.md`에 0.x 마이너 bump가 누락됨
+- Rule: MISTAKES.md "Public API & Module Exports #3" — 0.x semver에서 BREAKING은 minor bump
+- Context: 0.4.0 → 0.5.0 미반영, CHANGELOG에 신규 BREAKING/Phase 0~7 섹션 부재 (요약된 새 entry 추가)
+
+
+## [PR #70 round 2 | refactor/scope-realignment-phase-0 | 2026-05-02]
+- Violation: Tier 4 public repository interface 메서드에서 per-method JSDoc(`@param`/`@returns`) 누락
+- Rule: CONVENTIONS.md Tier 4 — public 인터페이스는 type-level description + per-field/per-method 한 줄 문서 + `@param`/`@returns` 필수
+- Context: `infrastructure/db/types.ts`의 `UserTierRepository.getUserTier/updateUserTier`, `UsageLogRepository.recordUsage`, `UsageRepository.recordUsage/getUsageToday` 메서드가 인터페이스-레벨 설명만 있고 메서드 본문 JSDoc이 없어 Tier 4 계약을 충족하지 못함
+
+- Violation: 대규모 ejection 이후 `docs/API.md`가 옛 외부 의존성(Neon/Drizzle/Auth/Email/OAuth/BYOK/Ticker/Gemini SDK)과 옛 환경변수(DATABASE_URL, OAUTH_TOKEN_ENCRYPTION_KEY, LLM_API_KEY_ENCRYPTION_KEY 등) 문서를 그대로 보존
+- Rule: CONVENTIONS.md / FF — Predictability. 코드와 docs가 어긋나면 consumer가 잘못된 환경변수를 설정하거나 존재하지 않는 모듈을 기대하게 됨
+- Context: Phase 6에서 `@neondatabase/serverless`, `drizzle-orm`, `@google/genai` peerDependency가 제거되고 db/auth/email/oauth/ticker/byok 모듈이 모두 ejection되었으나 API.md는 갱신되지 않아 코어가 직접 호출하는 서비스(Upstash, Worker, Market Data config reader)만 남도록 재작성
+
+
+## [PR #70 round 3 | refactor/scope-realignment-phase-0 | 2026-05-02]
+- Violation: src/infrastructure/CLAUDE.md sub-directory table fell out of sync with src/infrastructure/usage/ directory addition
+- Rule: MISTAKES.md Documentation Sync — agent guides must reflect actual directory structure
+- Context: Phase 0 added infrastructure/usage/hash.ts (extracted from db/usageRepository.ts) but did not add the new directory to the sub-directory table.

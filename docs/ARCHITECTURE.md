@@ -16,7 +16,7 @@ UI, 렌더링, 프레임워크 종속 코드는 이 레파지토리에 존재하
 │           market/, chat/, …            │  use-case 단위 함수
 ├─────────────────────────────────────────┤
 │          infrastructure (외부)          │  AI Provider, Skills Loader,
-│                                         │  Upstash Redis, Neon DB,
+│                                         │  Upstash Redis,
 │                                         │  Market Data Providers
 ├─────────────────────────────────────────┤
 │             domain (순수)              │  인디케이터, 캔들 패턴,
@@ -47,7 +47,7 @@ infrastructure ← domain import 가능
                  외부 API (AI 프로바이더 등) 호출 담당
                  Skills 파일 I/O 담당
                  Upstash Redis 캐시 관리 담당 (cache/)
-                 Neon / PostgreSQL 연결 관리 담당 (db/)
+                 추상 Repository 인터페이스 노출 담당 (db/) — 실제 DB 어댑터는 consumer 소유
                  인터페이스(types.ts)를 반드시 먼저 정의
 
 application    ← domain, infrastructure import 가능
@@ -111,34 +111,37 @@ const key = process.env.API_KEY; // 금지
 └── src
     ├── __tests__
     │   ├── application
-    │   │   ├── auth
+    │   │   ├── chat
     │   │   ├── dashboard
     │   │   ├── market
-    │   │   ├── ticker
-    │   │   └── tier
+    │   │   └── usage
     │   ├── domain
     │   └── infrastructure
     ├── application
-    │   ├── auth
     │   ├── chat
     │   ├── dashboard
     │   ├── market
-    │   ├── ticker
-    │   └── tier
+    │   └── usage
     ├── domain
     │   ├── analysis
+    │   ├── chat
     │   ├── constants
     │   ├── indicators
-    │   ├── llm
-    │   └── signals
+    │   ├── signals
+    │   └── utils
     ├── infrastructure
-    │   ├── ai
+    │   ├── ai            # AI provider type contracts (no SDK adapter)
     │   ├── cache
     │   ├── chat
-    │   ├── db
+    │   ├── db            # Abstract repository interfaces only (no Drizzle/Neon)
+    │   ├── email         # EmailDispatcher type contract only
+    │   ├── fmp           # Config reader for FMP env vars
     │   ├── jobs
     │   ├── market
-    │   └── skills
+    │   ├── oauth         # OAuth provider type contracts only
+    │   ├── skills
+    │   ├── upstash
+    │   └── usage         # hashUsageIp helper
     └── index.ts
 ```
 
@@ -196,13 +199,18 @@ no external imports, pure functions only.
 외부 시스템과의 경계를 담당한다. 각 서브디렉토리는 **하나의 외부 시스템**에만 대응하며,
 `types.ts`에 정의된 인터페이스를 구현한다.
 
-- `ai/` — AI 프로바이더 클라이언트 (Claude, Gemini)
+- `ai/` — AI 프로바이더 호출 시그니처(`callAiProvider`) 타입 계약. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
 - `cache/` — Upstash Redis 래퍼 (TTL 기반 캐시)
 - `chat/` — Upstash Redis 기반 채팅 토큰 저장소
-- `db/` — Neon serverless PostgreSQL + Drizzle ORM 스키마/클라이언트
+- `db/` — 추상 Repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`) + 사용량/티어 union 타입. 실제 DB 어댑터(Drizzle/Neon)는 consumer 소유.
+- `email/` — `EmailDispatcher` 타입 계약만 보유. 발송 어댑터(Resend 등)는 consumer 소유.
+- `fmp/` — FMP 환경변수 reader (값을 채우는 책임은 consumer).
 - `jobs/` — Redis 기반 Job 큐 (enqueue / dequeue / status 관리)
-- `market/` — 시세 프로바이더 래퍼 (consumer가 주입한 provider 추상화)
+- `market/` — 시세 프로바이더 인터페이스 (consumer가 주입한 provider 추상화)
+- `oauth/` — OAuth provider 타입 계약. 구체 OAuth 어댑터/플로우는 consumer 소유.
 - `skills/` — Skills 파일 로더 (filesystem → `Skill[]`)
+- `upstash/` — Upstash Redis 클라이언트 팩토리 (env-based)
+- `usage/` — `hashUsageIp` 같은 분석 사용량 보조 함수
 
 ---
 
@@ -278,5 +286,7 @@ domain은 환경에 의존하지 않는다.
 
 ### 4. 테스트에서는 인터페이스를 mock한다
 
-외부 시스템(Neon, Upstash, AI API)을 실제로 호출하는 테스트는 작성하지 않는다.
-`AnalysisCache` 같은 인터페이스를 stub 구현으로 교체하여 단위 테스트한다.
+외부 시스템(Upstash Redis, AI API, consumer 측 시세 API)을 실제로 호출하는
+테스트는 작성하지 않는다. `AnalysisCache` 같은 인터페이스를 stub 구현으로
+교체하여 단위 테스트한다. core는 자체 DB infrastructure를 보유하지 않으므로
+`UsageRepository` 등 추상 repository 인터페이스 또한 stub으로 mock한다.

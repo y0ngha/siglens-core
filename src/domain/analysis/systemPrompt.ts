@@ -4,9 +4,8 @@
  * Establishes four core principles (deterministic, grounded, conservative,
  * schema-faithful) and the output contract: a single JSON object with
  * Korean-language text fields in formal speech (존댓말). The string is
- * referenced verbatim by the worker when invoking
- * {@link callGeminiWithKeyFallback} for analysis prompts built via
- * {@link buildAnalysisPrompt}.
+ * referenced verbatim by the worker when invoking the configured AI provider
+ * for analysis prompts built via {@link buildAnalysisPrompt}.
  */
 export const AI_SYSTEM_PROMPT = `You are a senior technical analyst specializing in equity chart analysis.
 Your job is to interpret bar data, technical indicators, and candle/chart patterns to produce a structured analysis in JSON.

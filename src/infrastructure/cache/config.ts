@@ -3,7 +3,6 @@ import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
-    SECONDS_PER_YEAR,
 } from '@/domain/constants/time';
 import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
 
@@ -28,21 +27,6 @@ export const SECTOR_SIGNALS_TTL_BY_TIMEFRAME: Record<
     '1Hour': SECTOR_SIGNALS_1HOUR_TTL_MINUTES * SECONDS_PER_MINUTE,
     '15Min': SECTOR_SIGNALS_15MIN_TTL_MINUTES * SECONDS_PER_MINUTE,
 };
-
-// 티커 검색 결과: 하루 캐시
-export const TICKER_SEARCH_CACHE_TTL = SECONDS_PER_DAY;
-
-// 한국어 이름 매핑: 장기 보존 (sync 스크립트로 주기 갱신)
-export const KOREAN_NAMES_CACHE_TTL = SECONDS_PER_YEAR;
-
-// 한국어 미보유: 번역 대기 → 12시간 후 재시도 가능하도록 단기 보존
-export const ASSET_INFO_HOURS_WITHOUT_KOREAN = 12;
-export const ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN =
-    ASSET_INFO_HOURS_WITHOUT_KOREAN * SECONDS_PER_HOUR;
-// 한국어 보유: 완성된 데이터 → 1년 장기 보존
-export const ASSET_INFO_CACHE_TTL_WITH_KOREAN = SECONDS_PER_YEAR;
-
-export const KOREAN_TICKERS_CACHE_KEY = 'korean:tickers';
 
 /**
  * Per-timeframe TTL (seconds) for cached symbol analyses.
@@ -131,14 +115,6 @@ export function buildAnalysisCacheKey(
  */
 export function buildBriefingCacheKey(dateHour: string): string {
     return `briefing:market:${dateHour}`;
-}
-
-export function buildTickerSearchCacheKey(query: string): string {
-    return `ticker:search:${query.toLowerCase()}`;
-}
-
-export function buildAssetInfoCacheKey(symbol: string): string {
-    return `asset-info:${symbol.toUpperCase()}`;
 }
 
 export function buildSectorSignalsCacheKey(

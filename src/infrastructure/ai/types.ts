@@ -15,11 +15,6 @@ export interface GeminiContent {
 /** Provider-neutral prompt payload — a plain string or a role-tagged turn list. */
 export type AiContents = string | GeminiContent[];
 
-/**
- * @deprecated Use {@link AiContents} instead. Will be removed in the next major version.
- */
-export type GeminiContents = AiContents;
-
 /** Options accepted by the AI provider call (currently Gemini; shape is provider-neutral). */
 export interface CallAiProviderOptions {
     /** Primary key tried first; pass `undefined` to skip the primary attempt and go straight to fallback. */
@@ -33,8 +28,3 @@ export interface CallAiProviderOptions {
     /** Optional system instruction passed via `config.systemInstruction`. */
     systemInstruction?: string;
 }
-
-/**
- * @deprecated Use {@link CallAiProviderOptions} instead. Will be removed in the next major version.
- */
-export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions;

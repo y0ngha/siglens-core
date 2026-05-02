@@ -540,54 +540,6 @@ describe('requestChatCompletion', () => {
         );
     });
 
-    it('falls back to getCurrentDate when occurredAt is not in params (deprecated)', async () => {
-        const customDate = new Date('2025-12-01T00:00:00.000Z');
-
-        await requestChatCompletion(
-            createParams({
-                model: GEMINI_2_5_PRO_MODEL,
-                tierContext: { userId: 'user-1', tier: 'member' },
-            }),
-            {
-                tokenStore,
-                callAiProvider,
-                usageLogs,
-                usageRepository,
-                getCurrentDate: () => customDate,
-            }
-        );
-
-        expect(recordPremiumUsage).toHaveBeenCalledWith(
-            expect.objectContaining({ date: '2025-12-01' })
-        );
-        expect(recordUsage).toHaveBeenCalledWith(
-            expect.objectContaining({ occurredAt: customDate })
-        );
-    });
-
-    it('prefers params.occurredAt over getCurrentDate (deprecated) when both are provided', async () => {
-        const paramsDate = new Date('2025-11-15T00:00:00.000Z');
-        const depsDate = new Date('2025-12-01T00:00:00.000Z');
-
-        await requestChatCompletion(
-            createParams({
-                model: GEMINI_2_5_PRO_MODEL,
-                tierContext: { userId: 'user-1', tier: 'member' },
-                occurredAt: paramsDate,
-            }),
-            {
-                tokenStore,
-                callAiProvider,
-                usageLogs,
-                getCurrentDate: () => depsDate,
-            }
-        );
-
-        expect(recordPremiumUsage).toHaveBeenCalledWith(
-            expect.objectContaining({ date: '2025-11-15' })
-        );
-    });
-
     it('keeps the original server_error when token refund fails', async () => {
         callAiProvider.mockRejectedValueOnce(new Error('network failed'));
         refundConsumedToken.mockRejectedValueOnce(new Error('refund failed'));
@@ -601,31 +553,6 @@ describe('requestChatCompletion', () => {
         expect(console.warn).toHaveBeenCalledWith(
             '[requestChatCompletion] background action failed',
             expect.any(Error)
-        );
-    });
-
-    it('falls back to deprecated callGemini when callAiProvider is not provided', async () => {
-        const legacyCallGemini = vi.fn().mockResolvedValue('legacy response');
-
-        const result = await requestChatCompletion(
-            createParams({ freeApiKey: 'free-key' }),
-            {
-                tokenStore,
-                callGemini: legacyCallGemini,
-            }
-        );
-
-        expect(result).toEqual({
-            ok: true,
-            message: 'legacy response',
-            remainingTokens: 4,
-        });
-        expect(legacyCallGemini).toHaveBeenCalledWith(
-            expect.objectContaining({
-                primaryApiKey: 'free-key',
-                fallbackApiKey: 'paid-key',
-                model: GEMINI_2_5_FLASH_MODEL,
-            })
         );
     });
 });

@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0](https://github.com/y0ngha/siglens-core/compare/v0.4.0...v0.5.0) (2026-05-02)
+
+### BREAKING CHANGES
+
+* `requestChatCompletion(params, dependencies)`의 `dependencies` 인자가 더 이상 optional이 아니며, `callAiProvider`가 필수 필드로 승격됨. 이전에 `@deprecated`로 유지되던 `callGemini` 및 `getCurrentDate` 필드는 제거됨.
+* Deprecated 타입 별칭 제거: `GeminiContents` (→ `AiContents`), `CallGeminiWithKeyFallbackOptions` (→ `CallAiProviderOptions`).
+* `OAuthProvider`, `LlmProvider` 도메인 union 타입 제거 (in-core consumer 부재).
+* `src/index.ts`에서 약 140개의 export 제거 — auth use-case, OAuth helper, email dispatcher/template, contact, BYOK, Tier CRUD, ticker, Drizzle/Neon DB infra, Gemini SDK 어댑터 전부 consumer 애플리케이션으로 ejection.
+* `peerDependencies`에서 `@neondatabase/serverless`, `drizzle-orm`, `@google/genai` 제거. `@upstash/redis`만 유지됨.
+
+### Phases
+
+* Phase 0 — `docs/SCOPE.md` 재작성 + Phase 0~7 ejection 로드맵, `hashUsageIp`을 `infrastructure/usage/hash.ts`로 추출, ticker cache key 분리.
+* Phase 1 — Inquiry application, OAuth helpers, EmailTokenStore/EmailDispatcher, `infrastructure/db/inquiryRepository.ts` ejection (13 export 제거).
+* Phase 2 — 10개 auth use-case, `domain/auth/`, `infrastructure/auth/`, user/session/oauthAccount Drizzle repository ejection (~70 export 제거).
+* Phase 3 — BYOK (`domain/llm/`, `userApiKeyRepository`, `tokenEncryption`) 및 Tier CRUD use-case ejection. `domain/tier.ts`와 `UserTierRepository` 인터페이스는 분석 정책으로 유지.
+* Phase 4 — Ticker 한글 검색·매핑 (`application/ticker/`, `domain/ticker.ts`, `infrastructure/ticker/`, `tickerRepository`) 및 ticker cache key ejection (~14 export 제거).
+* Phase 4.5 — AI infra 슬림화: `infrastructure/ai/gemini.ts` 삭제, `AI_SYSTEM_PROMPT`를 `domain/analysis/systemPrompt.ts`로 이동, `callAiProvider` 필수화, `@google/genai` peer dep 제거.
+* Phase 5 — `DrizzleUsageRepository` / `DrizzleUsageLogRepository` ejection. `UsageRepository`, `UsageLogRepository` 인터페이스 및 정책 함수(`checkAnalysisLimit`, `checkChatbotLimit`) 유지.
+* Phase 6 — `infrastructure/db/{schema,client,config,constants}` 및 `drizzle/` 마이그레이션 전체 ejection. Drizzle/Neon dependency 제거.
+* Phase 7 — 문서 정리 (`PUBLIC_API.md` 요약 배너, `SERVICE.md` 재작성, `ARCHITECTURE.md` 폴더 트리 갱신), 잔존하던 `bcryptjs` dependency 제거.
+
 # [0.4.0](https://github.com/y0ngha/siglens-core/compare/v0.2.1...v0.4.0) (2026-05-01)
 
 

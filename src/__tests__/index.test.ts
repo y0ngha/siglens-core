@@ -1,38 +1,23 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
 import type {
     ChatbotLimitError,
-    EmailAuthUserRepository,
-    OAuthUserRepository,
-    PasswordHasher,
-    PasswordVerifier,
     PatternTrend,
-    SessionRepository,
     TierGateErrorResult,
     UsageLimitError,
     UsageRepository,
-    UserRepository,
 } from '@/index';
 import {
     asArray,
-    assetTranslations,
-    bcryptPasswordHasher,
-    bcryptPasswordVerifier,
     CANDLE_PATTERN_DETECTION_BARS,
     CCI_BULLISH_CROSS_LEVEL,
     checkAnalysisLimit,
     checkChatbotLimit,
     clusterKeyLevels,
     createChatTokenStore,
-    createDatabaseClient,
     CROSS_LOOKBACK_BARS,
     DEFAULT_TIER,
-    deleteAccount,
     detectBollingerSqueezeBearish,
     detectGoldenCross,
-    DrizzleSessionRepository,
-    DrizzleUsageLogRepository,
-    DrizzleUsageRepository,
-    DrizzleUserRepository,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
@@ -40,7 +25,6 @@ import {
     extendTrendline,
     extractReconciledActionLines,
     filterAnalysisResult,
-    findUserBySessionToken,
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_PRO_MODEL,
     getAllowedModels,
@@ -53,27 +37,12 @@ import {
     isModelAllowed,
     isTier,
     isTimeframeAllowed,
-    koreanTickers,
-    loginUser,
-    logoutUser,
     normalizeActionRecommendation,
     normalizeTrend,
-    OAUTH_PROVIDER_VALUES,
-    oauthAccounts,
-    oauthProviderEnum,
     postProcessAnalysisWithReconcile,
-    registerUser,
     requestChatCompletion,
     RSI_DEFAULT_PERIOD,
-    sessions,
-    socialLoginUser,
     TIER_CONFIG,
-    USAGE_ACTION_TYPE_VALUES,
-    usageActionTypeEnum,
-    usageLogs,
-    USER_TIER_VALUES,
-    users,
-    userTierEnum,
     VALID_CHAT_MODELS,
     validateActionPrices,
 } from '@/index';
@@ -149,96 +118,11 @@ describe('public API exports', () => {
         expect(typeof filterAnalysisResult).toBe('function');
     });
 
-    it('exports auth application entrypoints from package entrypoint', () => {
-        expect(typeof registerUser).toBe('function');
-        expect(typeof loginUser).toBe('function');
-        expect(typeof socialLoginUser).toBe('function');
-        expect(typeof logoutUser).toBe('function');
-        expect(typeof findUserBySessionToken).toBe('function');
-        expect(typeof deleteAccount).toBe('function');
-    });
-
-    it('exports bcrypt password adapters from package entrypoint', () => {
-        expect(typeof bcryptPasswordHasher.hashPassword).toBe('function');
-        expect(typeof bcryptPasswordVerifier.verifyPassword).toBe('function');
-    });
-
-    it('exports database client factory from package entrypoint', () => {
-        expect(typeof createDatabaseClient).toBe('function');
-    });
-
-    it('exports database repository classes from package entrypoint', () => {
-        expect(typeof DrizzleUserRepository).toBe('function');
-        expect(typeof DrizzleSessionRepository).toBe('function');
-        expect(typeof DrizzleUsageLogRepository).toBe('function');
-        expect(typeof DrizzleUsageRepository).toBe('function');
+    it('exports the usage IP hash helper from package entrypoint', () => {
         expect(typeof hashUsageIp).toBe('function');
     });
 
-    it('exports database schema objects from package entrypoint', () => {
-        expect(users.email.name).toBe('email');
-        expect(sessions.userId.name).toBe('user_id');
-        expect(usageLogs.actionType.name).toBe('action_type');
-        expect(oauthAccounts.provider.name).toBe('provider');
-        expect(koreanTickers.symbol.name).toBe('symbol');
-        expect(assetTranslations.symbol.name).toBe('symbol');
-        expect(userTierEnum.enumValues).toEqual([...USER_TIER_VALUES]);
-        expect(usageActionTypeEnum.enumValues).toEqual([
-            ...USAGE_ACTION_TYPE_VALUES,
-        ]);
-        expect(oauthProviderEnum.enumValues).toEqual([
-            ...OAUTH_PROVIDER_VALUES,
-        ]);
-    });
-
-    it('exports database enum values from package entrypoint', () => {
-        expect(USER_TIER_VALUES).toEqual(['free', 'member', 'pro']);
-        expect(USAGE_ACTION_TYPE_VALUES).toEqual([
-            'analysis',
-            'chatbot',
-            'premium_model',
-        ]);
-        expect(OAUTH_PROVIDER_VALUES).toEqual(['google', 'kakao', 'apple']);
-    });
-
-    it('exports auth interfaces from package entrypoint', () => {
-        const repository: UserRepository = {
-            findByEmail: async () => null,
-            findById: async () => null,
-            createEmailUser: async input => ({
-                id: 'user-1',
-                email: input.email,
-                name: input.name ?? null,
-                avatarUrl: input.avatarUrl ?? null,
-                tier: 'free',
-                emailVerified: input.emailVerified ?? false,
-                createdAt: new Date('2026-04-26T00:00:00.000Z'),
-                updatedAt: new Date('2026-04-26T00:00:00.000Z'),
-            }),
-            deleteUser: async () => true,
-            updatePassword: async () => true,
-        };
-        const passwordHasher: PasswordHasher = {
-            hashPassword: async password => `hashed:${password}`,
-        };
-        const emailAuthRepository: EmailAuthUserRepository = {
-            findEmailAuthUserByEmail: async () => null,
-        };
-        const oauthRepository: OAuthUserRepository = {
-            findByOAuthAccount: async () => null,
-            findByEmail: async () => null,
-            createOAuthUser: async () => null,
-        };
-        const sessionRepository: SessionRepository = {
-            createSession: async input => ({
-                id: 'session-1',
-                userId: input.userId,
-                expiresAt: input.expiresAt,
-                createdAt: new Date('2026-04-26T00:00:00.000Z'),
-            }),
-            findSession: async () => null,
-            deleteSession: async () => true,
-        };
+    it('exports usage repository interface from package entrypoint', () => {
         const usageRepository: UsageRepository = {
             recordUsage: async input => ({
                 id: 'usage-1',
@@ -254,39 +138,8 @@ describe('public API exports', () => {
             }),
             getUsageToday: async () => ({ analysis: 0, chatbot: 0 }),
         };
-        const passwordVerifier: PasswordVerifier = {
-            verifyPassword: async () => true,
-        };
 
-        expect(repository).toHaveProperty('findByEmail');
-        expect(passwordHasher).toHaveProperty('hashPassword');
-        expect(emailAuthRepository).toHaveProperty('findEmailAuthUserByEmail');
-        expect(oauthRepository).toHaveProperty('findByOAuthAccount');
-        expect(sessionRepository).toHaveProperty('createSession');
         expect(usageRepository).toHaveProperty('recordUsage');
-        expect(passwordVerifier).toHaveProperty('verifyPassword');
-    });
-
-    it('runs logout through the package entrypoint', async () => {
-        const sessionRepository: SessionRepository = {
-            createSession: async input => ({
-                id: 'session-1',
-                userId: input.userId,
-                expiresAt: input.expiresAt,
-                createdAt: new Date('2026-04-26T00:00:00.000Z'),
-            }),
-            findSession: async () => null,
-            deleteSession: async () => true,
-        };
-
-        const logoutResult = await logoutUser(
-            { sessionToken: 'session-1' },
-            { sessions: sessionRepository }
-        );
-
-        expect(logoutResult.ok).toBe(true);
-        expect(logoutResult.sessionInvalidated).toBe(true);
-        expect(logoutResult.cookie).toBeDefined();
     });
 
     it('exports chat application and infrastructure entrypoints', () => {
