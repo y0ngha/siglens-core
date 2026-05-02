@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.1](https://github.com/y0ngha/siglens-core/compare/v0.7.0...v0.7.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* PR [#74](https://github.com/y0ngha/siglens-core/issues/74) — move LlmProvider to domain/types, clarify key routing JSDoc, improve test coverage ([dd15a5c](https://github.com/y0ngha/siglens-core/commit/dd15a5cca34ba1ee59866d952fe2f0d89940f380))
+* PR [#74](https://github.com/y0ngha/siglens-core/issues/74) 리뷰 반영 - 중복 import 병합, isPremium 상수 추출, constants 파일 이름 변경 ([385b83c](https://github.com/y0ngha/siglens-core/commit/385b83cc14d648e274af442bac00dce8e358ea01))
+* PR [#74](https://github.com/y0ngha/siglens-core/issues/74) 리뷰 반영 - JSDoc 명확화, 타이어 분류 정정, 모델 상수 적용 ([c93b675](https://github.com/y0ngha/siglens-core/commit/c93b67557f3fb5b70522ccbb2ae12869440ccf74))
+* Remove circular import and improve provider constants exhaustiveness ([77eb329](https://github.com/y0ngha/siglens-core/commit/77eb329ea824945b46d34b75866f50bed87da83c))
+
+
+### Features
+
+* add user_api_key_required error code, pro tier key routing, and getProviderForModel ([e415631](https://github.com/y0ngha/siglens-core/commit/e4156316cab2eeea6dd4f21923f4203f899a4300))
+* submitAnalysis worker에 model 및 X-AI-API-KEY 지원 ([cda6c0c](https://github.com/y0ngha/siglens-core/commit/cda6c0c6b9bb6e498a770bc7992f133e1d52e886))
+
 # [0.7.0](https://github.com/y0ngha/siglens-core/compare/v0.4.0...v0.7.0) (2026-05-02)
 
 
