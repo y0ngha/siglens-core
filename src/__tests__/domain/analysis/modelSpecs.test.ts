@@ -161,7 +161,7 @@ describe('provider type guards', () => {
 
 describe('getThinkingBudgetSequence', () => {
     it('returns full descending sequence with two halving steps for high initial value', () => {
-        // 32000 → 16000 → 8000 → fallback steps (8192 deduped) → 4096 → 2048 → 0
+        // 32000 → 16000 → 8000 → fallback steps (8192 skipped, >= previous) → 4096 → 2048 → 0
         expect(getThinkingBudgetSequence(32000)).toEqual([
             32000,
             16000,

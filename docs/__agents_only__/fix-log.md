@@ -90,11 +90,6 @@
 - Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
 - Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
 
-## [PR #65 | feat/60/AI-모델-티어-확대 | 2026-05-01]
-- Violation: 테스트 설명에 PR 번호 참조 포함 (`'places PR #65 free-tier models correctly'`)
-- Rule: CONVENTIONS.md JSDoc Don'ts — PR/이슈/콜사이트 참조를 테스트 설명에 포함하지 않음
-- Context: `tier.test.ts`의 `isModelAllowed` 관련 3개 it() 설명이 PR #65를 직접 참조; 비즈니스 규칙 중심의 영속적 설명으로 교체
-
 ## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
@@ -157,10 +152,12 @@
 - Rule: CONVENTIONS.md JSDoc Rules — Tier 2 requires description + `@param` + `@returns`
 - Context: `getProvider`, `getThinkingBudgetSequence`, and the three `is*Model` predicates were converted to multi-line JSDoc with full param/return documentation.
 
-- Violation: JSDoc referenced a specific consumer (`siglens-worker`) by name
-- Rule: CONVENTIONS.md JSDoc Don'ts — write timeless docs; don't tie comments to a specific caller
-- Context: "Consumed by `siglens-worker`" / "siglens-worker reads this map" rewrote to provider-neutral "AI SDK callers (workers, server actions, UI)".
-
 - Violation: Provider predicates returned plain `boolean` instead of TypeScript type predicates
 - Rule: CONVENTIONS.md / typescript-advanced-types — narrow when the runtime check carries type information
 - Context: `isClaudeModel` / `isGeminiModel` / `isChatGPTModel` converted to `model is ClaudeModelId` etc. with derived subset types so callers can narrow `ActiveModelId` at the type level.
+
+
+## [PR #71 round 3 | refactor/model-specs-consolidation | 2026-05-02]
+- Violation: Test comment "8192 deduped" did not accurately describe the algorithm — the value is skipped because it is `>=` the previous accepted entry, not because of exact-duplicate deduplication
+- Rule: CONVENTIONS.md / FF.md Readability — comments must accurately reflect the underlying logic
+- Context: First `getThinkingBudgetSequence` test comment rewrote to "8192 skipped, >= previous" to match the `if (result.length === 0 || budget < result[result.length - 1])` non-decreasing-skip rule.

@@ -116,8 +116,8 @@ export {
     EXCLUDED_SINGLE_PATTERNS,
     getMultiPatternTrend,
     getSinglePatternTrend,
+    type PatternTrend,
 } from './domain/analysis/candle-trend';
-export type { PatternTrend } from './domain/analysis/candle-trend';
 
 // Signal constants / detectors
 export {
@@ -294,13 +294,11 @@ export {
     DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
     THINKING_BUDGET_FALLBACK_STEPS,
+    type ChatGPTModelId,
+    type ClaudeModelId,
+    type GeminiModelId,
 } from './domain/analysis/modelSpecs';
 export type { ActiveModelId, AIProvider, ModelSpec } from './domain/types';
-export type {
-    ChatGPTModelId,
-    ClaudeModelId,
-    GeminiModelId,
-} from './domain/analysis/modelSpecs';
 
 // Dashboard tickers / sectors
 export {
