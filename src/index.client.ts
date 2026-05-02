@@ -79,6 +79,15 @@ export {
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
 
+// Model spec helpers
+export {
+    getProvider,
+    getThinkingBudgetSequence,
+    isChatGPTModel,
+    isClaudeModel,
+    isGeminiModel,
+} from './domain/analysis/modelSpecs';
+
 // Candle patterns
 export {
     detectCandlePattern,
@@ -216,6 +225,18 @@ export {
     CANDLE_PATTERN_LABELS,
     MULTI_CANDLE_PATTERN_LABELS,
 } from './domain/analysis/candle-labels';
+
+// Model specs (single source of truth for AI SDK call parameters)
+export {
+    DISABLED_THINKING_BUDGET,
+    MODEL_SPECS,
+    THINKING_BUDGET_FALLBACK_STEPS,
+} from './domain/analysis/modelSpecs';
+export type {
+    ActiveModelId,
+    AIProvider,
+    ModelSpec,
+} from './domain/analysis/modelSpecs';
 
 // Indicator constants
 export {
