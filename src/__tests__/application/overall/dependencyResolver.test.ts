@@ -6,10 +6,8 @@ vi.mock('@/application/market/submitAnalysis');
 vi.mock('@/application/fundamental/submitFundamentalAnalysis');
 vi.mock('@/application/news/submitNewsAnalysis');
 
-import {
-    resolveOverallDependencies,
-    type OverallDependencyInputs,
-} from '@/application/overall/dependencyResolver';
+import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
+import type { OverallDependencyInputs } from '@/application/overall/types';
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';

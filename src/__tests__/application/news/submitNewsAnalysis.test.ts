@@ -10,10 +10,7 @@ import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
-import {
-    FileSkillsLoader,
-    loadSkillsCached,
-} from '@/infrastructure/skills/loader';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
     EnrichedNewsItem,
     EarningsCalendarItem,
@@ -24,6 +21,7 @@ const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFireAndForget = fireAndForget as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
+
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -98,10 +96,6 @@ describe('submitNewsAnalysis 함수는', () => {
             skills: [],
             skillsDegraded: false,
         });
-
-        (FileSkillsLoader as Mock).mockImplementation(() => ({
-            loadSkills: vi.fn().mockResolvedValue([]),
-        }));
     });
 
     afterEach(() => {
@@ -351,9 +345,6 @@ describe('submitNewsAnalysis 함수는', () => {
                 skills: [],
                 skillsDegraded: false,
             });
-            (FileSkillsLoader as Mock).mockImplementation(() => ({
-                loadSkills: vi.fn().mockResolvedValue([]),
-            }));
             mockCacheGet.mockResolvedValue(null);
 
             // Second call: [news2, news1] reversed order
