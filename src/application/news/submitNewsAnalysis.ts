@@ -1,5 +1,5 @@
 import { fireAndForget } from '@/application/background';
-import { hashAnalysisInput } from '@/application/analysisInputHash';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
 import type {
     SubmitNewsAnalysisLimitError,

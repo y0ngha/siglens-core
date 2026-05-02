@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hashAnalysisInput } from '@/application/analysisInputHash';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 
 describe('hashAnalysisInput', () => {
     it('동일한 입력은 항상 동일한 해시를 반환한다 (deterministic)', () => {

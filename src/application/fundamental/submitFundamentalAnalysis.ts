@@ -1,6 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
-import { hashAnalysisInput } from '@/application/analysisInputHash';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import type {
     SubmitFundamentalAnalysisOptions,
     SubmitFundamentalAnalysisResult,
@@ -146,7 +146,8 @@ export async function submitFundamentalAnalysis(
                 ?.changesPercentage ?? null;
 
         snapshot = normalizeFundamentalSnapshot({
-            profile,
+            // Map RawProfile.mktCap → FundamentalProfileInput.marketCap
+            profile: { ...profile, marketCap: profile.mktCap },
             keyMetricsTtm,
             ratiosTtm,
             cashFlow,

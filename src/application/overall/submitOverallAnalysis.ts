@@ -1,5 +1,5 @@
 import { fireAndForget } from '@/application/background';
-import { hashAnalysisInput } from '@/application/analysisInputHash';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type {
     SubmitOverallAnalysisOptions,
