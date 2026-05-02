@@ -16,13 +16,14 @@ import type { OverallAnalysisResponse } from '@/domain/types';
 export interface SubmitOverallAnalysisOptions
     extends OverallDependencyInputs, BackgroundTaskOptions {}
 
-/** The caller receives a cached overall analysis — no new job was created. */
+/** @internal The caller receives a cached overall analysis — no new job was created. */
 export interface SubmitOverallAnalysisCached {
     status: 'cached';
     result: OverallAnalysisResponse;
 }
 
 /**
+ * @internal
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
@@ -40,13 +41,14 @@ export interface SubmitOverallAnalysisPendingDependencies {
     >;
 }
 
-/** A new overall analysis job was submitted; poll with `jobId` for the result. */
+/** @internal A new overall analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitOverallAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
 /**
+ * @internal
  * One of the dependency axes returned an error (tier gate, usage limit, or
  * fetch failure). The overall job is not submitted.
  */

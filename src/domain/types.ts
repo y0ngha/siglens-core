@@ -417,8 +417,8 @@ export type SkillCategory =
     | 'continuation_bullish'
     | 'continuation_bearish'
     | 'neutral'
-    | 'fundamental' // 펀더멘털 분석 Skills
-    | 'news'; // 뉴스 분석 Skills
+    | 'fundamental'
+    | 'news';
 
 /** Chart-rendering directive carried by a skill (color, label, style). */
 export interface SkillChartDisplay {

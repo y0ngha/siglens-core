@@ -124,13 +124,13 @@ export function buildSectorSignalsCacheKey(
     return `dashboard:signals:${timeframe}:${bucket}`;
 }
 
-/** Fundamental 분석 결과 캐시 TTL. T3 동적 TTL — 호출 측에서 next_earnings_at 기준으로 계산. 디폴트는 24h. */
+/** TTL for fundamental analysis cache results. Default: 24 hours. The submit path may use a shorter dynamic TTL when next earnings is imminent. */
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** News 종합 분석 캐시 TTL — 24h (재호출 비용 절감). */
+/** TTL for news analysis aggregate cache results. Default: 24 hours. */
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** News 카드별 분석 (flash-lite) 영구 캐시 — 30일 (Redis 공간 회수용 상한). */
+/** TTL for per-card news analysis cache (translation + sentiment + summary). Default: 30 days — effectively permanent for the lifetime of a news article. */
 export const NEWS_CARD_CACHE_TTL_SECONDS = 30 * SECONDS_PER_DAY;
-/** Overall 종합 분석 TTL — 24h. */
+/** TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
 export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
 /**

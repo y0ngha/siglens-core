@@ -16,7 +16,7 @@ import type { UsageRepository } from '@/infrastructure/db';
 // Submit News Analysis
 // ─────────────────────────────────────────
 
-/** Usage tracking options for news analysis submissions. */
+/** @internal Usage tracking options for news analysis submissions. */
 export interface NewsAnalysisUsageOptions {
     /** Repository used to check today's count and record successful usage. */
     usageRepository: UsageRepository;
@@ -56,22 +56,22 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     now?: Date;
 }
 
-/** Machine-readable error code for news analysis submission failures. */
+/** @internal Machine-readable error code for news analysis submission failures. */
 export type SubmitNewsAnalysisErrorCode = 'usage_limit_exceeded' | 'no_news';
 
-/** The caller receives a cached analysis — no new job was created. */
+/** @internal The caller receives a cached analysis — no new job was created. */
 export interface SubmitNewsAnalysisCached {
     status: 'cached';
     result: NewsAnalysisResponse;
 }
 
-/** A new analysis job was submitted; poll with `jobId` for the result. */
+/** @internal A new analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitNewsAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** An application-level gate prevented the job from being submitted. */
+/** @internal An application-level gate prevented the job from being submitted. */
 export interface SubmitNewsAnalysisError {
     status: 'error';
     code: SubmitNewsAnalysisErrorCode;
@@ -99,19 +99,19 @@ export type PollNewsAnalysisResult =
 // Submit News Card Analysis
 // ─────────────────────────────────────────
 
-/** Options controlling per-card news analysis submission behavior. */
+/** @internal Options controlling per-card news analysis submission behavior. */
 export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     /** The raw news item to analyze. */
     item: NewsItem;
 }
 
-/** The caller receives a cached card analysis — no new job was created. */
+/** @internal The caller receives a cached card analysis — no new job was created. */
 export interface SubmitNewsCardAnalysisCached {
     status: 'cached';
     result: NewsCardAnalysis;
 }
 
-/** A new card analysis job was submitted; poll with `jobId` for the result. */
+/** @internal A new card analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitNewsCardAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
@@ -126,7 +126,7 @@ export type SubmitNewsCardAnalysisResult =
 // Poll News Card Analysis
 // ─────────────────────────────────────────
 
-/** Outcome of {@link pollNewsCardAnalysis}: still processing, finished, or errored. */
+/** @internal Outcome of {@link pollNewsCardAnalysis}: still processing, finished, or errored. */
 export type PollNewsCardAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: NewsCardAnalysis }

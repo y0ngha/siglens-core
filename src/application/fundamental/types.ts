@@ -13,7 +13,7 @@ import type { UsageRepository } from '@/infrastructure/db';
 // Submit
 // ─────────────────────────────────────────
 
-/** Usage tracking options for fundamental analysis submissions. */
+/** @internal Usage tracking options for fundamental analysis submissions. */
 export interface FundamentalAnalysisUsageOptions {
     /** Repository used to check today's count and record successful usage. */
     usageRepository: UsageRepository;
@@ -52,30 +52,30 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
     now?: Date;
 }
 
-/** Machine-readable error code for fundamental analysis submission failures. */
+/** @internal Machine-readable error code for fundamental analysis submission failures. */
 export type SubmitFundamentalAnalysisErrorCode =
     | 'usage_limit_exceeded'
     | 'fetch_failed';
 
-/** Outcome status variants for fundamental analysis submission. */
+/** @internal Outcome status variants for fundamental analysis submission. */
 export type SubmitFundamentalAnalysisResultStatus =
     | 'cached'
     | 'submitted'
     | 'error';
 
-/** The caller receives a cached analysis — no new job was created. */
+/** @internal The caller receives a cached analysis — no new job was created. */
 export interface SubmitFundamentalAnalysisCached {
     status: 'cached';
     result: FundamentalAnalysisResponse;
 }
 
-/** A new analysis job was submitted; poll with `jobId` for the result. */
+/** @internal A new analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitFundamentalAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** An application-level gate prevented the job from being submitted. */
+/** @internal An application-level gate prevented the job from being submitted. */
 export interface SubmitFundamentalAnalysisError {
     status: 'error';
     code: SubmitFundamentalAnalysisErrorCode;
@@ -93,7 +93,7 @@ export type SubmitFundamentalAnalysisResult =
 // Poll
 // ─────────────────────────────────────────
 
-/** Outcome status variants for fundamental analysis polling. */
+/** @internal Outcome status variants for fundamental analysis polling. */
 export type PollFundamentalAnalysisResultStatus =
     | 'processing'
     | 'done'
