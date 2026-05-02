@@ -230,14 +230,17 @@ export async function submitAnalysis(
         modelId: effectiveModelId,
     });
 
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
-            ...(options.userApiKey !== undefined
-                ? { 'X-AI-API-KEY': options.userApiKey }
-                : {}),
+            ...userApiKeyHeader,
         },
         body: JSON.stringify({ jobId, prompt, model: effectiveModelId }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),

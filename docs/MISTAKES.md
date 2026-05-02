@@ -425,6 +425,15 @@ and have been removed from this file.
    ❌ export function loginUser(input, deps) { ... }  // missing all JSDoc
    ❌ export function registerUser(...) { /** description only */ }  // no @param/@returns/@example/@see
    ✅ export function loginUser(...) { /** description. @param input deps. @returns result. @example usage. @see related */ }
+   → Also applies to Tier 2 functions: description + @param + @returns required
+
+4.5. Tier 2 and Tier 4 public functions/methods missing @param/@returns JSDoc
+   → Tier 2 functions and Tier 4 interface methods require @param and @returns JSDoc tags
+   → Per-method documentation is mandatory for public contracts; single-line description alone is insufficient
+   ❌ export function getProvider(id) { ... }  // only description, no @param/@returns
+   ❌ interface UserRepository { getUserTier(userId) { ... } }  // no per-method JSDoc
+   ✅ /** Get provider by ID. @param id The model provider identifier. @returns The provider spec. */ export function getProvider(id) { ... }
+   ✅ interface UserRepository { /** Get user tier. @param userId The user ID. @returns The tier or null. */ getUserTier(userId); }
 
 5. JSDoc tags reference specific call-sites instead of describing timeless purpose
    → @internal, @param, @returns must describe the function's role independent of any caller

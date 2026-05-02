@@ -123,21 +123,6 @@
 - Context: 0.4.0 → 0.5.0 미반영, CHANGELOG에 신규 BREAKING/Phase 0~7 섹션 부재 (요약된 새 entry 추가)
 
 
-## [PR #70 round 2 | refactor/scope-realignment-phase-0 | 2026-05-02]
-- Violation: Tier 4 public repository interface 메서드에서 per-method JSDoc(`@param`/`@returns`) 누락
-- Rule: CONVENTIONS.md Tier 4 — public 인터페이스는 type-level description + per-field/per-method 한 줄 문서 + `@param`/`@returns` 필수
-- Context: `infrastructure/db/types.ts`의 `UserTierRepository.getUserTier/updateUserTier`, `UsageLogRepository.recordUsage`, `UsageRepository.recordUsage/getUsageToday` 메서드가 인터페이스-레벨 설명만 있고 메서드 본문 JSDoc이 없어 Tier 4 계약을 충족하지 못함
-
-- Violation: 대규모 ejection 이후 `docs/API.md`가 옛 외부 의존성(Neon/Drizzle/Auth/Email/OAuth/BYOK/Ticker/Gemini SDK)과 옛 환경변수(DATABASE_URL, OAUTH_TOKEN_ENCRYPTION_KEY, LLM_API_KEY_ENCRYPTION_KEY 등) 문서를 그대로 보존
-- Rule: CONVENTIONS.md / FF — Predictability. 코드와 docs가 어긋나면 consumer가 잘못된 환경변수를 설정하거나 존재하지 않는 모듈을 기대하게 됨
-- Context: Phase 6에서 `@neondatabase/serverless`, `drizzle-orm`, `@google/genai` peerDependency가 제거되고 db/auth/email/oauth/ticker/byok 모듈이 모두 ejection되었으나 API.md는 갱신되지 않아 코어가 직접 호출하는 서비스(Upstash, Worker, Market Data config reader)만 남도록 재작성
-
-
-## [PR #70 round 3 | refactor/scope-realignment-phase-0 | 2026-05-02]
-- Violation: src/infrastructure/CLAUDE.md sub-directory table fell out of sync with src/infrastructure/usage/ directory addition
-- Rule: MISTAKES.md Documentation Sync — agent guides must reflect actual directory structure
-- Context: Phase 0 added infrastructure/usage/hash.ts (extracted from db/usageRepository.ts) but did not add the new directory to the sub-directory table.
-
 
 ## [PR #71 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Shared domain types (`ModelSpec`, `AIProvider`, `ActiveModelId`) were defined inside `domain/analysis/modelSpecs.ts` instead of `domain/types.ts`
@@ -147,10 +132,6 @@
 - Violation: `getThinkingBudgetSequence` used `reduce + spread` accumulator pattern (O(N²))
 - Rule: MISTAKES.md #14.5 — `[...acc, x]` inside reduce/flatMap causes O(N²); use `for + push` into a local mutable array
 - Context: Fallback-budget de-duplication loop replaced with `const result: number[] = []; for (...) result.push(...)` per the documented domain-layer performance exception.
-
-- Violation: Tier 2 public functions had single-line JSDoc only (description without `@param`/`@returns`)
-- Rule: CONVENTIONS.md JSDoc Rules — Tier 2 requires description + `@param` + `@returns`
-- Context: `getProvider`, `getThinkingBudgetSequence`, and the three `is*Model` predicates were converted to multi-line JSDoc with full param/return documentation.
 
 - Violation: Provider predicates returned plain `boolean` instead of TypeScript type predicates
 - Rule: CONVENTIONS.md / typescript-advanced-types — narrow when the runtime check carries type information

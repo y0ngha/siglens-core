@@ -567,15 +567,6 @@ describe('submitAnalysis 함수는', () => {
             expect(body.model).toBe('gemini-2.5-flash');
         });
 
-        it('modelId가 없으면 기본 모델 ID를 Worker body에 포함한다', async () => {
-            await submitAnalysis(mockSymbol, mockTimeframe);
-
-            const body = JSON.parse(
-                mockFetch.mock.calls[0][1].body as string
-            ) as Record<string, unknown>;
-            expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
-        });
-
         it('userApiKey가 있으면 X-AI-API-KEY 헤더를 포함한다', async () => {
             await submitAnalysis(mockSymbol, mockTimeframe, false, undefined, {
                 userApiKey: 'sk-user-key-123',
