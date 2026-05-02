@@ -32,6 +32,7 @@ const MARKDOWN_FENCE_PATTERN = /^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/;
  * instructed not to. This helper removes the fence before parsing so
  * normalizers can accept both raw JSON and fenced JSON strings.
  *
+ * @internal
  * @param raw - Raw string from the LLM response. May be fenced or plain JSON.
  * @returns Parsed JSON value as `unknown` — callers must validate the shape.
  * @throws {SyntaxError} When the string (after fence removal) is not valid JSON.

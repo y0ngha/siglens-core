@@ -4,7 +4,8 @@ import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
 import type { SubmitFundamentalAnalysisOptions, SubmitFundamentalAnalysisResult } from '@/application/fundamental/types';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
-import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
+import { TIER_CONFIG } from '@/domain/tier';
+import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
@@ -14,6 +15,9 @@ import type { FundamentalAnalysisResponse } from '@/domain/types';
 
 /** Length of the hex input hash prefix used in the fundamental cache key. */
 const INPUT_HASH_LENGTH = 16;
+
+/** Maximum time to wait for the worker to accept the fundamental analysis job. */
+const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
  * Derive a short deterministic hash of the normalized snapshot.
@@ -69,7 +73,7 @@ export async function submitFundamentalAnalysis(
 
     // ── 1. Usage limit check (only when both tier and usage are provided) ──
     if (options.tier !== undefined && options.usage !== undefined) {
-        const tier = options.tier ?? DEFAULT_TIER;
+        const tier = options.tier;
         const tierConfig = options.tierConfig ?? TIER_CONFIG;
         const ipHash = hashUsageIp(options.usage.clientIp, occurredAt);
         const allowed = await checkAnalysisLimit(
@@ -116,7 +120,7 @@ export async function submitFundamentalAnalysis(
             dataProvider.getPriceTargetSummary(symbol),
             dataProvider.getEarningsReport(symbol),
             dataProvider.getSectorPerformanceSnapshot(
-                new Date().toISOString().slice(0, 10)
+                occurredAt.toISOString().slice(0, 10)
             ),
         ]);
 
@@ -196,6 +200,7 @@ export async function submitFundamentalAnalysis(
             'X-Worker-Secret': workerSecret,
         },
         body: JSON.stringify({ jobId, prompt, model: modelId }),
+        signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitFundamentalAnalysis] Worker request failed:', error);
     });
