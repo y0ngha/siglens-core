@@ -270,4 +270,38 @@ describe('pollAnalysis 함수는', () => {
             expect(mockCacheSet).not.toHaveBeenCalled();
         });
     });
+
+    describe('B-5: meta.timeframe undefined 분기', () => {
+        beforeEach(() => {
+            mockGetJobStatus.mockResolvedValue('done');
+        });
+
+        it('meta.timeframe이 undefined이면 캐시 저장을 건너뛴다', async () => {
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                timeframe: undefined,
+            });
+
+            const result = await pollAnalysis('job-no-timeframe');
+
+            expect(result.status).toBe('done');
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('meta.timeframe이 정의되어 있으면 캐시에 저장한다', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                timeframe: '1Day',
+            });
+
+            await pollAnalysis('job-with-timeframe');
+
+            expect(mockCacheSet).toHaveBeenCalled();
+            vi.useRealTimers();
+        });
+    });
 });
