@@ -135,8 +135,8 @@ export async function resolveOverallDependencies(
     };
 }
 
-// Re-export types for any existing consumers that import from dependencyResolver directly.
-// Primary export location is now application/overall/types.ts.
+// Re-export types for direct imports from this module.
+// Primary export location is application/overall/types.ts.
 export type {
     DependencyState,
     DependencyStateCached,
