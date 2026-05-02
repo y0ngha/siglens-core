@@ -1,5 +1,20 @@
 # Changelog
 
+# [0.7.0](https://github.com/y0ngha/siglens-core/compare/v0.4.0...v0.7.0) (2026-05-02)
+
+
+### Bug Fixes
+
+* PR [#70](https://github.com/y0ngha/siglens-core/issues/70) review comments ([cfa7774](https://github.com/y0ngha/siglens-core/commit/cfa7774100ec1cc633b5d931e449790ee07732b8))
+* PR [#70](https://github.com/y0ngha/siglens-core/issues/70) round 2 — Tier 4 JSDoc + API.md sync ([3c4b6bd](https://github.com/y0ngha/siglens-core/commit/3c4b6bd1ee1cba07a854c86d18621b2090797572))
+* PR [#71](https://github.com/y0ngha/siglens-core/issues/71) review — narrowing predicates + types relocation + JSDoc ([8ca59e4](https://github.com/y0ngha/siglens-core/commit/8ca59e4c69999c6445d97c1535ed4fd6379083cb)), closes [#1](https://github.com/y0ngha/siglens-core/issues/1)
+* PR [#71](https://github.com/y0ngha/siglens-core/issues/71) round 3 — merge export blocks + extract constants + comment ([deb682a](https://github.com/y0ngha/siglens-core/commit/deb682a589d180b31e6185583483ab5f8544c8b7)), closes [#5](https://github.com/y0ngha/siglens-core/issues/5)
+
+
+### Features
+
+* add MODEL_SPECS as single source of truth for AI model parameters ([af004d0](https://github.com/y0ngha/siglens-core/commit/af004d0a3b85e6f25f5679a84a638f65d2f33cb1))
+
 ## [0.6.0] - 2026-05-02
 
 ### Features
