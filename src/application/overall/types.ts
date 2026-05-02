@@ -14,6 +14,9 @@ import type {
 } from '@/domain/types';
 import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
 
+/** @internal Axis identifier for the three-axis overall analysis pipeline. */
+export type OverallAxis = 'technical' | 'fundamental' | 'news';
+
 // ─────────────────────────────────────────
 // Dependency resolver input types
 // ─────────────────────────────────────────
@@ -99,10 +102,7 @@ export interface DependencyStateCached {
  */
 export interface DependencyStatePending {
     kind: 'pending';
-    pendingJobs: Record<
-        'technical' | 'fundamental' | 'news',
-        string | undefined
-    >;
+    pendingJobs: Record<OverallAxis, string | undefined>;
 }
 
 /**
@@ -113,7 +113,7 @@ export interface DependencyStatePending {
  */
 export interface DependencyStateError {
     kind: 'error';
-    axis: 'technical' | 'fundamental' | 'news';
+    axis: OverallAxis;
     error: unknown;
 }
 
@@ -162,10 +162,7 @@ export interface SubmitOverallAnalysisPendingDependencies {
      * Maps each axis to its background `jobId`, or `undefined` if that
      * axis already resolved from cache and is not pending.
      */
-    pendingJobs: Record<
-        'technical' | 'fundamental' | 'news',
-        string | undefined
-    >;
+    pendingJobs: Record<OverallAxis, string | undefined>;
 }
 
 /** @internal A new overall analysis job was submitted; poll with `jobId` for the result. */
@@ -182,7 +179,7 @@ export interface SubmitOverallAnalysisSubmitted {
 export interface SubmitOverallAnalysisError {
     status: 'error';
     /** Axis that failed: `'technical'`, `'fundamental'`, or `'news'`. */
-    axis: 'technical' | 'fundamental' | 'news';
+    axis: OverallAxis;
     /** Error payload from the failing axis submit result. */
     error: unknown;
 }
