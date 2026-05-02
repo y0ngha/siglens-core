@@ -31,7 +31,9 @@ describe('getProviderForModel', () => {
         });
 
         it('returns openai for unknown gpt-prefixed model', () => {
-            expect(getProviderForModel('gpt-4-turbo' as ModelId)).toBe('openai');
+            expect(getProviderForModel('gpt-4-turbo' as ModelId)).toBe(
+                'openai'
+            );
         });
     });
 });
