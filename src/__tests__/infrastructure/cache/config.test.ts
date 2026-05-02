@@ -7,17 +7,25 @@ import {
     ANALYSIS_CACHE_TTL,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildFundamentalCacheKey,
+    buildNewsCacheKey,
+    buildNewsCardCacheKey,
+    buildOverallCacheKey,
     buildSectorSignalsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
+    FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
+    NEWS_CACHE_TTL_SECONDS,
+    NEWS_CARD_CACHE_TTL_SECONDS,
+    OVERALL_CACHE_TTL_SECONDS,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 
 describe('cache config constants', () => {
     it('ANALYSIS_CACHE_TTL values', () => {
@@ -99,5 +107,40 @@ describe('cache key builders', () => {
         expect(SECTOR_SIGNALS_TTL_BY_TIMEFRAME['15Min']).toBe(
             SECTOR_SIGNALS_15MIN_TTL_MINUTES * SECONDS_PER_MINUTE
         );
+    });
+});
+
+describe('new analysis cache keys', () => {
+    test('buildFundamentalCacheKey is symbol+model+input_hash deterministic', () => {
+        const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
+        const b = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
+        expect(a).toBe(b);
+        expect(a).toMatch(/^analysis:fundamental:AAPL:gemini-2\.5-pro:h1$/);
+    });
+
+    test('buildNewsCacheKey same shape', () => {
+        expect(
+            buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')
+        ).toMatch(/^analysis:news:AAPL:gemini-2\.5-pro:h2$/);
+    });
+
+    test('buildNewsCardCacheKey is per-news-id (model fixed flash-lite)', () => {
+        const k = buildNewsCardCacheKey('news-12345');
+        expect(k).toBe(
+            'analysis:news-card:news-12345:gemini-2.5-flash-lite'
+        );
+    });
+
+    test('buildOverallCacheKey includes timeframe', () => {
+        expect(
+            buildOverallCacheKey('AAPL', '5m', 'gemini-2.5-pro', 'h3')
+        ).toBe('analysis:overall:AAPL:5m:gemini-2.5-pro:h3');
+    });
+
+    test('TTL constants are sane', () => {
+        expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBeGreaterThan(0);
+        expect(NEWS_CACHE_TTL_SECONDS).toBeGreaterThan(0);
+        expect(NEWS_CARD_CACHE_TTL_SECONDS).toBeGreaterThan(0);
+        expect(OVERALL_CACHE_TTL_SECONDS).toBeGreaterThan(0);
     });
 });

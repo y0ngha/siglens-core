@@ -123,3 +123,84 @@ export function buildSectorSignalsCacheKey(
 ): string {
     return `dashboard:signals:${timeframe}:${bucket}`;
 }
+
+/** Fundamental 분석 결과 캐시 TTL. T3 동적 TTL — 호출 측에서 next_earnings_at 기준으로 계산. 디폴트는 24h. */
+export const FUNDAMENTAL_CACHE_TTL_SECONDS = 24 * 60 * 60;
+/** News 종합 분석 캐시 TTL — 24h (재호출 비용 절감). */
+export const NEWS_CACHE_TTL_SECONDS = 24 * 60 * 60;
+/** News 카드별 분석 (flash-lite) 영구 캐시 — 30일 (Redis 공간 회수용 상한). */
+export const NEWS_CARD_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60;
+/** Overall 종합 분석 TTL — 24h. */
+export const OVERALL_CACHE_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * Build the Redis key for a cached fundamental analysis result.
+ *
+ * Format: `analysis:fundamental:<symbol>:<modelId>:<inputHash>`.
+ * The `inputHash` is a short hash of the FundamentalSnapshot contents so that
+ * results from different data vintages are cached independently.
+ *
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param inputHash - Short hash of the prompt input data.
+ * @returns The cache key.
+ */
+export function buildFundamentalCacheKey(
+    symbol: string,
+    modelId: string,
+    inputHash: string
+): string {
+    return `analysis:fundamental:${symbol}:${modelId}:${inputHash}`;
+}
+
+/**
+ * Build the Redis key for a cached news analysis result.
+ *
+ * Format: `analysis:news:<symbol>:<modelId>:<inputHash>`.
+ *
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param inputHash - Short hash of the news items used as prompt input.
+ * @returns The cache key.
+ */
+export function buildNewsCacheKey(
+    symbol: string,
+    modelId: string,
+    inputHash: string
+): string {
+    return `analysis:news:${symbol}:${modelId}:${inputHash}`;
+}
+
+/**
+ * Build the Redis key for a cached per-news-card analysis result.
+ *
+ * The model is fixed to `gemini-2.5-flash-lite` (translation + sentiment).
+ * Format: `analysis:news-card:<newsId>:gemini-2.5-flash-lite`.
+ *
+ * @param newsId - Stable unique identifier of the news article.
+ * @returns The cache key.
+ */
+export function buildNewsCardCacheKey(newsId: string): string {
+    return `analysis:news-card:${newsId}:gemini-2.5-flash-lite`;
+}
+
+/**
+ * Build the Redis key for a cached overall (3-axis) analysis result.
+ *
+ * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<inputHash>`.
+ * The `timeframe` distinguishes analyses run with different chart contexts.
+ *
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param timeframe - Bar resolution used for the technical axis.
+ * @param modelId - LLM model identifier.
+ * @param inputHash - Short hash of the combined technical/fundamental/news inputs.
+ * @returns The cache key.
+ */
+export function buildOverallCacheKey(
+    symbol: string,
+    timeframe: string,
+    modelId: string,
+    inputHash: string
+): string {
+    return `analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}`;
+}
