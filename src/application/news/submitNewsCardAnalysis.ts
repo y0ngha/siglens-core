@@ -6,20 +6,13 @@ import type {
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import type { NewsCardAnalysis } from '@/domain/types';
-import { buildNewsCardCacheKey } from '@/infrastructure/cache/config';
+import {
+    buildNewsCardCacheKey,
+    NEWS_CARD_MODEL_ID,
+} from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-
-/**
- * Model hard-coded for per-card translation and sentiment analysis.
- *
- * Flash-lite is chosen for its low cost and sub-second latency on brief
- * classification tasks. The model is intentionally not caller-configurable
- * so the cache key (keyed only by `newsId`) never produces cross-model
- * pollution in the permanent store.
- */
-const NEWS_CARD_MODEL = 'gemini-2.5-flash-lite' as const;
 
 /**
  * Per-card worker timeout.
@@ -35,7 +28,7 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS = 2 * MS_PER_MINUTE;
  *
  * Resolves to one of two outcomes:
  * - `cached`: a permanent per-card analysis already exists in Redis. The
- *   cache is keyed by `item.id` only; model is fixed to `NEWS_CARD_MODEL`.
+ *   cache is keyed by `item.id` only; model is fixed to `NEWS_CARD_MODEL_ID`.
  * - `submitted`: a `jobId` was registered and a fire-and-forget POST was
  *   sent to the configured worker. Poll the result with
  *   {@link pollNewsCardAnalysis}.
@@ -85,7 +78,7 @@ export async function submitNewsCardAnalysis(
 
     await setJobMeta(jobId, {
         symbol: item.symbol,
-        modelId: NEWS_CARD_MODEL,
+        modelId: NEWS_CARD_MODEL_ID,
         cacheKey,
     });
 
@@ -95,7 +88,7 @@ export async function submitNewsCardAnalysis(
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
         },
-        body: JSON.stringify({ jobId, prompt, model: NEWS_CARD_MODEL }),
+        body: JSON.stringify({ jobId, prompt, model: NEWS_CARD_MODEL_ID }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitNewsCardAnalysis] Worker request failed:', error);
