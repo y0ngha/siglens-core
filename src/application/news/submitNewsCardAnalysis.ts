@@ -4,10 +4,7 @@ import type { BackgroundTaskOptions } from '@/application/types';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import type { NewsItem, NewsCardAnalysis } from '@/domain/types';
-import {
-    buildNewsCardCacheKey,
-    NEWS_CARD_CACHE_TTL_SECONDS,
-} from '@/infrastructure/cache/config';
+import { buildNewsCardCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
