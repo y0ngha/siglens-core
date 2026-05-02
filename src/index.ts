@@ -203,6 +203,9 @@ export {
 } from './domain/analysis/normalizePrimitives';
 export { extendTrendline } from './domain/analysis/trendline';
 
+// LLM provider mapping
+export { getProviderForModel } from './domain/llm/providers';
+
 // Tier gating
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
@@ -445,6 +448,9 @@ export type {
 } from './application/market/types';
 
 // Domain types
+export type { LlmProvider } from './domain/llm/types';
+export { LLM_PROVIDER_VALUES } from './domain/llm/types';
+
 export type {
     ActionRecommendation,
     AnalysisResponse,

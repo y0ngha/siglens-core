@@ -85,10 +85,6 @@
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
 
-## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
-- Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
-- Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
 
 ## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
@@ -139,10 +135,6 @@
 
 
 ## [Issue #69 | feat/69/submitAnalysis-model-userApiKey | 2026-05-02]
-- Violation: 기존 메인 제출 테스트가 `objectContaining`으로 외부 객체를 감싸면서 내부 `headers` 필드는 plain equality로 단언해 assertion 일관성 문제 발생
-- Rule: MISTAKES.md Tests rule 6 — 각 it()은 단 하나의 고유 동작만 테스트해야 하며 단언 방식이 내/외부에서 충돌하면 false negative 위험이 생김
-- Context: `submitAnalysis.test.ts`의 "fetchBarsWithIndicators를 호출하고..." 테스트에서 headers 단언을 `expect.objectContaining`으로 통일하고 body.model 단언도 추가
-
 - Violation: `userApiKey?: string` 필드의 JSDoc에 "Required when..." 표현 사용 — 타입은 optional인데 required로 오해할 소지
 - Rule: FF Predictability — optional 필드의 JSDoc은 조건부 의무를 명확히 기술해야 하며 "Required"는 non-optional 필드에만 사용
 - Context: `SubmitAnalysisOptions.userApiKey` JSDoc을 "Must be provided when..." 형식으로 수정해 user-managed 모델 사용 시의 책임을 명확화

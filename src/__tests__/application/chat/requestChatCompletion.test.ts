@@ -182,9 +182,67 @@ describe('requestChatCompletion', () => {
         consoleWarn.mockRestore();
     });
 
-    it('returns server_error when the paid key is missing', async () => {
+    it('returns user_api_key_required when a non-pro tier user requests a premium model without a paid key', async () => {
         const result = await requestChatCompletion(
-            createParams({ paidApiKey: undefined }),
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                paidApiKey: undefined,
+                tierContext: { userId: null, tier: 'member' },
+            }),
+            { tokenStore, callAiProvider }
+        );
+
+        expect(result).toEqual({ ok: false, error: 'user_api_key_required' });
+        expect(tryConsumeToken).not.toHaveBeenCalled();
+    });
+
+    it('returns server_error when a free model is requested without a paid key', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_FLASH_MODEL,
+                paidApiKey: undefined,
+            }),
+            { tokenStore, callAiProvider }
+        );
+
+        expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(tryConsumeToken).not.toHaveBeenCalled();
+    });
+
+    it('allows a pro tier user to call a premium model using freeApiKey when no paidApiKey is provided', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                paidApiKey: undefined,
+                freeApiKey: 'server-key',
+                tierContext: { userId: 'user-1', tier: 'pro' },
+            }),
+            { tokenStore, callAiProvider }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
+        expect(callAiProvider).toHaveBeenCalledWith(
+            expect.objectContaining({
+                primaryApiKey: undefined,
+                fallbackApiKey: 'server-key',
+                model: GEMINI_2_5_PRO_MODEL,
+            })
+        );
+        expect(tryConsumeToken).toHaveBeenCalled();
+    });
+
+    it('returns server_error when a pro tier user has no paidApiKey and no freeApiKey', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                paidApiKey: undefined,
+                freeApiKey: undefined,
+                tierContext: { userId: 'user-1', tier: 'pro' },
+            }),
             { tokenStore, callAiProvider }
         );
 
@@ -351,6 +409,32 @@ describe('requestChatCompletion', () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'pro' },
+                occurredAt: new Date('2026-04-28T12:34:56.000Z'),
+            }),
+            {
+                tokenStore,
+                callAiProvider,
+                usageLogs,
+            }
+        );
+
+        expect(result.ok).toBe(true);
+        expect(recordPremiumUsage).toHaveBeenCalledWith({
+            userId: 'user-1',
+            ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
+            actionType: 'premium_model',
+            modelUsed: GEMINI_2_5_PRO_MODEL,
+            date: '2026-04-28',
+        });
+    });
+
+    it('records premium usage for a pro tier user calling via freeApiKey without paidApiKey', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                paidApiKey: undefined,
+                freeApiKey: 'server-key',
                 tierContext: { userId: 'user-1', tier: 'pro' },
                 occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),

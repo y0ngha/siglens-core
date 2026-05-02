@@ -61,6 +61,11 @@ export {
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 
+// LLM provider mapping
+export { getProviderForModel } from './domain/llm/providers';
+export type { LlmProvider } from './domain/llm/types';
+export { LLM_PROVIDER_VALUES } from './domain/llm/types';
+
 // Tier gating
 export {
     DEFAULT_TIER,

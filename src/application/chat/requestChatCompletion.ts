@@ -180,6 +180,16 @@ async function requestAiChatCompletion(
  * AI provider payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
  *
+ * **API key routing:**
+ * - Free models: always call with `freeApiKey` (server-owned key).
+ * - Premium models + `paidApiKey` provided: call with `freeApiKey` as primary,
+ *   `paidApiKey` as fallback.
+ * - Premium models + `paidApiKey` absent + tier `'pro'`: server calls with
+ *   `freeApiKey` only; no `paidApiKey` is required because the server holds the
+ *   key for pro-tier users. `freeApiKey` must be provided in this case.
+ * - Premium models + `paidApiKey` absent + tier below `'pro'`: returns
+ *   `user_api_key_required` so the caller can prompt the user to register a key.
+ *
  * Token refund: when the result is `server_busy` or `server_error`, the
  * consumed token is returned to the caller's bucket via a best-effort
  * background call so server-side failures do not count against the daily
@@ -194,9 +204,15 @@ async function requestAiChatCompletion(
  *   implementation; `callAiProvider` must be supplied by the caller and is
  *   responsible for routing by `options.model` to the upstream provider.
  * @returns A {@link ChatActionResult} — `{ ok: true, message, remainingTokens }`
- *   on success, or `{ ok: false, error }` with a typed error code
- *   (`token_exhausted`, `model_not_allowed`, `rate_limited`, `server_busy`,
- *   `server_error`) or a {@link ChatbotLimitError}.
+ *   on success, or `{ ok: false, error }` with a typed error code:
+ *   - `user_api_key_required` — premium model requested by a non-pro-tier user
+ *     without a registered API key; show a "register your key" CTA.
+ *   - `model_not_allowed` — the caller's tier does not have access to this model.
+ *   - `token_exhausted` — daily chat token budget consumed.
+ *   - `rate_limited` — upstream provider rate limit hit.
+ *   - `server_busy` — upstream provider temporarily unavailable (token refunded).
+ *   - `server_error` — unexpected server-side failure.
+ *   - {@link ChatbotLimitError} — daily usage limit exceeded.
  *
  * @throws {never} Never throws — all infrastructure failures are mapped to typed
  *   error codes in the return value.
@@ -211,7 +227,9 @@ export async function requestChatCompletion(
 ): Promise<ChatActionResult> {
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
     const paidApiKey = params.paidApiKey;
-    if (!isValidChatModel(model) || !paidApiKey) {
+    const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
+
+    if (!isValidChatModel(model)) {
         return { ok: false, error: 'server_error' };
     }
 
@@ -219,7 +237,21 @@ export async function requestChatCompletion(
         userId: null,
         tier: DEFAULT_TIER,
     };
-    const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
+
+    if (!paidApiKey) {
+        const isPremium = isPremiumChatModel(model, tierConfig);
+        if (!isPremium) {
+            return { ok: false, error: 'server_error' };
+        }
+        if (tierContext.tier !== 'pro') {
+            return { ok: false, error: 'user_api_key_required' };
+        }
+        // Pro tier + premium model: freeApiKey is the server-owned key.
+        if (!params.freeApiKey) {
+            return { ok: false, error: 'server_error' };
+        }
+    }
+
     if (!isModelAllowed(tierContext.tier, model, tierConfig)) {
         return { ok: false, error: 'model_not_allowed' };
     }
@@ -267,9 +299,14 @@ export async function requestChatCompletion(
         params.userMessage
     );
 
+    // Pro tier without paidApiKey uses freeApiKey as the sole server-owned key.
+    // Safe: guard above ensures freeApiKey is defined on this path.
+    const effectivePrimaryKey = paidApiKey ? params.freeApiKey : undefined;
+    const effectiveFallbackKey: string = paidApiKey ?? params.freeApiKey!;
+
     const aiResult = await requestAiChatCompletion(
-        params.freeApiKey,
-        paidApiKey,
+        effectivePrimaryKey,
+        effectiveFallbackKey,
         tokenStore,
         callAiProvider,
         model,
