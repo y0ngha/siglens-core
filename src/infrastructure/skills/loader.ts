@@ -195,7 +195,7 @@ const countMdFiles = async (subdir: string): Promise<number> => {
 let _cachedSkills: Skill[] | null = null;
 let _cachedSkillsDegraded: boolean = false;
 
-/** Result shape returned by {@link loadSkillsCached}. */
+/** @internal Result shape returned by {@link loadSkillsCached}. */
 export interface LoadSkillsCachedResult {
     /** Parsed skills list; empty when load failed. */
     skills: Skill[];
