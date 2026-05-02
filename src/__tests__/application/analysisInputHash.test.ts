@@ -3,7 +3,10 @@ import { hashAnalysisInput } from '@/application/analysisInputHash';
 
 describe('hashAnalysisInput', () => {
     it('동일한 입력은 항상 동일한 해시를 반환한다 (deterministic)', () => {
-        const input = JSON.stringify({ symbol: 'AAPL', valuation: { per: 30 } });
+        const input = JSON.stringify({
+            symbol: 'AAPL',
+            valuation: { per: 30 },
+        });
         expect(hashAnalysisInput(input)).toBe(hashAnalysisInput(input));
     });
 

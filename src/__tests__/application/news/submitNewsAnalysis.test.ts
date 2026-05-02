@@ -348,9 +348,9 @@ describe('submitNewsAnalysis 함수는', () => {
             mockSetJobMeta.mockResolvedValue(undefined);
             mockFireAndForget.mockImplementation(() => undefined);
             mockLoadSkillsCached.mockResolvedValue({
-            skills: [],
-            skillsDegraded: false,
-        });
+                skills: [],
+                skillsDegraded: false,
+            });
             (FileSkillsLoader as Mock).mockImplementation(() => ({
                 loadSkills: vi.fn().mockResolvedValue([]),
             }));
