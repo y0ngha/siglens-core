@@ -1473,7 +1473,7 @@ export interface FundamentalProfileInput {
     companyName: string;
     sector: string;
     industry: string;
-    mktCap: number;
+    marketCap: number;
     ceo: string | null;
     website: string | null;
     description: string | null;
@@ -1547,15 +1547,20 @@ export interface FundamentalPriceTargetConsensusInput {
     targetConsensus: number | null;
 }
 
+/** Single average price target bucket (1-month, 3-month, or 12-month window). */
+export interface PriceTargetAvg {
+    avgPriceTarget: number | null;
+}
+
 /**
  * Rolling average price targets grouped by lookback window.
  * `lastMonth` → 1-month avg, `lastQuarter` → 3-month avg, `lastYear` → 12-month avg.
  * Maps to domain {@link PriceTargetSummary} via `normalizeFundamentalSnapshot`.
  */
 export interface FundamentalPriceTargetSummaryInput {
-    lastMonth: { avgPriceTarget: number | null };
-    lastQuarter: { avgPriceTarget: number | null };
-    lastYear: { avgPriceTarget: number | null };
+    lastMonth: PriceTargetAvg;
+    lastQuarter: PriceTargetAvg;
+    lastYear: PriceTargetAvg;
 }
 
 /** Sector performance snapshot entry for a single trading date. */
@@ -1576,12 +1581,22 @@ export interface FundamentalCashFlowInput {
     operatingCashFlow: number | null;
 }
 
-/** Earnings report entry for a symbol. `raw` preserves the full provider payload. */
-export interface FundamentalEarningsReportInput {
-    symbol: string;
-    /** ISO date of the earnings event. Named `earningsDate` to match {@link EarningsReport.earningsDate}. */
-    earningsDate: string;
-    raw: unknown;
+/** Input bundle for {@link normalizeFundamentalSnapshot}. Each field corresponds to a single FMP-style fetch result, normalized to domain shapes. */
+export interface NormalizeFundamentalSnapshotInput {
+    profile: FundamentalProfileInput;
+    keyMetricsTtm: FundamentalValuationMetrics | null;
+    ratiosTtm: FundamentalRatiosInput | null;
+    cashFlow: FundamentalCashFlowInput | null;
+    incomeGrowth: FundamentalGrowthInput | null;
+    financialScores: FundamentalFinancialScoresInput | null;
+    peers: FundamentalPeerInput[];
+    analystEstimate: FundamentalAnalystEstimateInput | null;
+    gradesConsensus: FundamentalGradesConsensusInput | null;
+    priceTargetConsensus: FundamentalPriceTargetConsensusInput | null;
+    priceTargetSummary: FundamentalPriceTargetSummaryInput | null;
+    nextEarningsAt: string | null;
+    sectorTodayChangePct: number | null;
+    sectorHistorical: SectorHistoricalPoint[];
 }
 
 // ─────────────────────────────────────────
@@ -1616,7 +1631,7 @@ export interface NewsItem {
 export interface NewsCardAnalysis {
     titleKo: string;
     bodyKo: string | null;
-    summaryKo: string; // 한 줄 요약
+    summaryKo: string; // single-line summary
     sentiment: NewsSentiment;
     category: NewsCategory;
 }
@@ -1654,7 +1669,6 @@ export interface EarningsCalendarItem {
 export interface EarningsReport {
     symbol: string;
     earningsDate: string;
-    raw: unknown;
 }
 
 /** Named union for the action type on an analyst grade change event. */
