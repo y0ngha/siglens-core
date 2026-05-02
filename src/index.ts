@@ -30,6 +30,24 @@ export { requestChatCompletion } from './application/chat/requestChatCompletion'
 
 export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
+// Fundamental analysis use-cases
+export { cancelFundamentalAnalysisJob } from './application/fundamental/cancelFundamentalAnalysisJob';
+export { pollFundamentalAnalysis } from './application/fundamental/pollFundamentalAnalysis';
+export { submitFundamentalAnalysis } from './application/fundamental/submitFundamentalAnalysis';
+
+// News analysis use-cases
+export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
+export { pollNewsAnalysis } from './application/news/pollNewsAnalysis';
+export { pollNewsCardAnalysis } from './application/news/pollNewsCardAnalysis';
+export { submitNewsAnalysis } from './application/news/submitNewsAnalysis';
+export { submitNewsCardAnalysis } from './application/news/submitNewsCardAnalysis';
+
+// Overall analysis use-cases
+export { cancelOverallAnalysisJob } from './application/overall/cancelOverallAnalysisJob';
+export { pollOverallAnalysis } from './application/overall/pollOverallAnalysis';
+export { resolveOverallDependencies } from './application/overall/dependencyResolver';
+export { submitOverallAnalysis } from './application/overall/submitOverallAnalysis';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -78,7 +96,11 @@ export {
 export { classifyTrend, detectSignals } from './domain/signals';
 
 // Prompt builders
+export { buildFundamentalAnalysisPrompt } from './domain/analysis/fundamentalPrompt';
 export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
+export { buildNewsAnalysisPrompt } from './domain/analysis/newsPrompt';
+export { buildNewsCardAnalysisPrompt } from './domain/analysis/newsCardPrompt';
+export { buildOverallAnalysisPrompt } from './domain/analysis/overallPrompt';
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
@@ -86,6 +108,13 @@ export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
+export { normalizeFundamentalAnalysisResponse } from './domain/analysis/normalizeFundamental';
+export { normalizeFundamentalSnapshot } from './domain/analysis/normalizeFundamentalSnapshot';
+export {
+    normalizeNewsAnalysisResponse,
+    normalizeNewsCardAnalysis,
+} from './domain/analysis/normalizeNews';
+export { normalizeOverallAnalysisResponse } from './domain/analysis/normalizeOverall';
 
 // Model spec helpers
 export {
@@ -237,9 +266,17 @@ export {
     ANALYSIS_CACHE_TTL,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildFundamentalCacheKey,
+    buildNewsCacheKey,
+    buildNewsCardCacheKey,
+    buildOverallCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
+    FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
+    NEWS_CACHE_TTL_SECONDS,
+    NEWS_CARD_CACHE_TTL_SECONDS,
+    OVERALL_CACHE_TTL_SECONDS,
 } from './infrastructure/cache/config';
 export { createCacheProvider } from './infrastructure/cache/redis';
 
@@ -425,12 +462,16 @@ export type {
     UserTierRepository,
 } from './infrastructure/db';
 export type { FmpConfig } from './infrastructure/fmp/types';
+export type {
+    FundamentalDataProvider,
+} from './infrastructure/fundamental/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
     AcquireReanalyzeCooldownResult,
     GetBarsOptions,
     MarketDataProvider,
 } from './infrastructure/market/types';
+export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
 export type { SkillsProvider } from './infrastructure/skills/types';
 
 // Application types
@@ -442,6 +483,11 @@ export type {
     RequestChatCompletionResult,
 } from './application/chat/types';
 export type {
+    PollFundamentalAnalysisResult,
+    SubmitFundamentalAnalysisOptions,
+    SubmitFundamentalAnalysisResult,
+} from './application/fundamental/types';
+export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
@@ -449,6 +495,16 @@ export type {
     TierGateErrorResult,
     TierTimeframeAccessError,
 } from './application/market/types';
+export type {
+    PollNewsAnalysisResult,
+    SubmitNewsAnalysisOptions,
+    SubmitNewsAnalysisResult,
+} from './application/news/types';
+export type {
+    PollOverallAnalysisResult,
+    SubmitOverallAnalysisOptions,
+    SubmitOverallAnalysisResult,
+} from './application/overall/types';
 
 // Domain types
 
@@ -457,6 +513,7 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     AnalysisSignalType,
+    CurrentAnalysisContext,
     BacktestAiAnalysis,
     BacktestAiEntryRecommendation,
     BacktestAiPriceTarget,
@@ -487,7 +544,27 @@ export type {
     CrossDirection,
     DashboardTimeframe,
     DMIResult,
+    EarningsCalendarItem,
+    EarningsReport,
+    EnrichedNewsItem,
     DonchianChannelResult,
+    FundamentalAnalysisResponse,
+    FundamentalCategoryAssessment,
+    FundamentalCategory,
+    FundamentalFutureDirection,
+    FundamentalGrowth,
+    FundamentalHealth,
+    FundamentalPeer,
+    FundamentalProfitability,
+    FundamentalSectorAverages,
+    FundamentalSectorDirection,
+    FundamentalSentiment,
+    FundamentalSnapshot,
+    FundamentalProfile,
+    FundamentalValuation,
+    GradesAction,
+    GradesConsensus,
+    GradesEvent,
     EntryRecommendation,
     FilteredActionRecommendation,
     FilteredAnalysisResponse,
@@ -505,6 +582,11 @@ export type {
     LevelSource,
     MACDResult,
     MarketBriefingResponse,
+    NewsAnalysisResponse,
+    NewsCardAnalysis,
+    NewsCategory,
+    NewsItem,
+    NewsSentiment,
     MarketBriefingSectorAnalysis,
     MarketBriefingVolatilityAnalysis,
     MarketIndexData,
@@ -526,6 +608,11 @@ export type {
     PriceTarget,
     PriceTargets,
     PriceTrend,
+    OverallAnalysisResponse,
+    OverallScenario,
+    OverallScenarioName,
+    PriceTargetConsensus,
+    PriceTargetSummary,
     PromptConfig,
     QuadrantKey,
     RawAnalysisResponse,

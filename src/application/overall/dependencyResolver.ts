@@ -146,7 +146,6 @@ export type DependencyState = DependencyStateCached | DependencyStatePending;
  * ```
  *
  * @see submitOverallAnalysis
- * @internal
  */
 export async function resolveOverallDependencies(
     inputs: OverallDependencyInputs

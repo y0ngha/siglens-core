@@ -156,7 +156,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (12)
+### Tier 1 — Application Entrypoints (24)
 
 | Symbol | Source |
 |---|---|
@@ -172,6 +172,18 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `checkAnalysisLimit` | `application/usage/limits.ts` |
 | `checkChatbotLimit` | `application/usage/limits.ts` |
 | `requestChatCompletion` | `application/chat/requestChatCompletion.ts` |
+| `submitFundamentalAnalysis` | `application/fundamental/submitFundamentalAnalysis.ts` |
+| `pollFundamentalAnalysis` | `application/fundamental/pollFundamentalAnalysis.ts` |
+| `cancelFundamentalAnalysisJob` | `application/fundamental/cancelFundamentalAnalysisJob.ts` |
+| `submitNewsAnalysis` | `application/news/submitNewsAnalysis.ts` |
+| `pollNewsAnalysis` | `application/news/pollNewsAnalysis.ts` |
+| `cancelNewsAnalysisJob` | `application/news/cancelNewsAnalysisJob.ts` |
+| `submitNewsCardAnalysis` | `application/news/submitNewsCardAnalysis.ts` |
+| `pollNewsCardAnalysis` | `application/news/pollNewsCardAnalysis.ts` |
+| `submitOverallAnalysis` | `application/overall/submitOverallAnalysis.ts` |
+| `pollOverallAnalysis` | `application/overall/pollOverallAnalysis.ts` |
+| `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
+| `resolveOverallDependencies` | `application/overall/dependencyResolver.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -182,19 +194,28 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `detectSignals` | `domain/signals/index.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
-**프롬프트 빌더 (3 + 1 상수)**
+**프롬프트 빌더 (7 + 1 상수)**
 | Symbol | Source |
 |---|---|
 | `buildAnalysisPrompt` | `domain/analysis/prompt.ts` |
+| `buildFundamentalAnalysisPrompt` | `domain/analysis/fundamentalPrompt.ts` |
 | `buildMarketBriefingPrompt` | `domain/analysis/marketBriefingPrompt.ts` |
+| `buildNewsAnalysisPrompt` | `domain/analysis/newsPrompt.ts` |
+| `buildNewsCardAnalysisPrompt` | `domain/analysis/newsCardPrompt.ts` |
+| `buildOverallAnalysisPrompt` | `domain/analysis/overallPrompt.ts` |
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
 
-**응답 정규화 (2)**
+**응답 정규화 (6)**
 | Symbol | Source |
 |---|---|
 | `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
 | `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
+| `normalizeFundamentalAnalysisResponse` | `domain/analysis/normalizeFundamental.ts` |
+| `normalizeFundamentalSnapshot` | `domain/analysis/normalizeFundamentalSnapshot.ts` |
+| `normalizeNewsAnalysisResponse` | `domain/analysis/normalizeNews.ts` |
+| `normalizeNewsCardAnalysis` | `domain/analysis/normalizeNews.ts` |
+| `normalizeOverallAnalysisResponse` | `domain/analysis/normalizeOverall.ts` |
 
 **티어 게이트 (Tier gating) (11)**
 | Symbol | Source |
@@ -230,15 +251,23 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 3 — Infrastructure Factories & Config
 
-**캐시 (1 factory + 6 helper/const)**
+**캐시 (1 factory + 13 helper/const)**
 | Symbol | Source |
 |---|---|
 | `createCacheProvider` | `infrastructure/cache/redis.ts` |
 | `ANALYSIS_CACHE_TTL` | `infrastructure/cache/config.ts` |
 | `MARKET_BRIEFING_CACHE_TTL` | `infrastructure/cache/config.ts` |
+| `FUNDAMENTAL_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
+| `NEWS_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
+| `NEWS_CARD_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
+| `OVERALL_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
 | `CACHE_EXPIRY_HOUR_KST` | `infrastructure/cache/config.ts` |
 | `buildAnalysisCacheKey` | `infrastructure/cache/config.ts` |
 | `buildBriefingCacheKey` | `infrastructure/cache/config.ts` |
+| `buildFundamentalCacheKey` | `infrastructure/cache/config.ts` |
+| `buildNewsCacheKey` | `infrastructure/cache/config.ts` |
+| `buildNewsCardCacheKey` | `infrastructure/cache/config.ts` |
+| `buildOverallCacheKey` | `infrastructure/cache/config.ts` |
 | `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
 
 > 티커 관련 캐시 키 — `TICKER_SEARCH_CACHE_TTL`, `ASSET_INFO_CACHE_TTL_WITH_KOREAN`,
@@ -293,7 +322,23 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 4 — Types & Constants
 
-**도메인 타입** (대시보드/지표/신호/분석/캔들/추세선/티어 설정 타입 일체) — `domain/types.ts`에서 일괄 export. (티커 타입은 Phase 4에서 siglens로 이전)
+**도메인 타입** (대시보드/지표/신호/분석/캔들/추세선/티어 설정 타입 일체 + 펀더멘털/뉴스/종합 분석 타입) — `domain/types.ts`에서 일괄 export. (티커 타입은 Phase 4에서 siglens로 이전)
+
+새로 추가된 도메인 타입:
+- `CurrentAnalysisContext` — 챗봇 시스템 프롬프트에 주입되는 현재 분석 컨텍스트 tagged union (Task 1.17).
+- 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalSnapshot`, `FundamentalProfile`, `FundamentalValuation`, `FundamentalSectorAverages`, `FundamentalPeer`, `FundamentalProfitability`, `FundamentalGrowth`, `FundamentalHealth`, `FundamentalFutureDirection`, `GradesConsensus`, `GradesEvent`, `GradesAction`, `PriceTargetConsensus`, `PriceTargetSummary`, `FundamentalSectorDirection`, `SectorHistoricalPoint`.
+- 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
+- 종합: `OverallAnalysisResponse`, `OverallScenario`, `OverallScenarioName`.
+
+새로 추가된 Provider 인터페이스:
+- `FundamentalDataProvider` — `infrastructure/fundamental/types.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
+- `NewsProvider` — `infrastructure/news/types.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
+- `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
+
+새로 추가된 use-case option/result 타입:
+- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `PollFundamentalAnalysisResult`.
+- 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `PollNewsAnalysisResult`.
+- 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `PollOverallAnalysisResult`.
 
 **인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), `BackgroundTaskOptions`, 채팅 application 타입.
 
@@ -428,3 +473,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 |---|---|
 | 2026-04-26 | 최초 작성 — Tier 정의, 인벤토리, 워크플로우, 버전 정책. |
 | 2026-05-02 | Phase 0~6 완료. 인증/OAuth/이메일/문의/BYOK/Tier CRUD/한국어 티커/Drizzle·Neon DB/Gemini SDK 어댑터가 모두 siglens로 이전됨. core는 분석 도메인 + 분석 직결 infrastructure + Skills + 추상 repository 인터페이스만 보유. |
+| 2026-05-02 | Task 1.17~1.18: 펀더멘털/뉴스/종합 분석 use-case 12종 + 프롬프트 빌더 4종 + 정규화 함수 5종 + 캐시 키/TTL 7종 + Provider 인터페이스 2종 + 도메인 타입 30여종 public export 추가. `buildChatPrompt`에 `currentAnalysisContext` 파라미터 추가 (`CurrentAnalysisContext` tagged union). |
