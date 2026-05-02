@@ -56,11 +56,6 @@
 - Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`
 
 ## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
-- Violation: Drizzle `onConflictDoUpdate` set clauses referenced target table columns instead of inserted row values
-- Rule: DB upsert semantics — conflict updates must use the `excluded` row when replacing existing values
-- Context: `DrizzleKoreanTickerRepository.upsertMany` and `DrizzleAssetTranslationRepository.upsert` now update rows from `excluded.*` values instead of preserving existing column values
-
-## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
 - Violation: Redis cache update used read-modify-write merge after DB upsert, allowing concurrent writes to overwrite each other
 - Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
 - Context: `setKoreanTickers` now deletes `korean:tickers` after successful DB upsert so the next read rebuilds cache from the database
@@ -110,11 +105,6 @@
 - Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
 - Context: `tier.ts`의 `getAllowedModels`는 `enableTierRestrictions: false`일 때만 `.toSorted()`를 적용했으나, `true`일 때도 동일한 안정 순서를 보장해야 함
 
-## [PR #68 | feat/58/llm-api-key-storage | 2026-05-01]
-- Violation: `onConflictDoUpdate` SET 절에 `updatedAt` 누락
-- Rule: Drizzle ORM `$onUpdateFn`은 `db.update().set()` 호출에만 자동 적용됨; `insert().onConflictDoUpdate()`의 conflict resolution SET 절에는 적용되지 않으므로 명시적으로 `updatedAt: sql\`now()\``을 포함해야 함
-- Context: `src/infrastructure/db/userApiKeyRepository.ts` `upsert` 메서드의 conflict 경로에서 기존 키 교체 시 `updated_at` 컬럼이 갱신되지 않는 버그
-
 ## [PR #65 Round 6 | feat/60/AI-모델-티어-확대 | 2026-05-02]
 - Violation: 폴백 경로 호환성 테스트가 호출 사실만 검증하고 새 필드명(`primaryApiKey`/`fallbackApiKey`)이 실제로 전달되는지 검증하지 않음
 - Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
@@ -152,3 +142,25 @@
 - Violation: src/infrastructure/CLAUDE.md sub-directory table fell out of sync with src/infrastructure/usage/ directory addition
 - Rule: MISTAKES.md Documentation Sync — agent guides must reflect actual directory structure
 - Context: Phase 0 added infrastructure/usage/hash.ts (extracted from db/usageRepository.ts) but did not add the new directory to the sub-directory table.
+
+
+## [PR #71 | refactor/model-specs-consolidation | 2026-05-02]
+- Violation: Shared domain types (`ModelSpec`, `AIProvider`, `ActiveModelId`) were defined inside `domain/analysis/modelSpecs.ts` instead of `domain/types.ts`
+- Rule: ARCHITECTURE Mistake #1 / domain/CLAUDE.md — shared domain types must live in `domain/types.ts`
+- Context: Initial implementation co-located the new `ModelSpec` type with the spec map; review caught it and the types were moved to `domain/types.ts` with `modelSpecs.ts` importing them via `@/domain/types`.
+
+- Violation: `getThinkingBudgetSequence` used `reduce + spread` accumulator pattern (O(N²))
+- Rule: MISTAKES.md #14.5 — `[...acc, x]` inside reduce/flatMap causes O(N²); use `for + push` into a local mutable array
+- Context: Fallback-budget de-duplication loop replaced with `const result: number[] = []; for (...) result.push(...)` per the documented domain-layer performance exception.
+
+- Violation: Tier 2 public functions had single-line JSDoc only (description without `@param`/`@returns`)
+- Rule: CONVENTIONS.md JSDoc Rules — Tier 2 requires description + `@param` + `@returns`
+- Context: `getProvider`, `getThinkingBudgetSequence`, and the three `is*Model` predicates were converted to multi-line JSDoc with full param/return documentation.
+
+- Violation: JSDoc referenced a specific consumer (`siglens-worker`) by name
+- Rule: CONVENTIONS.md JSDoc Don'ts — write timeless docs; don't tie comments to a specific caller
+- Context: "Consumed by `siglens-worker`" / "siglens-worker reads this map" rewrote to provider-neutral "AI SDK callers (workers, server actions, UI)".
+
+- Violation: Provider predicates returned plain `boolean` instead of TypeScript type predicates
+- Rule: CONVENTIONS.md / typescript-advanced-types — narrow when the runtime check carries type information
+- Context: `isClaudeModel` / `isGeminiModel` / `isChatGPTModel` converted to `model is ClaudeModelId` etc. with derived subset types so callers can narrow `ActiveModelId` at the type level.

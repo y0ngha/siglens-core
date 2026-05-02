@@ -1,57 +1,16 @@
-import type { TierModel } from '@/domain/types';
-
-/**
- * Deprecated AI model identifiers retained in {@link TierModel} for
- * backward-compatibility with consumers that still reference the older labels.
- * Active SDK call configuration ({@link MODEL_SPECS}) is keyed by
- * {@link ActiveModelId} so deprecated identifiers are intentionally excluded.
- */
-type DeprecatedModelId = 'claude-sonnet-4' | 'claude-opus-4';
-
-/**
- * Active AI model identifiers — the subset of {@link TierModel} that
- * `siglens-worker` actually invokes. Deprecated aliases are filtered out.
- */
-export type ActiveModelId = Exclude<TierModel, DeprecatedModelId>;
-
-/** AI provider that hosts a model. */
-export type AIProvider = 'claude' | 'gemini' | 'chatgpt';
-
-/**
- * Per-model SDK call parameters.
- *
- * Single source of truth for everything a worker / SDK adapter needs to call
- * the model — provider routing, output limits, thinking budget, sampling
- * parameters. `siglens-worker` reads this map; new model additions add a row
- * here and the worker picks them up after the next core publish.
- */
-export interface ModelSpec {
-    /** Provider that hosts the model (drives SDK selection). */
-    provider: AIProvider;
-    /** Provider-side max output tokens cap. */
-    maxOutputTokens: number;
-    /**
-     * Initial thinking budget. `0` means the model does not support thinking
-     * (e.g. `claude-haiku-3-5`, GPT-5 series).
-     */
-    thinkingBudget: number;
-    /** Sampling temperature. */
-    temperature: number;
-    /** Top-p nucleus sampling parameter. */
-    topP: number;
-}
+import type { ActiveModelId, AIProvider, ModelSpec } from '@/domain/types';
 
 /**
  * Per-model AI SDK call parameters keyed by {@link ActiveModelId}.
  *
- * Consumed by `siglens-worker` as the single source of truth for SDK
- * invocation. Adding a new model is a one-row change here followed by a core
- * publish — the worker picks it up automatically.
+ * Single source of truth for AI SDK callers (workers, server actions, UI).
+ * Adding a new model is a one-row change here followed by a core publish — all
+ * downstream callers pick it up automatically on upgrade.
  *
  * Notes:
  * - Claude `maxOutputTokens` follow Anthropic SDK 0.92.0 caps
  *   (haiku-3-5: 8K, sonnet-4-6 / opus-4-7: 128K).
- * - All Gemini models share `maxOutputTokens: 65_536` per existing worker policy.
+ * - All Gemini models share `maxOutputTokens: 65_536` per existing policy.
  * - GPT-5 series use 128K max output tokens.
  * - `thinkingBudget: 0` indicates the model does not support thinking.
  */
@@ -149,6 +108,9 @@ export const DISABLED_THINKING_BUDGET = 0;
  * possible before falling into the standard candidates. Entries that are
  * greater than or equal to the previous accepted value are skipped, so
  * duplicates and non-decreasing values never appear in the result.
+ *
+ * @param initial - Initial thinking budget (in tokens) to derive the sequence from.
+ * @returns Strictly-decreasing sequence of thinking budgets, ending at `0`.
  */
 export function getThinkingBudgetSequence(initial: number): readonly number[] {
     const candidates = [
@@ -158,30 +120,75 @@ export function getThinkingBudgetSequence(initial: number): readonly number[] {
         ...THINKING_BUDGET_FALLBACK_STEPS,
         DISABLED_THINKING_BUDGET,
     ];
-    return candidates.reduce<number[]>((acc, budget) => {
-        if (acc.length === 0 || budget < acc[acc.length - 1]) {
-            return [...acc, budget];
+    const result: number[] = [];
+    for (const budget of candidates) {
+        if (result.length === 0 || budget < result[result.length - 1]) {
+            result.push(budget);
         }
-        return acc;
-    }, []);
+    }
+    return result;
 }
 
-/** Resolve the hosting provider for an active model identifier. */
+/**
+ * Resolve the hosting provider for an active model identifier.
+ *
+ * @param model - Active model identifier to look up.
+ * @returns The {@link AIProvider} that hosts the given model.
+ */
 export function getProvider(model: ActiveModelId): AIProvider {
     return MODEL_SPECS[model].provider;
 }
 
-/** Returns true when the model is hosted on Claude. */
-export function isClaudeModel(model: ActiveModelId): boolean {
+/** Active model identifiers hosted on Claude (Anthropic). */
+export type ClaudeModelId = {
+    [K in ActiveModelId]: (typeof MODEL_SPECS)[K]['provider'] extends 'claude'
+        ? K
+        : never;
+}[ActiveModelId];
+
+/** Active model identifiers hosted on Gemini (Google). */
+export type GeminiModelId = {
+    [K in ActiveModelId]: (typeof MODEL_SPECS)[K]['provider'] extends 'gemini'
+        ? K
+        : never;
+}[ActiveModelId];
+
+/** Active model identifiers hosted on ChatGPT (OpenAI). */
+export type ChatGPTModelId = {
+    [K in ActiveModelId]: (typeof MODEL_SPECS)[K]['provider'] extends 'chatgpt'
+        ? K
+        : never;
+}[ActiveModelId];
+
+/**
+ * Type predicate that narrows the model to the Claude-hosted subset.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `true` (narrowing to {@link ClaudeModelId}) when
+ *   `MODEL_SPECS[model].provider === 'claude'`.
+ */
+export function isClaudeModel(model: ActiveModelId): model is ClaudeModelId {
     return MODEL_SPECS[model].provider === 'claude';
 }
 
-/** Returns true when the model is hosted on Gemini. */
-export function isGeminiModel(model: ActiveModelId): boolean {
+/**
+ * Type predicate that narrows the model to the Gemini-hosted subset.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `true` (narrowing to {@link GeminiModelId}) when
+ *   `MODEL_SPECS[model].provider === 'gemini'`.
+ */
+export function isGeminiModel(model: ActiveModelId): model is GeminiModelId {
     return MODEL_SPECS[model].provider === 'gemini';
 }
 
-/** Returns true when the model is hosted on ChatGPT (OpenAI). */
-export function isChatGPTModel(model: ActiveModelId): boolean {
+/**
+ * Type predicate that narrows the model to the ChatGPT-hosted subset.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `true` (narrowing to {@link ChatGPTModelId}) when
+ *   `MODEL_SPECS[model].provider === 'chatgpt'`.
+ */
+export function isChatGPTModel(model: ActiveModelId): model is ChatGPTModelId {
     return MODEL_SPECS[model].provider === 'chatgpt';
 }

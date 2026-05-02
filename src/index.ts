@@ -295,10 +295,11 @@ export {
     MODEL_SPECS,
     THINKING_BUDGET_FALLBACK_STEPS,
 } from './domain/analysis/modelSpecs';
+export type { ActiveModelId, AIProvider, ModelSpec } from './domain/types';
 export type {
-    ActiveModelId,
-    AIProvider,
-    ModelSpec,
+    ChatGPTModelId,
+    ClaudeModelId,
+    GeminiModelId,
 } from './domain/analysis/modelSpecs';
 
 // Dashboard tickers / sectors

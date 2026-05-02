@@ -1123,6 +1123,33 @@ export type TierInfoDepth =
     | 'target'
     | 'confidence';
 
+/** AI provider that hosts a model. */
+export type AIProvider = 'claude' | 'gemini' | 'chatgpt';
+
+/**
+ * Per-model SDK call parameters.
+ *
+ * Single source of truth for everything an AI SDK caller (workers, server
+ * actions, UI) needs to invoke the model — provider routing, output limits,
+ * thinking budget, sampling parameters. New model additions add a row to the
+ * spec map and downstream callers pick them up automatically.
+ */
+export interface ModelSpec {
+    /** Provider that hosts the model (drives SDK selection). */
+    provider: AIProvider;
+    /** Provider-side max output tokens cap. */
+    maxOutputTokens: number;
+    /**
+     * Initial thinking budget. `0` means the model does not support thinking
+     * (e.g. `claude-haiku-3-5`, GPT-5 series).
+     */
+    thinkingBudget: number;
+    /** Sampling temperature. */
+    temperature: number;
+    /** Top-p nucleus sampling parameter. */
+    topP: number;
+}
+
 /** AI model identifiers allowed by tier gating. */
 export type TierModel =
     | 'gemini-2.5-flash'
@@ -1140,6 +1167,20 @@ export type TierModel =
     | 'claude-sonnet-4'
     /** @deprecated Use `claude-opus-4-7` instead. Will be removed in the next major version. */
     | 'claude-opus-4';
+
+/**
+ * Deprecated AI model identifiers retained in {@link TierModel} for
+ * backward-compatibility with consumers that still reference the older labels.
+ * Active SDK call configuration is keyed by {@link ActiveModelId} so deprecated
+ * identifiers are intentionally excluded.
+ */
+type DeprecatedModelId = 'claude-sonnet-4' | 'claude-opus-4';
+
+/**
+ * Active AI model identifiers — the subset of {@link TierModel} that AI SDK
+ * callers actually invoke. Deprecated aliases are filtered out.
+ */
+export type ActiveModelId = Exclude<TierModel, DeprecatedModelId>;
 
 /** Public model identifier used by tier model access helpers. */
 export type ModelId = TierModel;

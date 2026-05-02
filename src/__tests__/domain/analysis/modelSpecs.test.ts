@@ -1,15 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
     DISABLED_THINKING_BUDGET,
-    MODEL_SPECS,
-    THINKING_BUDGET_FALLBACK_STEPS,
     getProvider,
     getThinkingBudgetSequence,
     isChatGPTModel,
     isClaudeModel,
     isGeminiModel,
+    MODEL_SPECS,
+    THINKING_BUDGET_FALLBACK_STEPS,
+    type ChatGPTModelId,
+    type ClaudeModelId,
+    type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
-import type { ActiveModelId } from '@/domain/analysis/modelSpecs';
+import type { ActiveModelId } from '@/domain/types';
 
 describe('MODEL_SPECS', () => {
     it('covers every active model identifier exactly once', () => {
@@ -121,6 +124,38 @@ describe('provider type guards', () => {
         expect(isChatGPTModel('gpt-5.5')).toBe(true);
         expect(isChatGPTModel('claude-sonnet-4-6')).toBe(false);
         expect(isChatGPTModel('gemini-3-flash-preview')).toBe(false);
+    });
+
+    it('isClaudeModel narrows ActiveModelId to ClaudeModelId at the type level', () => {
+        const model = 'claude-opus-4-7' as ActiveModelId;
+        if (isClaudeModel(model)) {
+            // Compile-time assertion: narrowed identifier assigns to the
+            // Claude-only subset without a cast.
+            const narrowed: ClaudeModelId = model;
+            expect(MODEL_SPECS[narrowed].provider).toBe('claude');
+        } else {
+            throw new Error('expected claude-opus-4-7 to narrow to Claude');
+        }
+    });
+
+    it('isGeminiModel narrows ActiveModelId to GeminiModelId at the type level', () => {
+        const model = 'gemini-2.5-pro' as ActiveModelId;
+        if (isGeminiModel(model)) {
+            const narrowed: GeminiModelId = model;
+            expect(MODEL_SPECS[narrowed].provider).toBe('gemini');
+        } else {
+            throw new Error('expected gemini-2.5-pro to narrow to Gemini');
+        }
+    });
+
+    it('isChatGPTModel narrows ActiveModelId to ChatGPTModelId at the type level', () => {
+        const model = 'gpt-5.5' as ActiveModelId;
+        if (isChatGPTModel(model)) {
+            const narrowed: ChatGPTModelId = model;
+            expect(MODEL_SPECS[narrowed].provider).toBe('chatgpt');
+        } else {
+            throw new Error('expected gpt-5.5 to narrow to ChatGPT');
+        }
     });
 });
 
