@@ -1,6 +1,9 @@
 import type { ModelId, Tier } from '@/domain/types';
 
 /**
+ * @deprecated Use {@link Tier} directly.
+ * Kept as a backward-compatible alias; the canonical type is {@link Tier} in `domain/types.ts`.
+ *
  * Subscription tier persisted on user records. Mirrors the `Tier` union from
  * `domain/types.ts` so consumers can reference either name interchangeably.
  */
@@ -81,17 +84,53 @@ export interface UsageCounts {
 
 /** Persistence operations required by tier-gating use-cases. */
 export interface UserTierRepository {
+    /**
+     * Find the tier currently assigned to a user.
+     *
+     * @param userId - User UUID to look up.
+     * @returns The persisted tier, or null when the user does not exist.
+     */
     getUserTier(userId: string): Promise<Tier | null>;
+
+    /**
+     * Manually update a user's tier.
+     *
+     * @param userId - User UUID to update.
+     * @param tier - New tier to persist.
+     * @returns The updated tier, or null when the user does not exist.
+     */
     updateUserTier(userId: string, tier: Tier): Promise<Tier | null>;
 }
 
 /** Persistence operations for request usage accounting. */
 export interface UsageLogRepository {
+    /**
+     * Append a single usage log entry.
+     *
+     * @param input - Usage log payload (user, IP hash, action type, model, date bucket).
+     * @returns Resolves when the row has been persisted.
+     */
     recordUsage(input: CreateUsageLogInput): Promise<void>;
 }
 
 /** Persistence operations required by usage tracking and analytics. */
 export interface UsageRepository {
+    /**
+     * Record one analysis or chatbot usage event.
+     *
+     * The raw IP from `input.ipAddress` is hashed inside the implementation and is never persisted.
+     *
+     * @param input - Event payload including authenticated user (or null), raw IP, action type, model, and optional timestamp.
+     * @returns The persisted usage log record with generated id, hashed IP, and UTC date bucket.
+     */
     recordUsage(input: RecordUsageInput): Promise<UsageLogRecord>;
+
+    /**
+     * Aggregate today's usage counts for a given hashed IP.
+     *
+     * @param ipHash - SHA-256 IP hash used as the daily aggregation key.
+     * @param now - Optional reference timestamp; defaults to the current time. Useful for tests.
+     * @returns Per-action usage counts for the UTC day containing `now`.
+     */
     getUsageToday(ipHash: string, now?: Date): Promise<UsageCounts>;
 }

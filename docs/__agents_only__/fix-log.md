@@ -137,3 +137,12 @@
 - Rule: MISTAKES.md "Public API & Module Exports #3" — 0.x semver에서 BREAKING은 minor bump
 - Context: 0.4.0 → 0.5.0 미반영, CHANGELOG에 신규 BREAKING/Phase 0~7 섹션 부재 (요약된 새 entry 추가)
 
+
+## [PR #70 round 2 | refactor/scope-realignment-phase-0 | 2026-05-02]
+- Violation: Tier 4 public repository interface 메서드에서 per-method JSDoc(`@param`/`@returns`) 누락
+- Rule: CONVENTIONS.md Tier 4 — public 인터페이스는 type-level description + per-field/per-method 한 줄 문서 + `@param`/`@returns` 필수
+- Context: `infrastructure/db/types.ts`의 `UserTierRepository.getUserTier/updateUserTier`, `UsageLogRepository.recordUsage`, `UsageRepository.recordUsage/getUsageToday` 메서드가 인터페이스-레벨 설명만 있고 메서드 본문 JSDoc이 없어 Tier 4 계약을 충족하지 못함
+
+- Violation: 대규모 ejection 이후 `docs/API.md`가 옛 외부 의존성(Neon/Drizzle/Auth/Email/OAuth/BYOK/Ticker/Gemini SDK)과 옛 환경변수(DATABASE_URL, OAUTH_TOKEN_ENCRYPTION_KEY, LLM_API_KEY_ENCRYPTION_KEY 등) 문서를 그대로 보존
+- Rule: CONVENTIONS.md / FF — Predictability. 코드와 docs가 어긋나면 consumer가 잘못된 환경변수를 설정하거나 존재하지 않는 모듈을 기대하게 됨
+- Context: Phase 6에서 `@neondatabase/serverless`, `drizzle-orm`, `@google/genai` peerDependency가 제거되고 db/auth/email/oauth/ticker/byok 모듈이 모두 ejection되었으나 API.md는 갱신되지 않아 코어가 직접 호출하는 서비스(Upstash, Worker, Market Data config reader)만 남도록 재작성
