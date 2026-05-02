@@ -203,6 +203,9 @@ export {
 } from './domain/analysis/normalizePrimitives';
 export { extendTrendline } from './domain/analysis/trendline';
 
+// LLM provider mapping
+export { getProviderForModel } from './domain/llm/providers';
+
 // Tier gating
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
@@ -285,6 +288,9 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// LLM provider constants
+export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
@@ -445,6 +451,7 @@ export type {
 } from './application/market/types';
 
 // Domain types
+
 export type {
     ActionRecommendation,
     AnalysisResponse,
@@ -580,6 +587,7 @@ export type {
     TrendlinePoint,
     TrendState,
     UserTierContext,
+    LlmProvider,
     ValidatedActionPrices,
     VolumeProfileResult,
     VolumeProfileRow,

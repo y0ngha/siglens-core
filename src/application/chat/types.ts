@@ -17,7 +17,8 @@ export type ChatErrorCode =
     | 'model_not_allowed'
     | 'rate_limited'
     | 'server_error'
-    | 'server_busy';
+    | 'server_busy'
+    | 'user_api_key_required';
 
 export interface RequestChatCompletionParams {
     symbol: string;
@@ -27,7 +28,20 @@ export interface RequestChatCompletionParams {
     userMessage: string;
     clientIp: string;
     model?: ModelId;
+    /**
+     * Server-owned API key for all AI provider calls.
+     * When `paidApiKey` is also present, this key is the **primary** credential
+     * and `paidApiKey` is the fallback. For `'pro'`-tier users (who do not
+     * supply a `paidApiKey`), this is the sole credential forwarded to the AI
+     * provider.
+     */
     freeApiKey?: string;
+    /**
+     * User-registered API key. Must be provided when a non-`'pro'`-tier user
+     * requests a premium model. Omitting it in that case returns
+     * `user_api_key_required`. `'pro'`-tier users are exempt — the server
+     * covers all models via `freeApiKey` and never requires a personal key.
+     */
     paidApiKey?: string;
     occurredAt?: Date;
     tierContext?: UserTierContext;

@@ -491,6 +491,14 @@ and have been removed from this file.
    → Persisted token state (Redis, cache) must validate before use, producing consistent invalid-token result as other bad inputs
    ❌ safeCompareTokenHashes accepts non-hex 64-char string, throws during timingSafeEqual
    ✅ Validate format (hex check, length) before comparison; return false/invalid on format error
+
+9. Optional JSDoc fields mislabeled with "Required" in JSDoc when the type is optional (?)
+   → Optional fields must use conditional language in JSDoc: "Must be provided when..." instead of "Required"
+   ❌ userApiKey?: string with JSDoc "Required for..." — type says optional but doc says required
+   ❌ paidApiKey?: string with JSDoc "Required for non-'pro'-tier users..." — contradicts optional type marker
+   ✅ userApiKey?: string with JSDoc "Must be provided when using user-managed models"
+   ✅ paidApiKey?: string with JSDoc "Must be provided when tier is not 'pro'"
+   → Clarifies that the field is optional at the type level but required under specific conditions
 ```
 
 ---
@@ -519,6 +527,15 @@ and have been removed from this file.
 5. Repeated literal values in the same module across multiple locations
    → Extract to a named constant; prevents silent divergence when updating
    → Applies to descriptions, messages, configuration values, and metadata strings
+
+6. Dead code and orphaned files left behind after module refactoring
+   → When code is ejected or refactored out, ALL related files and exports must be removed together
+   → Orphaned type files (types.ts) or unnecessary helper exports left in place cause ambiguity and waste maintenance effort
+   ❌ email/, oauth/ modules ejected but types.ts files left behind with no consumers
+   ❌ Single-file utility function exported from module even though only that one file imports it
+   ✅ Remove type files when consumers of those types are deleted
+   ✅ Don't export file-private helpers; keep them internal with no export keyword
+   → Also audit and remove unnecessary re-exports from public API and module barrels after refactoring
 ```
 
 ---

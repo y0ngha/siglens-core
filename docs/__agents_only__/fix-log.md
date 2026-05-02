@@ -85,42 +85,12 @@
 - Rule: Auth use-cases must target the credential type they operate on, not any account with a matching email
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
 
-## [PR #49 Round 6 | feat/10-11/usage-limit-gates | 2026-04-30]
-- Violation: Two sibling repository interfaces in the same test shared a single `vi.fn()` mock for their `recordUsage` method
-- Rule: Test isolation — each repository stub must have an independent mock so `toHaveBeenCalledTimes` and `toHaveBeenCalledWith` assertions target exactly the correct dependency
-- Context: `usageRepository.recordUsage` and `usageLogs.recordUsage` in `requestChatCompletion.test.ts` shared one `recordUsage` fn; calls from either stub incremented the same counter, potentially causing assertion interference when both stubs are provided to the function under test.
 
 ## [Issue #59 | feat/59/분석-캐시-키에-모델-식별자-포함 | 2026-05-01]
 - Violation: Module-level `const` declaration placed inside the import block (between two `import` statements)
 - Rule: FF 1-G (Readability) — all import statements must precede any declarations; interspersing const inside imports creates a viewpoint shift
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
 
-## [PR #65 Round 2 | feat/60/AI-모델-티어-확대 | 2026-05-01]
-- Violation: `getAllowedModels`가 `enableTierRestrictions: true`일 때 결과를 정렬하지 않음
-- Rule: MISTAKES.md Predictability #7 — Public helper return ordering must be stable; sort with toSorted() before returning
-- Context: `tier.ts`의 `getAllowedModels`는 `enableTierRestrictions: false`일 때만 `.toSorted()`를 적용했으나, `true`일 때도 동일한 안정 순서를 보장해야 함
-
-## [PR #65 Round 6 | feat/60/AI-모델-티어-확대 | 2026-05-02]
-- Violation: 폴백 경로 호환성 테스트가 호출 사실만 검증하고 새 필드명(`primaryApiKey`/`fallbackApiKey`)이 실제로 전달되는지 검증하지 않음
-- Rule: deprecated alias 폴백 테스트는 단순 호출 검증을 넘어 새 인터페이스의 전달값까지 단언해야 회귀를 잡음
-- Context: `requestChatCompletion.test.ts`의 `falls back to deprecated callGemini` 케이스에 `expect.objectContaining({ primaryApiKey, fallbackApiKey, model })` 단언 추가
-
-## [PR #70 | refactor/scope-realignment-phase-0 | 2026-05-02]
-- Violation: orphaned `types.ts` 파일이 ejection 후에도 `infrastructure/email/`, `infrastructure/oauth/` 디렉토리에 남아 있음
-- Rule: FF — Cohesion. consumer가 모두 제거된 모듈은 함께 삭제해야 dead code 누적을 막을 수 있음
-- Context: Phase 1에서 `email/{redis,index}.ts`, `oauth/{revoker,google,kakao}.ts`가 모두 ejection되었으나 type 파일만 남아 어떤 코드도 import하지 않는 상태였음
-
-- Violation: 단일 파일 내부에서만 사용되는 헬퍼 `toUtcDateString`이 `export` 되어 모듈 surface area를 불필요하게 넓힘
-- Rule: FF — Coupling. file-private helper는 모듈 외부에 노출하지 않아 의도치 않은 의존성을 차단
-- Context: `infrastructure/usage/hash.ts`의 `toUtcDateString`은 같은 파일의 `hashUsageIp`만 사용; export 제거 + JSDoc에 file-private 명시
-
-- Violation: schema enum과 손으로 동기화해야 하는 union 타입에 sync 의무 표기가 없음
-- Rule: FF — Predictability. consumer가 변경 의무를 추적할 수 있도록 hand-written 동기화 union에는 `@internal-sync` 같은 명시적 contract가 필요
-- Context: `infrastructure/db/types.ts`의 `UsageActionType`은 siglens 측 `USAGE_ACTION_TYPE_VALUES` enum과 동기화돼야 하지만 코드에 표시가 없었음
-
-- Violation: BREAKING change PR임에도 `package.json` `version` 및 `CHANGELOG.md`에 0.x 마이너 bump가 누락됨
-- Rule: MISTAKES.md "Public API & Module Exports #3" — 0.x semver에서 BREAKING은 minor bump
-- Context: 0.4.0 → 0.5.0 미반영, CHANGELOG에 신규 BREAKING/Phase 0~7 섹션 부재 (요약된 새 entry 추가)
 
 
 
@@ -138,16 +108,26 @@
 - Context: `isClaudeModel` / `isGeminiModel` / `isChatGPTModel` converted to `model is ClaudeModelId` etc. with derived subset types so callers can narrow `ActiveModelId` at the type level.
 
 
-## [Issue #69 | feat/69/submitAnalysis-model-userApiKey | 2026-05-02]
-- Violation: 기존 메인 제출 테스트가 `objectContaining`으로 외부 객체를 감싸면서 내부 `headers` 필드는 plain equality로 단언해 assertion 일관성 문제 발생
-- Rule: MISTAKES.md Tests rule 6 — 각 it()은 단 하나의 고유 동작만 테스트해야 하며 단언 방식이 내/외부에서 충돌하면 false negative 위험이 생김
-- Context: `submitAnalysis.test.ts`의 "fetchBarsWithIndicators를 호출하고..." 테스트에서 headers 단언을 `expect.objectContaining`으로 통일하고 body.model 단언도 추가
-
-- Violation: `userApiKey?: string` 필드의 JSDoc에 "Required when..." 표현 사용 — 타입은 optional인데 required로 오해할 소지
-- Rule: FF Predictability — optional 필드의 JSDoc은 조건부 의무를 명확히 기술해야 하며 "Required"는 non-optional 필드에만 사용
-- Context: `SubmitAnalysisOptions.userApiKey` JSDoc을 "Must be provided when..." 형식으로 수정해 user-managed 모델 사용 시의 책임을 명확화
-
 ## [PR #71 round 3 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Test comment "8192 deduped" did not accurately describe the algorithm — the value is skipped because it is `>=` the previous accepted entry, not because of exact-duplicate deduplication
 - Rule: CONVENTIONS.md / FF.md Readability — comments must accurately reflect the underlying logic
 - Context: First `getThinkingBudgetSequence` test comment rewrote to "8192 skipped, >= previous" to match the `if (result.length === 0 || budget < result[result.length - 1])` non-decreasing-skip rule.
+
+## [PR #74 Round 2 | main | 2026-05-02]
+- Violation: Two separate import blocks from the same `@/domain/types` specifier in `domain/llm/providers.ts`
+- Rule: MISTAKES.md TypeScript #3.5 — multiple import blocks from the same module must be merged into one
+- Context: `LlmProvider` was added in a separate import block from the existing `AIProvider, ActiveModelId, ModelId` block after the B3 fix moved the type to `domain/types`
+
+- Violation: `isPremiumChatModel(model, tierConfig)` called twice in `requestChatCompletion` — once in the guard block and once in `shouldRecordPremiumUsage`
+- Rule: MISTAKES.md Coding Paradigm #2 — identical values computed multiple times must be extracted to a const
+- Context: `model` and `tierConfig` are immutable within the function; hoisted to `const isPremium` before the guard block
+
+## [PR #74 | feat/73/chat-provider-mapping-user-api-key-error | 2026-05-02]
+- Violation: Tier 4 상수 `LLM_PROVIDER_VALUES`가 `src/index.ts`, `src/index.client.ts`의 Tier 2 섹션에 export됨
+- Rule: ARCHITECTURE.md — Tier 분리 원칙; 런타임 상수 배열은 Tier 4 섹션에 위치해야 함
+- Context: LLM 모듈 추가 시 `getProviderForModel`(Tier 2)과 `LLM_PROVIDER_VALUES`(Tier 4)를 같은 export 블록에 묶어 Tier 2 섹션에 배치함
+
+## [PR #74 Round 4 | feat/73/chat-provider-mapping-user-api-key-error | 2026-05-02]
+- Violation: domain 테스트(`src/__tests__/domain/llm/providers.test.ts`)에서 application 레이어 상수(`@/application/chat/constants`) import
+- Rule: ARCHITECTURE.md — domain은 application에서 import 금지 (ESLint 강제); 동일 규칙이 domain 테스트에도 적용됨
+- Context: S1 Suggestion을 반영하면서 `GEMINI_2_5_FLASH_MODEL`을 application 레이어에서 import했으나, domain 테스트는 application 레이어 심볼에 의존해서는 안 됨

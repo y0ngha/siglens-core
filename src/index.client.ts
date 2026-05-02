@@ -61,6 +61,9 @@ export {
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 
+// LLM provider mapping
+export { getProviderForModel } from './domain/llm/providers';
+
 // Tier gating
 export {
     DEFAULT_TIER,
@@ -206,6 +209,9 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// LLM provider constants
+export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Dashboard tickers / sectors
 export {
@@ -477,5 +483,6 @@ export type {
     BacktestAiEntryRecommendation,
     BacktestAiAnalysis,
     BacktestData,
+    LlmProvider,
     WaitUntil,
 } from './domain/types';
