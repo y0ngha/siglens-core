@@ -38,6 +38,7 @@ function requireNewsSentiment(value: unknown, field: string): NewsSentiment {
                 `Expected one of: ${VALID_NEWS_SENTIMENTS.join(', ')}`
         );
     }
+    // .includes() guard above guarantees value is a valid NewsSentiment at runtime
     return value as NewsSentiment;
 }
 
@@ -55,6 +56,7 @@ function requireNewsCategory(value: unknown, field: string): NewsCategory {
                 `Expected one of: ${VALID_NEWS_CATEGORIES.join(', ')}`
         );
     }
+    // .includes() guard above guarantees value is a valid NewsCategory at runtime
     return value as NewsCategory;
 }
 

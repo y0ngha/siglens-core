@@ -29,6 +29,7 @@ function requireOverallScenarioName(
                 `Expected one of: ${VALID_OVERALL_SCENARIO_NAMES.join(', ')}`
         );
     }
+    // .includes() guard above guarantees value is a valid OverallScenarioName at runtime
     return value as OverallScenarioName;
 }
 

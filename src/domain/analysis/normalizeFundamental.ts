@@ -39,6 +39,7 @@ function requireFundamentalSentiment(
                 `Expected one of: ${VALID_FUNDAMENTAL_SENTIMENTS.join(', ')}`
         );
     }
+    // .includes() guard above guarantees value is a valid FundamentalSentiment at runtime
     return value as FundamentalSentiment;
 }
 
@@ -59,6 +60,7 @@ function requireFundamentalCategory(
                 `Expected one of: ${VALID_FUNDAMENTAL_CATEGORIES.join(', ')}`
         );
     }
+    // .includes() guard above guarantees value is a valid FundamentalCategory at runtime
     return value as FundamentalCategory;
 }
 
