@@ -8,7 +8,7 @@ import type {
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
-import { buildNewsCacheKey, NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
+import { buildNewsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
