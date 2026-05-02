@@ -28,10 +28,10 @@
         "format:check": "prettier --check .",
         "doc": "typedoc",
         "doc:watch": "typedoc --watch",
-        "release": "release-it",
-        "release:patch": "release-it patch",
-        "release:minor": "release-it minor",
-        "release:major": "release-it major"
+        "release": "dotenv -e .env.local -- release-it",
+        "release:patch": "dotenv -e .env.local -- release-it patch",
+        "release:minor": "dotenv -e .env.local -- release-it minor",
+        "release:major": "dotenv -e .env.local -- release-it major"
     },
     "peerDependencies": {
         "@upstash/redis": "^1.37.0"
@@ -46,6 +46,7 @@
         "@types/node": "^20.11.0",
         "@upstash/redis": "^1.37.0",
         "@vitest/coverage-v8": "^2.1.0",
+        "dotenv-cli": "^11.0.0",
         "eslint": "^9.18.0",
         "husky": "^9.1.7",
         "prettier": "^3.4.0",
