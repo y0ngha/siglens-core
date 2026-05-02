@@ -26,7 +26,9 @@ describe('normalizeNewsAnalysisResponse 함수는', () => {
                 JSON.stringify(validNewsAnalysis)
             );
 
-            expect(result.currentDriverKo).toBe('최근 어닝 서프라이즈가 주가를 견인했습니다.');
+            expect(result.currentDriverKo).toBe(
+                '최근 어닝 서프라이즈가 주가를 견인했습니다.'
+            );
             expect(result.overallSentiment).toBe('bullish');
             expect(result.keyEventsKo).toEqual(['어닝 서프라이즈', 'CEO 교체']);
             expect(result.upcomingEventsKo).toEqual(['다음 분기 실적 발표']);
@@ -38,7 +40,9 @@ describe('normalizeNewsAnalysisResponse 함수는', () => {
             const fenced = `\`\`\`json\n${JSON.stringify(validNewsAnalysis)}\n\`\`\``;
             const result = normalizeNewsAnalysisResponse(fenced);
             expect(result.overallSentiment).toBe('bullish');
-            expect(result.currentDriverKo).toBe('최근 어닝 서프라이즈가 주가를 견인했습니다.');
+            expect(result.currentDriverKo).toBe(
+                '최근 어닝 서프라이즈가 주가를 견인했습니다.'
+            );
         });
 
         it('``` ... ``` 펜스(타입 없음)를 제거하고 올바르게 파싱한다', () => {
@@ -80,7 +84,10 @@ describe('normalizeNewsAnalysisResponse 함수는', () => {
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
         it('overallSentiment가 유효하지 않으면 에러를 던진다', () => {
-            const invalid = { ...validNewsAnalysis, overallSentiment: 'positive' };
+            const invalid = {
+                ...validNewsAnalysis,
+                overallSentiment: 'positive',
+            };
             expect(() =>
                 normalizeNewsAnalysisResponse(JSON.stringify(invalid))
             ).toThrow();
@@ -104,7 +111,9 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
             );
 
             expect(result.titleKo).toBe('애플, 어닝 서프라이즈 기록');
-            expect(result.bodyKo).toBe('애플은 2분기 실적에서 예상치를 크게 웃도는 성과를 보였습니다.');
+            expect(result.bodyKo).toBe(
+                '애플은 2분기 실적에서 예상치를 크게 웃도는 성과를 보였습니다.'
+            );
             expect(result.summaryKo).toBe('애플 어닝 서프라이즈');
             expect(result.sentiment).toBe('bullish');
             expect(result.category).toBe('earnings');
@@ -112,7 +121,9 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
 
         it('bodyKo가 null인 경우도 허용한다', () => {
             const withNullBody = { ...validNewsCard, bodyKo: null };
-            const result = normalizeNewsCardAnalysis(JSON.stringify(withNullBody));
+            const result = normalizeNewsCardAnalysis(
+                JSON.stringify(withNullBody)
+            );
             expect(result.bodyKo).toBeNull();
         });
     });
@@ -174,9 +185,7 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
 
     describe('유효하지 않은 JSON 문자열이 주어졌을 때', () => {
         it('파싱 불가능한 문자열이면 에러를 던진다', () => {
-            expect(() =>
-                normalizeNewsCardAnalysis('not valid json')
-            ).toThrow();
+            expect(() => normalizeNewsCardAnalysis('not valid json')).toThrow();
         });
     });
 });

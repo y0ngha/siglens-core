@@ -11,7 +11,11 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
-import type { EnrichedNewsItem, EarningsCalendarItem, TierConfig } from '@/domain/types';
+import type {
+    EnrichedNewsItem,
+    EarningsCalendarItem,
+    TierConfig,
+} from '@/domain/types';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -125,7 +129,9 @@ describe('submitNewsAnalysis 함수는', () => {
                 usage: {
                     usageRepository: {
                         recordUsage: vi.fn(),
-                        getUsageToday: vi.fn().mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
                     },
                     clientIp: '203.0.113.10',
                 },
@@ -206,11 +212,23 @@ describe('submitNewsAnalysis 함수는', () => {
         it('tier와 usage가 제공되고 한도 초과 시 usage_limit_exceeded 에러를 반환한다', async () => {
             const restrictedTierConfig: TierConfig = {
                 limits: {
-                    analysisPerDay: { free: 1, member: Infinity, pro: Infinity },
-                    chatbotPerDay: { free: Infinity, member: Infinity, pro: Infinity },
+                    analysisPerDay: {
+                        free: 1,
+                        member: Infinity,
+                        pro: Infinity,
+                    },
+                    chatbotPerDay: {
+                        free: Infinity,
+                        member: Infinity,
+                        pro: Infinity,
+                    },
                 },
                 timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
-                infoDepth: { free: ['summary'], member: ['summary'], pro: ['summary'] },
+                infoDepth: {
+                    free: ['summary'],
+                    member: ['summary'],
+                    pro: ['summary'],
+                },
                 models: {
                     free: ['gemini-2.5-flash'],
                     member: ['gemini-2.5-flash'],
@@ -230,7 +248,9 @@ describe('submitNewsAnalysis 함수는', () => {
                     usageRepository: {
                         recordUsage: vi.fn(),
                         // Count already at the limit (1 >= 1)
-                        getUsageToday: vi.fn().mockResolvedValue({ analysis: 1, chatbot: 0 }),
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 1, chatbot: 0 }),
                     },
                     clientIp: '203.0.113.10',
                 },
@@ -272,7 +292,9 @@ describe('submitNewsAnalysis 함수는', () => {
                 news: [news1, news2],
                 upcomingCalendar: [singleCalendarItem],
             });
-            const firstCallMeta = mockSetJobMeta.mock.calls[0]?.[1] as { cacheKey: string } | undefined;
+            const firstCallMeta = mockSetJobMeta.mock.calls[0]?.[1] as
+                | { cacheKey: string }
+                | undefined;
 
             vi.clearAllMocks();
             mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
@@ -290,7 +312,9 @@ describe('submitNewsAnalysis 함수는', () => {
                 news: [news2, news1],
                 upcomingCalendar: [singleCalendarItem],
             });
-            const secondCallMeta = mockSetJobMeta.mock.calls[0]?.[1] as { cacheKey: string } | undefined;
+            const secondCallMeta = mockSetJobMeta.mock.calls[0]?.[1] as
+                | { cacheKey: string }
+                | undefined;
 
             expect(firstCallMeta?.cacheKey).toBeDefined();
             expect(firstCallMeta?.cacheKey).toBe(secondCallMeta?.cacheKey);

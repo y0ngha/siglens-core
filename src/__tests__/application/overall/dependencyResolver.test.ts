@@ -18,7 +18,11 @@ import type {
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
 } from '@/domain/types';
-import { makeEnrichedNewsItem, makeCalendarItem, minimalProvider } from './fixtures';
+import {
+    makeEnrichedNewsItem,
+    makeCalendarItem,
+    minimalProvider,
+} from './fixtures';
 
 const mockSubmitAnalysis = submitAnalysis as Mock;
 const mockSubmitFundamentalAnalysis = submitFundamentalAnalysis as Mock;
@@ -82,9 +86,18 @@ describe('resolveOverallDependencies 함수는', () => {
 
     describe('세 축 모두 캐시 히트일 때', () => {
         it('kind: cached 를 반환하고 세 결과를 포함한다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'cached', result: cachedTechnical });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
             const state = await resolveOverallDependencies(makeInputs());
 
@@ -97,9 +110,18 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('세 submit 함수를 정확히 한 번씩 호출한다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'cached', result: cachedTechnical });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
             await resolveOverallDependencies(makeInputs());
 
@@ -111,9 +133,18 @@ describe('resolveOverallDependencies 함수는', () => {
 
     describe('일부 축이 submitted 일 때', () => {
         it('kind: pending 을 반환하고 submitted 축의 jobId 를 포함한다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'submitted', jobId: 'tech-job-001' });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'submitted', jobId: 'news-job-001' });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'tech-job-001',
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'news-job-001',
+            });
 
             const state = await resolveOverallDependencies(makeInputs());
 
@@ -126,9 +157,18 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('fundamental 만 submitted 이면 해당 jobId 만 있고 나머지는 undefined 다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'cached', result: cachedTechnical });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'submitted', jobId: 'fund-job-007' });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'fund-job-007',
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
             const state = await resolveOverallDependencies(makeInputs());
 
@@ -143,9 +183,18 @@ describe('resolveOverallDependencies 함수는', () => {
 
     describe('세 축 모두 submitted 일 때', () => {
         it('kind: pending 을 반환하고 모든 jobId 가 존재한다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'submitted', jobId: 'tech-job-111' });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'submitted', jobId: 'fund-job-222' });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'submitted', jobId: 'news-job-333' });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'tech-job-111',
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'fund-job-222',
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'news-job-333',
+            });
 
             const state = await resolveOverallDependencies(makeInputs());
 
@@ -162,10 +211,22 @@ describe('resolveOverallDependencies 함수는', () => {
         it('kind: pending 을 반환하고 technical jobId 는 undefined 다', async () => {
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'error',
-                error: { code: 'timeframe_not_allowed', message: 'Not allowed', tier: 'free', timeframe: '1Day', allowedTimeframes: [] },
+                error: {
+                    code: 'timeframe_not_allowed',
+                    message: 'Not allowed',
+                    tier: 'free',
+                    timeframe: '1Day',
+                    allowedTimeframes: [],
+                },
             });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
             const state = await resolveOverallDependencies(makeInputs());
 
@@ -178,36 +239,81 @@ describe('resolveOverallDependencies 함수는', () => {
 
     describe('inputs 전달 확인', () => {
         it('submitAnalysis 에 symbol, timeframe 이 올바르게 전달된다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'cached', result: cachedTechnical });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
-            await resolveOverallDependencies(makeInputs({ symbol: 'TSLA', timeframe: '4Hour' }));
+            await resolveOverallDependencies(
+                makeInputs({ symbol: 'TSLA', timeframe: '4Hour' })
+            );
 
-            expect(mockSubmitAnalysis).toHaveBeenCalledWith('TSLA', '4Hour', false, undefined, expect.any(Object));
+            expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                'TSLA',
+                '4Hour',
+                false,
+                undefined,
+                expect.any(Object)
+            );
         });
 
         it('submitFundamentalAnalysis 에 symbol 과 modelId 가 올바르게 전달된다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'cached', result: cachedTechnical });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
-            await resolveOverallDependencies(makeInputs({ symbol: 'NVDA', modelId: 'claude-sonnet-4-6' }));
+            await resolveOverallDependencies(
+                makeInputs({ symbol: 'NVDA', modelId: 'claude-sonnet-4-6' })
+            );
 
             expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
-                expect.objectContaining({ symbol: 'NVDA', modelId: 'claude-sonnet-4-6' })
+                expect.objectContaining({
+                    symbol: 'NVDA',
+                    modelId: 'claude-sonnet-4-6',
+                })
             );
         });
 
         it('submitNewsAnalysis 에 news 와 upcomingCalendar 가 올바르게 전달된다', async () => {
-            mockSubmitAnalysis.mockResolvedValue({ status: 'cached', result: cachedTechnical });
-            mockSubmitFundamentalAnalysis.mockResolvedValue({ status: 'cached', result: cachedFundamental });
-            mockSubmitNewsAnalysis.mockResolvedValue({ status: 'cached', result: cachedNews });
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
 
-            const news = [makeEnrichedNewsItem('x1'), makeEnrichedNewsItem('x2')];
+            const news = [
+                makeEnrichedNewsItem('x1'),
+                makeEnrichedNewsItem('x2'),
+            ];
             const upcomingCalendar = [makeCalendarItem('2026-08-01')];
 
-            await resolveOverallDependencies(makeInputs({ news, upcomingCalendar }));
+            await resolveOverallDependencies(
+                makeInputs({ news, upcomingCalendar })
+            );
 
             expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
                 expect.objectContaining({ news, upcomingCalendar })

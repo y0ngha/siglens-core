@@ -16,7 +16,8 @@ const TEST_SNAPSHOT: FundamentalSnapshot = {
         marketCap: 3_000_000_000_000,
         ceo: 'Tim Cook',
         website: 'https://apple.com',
-        description: 'Apple Inc. designs, manufactures, and markets consumer electronics.',
+        description:
+            'Apple Inc. designs, manufactures, and markets consumer electronics.',
     },
     valuation: {
         per: 28.5,
@@ -28,8 +29,16 @@ const TEST_SNAPSHOT: FundamentalSnapshot = {
         sectorAverages: { per: 25.0, psr: 5.0 },
     },
     peers: [
-        { symbol: 'MSFT', companyName: 'Microsoft Corp.', marketCap: 2_800_000_000_000 },
-        { symbol: 'GOOGL', companyName: 'Alphabet Inc.', marketCap: 1_900_000_000_000 },
+        {
+            symbol: 'MSFT',
+            companyName: 'Microsoft Corp.',
+            marketCap: 2_800_000_000_000,
+        },
+        {
+            symbol: 'GOOGL',
+            companyName: 'Alphabet Inc.',
+            marketCap: 1_900_000_000_000,
+        },
     ],
     profitability: {
         roe: 160.5,
@@ -52,8 +61,19 @@ const TEST_SNAPSHOT: FundamentalSnapshot = {
         nextEarningsAt: '2025-07-30',
         analystEstimateEps: 6.5,
         analystEstimateRevenue: 95_000_000_000,
-        gradesConsensus: { strongBuy: 20, buy: 15, hold: 5, sell: 1, strongSell: 0 },
-        priceTargetConsensus: { high: 250, low: 180, median: 215, consensus: 212 },
+        gradesConsensus: {
+            strongBuy: 20,
+            buy: 15,
+            hold: 5,
+            sell: 1,
+            strongSell: 0,
+        },
+        priceTargetConsensus: {
+            high: 250,
+            low: 180,
+            median: 215,
+            consensus: 212,
+        },
         priceTargetSummary: { month1Avg: 210, month3Avg: 208, year1Avg: 200 },
     },
     sectorDirection: {
@@ -102,7 +122,7 @@ describe('buildFundamentalAnalysisPrompt', () => {
         const prompt = buildFundamentalAnalysisPrompt(
             TEST_SYMBOL,
             TEST_SNAPSHOT,
-            [FUNDAMENTAL_SKILL_HIGH],
+            [FUNDAMENTAL_SKILL_HIGH]
         );
 
         expect(prompt).toContain('AAPL');
@@ -110,20 +130,20 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('Technology');
         // Valuation numbers
         expect(prompt).toContain('28.5'); // P/E
-        expect(prompt).toContain('7.2');  // P/S
+        expect(prompt).toContain('7.2'); // P/S
         // Profitability
         expect(prompt).toContain('160.5'); // ROE
-        expect(prompt).toContain('30.1');  // Operating margin
+        expect(prompt).toContain('30.1'); // Operating margin
         // Growth
-        expect(prompt).toContain('8.2');   // Revenue YoY
-        expect(prompt).toContain('12.5');  // EPS YoY
+        expect(prompt).toContain('8.2'); // Revenue YoY
+        expect(prompt).toContain('12.5'); // EPS YoY
         // Health
-        expect(prompt).toContain('0.94');  // Current ratio
-        expect(prompt).toContain('7');     // Piotroski score
+        expect(prompt).toContain('0.94'); // Current ratio
+        expect(prompt).toContain('7'); // Piotroski score
         // Future direction
         expect(prompt).toContain('2025-07-30'); // Next earnings date
         // Analyst consensus
-        expect(prompt).toContain('212');   // Price target consensus
+        expect(prompt).toContain('212'); // Price target consensus
         // Peer
         expect(prompt).toContain('MSFT');
     });
@@ -132,7 +152,7 @@ describe('buildFundamentalAnalysisPrompt', () => {
         const prompt = buildFundamentalAnalysisPrompt(
             TEST_SYMBOL,
             TEST_SNAPSHOT,
-            [FUNDAMENTAL_SKILL_HIGH, FUNDAMENTAL_SKILL_LOW],
+            [FUNDAMENTAL_SKILL_HIGH, FUNDAMENTAL_SKILL_LOW]
         );
 
         expect(prompt).toContain('value-investing');
@@ -145,7 +165,7 @@ describe('buildFundamentalAnalysisPrompt', () => {
         const prompt = buildFundamentalAnalysisPrompt(
             TEST_SYMBOL,
             TEST_SNAPSHOT,
-            [FUNDAMENTAL_SKILL_HIGH, NEWS_SKILL],
+            [FUNDAMENTAL_SKILL_HIGH, NEWS_SKILL]
         );
 
         expect(prompt).toContain('value-investing');

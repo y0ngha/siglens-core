@@ -116,21 +116,33 @@ export function normalizeFundamentalAnalysisResponse(
 ): FundamentalAnalysisResponse {
     const parsed = extractJsonFromLlmResponse(raw);
 
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('FundamentalAnalysisResponse: payload must be a JSON object');
+    if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+    ) {
+        throw new Error(
+            'FundamentalAnalysisResponse: payload must be a JSON object'
+        );
     }
     const o = parsed as Record<string, unknown>;
 
     if (typeof o.overallConclusionKo !== 'string') {
-        throw new Error('FundamentalAnalysisResponse: missing required field "overallConclusionKo"');
+        throw new Error(
+            'FundamentalAnalysisResponse: missing required field "overallConclusionKo"'
+        );
     }
 
     if (!Array.isArray(o.categoryAssessments)) {
-        throw new Error('FundamentalAnalysisResponse: missing required field "categoryAssessments"');
+        throw new Error(
+            'FundamentalAnalysisResponse: missing required field "categoryAssessments"'
+        );
     }
 
     if (!Array.isArray(o.riskFactorsKo)) {
-        throw new Error('FundamentalAnalysisResponse: missing required field "riskFactorsKo"');
+        throw new Error(
+            'FundamentalAnalysisResponse: missing required field "riskFactorsKo"'
+        );
     }
 
     const overallSentiment = requireFundamentalSentiment(

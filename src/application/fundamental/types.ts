@@ -1,6 +1,11 @@
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { AnalysisLimitError } from '@/application/usage/types';
-import type { FundamentalAnalysisResponse, ModelId, Tier, TierConfig } from '@/domain/types';
+import type {
+    FundamentalAnalysisResponse,
+    ModelId,
+    Tier,
+    TierConfig,
+} from '@/domain/types';
 import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
 import type { UsageRepository } from '@/infrastructure/db';
 
@@ -59,7 +64,10 @@ export type SubmitFundamentalAnalysisErrorCode =
     | 'fetch_failed';
 
 /** Outcome status variants for fundamental analysis submission. */
-export type SubmitFundamentalAnalysisResultStatus = 'cached' | 'submitted' | 'error';
+export type SubmitFundamentalAnalysisResultStatus =
+    | 'cached'
+    | 'submitted'
+    | 'error';
 
 /** The caller receives a cached analysis — no new job was created. */
 export interface SubmitFundamentalAnalysisCached {
@@ -92,7 +100,10 @@ export type SubmitFundamentalAnalysisResult =
 // ─────────────────────────────────────────
 
 /** Outcome status variants for fundamental analysis polling. */
-export type PollFundamentalAnalysisResultStatus = 'processing' | 'done' | 'error';
+export type PollFundamentalAnalysisResultStatus =
+    | 'processing'
+    | 'done'
+    | 'error';
 
 /** Outcome of {@link pollFundamentalAnalysis}: still processing, finished, or errored. */
 export type PollFundamentalAnalysisResult =

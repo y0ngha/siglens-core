@@ -355,7 +355,9 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
             [],
             '질문'
         );
-        expect(result.systemPrompt).not.toContain('## Current analysis context');
+        expect(result.systemPrompt).not.toContain(
+            '## Current analysis context'
+        );
     });
 
     it('currentAnalysisContext가 undefined이면 기존 동작과 동일하다 (회귀 테스트)', () => {
@@ -414,7 +416,9 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         expect(result.systemPrompt).toContain('## Current analysis context');
         expect(result.systemPrompt).toContain('Kind: fundamental');
         expect(result.systemPrompt).toContain('Overall Sentiment: bullish');
-        expect(result.systemPrompt).toContain('재무 구조가 탄탄하고 성장성이 높습니다.');
+        expect(result.systemPrompt).toContain(
+            '재무 구조가 탄탄하고 성장성이 높습니다.'
+        );
     });
 
     it('news 컨텍스트가 제공되면 뉴스 분석 섹션을 포함한다', () => {
@@ -433,7 +437,9 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         expect(result.systemPrompt).toContain('## Current analysis context');
         expect(result.systemPrompt).toContain('Kind: news');
         expect(result.systemPrompt).toContain('Overall Sentiment: bullish');
-        expect(result.systemPrompt).toContain('실적 기대감이 주가를 견인하고 있습니다.');
+        expect(result.systemPrompt).toContain(
+            '실적 기대감이 주가를 견인하고 있습니다.'
+        );
     });
 
     it('overall 컨텍스트가 제공되면 종합 분석 섹션을 포함한다', () => {
@@ -451,7 +457,11 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         );
         expect(result.systemPrompt).toContain('## Current analysis context');
         expect(result.systemPrompt).toContain('Kind: overall');
-        expect(result.systemPrompt).toContain('3축 종합 분석: 강세 국면 진입 예상');
-        expect(result.systemPrompt).toContain('기술·펀더·뉴스 모두 긍정적입니다.');
+        expect(result.systemPrompt).toContain(
+            '3축 종합 분석: 강세 국면 진입 예상'
+        );
+        expect(result.systemPrompt).toContain(
+            '기술·펀더·뉴스 모두 긍정적입니다.'
+        );
     });
 });

@@ -50,7 +50,9 @@ function parseScenario(item: unknown, index: number): OverallScenario {
     const name = requireOverallScenarioName(o.name, `scenarios[${index}].name`);
 
     if (typeof o.triggerConditionKo !== 'string') {
-        throw new Error(`scenarios[${index}].triggerConditionKo must be a string`);
+        throw new Error(
+            `scenarios[${index}].triggerConditionKo must be a string`
+        );
     }
     if (typeof o.priceRangeKo !== 'string') {
         throw new Error(`scenarios[${index}].priceRangeKo must be a string`);
@@ -80,31 +82,51 @@ export function normalizeOverallAnalysisResponse(
 ): OverallAnalysisResponse {
     const parsed = extractJsonFromLlmResponse(raw);
 
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('OverallAnalysisResponse: payload must be a JSON object');
+    if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+    ) {
+        throw new Error(
+            'OverallAnalysisResponse: payload must be a JSON object'
+        );
     }
     const o = parsed as Record<string, unknown>;
 
     if (typeof o.headlineKo !== 'string') {
-        throw new Error('OverallAnalysisResponse: missing required field "headlineKo"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "headlineKo"'
+        );
     }
     if (!Array.isArray(o.technicalBulletsKo)) {
-        throw new Error('OverallAnalysisResponse: missing required field "technicalBulletsKo"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "technicalBulletsKo"'
+        );
     }
     if (!Array.isArray(o.fundamentalBulletsKo)) {
-        throw new Error('OverallAnalysisResponse: missing required field "fundamentalBulletsKo"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "fundamentalBulletsKo"'
+        );
     }
     if (!Array.isArray(o.newsBulletsKo)) {
-        throw new Error('OverallAnalysisResponse: missing required field "newsBulletsKo"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "newsBulletsKo"'
+        );
     }
     if (typeof o.threeAxisConclusionKo !== 'string') {
-        throw new Error('OverallAnalysisResponse: missing required field "threeAxisConclusionKo"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "threeAxisConclusionKo"'
+        );
     }
     if (!Array.isArray(o.scenarios)) {
-        throw new Error('OverallAnalysisResponse: missing required field "scenarios"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "scenarios"'
+        );
     }
     if (!Array.isArray(o.riskFactorsKo)) {
-        throw new Error('OverallAnalysisResponse: missing required field "riskFactorsKo"');
+        throw new Error(
+            'OverallAnalysisResponse: missing required field "riskFactorsKo"'
+        );
     }
 
     const scenarios = (o.scenarios as unknown[]).map((item, i) =>

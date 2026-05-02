@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
-import type { EarningsCalendarItem, EnrichedNewsItem, Skill } from '@/domain/types';
+import type {
+    EarningsCalendarItem,
+    EnrichedNewsItem,
+    Skill,
+} from '@/domain/types';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -31,7 +35,7 @@ const NEWS_ITEM_2: EnrichedNewsItem = {
     url: 'https://bloomberg.com/aapl-antitrust',
     publishedAt: '2025-04-27T09:30:00Z',
     titleEn: 'EU opens antitrust probe into Apple App Store policies',
-    bodyEn: 'European regulators announced a formal investigation into Apple\'s App Store practices.',
+    bodyEn: "European regulators announced a formal investigation into Apple's App Store practices.",
     card: {
         titleKo: 'EU, 애플 앱스토어 정책 반독점 조사 개시',
         bodyKo: '유럽 규제 당국이 애플 앱스토어 관행에 대한 공식 조사를 개시했습니다.',
@@ -57,7 +61,8 @@ const NEWS_SKILL_HIGH: Skill = {
     category: 'news',
     indicators: [],
     confidenceWeight: MIN_CONFIDENCE_WEIGHT,
-    content: 'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
+    content:
+        'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
 };
 
 const NEWS_SKILL_LOW: Skill = {
@@ -86,15 +91,19 @@ describe('buildNewsAnalysisPrompt', () => {
             TEST_SYMBOL,
             [NEWS_ITEM_1, NEWS_ITEM_2],
             [UPCOMING_EARNINGS],
-            [NEWS_SKILL_HIGH],
+            [NEWS_SKILL_HIGH]
         );
 
         expect(prompt).toContain('AAPL');
         // News titles
         expect(prompt).toContain('Apple reports record Q2 earnings beat');
-        expect(prompt).toContain('EU opens antitrust probe into Apple App Store policies');
+        expect(prompt).toContain(
+            'EU opens antitrust probe into Apple App Store policies'
+        );
         // Korean summaries from card analysis
-        expect(prompt).toContain('실적 발표에서 시장 예상을 웃도는 호실적 기록');
+        expect(prompt).toContain(
+            '실적 발표에서 시장 예상을 웃도는 호실적 기록'
+        );
         expect(prompt).toContain('EU 반독점 조사로 인한 규제 리스크 부각');
         // Sentiment labels
         expect(prompt).toContain('bullish');
@@ -109,7 +118,7 @@ describe('buildNewsAnalysisPrompt', () => {
             TEST_SYMBOL,
             [NEWS_ITEM_1],
             [],
-            [NEWS_SKILL_HIGH, NEWS_SKILL_LOW, FUNDAMENTAL_SKILL],
+            [NEWS_SKILL_HIGH, NEWS_SKILL_LOW, FUNDAMENTAL_SKILL]
         );
 
         // High-weight news skill is included

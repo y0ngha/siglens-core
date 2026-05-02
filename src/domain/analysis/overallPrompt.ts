@@ -28,8 +28,7 @@ const TIMEFRAME_LABEL: Record<Timeframe, string> = {
  * focus to positional and multi-day trend analysis.
  */
 const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
-    '5Min':
-        'Very short-term intraday chart. Focus on immediate momentum and near-term price catalysts. Macro and fundamental inputs should be treated as background context, not primary drivers.',
+    '5Min': 'Very short-term intraday chart. Focus on immediate momentum and near-term price catalysts. Macro and fundamental inputs should be treated as background context, not primary drivers.',
     '15Min':
         'Short-term intraday chart. Integrate technical signals with news flow. Fundamental data provides context for intraday support/resistance interpretation.',
     '30Min':
@@ -38,8 +37,7 @@ const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
         'Medium-term chart. Divergences and cross-axis confirmations (technical + fundamental + news) carry meaningful weight. Good for swing entry/exit evaluation.',
     '4Hour':
         'Swing trading positional chart. All three axes (technical, fundamental, news) should converge before taking a strong directional stance. Multi-day trends dominate.',
-    '1Day':
-        'Daily positional chart. Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for medium- to long-term position analysis.',
+    '1Day': 'Daily positional chart. Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for medium- to long-term position analysis.',
 };
 
 /** Formats technical analysis fields (trend, risk, key levels, price targets, patterns) into prompt lines. */
@@ -65,17 +63,27 @@ function formatTechnical(tech: AnalysisResponse): string {
     }
 
     if (tech.priceTargets.bullish) {
-        const targets = tech.priceTargets.bullish.targets.map(t => t.price.toFixed(2)).join(', ');
-        lines.push(`- Bullish Targets: ${targets} — ${tech.priceTargets.bullish.condition}`);
+        const targets = tech.priceTargets.bullish.targets
+            .map(t => t.price.toFixed(2))
+            .join(', ');
+        lines.push(
+            `- Bullish Targets: ${targets} — ${tech.priceTargets.bullish.condition}`
+        );
     }
 
     if (tech.priceTargets.bearish) {
-        const targets = tech.priceTargets.bearish.targets.map(t => t.price.toFixed(2)).join(', ');
-        lines.push(`- Bearish Targets: ${targets} — ${tech.priceTargets.bearish.condition}`);
+        const targets = tech.priceTargets.bearish.targets
+            .map(t => t.price.toFixed(2))
+            .join(', ');
+        lines.push(
+            `- Bearish Targets: ${targets} — ${tech.priceTargets.bearish.condition}`
+        );
     }
 
     if (tech.patternSummaries.length > 0) {
-        lines.push(`- Chart Patterns: ${tech.patternSummaries.map(p => p.patternName).join(', ')}`);
+        lines.push(
+            `- Chart Patterns: ${tech.patternSummaries.map(p => p.patternName).join(', ')}`
+        );
     }
 
     return lines.join('\n');
@@ -89,7 +97,9 @@ function formatFundamental(fund: FundamentalAnalysisResponse): string {
     ];
 
     for (const assessment of fund.categoryAssessments) {
-        lines.push(`- ${assessment.category} [${assessment.sentiment}]: ${assessment.rationaleKo}`);
+        lines.push(
+            `- ${assessment.category} [${assessment.sentiment}]: ${assessment.rationaleKo}`
+        );
     }
 
     if (fund.riskFactorsKo.length > 0) {
@@ -139,7 +149,7 @@ export function buildOverallAnalysisPrompt(
     technical: AnalysisResponse,
     fundamental: FundamentalAnalysisResponse,
     news: NewsAnalysisResponse,
-    timeframe: Timeframe,
+    timeframe: Timeframe
 ): string {
     const label = TIMEFRAME_LABEL[timeframe];
     const context = TIMEFRAME_CONTEXT[timeframe];

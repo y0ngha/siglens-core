@@ -5,7 +5,10 @@ vi.mock('node:fs/promises');
 
 import { readdir, readFile } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
-import { FileSkillsLoader, countSkillFiles } from '@/infrastructure/skills/loader';
+import {
+    FileSkillsLoader,
+    countSkillFiles,
+} from '@/infrastructure/skills/loader';
 import type { SkillCounts } from '@/domain/types';
 
 const mockReaddir = readdir as Mock;
@@ -125,7 +128,7 @@ Focus on intrinsic value and margin of safety.`;
             const loader = new FileSkillsLoader();
             const skills = await loader.loadSkills();
             const fundamental = skills.filter(
-                (s) => s.category === 'fundamental',
+                s => s.category === 'fundamental'
             );
 
             expect(fundamental.length).toBeGreaterThanOrEqual(1);
@@ -149,7 +152,7 @@ Analyze market-moving news events and their impact on price.`;
 
             const loader = new FileSkillsLoader();
             const skills = await loader.loadSkills();
-            const news = skills.filter((s) => s.category === 'news');
+            const news = skills.filter(s => s.category === 'news');
 
             expect(news.length).toBeGreaterThanOrEqual(1);
             expect(news[0].category).toBe('news');
@@ -189,12 +192,10 @@ Identifies bullish reversal setups.`;
             const skills = await loader.loadSkills();
 
             expect(skills).toHaveLength(2);
-            expect(
-                skills.some((s) => s.category === 'fundamental'),
-            ).toBe(true);
-            expect(
-                skills.some((s) => s.category === 'reversal_bullish'),
-            ).toBe(true);
+            expect(skills.some(s => s.category === 'fundamental')).toBe(true);
+            expect(skills.some(s => s.category === 'reversal_bullish')).toBe(
+                true
+            );
         });
     });
 });
@@ -207,13 +208,22 @@ describe('countSkillFiles', () => {
     it('모든 카테고리 디렉토리에서 파일 수를 합산한다', async () => {
         // Each call to readdir returns a different set of files per subdirectory
         mockReaddir
-            .mockResolvedValueOnce([makeDirent('rsi.md'), makeDirent('macd.md')]) // indicators — 2
-            .mockResolvedValueOnce([makeDirent('doji.md')])                        // candlesticks — 1
-            .mockResolvedValueOnce([makeDirent('head-shoulders.md')])              // patterns — 1
-            .mockResolvedValueOnce([makeDirent('breakout.md'), makeDirent('trend.md')]) // strategies — 2
-            .mockResolvedValueOnce([makeDirent('support.md')])                     // support-resistance — 1
-            .mockResolvedValueOnce([makeDirent('dcf.md'), makeDirent('ratio.md')]) // fundamental — 2
-            .mockResolvedValueOnce([makeDirent('earnings.md')]);                   // news — 1
+            .mockResolvedValueOnce([
+                makeDirent('rsi.md'),
+                makeDirent('macd.md'),
+            ]) // indicators — 2
+            .mockResolvedValueOnce([makeDirent('doji.md')]) // candlesticks — 1
+            .mockResolvedValueOnce([makeDirent('head-shoulders.md')]) // patterns — 1
+            .mockResolvedValueOnce([
+                makeDirent('breakout.md'),
+                makeDirent('trend.md'),
+            ]) // strategies — 2
+            .mockResolvedValueOnce([makeDirent('support.md')]) // support-resistance — 1
+            .mockResolvedValueOnce([
+                makeDirent('dcf.md'),
+                makeDirent('ratio.md'),
+            ]) // fundamental — 2
+            .mockResolvedValueOnce([makeDirent('earnings.md')]); // news — 1
 
         const counts = await countSkillFiles();
 
@@ -257,7 +267,10 @@ describe('countSkillFiles', () => {
     it('디렉토리 내 .md가 아닌 파일은 집계에서 제외한다', async () => {
         // indicators dir has 1 md + 1 non-md; countMdFiles filters non-.md
         mockReaddir
-            .mockResolvedValueOnce([makeDirent('rsi.md'), makeDirent('image.png')]) // indicators — only 1 md
+            .mockResolvedValueOnce([
+                makeDirent('rsi.md'),
+                makeDirent('image.png'),
+            ]) // indicators — only 1 md
             .mockResolvedValue([]); // all other dirs empty
 
         const counts = await countSkillFiles();

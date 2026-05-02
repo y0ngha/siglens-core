@@ -1,7 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
 import { hashAnalysisInput } from '@/application/analysisInputHash';
-import type { SubmitFundamentalAnalysisOptions, SubmitFundamentalAnalysisResult } from '@/application/fundamental/types';
+import type {
+    SubmitFundamentalAnalysisOptions,
+    SubmitFundamentalAnalysisResult,
+} from '@/application/fundamental/types';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { TIER_CONFIG } from '@/domain/tier';
@@ -131,8 +134,8 @@ export async function submitFundamentalAnalysis(
             : [];
 
         const sectorToday =
-            sectorSnapshot.find(s => s.sector === sectorName)?.changesPercentage ??
-            null;
+            sectorSnapshot.find(s => s.sector === sectorName)
+                ?.changesPercentage ?? null;
 
         snapshot = normalizeFundamentalSnapshot({
             profile,
@@ -154,7 +157,10 @@ export async function submitFundamentalAnalysis(
             })),
         });
     } catch (error) {
-        console.error('[submitFundamentalAnalysis] Provider fetch failed:', error);
+        console.error(
+            '[submitFundamentalAnalysis] Provider fetch failed:',
+            error
+        );
         return { status: 'error', code: 'fetch_failed', error: String(error) };
     }
 
@@ -165,12 +171,16 @@ export async function submitFundamentalAnalysis(
 
     if (cache !== null) {
         try {
-            const cached = await cache.get<FundamentalAnalysisResponse>(cacheKey);
+            const cached =
+                await cache.get<FundamentalAnalysisResponse>(cacheKey);
             if (cached !== null) {
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
-            console.error('[submitFundamentalAnalysis] Cache read failed:', error);
+            console.error(
+                '[submitFundamentalAnalysis] Cache read failed:',
+                error
+            );
         }
     }
 
@@ -195,7 +205,10 @@ export async function submitFundamentalAnalysis(
         body: JSON.stringify({ jobId, prompt, model: modelId }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
-        console.error('[submitFundamentalAnalysis] Worker request failed:', error);
+        console.error(
+            '[submitFundamentalAnalysis] Worker request failed:',
+            error
+        );
     });
     fireAndForget(dispatch, options);
 

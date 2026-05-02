@@ -7,30 +7,42 @@ import { formatNullableNumber as fmt } from './promptFormat';
 /** Filter skills to fundamental category with sufficient confidence weight. */
 function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
     return skills.filter(
-        s => s.category === 'fundamental' && s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT,
+        s =>
+            s.category === 'fundamental' &&
+            s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT
     );
 }
 
 /** Render analyst grade counts into a compact inline string. */
-function formatGrades(g: FundamentalSnapshot['futureDirection']['gradesConsensus']): string {
+function formatGrades(
+    g: FundamentalSnapshot['futureDirection']['gradesConsensus']
+): string {
     if (!g) return 'N/A';
     return `Strong Buy: ${g.strongBuy}, Buy: ${g.buy}, Hold: ${g.hold}, Sell: ${g.sell}, Strong Sell: ${g.strongSell}`;
 }
 
 /** Render price target data into a compact inline string. */
 function formatPriceTarget(
-    consensus: FundamentalSnapshot['futureDirection']['priceTargetConsensus'],
+    consensus: FundamentalSnapshot['futureDirection']['priceTargetConsensus']
 ): string {
     if (!consensus) return 'N/A';
     return `Consensus: ${fmt(consensus.consensus)}, High: ${fmt(consensus.high)}, Low: ${fmt(consensus.low)}, Median: ${fmt(consensus.median)}`;
 }
 
 /** Render sector direction as a compact inline string. */
-function formatSectorDirection(sd: FundamentalSnapshot['sectorDirection']): string {
-    const today = sd.todayChangePct != null ? `${sd.todayChangePct >= 0 ? '+' : ''}${sd.todayChangePct.toFixed(2)}%` : 'N/A';
+function formatSectorDirection(
+    sd: FundamentalSnapshot['sectorDirection']
+): string {
+    const today =
+        sd.todayChangePct != null
+            ? `${sd.todayChangePct >= 0 ? '+' : ''}${sd.todayChangePct.toFixed(2)}%`
+            : 'N/A';
     const history = sd.historical
         .slice(0, 3)
-        .map(h => `${h.date}: ${h.changePct >= 0 ? '+' : ''}${h.changePct.toFixed(2)}%`)
+        .map(
+            h =>
+                `${h.date}: ${h.changePct >= 0 ? '+' : ''}${h.changePct.toFixed(2)}%`
+        )
         .join(', ');
     return `Today: ${today}${history ? `; Recent: ${history}` : ''}`;
 }
@@ -53,18 +65,36 @@ function formatSectorDirection(sd: FundamentalSnapshot['sectorDirection']): stri
 export function buildFundamentalAnalysisPrompt(
     symbol: string,
     snapshot: FundamentalSnapshot,
-    skills: readonly Skill[],
+    skills: readonly Skill[]
 ): string {
-    const { profile, valuation, peers, profitability, growth, health, futureDirection, sectorDirection } = snapshot;
+    const {
+        profile,
+        valuation,
+        peers,
+        profitability,
+        growth,
+        health,
+        futureDirection,
+        sectorDirection,
+    } = snapshot;
 
     const qualifiedSkills = filterFundamentalSkills(skills);
-    const skillsSection = qualifiedSkills.length > 0
-        ? qualifiedSkills.map(s => `### ${s.name}\n${s.content}`).join('\n\n')
-        : 'No additional fundamental skills loaded.';
+    const skillsSection =
+        qualifiedSkills.length > 0
+            ? qualifiedSkills
+                  .map(s => `### ${s.name}\n${s.content}`)
+                  .join('\n\n')
+            : 'No additional fundamental skills loaded.';
 
-    const peerLines = peers.length > 0
-        ? peers.map(p => `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B`).join('\n')
-        : '  None';
+    const peerLines =
+        peers.length > 0
+            ? peers
+                  .map(
+                      p =>
+                          `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B`
+                  )
+                  .join('\n')
+            : '  None';
 
     const sectorAvg = valuation.sectorAverages
         ? `P/E: ${fmt(valuation.sectorAverages.per)}, P/S: ${fmt(valuation.sectorAverages.psr)}`

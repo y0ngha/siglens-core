@@ -1,13 +1,18 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
-import type { EarningsCalendarItem, EnrichedNewsItem, Skill } from '@/domain/types';
+import type {
+    EarningsCalendarItem,
+    EnrichedNewsItem,
+    Skill,
+} from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
 /** Filter skills to news category with sufficient confidence weight. */
 function filterNewsSkills(skills: readonly Skill[]): Skill[] {
     return skills.filter(
-        s => s.category === 'news' && s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT,
+        s =>
+            s.category === 'news' && s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT
     );
 }
 
@@ -31,10 +36,14 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
     return items
         .map(item => {
             const eps = fmt(item.epsEstimated);
-            const rev = item.revenueEstimated != null
-                ? `${(item.revenueEstimated / 1e9).toFixed(1)}B`
-                : 'N/A';
-            const actEps = item.epsActual != null ? `Actual EPS: ${fmt(item.epsActual)}` : '';
+            const rev =
+                item.revenueEstimated != null
+                    ? `${(item.revenueEstimated / 1e9).toFixed(1)}B`
+                    : 'N/A';
+            const actEps =
+                item.epsActual != null
+                    ? `Actual EPS: ${fmt(item.epsActual)}`
+                    : '';
             return `  - ${item.earningsDate}: EPS est. ${eps}${actEps ? ` | ${actEps}` : ''} | Rev est. ${rev}`;
         })
         .join('\n');
@@ -62,16 +71,20 @@ export function buildNewsAnalysisPrompt(
     symbol: string,
     news: ReadonlyArray<EnrichedNewsItem>,
     upcomingCalendar: readonly EarningsCalendarItem[],
-    skills: readonly Skill[],
+    skills: readonly Skill[]
 ): string {
     const qualifiedSkills = filterNewsSkills(skills);
-    const skillsSection = qualifiedSkills.length > 0
-        ? qualifiedSkills.map(s => `### ${s.name}\n${s.content}`).join('\n\n')
-        : 'No additional news skills loaded.';
+    const skillsSection =
+        qualifiedSkills.length > 0
+            ? qualifiedSkills
+                  .map(s => `### ${s.name}\n${s.content}`)
+                  .join('\n\n')
+            : 'No additional news skills loaded.';
 
-    const newsSection = news.length > 0
-        ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
-        : 'No recent news articles available.';
+    const newsSection =
+        news.length > 0
+            ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
+            : 'No recent news articles available.';
 
     const calendarSection = formatCalendarItems(upcomingCalendar);
 

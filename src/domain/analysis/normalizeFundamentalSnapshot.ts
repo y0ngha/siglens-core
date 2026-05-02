@@ -196,7 +196,7 @@ export function normalizeFundamentalSnapshot(input: {
                 input.keyMetricsTtm?.enterpriseValueOverEBITDATTM ?? null,
             eps: input.keyMetricsTtm?.epsTTM ?? null,
         },
-        peers: input.peers.map((p) => ({
+        peers: input.peers.map(p => ({
             symbol: p.symbol,
             companyName: p.companyName,
             marketCap: p.marketCap,
@@ -204,8 +204,7 @@ export function normalizeFundamentalSnapshot(input: {
         profitability: {
             roe: input.ratiosTtm?.returnOnEquityTTM ?? null,
             roa: input.ratiosTtm?.returnOnAssetsTTM ?? null,
-            operatingMargin:
-                input.ratiosTtm?.operatingProfitMarginTTM ?? null,
+            operatingMargin: input.ratiosTtm?.operatingProfitMarginTTM ?? null,
             netMargin: input.ratiosTtm?.netProfitMarginTTM ?? null,
         },
         growth: {
@@ -221,8 +220,7 @@ export function normalizeFundamentalSnapshot(input: {
         },
         futureDirection: {
             nextEarningsAt: input.nextEarningsAt,
-            analystEstimateEps:
-                input.analystEstimate?.estimatedEpsAvg ?? null,
+            analystEstimateEps: input.analystEstimate?.estimatedEpsAvg ?? null,
             analystEstimateRevenue:
                 input.analystEstimate?.estimatedRevenueAvg ?? null,
             gradesConsensus: input.gradesConsensus,

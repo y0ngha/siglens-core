@@ -97,7 +97,10 @@ export async function pollFundamentalAnalysis(
                 cache
                     .set(meta.cacheKey, result, FUNDAMENTAL_CACHE_TTL_SECONDS)
                     .catch(error =>
-                        console.error('[PollFundamental] Cache write failed:', error)
+                        console.error(
+                            '[PollFundamental] Cache write failed:',
+                            error
+                        )
                     ),
                 options
             );

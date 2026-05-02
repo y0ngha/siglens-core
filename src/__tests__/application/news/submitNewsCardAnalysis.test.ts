@@ -133,7 +133,9 @@ describe('submitNewsCardAnalysis 함수는', () => {
         it('캐시 키에 news.id가 포함된다', async () => {
             await submitNewsCardAnalysis(testNewsItem);
 
-            const meta = mockSetJobMeta.mock.calls[0]?.[1] as { cacheKey: string } | undefined;
+            const meta = mockSetJobMeta.mock.calls[0]?.[1] as
+                | { cacheKey: string }
+                | undefined;
             expect(meta?.cacheKey).toContain(testNewsItem.id);
         });
     });

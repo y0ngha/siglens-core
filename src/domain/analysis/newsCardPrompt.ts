@@ -18,9 +18,10 @@ import type { NewsItem } from '@/domain/types';
  * @returns Prompt string ready to be sent to the flash-lite LLM.
  */
 export function buildNewsCardAnalysisPrompt(item: NewsItem): string {
-    const bodySection = item.bodyEn != null
-        ? `Body:\n${item.bodyEn}`
-        : '(No article body available — analyse title only.)';
+    const bodySection =
+        item.bodyEn != null
+            ? `Body:\n${item.bodyEn}`
+            : '(No article body available — analyse title only.)';
 
     return `You are a financial news translator and classifier. Analyse the article below and respond with a JSON object matching the exact schema provided. No markdown, no extra text — only valid JSON.
 

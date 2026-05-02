@@ -17,7 +17,10 @@
  * @param dp - Decimal places to use (default: `2`).
  * @returns Formatted string, e.g. `"3.14"` or `"N/A"`.
  */
-export function formatNullableNumber(n: number | null | undefined, dp = 2): string {
+export function formatNullableNumber(
+    n: number | null | undefined,
+    dp = 2
+): string {
     return n == null ? 'N/A' : n.toFixed(dp);
 }
 

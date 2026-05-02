@@ -21,8 +21,14 @@ const MOCK_TECHNICAL: AnalysisResponse = {
         resistance: [{ price: 200.0, reason: 'Key resistance at 200' }],
     },
     priceTargets: {
-        bullish: { targets: [{ price: 210.0, basis: 'Break above resistance' }], condition: '200 돌파 시' },
-        bearish: { targets: [{ price: 160.0, basis: 'Break below support' }], condition: '170 하향 이탈 시' },
+        bullish: {
+            targets: [{ price: 210.0, basis: 'Break above resistance' }],
+            condition: '200 돌파 시',
+        },
+        bearish: {
+            targets: [{ price: 160.0, basis: 'Break below support' }],
+            condition: '170 하향 이탈 시',
+        },
     },
     patternSummaries: [],
     strategyResults: [],
@@ -31,20 +37,42 @@ const MOCK_TECHNICAL: AnalysisResponse = {
 };
 
 const MOCK_FUNDAMENTAL: FundamentalAnalysisResponse = {
-    overallConclusionKo: '펀더멘털 관점에서 테슬라는 고평가 구간에 위치하며 성장 둔화가 감지됩니다.',
+    overallConclusionKo:
+        '펀더멘털 관점에서 테슬라는 고평가 구간에 위치하며 성장 둔화가 감지됩니다.',
     categoryAssessments: [
-        { category: 'valuation', sentiment: 'bearish', rationaleKo: 'PER이 업종 평균 대비 높습니다.' },
-        { category: 'profitability', sentiment: 'neutral', rationaleKo: '마진 압박이 지속되고 있습니다.' },
-        { category: 'growth', sentiment: 'bearish', rationaleKo: '매출 성장이 둔화되었습니다.' },
-        { category: 'health', sentiment: 'neutral', rationaleKo: '유동성은 양호합니다.' },
-        { category: 'futureDirection', sentiment: 'bearish', rationaleKo: '애널리스트 목표주가가 하향 조정됐습니다.' },
+        {
+            category: 'valuation',
+            sentiment: 'bearish',
+            rationaleKo: 'PER이 업종 평균 대비 높습니다.',
+        },
+        {
+            category: 'profitability',
+            sentiment: 'neutral',
+            rationaleKo: '마진 압박이 지속되고 있습니다.',
+        },
+        {
+            category: 'growth',
+            sentiment: 'bearish',
+            rationaleKo: '매출 성장이 둔화되었습니다.',
+        },
+        {
+            category: 'health',
+            sentiment: 'neutral',
+            rationaleKo: '유동성은 양호합니다.',
+        },
+        {
+            category: 'futureDirection',
+            sentiment: 'bearish',
+            rationaleKo: '애널리스트 목표주가가 하향 조정됐습니다.',
+        },
     ],
     riskFactorsKo: ['경쟁 심화', '금리 인상 영향'],
     overallSentiment: 'bearish',
 };
 
 const MOCK_NEWS: NewsAnalysisResponse = {
-    currentDriverKo: '최근 실적 실망과 수요 우려가 주가 하락을 이끌고 있습니다.',
+    currentDriverKo:
+        '최근 실적 실망과 수요 우려가 주가 하락을 이끌고 있습니다.',
     keyEventsKo: ['Q1 인도량 예상 하회', 'EU 보조금 축소 발표'],
     upcomingEventsKo: ['2025-07-30 실적 발표 예정'],
     overallSentiment: 'bearish',
@@ -59,7 +87,7 @@ describe('buildOverallAnalysisPrompt', () => {
             MOCK_TECHNICAL,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,
-            '5Min' as Timeframe,
+            '5Min' as Timeframe
         );
 
         expect(prompt).toContain('TSLA');
@@ -80,7 +108,7 @@ describe('buildOverallAnalysisPrompt', () => {
             MOCK_TECHNICAL,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,
-            '1Day' as Timeframe,
+            '1Day' as Timeframe
         );
 
         expect(prompt).toContain('TSLA');
@@ -100,7 +128,7 @@ describe('buildOverallAnalysisPrompt', () => {
             MOCK_TECHNICAL,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,
-            '1Hour' as Timeframe,
+            '1Hour' as Timeframe
         );
 
         // Technical summary content

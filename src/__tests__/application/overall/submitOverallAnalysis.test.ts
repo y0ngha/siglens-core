@@ -18,7 +18,11 @@ import type {
     NewsAnalysisResponse,
 } from '@/domain/types';
 import type { SubmitOverallAnalysisOptions } from '@/application/overall/types';
-import { makeEnrichedNewsItem, makeCalendarItem, minimalProvider } from './fixtures';
+import {
+    makeEnrichedNewsItem,
+    makeCalendarItem,
+    minimalProvider,
+} from './fixtures';
 
 const mockResolveOverallDependencies = resolveOverallDependencies as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -210,7 +214,10 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
-                expect.objectContaining({ symbol: 'AAPL', modelId: 'gemini-2.5-flash' })
+                expect.objectContaining({
+                    symbol: 'AAPL',
+                    modelId: 'gemini-2.5-flash',
+                })
             );
         });
 
@@ -224,7 +231,9 @@ describe('submitOverallAnalysis 함수는', () => {
                 'https://worker.test/analyze',
                 expect.objectContaining({
                     method: 'POST',
-                    headers: expect.objectContaining({ 'X-Worker-Secret': 'test-secret' }),
+                    headers: expect.objectContaining({
+                        'X-Worker-Secret': 'test-secret',
+                    }),
                 })
             );
         });

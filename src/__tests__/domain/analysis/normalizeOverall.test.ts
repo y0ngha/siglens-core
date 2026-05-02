@@ -32,9 +32,18 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
             expect(result.headlineKo).toBe(
                 '기술적 강세와 양호한 펀더멘탈이 복합 상승을 지지합니다.'
             );
-            expect(result.technicalBulletsKo).toEqual(['RSI 상승 다이버전스', '50일 이평선 돌파']);
-            expect(result.fundamentalBulletsKo).toEqual(['EPS 성장 지속', '부채비율 안정']);
-            expect(result.newsBulletsKo).toEqual(['어닝 서프라이즈 연속', 'CEO 신뢰도 상승']);
+            expect(result.technicalBulletsKo).toEqual([
+                'RSI 상승 다이버전스',
+                '50일 이평선 돌파',
+            ]);
+            expect(result.fundamentalBulletsKo).toEqual([
+                'EPS 성장 지속',
+                '부채비율 안정',
+            ]);
+            expect(result.newsBulletsKo).toEqual([
+                '어닝 서프라이즈 연속',
+                'CEO 신뢰도 상승',
+            ]);
             expect(result.threeAxisConclusionKo).toBe(
                 '세 가지 축 모두 긍정적 신호를 보내고 있습니다.'
             );
@@ -44,7 +53,10 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 triggerConditionKo: '저항선 돌파 시',
                 priceRangeKo: '200~220달러',
             });
-            expect(result.riskFactorsKo).toEqual(['금리 인상 위험', '규제 리스크']);
+            expect(result.riskFactorsKo).toEqual([
+                '금리 인상 위험',
+                '규제 리스크',
+            ]);
         });
     });
 

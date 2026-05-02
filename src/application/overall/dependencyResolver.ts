@@ -55,7 +55,12 @@ export interface OverallDependencyInputs {
      */
     technical: Pick<
         SubmitAnalysisOptions,
-        'usage' | 'tierContext' | 'tierConfig' | 'modelId' | 'userApiKey' | 'waitUntil'
+        | 'usage'
+        | 'tierContext'
+        | 'tierConfig'
+        | 'modelId'
+        | 'userApiKey'
+        | 'waitUntil'
     >;
     /**
      * Options forwarded verbatim to `submitFundamentalAnalysis`.
@@ -95,7 +100,10 @@ export interface DependencyStateCached {
  */
 export interface DependencyStatePending {
     kind: 'pending';
-    pendingJobs: Record<'technical' | 'fundamental' | 'news', string | undefined>;
+    pendingJobs: Record<
+        'technical' | 'fundamental' | 'news',
+        string | undefined
+    >;
 }
 
 /**
@@ -185,9 +193,13 @@ export async function resolveOverallDependencies(
 
     // ── Determine pending job IDs for each axis ──
     const technicalJobId =
-        technicalResult.status === 'submitted' ? technicalResult.jobId : undefined;
+        technicalResult.status === 'submitted'
+            ? technicalResult.jobId
+            : undefined;
     const fundamentalJobId =
-        fundamentalResult.status === 'submitted' ? fundamentalResult.jobId : undefined;
+        fundamentalResult.status === 'submitted'
+            ? fundamentalResult.jobId
+            : undefined;
     const newsJobId =
         newsResult.status === 'submitted' ? newsResult.jobId : undefined;
 

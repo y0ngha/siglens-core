@@ -1,7 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { hashAnalysisInput } from '@/application/analysisInputHash';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
-import type { SubmitOverallAnalysisOptions, SubmitOverallAnalysisResult } from '@/application/overall/types';
+import type {
+    SubmitOverallAnalysisOptions,
+    SubmitOverallAnalysisResult,
+} from '@/application/overall/types';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
@@ -67,7 +70,12 @@ export async function submitOverallAnalysis(
     const inputHash = hashAnalysisInput(
         JSON.stringify({ t: deps.technical, f: deps.fundamental, n: deps.news })
     );
-    const cacheKey = buildOverallCacheKey(symbol, timeframe, modelId, inputHash);
+    const cacheKey = buildOverallCacheKey(
+        symbol,
+        timeframe,
+        modelId,
+        inputHash
+    );
     const cache = createCacheProvider();
 
     if (cache !== null) {

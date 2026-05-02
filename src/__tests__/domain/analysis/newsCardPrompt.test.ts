@@ -10,9 +10,9 @@ const FULL_NEWS_ITEM: NewsItem = {
     source: 'Bloomberg',
     url: 'https://bloomberg.com/nvda-ai-chips',
     publishedAt: '2025-04-28T14:30:00Z',
-    titleEn: 'Nvidia unveils next-gen AI chip platform targeting data center workloads',
-    bodyEn:
-        'Nvidia Corporation announced its next generation of AI-focused GPU chips on Monday, targeting enterprise data center customers. The new platform promises a 3x performance improvement over the previous generation.',
+    titleEn:
+        'Nvidia unveils next-gen AI chip platform targeting data center workloads',
+    bodyEn: 'Nvidia Corporation announced its next generation of AI-focused GPU chips on Monday, targeting enterprise data center customers. The new platform promises a 3x performance improvement over the previous generation.',
 };
 
 const NULL_BODY_NEWS_ITEM: NewsItem = {
@@ -35,7 +35,9 @@ describe('buildNewsCardAnalysisPrompt', () => {
         expect(prompt).toContain('NVDA');
         expect(prompt).toContain('Bloomberg');
         expect(prompt).toContain('2025-04-28T14:30:00Z');
-        expect(prompt).toContain('Nvidia unveils next-gen AI chip platform targeting data center workloads');
+        expect(prompt).toContain(
+            'Nvidia unveils next-gen AI chip platform targeting data center workloads'
+        );
         expect(prompt).toContain('Nvidia Corporation announced');
 
         // Output schema fields

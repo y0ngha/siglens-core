@@ -96,7 +96,10 @@ export async function pollNewsCardAnalysis(
                 cache
                     .set(meta.cacheKey, result, NEWS_CARD_CACHE_TTL_SECONDS)
                     .catch(error =>
-                        console.error('[PollNewsCard] Cache write failed:', error)
+                        console.error(
+                            '[PollNewsCard] Cache write failed:',
+                            error
+                        )
                     ),
                 options
             );

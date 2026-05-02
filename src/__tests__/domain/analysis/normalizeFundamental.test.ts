@@ -28,7 +28,10 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
 
             expect(result.overallConclusionKo).toBe('전반적으로 긍정적입니다.');
             expect(result.overallSentiment).toBe('bullish');
-            expect(result.riskFactorsKo).toEqual(['금리 상승 위험', '환율 변동 위험']);
+            expect(result.riskFactorsKo).toEqual([
+                '금리 상승 위험',
+                '환율 변동 위험',
+            ]);
             expect(result.categoryAssessments).toHaveLength(2);
             expect(result.categoryAssessments[0]).toEqual({
                 category: 'valuation',
@@ -85,7 +88,10 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
         it('overallSentiment가 유효하지 않으면 에러를 던진다', () => {
-            const invalid = { ...validPayload, overallSentiment: 'very_bullish' };
+            const invalid = {
+                ...validPayload,
+                overallSentiment: 'very_bullish',
+            };
             expect(() =>
                 normalizeFundamentalAnalysisResponse(JSON.stringify(invalid))
             ).toThrow();
@@ -95,7 +101,10 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
             const invalid = {
                 ...validPayload,
                 categoryAssessments: [
-                    { ...validPayload.categoryAssessments[0], sentiment: 'unknown' },
+                    {
+                        ...validPayload.categoryAssessments[0],
+                        sentiment: 'unknown',
+                    },
                 ],
             };
             expect(() =>
@@ -107,7 +116,10 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
             const invalid = {
                 ...validPayload,
                 categoryAssessments: [
-                    { ...validPayload.categoryAssessments[0], category: 'invalid_cat' },
+                    {
+                        ...validPayload.categoryAssessments[0],
+                        category: 'invalid_cat',
+                    },
                 ],
             };
             expect(() =>

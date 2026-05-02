@@ -96,7 +96,10 @@ export async function pollOverallAnalysis(
                 cache
                     .set(meta.cacheKey, result, OVERALL_CACHE_TTL_SECONDS)
                     .catch(error =>
-                        console.error('[PollOverall] Cache write failed:', error)
+                        console.error(
+                            '[PollOverall] Cache write failed:',
+                            error
+                        )
                     ),
                 options
             );

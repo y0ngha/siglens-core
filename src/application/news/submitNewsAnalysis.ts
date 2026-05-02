@@ -130,7 +130,12 @@ export async function submitNewsAnalysis(
     }
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildNewsAnalysisPrompt(symbol, news, upcomingCalendar, skills);
+    const prompt = buildNewsAnalysisPrompt(
+        symbol,
+        news,
+        upcomingCalendar,
+        skills
+    );
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {

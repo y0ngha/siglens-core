@@ -104,9 +104,7 @@ function formatFundamentalContext(
  * @param payload - The {@link NewsAnalysisResponse} to format.
  * @returns A markdown section string.
  */
-function formatNewsContext(
-    payload: NewsAnalysisResponse
-): string {
+function formatNewsContext(payload: NewsAnalysisResponse): string {
     return [
         `Overall Sentiment: ${payload.overallSentiment}`,
         `Current Driver: ${payload.currentDriverKo}`,
@@ -122,9 +120,7 @@ function formatNewsContext(
  * @param payload - The {@link OverallAnalysisResponse} to format.
  * @returns A markdown section string.
  */
-function formatOverallContext(
-    payload: OverallAnalysisResponse
-): string {
+function formatOverallContext(payload: OverallAnalysisResponse): string {
     return [
         `Headline: ${payload.headlineKo}`,
         `Three-axis Conclusion: ${payload.threeAxisConclusionKo}`,

@@ -172,7 +172,9 @@ describe('normalizeFundamentalSnapshot — happy path (all fields populated)', (
 
     it('futureDirection.analystEstimate가 올바르게 매핑된다', () => {
         expect(result.futureDirection.analystEstimateEps).toBe(1.62);
-        expect(result.futureDirection.analystEstimateRevenue).toBe(94_000_000_000);
+        expect(result.futureDirection.analystEstimateRevenue).toBe(
+            94_000_000_000
+        );
     });
 
     it('futureDirection.gradesConsensus가 그대로 전달된다', () => {
@@ -184,13 +186,19 @@ describe('normalizeFundamentalSnapshot — happy path (all fields populated)', (
         expect(result.futureDirection.priceTargetConsensus!.high).toBe(230.0);
         expect(result.futureDirection.priceTargetConsensus!.low).toBe(150.0);
         expect(result.futureDirection.priceTargetConsensus!.median).toBe(200.0);
-        expect(result.futureDirection.priceTargetConsensus!.consensus).toBe(198.5);
+        expect(result.futureDirection.priceTargetConsensus!.consensus).toBe(
+            198.5
+        );
     });
 
     it('priceTargetSummary: lastMonth→month1Avg, lastQuarter→month3Avg, lastYear→year1Avg', () => {
         expect(result.futureDirection.priceTargetSummary).not.toBeNull();
-        expect(result.futureDirection.priceTargetSummary!.month1Avg).toBe(195.0);
-        expect(result.futureDirection.priceTargetSummary!.month3Avg).toBe(190.0);
+        expect(result.futureDirection.priceTargetSummary!.month1Avg).toBe(
+            195.0
+        );
+        expect(result.futureDirection.priceTargetSummary!.month3Avg).toBe(
+            190.0
+        );
         expect(result.futureDirection.priceTargetSummary!.year1Avg).toBe(180.0);
     });
 
@@ -390,7 +398,7 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
             keyMetricsTtm: null,
             ratiosTtm: null,
             cashFlow: null,
-            incomeGrowth: { growthRevenue: 0.15, growthEPS: 0.20 },
+            incomeGrowth: { growthRevenue: 0.15, growthEPS: 0.2 },
             financialScores: null,
             peers: [],
             analystEstimate: null,
@@ -403,7 +411,7 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
         });
 
         expect(result.growth.revenueYoy).toBe(0.15);
-        expect(result.growth.epsYoy).toBe(0.20);
+        expect(result.growth.epsYoy).toBe(0.2);
     });
 
     it('debtRatioTTM → health.debtRatio, currentRatioTTM → health.currentRatio', () => {
@@ -487,7 +495,10 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
             incomeGrowth: null,
             financialScores: null,
             peers: [],
-            analystEstimate: { estimatedEpsAvg: 2.05, estimatedRevenueAvg: 120_000_000_000 },
+            analystEstimate: {
+                estimatedEpsAvg: 2.05,
+                estimatedRevenueAvg: 120_000_000_000,
+            },
             gradesConsensus: null,
             priceTargetConsensus: null,
             priceTargetSummary: null,
@@ -497,7 +508,9 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
         });
 
         expect(result.futureDirection.analystEstimateEps).toBe(2.05);
-        expect(result.futureDirection.analystEstimateRevenue).toBe(120_000_000_000);
+        expect(result.futureDirection.analystEstimateRevenue).toBe(
+            120_000_000_000
+        );
     });
 
     it('sectorHistorical[i].changesPercentage → historical[i].changePct', () => {

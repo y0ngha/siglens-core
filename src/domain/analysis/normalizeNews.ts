@@ -74,7 +74,11 @@ function requireNewsCategory(value: unknown, field: string): NewsCategory {
 export function normalizeNewsCardAnalysis(raw: string): NewsCardAnalysis {
     const parsed = extractJsonFromLlmResponse(raw);
 
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+    ) {
         throw new Error('NewsCardAnalysis: payload must be a JSON object');
     }
     const o = parsed as Record<string, unknown>;
@@ -122,22 +126,35 @@ export function normalizeNewsAnalysisResponse(
 ): NewsAnalysisResponse {
     const parsed = extractJsonFromLlmResponse(raw);
 
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+    ) {
         throw new Error('NewsAnalysisResponse: payload must be a JSON object');
     }
     const o = parsed as Record<string, unknown>;
 
     if (typeof o.currentDriverKo !== 'string') {
-        throw new Error('NewsAnalysisResponse: missing required field "currentDriverKo"');
+        throw new Error(
+            'NewsAnalysisResponse: missing required field "currentDriverKo"'
+        );
     }
     if (!Array.isArray(o.keyEventsKo)) {
-        throw new Error('NewsAnalysisResponse: missing required field "keyEventsKo"');
+        throw new Error(
+            'NewsAnalysisResponse: missing required field "keyEventsKo"'
+        );
     }
     if (!Array.isArray(o.upcomingEventsKo)) {
-        throw new Error('NewsAnalysisResponse: missing required field "upcomingEventsKo"');
+        throw new Error(
+            'NewsAnalysisResponse: missing required field "upcomingEventsKo"'
+        );
     }
 
-    const overallSentiment = requireNewsSentiment(o.overallSentiment, 'overallSentiment');
+    const overallSentiment = requireNewsSentiment(
+        o.overallSentiment,
+        'overallSentiment'
+    );
 
     return {
         currentDriverKo: o.currentDriverKo,

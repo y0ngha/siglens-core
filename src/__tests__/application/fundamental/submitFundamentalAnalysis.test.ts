@@ -146,9 +146,11 @@ describe('submitFundamentalAnalysis 함수는', () => {
         });
 
         it('워커에 jobId, prompt, model을 포함한 body를 전송한다', async () => {
-            mockFireAndForget.mockImplementationOnce((promise: Promise<unknown>) => {
-                void promise; // track that it was called but don't await
-            });
+            mockFireAndForget.mockImplementationOnce(
+                (promise: Promise<unknown>) => {
+                    void promise; // track that it was called but don't await
+                }
+            );
 
             // We need to verify fetch is called with correct args — capture via fetch mock
             // Since fireAndForget wraps the fetch, we test what was passed by checking
@@ -195,11 +197,23 @@ describe('submitFundamentalAnalysis 함수는', () => {
             // TierConfig with restrictions enabled and analysisPerDay limit of 1 for free tier.
             const restrictedTierConfig = {
                 limits: {
-                    analysisPerDay: { free: 1, member: Infinity, pro: Infinity },
-                    chatbotPerDay: { free: Infinity, member: Infinity, pro: Infinity },
+                    analysisPerDay: {
+                        free: 1,
+                        member: Infinity,
+                        pro: Infinity,
+                    },
+                    chatbotPerDay: {
+                        free: Infinity,
+                        member: Infinity,
+                        pro: Infinity,
+                    },
                 },
                 timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
-                infoDepth: { free: ['summary'], member: ['summary'], pro: ['summary'] },
+                infoDepth: {
+                    free: ['summary'],
+                    member: ['summary'],
+                    pro: ['summary'],
+                },
                 models: {
                     free: ['gemini-2.5-flash'],
                     member: ['gemini-2.5-flash'],
@@ -218,7 +232,9 @@ describe('submitFundamentalAnalysis 함수는', () => {
                     usageRepository: {
                         recordUsage: vi.fn(),
                         // Returns analysis count already at the limit (1 >= 1)
-                        getUsageToday: vi.fn().mockResolvedValue({ analysis: 1, chatbot: 0 }),
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 1, chatbot: 0 }),
                     },
                     clientIp: '203.0.113.10',
                 },

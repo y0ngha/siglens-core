@@ -14,8 +14,7 @@ import type { OverallAnalysisResponse } from '@/domain/types';
  * before invoking {@link submitOverallAnalysis}.
  */
 export interface SubmitOverallAnalysisOptions
-    extends OverallDependencyInputs,
-        BackgroundTaskOptions {}
+    extends OverallDependencyInputs, BackgroundTaskOptions {}
 
 /** The caller receives a cached overall analysis — no new job was created. */
 export interface SubmitOverallAnalysisCached {
@@ -35,7 +34,10 @@ export interface SubmitOverallAnalysisPendingDependencies {
      * Maps each axis to its background `jobId`, or `undefined` if that
      * axis already resolved from cache and is not pending.
      */
-    pendingJobs: Record<'technical' | 'fundamental' | 'news', string | undefined>;
+    pendingJobs: Record<
+        'technical' | 'fundamental' | 'news',
+        string | undefined
+    >;
 }
 
 /** A new overall analysis job was submitted; poll with `jobId` for the result. */

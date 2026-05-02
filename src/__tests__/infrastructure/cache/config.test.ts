@@ -117,22 +117,20 @@ describe('new analysis cache keys', () => {
     });
 
     it('buildNewsCacheKey same shape', () => {
-        expect(
-            buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')
-        ).toBe('analysis:news:AAPL:gemini-2.5-pro:h2');
+        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')).toBe(
+            'analysis:news:AAPL:gemini-2.5-pro:h2'
+        );
     });
 
     it('buildNewsCardCacheKey is per-news-id (model fixed flash-lite)', () => {
         const k = buildNewsCardCacheKey('news-12345');
-        expect(k).toBe(
-            'analysis:news-card:news-12345:gemini-2.5-flash-lite'
-        );
+        expect(k).toBe('analysis:news-card:news-12345:gemini-2.5-flash-lite');
     });
 
     it('buildOverallCacheKey includes timeframe', () => {
-        expect(
-            buildOverallCacheKey('AAPL', '5m', 'gemini-2.5-pro', 'h3')
-        ).toBe('analysis:overall:AAPL:5m:gemini-2.5-pro:h3');
+        expect(buildOverallCacheKey('AAPL', '5m', 'gemini-2.5-pro', 'h3')).toBe(
+            'analysis:overall:AAPL:5m:gemini-2.5-pro:h3'
+        );
     });
 
     it('TTL constants match SECONDS_PER_DAY', () => {

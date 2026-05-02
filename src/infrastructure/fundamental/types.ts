@@ -165,7 +165,7 @@ export interface FundamentalDataProvider {
      * @returns Raw price target consensus, or `null` if unavailable.
      */
     getPriceTargetConsensus(
-        symbol: string,
+        symbol: string
     ): Promise<RawPriceTargetConsensus | null>;
 
     /**
@@ -175,7 +175,7 @@ export interface FundamentalDataProvider {
      * @returns Raw price target summary, or `null` if unavailable.
      */
     getPriceTargetSummary(
-        symbol: string,
+        symbol: string
     ): Promise<RawPriceTargetSummary | null>;
 
     /**
@@ -195,7 +195,7 @@ export interface FundamentalDataProvider {
      * @returns Array of historical sector performance entries.
      */
     getHistoricalSectorPerformance(
-        sector: string,
+        sector: string
     ): Promise<RawHistoricalSectorPerformance[]>;
 
     /**
