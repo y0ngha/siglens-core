@@ -25,7 +25,7 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import { describe, expect, it, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 describe('cache config constants', () => {
     it('ANALYSIS_CACHE_TTL values', () => {
