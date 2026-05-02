@@ -416,7 +416,9 @@ export type SkillCategory =
     | 'reversal_bearish'
     | 'continuation_bullish'
     | 'continuation_bearish'
-    | 'neutral';
+    | 'neutral'
+    | 'fundamental' // 펀더멘털 분석 Skills
+    | 'news'; // 뉴스 분석 Skills
 
 /** Chart-rendering directive carried by a skill (color, label, style). */
 export interface SkillChartDisplay {
@@ -1301,3 +1303,201 @@ export type WaitUntil = (promise: Promise<unknown>) => void;
 
 /** Canonical API key provider identifier. Single source of truth for key storage routing. */
 export type LlmProvider = 'anthropic' | 'google' | 'openai';
+
+// ─────────────────────────────────────────
+// Fundamental analysis
+// ─────────────────────────────────────────
+
+export type FundamentalSentiment = 'bullish' | 'neutral' | 'bearish';
+
+export interface FundamentalCategoryAssessment {
+    /** 'valuation' | 'profitability' | 'growth' | 'health' | 'futureDirection' */
+    category:
+        | 'valuation'
+        | 'profitability'
+        | 'growth'
+        | 'health'
+        | 'futureDirection';
+    sentiment: FundamentalSentiment;
+    /** 한 단락 평가 (한국어). */
+    rationaleKo: string;
+}
+
+export interface FundamentalAnalysisResponse {
+    /** 종합 결론 (한 단락, 한국어). */
+    overallConclusionKo: string;
+    /** 카테고리별 평가. */
+    categoryAssessments: FundamentalCategoryAssessment[];
+    /** 위험 요인 bullets (한국어). */
+    riskFactorsKo: string[];
+    /** 종합 sentiment (강세/중립/약세). */
+    overallSentiment: FundamentalSentiment;
+}
+
+/** Fundamental 분석 prompt에 들어가는 정규화된 데이터. */
+export interface FundamentalSnapshot {
+    profile: {
+        symbol: string;
+        companyName: string;
+        sector: string;
+        industry: string;
+        marketCap: number;
+        ceo: string | null;
+        website: string | null;
+        description: string | null;
+    };
+    valuation: {
+        per: number | null;
+        psr: number | null;
+        pbr: number | null;
+        peg: number | null;
+        evToEbitda: number | null;
+        eps: number | null;
+        sectorAverages?: {
+            per: number | null;
+            psr: number | null;
+        };
+    };
+    peers: Array<{ symbol: string; companyName: string; marketCap: number }>;
+    profitability: {
+        roe: number | null;
+        roa: number | null;
+        operatingMargin: number | null;
+        netMargin: number | null;
+    };
+    growth: {
+        revenueYoy: number | null;
+        epsYoy: number | null;
+    };
+    health: {
+        debtRatio: number | null;
+        currentRatio: number | null;
+        operatingCashFlow: number | null;
+        altmanZScore: number | null;
+        piotroskiScore: number | null;
+    };
+    futureDirection: {
+        nextEarningsAt: string | null; // ISO date
+        analystEstimateEps: number | null;
+        analystEstimateRevenue: number | null;
+        gradesConsensus: {
+            strongBuy: number;
+            buy: number;
+            hold: number;
+            sell: number;
+            strongSell: number;
+        } | null;
+        priceTargetConsensus: {
+            high: number | null;
+            low: number | null;
+            median: number | null;
+            consensus: number | null;
+        } | null;
+        priceTargetSummary: {
+            month1Avg: number | null;
+            month3Avg: number | null;
+            year1Avg: number | null;
+        } | null;
+    };
+    sectorDirection: {
+        todayChangePct: number | null;
+        historical: Array<{ date: string; changePct: number }>;
+    };
+}
+
+// ─────────────────────────────────────────
+// News analysis
+// ─────────────────────────────────────────
+
+export type NewsSentiment = 'bullish' | 'neutral' | 'bearish';
+
+export type NewsCategory =
+    | 'earnings'
+    | 'm_and_a'
+    | 'guidance'
+    | 'regulation'
+    | 'macro'
+    | 'product'
+    | 'other';
+
+export interface NewsItem {
+    id: string;
+    symbol: string;
+    source: string;
+    url: string;
+    publishedAt: string; // ISO
+    titleEn: string;
+    bodyEn: string | null;
+}
+
+export interface NewsCardAnalysis {
+    titleKo: string;
+    bodyKo: string | null;
+    summaryKo: string; // 한 줄 요약
+    sentiment: NewsSentiment;
+    category: NewsCategory;
+}
+
+export interface NewsAnalysisResponse {
+    /** 종합 분석 첫 단락 (한국어): "현재 가격 흐름의 뉴스 원인". A 보강에서 인용. */
+    currentDriverKo: string;
+    /** 핵심 이벤트 3-5개 bullets. */
+    keyEventsKo: string[];
+    /** 향후 주의 이벤트 bullets. */
+    upcomingEventsKo: string[];
+    overallSentiment: NewsSentiment;
+}
+
+export interface EarningsCalendarItem {
+    symbol: string;
+    earningsDate: string; // ISO date
+    epsActual: number | null;
+    epsEstimated: number | null;
+    revenueActual: number | null;
+    revenueEstimated: number | null;
+    lastUpdated: string; // ISO date
+}
+
+export interface EarningsReport {
+    symbol: string;
+    earningsDate: string;
+    raw: unknown;
+}
+
+export interface GradesEvent {
+    symbol: string;
+    date: string;
+    gradingCompany: string;
+    previousGrade: string | null;
+    newGrade: string;
+    action: 'upgrade' | 'downgrade' | 'maintained' | 'initiated' | 'other';
+}
+
+// ─────────────────────────────────────────
+// Overall analysis
+// ─────────────────────────────────────────
+
+export type OverallScenarioName = 'bullish' | 'neutral' | 'bearish';
+
+export interface OverallScenario {
+    name: OverallScenarioName;
+    triggerConditionKo: string;
+    priceRangeKo: string;
+}
+
+export interface OverallAnalysisResponse {
+    /** 한 줄 정의 + 현재 상태 1단락. */
+    headlineKo: string;
+    /** 기술 분석 요약 bullets. */
+    technicalBulletsKo: string[];
+    /** 펀더 요약 bullets. */
+    fundamentalBulletsKo: string[];
+    /** 뉴스 요약 bullets. */
+    newsBulletsKo: string[];
+    /** 3축 종합 결론 큰 박스 (한 단락 또는 두 단락). */
+    threeAxisConclusionKo: string;
+    /** 시나리오 분석. */
+    scenarios: OverallScenario[];
+    /** 위험 요인 bullets. */
+    riskFactorsKo: string[];
+}
