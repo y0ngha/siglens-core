@@ -146,8 +146,7 @@ export async function submitFundamentalAnalysis(
                 ?.changesPercentage ?? null;
 
         snapshot = normalizeFundamentalSnapshot({
-            // Map RawProfile.mktCap → FundamentalProfileInput.marketCap
-            profile: { ...profile, marketCap: profile.mktCap },
+            profile,
             keyMetricsTtm,
             ratiosTtm,
             cashFlow,

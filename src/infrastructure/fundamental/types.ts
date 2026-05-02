@@ -2,14 +2,21 @@
  * FundamentalDataProvider infrastructure types.
  *
  * FMP-specific `Raw*` response shapes are defined here as infrastructure-layer
- * types owned by the FMP adapter. They structurally satisfy the domain-neutral
- * `Fundamental*Input` interfaces consumed by `normalizeFundamentalSnapshot`
- * (TypeScript structural typing guarantees compatibility when field names align).
+ * types owned by the FMP adapter. The Raw* types represent the FMP-source shapes
+ * that adapters typically receive before mapping to domain-neutral input interfaces.
+ *
+ * Provider implementations are responsible for adapting their source-specific shapes
+ * (e.g. FMP's `mktCap`) to the domain-neutral input interfaces. The `FundamentalDataProvider`
+ * interface exposes the domain-neutral types — concrete adapters must perform any
+ * field-name or shape mapping before returning.
  *
  * Consumer (siglens) implements `FundamentalDataProvider` using FMP `/stable/*`
  * endpoints. Core depends only on the interface — never on the concrete HTTP client.
  */
-import type { GradesEvent } from '@/domain/types';
+import type {
+    FundamentalProfileInput,
+    GradesEvent,
+} from '@/domain/types';
 
 // ─────────────────────────────────────────
 // FMP-specific Raw* response shapes (infrastructure-owned)
@@ -21,6 +28,7 @@ export interface RawProfile {
     companyName: string;
     sector: string;
     industry: string;
+    /** FMP-specific field name. Adapters must map this to `FundamentalProfileInput.marketCap` before returning from `getProfile`. */
     mktCap: number;
     ceo: string | null;
     website: string | null;
@@ -141,10 +149,10 @@ export interface RawEarningsReport {
  * Fundamental data fetcher abstraction. Consumer (siglens) implements via
  * FMP `/stable/*` endpoints. Core only depends on this interface.
  *
- * Each method returns the raw FMP response shape (or null / empty array if
- * the data is unavailable). The Raw* types structurally satisfy the domain-neutral
- * `Fundamental*Input` interfaces, so normalization via `normalizeFundamentalSnapshot`
- * works without any intermediate mapping layer.
+ * Provider implementations are responsible for adapting their source-specific shapes
+ * (e.g. FMP's `mktCap`) to the domain-neutral input interfaces before returning.
+ * The Raw* types in this file represent the FMP-source shapes that adapters typically
+ * receive before mapping.
  *
  * @see normalizeFundamentalSnapshot
  */
@@ -152,10 +160,13 @@ export interface FundamentalDataProvider {
     /**
      * Fetch company profile (name, sector, industry, market cap, CEO, …).
      *
+     * Implementations must map source-specific field names to {@link FundamentalProfileInput}
+     * before returning (e.g. FMP's `mktCap` → `marketCap`).
+     *
      * @param symbol - Ticker symbol (e.g. `"AAPL"`).
-     * @returns Raw profile object, or `null` if unavailable.
+     * @returns Domain-neutral profile object, or `null` if unavailable.
      */
-    getProfile(symbol: string): Promise<RawProfile | null>;
+    getProfile(symbol: string): Promise<FundamentalProfileInput | null>;
 
     /**
      * Fetch TTM key metrics (valuation multiples, EPS).
@@ -215,6 +226,9 @@ export interface FundamentalDataProvider {
 
     /**
      * Fetch the latest grading actions (analyst rating changes) for a symbol.
+     *
+     * @todo Reserved for a future analysis phase that surfaces individual rating events.
+     *   Current `submitFundamentalAnalysis` uses `getGradesConsensus` (aggregated counts) only.
      *
      * @param symbol - U.S. equity ticker.
      * @param limit - Maximum number of recent grading events to return.
