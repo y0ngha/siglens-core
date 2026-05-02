@@ -210,7 +210,8 @@ export async function loadSkillsCached(): Promise<Skill[]> {
     if (_cachedSkills !== null) return _cachedSkills;
     try {
         _cachedSkills = await new FileSkillsLoader().loadSkills();
-    } catch {
+    } catch (error) {
+        console.error('[loadSkillsCached] Skills load failed:', error);
         _cachedSkills = [];
     }
     return _cachedSkills;

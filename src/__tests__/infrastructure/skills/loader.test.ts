@@ -331,6 +331,25 @@ describe('loadSkillsCached', () => {
         loadSkillsSpy.mockRestore();
     });
 
+    it('loadSkills 가 실패하면 console.error 를 호출한다', async () => {
+        const error = new Error('ENOENT: no such file or directory');
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockRejectedValue(error);
+        const consoleErrorSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        await loadSkillsCached();
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            '[loadSkillsCached] Skills load failed:',
+            error
+        );
+        loadSkillsSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+    });
+
     it('clearSkillsCache 호출 후 다시 loadSkills 를 호출한다', async () => {
         const loadSkillsSpy = vi
             .spyOn(FileSkillsLoader.prototype, 'loadSkills')
