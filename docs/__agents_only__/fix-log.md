@@ -370,3 +370,57 @@
 - Violation: SkillCategory type has inline Korean comments on 'fundamental' and 'news' members
 - Rule: FF Principle 2-B Consistency — mixed comment patterns (some members documented, others not) break readability consistency
 - Context: Inline Korean comments removed; SkillCategory JSDoc relies on type name for clarity per existing pattern in domain/types.ts
+
+## [PR #75 Round 3 | feat/fundamental-news-analysis | 2026-05-02]
+
+### Blockers (9 findings)
+
+- Violation: 8 internal cache helpers/constants leaked to public API (src/index.ts)
+- Rule: MISTAKES.md Public API & Module Exports §6.5 — internal implementation constants must not be re-exported
+- Context: Cache helpers (ANALYSIS_CACHE_KEY, NEWS_CACHE_KEY, etc.) removed from src/index.ts; marked @internal in cache/config.ts
+
+- Violation: 5 public types defined in implementation file (application/overall/dependencyResolver.ts, src/index.ts)
+- Rule: MISTAKES.md Architecture §4 — public interfaces must be defined in types.ts, not implementation files
+- Context: OverallDependencyInputs, DependencyState variants moved to application/overall/types.ts; src/index.ts updated to import from types.ts
+
+- Violation: `as XxxSentiment` type casts post-`.includes()` guard lacking guarantee comments
+- Rule: MISTAKES.md TypeScript §7 — safe-cast `as` must be accompanied by guarantee comment
+- Context: Added guarantee comments to all 3 cast locations (normalize{Fundamental,News,Overall}.ts) documenting that .includes() guard ensures the type
+
+- Violation: Inline `Array<{date: string; changePct: number}>` instead of named `SectorHistoricalPoint[]` type
+- Rule: MISTAKES.md TypeScript §5 — inline shapes must be extracted to named type aliases
+- Context: SectorHistoricalPoint[] imported and used in normalizeFundamentalSnapshot.ts
+
+- Violation: Mixed-shape error union prevents type narrowing (application/{fundamental,news}/types.ts)
+- Rule: MISTAKES.md TypeScript §8 — sibling error types must use discriminated union pattern
+- Context: Error union split into discriminated LimitError / FetchError / NoNewsError variants with distinct code fields; submit functions return variant-specific types
+
+- Violation: `loadSkillsCached` failure not exposed as `skillsDegraded` flag (infrastructure/skills/loader.ts + submit functions + jobs/types.ts)
+- Rule: MISTAKES.md Domain Functions §2 — silent fallback forbidden; degradation must be exposed to caller
+- Context: loadSkillsCached() now returns { skills, skillsDegraded: boolean }; submit functions propagate to JobMeta
+
+- Violation: Duplicate `'gemini-2.5-flash-lite'` literal in two locations (infrastructure/cache/config.ts + application/news/submitNewsCardAnalysis.ts)
+- Rule: MISTAKES.md Public API & Module Exports §6.5 / Coding Paradigm §13 — hardcoded literals must be extracted to named constants
+- Context: NEWS_CARD_MODEL_ID constant exported from cache/config.ts (@internal); submitNewsCardAnalysis.ts imports it
+
+- Violation: Tier 1 public functions missing JSDoc (application/{fundamental,news}/cancelXxxAnalysisJob.ts)
+- Rule: MISTAKES.md Documentation Sync §4 — Tier 1 public exports require full JSDoc (@param, @returns, @see)
+- Context: Full JSDoc with parameter/returns/see tags added to cancelFundamentalAnalysisJob and cancelNewsAnalysisJob
+
+- Violation: Inline callback type annotation when TS could infer (application/fundamental/submitFundamentalAnalysis.ts)
+- Rule: CONVENTIONS.md / TypeScript best practices — prefer inference over redundant explicit annotations
+- Context: Inline callback type annotation removed; TypeScript inference sufficient after type chain settles
+
+### Suggestions (3 findings, already-documented patterns)
+
+- Violation: New function `hashAnalysisInput` lacks unit tests
+- Rule: MISTAKES.md Tests §15 — all new infrastructure/domain functions require 100% branch coverage
+- Context: 5 test cases added to application/analysisInputHash.test.ts covering empty/null/collision scenarios
+
+- Violation: Module JSDoc references future Phase 4 capability not yet implemented (domain/tier.ts)
+- Rule: CONVENTIONS.md / Documentation Sync §3 — JSDoc must describe current behavior, not aspirational future
+- Context: Phase 4 reference removed from tier.ts JSDoc
+
+- Violation: 14 input interfaces should live in domain/types.ts for centralization (normalizeFundamentalSnapshot.ts + imports)
+- Rule: MISTAKES.md Architecture §1 — shared domain types must be centralized in domain/types.ts
+- Context: 14 Fundamental*Input interfaces moved to domain/types.ts; src/index.ts export path updated
