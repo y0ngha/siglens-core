@@ -1,10 +1,8 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
-import type { EarningsCalendarItem, NewsCardAnalysis, NewsItem, Skill } from '@/domain/types';
-
-/** A news item enriched with the per-card translation and sentiment analysis. */
-type EnrichedNewsItem = NewsItem & { card: NewsCardAnalysis };
+import type { EarningsCalendarItem, EnrichedNewsItem, Skill } from '@/domain/types';
+import { formatNullableNumber as fmt } from './promptFormat';
 
 /** Filter skills to news category with sufficient confidence weight. */
 function filterNewsSkills(skills: readonly Skill[]): Skill[] {
@@ -25,11 +23,6 @@ function formatNewsItem(item: EnrichedNewsItem, index: number): string {
         lines.push(`    Body (KO): ${item.card.bodyKo}`);
     }
     return lines.join('\n');
-}
-
-/** Null-safe formatter: returns number to `dp` decimal places or `'N/A'`. */
-function fmt(n: number | null | undefined, dp = 2): string {
-    return n == null ? 'N/A' : n.toFixed(dp);
 }
 
 /** Format upcoming earnings calendar items into a compact block. */

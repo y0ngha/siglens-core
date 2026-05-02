@@ -2,11 +2,7 @@
 
 import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type { FundamentalSnapshot, Skill } from '@/domain/types';
-
-/** Null-safe formatter: returns the number rounded to `dp` decimal places, or `'N/A'`. */
-function fmt(n: number | null | undefined, dp = 2): string {
-    return n == null ? 'N/A' : n.toFixed(dp);
-}
+import { formatNullableNumber as fmt } from './promptFormat';
 
 /** Filter skills to fundamental category with sufficient confidence weight. */
 function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {

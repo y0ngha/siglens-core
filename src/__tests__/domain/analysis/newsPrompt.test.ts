@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
-import type { EarningsCalendarItem, NewsCardAnalysis, NewsItem, Skill } from '@/domain/types';
+import type { EarningsCalendarItem, EnrichedNewsItem, Skill } from '@/domain/types';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const TEST_SYMBOL = 'AAPL';
-
-type EnrichedNewsItem = NewsItem & { card: NewsCardAnalysis };
 
 const NEWS_ITEM_1: EnrichedNewsItem = {
     id: 'n1',

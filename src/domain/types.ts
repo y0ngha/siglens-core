@@ -1495,6 +1495,13 @@ export interface NewsCardAnalysis {
     category: NewsCategory;
 }
 
+/**
+ * News item paired with its LLM-analyzed card metadata (translation, sentiment, summary).
+ * Used as input to {@link buildNewsAnalysisPrompt} and downstream consumers that need
+ * pre-analyzed news flow.
+ */
+export type EnrichedNewsItem = NewsItem & { card: NewsCardAnalysis };
+
 /** LLM-generated aggregate news analysis result returned to the caller. */
 export interface NewsAnalysisResponse {
     /** 종합 분석 첫 단락 (한국어): "현재 가격 흐름의 뉴스 원인". A 보강에서 인용. */
