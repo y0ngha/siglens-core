@@ -205,7 +205,6 @@ export { extendTrendline } from './domain/analysis/trendline';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
-export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
@@ -289,6 +288,9 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// LLM provider constants
+export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';

@@ -63,7 +63,6 @@ export {
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
-export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating
 export {
@@ -210,6 +209,9 @@ export {
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
+
+// LLM provider constants
+export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Dashboard tickers / sectors
 export {

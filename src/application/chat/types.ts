@@ -37,10 +37,10 @@ export interface RequestChatCompletionParams {
      */
     freeApiKey?: string;
     /**
-     * User-registered API key. Required for non-`'pro'`-tier users requesting
-     * a premium model. Omitting it in that case returns `user_api_key_required`.
-     * `'pro'`-tier users are exempt — the server covers all models via
-     * `freeApiKey` and never requires a personal key.
+     * User-registered API key. Must be provided when a non-`'pro'`-tier user
+     * requests a premium model. Omitting it in that case returns
+     * `user_api_key_required`. `'pro'`-tier users are exempt — the server
+     * covers all models via `freeApiKey` and never requires a personal key.
      */
     paidApiKey?: string;
     occurredAt?: Date;

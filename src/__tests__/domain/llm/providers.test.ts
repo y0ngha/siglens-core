@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { GEMINI_2_5_FLASH_MODEL } from '@/application/chat/constants';
 import { getProviderForModel } from '@/domain/llm/providers';
 import type { ModelId } from '@/domain/types';
 
 describe('getProviderForModel', () => {
     describe('active models resolved via MODEL_SPECS', () => {
         it('returns google for gemini-2.5-flash', () => {
-            expect(getProviderForModel('gemini-2.5-flash')).toBe('google');
+            expect(getProviderForModel(GEMINI_2_5_FLASH_MODEL)).toBe('google');
         });
 
         it('returns anthropic for claude-haiku-3-5', () => {
