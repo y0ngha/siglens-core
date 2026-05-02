@@ -8,37 +8,48 @@ import type {
 } from '@/domain/types';
 
 /**
- * Human-readable label for each timeframe displayed in the prompt header.
+ * Per-timeframe label and context string injected into the overall analysis prompt.
+ *
+ * - `label`: Human-readable label for the prompt header (e.g. `"5-Minute"`).
+ * - `context`: Orientation text for the LLM analyst. Short-term frames emphasise
+ *   intraday price dynamics; longer frames shift focus to positional and multi-day
+ *   trend analysis.
  *
  * Matches the canonical {@link Timeframe} literals used throughout the codebase.
  */
-const TIMEFRAME_LABEL: Record<Timeframe, string> = {
-    '5Min': '5-Minute',
-    '15Min': '15-Minute',
-    '30Min': '30-Minute',
-    '1Hour': '1-Hour',
-    '4Hour': '4-Hour',
-    '1Day': 'Daily',
-};
-
-/**
- * Timeframe context injected into the prompt to orient the LLM analyst.
- *
- * Short-term frames emphasise intraday price dynamics; longer frames shift
- * focus to positional and multi-day trend analysis.
- */
-const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
-    '5Min': 'Very short-term intraday chart. Focus on immediate momentum and near-term price catalysts. Macro and fundamental inputs should be treated as background context, not primary drivers.',
-    '15Min':
-        'Short-term intraday chart. Integrate technical signals with news flow. Fundamental data provides context for intraday support/resistance interpretation.',
-    '30Min':
-        'Intraday chart with moderate signal reliability. Technical, fundamental, and news inputs carry roughly equal weight. Identify the dominant intraday trend.',
-    '1Hour':
-        'Medium-term chart. Divergences and cross-axis confirmations (technical + fundamental + news) carry meaningful weight. Good for swing entry/exit evaluation.',
-    '4Hour':
-        'Swing trading positional chart. All three axes (technical, fundamental, news) should converge before taking a strong directional stance. Multi-day trends dominate.',
-    '1Day': 'Daily positional chart. Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for medium- to long-term position analysis.',
-};
+const TIMEFRAME_CONFIG: Record<Timeframe, { label: string; context: string }> =
+    {
+        '5Min': {
+            label: '5-Minute',
+            context:
+                'Very short-term intraday chart. Focus on immediate momentum and near-term price catalysts. Macro and fundamental inputs should be treated as background context, not primary drivers.',
+        },
+        '15Min': {
+            label: '15-Minute',
+            context:
+                'Short-term intraday chart. Integrate technical signals with news flow. Fundamental data provides context for intraday support/resistance interpretation.',
+        },
+        '30Min': {
+            label: '30-Minute',
+            context:
+                'Intraday chart with moderate signal reliability. Technical, fundamental, and news inputs carry roughly equal weight. Identify the dominant intraday trend.',
+        },
+        '1Hour': {
+            label: '1-Hour',
+            context:
+                'Medium-term chart. Divergences and cross-axis confirmations (technical + fundamental + news) carry meaningful weight. Good for swing entry/exit evaluation.',
+        },
+        '4Hour': {
+            label: '4-Hour',
+            context:
+                'Swing trading positional chart. All three axes (technical, fundamental, news) should converge before taking a strong directional stance. Multi-day trends dominate.',
+        },
+        '1Day': {
+            label: 'Daily',
+            context:
+                'Daily positional chart. Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for medium- to long-term position analysis.',
+        },
+    };
 
 /** Formats technical analysis fields (trend, risk, key levels, price targets, patterns) into prompt lines. */
 function formatTechnical(tech: AnalysisResponse): string {
@@ -151,8 +162,7 @@ export function buildOverallAnalysisPrompt(
     news: NewsAnalysisResponse,
     timeframe: Timeframe
 ): string {
-    const label = TIMEFRAME_LABEL[timeframe];
-    const context = TIMEFRAME_CONTEXT[timeframe];
+    const { label, context } = TIMEFRAME_CONFIG[timeframe];
 
     return `You are a senior equity analyst integrating technical, fundamental, and news analysis into a unified investment verdict. Analyse the three-axis data for ${symbol} on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
 
