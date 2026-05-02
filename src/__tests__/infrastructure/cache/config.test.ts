@@ -111,36 +111,34 @@ describe('cache key builders', () => {
 });
 
 describe('new analysis cache keys', () => {
-    test('buildFundamentalCacheKey is symbol+model+input_hash deterministic', () => {
+    it('returns analysis:fundamental:{symbol}:{model}:{hash} format', () => {
         const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
-        const b = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
-        expect(a).toBe(b);
-        expect(a).toMatch(/^analysis:fundamental:AAPL:gemini-2\.5-pro:h1$/);
+        expect(a).toBe('analysis:fundamental:AAPL:gemini-2.5-pro:h1');
     });
 
-    test('buildNewsCacheKey same shape', () => {
+    it('buildNewsCacheKey same shape', () => {
         expect(
             buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')
-        ).toMatch(/^analysis:news:AAPL:gemini-2\.5-pro:h2$/);
+        ).toBe('analysis:news:AAPL:gemini-2.5-pro:h2');
     });
 
-    test('buildNewsCardCacheKey is per-news-id (model fixed flash-lite)', () => {
+    it('buildNewsCardCacheKey is per-news-id (model fixed flash-lite)', () => {
         const k = buildNewsCardCacheKey('news-12345');
         expect(k).toBe(
             'analysis:news-card:news-12345:gemini-2.5-flash-lite'
         );
     });
 
-    test('buildOverallCacheKey includes timeframe', () => {
+    it('buildOverallCacheKey includes timeframe', () => {
         expect(
             buildOverallCacheKey('AAPL', '5m', 'gemini-2.5-pro', 'h3')
         ).toBe('analysis:overall:AAPL:5m:gemini-2.5-pro:h3');
     });
 
-    test('TTL constants are sane', () => {
-        expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBeGreaterThan(0);
-        expect(NEWS_CACHE_TTL_SECONDS).toBeGreaterThan(0);
-        expect(NEWS_CARD_CACHE_TTL_SECONDS).toBeGreaterThan(0);
-        expect(OVERALL_CACHE_TTL_SECONDS).toBeGreaterThan(0);
+    it('TTL constants match SECONDS_PER_DAY', () => {
+        expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+        expect(NEWS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+        expect(NEWS_CARD_CACHE_TTL_SECONDS).toBe(30 * SECONDS_PER_DAY);
+        expect(OVERALL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
     });
 });

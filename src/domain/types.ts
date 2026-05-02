@@ -1308,21 +1308,26 @@ export type LlmProvider = 'anthropic' | 'google' | 'openai';
 // Fundamental analysis
 // ─────────────────────────────────────────
 
+/** Sentiment label for a single fundamental analysis category or summary. Equivalent shape to {@link Trend} and {@link NewsSentiment}; kept separate for domain clarity. */
 export type FundamentalSentiment = 'bullish' | 'neutral' | 'bearish';
 
+/** Named union for the five fundamental analysis categories. */
+export type FundamentalCategory =
+    | 'valuation'
+    | 'profitability'
+    | 'growth'
+    | 'health'
+    | 'futureDirection';
+
+/** Per-category assessment summary used by the fundamental analysis response. */
 export interface FundamentalCategoryAssessment {
-    /** 'valuation' | 'profitability' | 'growth' | 'health' | 'futureDirection' */
-    category:
-        | 'valuation'
-        | 'profitability'
-        | 'growth'
-        | 'health'
-        | 'futureDirection';
+    category: FundamentalCategory;
     sentiment: FundamentalSentiment;
     /** 한 단락 평가 (한국어). */
     rationaleKo: string;
 }
 
+/** LLM-generated fundamental analysis result returned to the caller. */
 export interface FundamentalAnalysisResponse {
     /** 종합 결론 (한 단락, 한국어). */
     overallConclusionKo: string;
@@ -1334,81 +1339,128 @@ export interface FundamentalAnalysisResponse {
     overallSentiment: FundamentalSentiment;
 }
 
+/** Company profile fields included in the fundamental snapshot. */
+export interface FundamentalProfile {
+    symbol: string;
+    companyName: string;
+    sector: string;
+    industry: string;
+    marketCap: number;
+    ceo: string | null;
+    website: string | null;
+    description: string | null;
+}
+
+/** Sector-average multiples used for valuation comparison. */
+export interface FundamentalSectorAverages {
+    per: number | null;
+    psr: number | null;
+}
+
+/** Valuation multiples and optional sector benchmarks. */
+export interface FundamentalValuation {
+    per: number | null;
+    psr: number | null;
+    pbr: number | null;
+    peg: number | null;
+    evToEbitda: number | null;
+    eps: number | null;
+    sectorAverages?: FundamentalSectorAverages;
+}
+
+/** Single peer entry for relative valuation context. */
+export interface FundamentalPeer {
+    symbol: string;
+    companyName: string;
+    marketCap: number;
+}
+
+/** Profitability metrics. */
+export interface FundamentalProfitability {
+    roe: number | null;
+    roa: number | null;
+    operatingMargin: number | null;
+    netMargin: number | null;
+}
+
+/** Revenue and EPS year-over-year growth rates. */
+export interface FundamentalGrowth {
+    revenueYoy: number | null;
+    epsYoy: number | null;
+}
+
+/** Financial health and solvency metrics. */
+export interface FundamentalHealth {
+    debtRatio: number | null;
+    currentRatio: number | null;
+    operatingCashFlow: number | null;
+    altmanZScore: number | null;
+    piotroskiScore: number | null;
+}
+
+/** Analyst grade breakdown (buy/hold/sell counts). */
+export interface GradesConsensus {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+}
+
+/** Analyst price target consensus range. */
+export interface PriceTargetConsensus {
+    high: number | null;
+    low: number | null;
+    median: number | null;
+    consensus: number | null;
+}
+
+/** Rolling average price targets over recent months and year. */
+export interface PriceTargetSummary {
+    month1Avg: number | null;
+    month3Avg: number | null;
+    year1Avg: number | null;
+}
+
+/** Forward-looking metrics: earnings estimate, analyst grades, and price targets. */
+export interface FundamentalFutureDirection {
+    nextEarningsAt: string | null; // ISO date
+    analystEstimateEps: number | null;
+    analystEstimateRevenue: number | null;
+    gradesConsensus: GradesConsensus | null;
+    priceTargetConsensus: PriceTargetConsensus | null;
+    priceTargetSummary: PriceTargetSummary | null;
+}
+
+/** Single historical data point for sector performance. */
+export interface SectorHistoricalPoint {
+    date: string;
+    changePct: number;
+}
+
+/** Sector-level price direction including recent history. */
+export interface FundamentalSectorDirection {
+    todayChangePct: number | null;
+    historical: SectorHistoricalPoint[];
+}
+
 /** Fundamental 분석 prompt에 들어가는 정규화된 데이터. */
 export interface FundamentalSnapshot {
-    profile: {
-        symbol: string;
-        companyName: string;
-        sector: string;
-        industry: string;
-        marketCap: number;
-        ceo: string | null;
-        website: string | null;
-        description: string | null;
-    };
-    valuation: {
-        per: number | null;
-        psr: number | null;
-        pbr: number | null;
-        peg: number | null;
-        evToEbitda: number | null;
-        eps: number | null;
-        sectorAverages?: {
-            per: number | null;
-            psr: number | null;
-        };
-    };
-    peers: Array<{ symbol: string; companyName: string; marketCap: number }>;
-    profitability: {
-        roe: number | null;
-        roa: number | null;
-        operatingMargin: number | null;
-        netMargin: number | null;
-    };
-    growth: {
-        revenueYoy: number | null;
-        epsYoy: number | null;
-    };
-    health: {
-        debtRatio: number | null;
-        currentRatio: number | null;
-        operatingCashFlow: number | null;
-        altmanZScore: number | null;
-        piotroskiScore: number | null;
-    };
-    futureDirection: {
-        nextEarningsAt: string | null; // ISO date
-        analystEstimateEps: number | null;
-        analystEstimateRevenue: number | null;
-        gradesConsensus: {
-            strongBuy: number;
-            buy: number;
-            hold: number;
-            sell: number;
-            strongSell: number;
-        } | null;
-        priceTargetConsensus: {
-            high: number | null;
-            low: number | null;
-            median: number | null;
-            consensus: number | null;
-        } | null;
-        priceTargetSummary: {
-            month1Avg: number | null;
-            month3Avg: number | null;
-            year1Avg: number | null;
-        } | null;
-    };
-    sectorDirection: {
-        todayChangePct: number | null;
-        historical: Array<{ date: string; changePct: number }>;
-    };
+    profile: FundamentalProfile;
+    valuation: FundamentalValuation;
+    peers: FundamentalPeer[];
+    profitability: FundamentalProfitability;
+    growth: FundamentalGrowth;
+    health: FundamentalHealth;
+    futureDirection: FundamentalFutureDirection;
+    sectorDirection: FundamentalSectorDirection;
 }
 
 // ─────────────────────────────────────────
 // News analysis
 // ─────────────────────────────────────────
 
+/** Sentiment label for an individual news article or aggregate news flow. Equivalent shape to {@link Trend} and {@link FundamentalSentiment}; kept separate for domain clarity. */
 export type NewsSentiment = 'bullish' | 'neutral' | 'bearish';
 
 export type NewsCategory =
@@ -1420,6 +1472,7 @@ export type NewsCategory =
     | 'product'
     | 'other';
 
+/** Raw news article fetched from the data provider before translation or analysis. */
 export interface NewsItem {
     id: string;
     symbol: string;
@@ -1430,6 +1483,7 @@ export interface NewsItem {
     bodyEn: string | null;
 }
 
+/** Per-card translation and sentiment result produced by the flash-lite model. */
 export interface NewsCardAnalysis {
     titleKo: string;
     bodyKo: string | null;
@@ -1438,6 +1492,7 @@ export interface NewsCardAnalysis {
     category: NewsCategory;
 }
 
+/** LLM-generated aggregate news analysis result returned to the caller. */
 export interface NewsAnalysisResponse {
     /** 종합 분석 첫 단락 (한국어): "현재 가격 흐름의 뉴스 원인". A 보강에서 인용. */
     currentDriverKo: string;
@@ -1448,6 +1503,7 @@ export interface NewsAnalysisResponse {
     overallSentiment: NewsSentiment;
 }
 
+/** Scheduled or reported earnings event with actual vs. estimated figures. */
 export interface EarningsCalendarItem {
     symbol: string;
     earningsDate: string; // ISO date
@@ -1458,19 +1514,29 @@ export interface EarningsCalendarItem {
     lastUpdated: string; // ISO date
 }
 
+/** Raw earnings report payload as returned by the data provider. */
 export interface EarningsReport {
     symbol: string;
     earningsDate: string;
     raw: unknown;
 }
 
+/** Named union for the action type on an analyst grade change event. */
+export type GradesAction =
+    | 'upgrade'
+    | 'downgrade'
+    | 'maintained'
+    | 'initiated'
+    | 'other';
+
+/** Single analyst grade change event for a symbol. */
 export interface GradesEvent {
     symbol: string;
     date: string;
     gradingCompany: string;
     previousGrade: string | null;
     newGrade: string;
-    action: 'upgrade' | 'downgrade' | 'maintained' | 'initiated' | 'other';
+    action: GradesAction;
 }
 
 // ─────────────────────────────────────────
@@ -1479,12 +1545,14 @@ export interface GradesEvent {
 
 export type OverallScenarioName = 'bullish' | 'neutral' | 'bearish';
 
+/** Single bullish/neutral/bearish scenario with trigger condition and price range. */
 export interface OverallScenario {
     name: OverallScenarioName;
     triggerConditionKo: string;
     priceRangeKo: string;
 }
 
+/** LLM-generated 3-axis (technical + fundamental + news) overall analysis result. */
 export interface OverallAnalysisResponse {
     /** 한 줄 정의 + 현재 상태 1단락. */
     headlineKo: string;
