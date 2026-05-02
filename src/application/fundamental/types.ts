@@ -52,17 +52,6 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
     now?: Date;
 }
 
-/** @internal Machine-readable error code for fundamental analysis submission failures. */
-export type SubmitFundamentalAnalysisErrorCode =
-    | 'usage_limit_exceeded'
-    | 'fetch_failed';
-
-/** @internal Outcome status variants for fundamental analysis submission. */
-export type SubmitFundamentalAnalysisResultStatus =
-    | 'cached'
-    | 'submitted'
-    | 'error';
-
 /** @internal The caller receives a cached analysis — no new job was created. */
 export interface SubmitFundamentalAnalysisCached {
     status: 'cached';
@@ -75,19 +64,26 @@ export interface SubmitFundamentalAnalysisSubmitted {
     jobId: string;
 }
 
-/** @internal An application-level gate prevented the job from being submitted. */
-export interface SubmitFundamentalAnalysisError {
+/** @internal Result variant when the daily analysis limit is exceeded. */
+export interface SubmitFundamentalAnalysisLimitError {
     status: 'error';
-    code: SubmitFundamentalAnalysisErrorCode;
-    /** Human-readable explanation, or a structured limit error for `usage_limit_exceeded`. */
-    error?: AnalysisLimitError | string;
+    code: 'usage_limit_exceeded';
+    error: AnalysisLimitError;
+}
+
+/** @internal Result variant when the provider fetch or data normalization fails. */
+export interface SubmitFundamentalAnalysisFetchError {
+    status: 'error';
+    code: 'fetch_failed';
+    error?: string;
 }
 
 /** Union of all possible outcomes from {@link submitFundamentalAnalysis}. */
 export type SubmitFundamentalAnalysisResult =
     | SubmitFundamentalAnalysisCached
     | SubmitFundamentalAnalysisSubmitted
-    | SubmitFundamentalAnalysisError;
+    | SubmitFundamentalAnalysisLimitError
+    | SubmitFundamentalAnalysisFetchError;
 
 // ─────────────────────────────────────────
 // Poll

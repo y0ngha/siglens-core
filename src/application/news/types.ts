@@ -56,9 +56,6 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     now?: Date;
 }
 
-/** @internal Machine-readable error code for news analysis submission failures. */
-export type SubmitNewsAnalysisErrorCode = 'usage_limit_exceeded' | 'no_news';
-
 /** @internal The caller receives a cached analysis — no new job was created. */
 export interface SubmitNewsAnalysisCached {
     status: 'cached';
@@ -71,19 +68,26 @@ export interface SubmitNewsAnalysisSubmitted {
     jobId: string;
 }
 
-/** @internal An application-level gate prevented the job from being submitted. */
-export interface SubmitNewsAnalysisError {
+/** @internal Result variant when no news items were provided to analyze. */
+export interface SubmitNewsAnalysisNoNewsError {
     status: 'error';
-    code: SubmitNewsAnalysisErrorCode;
-    /** Human-readable explanation, or a structured limit error for `usage_limit_exceeded`. */
-    error?: AnalysisLimitError | string;
+    code: 'no_news';
+    error: string;
+}
+
+/** @internal Result variant when the daily analysis limit is exceeded. */
+export interface SubmitNewsAnalysisLimitError {
+    status: 'error';
+    code: 'usage_limit_exceeded';
+    error: AnalysisLimitError;
 }
 
 /** Union of all possible outcomes from {@link submitNewsAnalysis}. */
 export type SubmitNewsAnalysisResult =
     | SubmitNewsAnalysisCached
     | SubmitNewsAnalysisSubmitted
-    | SubmitNewsAnalysisError;
+    | SubmitNewsAnalysisNoNewsError
+    | SubmitNewsAnalysisLimitError;
 
 // ─────────────────────────────────────────
 // Poll News Analysis
