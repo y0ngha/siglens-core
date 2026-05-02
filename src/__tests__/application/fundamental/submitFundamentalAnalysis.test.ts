@@ -34,7 +34,7 @@ const validProfile = {
     companyName: 'Apple Inc.',
     sector: 'Technology',
     industry: 'Consumer Electronics',
-    mktCap: 3000000000000,
+    marketCap: 3000000000000,
     ceo: 'Tim Cook',
     website: 'https://www.apple.com',
     description: null,
