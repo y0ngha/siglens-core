@@ -1,49 +1,137 @@
 /**
  * FundamentalDataProvider infrastructure types.
  *
- * Raw FMP response shapes live in `src/domain/analysis/normalizeFundamentalSnapshot.ts`
- * (pure shape definitions owned by domain). This file re-exports them for
- * infrastructure consumers that need to implement `FundamentalDataProvider`, and
- * defines the provider interface itself.
+ * FMP-specific `Raw*` response shapes are defined here as infrastructure-layer
+ * types owned by the FMP adapter. They structurally satisfy the domain-neutral
+ * `Fundamental*Input` interfaces consumed by `normalizeFundamentalSnapshot`
+ * (TypeScript structural typing guarantees compatibility when field names align).
  *
- * Consumer (siglens) implements `FundamentalDataProvider` using FMP `/stable/*` endpoints.
- * Core depends only on the interface — never on the concrete HTTP client.
+ * Consumer (siglens) implements `FundamentalDataProvider` using FMP `/stable/*`
+ * endpoints. Core depends only on the interface — never on the concrete HTTP client.
  */
 import type { GradesEvent } from '@/domain/types';
 
-import type {
-    RawProfile,
-    RawKeyMetricsTtm,
-    RawRatiosTtm,
-    RawIncomeGrowth,
-    RawFinancialScore,
-    RawStockPeer,
-    RawAnalystEstimate,
-    RawGradesConsensus,
-    RawPriceTargetConsensus,
-    RawPriceTargetSummary,
-    RawSectorPerformance,
-    RawHistoricalSectorPerformance,
-    RawCashFlowStatement,
-    RawEarningsReport,
-} from '@/domain/analysis/normalizeFundamentalSnapshot';
+// ─────────────────────────────────────────
+// FMP-specific Raw* response shapes (infrastructure-owned)
+// ─────────────────────────────────────────
 
-export type {
-    RawProfile,
-    RawKeyMetricsTtm,
-    RawRatiosTtm,
-    RawIncomeGrowth,
-    RawFinancialScore,
-    RawStockPeer,
-    RawAnalystEstimate,
-    RawGradesConsensus,
-    RawPriceTargetConsensus,
-    RawPriceTargetSummary,
-    RawSectorPerformance,
-    RawHistoricalSectorPerformance,
-    RawCashFlowStatement,
-    RawEarningsReport,
-};
+/** @internal Raw FMP company profile fields (subset used by the snapshot normalizer). */
+export interface RawProfile {
+    symbol: string;
+    companyName: string;
+    sector: string;
+    industry: string;
+    mktCap: number;
+    ceo: string | null;
+    website: string | null;
+    description: string | null;
+}
+
+/** @internal Raw FMP key metrics (TTM). Covers valuation multiples needed for snapshot. */
+export interface RawKeyMetricsTtm {
+    peRatioTTM: number | null;
+    priceToSalesRatioTTM: number | null;
+    pbRatioTTM: number | null;
+    pegRatioTTM: number | null;
+    enterpriseValueOverEBITDATTM: number | null;
+    epsTTM: number | null;
+}
+
+/** @internal Raw FMP ratios (TTM). Covers profitability and health metrics. */
+export interface RawRatiosTtm {
+    returnOnEquityTTM: number | null;
+    returnOnAssetsTTM: number | null;
+    operatingProfitMarginTTM: number | null;
+    netProfitMarginTTM: number | null;
+    debtRatioTTM: number | null;
+    currentRatioTTM: number | null;
+}
+
+/** @internal Raw FMP income statement growth (year-over-year). */
+export interface RawIncomeGrowth {
+    growthRevenue: number | null;
+    growthEPS: number | null;
+}
+
+/** @internal Raw FMP financial scores (Altman Z-score + Piotroski F-score). */
+export interface RawFinancialScore {
+    altmanZScore: number | null;
+    piotroskiScore: number | null;
+}
+
+/** @internal Raw FMP stock peer entry used for peer comparison table. */
+export interface RawStockPeer {
+    symbol: string;
+    companyName: string;
+    marketCap: number;
+}
+
+/**
+ * @internal
+ * Raw FMP analyst estimate (next quarter averages).
+ * `estimatedEpsAvg` and `estimatedRevenueAvg` are the consensus mean values.
+ */
+export interface RawAnalystEstimate {
+    estimatedEpsAvg: number | null;
+    estimatedRevenueAvg: number | null;
+}
+
+/** @internal Raw FMP analyst grade consensus breakdown. */
+export interface RawGradesConsensus {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+}
+
+/**
+ * @internal
+ * Raw FMP price target consensus (high / low / median / mean).
+ */
+export interface RawPriceTargetConsensus {
+    targetHigh: number | null;
+    targetLow: number | null;
+    targetMedian: number | null;
+    targetConsensus: number | null;
+}
+
+/**
+ * @internal
+ * Raw FMP price target summary grouped by lookback window.
+ * `lastMonth` → 1-month avg, `lastQuarter` → 3-month avg, `lastYear` → 12-month avg.
+ */
+export interface RawPriceTargetSummary {
+    lastMonth: { avgPriceTarget: number | null };
+    lastQuarter: { avgPriceTarget: number | null };
+    lastYear: { avgPriceTarget: number | null };
+}
+
+/** @internal Raw FMP sector performance snapshot for a single trading date. */
+export interface RawSectorPerformance {
+    sector: string;
+    changesPercentage: number;
+}
+
+/** @internal Raw FMP historical sector performance entry (one row per date per sector). */
+export interface RawHistoricalSectorPerformance {
+    date: string;
+    sector: string;
+    changesPercentage: number;
+}
+
+/** @internal Raw FMP cash flow statement (subset — operating cash flow only). */
+export interface RawCashFlowStatement {
+    operatingCashFlow: number | null;
+}
+
+/** @internal Raw FMP earnings report for a symbol. `raw` preserves the full provider payload. */
+export interface RawEarningsReport {
+    symbol: string;
+    /** ISO date of the earnings event. Named `earningsDate` to match {@link EarningsReport.earningsDate}. */
+    earningsDate: string;
+    raw: unknown;
+}
 
 // ─────────────────────────────────────────
 // Provider interface
@@ -54,8 +142,9 @@ export type {
  * FMP `/stable/*` endpoints. Core only depends on this interface.
  *
  * Each method returns the raw FMP response shape (or null / empty array if
- * the data is unavailable). Normalization to domain `FundamentalSnapshot`
- * happens in the domain layer via `normalizeFundamentalSnapshot`.
+ * the data is unavailable). The Raw* types structurally satisfy the domain-neutral
+ * `Fundamental*Input` interfaces, so normalization via `normalizeFundamentalSnapshot`
+ * works without any intermediate mapping layer.
  *
  * @see normalizeFundamentalSnapshot
  */

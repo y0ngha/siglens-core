@@ -1,22 +1,22 @@
 /**
- * Raw FMP response shapes consumed by `normalizeFundamentalSnapshot`.
+ * Domain-neutral input shapes consumed by `normalizeFundamentalSnapshot`.
  *
- * These interfaces live in domain because they describe the _input shape_ of a
- * pure normalization function — not the wire format of any concrete HTTP client.
- * The infrastructure `FundamentalDataProvider` returns objects that structurally
- * satisfy these interfaces; domain never imports from infrastructure.
+ * These interfaces describe the _domain role_ of each input to the pure
+ * normalization function — not the wire format of any concrete HTTP provider.
+ * Infrastructure adapters (e.g. FMP) return objects that structurally satisfy
+ * these interfaces; domain never imports from infrastructure.
  *
- * Consistent with the existing pattern: `Bar`, `IndicatorResult`, etc. are
- * defined in domain and produced by infrastructure.
+ * Naming convention: `Fundamental<Role>Input` — describes what the field
+ * represents in the business domain, not which API it comes from.
  */
 import type { FundamentalSnapshot } from '@/domain/types';
 
 // ─────────────────────────────────────────
-// Raw FMP response shapes (domain-owned)
+// Domain-neutral input shapes
 // ─────────────────────────────────────────
 
-/** Raw FMP company profile fields (subset used by the snapshot normalizer). */
-export interface RawProfile {
+/** Company identity and market classification fields required for snapshot normalization. */
+export interface FundamentalProfileInput {
     symbol: string;
     companyName: string;
     sector: string;
@@ -27,8 +27,8 @@ export interface RawProfile {
     description: string | null;
 }
 
-/** Raw FMP key metrics (TTM). Covers valuation multiples needed for snapshot. */
-export interface RawKeyMetricsTtm {
+/** Valuation multiples and per-share earnings metrics (trailing-twelve-month). */
+export interface FundamentalValuationMetrics {
     peRatioTTM: number | null;
     priceToSalesRatioTTM: number | null;
     pbRatioTTM: number | null;
@@ -37,8 +37,8 @@ export interface RawKeyMetricsTtm {
     epsTTM: number | null;
 }
 
-/** Raw FMP ratios (TTM). Covers profitability and health metrics. */
-export interface RawRatiosTtm {
+/** Profitability and financial health ratios (trailing-twelve-month). */
+export interface FundamentalRatiosInput {
     returnOnEquityTTM: number | null;
     returnOnAssetsTTM: number | null;
     operatingProfitMarginTTM: number | null;
@@ -47,36 +47,36 @@ export interface RawRatiosTtm {
     currentRatioTTM: number | null;
 }
 
-/** Raw FMP income statement growth (year-over-year). */
-export interface RawIncomeGrowth {
+/** Year-over-year income statement growth rates. */
+export interface FundamentalGrowthInput {
     growthRevenue: number | null;
     growthEPS: number | null;
 }
 
-/** Raw FMP financial scores (Altman Z-score + Piotroski F-score). */
-export interface RawFinancialScore {
+/** Composite financial health scores (Altman Z-score + Piotroski F-score). */
+export interface FundamentalFinancialScoresInput {
     altmanZScore: number | null;
     piotroskiScore: number | null;
 }
 
-/** Raw FMP stock peer entry used for peer comparison table. */
-export interface RawStockPeer {
+/** Peer company entry used for the peer comparison table. */
+export interface FundamentalPeerInput {
     symbol: string;
     companyName: string;
     marketCap: number;
 }
 
 /**
- * Raw FMP analyst estimate (next quarter averages).
- * `estimatedEpsAvg` and `estimatedRevenueAvg` are the consensus mean values.
+ * Consensus analyst estimate for the next reporting quarter.
+ * `estimatedEpsAvg` and `estimatedRevenueAvg` are the mean values.
  */
-export interface RawAnalystEstimate {
+export interface FundamentalAnalystEstimateInput {
     estimatedEpsAvg: number | null;
     estimatedRevenueAvg: number | null;
 }
 
-/** Raw FMP analyst grade consensus breakdown. */
-export interface RawGradesConsensus {
+/** Buy/hold/sell grade consensus breakdown from analyst ratings. */
+export interface FundamentalGradesConsensusInput {
     strongBuy: number;
     buy: number;
     hold: number;
@@ -85,10 +85,10 @@ export interface RawGradesConsensus {
 }
 
 /**
- * Raw FMP price target consensus (high / low / median / mean).
+ * Analyst price target consensus (high / low / median / mean).
  * Maps to domain {@link PriceTargetConsensus} via `normalizeFundamentalSnapshot`.
  */
-export interface RawPriceTargetConsensus {
+export interface FundamentalPriceTargetConsensusInput {
     targetHigh: number | null;
     targetLow: number | null;
     targetMedian: number | null;
@@ -96,36 +96,36 @@ export interface RawPriceTargetConsensus {
 }
 
 /**
- * Raw FMP price target summary grouped by lookback window.
+ * Rolling average price targets grouped by lookback window.
  * `lastMonth` → 1-month avg, `lastQuarter` → 3-month avg, `lastYear` → 12-month avg.
  * Maps to domain {@link PriceTargetSummary} via `normalizeFundamentalSnapshot`.
  */
-export interface RawPriceTargetSummary {
+export interface FundamentalPriceTargetSummaryInput {
     lastMonth: { avgPriceTarget: number | null };
     lastQuarter: { avgPriceTarget: number | null };
     lastYear: { avgPriceTarget: number | null };
 }
 
-/** Raw FMP sector performance snapshot for a single trading date. */
-export interface RawSectorPerformance {
+/** Sector performance snapshot entry for a single trading date. */
+export interface FundamentalSectorPerformanceEntry {
     sector: string;
     changesPercentage: number;
 }
 
-/** Raw FMP historical sector performance entry (one row per date per sector). */
-export interface RawHistoricalSectorPerformance {
+/** Historical daily sector performance entry (one row per date per sector). */
+export interface FundamentalSectorHistoricalEntry {
     date: string;
     sector: string;
     changesPercentage: number;
 }
 
-/** Raw FMP cash flow statement (subset — operating cash flow only). */
-export interface RawCashFlowStatement {
+/** Cash flow statement input (subset — operating cash flow only). */
+export interface FundamentalCashFlowInput {
     operatingCashFlow: number | null;
 }
 
-/** Raw FMP earnings report for a symbol. `raw` preserves the full provider payload. */
-export interface RawEarningsReport {
+/** Earnings report entry for a symbol. `raw` preserves the full provider payload. */
+export interface FundamentalEarningsReportInput {
     symbol: string;
     /** ISO date of the earnings event. Named `earningsDate` to match {@link EarningsReport.earningsDate}. */
     earningsDate: string;
@@ -178,17 +178,17 @@ const toPercent = (v: number | null | undefined): number | null =>
  * @returns A fully typed `FundamentalSnapshot` ready for prompt builders and UI.
  */
 export function normalizeFundamentalSnapshot(input: {
-    profile: RawProfile;
-    keyMetricsTtm: RawKeyMetricsTtm | null;
-    ratiosTtm: RawRatiosTtm | null;
-    cashFlow: RawCashFlowStatement | null;
-    incomeGrowth: RawIncomeGrowth | null;
-    financialScores: RawFinancialScore | null;
-    peers: RawStockPeer[];
-    analystEstimate: RawAnalystEstimate | null;
-    gradesConsensus: RawGradesConsensus | null;
-    priceTargetConsensus: RawPriceTargetConsensus | null;
-    priceTargetSummary: RawPriceTargetSummary | null;
+    profile: FundamentalProfileInput;
+    keyMetricsTtm: FundamentalValuationMetrics | null;
+    ratiosTtm: FundamentalRatiosInput | null;
+    cashFlow: FundamentalCashFlowInput | null;
+    incomeGrowth: FundamentalGrowthInput | null;
+    financialScores: FundamentalFinancialScoresInput | null;
+    peers: FundamentalPeerInput[];
+    analystEstimate: FundamentalAnalystEstimateInput | null;
+    gradesConsensus: FundamentalGradesConsensusInput | null;
+    priceTargetConsensus: FundamentalPriceTargetConsensusInput | null;
+    priceTargetSummary: FundamentalPriceTargetSummaryInput | null;
     nextEarningsAt: string | null;
     sectorTodayChangePct: number | null;
     sectorHistorical: Array<{ date: string; changePct: number }>;

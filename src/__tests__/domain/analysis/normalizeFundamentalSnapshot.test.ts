@@ -1,24 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import {
     normalizeFundamentalSnapshot,
-    type RawProfile,
-    type RawKeyMetricsTtm,
-    type RawRatiosTtm,
-    type RawCashFlowStatement,
-    type RawIncomeGrowth,
-    type RawFinancialScore,
-    type RawStockPeer,
-    type RawAnalystEstimate,
-    type RawGradesConsensus,
-    type RawPriceTargetConsensus,
-    type RawPriceTargetSummary,
+    type FundamentalProfileInput,
+    type FundamentalValuationMetrics,
+    type FundamentalRatiosInput,
+    type FundamentalCashFlowInput,
+    type FundamentalGrowthInput,
+    type FundamentalFinancialScoresInput,
+    type FundamentalPeerInput,
+    type FundamentalAnalystEstimateInput,
+    type FundamentalGradesConsensusInput,
+    type FundamentalPriceTargetConsensusInput,
+    type FundamentalPriceTargetSummaryInput,
 } from '@/domain/analysis/normalizeFundamentalSnapshot';
 
 // ─────────────────────────────────────────
 // Fixtures
 // ─────────────────────────────────────────
 
-const baseProfile: RawProfile = {
+const baseProfile: FundamentalProfileInput = {
     symbol: 'AAPL',
     companyName: 'Apple Inc.',
     sector: 'Technology',
@@ -29,7 +29,7 @@ const baseProfile: RawProfile = {
     description: 'A tech company.',
 };
 
-const keyMetricsTtm: RawKeyMetricsTtm = {
+const keyMetricsTtm: FundamentalValuationMetrics = {
     peRatioTTM: 28.5,
     priceToSalesRatioTTM: 7.2,
     pbRatioTTM: 45.1,
@@ -38,7 +38,7 @@ const keyMetricsTtm: RawKeyMetricsTtm = {
     epsTTM: 6.43,
 };
 
-const ratiosTtm: RawRatiosTtm = {
+const ratiosTtm: FundamentalRatiosInput = {
     returnOnEquityTTM: 1.45,
     returnOnAssetsTTM: 0.28,
     operatingProfitMarginTTM: 0.31,
@@ -47,31 +47,31 @@ const ratiosTtm: RawRatiosTtm = {
     currentRatioTTM: 0.94,
 };
 
-const cashFlow: RawCashFlowStatement = {
+const cashFlow: FundamentalCashFlowInput = {
     operatingCashFlow: 110_543_000_000,
 };
 
-const incomeGrowth: RawIncomeGrowth = {
+const incomeGrowth: FundamentalGrowthInput = {
     growthRevenue: 0.08,
     growthEPS: 0.12,
 };
 
-const financialScores: RawFinancialScore = {
+const financialScores: FundamentalFinancialScoresInput = {
     altmanZScore: 4.5,
     piotroskiScore: 7,
 };
 
-const peers: RawStockPeer[] = [
+const peers: FundamentalPeerInput[] = [
     { symbol: 'MSFT', companyName: 'Microsoft', marketCap: 2_800_000_000_000 },
     { symbol: 'GOOGL', companyName: 'Alphabet', marketCap: 1_900_000_000_000 },
 ];
 
-const analystEstimate: RawAnalystEstimate = {
+const analystEstimate: FundamentalAnalystEstimateInput = {
     estimatedEpsAvg: 1.62,
     estimatedRevenueAvg: 94_000_000_000,
 };
 
-const gradesConsensus: RawGradesConsensus = {
+const gradesConsensus: FundamentalGradesConsensusInput = {
     strongBuy: 12,
     buy: 8,
     hold: 5,
@@ -79,14 +79,14 @@ const gradesConsensus: RawGradesConsensus = {
     strongSell: 0,
 };
 
-const priceTargetConsensus: RawPriceTargetConsensus = {
+const priceTargetConsensus: FundamentalPriceTargetConsensusInput = {
     targetHigh: 230.0,
     targetLow: 150.0,
     targetMedian: 200.0,
     targetConsensus: 198.5,
 };
 
-const priceTargetSummary: RawPriceTargetSummary = {
+const priceTargetSummary: FundamentalPriceTargetSummaryInput = {
     lastMonth: { avgPriceTarget: 195.0 },
     lastQuarter: { avgPriceTarget: 190.0 },
     lastYear: { avgPriceTarget: 180.0 },

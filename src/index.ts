@@ -109,7 +109,23 @@ export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
 export { normalizeFundamentalAnalysisResponse } from './domain/analysis/normalizeFundamental';
-export { normalizeFundamentalSnapshot } from './domain/analysis/normalizeFundamentalSnapshot';
+export {
+    normalizeFundamentalSnapshot,
+    type FundamentalAnalystEstimateInput,
+    type FundamentalCashFlowInput,
+    type FundamentalEarningsReportInput,
+    type FundamentalFinancialScoresInput,
+    type FundamentalGradesConsensusInput,
+    type FundamentalGrowthInput,
+    type FundamentalPeerInput,
+    type FundamentalPriceTargetConsensusInput,
+    type FundamentalPriceTargetSummaryInput,
+    type FundamentalProfileInput,
+    type FundamentalRatiosInput,
+    type FundamentalSectorHistoricalEntry,
+    type FundamentalSectorPerformanceEntry,
+    type FundamentalValuationMetrics,
+} from './domain/analysis/normalizeFundamentalSnapshot';
 export {
     normalizeNewsAnalysisResponse,
     normalizeNewsCardAnalysis,
@@ -503,6 +519,13 @@ export type {
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
 } from './application/overall/types';
+export type {
+    DependencyState,
+    DependencyStateCached,
+    DependencyStatePending,
+    DependencyStateError,
+    OverallDependencyInputs,
+} from './application/overall/dependencyResolver';
 
 // Domain types
 
