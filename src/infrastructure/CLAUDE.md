@@ -19,6 +19,7 @@ Each sub-directory corresponds to exactly **one** external system:
 | `skills/` | Filesystem Skills loader (`skills/*.md` → `Skill[]`) |
 | `ticker/` | Ticker metadata persistence (Neon / PostgreSQL) |
 | `upstash/` | Upstash Redis client factory |
+| `usage/` | Daily-salt IP hashing helper for cross-DB usage tracking |
 
 ## Dependency Rules
 
