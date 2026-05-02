@@ -1463,6 +1463,7 @@ export interface FundamentalSnapshot {
 /** Sentiment label for an individual news article or aggregate news flow. Equivalent shape to {@link Trend} and {@link FundamentalSentiment}; kept separate for domain clarity. */
 export type NewsSentiment = 'bullish' | 'neutral' | 'bearish';
 
+/** Dominant theme of a news article. Used for filtering and prompt context grouping (e.g. earnings results vs M&A vs regulatory action). */
 export type NewsCategory =
     | 'earnings'
     | 'm_and_a'
