@@ -125,6 +125,27 @@ describe('submitOverallAnalysis 함수는', () => {
         process.env = originalEnv;
     });
 
+    describe('의존성 축이 error 일 때', () => {
+        it('error 를 반환하고 axis 와 error 를 포함한다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'error',
+                axis: 'technical',
+                error: { code: 'timeframe_not_allowed' },
+            });
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error') {
+                expect(result.axis).toBe('technical');
+                expect(result.error).toEqual({ code: 'timeframe_not_allowed' });
+            }
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
+        });
+    });
+
     describe('의존성 축이 pending 일 때', () => {
         it('pending_dependencies 를 반환하고 캐시 및 잡 등록을 하지 않는다', async () => {
             mockResolveOverallDependencies.mockResolvedValue({

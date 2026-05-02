@@ -136,6 +136,22 @@ export interface RawEarningsReport {
 // ─────────────────────────────────────────
 
 /**
+ * Convert an FMP decimal ratio to a percentage value suitable for prompt display.
+ *
+ * FMP returns profitability/growth/health ratios as decimals (e.g. `0.15` for 15%).
+ * The AI prompt prints these with a `%` suffix, so we multiply by 100 to avoid
+ * the LLM seeing 100× wrong values.
+ *
+ * Fields that are already absolute (P/E, EPS, Altman Z-Score, cash flow amounts, etc.)
+ * must NOT be passed through this helper.
+ *
+ * @param v - Decimal ratio from FMP, or `null`/`undefined` when unavailable.
+ * @returns Value × 100, or `null` when input is nullish.
+ */
+const toPercent = (v: number | null | undefined): number | null =>
+    v == null ? null : v * 100;
+
+/**
  * Normalize raw FMP provider responses into the domain {@link FundamentalSnapshot}.
  *
  * Accepts all raw pieces collected by the application layer and maps field names
@@ -202,17 +218,17 @@ export function normalizeFundamentalSnapshot(input: {
             marketCap: p.marketCap,
         })),
         profitability: {
-            roe: input.ratiosTtm?.returnOnEquityTTM ?? null,
-            roa: input.ratiosTtm?.returnOnAssetsTTM ?? null,
-            operatingMargin: input.ratiosTtm?.operatingProfitMarginTTM ?? null,
-            netMargin: input.ratiosTtm?.netProfitMarginTTM ?? null,
+            roe: toPercent(input.ratiosTtm?.returnOnEquityTTM),
+            roa: toPercent(input.ratiosTtm?.returnOnAssetsTTM),
+            operatingMargin: toPercent(input.ratiosTtm?.operatingProfitMarginTTM),
+            netMargin: toPercent(input.ratiosTtm?.netProfitMarginTTM),
         },
         growth: {
-            revenueYoy: input.incomeGrowth?.growthRevenue ?? null,
-            epsYoy: input.incomeGrowth?.growthEPS ?? null,
+            revenueYoy: toPercent(input.incomeGrowth?.growthRevenue),
+            epsYoy: toPercent(input.incomeGrowth?.growthEPS),
         },
         health: {
-            debtRatio: input.ratiosTtm?.debtRatioTTM ?? null,
+            debtRatio: toPercent(input.ratiosTtm?.debtRatioTTM),
             currentRatio: input.ratiosTtm?.currentRatioTTM ?? null,
             operatingCashFlow: input.cashFlow?.operatingCashFlow ?? null,
             altmanZScore: input.financialScores?.altmanZScore ?? null,

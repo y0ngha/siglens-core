@@ -107,12 +107,28 @@ export interface DependencyStatePending {
 }
 
 /**
+ * One of the dependency axes returned `status: 'error'` from its submit function.
+ *
+ * `axis` identifies which axis failed; `error` carries the error payload from
+ * the respective submit result (string message or structured `AnalysisLimitError`).
+ */
+export interface DependencyStateError {
+    kind: 'error';
+    axis: 'technical' | 'fundamental' | 'news';
+    error: unknown;
+}
+
+/**
  * Result returned by {@link resolveOverallDependencies}.
  *
  * - `cached` — all three axes resolved from cache; the results are embedded.
  * - `pending` — one or more axes submitted new jobs; caller should poll.
+ * - `error` — one axis returned an error (tier gate, usage limit, or fetch failure).
  */
-export type DependencyState = DependencyStateCached | DependencyStatePending;
+export type DependencyState =
+    | DependencyStateCached
+    | DependencyStatePending
+    | DependencyStateError;
 
 // ─────────────────────────────────────────
 // Resolver
@@ -127,28 +143,24 @@ export type DependencyState = DependencyStateCached | DependencyStatePending;
  * `{ kind: 'cached', ... }` with the three embedded results so the caller
  * can immediately build the overall prompt.
  *
- * If **any** axis resolves to `status: 'submitted'` (or `status: 'error'`
- * for the technical axis), the function returns `{ kind: 'pending', pendingJobs }`
- * containing the `jobId` for submitted axes (`undefined` for cached ones).
+ * If **any** axis resolves to `status: 'submitted'`, the function returns
+ * `{ kind: 'pending', pendingJobs }` containing the `jobId` for submitted
+ * axes (`undefined` for cached ones).
  *
- * The caller (typically `submitOverallAnalysis`) is responsible for deciding
- * how to surface pending states to the end-user (e.g. polling each jobId,
- * then retrying the overall submission).
- *
- * **Note on technical errors**: If `submitAnalysis` returns
- * `status: 'error'` (tier gate or usage limit), that error is not re-thrown
- * here — it is treated as a pending state with an undefined technical jobId.
- * Callers that need to surface tier errors must inspect the raw submit result
- * separately.
+ * If **any** axis resolves to `status: 'error'` (tier gate, usage limit, or
+ * fetch failure), the function returns `{ kind: 'error', axis, error }` immediately
+ * so the caller can surface the failure to the user without waiting for other axes.
  *
  * @param inputs - Symbol, timeframe, model, providers, and pass-through
  *   options for each submit function.
- * @returns `{ kind: 'cached' }` if all axes were cache hits, or
- *   `{ kind: 'pending', pendingJobs }` otherwise.
+ * @returns `{ kind: 'cached' }` if all axes were cache hits,
+ *   `{ kind: 'pending', pendingJobs }` if one or more are still processing, or
+ *   `{ kind: 'error', axis, error }` if an axis returned an error.
  *
  * @example
  * ```ts
  * const state = await resolveOverallDependencies(inputs);
+ * if (state.kind === 'error') return { status: 'error', axis: state.axis, error: state.error };
  * if (state.kind === 'pending') return { status: 'pending_dependencies', pendingJobs: state.pendingJobs };
  * // All three cached — build overall prompt with state.technical/fundamental/news
  * ```
@@ -175,6 +187,7 @@ export async function resolveOverallDependencies(
         submitAnalysis(symbol, timeframe, false, undefined, {
             ...technicalOptions,
             modelId: technicalOptions.modelId ?? modelId,
+            userApiKey: technicalOptions.userApiKey,
         }),
         submitFundamentalAnalysis({
             symbol,
@@ -190,6 +203,21 @@ export async function resolveOverallDependencies(
             ...newsOptions,
         }),
     ]);
+
+    // ── Check for axis errors — surface immediately, do not coerce to pending ──
+    if (technicalResult.status === 'error') {
+        return { kind: 'error', axis: 'technical', error: technicalResult.error };
+    }
+    if (fundamentalResult.status === 'error') {
+        return {
+            kind: 'error',
+            axis: 'fundamental',
+            error: fundamentalResult.error,
+        };
+    }
+    if (newsResult.status === 'error') {
+        return { kind: 'error', axis: 'news', error: newsResult.error };
+    }
 
     // ── Determine pending job IDs for each axis ──
     const technicalJobId =
@@ -217,7 +245,7 @@ export async function resolveOverallDependencies(
         };
     }
 
-    // ── At least one axis is pending or errored → return pending state ──
+    // ── At least one axis is pending → return pending state ──
     return {
         kind: 'pending',
         pendingJobs: {

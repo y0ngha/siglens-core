@@ -14,7 +14,8 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import type { FundamentalAnalysisResponse } from '@/domain/types';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import type { FundamentalAnalysisResponse, Skill } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the fundamental analysis job. */
 const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -186,8 +187,8 @@ export async function submitFundamentalAnalysis(
 
     // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
-    // Skills are not loaded for fundamental analysis in this version.
-    const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, []);
+    const skills: Skill[] = await loadSkillsCached();
+    const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, skills);
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {

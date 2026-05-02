@@ -143,21 +143,21 @@ describe('normalizeFundamentalSnapshot — happy path (all fields populated)', (
         expect(result.valuation.eps).toBe(6.43);
     });
 
-    it('profitability 필드가 올바르게 매핑된다', () => {
-        expect(result.profitability.roe).toBe(1.45);
-        expect(result.profitability.roa).toBe(0.28);
-        expect(result.profitability.operatingMargin).toBe(0.31);
-        expect(result.profitability.netMargin).toBe(0.25);
+    it('profitability 필드가 decimal → percent 로 변환된다', () => {
+        expect(result.profitability.roe).toBeCloseTo(145);
+        expect(result.profitability.roa).toBeCloseTo(28);
+        expect(result.profitability.operatingMargin).toBeCloseTo(31);
+        expect(result.profitability.netMargin).toBeCloseTo(25);
     });
 
-    it('growth 필드가 올바르게 매핑된다', () => {
-        expect(result.growth.revenueYoy).toBe(0.08);
-        expect(result.growth.epsYoy).toBe(0.12);
+    it('growth 필드가 decimal → percent 로 변환된다', () => {
+        expect(result.growth.revenueYoy).toBeCloseTo(8);
+        expect(result.growth.epsYoy).toBeCloseTo(12);
     });
 
     it('health 필드가 올바르게 매핑된다', () => {
-        expect(result.health.debtRatio).toBe(0.32);
-        expect(result.health.currentRatio).toBe(0.94);
+        expect(result.health.debtRatio).toBeCloseTo(32); // 0.32 → 32%
+        expect(result.health.currentRatio).toBe(0.94); // currentRatio is absolute, no conversion
         expect(result.health.operatingCashFlow).toBe(110_543_000_000);
         expect(result.health.altmanZScore).toBe(4.5);
         expect(result.health.piotroskiScore).toBe(7);
@@ -392,7 +392,7 @@ describe('normalizeFundamentalSnapshot — 혼합 nullability (keyMetricsTtm 있
 // ─────────────────────────────────────────
 
 describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
-    it('growthRevenue → growth.revenueYoy, growthEPS → growth.epsYoy', () => {
+    it('growthRevenue → growth.revenueYoy, growthEPS → growth.epsYoy (decimal → percent)', () => {
         const result = normalizeFundamentalSnapshot({
             profile: baseProfile,
             keyMetricsTtm: null,
@@ -410,11 +410,11 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
             sectorHistorical: [],
         });
 
-        expect(result.growth.revenueYoy).toBe(0.15);
-        expect(result.growth.epsYoy).toBe(0.2);
+        expect(result.growth.revenueYoy).toBeCloseTo(15); // 0.15 × 100
+        expect(result.growth.epsYoy).toBeCloseTo(20);     // 0.20 × 100
     });
 
-    it('debtRatioTTM → health.debtRatio, currentRatioTTM → health.currentRatio', () => {
+    it('debtRatioTTM → health.debtRatio (decimal → percent), currentRatioTTM → health.currentRatio (absolute)', () => {
         const result = normalizeFundamentalSnapshot({
             profile: baseProfile,
             keyMetricsTtm: null,
@@ -439,8 +439,8 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
             sectorHistorical: [],
         });
 
-        expect(result.health.debtRatio).toBe(0.45);
-        expect(result.health.currentRatio).toBe(1.2);
+        expect(result.health.debtRatio).toBeCloseTo(45);  // 0.45 × 100
+        expect(result.health.currentRatio).toBe(1.2);     // already absolute
     });
 
     it('operatingCashFlow → health.operatingCashFlow', () => {
@@ -537,5 +537,141 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
         expect(result.sectorDirection.historical[0].changePct).toBe(1.23);
         expect(result.sectorDirection.historical[1].changePct).toBe(-0.45);
         expect(result.sectorDirection.historical[0].date).toBe('2024-03-01');
+    });
+});
+
+// ─────────────────────────────────────────
+// IC-3: Decimal → Percent unit conversion
+// ─────────────────────────────────────────
+
+describe('normalizeFundamentalSnapshot — IC-3 decimal → percent 단위 변환', () => {
+    const makeInput = (partial: {
+        ratiosTtm?: typeof ratiosTtm | null;
+        incomeGrowth?: typeof incomeGrowth | null;
+    }) =>
+        normalizeFundamentalSnapshot({
+            profile: baseProfile,
+            keyMetricsTtm: null,
+            ratiosTtm: partial.ratiosTtm ?? null,
+            cashFlow: null,
+            incomeGrowth: partial.incomeGrowth ?? null,
+            financialScores: null,
+            peers: [],
+            analystEstimate: null,
+            gradesConsensus: null,
+            priceTargetConsensus: null,
+            priceTargetSummary: null,
+            nextEarningsAt: null,
+            sectorTodayChangePct: null,
+            sectorHistorical: [],
+        });
+
+    it('returnOnEquityTTM 0.15 → roe 15', () => {
+        const result = makeInput({
+            ratiosTtm: {
+                returnOnEquityTTM: 0.15,
+                returnOnAssetsTTM: null,
+                operatingProfitMarginTTM: null,
+                netProfitMarginTTM: null,
+                debtRatioTTM: null,
+                currentRatioTTM: null,
+            },
+        });
+        expect(result.profitability.roe).toBeCloseTo(15);
+    });
+
+    it('returnOnAssetsTTM 0.08 → roa 8', () => {
+        const result = makeInput({
+            ratiosTtm: {
+                returnOnEquityTTM: null,
+                returnOnAssetsTTM: 0.08,
+                operatingProfitMarginTTM: null,
+                netProfitMarginTTM: null,
+                debtRatioTTM: null,
+                currentRatioTTM: null,
+            },
+        });
+        expect(result.profitability.roa).toBeCloseTo(8);
+    });
+
+    it('operatingProfitMarginTTM 0.30 → operatingMargin 30', () => {
+        const result = makeInput({
+            ratiosTtm: {
+                returnOnEquityTTM: null,
+                returnOnAssetsTTM: null,
+                operatingProfitMarginTTM: 0.30,
+                netProfitMarginTTM: null,
+                debtRatioTTM: null,
+                currentRatioTTM: null,
+            },
+        });
+        expect(result.profitability.operatingMargin).toBeCloseTo(30);
+    });
+
+    it('netProfitMarginTTM 0.25 → netMargin 25', () => {
+        const result = makeInput({
+            ratiosTtm: {
+                returnOnEquityTTM: null,
+                returnOnAssetsTTM: null,
+                operatingProfitMarginTTM: null,
+                netProfitMarginTTM: 0.25,
+                debtRatioTTM: null,
+                currentRatioTTM: null,
+            },
+        });
+        expect(result.profitability.netMargin).toBeCloseTo(25);
+    });
+
+    it('growthRevenue 0.10 → revenueYoy 10', () => {
+        const result = makeInput({
+            incomeGrowth: { growthRevenue: 0.10, growthEPS: null },
+        });
+        expect(result.growth.revenueYoy).toBeCloseTo(10);
+    });
+
+    it('growthEPS 0.05 → epsYoy 5', () => {
+        const result = makeInput({
+            incomeGrowth: { growthRevenue: null, growthEPS: 0.05 },
+        });
+        expect(result.growth.epsYoy).toBeCloseTo(5);
+    });
+
+    it('debtRatioTTM 0.40 → debtRatio 40', () => {
+        const result = makeInput({
+            ratiosTtm: {
+                returnOnEquityTTM: null,
+                returnOnAssetsTTM: null,
+                operatingProfitMarginTTM: null,
+                netProfitMarginTTM: null,
+                debtRatioTTM: 0.40,
+                currentRatioTTM: null,
+            },
+        });
+        expect(result.health.debtRatio).toBeCloseTo(40);
+    });
+
+    it('currentRatioTTM 1.5 는 변환 없이 그대로 1.5 이다', () => {
+        const result = makeInput({
+            ratiosTtm: {
+                returnOnEquityTTM: null,
+                returnOnAssetsTTM: null,
+                operatingProfitMarginTTM: null,
+                netProfitMarginTTM: null,
+                debtRatioTTM: null,
+                currentRatioTTM: 1.5,
+            },
+        });
+        expect(result.health.currentRatio).toBe(1.5);
+    });
+
+    it('null 입력은 null 을 반환한다', () => {
+        const result = makeInput({ ratiosTtm: null, incomeGrowth: null });
+        expect(result.profitability.roe).toBeNull();
+        expect(result.profitability.roa).toBeNull();
+        expect(result.profitability.operatingMargin).toBeNull();
+        expect(result.profitability.netMargin).toBeNull();
+        expect(result.growth.revenueYoy).toBeNull();
+        expect(result.growth.epsYoy).toBeNull();
+        expect(result.health.debtRatio).toBeNull();
     });
 });

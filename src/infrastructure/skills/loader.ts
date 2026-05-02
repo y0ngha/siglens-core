@@ -188,6 +188,44 @@ const countMdFiles = async (subdir: string): Promise<number> => {
     return files.length;
 };
 
+// ─────────────────────────────────────────
+// Module-level cached loader
+// ─────────────────────────────────────────
+
+let _cachedSkills: Skill[] | null = null;
+
+/**
+ * Load all skills from disk, memoizing the result for the module lifetime.
+ *
+ * The first call invokes {@link FileSkillsLoader#loadSkills} and stores the
+ * result. Subsequent calls return the cached array without hitting the
+ * filesystem again. On failure the cache is set to `[]` so the second call
+ * does not retry the filesystem unnecessarily.
+ *
+ * Use {@link clearSkillsCache} in test setup/teardown to reset memoization.
+ *
+ * @returns The full list of parsed skills (empty array on load failure).
+ */
+export async function loadSkillsCached(): Promise<Skill[]> {
+    if (_cachedSkills !== null) return _cachedSkills;
+    try {
+        _cachedSkills = await new FileSkillsLoader().loadSkills();
+    } catch {
+        _cachedSkills = [];
+    }
+    return _cachedSkills;
+}
+
+/**
+ * Reset the module-level skills cache.
+ *
+ * @internal Test-only. Call in `beforeEach`/`afterEach` to prevent cross-test
+ * cache pollution when mocking {@link FileSkillsLoader}.
+ */
+export function clearSkillsCache(): void {
+    _cachedSkills = null;
+}
+
 export async function countSkillFiles(): Promise<SkillCounts> {
     const [
         indicators,

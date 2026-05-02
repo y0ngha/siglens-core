@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('node:fs/promises');
@@ -8,6 +8,8 @@ import type { Dirent } from 'node:fs';
 import {
     FileSkillsLoader,
     countSkillFiles,
+    loadSkillsCached,
+    clearSkillsCache,
 } from '@/infrastructure/skills/loader';
 import type { SkillCounts } from '@/domain/types';
 
@@ -276,5 +278,69 @@ describe('countSkillFiles', () => {
         const counts = await countSkillFiles();
 
         expect(counts.indicators).toBe(1);
+    });
+});
+
+// ─────────────────────────────────────────
+// IC-4: loadSkillsCached — module-level memoization
+// ─────────────────────────────────────────
+
+describe('loadSkillsCached', () => {
+    beforeEach(() => {
+        clearSkillsCache();
+        // Simulate no skill files found (empty skills dir)
+        mockReaddir.mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+        clearSkillsCache();
+    });
+
+    it('첫 번째 호출에서 FileSkillsLoader.loadSkills 를 호출한다', async () => {
+        const loadSkillsSpy = vi.spyOn(
+            FileSkillsLoader.prototype,
+            'loadSkills'
+        );
+
+        await loadSkillsCached();
+
+        expect(loadSkillsSpy).toHaveBeenCalledTimes(1);
+        loadSkillsSpy.mockRestore();
+    });
+
+    it('두 번째 호출에서는 FileSkillsLoader.loadSkills 를 호출하지 않는다 (캐시 히트)', async () => {
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockResolvedValue([]);
+
+        await loadSkillsCached();
+        await loadSkillsCached();
+
+        expect(loadSkillsSpy).toHaveBeenCalledTimes(1);
+        loadSkillsSpy.mockRestore();
+    });
+
+    it('loadSkills 가 실패해도 빈 배열을 반환한다', async () => {
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockRejectedValue(new Error('ENOENT'));
+
+        const skills = await loadSkillsCached();
+
+        expect(skills).toEqual([]);
+        loadSkillsSpy.mockRestore();
+    });
+
+    it('clearSkillsCache 호출 후 다시 loadSkills 를 호출한다', async () => {
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockResolvedValue([]);
+
+        await loadSkillsCached();
+        clearSkillsCache();
+        await loadSkillsCached();
+
+        expect(loadSkillsSpy).toHaveBeenCalledTimes(2);
+        loadSkillsSpy.mockRestore();
     });
 });

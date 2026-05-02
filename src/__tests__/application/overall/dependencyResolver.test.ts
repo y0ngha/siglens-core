@@ -207,17 +207,18 @@ describe('resolveOverallDependencies 함수는', () => {
         });
     });
 
-    describe('technical 에러(tier gate) 일 때', () => {
-        it('kind: pending 을 반환하고 technical jobId 는 undefined 다', async () => {
+    describe('축 에러 처리', () => {
+        it('technical 에러이면 kind: error 를 반환하고 axis: technical 을 포함한다', async () => {
+            const technicalError = {
+                code: 'timeframe_not_allowed',
+                message: 'Not allowed',
+                tier: 'free',
+                timeframe: '1Day',
+                allowedTimeframes: [],
+            };
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'error',
-                error: {
-                    code: 'timeframe_not_allowed',
-                    message: 'Not allowed',
-                    tier: 'free',
-                    timeframe: '1Day',
-                    allowedTimeframes: [],
-                },
+                error: technicalError,
             });
             mockSubmitFundamentalAnalysis.mockResolvedValue({
                 status: 'cached',
@@ -230,9 +231,56 @@ describe('resolveOverallDependencies 함수는', () => {
 
             const state = await resolveOverallDependencies(makeInputs());
 
-            expect(state.kind).toBe('pending');
-            if (state.kind === 'pending') {
-                expect(state.pendingJobs.technical).toBeUndefined();
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('technical');
+                expect(state.error).toEqual(technicalError);
+            }
+        });
+
+        it('fundamental 에러이면 kind: error 를 반환하고 axis: fundamental 을 포함한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'error',
+                code: 'fetch_failed',
+                error: 'Profile not found',
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('fundamental');
+            }
+        });
+
+        it('news 에러이면 kind: error 를 반환하고 axis: news 를 포함한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'error',
+                code: 'no_news',
+                error: 'No news to analyze',
+            });
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('news');
             }
         });
     });
@@ -262,6 +310,33 @@ describe('resolveOverallDependencies 함수는', () => {
                 false,
                 undefined,
                 expect.any(Object)
+            );
+        });
+
+        it('technical.userApiKey 가 submitAnalysis 에 전달된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({ technical: { userApiKey: 'my-key' } })
+            );
+
+            expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                false,
+                undefined,
+                expect.objectContaining({ userApiKey: 'my-key' })
             );
         });
 

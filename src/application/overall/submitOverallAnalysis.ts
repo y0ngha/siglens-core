@@ -54,6 +54,11 @@ export async function submitOverallAnalysis(
     // ── 1. Resolve all three dependency axes in parallel ──
     const deps = await resolveOverallDependencies(options);
 
+    if (deps.kind === 'error') {
+        // One axis failed — return immediately without cache lookup or job submission.
+        return { status: 'error', axis: deps.axis, error: deps.error };
+    }
+
     if (deps.kind === 'pending') {
         // One or more axes are still processing — surface pending state to caller.
         return {

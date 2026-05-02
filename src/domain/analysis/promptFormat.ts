@@ -24,24 +24,47 @@ export function formatNullableNumber(
     return n == null ? 'N/A' : n.toFixed(dp);
 }
 
-/** Regex that matches optional ` ```json ` or ` ``` ` opening fence and trailing ` ``` `. */
-const MARKDOWN_FENCE_PATTERN = /^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/;
+/**
+ * Strip optional markdown code fences from an LLM response string.
+ *
+ * LLMs sometimes wrap JSON in prose and fences, e.g.:
+ * `Here's the JSON: \`\`\`json {...} \`\`\` Hope this helps`.
+ *
+ * Two-step extraction:
+ * 1. If a ` ```json ` / ` ``` ` fence is present anywhere, extract its content.
+ * 2. Otherwise, slice the first `{`…last `}` brace pair.
+ * 3. Fall back to the trimmed raw string.
+ *
+ * @param raw - Raw string from the LLM response.
+ * @returns Extracted JSON string (not yet parsed).
+ */
+function stripFence(raw: string): string {
+    const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenceMatch) return fenceMatch[1].trim();
+
+    const braceStart = raw.indexOf('{');
+    const braceEnd = raw.lastIndexOf('}');
+    if (braceStart !== -1 && braceEnd > braceStart) {
+        return raw.slice(braceStart, braceEnd + 1);
+    }
+
+    return raw.trim();
+}
 
 /**
  * Strip optional ` ```json ` / ` ``` ` markdown code fences from an LLM response
  * and parse the inner content as JSON.
  *
  * LLMs occasionally wrap JSON responses in markdown code fences even when
- * instructed not to. This helper removes the fence before parsing so
- * normalizers can accept both raw JSON and fenced JSON strings.
+ * instructed not to, or prepend/append prose around the JSON block. This helper
+ * extracts the first JSON block before parsing so normalizers can accept both
+ * raw JSON and fenced/prose-wrapped JSON strings.
  *
  * @internal
- * @param raw - Raw string from the LLM response. May be fenced or plain JSON.
+ * @param raw - Raw string from the LLM response. May be fenced, prose-wrapped, or plain JSON.
  * @returns Parsed JSON value as `unknown` — callers must validate the shape.
  * @throws {SyntaxError} When the string (after fence removal) is not valid JSON.
  */
 export function extractJsonFromLlmResponse(raw: string): unknown {
-    const match = MARKDOWN_FENCE_PATTERN.exec(raw.trim());
-    const jsonString = match !== null ? match[1] : raw;
-    return JSON.parse(jsonString);
+    return JSON.parse(stripFence(raw));
 }

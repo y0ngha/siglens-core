@@ -10,7 +10,7 @@ import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+import { FileSkillsLoader, loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
     EnrichedNewsItem,
     EarningsCalendarItem,
@@ -20,6 +20,7 @@ import type {
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFireAndForget = fireAndForget as Mock;
+const mockLoadSkillsCached = loadSkillsCached as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -90,6 +91,7 @@ describe('submitNewsAnalysis 함수는', () => {
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFireAndForget.mockImplementation(() => undefined);
+        mockLoadSkillsCached.mockResolvedValue([]);
 
         (FileSkillsLoader as Mock).mockImplementation(() => ({
             loadSkills: vi.fn().mockResolvedValue([]),
@@ -300,6 +302,7 @@ describe('submitNewsAnalysis 함수는', () => {
             mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
             mockSetJobMeta.mockResolvedValue(undefined);
             mockFireAndForget.mockImplementation(() => undefined);
+            mockLoadSkillsCached.mockResolvedValue([]);
             (FileSkillsLoader as Mock).mockImplementation(() => ({
                 loadSkills: vi.fn().mockResolvedValue([]),
             }));

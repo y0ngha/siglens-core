@@ -47,16 +47,30 @@ export interface SubmitOverallAnalysisSubmitted {
 }
 
 /**
+ * One of the dependency axes returned an error (tier gate, usage limit, or
+ * fetch failure). The overall job is not submitted.
+ */
+export interface SubmitOverallAnalysisError {
+    status: 'error';
+    /** Axis that failed: `'technical'`, `'fundamental'`, or `'news'`. */
+    axis: 'technical' | 'fundamental' | 'news';
+    /** Error payload from the failing axis submit result. */
+    error: unknown;
+}
+
+/**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.
  *
  * - `cached` — a fresh analysis exists in the cache; result is embedded.
  * - `pending_dependencies` — one or more axis jobs are still running; retry after polling each.
  * - `submitted` — overall analysis job submitted; poll via {@link pollOverallAnalysis}.
+ * - `error` — one of the dependency axes failed; see `axis` and `error` for details.
  */
 export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisCached
     | SubmitOverallAnalysisPendingDependencies
-    | SubmitOverallAnalysisSubmitted;
+    | SubmitOverallAnalysisSubmitted
+    | SubmitOverallAnalysisError;
 
 // ─────────────────────────────────────────
 // Poll

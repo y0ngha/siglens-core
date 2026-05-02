@@ -13,8 +13,8 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
-import type { NewsAnalysisResponse, Skill } from '@/domain/types';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import type { NewsAnalysisResponse } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the news analysis job. */
 const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -121,13 +121,8 @@ export async function submitNewsAnalysis(
         }
     }
 
-    // ── 4. Load skills (best-effort), build prompt, enqueue job, fire-and-forget ──
-    let skills: Skill[];
-    try {
-        skills = await new FileSkillsLoader().loadSkills();
-    } catch {
-        skills = [];
-    }
+    // ── 4. Load skills (best-effort, cached), build prompt, enqueue job, fire-and-forget ──
+    const skills = await loadSkillsCached();
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildNewsAnalysisPrompt(

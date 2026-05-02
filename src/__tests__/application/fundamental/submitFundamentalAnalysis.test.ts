@@ -4,15 +4,18 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
+vi.mock('@/infrastructure/skills/loader');
 
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFireAndForget = fireAndForget as Mock;
+const mockLoadSkillsCached = loadSkillsCached as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -79,6 +82,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFireAndForget.mockImplementation(() => undefined);
+        mockLoadSkillsCached.mockResolvedValue([]);
 
         // Reset provider mocks
         mockDataProvider.getProfile.mockResolvedValue(validProfile);
