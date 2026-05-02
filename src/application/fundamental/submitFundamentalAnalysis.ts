@@ -5,10 +5,7 @@ import type { SubmitFundamentalAnalysisOptions, SubmitFundamentalAnalysisResult 
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
-import {
-    buildFundamentalCacheKey,
-    FUNDAMENTAL_CACHE_TTL_SECONDS,
-} from '@/infrastructure/cache/config';
+import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';

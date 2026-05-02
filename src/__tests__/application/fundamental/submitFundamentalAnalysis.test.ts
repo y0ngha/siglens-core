@@ -146,7 +146,6 @@ describe('submitFundamentalAnalysis 함수는', () => {
         });
 
         it('워커에 jobId, prompt, model을 포함한 body를 전송한다', async () => {
-            let capturedFetchCall: RequestInit | undefined;
             mockFireAndForget.mockImplementationOnce((promise: Promise<unknown>) => {
                 void promise; // track that it was called but don't await
             });
