@@ -42,7 +42,7 @@ const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
         'Daily positional chart. Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for medium- to long-term position analysis.',
 };
 
-/** Format the technical analysis summary for prompt injection. */
+/** Formats technical analysis fields (trend, risk, key levels, price targets, patterns) into prompt lines. */
 function formatTechnical(tech: AnalysisResponse): string {
     const lines: string[] = [
         `- Overall Trend: ${tech.trend}`,
@@ -81,7 +81,7 @@ function formatTechnical(tech: AnalysisResponse): string {
     return lines.join('\n');
 }
 
-/** Format the fundamental analysis summary for prompt injection. */
+/** Formats fundamental analysis fields (sentiment, conclusion, per-category assessments, risk factors) into prompt lines. */
 function formatFundamental(fund: FundamentalAnalysisResponse): string {
     const lines: string[] = [
         `- Overall Sentiment: ${fund.overallSentiment}`,
@@ -99,7 +99,7 @@ function formatFundamental(fund: FundamentalAnalysisResponse): string {
     return lines.join('\n');
 }
 
-/** Format the news analysis summary for prompt injection. */
+/** Formats news analysis fields (sentiment, current driver, key events, upcoming events) into prompt lines. */
 function formatNews(news: NewsAnalysisResponse): string {
     const lines: string[] = [
         `- Overall Sentiment: ${news.overallSentiment}`,
