@@ -235,8 +235,11 @@ export async function submitAnalysis(
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
+            ...(options.userApiKey !== undefined
+                ? { 'X-AI-API-KEY': options.userApiKey }
+                : {}),
         },
-        body: JSON.stringify({ jobId, prompt }),
+        body: JSON.stringify({ jobId, prompt, model: effectiveModelId }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[Submit] Worker request failed:', error);

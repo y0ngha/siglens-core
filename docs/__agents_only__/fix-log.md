@@ -157,6 +157,15 @@
 - Context: `isClaudeModel` / `isGeminiModel` / `isChatGPTModel` converted to `model is ClaudeModelId` etc. with derived subset types so callers can narrow `ActiveModelId` at the type level.
 
 
+## [Issue #69 | feat/69/submitAnalysis-model-userApiKey | 2026-05-02]
+- Violation: 기존 메인 제출 테스트가 `objectContaining`으로 외부 객체를 감싸면서 내부 `headers` 필드는 plain equality로 단언해 assertion 일관성 문제 발생
+- Rule: MISTAKES.md Tests rule 6 — 각 it()은 단 하나의 고유 동작만 테스트해야 하며 단언 방식이 내/외부에서 충돌하면 false negative 위험이 생김
+- Context: `submitAnalysis.test.ts`의 "fetchBarsWithIndicators를 호출하고..." 테스트에서 headers 단언을 `expect.objectContaining`으로 통일하고 body.model 단언도 추가
+
+- Violation: `userApiKey?: string` 필드의 JSDoc에 "Required when..." 표현 사용 — 타입은 optional인데 required로 오해할 소지
+- Rule: FF Predictability — optional 필드의 JSDoc은 조건부 의무를 명확히 기술해야 하며 "Required"는 non-optional 필드에만 사용
+- Context: `SubmitAnalysisOptions.userApiKey` JSDoc을 "Must be provided when..." 형식으로 수정해 user-managed 모델 사용 시의 책임을 명확화
+
 ## [PR #71 round 3 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Test comment "8192 deduped" did not accurately describe the algorithm — the value is skipped because it is `>=` the previous accepted entry, not because of exact-duplicate deduplication
 - Rule: CONVENTIONS.md / FF.md Readability — comments must accurately reflect the underlying logic
