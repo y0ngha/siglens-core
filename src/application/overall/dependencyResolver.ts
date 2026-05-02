@@ -62,7 +62,6 @@ export async function resolveOverallDependencies(
         submitAnalysis(symbol, timeframe, false, undefined, {
             ...technicalOptions,
             modelId: technicalOptions.modelId ?? modelId,
-            userApiKey: technicalOptions.userApiKey,
         }),
         submitFundamentalAnalysis({
             symbol,

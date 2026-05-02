@@ -214,12 +214,11 @@ export interface FundamentalDataProvider {
     getAnalystEstimates(symbol: string): Promise<RawAnalystEstimate | null>;
 
     /**
-     * Fetch the most recent analyst grade change events for a symbol.
-     * Also used by the News page; exposed here to avoid a second provider.
+     * Fetch the latest grading actions (analyst rating changes) for a symbol.
      *
-     * @param symbol - Ticker symbol.
-     * @param limit - Maximum number of events to return (default: 10).
-     * @returns Array of grade change events ordered by date (most recent first).
+     * @param symbol - U.S. equity ticker.
+     * @param limit - Maximum number of recent grading events to return.
+     * @returns Recent grading actions sorted descending by date.
      */
     getGrades(symbol: string, limit?: number): Promise<GradesEvent[]>;
 

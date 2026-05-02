@@ -1,8 +1,3 @@
-/**
- * NOTE: TIER_CONFIG.infoDepth applies to all analysis types
- * (technical, fundamental, news, overall). The siglens app does not
- * currently enforce these limits at the request boundary.
- */
 import type {
     Tier,
     TierConfig,

@@ -1,7 +1,12 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
-import type { FundamentalSnapshot, Skill } from '@/domain/types';
+import type {
+    FundamentalSnapshot,
+    GradesConsensus,
+    PriceTargetConsensus,
+    Skill,
+} from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
 /** Filter skills to fundamental category with sufficient confidence weight. */
@@ -14,17 +19,13 @@ function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
 }
 
 /** Render analyst grade counts into a compact inline string. */
-function formatGrades(
-    g: FundamentalSnapshot['futureDirection']['gradesConsensus']
-): string {
+function formatGrades(g: GradesConsensus | null): string {
     if (!g) return 'N/A';
     return `Strong Buy: ${g.strongBuy}, Buy: ${g.buy}, Hold: ${g.hold}, Sell: ${g.sell}, Strong Sell: ${g.strongSell}`;
 }
 
 /** Render price target data into a compact inline string. */
-function formatPriceTarget(
-    consensus: FundamentalSnapshot['futureDirection']['priceTargetConsensus']
-): string {
+function formatPriceTarget(consensus: PriceTargetConsensus | null): string {
     if (!consensus) return 'N/A';
     return `Consensus: ${fmt(consensus.consensus)}, High: ${fmt(consensus.high)}, Low: ${fmt(consensus.low)}, Median: ${fmt(consensus.median)}`;
 }
