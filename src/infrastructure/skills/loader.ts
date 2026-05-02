@@ -8,7 +8,7 @@ import type {
     SkillDisplay,
     SkillType,
 } from '@/domain/types';
-import type { SkillsProvider } from './types';
+import type { LoadSkillsCachedResult, SkillsProvider } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
 
@@ -194,18 +194,6 @@ const countMdFiles = async (subdir: string): Promise<number> => {
 
 let _cachedSkills: Skill[] | null = null;
 let _cachedSkillsDegraded: boolean = false;
-
-/** @internal Result shape returned by {@link loadSkillsCached}. */
-export interface LoadSkillsCachedResult {
-    /** Parsed skills list; empty when load failed. */
-    skills: Skill[];
-    /**
-     * `true` when the loaded skills failed to read from disk and the analysis
-     * ran with an empty skills list. Used by the worker / consumer to surface
-     * a degraded warning.
-     */
-    skillsDegraded: boolean;
-}
 
 /**
  * Load all skills from disk, memoizing the result for the module lifetime.
