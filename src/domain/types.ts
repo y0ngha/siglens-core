@@ -1353,13 +1353,7 @@ export interface FundamentalProfile {
     description: string | null;
 }
 
-/** Sector-average multiples used for valuation comparison. */
-export interface FundamentalSectorAverages {
-    per: number | null;
-    psr: number | null;
-}
-
-/** Valuation multiples and optional sector benchmarks. */
+/** Valuation multiples. */
 export interface FundamentalValuation {
     per: number | null;
     psr: number | null;
@@ -1367,7 +1361,6 @@ export interface FundamentalValuation {
     peg: number | null;
     evToEbitda: number | null;
     eps: number | null;
-    sectorAverages?: FundamentalSectorAverages;
 }
 
 /** Single peer entry for relative valuation context. */
@@ -1553,6 +1546,7 @@ export interface GradesEvent {
 // Overall analysis
 // ─────────────────────────────────────────
 
+/** Scenario name for the three-axis overall analysis. Equivalent shape to {@link FundamentalSentiment} and {@link NewsSentiment}; kept separate for domain clarity (scenario direction vs. sentiment label). */
 export type OverallScenarioName = 'bullish' | 'neutral' | 'bearish';
 
 /** Single bullish/neutral/bearish scenario with trigger condition and price range. */

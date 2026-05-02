@@ -554,7 +554,6 @@ export type {
     FundamentalHealth,
     FundamentalPeer,
     FundamentalProfitability,
-    FundamentalSectorAverages,
     FundamentalSectorDirection,
     FundamentalSentiment,
     FundamentalSnapshot,

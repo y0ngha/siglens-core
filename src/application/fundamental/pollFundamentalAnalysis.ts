@@ -2,6 +2,7 @@ import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { PollFundamentalAnalysisResult } from '@/application/fundamental/types';
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
+import type { FundamentalAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FUNDAMENTAL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import {
@@ -76,7 +77,7 @@ export async function pollFundamentalAnalysis(
 
     // The worker stores the raw LLM response as a JSON string or object.
     // Normalize it through the fundamental response normalizer.
-    let result;
+    let result: FundamentalAnalysisResponse;
     try {
         const rawString =
             typeof rawResult === 'string'

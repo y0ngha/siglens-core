@@ -26,7 +26,6 @@ const TEST_SNAPSHOT: FundamentalSnapshot = {
         peg: 2.1,
         evToEbitda: 22.4,
         eps: 6.13,
-        sectorAverages: { per: 25.0, psr: 5.0 },
     },
     peers: [
         {

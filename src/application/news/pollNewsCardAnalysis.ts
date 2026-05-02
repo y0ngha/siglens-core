@@ -2,6 +2,7 @@ import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { PollNewsCardAnalysisResult } from '@/application/news/types';
 import { normalizeNewsCardAnalysis } from '@/domain/analysis/normalizeNews';
+import type { NewsCardAnalysis } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CARD_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import {
@@ -75,7 +76,7 @@ export async function pollNewsCardAnalysis(
     }
 
     // Normalize the raw LLM response through the news-card normalizer.
-    let result;
+    let result: NewsCardAnalysis;
     try {
         const rawString =
             typeof rawResult === 'string'

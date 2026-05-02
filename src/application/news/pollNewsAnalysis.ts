@@ -2,6 +2,7 @@ import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { PollNewsAnalysisResult } from '@/application/news/types';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
+import type { NewsAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import {
@@ -75,7 +76,7 @@ export async function pollNewsAnalysis(
 
     // The worker stores the raw LLM response as a JSON string or object.
     // Normalize it through the news response normalizer.
-    let result;
+    let result: NewsAnalysisResponse;
     try {
         const rawString =
             typeof rawResult === 'string'

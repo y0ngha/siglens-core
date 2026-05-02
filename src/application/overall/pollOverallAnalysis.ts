@@ -2,6 +2,7 @@ import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { PollOverallAnalysisResult } from '@/application/overall/types';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
+import type { OverallAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { OVERALL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import {
@@ -75,7 +76,7 @@ export async function pollOverallAnalysis(
     }
 
     // Normalize the raw LLM response through the overall response normalizer.
-    let result;
+    let result: OverallAnalysisResponse;
     try {
         const rawString =
             typeof rawResult === 'string'

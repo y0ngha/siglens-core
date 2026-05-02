@@ -96,10 +96,6 @@ export function buildFundamentalAnalysisPrompt(
                   .join('\n')
             : '  None';
 
-    const sectorAvg = valuation.sectorAverages
-        ? `P/E: ${fmt(valuation.sectorAverages.per)}, P/S: ${fmt(valuation.sectorAverages.psr)}`
-        : 'N/A';
-
     return `You are a seasoned equity analyst. Analyze the fundamental data for ${symbol} (${profile.companyName}) and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
 
 ## Company Profile
@@ -118,7 +114,6 @@ export function buildFundamentalAnalysisPrompt(
 - PEG: ${fmt(valuation.peg)}
 - EV/EBITDA: ${fmt(valuation.evToEbitda)}
 - EPS (TTM): ${fmt(valuation.eps)}
-- Sector Averages: ${sectorAvg}
 
 ## Comparable Peers
 ${peerLines}

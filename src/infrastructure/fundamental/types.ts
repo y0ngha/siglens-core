@@ -11,23 +11,6 @@
  */
 import type { GradesEvent } from '@/domain/types';
 
-export type {
-    RawProfile,
-    RawKeyMetricsTtm,
-    RawRatiosTtm,
-    RawIncomeGrowth,
-    RawFinancialScore,
-    RawStockPeer,
-    RawAnalystEstimate,
-    RawGradesConsensus,
-    RawPriceTargetConsensus,
-    RawPriceTargetSummary,
-    RawSectorPerformance,
-    RawHistoricalSectorPerformance,
-    RawCashFlowStatement,
-    RawEarningsReport,
-} from '@/domain/analysis/normalizeFundamentalSnapshot';
-
 import type {
     RawProfile,
     RawKeyMetricsTtm,
@@ -44,6 +27,23 @@ import type {
     RawCashFlowStatement,
     RawEarningsReport,
 } from '@/domain/analysis/normalizeFundamentalSnapshot';
+
+export type {
+    RawProfile,
+    RawKeyMetricsTtm,
+    RawRatiosTtm,
+    RawIncomeGrowth,
+    RawFinancialScore,
+    RawStockPeer,
+    RawAnalystEstimate,
+    RawGradesConsensus,
+    RawPriceTargetConsensus,
+    RawPriceTargetSummary,
+    RawSectorPerformance,
+    RawHistoricalSectorPerformance,
+    RawCashFlowStatement,
+    RawEarningsReport,
+};
 
 // ─────────────────────────────────────────
 // Provider interface

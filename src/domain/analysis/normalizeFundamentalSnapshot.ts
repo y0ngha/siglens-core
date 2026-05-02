@@ -127,7 +127,8 @@ export interface RawCashFlowStatement {
 /** Raw FMP earnings report for a symbol. `raw` preserves the full provider payload. */
 export interface RawEarningsReport {
     symbol: string;
-    date: string;
+    /** ISO date of the earnings event. Named `earningsDate` to match {@link EarningsReport.earningsDate}. */
+    earningsDate: string;
     raw: unknown;
 }
 

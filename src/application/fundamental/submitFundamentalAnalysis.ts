@@ -150,7 +150,7 @@ export async function submitFundamentalAnalysis(
             gradesConsensus,
             priceTargetConsensus,
             priceTargetSummary,
-            nextEarningsAt: earningsReport?.date ?? null,
+            nextEarningsAt: earningsReport?.earningsDate ?? null,
             sectorTodayChangePct: sectorToday,
             sectorHistorical: sectorHistorical.map(h => ({
                 date: h.date,
