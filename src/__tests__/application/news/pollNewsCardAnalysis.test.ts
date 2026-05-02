@@ -118,7 +118,9 @@ describe('pollNewsCardAnalysis 함수는', () => {
         it('normalize가 실패하면 error를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce('invalid json {{{');
 
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
             const result = await pollNewsCardAnalysis('job-invalid');
             consoleSpy.mockRestore();
 

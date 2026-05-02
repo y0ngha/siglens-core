@@ -36,7 +36,11 @@ const rawNewsJson = JSON.stringify({
     overallSentiment: 'bullish',
 });
 
-const mockMeta = { symbol: 'AAPL', modelId: 'gemini-2.5-flash', cacheKey: 'news:AAPL:flash:abc123' };
+const mockMeta = {
+    symbol: 'AAPL',
+    modelId: 'gemini-2.5-flash',
+    cacheKey: 'news:AAPL:flash:abc123',
+};
 
 describe('pollNewsAnalysis 함수는', () => {
     beforeEach(() => {
@@ -113,7 +117,9 @@ describe('pollNewsAnalysis 함수는', () => {
         it('normalize가 실패하면 error를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce('invalid {{{');
 
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
             const result = await pollNewsAnalysis('job-invalid');
             consoleSpy.mockRestore();
 
@@ -144,7 +150,10 @@ describe('pollNewsAnalysis 함수는', () => {
         });
 
         it('meta.cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
-            mockGetJobMeta.mockResolvedValueOnce({ symbol: 'AAPL', modelId: 'flash' });
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'AAPL',
+                modelId: 'flash',
+            });
             mockGetJobResult.mockResolvedValueOnce(rawNewsJson);
 
             await pollNewsAnalysis('job-no-key');

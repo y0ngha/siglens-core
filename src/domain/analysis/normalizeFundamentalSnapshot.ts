@@ -221,7 +221,9 @@ export function normalizeFundamentalSnapshot(input: {
         profitability: {
             roe: toPercent(input.ratiosTtm?.returnOnEquityTTM),
             roa: toPercent(input.ratiosTtm?.returnOnAssetsTTM),
-            operatingMargin: toPercent(input.ratiosTtm?.operatingProfitMarginTTM),
+            operatingMargin: toPercent(
+                input.ratiosTtm?.operatingProfitMarginTTM
+            ),
             netMargin: toPercent(input.ratiosTtm?.netProfitMarginTTM),
         },
         growth: {

@@ -10,7 +10,10 @@ import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
-import { FileSkillsLoader, loadSkillsCached } from '@/infrastructure/skills/loader';
+import {
+    FileSkillsLoader,
+    loadSkillsCached,
+} from '@/infrastructure/skills/loader';
 import type {
     EnrichedNewsItem,
     EarningsCalendarItem,

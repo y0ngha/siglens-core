@@ -411,7 +411,7 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
         });
 
         expect(result.growth.revenueYoy).toBeCloseTo(15); // 0.15 × 100
-        expect(result.growth.epsYoy).toBeCloseTo(20);     // 0.20 × 100
+        expect(result.growth.epsYoy).toBeCloseTo(20); // 0.20 × 100
     });
 
     it('debtRatioTTM → health.debtRatio (decimal → percent), currentRatioTTM → health.currentRatio (absolute)', () => {
@@ -439,8 +439,8 @@ describe('normalizeFundamentalSnapshot — 필드 매핑 검증', () => {
             sectorHistorical: [],
         });
 
-        expect(result.health.debtRatio).toBeCloseTo(45);  // 0.45 × 100
-        expect(result.health.currentRatio).toBe(1.2);     // already absolute
+        expect(result.health.debtRatio).toBeCloseTo(45); // 0.45 × 100
+        expect(result.health.currentRatio).toBe(1.2); // already absolute
     });
 
     it('operatingCashFlow → health.operatingCashFlow', () => {
@@ -599,7 +599,7 @@ describe('normalizeFundamentalSnapshot — IC-3 decimal → percent 단위 변�
             ratiosTtm: {
                 returnOnEquityTTM: null,
                 returnOnAssetsTTM: null,
-                operatingProfitMarginTTM: 0.30,
+                operatingProfitMarginTTM: 0.3,
                 netProfitMarginTTM: null,
                 debtRatioTTM: null,
                 currentRatioTTM: null,
@@ -624,7 +624,7 @@ describe('normalizeFundamentalSnapshot — IC-3 decimal → percent 단위 변�
 
     it('growthRevenue 0.10 → revenueYoy 10', () => {
         const result = makeInput({
-            incomeGrowth: { growthRevenue: 0.10, growthEPS: null },
+            incomeGrowth: { growthRevenue: 0.1, growthEPS: null },
         });
         expect(result.growth.revenueYoy).toBeCloseTo(10);
     });
@@ -643,7 +643,7 @@ describe('normalizeFundamentalSnapshot — IC-3 decimal → percent 단위 변�
                 returnOnAssetsTTM: null,
                 operatingProfitMarginTTM: null,
                 netProfitMarginTTM: null,
-                debtRatioTTM: 0.40,
+                debtRatioTTM: 0.4,
                 currentRatioTTM: null,
             },
         });

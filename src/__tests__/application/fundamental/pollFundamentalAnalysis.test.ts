@@ -32,17 +32,41 @@ const mockCacheProvider = { get: vi.fn(), set: mockCacheSet, delete: vi.fn() };
 const rawFundamentalJson = JSON.stringify({
     overallConclusionKo: '종합 분석',
     categoryAssessments: [
-        { category: 'valuation', sentiment: 'neutral', rationaleKo: '적정 가치' },
-        { category: 'profitability', sentiment: 'bullish', rationaleKo: '수익성 양호' },
-        { category: 'growth', sentiment: 'bullish', rationaleKo: '성장세 긍정' },
-        { category: 'health', sentiment: 'neutral', rationaleKo: '재무건전성 보통' },
-        { category: 'futureDirection', sentiment: 'bullish', rationaleKo: '전망 양호' },
+        {
+            category: 'valuation',
+            sentiment: 'neutral',
+            rationaleKo: '적정 가치',
+        },
+        {
+            category: 'profitability',
+            sentiment: 'bullish',
+            rationaleKo: '수익성 양호',
+        },
+        {
+            category: 'growth',
+            sentiment: 'bullish',
+            rationaleKo: '성장세 긍정',
+        },
+        {
+            category: 'health',
+            sentiment: 'neutral',
+            rationaleKo: '재무건전성 보통',
+        },
+        {
+            category: 'futureDirection',
+            sentiment: 'bullish',
+            rationaleKo: '전망 양호',
+        },
     ],
     riskFactorsKo: ['환율 리스크'],
     overallSentiment: 'bullish',
 });
 
-const mockMeta = { symbol: 'AAPL', modelId: 'gemini-2.5-flash', cacheKey: 'fundamental:AAPL:flash:abc123' };
+const mockMeta = {
+    symbol: 'AAPL',
+    modelId: 'gemini-2.5-flash',
+    cacheKey: 'fundamental:AAPL:flash:abc123',
+};
 
 describe('pollFundamentalAnalysis 함수는', () => {
     beforeEach(() => {
@@ -131,7 +155,9 @@ describe('pollFundamentalAnalysis 함수는', () => {
         it('normalize가 실패하면 error를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce('not valid json {{{');
 
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
             const result = await pollFundamentalAnalysis('job-invalid');
             consoleSpy.mockRestore();
 
@@ -150,7 +176,10 @@ describe('pollFundamentalAnalysis 함수는', () => {
         });
 
         it('meta.cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
-            mockGetJobMeta.mockResolvedValueOnce({ symbol: 'AAPL', modelId: 'flash' });
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'AAPL',
+                modelId: 'flash',
+            });
             mockGetJobResult.mockResolvedValueOnce(rawFundamentalJson);
 
             await pollFundamentalAnalysis('job-no-cache-key');

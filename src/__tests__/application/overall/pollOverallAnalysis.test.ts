@@ -36,7 +36,11 @@ const rawOverallJson = JSON.stringify({
     newsBulletsKo: ['긍정적 뉴스 흐름'],
     threeAxisConclusionKo: '세 축 모두 긍정적',
     scenarios: [
-        { name: 'bullish', triggerConditionKo: '210 돌파', priceRangeKo: '210-230' },
+        {
+            name: 'bullish',
+            triggerConditionKo: '210 돌파',
+            priceRangeKo: '210-230',
+        },
     ],
     riskFactorsKo: ['금리 인상 리스크'],
 });
@@ -122,7 +126,9 @@ describe('pollOverallAnalysis 함수는', () => {
         it('normalize가 실패하면 error를 반환한다', async () => {
             mockGetJobResult.mockResolvedValueOnce('broken json {{{');
 
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
             const result = await pollOverallAnalysis('job-invalid');
             consoleSpy.mockRestore();
 

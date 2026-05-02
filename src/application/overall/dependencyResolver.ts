@@ -206,7 +206,11 @@ export async function resolveOverallDependencies(
 
     // ── Check for axis errors — surface immediately, do not coerce to pending ──
     if (technicalResult.status === 'error') {
-        return { kind: 'error', axis: 'technical', error: technicalResult.error };
+        return {
+            kind: 'error',
+            axis: 'technical',
+            error: technicalResult.error,
+        };
     }
     if (fundamentalResult.status === 'error') {
         return {
