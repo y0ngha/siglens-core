@@ -1579,3 +1579,14 @@ export interface OverallAnalysisResponse {
     /** 위험 요인 bullets. */
     riskFactorsKo: string[];
 }
+
+/**
+ * Tagged union representing the analysis result currently in view by the chatbot.
+ * Injected as context into the chat system prompt so the assistant can reference
+ * live numbers from the user's current page.
+ */
+export type CurrentAnalysisContext =
+    | { kind: 'technical'; payload: AnalysisResponse }
+    | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
+    | { kind: 'news'; payload: NewsAnalysisResponse }
+    | { kind: 'overall'; payload: OverallAnalysisResponse };
