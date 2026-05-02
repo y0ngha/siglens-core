@@ -20,3 +20,24 @@
 export function formatNullableNumber(n: number | null | undefined, dp = 2): string {
     return n == null ? 'N/A' : n.toFixed(dp);
 }
+
+/** Regex that matches optional ` ```json ` or ` ``` ` opening fence and trailing ` ``` `. */
+const MARKDOWN_FENCE_PATTERN = /^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/;
+
+/**
+ * Strip optional ` ```json ` / ` ``` ` markdown code fences from an LLM response
+ * and parse the inner content as JSON.
+ *
+ * LLMs occasionally wrap JSON responses in markdown code fences even when
+ * instructed not to. This helper removes the fence before parsing so
+ * normalizers can accept both raw JSON and fenced JSON strings.
+ *
+ * @param raw - Raw string from the LLM response. May be fenced or plain JSON.
+ * @returns Parsed JSON value as `unknown` — callers must validate the shape.
+ * @throws {SyntaxError} When the string (after fence removal) is not valid JSON.
+ */
+export function extractJsonFromLlmResponse(raw: string): unknown {
+    const match = MARKDOWN_FENCE_PATTERN.exec(raw.trim());
+    const jsonString = match !== null ? match[1] : raw;
+    return JSON.parse(jsonString);
+}
