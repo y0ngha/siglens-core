@@ -554,3 +554,12 @@
 - Violation: resolveOverallDependencies exposed in public API (src/index.ts) but is internal implementation detail of submitOverallAnalysis
 - Rule: API surface minimization — public API should not expose internal use-case orchestration; only top-level consumer functions should be exported
 - Context: resolveOverallDependencies removed from src/index.ts; remains internal infrastructure function
+
+## [PR #75 | feat/fundamental-news-analysis | 2026-05-03]
+- Violation: @internal tags on public union variant types (SubmitFundamentalAnalysisCached/Submitted/LimitError/FetchError, SubmitNewsAnalysisCached/Submitted/NoNewsError/LimitError)
+- Rule: MISTAKES.md §9.5 — @internal must not appear on types that are re-exported in src/index.ts; consumers must be able to use them explicitly
+- Context: These variants were already in src/index.ts public exports but still had @internal JSDoc; removed the tag from all 8 variant types
+
+- Violation: SubmitNewsCardAnalysisOptions/Result and PollNewsCardAnalysisResult missing from src/index.ts despite being parameter/return types of public functions
+- Rule: Public API completeness — parameter and return types of public functions must themselves be public exports
+- Context: submitNewsCardAnalysis and pollNewsCardAnalysis are public but their option/result types were marked @internal and omitted from src/index.ts; added all 5 types to exports and removed @internal
