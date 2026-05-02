@@ -1,40 +1,7 @@
 import type {
-    FundamentalAnalystEstimateInput,
-    FundamentalCashFlowInput,
-    FundamentalEarningsReportInput,
-    FundamentalFinancialScoresInput,
-    FundamentalGradesConsensusInput,
-    FundamentalGrowthInput,
-    FundamentalPeerInput,
-    FundamentalPriceTargetConsensusInput,
-    FundamentalPriceTargetSummaryInput,
-    FundamentalProfileInput,
-    FundamentalRatiosInput,
-    FundamentalSectorHistoricalEntry,
-    FundamentalSectorPerformanceEntry,
     FundamentalSnapshot,
-    FundamentalValuationMetrics,
-    SectorHistoricalPoint,
+    NormalizeFundamentalSnapshotInput,
 } from '@/domain/types';
-
-// Re-export input shapes so existing consumers importing from this module
-// continue to compile. Primary export location is now domain/types.ts.
-export type {
-    FundamentalAnalystEstimateInput,
-    FundamentalCashFlowInput,
-    FundamentalEarningsReportInput,
-    FundamentalFinancialScoresInput,
-    FundamentalGradesConsensusInput,
-    FundamentalGrowthInput,
-    FundamentalPeerInput,
-    FundamentalPriceTargetConsensusInput,
-    FundamentalPriceTargetSummaryInput,
-    FundamentalProfileInput,
-    FundamentalRatiosInput,
-    FundamentalSectorHistoricalEntry,
-    FundamentalSectorPerformanceEntry,
-    FundamentalValuationMetrics,
-};
 
 // ─────────────────────────────────────────
 // Normalization helper
@@ -60,50 +27,29 @@ const toPercent = (v: number | null | undefined): number | null =>
  * Normalize raw FMP provider responses into the domain {@link FundamentalSnapshot}.
  *
  * Accepts all raw pieces collected by the application layer and maps field names
- * (e.g. `mktCap` → `marketCap`, `peRatioTTM` → `per`) to the canonical domain
- * shape. Null-coalesces every optional field so callers always receive a
- * structurally complete snapshot even when individual FMP calls return null.
+ * (e.g. `profile.marketCap` → `FundamentalProfile.marketCap`, `peRatioTTM` → `per`)
+ * to the canonical domain shape. Null-coalesces every optional field so callers
+ * always receive a structurally complete snapshot even when individual FMP calls
+ * return null.
  *
- * @param input - Aggregated raw responses from `FundamentalDataProvider` methods.
- * @param input.profile - Raw company profile (required; provides name, sector, etc.).
- * @param input.keyMetricsTtm - Raw TTM key metrics (valuation multiples, EPS); nullable.
- * @param input.ratiosTtm - Raw TTM ratios (profitability, debt, current ratio); nullable.
- * @param input.cashFlow - Raw cash flow statement (operating cash flow); nullable.
- * @param input.incomeGrowth - Raw year-over-year income growth (revenue + EPS); nullable.
- * @param input.financialScores - Raw Altman Z-score and Piotroski F-score; nullable.
- * @param input.peers - Raw peer list (empty array when peers are unavailable).
- * @param input.analystEstimate - Raw next-quarter analyst EPS + revenue consensus; nullable.
- * @param input.gradesConsensus - Raw buy/hold/sell grade breakdown; nullable.
- * @param input.priceTargetConsensus - Raw high/low/median/mean price targets; nullable.
- * @param input.priceTargetSummary - Raw rolling average price targets; nullable.
- * @param input.nextEarningsAt - ISO date string of the next earnings event; nullable.
- * @param input.sectorTodayChangePct - Sector day-over-day percent change; nullable.
- * @param input.sectorHistorical - Historical daily sector performance entries.
+ * Infrastructure adapters (e.g. the siglens FMP client) must map
+ * `RawProfile.mktCap` → `FundamentalProfileInput.marketCap` when constructing the
+ * input bundle, since `mktCap` is the FMP wire-format field name and `marketCap` is
+ * the domain-neutral name used here.
+ *
+ * @param input - Aggregated domain-neutral inputs; see {@link NormalizeFundamentalSnapshotInput}.
  * @returns A fully typed `FundamentalSnapshot` ready for prompt builders and UI.
  */
-export function normalizeFundamentalSnapshot(input: {
-    profile: FundamentalProfileInput;
-    keyMetricsTtm: FundamentalValuationMetrics | null;
-    ratiosTtm: FundamentalRatiosInput | null;
-    cashFlow: FundamentalCashFlowInput | null;
-    incomeGrowth: FundamentalGrowthInput | null;
-    financialScores: FundamentalFinancialScoresInput | null;
-    peers: FundamentalPeerInput[];
-    analystEstimate: FundamentalAnalystEstimateInput | null;
-    gradesConsensus: FundamentalGradesConsensusInput | null;
-    priceTargetConsensus: FundamentalPriceTargetConsensusInput | null;
-    priceTargetSummary: FundamentalPriceTargetSummaryInput | null;
-    nextEarningsAt: string | null;
-    sectorTodayChangePct: number | null;
-    sectorHistorical: SectorHistoricalPoint[];
-}): FundamentalSnapshot {
+export function normalizeFundamentalSnapshot(
+    input: NormalizeFundamentalSnapshotInput
+): FundamentalSnapshot {
     return {
         profile: {
             symbol: input.profile.symbol,
             companyName: input.profile.companyName,
             sector: input.profile.sector,
             industry: input.profile.industry,
-            marketCap: input.profile.mktCap,
+            marketCap: input.profile.marketCap,
             ceo: input.profile.ceo,
             website: input.profile.website,
             description: input.profile.description,

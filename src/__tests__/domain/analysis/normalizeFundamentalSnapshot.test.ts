@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import {
-    normalizeFundamentalSnapshot,
-    type FundamentalProfileInput,
-    type FundamentalValuationMetrics,
-    type FundamentalRatiosInput,
-    type FundamentalCashFlowInput,
-    type FundamentalGrowthInput,
-    type FundamentalFinancialScoresInput,
-    type FundamentalPeerInput,
-    type FundamentalAnalystEstimateInput,
-    type FundamentalGradesConsensusInput,
-    type FundamentalPriceTargetConsensusInput,
-    type FundamentalPriceTargetSummaryInput,
-} from '@/domain/analysis/normalizeFundamentalSnapshot';
+import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
+import type {
+    FundamentalProfileInput,
+    FundamentalValuationMetrics,
+    FundamentalRatiosInput,
+    FundamentalCashFlowInput,
+    FundamentalGrowthInput,
+    FundamentalFinancialScoresInput,
+    FundamentalPeerInput,
+    FundamentalAnalystEstimateInput,
+    FundamentalGradesConsensusInput,
+    FundamentalPriceTargetConsensusInput,
+    FundamentalPriceTargetSummaryInput,
+} from '@/domain/types';
 
 // ─────────────────────────────────────────
 // Fixtures
@@ -23,7 +23,7 @@ const baseProfile: FundamentalProfileInput = {
     companyName: 'Apple Inc.',
     sector: 'Technology',
     industry: 'Consumer Electronics',
-    mktCap: 3_000_000_000_000,
+    marketCap: 3_000_000_000_000,
     ceo: 'Tim Cook',
     website: 'https://apple.com',
     description: 'A tech company.',
@@ -130,8 +130,8 @@ describe('normalizeFundamentalSnapshot — happy path (all fields populated)', (
         expect(result.profile.description).toBe('A tech company.');
     });
 
-    it('mktCap → marketCap 매핑이 정확하다', () => {
-        expect(result.profile.marketCap).toBe(baseProfile.mktCap);
+    it('profile.marketCap 매핑이 정확하다', () => {
+        expect(result.profile.marketCap).toBe(baseProfile.marketCap);
     });
 
     it('valuation 필드가 올바르게 매핑된다', () => {
