@@ -257,18 +257,15 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `createCacheProvider` | `infrastructure/cache/redis.ts` |
 | `ANALYSIS_CACHE_TTL` | `infrastructure/cache/config.ts` |
 | `MARKET_BRIEFING_CACHE_TTL` | `infrastructure/cache/config.ts` |
-| `FUNDAMENTAL_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
-| `NEWS_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
-| `NEWS_CARD_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
-| `OVERALL_CACHE_TTL_SECONDS` | `infrastructure/cache/config.ts` |
 | `CACHE_EXPIRY_HOUR_KST` | `infrastructure/cache/config.ts` |
 | `buildAnalysisCacheKey` | `infrastructure/cache/config.ts` |
 | `buildBriefingCacheKey` | `infrastructure/cache/config.ts` |
-| `buildFundamentalCacheKey` | `infrastructure/cache/config.ts` |
-| `buildNewsCacheKey` | `infrastructure/cache/config.ts` |
-| `buildNewsCardCacheKey` | `infrastructure/cache/config.ts` |
-| `buildOverallCacheKey` | `infrastructure/cache/config.ts` |
 | `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
+
+> **@internal (not exported)**: `FUNDAMENTAL_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS`,
+> `NEWS_CARD_CACHE_TTL_SECONDS`, `OVERALL_CACHE_TTL_SECONDS`, `buildFundamentalCacheKey`,
+> `buildNewsCacheKey`, `buildNewsCardCacheKey`, `buildOverallCacheKey` — consumer cannot
+> construct the `inputHash` parameter; these are internal to the submit use-cases.
 
 > 티커 관련 캐시 키 — `TICKER_SEARCH_CACHE_TTL`, `ASSET_INFO_CACHE_TTL_WITH_KOREAN`,
 > `ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN`, `buildTickerSearchCacheKey`,

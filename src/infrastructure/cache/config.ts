@@ -124,13 +124,13 @@ export function buildSectorSignalsCacheKey(
     return `dashboard:signals:${timeframe}:${bucket}`;
 }
 
-/** TTL for fundamental analysis cache results. Default: 24 hours. The submit path may use a shorter dynamic TTL when next earnings is imminent. */
+/** @internal TTL for fundamental analysis cache results. Default: 24 hours. The submit path may use a shorter dynamic TTL when next earnings is imminent. */
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** TTL for news analysis aggregate cache results. Default: 24 hours. */
+/** @internal TTL for news analysis aggregate cache results. Default: 24 hours. */
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** TTL for per-card news analysis cache (translation + sentiment + summary). Default: 30 days — effectively permanent for the lifetime of a news article. */
+/** @internal TTL for per-card news analysis cache (translation + sentiment + summary). Default: 30 days — effectively permanent for the lifetime of a news article. */
 export const NEWS_CARD_CACHE_TTL_SECONDS = 30 * SECONDS_PER_DAY;
-/** TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
+/** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
 export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
 /**
@@ -140,6 +140,9 @@ export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * The `inputHash` is a short hash of the FundamentalSnapshot contents so that
  * results from different data vintages are cached independently.
  *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitFundamentalAnalysis`. Do not depend on this function from
+ *   outside the core library.
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the prompt input data.
@@ -158,6 +161,9 @@ export function buildFundamentalCacheKey(
  *
  * Format: `analysis:news:<symbol>:<modelId>:<inputHash>`.
  *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitNewsAnalysis`. Do not depend on this function from outside
+ *   the core library.
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
@@ -171,8 +177,11 @@ export function buildNewsCacheKey(
     return `analysis:news:${symbol}:${modelId}:${inputHash}`;
 }
 
-/** Fixed model identifier used for per-news-card translation and sentiment analysis. */
-const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+/**
+ * @internal Fixed model identifier used for per-news-card translation and sentiment analysis.
+ * Single source of truth — also consumed by `submitNewsCardAnalysis`.
+ */
+export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
 
 /**
  * Build the Redis key for a cached per-news-card analysis result.
@@ -181,6 +190,9 @@ const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * for translation and sentiment analysis.
  * Format: `analysis:news-card:<newsId>:gemini-2.5-flash-lite`.
  *
+ * @internal Keyed only by `newsId` — consumer cannot reuse this key without
+ *   knowing the fixed model. Do not depend on this function from outside the
+ *   core library.
  * @param newsId - Stable unique identifier of the news article.
  * @returns The cache key.
  */
@@ -194,6 +206,9 @@ export function buildNewsCardCacheKey(newsId: string): string {
  * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<inputHash>`.
  * The `timeframe` distinguishes analyses run with different chart contexts.
  *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitOverallAnalysis`. Do not depend on this function from outside
+ *   the core library.
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier.
