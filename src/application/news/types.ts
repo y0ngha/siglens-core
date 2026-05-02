@@ -22,12 +22,6 @@ export interface NewsAnalysisUsageOptions {
     usageRepository: UsageRepository;
     /** Raw client IP. Hashed before persistence. */
     clientIp: string;
-    /** Authenticated user UUID, or null/undefined for anonymous usage. */
-    userId?: string | null;
-    /** Model/backend identifier stored in usage_logs.model_used. */
-    modelUsed?: string;
-    /** Clock injection for UTC-day tests. Defaults to infrastructure time. */
-    occurredAt?: Date;
 }
 
 /** Options controlling news analysis submission behavior. */

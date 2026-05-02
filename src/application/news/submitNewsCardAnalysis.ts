@@ -1,9 +1,11 @@
 import { fireAndForget } from '@/application/background';
-import type { SubmitNewsCardAnalysisResult } from '@/application/news/types';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type {
+    SubmitNewsCardAnalysisOptions,
+    SubmitNewsCardAnalysisResult,
+} from '@/application/news/types';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
-import type { NewsItem, NewsCardAnalysis } from '@/domain/types';
+import type { NewsCardAnalysis } from '@/domain/types';
 import { buildNewsCardCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -44,14 +46,13 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS = 2 * MS_PER_MINUTE;
  * The result cache TTL is {@link NEWS_CARD_CACHE_TTL_SECONDS} (30 days),
  * making it effectively permanent for the lifetime of a news article.
  *
- * @param item - Raw news article to translate and classify.
- * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
- *   so the worker dispatch can continue after the response.
+ * @param options - Options object containing the raw news item and optional background-task hooks.
+ *   Pass Vercel's `waitUntil` so the worker dispatch can continue after the response.
  * @returns The submission outcome — see {@link SubmitNewsCardAnalysisResult}.
  *
  * @example
  * ```ts
- * const res = await submitNewsCardAnalysis(newsItem);
+ * const res = await submitNewsCardAnalysis({ item: newsItem });
  * if (res.status === 'cached') return res.result;
  * const polled = await pollNewsCardAnalysis(res.jobId);
  * ```
@@ -59,9 +60,9 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS = 2 * MS_PER_MINUTE;
  * @see pollNewsCardAnalysis
  */
 export async function submitNewsCardAnalysis(
-    item: NewsItem,
-    options?: BackgroundTaskOptions
+    options: SubmitNewsCardAnalysisOptions
 ): Promise<SubmitNewsCardAnalysisResult> {
+    const { item } = options;
     const cacheKey = buildNewsCardCacheKey(item.id);
     const cache = createCacheProvider();
 

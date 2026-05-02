@@ -72,7 +72,7 @@ describe('submitNewsCardAnalysis 함수는', () => {
         it('cached 상태와 결과를 반환하고 워커를 호출하지 않는다', async () => {
             mockCacheGet.mockResolvedValueOnce(cachedCardAnalysis);
 
-            const result = await submitNewsCardAnalysis(testNewsItem);
+            const result = await submitNewsCardAnalysis({ item: testNewsItem });
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
@@ -86,7 +86,7 @@ describe('submitNewsCardAnalysis 함수는', () => {
         it('캐시 키는 news.id로만 결정된다', async () => {
             mockCacheGet.mockResolvedValueOnce(cachedCardAnalysis);
 
-            await submitNewsCardAnalysis(testNewsItem);
+            await submitNewsCardAnalysis({ item: testNewsItem });
 
             // Cache lookup was called with the key derived from item.id
             expect(mockCacheGet).toHaveBeenCalledWith(
@@ -101,7 +101,7 @@ describe('submitNewsCardAnalysis 함수는', () => {
         });
 
         it('submitted 상태와 jobId를 반환한다', async () => {
-            const result = await submitNewsCardAnalysis(testNewsItem);
+            const result = await submitNewsCardAnalysis({ item: testNewsItem });
 
             expect(result.status).toBe('submitted');
             if (result.status === 'submitted') {
@@ -111,7 +111,7 @@ describe('submitNewsCardAnalysis 함수는', () => {
         });
 
         it('jobId와 flash-lite 모델 ID로 작업 메타를 등록한다', async () => {
-            const result = await submitNewsCardAnalysis(testNewsItem);
+            const result = await submitNewsCardAnalysis({ item: testNewsItem });
 
             expect(result.status).toBe('submitted');
             expect(mockSetJobMeta).toHaveBeenCalledWith(
@@ -125,13 +125,13 @@ describe('submitNewsCardAnalysis 함수는', () => {
         });
 
         it('fireAndForget를 통해 워커에 fetch 요청을 보낸다', async () => {
-            await submitNewsCardAnalysis(testNewsItem);
+            await submitNewsCardAnalysis({ item: testNewsItem });
 
             expect(mockFireAndForget).toHaveBeenCalled();
         });
 
         it('캐시 키에 news.id가 포함된다', async () => {
-            await submitNewsCardAnalysis(testNewsItem);
+            await submitNewsCardAnalysis({ item: testNewsItem });
 
             const meta = mockSetJobMeta.mock.calls[0]?.[1] as
                 | { cacheKey: string }
@@ -145,7 +145,7 @@ describe('submitNewsCardAnalysis 함수는', () => {
             mockCacheGet.mockResolvedValueOnce(null);
 
             const waitUntil = vi.fn();
-            await submitNewsCardAnalysis(testNewsItem, { waitUntil });
+            await submitNewsCardAnalysis({ item: testNewsItem, waitUntil });
 
             // fireAndForget is called (which internally passes options to waitUntil)
             expect(mockFireAndForget).toHaveBeenCalledWith(

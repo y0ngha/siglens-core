@@ -40,8 +40,6 @@ export const minimalProvider: FundamentalDataProvider = {
     getProfile: vi.fn(),
     getKeyMetricsTtm: vi.fn(),
     getRatiosTtm: vi.fn(),
-    getIncomeStatement: vi.fn(),
-    getBalanceSheetStatement: vi.fn(),
     getCashFlowStatement: vi.fn(),
     getIncomeStatementGrowth: vi.fn(),
     getFinancialScores: vi.fn(),

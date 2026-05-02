@@ -43,8 +43,6 @@ const mockDataProvider = {
     getProfile: vi.fn().mockResolvedValue(validProfile),
     getKeyMetricsTtm: vi.fn().mockResolvedValue(null),
     getRatiosTtm: vi.fn().mockResolvedValue(null),
-    getIncomeStatement: vi.fn().mockResolvedValue(null),
-    getBalanceSheetStatement: vi.fn().mockResolvedValue(null),
     getCashFlowStatement: vi.fn().mockResolvedValue(null),
     getIncomeStatementGrowth: vi.fn().mockResolvedValue(null),
     getFinancialScores: vi.fn().mockResolvedValue(null),
@@ -88,8 +86,6 @@ describe('submitFundamentalAnalysis 함수는', () => {
         mockDataProvider.getProfile.mockResolvedValue(validProfile);
         mockDataProvider.getKeyMetricsTtm.mockResolvedValue(null);
         mockDataProvider.getRatiosTtm.mockResolvedValue(null);
-        mockDataProvider.getIncomeStatement.mockResolvedValue(null);
-        mockDataProvider.getBalanceSheetStatement.mockResolvedValue(null);
         mockDataProvider.getCashFlowStatement.mockResolvedValue(null);
         mockDataProvider.getIncomeStatementGrowth.mockResolvedValue(null);
         mockDataProvider.getFinancialScores.mockResolvedValue(null);

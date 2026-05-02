@@ -85,22 +85,6 @@ export interface FundamentalDataProvider {
     getRatiosTtm(symbol: string): Promise<RawRatiosTtm | null>;
 
     /**
-     * Fetch the latest annual income statement (full shape varies by provider).
-     *
-     * @param symbol - Ticker symbol.
-     * @returns Raw income statement payload, or `null` if unavailable.
-     */
-    getIncomeStatement(symbol: string): Promise<unknown | null>;
-
-    /**
-     * Fetch the latest annual balance sheet statement (full shape varies by provider).
-     *
-     * @param symbol - Ticker symbol.
-     * @returns Raw balance sheet payload, or `null` if unavailable.
-     */
-    getBalanceSheetStatement(symbol: string): Promise<unknown | null>;
-
-    /**
      * Fetch the latest annual cash flow statement (operating cash flow subset).
      *
      * @param symbol - Ticker symbol.
