@@ -424,3 +424,49 @@
 - Violation: 14 input interfaces should live in domain/types.ts for centralization (normalizeFundamentalSnapshot.ts + imports)
 - Rule: MISTAKES.md Architecture §1 — shared domain types must be centralized in domain/types.ts
 - Context: 14 Fundamental*Input interfaces moved to domain/types.ts; src/index.ts export path updated
+
+## [PR #75 Round 4 | feat/fundamental-news-analysis | 2026-05-02]
+
+### Blockers (5 findings)
+
+- Violation: `ReturnType<typeof normalizeFundamentalSnapshot>` used instead of explicit named type
+- Rule: MISTAKES.md TypeScript §9 — complex ReturnType<typeof fn> inference chains must be replaced with the named return type directly
+- Context: snapshot variable in submitFundamentalAnalysis.ts typed as `FundamentalSnapshot` directly; `FundamentalSnapshot` added to import from `@/domain/types`
+
+- Violation: Two separate `export type { ... } from './application/overall/types'` blocks in src/index.ts
+- Rule: MISTAKES.md Components §0 / ESLint import/no-duplicates — multiple export blocks from the same module must be merged
+- Context: SubmitOverallAnalysis*/PollOverallAnalysisResult and DependencyState*/OverallDependencyInputs merged into single block
+
+- Violation: `LoadSkillsCachedResult` missing `@internal` JSDoc tag
+- Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
+- Context: @internal prepended to LoadSkillsCachedResult JSDoc in infrastructure/skills/loader.ts
+
+- Violation: `PollFundamentalAnalysisResultStatus` dead type with zero usages
+- Rule: MISTAKES.md §15 / Dead Code — types with no consumers must be deleted
+- Context: Dead type removed from application/fundamental/types.ts; confirmed zero grep hits across src/
+
+- Violation: `cancelOverallAnalysisJob.ts` Tier 1 JSDoc missing @param and @returns
+- Rule: MISTAKES.md Documentation Sync §4 — Tier 1 public exports require full JSDoc
+- Context: Full JSDoc with @param jobId, @returns, @see tags added to cancelOverallAnalysisJob
+
+### Suggestions (5 findings)
+
+- Violation: `'technical' | 'fundamental' | 'news'` literal union repeated in 4 type shapes
+- Rule: MISTAKES.md TypeScript §5 — repeated union literals must be extracted to named type alias
+- Context: OverallAxis type alias extracted; applied to DependencyStatePending.pendingJobs, DependencyStateError.axis, SubmitOverallAnalysisPendingDependencies.pendingJobs, SubmitOverallAnalysisError.axis
+
+- Violation: Korean JSDoc on public-exported types in domain/types.ts
+- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
+- Context: FundamentalSnapshot, FundamentalAnalysisResponse fields, NewsAnalysisResponse fields, OverallAnalysisResponse fields translated to English
+
+- Violation: Misleading "existing consumers" comment in dependencyResolver.ts re-export block
+- Rule: FF Principle 2-A Predictability / CONVENTIONS.md — comments must reflect current intent, not historical state
+- Context: Comment updated to "Re-export types for direct imports from this module" without historical claim
+
+- Violation: Dead `FileSkillsLoader` import and mock in submitNewsAnalysis.test.ts
+- Rule: MISTAKES.md Tests §13 / Dead Code — dead test mocks and imports must be removed
+- Context: FileSkillsLoader import and (FileSkillsLoader as Mock).mockImplementation calls removed; only loadSkillsCached mock kept
+
+- Violation: Type import from implementation file (`dependencyResolver`) instead of canonical `types.ts`
+- Rule: MISTAKES.md Architecture §0.5 — type imports must reference the canonical types.ts, not implementation files
+- Context: OverallDependencyInputs import in dependencyResolver.test.ts moved to `@/application/overall/types`
