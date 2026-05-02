@@ -17,7 +17,10 @@ import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import type { FundamentalAnalysisResponse, FundamentalSnapshot } from '@/domain/types';
+import type {
+    FundamentalAnalysisResponse,
+    FundamentalSnapshot,
+} from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the fundamental analysis job. */
 const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;

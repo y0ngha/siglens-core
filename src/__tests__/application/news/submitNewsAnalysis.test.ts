@@ -22,7 +22,6 @@ const mockSetJobMeta = setJobMeta as Mock;
 const mockFireAndForget = fireAndForget as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
 
-
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
 const mockCacheProvider = {
