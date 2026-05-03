@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    AI_SYSTEM_PROMPT,
     CANDLE_PATTERN_DETECTION_BARS,
     DEFAULT_TIER,
     detectGoldenCross,
@@ -16,12 +17,20 @@ import {
     isModelAllowed,
     isTier,
     isTimeframeAllowed,
+    normalizeNewsAnalysisResponse,
     normalizeTrend,
     TIER_CONFIG,
     VALID_CHAT_MODELS,
 } from '@/index.client';
 import * as clientApi from '@/index.client';
-import type { ModelId, SkillType, TierConfig } from '@/index.client';
+import type {
+    FundamentalSnapshot,
+    ModelId,
+    NewsAnalysisResponse,
+    OverallAnalysisResponse,
+    SkillType,
+    TierConfig,
+} from '@/index.client';
 
 describe('browser public API exports', () => {
     it('exports domain values used by browser consumers', () => {
@@ -51,6 +60,43 @@ describe('browser public API exports', () => {
         expect(typeof detectGoldenCross).toBe('function');
         expect(normalizeTrend('bullish')).toBe('bullish');
         expect(skillType).toBe('indicator_guide');
+    });
+
+    it('exports fundamental / news / overall domain symbols for browser consumers', () => {
+        // Type-level imports — verify the new domain types are reachable from the
+        // browser entry by assigning a representative literal to each.
+        const snapshotKeys: Array<keyof FundamentalSnapshot> = ['profile'];
+        expect(snapshotKeys).toContain('profile');
+
+        // Runtime exports must be callable on the browser entry.
+        expect(typeof normalizeNewsAnalysisResponse).toBe('function');
+        expect(typeof AI_SYSTEM_PROMPT).toBe('string');
+        expect(AI_SYSTEM_PROMPT.length).toBeGreaterThan(0);
+
+        // Smoke-call normalize on a minimal payload to confirm it runs in the
+        // browser bundle (no Node-only deps pulled in transitively).
+        const news: NewsAnalysisResponse = normalizeNewsAnalysisResponse(
+            JSON.stringify({
+                currentDriverKo: 'driver',
+                keyEventsKo: ['event'],
+                upcomingEventsKo: ['upcoming'],
+                overallSentiment: 'neutral',
+            })
+        );
+        expect(news.overallSentiment).toBe('neutral');
+
+        // Verify representative new exports exist on the namespace import.
+        expect('buildFundamentalAnalysisPrompt' in clientApi).toBe(true);
+        expect('buildNewsAnalysisPrompt' in clientApi).toBe(true);
+        expect('buildOverallAnalysisPrompt' in clientApi).toBe(true);
+        expect('normalizeFundamentalAnalysisResponse' in clientApi).toBe(true);
+        expect('normalizeFundamentalSnapshot' in clientApi).toBe(true);
+        expect('normalizeOverallAnalysisResponse' in clientApi).toBe(true);
+        expect('normalizeNewsCardAnalysis' in clientApi).toBe(true);
+
+        // Type assignability check (compile-time only).
+        const overall = {} as OverallAnalysisResponse;
+        void overall;
     });
 
     it('does not export server-only runtime entrypoints', () => {
