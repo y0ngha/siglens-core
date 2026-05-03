@@ -11,7 +11,12 @@ import type {
 } from '@/application/chat/types';
 import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
-import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
+import {
+    DEFAULT_TIER,
+    TIER_CONFIG,
+    getAllowedModels,
+    isModelAllowed,
+} from '@/domain/tier';
 import type {
     ChatPromptPayload,
     ModelId,
@@ -58,9 +63,43 @@ function toChatErrorResult(error: unknown): ChatActionResult {
     return { ok: false, error: 'server_error' };
 }
 
-// Runtime guard against `as ModelId` casts; rejects model identifiers not present in the active tier configuration.
-function isValidChatModel(model: ModelId): boolean {
-    return VALID_CHAT_MODELS.some(validModel => validModel === model);
+// Runtime guard against `as ModelId` casts; rejects model identifiers not
+// present in the active tier configuration. Falls back to the static
+// `VALID_CHAT_MODELS` snapshot when the caller does not inject a custom
+// `TierConfig`.
+function isValidChatModel(model: ModelId, config?: TierConfig): boolean {
+    const allowed: readonly ModelId[] =
+        config === undefined ? VALID_CHAT_MODELS : getAllowedModels('pro', config);
+    return allowed.some(validModel => validModel === model);
+}
+
+/**
+ * Resolve the primary / fallback API key pair forwarded to the AI provider.
+ *
+ * Routing matrix — see JSDoc on
+ * {@link RequestChatCompletionParams.freeApiKey} for the full contract.
+ * Caller-side guards in {@link requestChatCompletion} ensure the keys
+ * required by each branch are present before this helper runs:
+ * - When `paidApiKey` is absent, the call site has already enforced
+ *   pro tier + premium model + present `freeApiKey`, so `freeApiKey`
+ *   is the sole server-owned credential and is used as the fallback
+ *   (primary is undefined so the provider does not attempt a separate
+ *   primary call).
+ * - When `paidApiKey` is present, `freeApiKey` is the primary credential
+ *   (may be undefined for pro-tier requests that skip the primary call)
+ *   and `paidApiKey` is the fallback.
+ *
+ * @internal
+ */
+function resolveApiKeys(params: {
+    freeApiKey?: string;
+    paidApiKey?: string;
+}): { primary: string | undefined; fallback: string } {
+    if (params.paidApiKey === undefined) {
+        // Guard in `requestChatCompletion` ensures `freeApiKey` is defined here.
+        return { primary: undefined, fallback: params.freeApiKey! };
+    }
+    return { primary: params.freeApiKey, fallback: params.paidApiKey };
 }
 
 function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
@@ -228,7 +267,7 @@ export async function requestChatCompletion(
     const paidApiKey = params.paidApiKey;
     const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
 
-    if (!isValidChatModel(model)) {
+    if (!isValidChatModel(model, tierConfig)) {
         return { ok: false, error: 'server_error' };
     }
 
@@ -249,6 +288,13 @@ export async function requestChatCompletion(
         if (!params.freeApiKey) {
             return { ok: false, error: 'server_error' };
         }
+    } else if (tierContext.tier !== 'pro' && !params.freeApiKey) {
+        // Non-pro users must always receive both keys from the server
+        // (freeApiKey = primary, paidApiKey = fallback). Missing the primary
+        // here means the caller did not honor the contract on
+        // `RequestChatCompletionParams.freeApiKey`; refuse rather than silently
+        // routing fallback-only with primary=undefined.
+        return { ok: false, error: 'server_error' };
     }
 
     if (!isModelAllowed(tierContext.tier, model, tierConfig)) {
@@ -295,13 +341,12 @@ export async function requestChatCompletion(
         params.timeframe,
         params.analysis,
         params.history,
-        params.userMessage
+        params.userMessage,
+        params.currentAnalysisContext
     );
 
-    // Pro tier without paidApiKey uses freeApiKey as the sole server-owned key.
-    // Safe: guard above ensures freeApiKey is defined on this path.
-    const effectivePrimaryKey = paidApiKey ? params.freeApiKey : undefined;
-    const effectiveFallbackKey: string = paidApiKey ?? params.freeApiKey!;
+    const { primary: effectivePrimaryKey, fallback: effectiveFallbackKey } =
+        resolveApiKeys(params);
 
     const aiResult = await requestAiChatCompletion(
         effectivePrimaryKey,
