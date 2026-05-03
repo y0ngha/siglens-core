@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.3](https://github.com/y0ngha/siglens-core/compare/v0.7.2...v0.7.3) (2026-05-03)
+
+
+### Bug Fixes
+
+* **cache,prompt:** cache stability + interface cleanup + prompt completeness ([025c9fc](https://github.com/y0ngha/siglens-core/commit/025c9fc30de0a8363429470d3ba61eb983941db3)), closes [#11](https://github.com/y0ngha/siglens-core/issues/11)
+* **chat:** wire currentAnalysisContext + tighten non-pro key routing guard ([094b6ea](https://github.com/y0ngha/siglens-core/commit/094b6ea8c2479adeae061d608349208978a15190)), closes [#5](https://github.com/y0ngha/siglens-core/issues/5) [#4](https://github.com/y0ngha/siglens-core/issues/4)
+* **docs,domain:** contract alignment + dead-text cleanup + safer provider mapping ([0e6096f](https://github.com/y0ngha/siglens-core/commit/0e6096f16127a39f89acca260a7e34a5e5a736ed)), closes [#15](https://github.com/y0ngha/siglens-core/issues/15) [#9](https://github.com/y0ngha/siglens-core/issues/9) [#10](https://github.com/y0ngha/siglens-core/issues/10) [#14](https://github.com/y0ngha/siglens-core/issues/14) [#12](https://github.com/y0ngha/siglens-core/issues/12)
+* **overall:** cache key stability + dependency meta alignment ([2e08a08](https://github.com/y0ngha/siglens-core/commit/2e08a0822d6b3618da8a7a9b70f303af16391f75)), closes [#1](https://github.com/y0ngha/siglens-core/issues/1) [#8](https://github.com/y0ngha/siglens-core/issues/8) [#16](https://github.com/y0ngha/siglens-core/issues/16)
+* PR [#76](https://github.com/y0ngha/siglens-core/issues/76) review feedback (4 blockers + 2 suggestions + 1 inline) ([a9b0d46](https://github.com/y0ngha/siglens-core/commit/a9b0d46687b325872451d45fbf2e9ddc78c7c9eb)), closes [#75](https://github.com/y0ngha/siglens-core/issues/75)
+* PR [#76](https://github.com/y0ngha/siglens-core/issues/76) round 2 review (3 blockers + 2 suggestions) ([199532f](https://github.com/y0ngha/siglens-core/commit/199532f027b317dd4cb05d3b98ce97206fda7099))
+* **usage:** unify analysis usage tracking + prevent overall triple-counting ([3970e35](https://github.com/y0ngha/siglens-core/commit/3970e3517bdc2bea608621618df0fc822d97d04e)), closes [2/#3](https://github.com/y0ngha/siglens-core/issues/3) [#2](https://github.com/y0ngha/siglens-core/issues/2) [#3](https://github.com/y0ngha/siglens-core/issues/3)
+
+
+### Features
+
+* **client:** expose new fundamental/news/overall types + pure functions ([60bf52d](https://github.com/y0ngha/siglens-core/commit/60bf52d764d316fcf3d31687c181cb3213cbde4b)), closes [#7](https://github.com/y0ngha/siglens-core/issues/7)
+
 ## [0.7.2](https://github.com/y0ngha/siglens-core/compare/v0.7.1...v0.7.2) (2026-05-03)
 
 
