@@ -98,7 +98,7 @@ export async function submitOverallAnalysis(
         );
         if (!allowed) {
             return {
-                status: 'error',
+                status: 'limit_error',
                 code: 'usage_limit_exceeded',
                 error: buildUsageLimitError('analysisPerDay', tier),
             };

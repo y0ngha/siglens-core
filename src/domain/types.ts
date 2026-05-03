@@ -1353,6 +1353,13 @@ export interface FundamentalProfile {
     description: string | null;
 }
 
+/**
+ * @deprecated Use {@link FundamentalProfile} instead. Kept as a type alias
+ *   for one minor version so existing consumers keep compiling. Will be
+ *   removed in a future minor release.
+ */
+export type FundamentalProfileInput = FundamentalProfile;
+
 /** Valuation multiples. */
 export interface FundamentalValuation {
     per: number | null;

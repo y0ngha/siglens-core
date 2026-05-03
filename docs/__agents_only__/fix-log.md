@@ -613,3 +613,32 @@
 - Violation: Public function return type variants missing from src/index.ts or wrongly tagged @internal
 - Rule: Public API variant type exports (MISTAKES.md Public API §8)
 - Context: PR #75 R8 (SubmitFundamentalAnalysis/News/OverallAnalysis variants, OverallAxis type), Task 7 round 3 (14 Raw* types + 8 variant types) — 22+ type instances; all union variants used in public function returns must be exported without @internal
+
+## [PR #76 | fix/post-210a423-comprehensive | 2026-05-03]
+- Violation: FundamentalProfileInput public type alias removed without @deprecated alias retention
+- Rule: MISTAKES.md Public API §3 — Tier 4 type rename/deletion requires @deprecated alias for one minor version OR major semver bump
+- Context: Blocker B1 — alias was added in c7b77d2 (PR #75 R8 S-2) and exported in src/index.ts; restored as @deprecated FundamentalProfile alias in domain/types.ts plus re-export in both index files
+
+- Violation: SubmitOverallAnalysisLimitError shares status:'error' discriminant with SubmitOverallAnalysisError (which has axis field)
+- Rule: TypeScript discriminated union — narrowing by status must yield a single shape
+- Context: Blocker B2 — consumers narrowing on result.status==='error' to access .axis broke after limit-error variant was added; fixed by giving limit error its own status:'limit_error' discriminant
+
+- Violation: FundamentalDataProvider.getGrades public method removed without @deprecated retention
+- Rule: MISTAKES.md Public API §3 — interface public method removal requires deprecation alias OR major semver bump
+- Context: Blocker B3 — restored as optional getGrades?(...) with @deprecated JSDoc; consumers may omit implementation now (optional) but call sites that referenced it keep compiling
+
+- Violation: let + .catch() mutation pattern in pollAnalysis skill loading
+- Rule: MISTAKES.md Coding Paradigm §12 — replace let+if/catch reassignment with const expressions or .then().catch() chaining
+- Context: Blocker B4 — `let pollSkillsDegraded = false; ... .catch(() => { pollSkillsDegraded = true; ... })` rewritten as single .then().catch() returning {skills, skillsDegraded} object
+
+- Violation: reduce accumulator mutated directly via property assignment
+- Rule: CONVENTIONS.md Functional Programming — reduce accumulators must be replaced via spread, not mutated
+- Context: Suggestion S1 — overallPrompt.formatTechnical trendCounts reduce now returns {...acc, [s.trend]: ...+1} instead of acc[s.trend]=...
+
+- Violation: JSDoc claim "never stored" contradicts actual recordUsage forwarding behavior
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime behavior
+- Context: Suggestion S2 — AnalysisUsageOptions.clientIp JSDoc clarifies that checkAnalysisUsageAllowed hashes via hashUsageIp but recordAnalysisUsageSafely forwards raw IP to repository.recordUsage; persistence semantics owned by repository implementation
+
+- Violation: Explicit parameter type annotation on Array.prototype.find callback when type inference would suffice
+- Rule: CONVENTIONS.md Type Inference — prefer inference for callback parameters when surrounding code has sufficient type context
+- Context: Inline gemini-bot comment — submitFundamentalAnalysis sectorSnapshot.find callback reverted from explicit (s: FundamentalSectorPerformanceInput) to inferred parameter; FundamentalSectorPerformanceInput import dropped

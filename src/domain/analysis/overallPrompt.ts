@@ -111,12 +111,9 @@ function formatTechnical(tech: AnalysisResponse): string {
     }
 
     if (tech.strategyResults.length > 0) {
-        const trendCounts = tech.strategyResults.reduce(
-            (acc, s) => {
-                acc[s.trend] = (acc[s.trend] ?? 0) + 1;
-                return acc;
-            },
-            {} as Record<string, number>
+        const trendCounts = tech.strategyResults.reduce<Record<string, number>>(
+            (acc, s) => ({ ...acc, [s.trend]: (acc[s.trend] ?? 0) + 1 }),
+            {}
         );
         const breakdown = Object.entries(trendCounts)
             .map(([trend, count]) => `${count} ${trend}`)

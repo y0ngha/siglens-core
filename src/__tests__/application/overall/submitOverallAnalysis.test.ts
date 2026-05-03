@@ -427,8 +427,8 @@ describe('submitOverallAnalysis 함수는', () => {
                 })
             );
 
-            expect(result.status).toBe('error');
-            if (result.status === 'error' && 'code' in result) {
+            expect(result.status).toBe('limit_error');
+            if (result.status === 'limit_error') {
                 expect(result.code).toBe('usage_limit_exceeded');
             }
             expect(mockResolveOverallDependencies).not.toHaveBeenCalled();

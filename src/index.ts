@@ -586,6 +586,7 @@ export type {
     FundamentalSentiment,
     FundamentalSnapshot,
     FundamentalProfile,
+    FundamentalProfileInput,
     FundamentalValuation,
     FundamentalValuationMetrics,
     NormalizeFundamentalSnapshotInput,

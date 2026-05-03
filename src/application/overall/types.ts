@@ -262,10 +262,14 @@ export interface SubmitOverallAnalysisError {
 /**
  * Daily analysis limit was exceeded by the overall-scoped usage check.
  * No axis submit was dispatched.
+ *
+ * Uses its own `status: 'limit_error'` discriminant (not `'error'`) so a
+ * consumer narrowing on `result.status === 'error'` keeps the existing
+ * `SubmitOverallAnalysisError` shape (with `axis` field) unaffected.
  */
 export interface SubmitOverallAnalysisLimitError {
-    status: 'error';
-    /** Discriminator matching the per-axis usage error code. */
+    status: 'limit_error';
+    /** Machine-readable error code shared with per-axis usage limit errors. */
     code: 'usage_limit_exceeded';
     /** Structured limit error including the resolved tier. */
     error: AnalysisLimitError;

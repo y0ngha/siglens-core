@@ -28,6 +28,7 @@ import type {
     FundamentalSectorHistoricalInput,
     FundamentalSectorPerformanceInput,
     FundamentalValuationMetrics,
+    GradesEvent,
 } from '@/domain/types';
 
 // ─────────────────────────────────────────
@@ -246,12 +247,20 @@ export interface FundamentalDataProvider {
         symbol: string
     ): Promise<FundamentalAnalystEstimateInput | null>;
 
-    // TODO: Add `getGrades(symbol, limit?): Promise<GradesEvent[]>` here when
-    // a future analysis phase surfaces individual analyst rating events.
-    // Until then the interface stays minimal so consumers (e.g. siglens FMP
-    // adapter) are not forced to implement and stub a method that no
-    // use-case calls. The aggregated `getGradesConsensus` (next method) is
-    // sufficient for `submitFundamentalAnalysis` today.
+    /**
+     * @deprecated Reserved for a future analysis phase that surfaces
+     *   individual analyst rating events. No use-case currently calls this
+     *   method, and consumers (e.g. siglens FMP adapter) MAY implement it as
+     *   a no-op or omit it entirely (the field is optional). The aggregated
+     *   {@link FundamentalDataProvider.getGradesConsensus} is sufficient for
+     *   `submitFundamentalAnalysis` today. Will be re-promoted to required
+     *   in a future minor release once a caller exists.
+     *
+     * @param symbol - Ticker symbol.
+     * @param limit  - Maximum number of recent grading events to return.
+     * @returns Recent analyst grading events for the symbol.
+     */
+    getGrades?(symbol: string, limit?: number): Promise<GradesEvent[]>;
 
     /**
      * Fetch the current buy/hold/sell grade consensus breakdown.

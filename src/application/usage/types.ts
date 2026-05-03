@@ -13,7 +13,17 @@ import type { UsageRepository } from '@/infrastructure/db';
 export interface AnalysisUsageOptions {
     /** Repository used to check today's count and record successful usage. */
     usageRepository: UsageRepository;
-    /** Raw client IP. It is hashed before persistence and never stored. */
+    /**
+     * Raw client IP address.
+     *
+     * - {@link checkAnalysisUsageAllowed} hashes this via `hashUsageIp` before
+     *   querying the usage repository — the limit-check path never reads or
+     *   stores the raw IP.
+     * - {@link recordAnalysisUsageSafely} forwards this value as-is to
+     *   `UsageRepository.recordUsage` (`ipAddress` field). Persistence
+     *   semantics (raw vs hashed storage) are owned by the repository
+     *   implementation; core does not assume either.
+     */
     clientIp: string;
     /** Authenticated user UUID, or null/undefined for anonymous usage. */
     userId?: string | null;

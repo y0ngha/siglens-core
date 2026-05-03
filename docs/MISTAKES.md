@@ -92,10 +92,13 @@ and have been removed from this file.
     → Never suppress warnings with eslint-disable-next-line or inline comments
     → Always restructure the code to fix the actual issue
 
-12. Using let + if for conditional assignment instead of declarative const expressions
+12. Using let + if/catch for conditional assignment instead of declarative const expressions
     → Prefer ternary/conditional expressions (const) over imperative reassignment (let)
+    → Applies to both if-reassignment and .catch() handler reassignment patterns
     ❌ let result = value; if (condition) result = newValue; return result;
+    ❌ let skillsDegraded = false; loadSkills().catch(() => { skillsDegraded = true; });
     ✅ const result = condition ? newValue : value; return result;
+    ✅ const { skills, skillsDegraded } = await loadSkills().then(s => ({ skills: s, skillsDegraded: false })).catch(() => ({ skills: [], skillsDegraded: true }));
 
 13. Hardcoded literals in function names or calculations
     → All magic numbers and constant values must be extracted to module-level constants
@@ -243,6 +246,11 @@ and have been removed from this file.
    ❌ { ok: false; error: ChatErrorCode | ChatUsageLimitError }  // error field accepts both; callers must typeof-guard
    ✅ Split into separate union branches:
       { ok: false; error: ChatErrorCode } | { ok: false; error: ChatUsageLimitError }
+   → Discriminator field values must be distinct across all union variants — colliding discriminants break type narrowing
+   ❌ type Result = { status: 'error'; message: string; axis?: string } | { status: 'error'; limitError: true }
+      // Both variants share status:'error'; result.status==='error' yields union, not single type
+   ✅ type Result = { status: 'error'; message: string; axis: OverallAxis } | { status: 'limit_error'; limitError: true }
+      // Each variant has unique status discriminant; narrowing resolves to single type (PR #76 B2)
 
 9. Complex type inference chains instead of importing direct types
    → When a function's return type can be expressed as an imported concrete type, prefer direct import over inference chains
@@ -637,15 +645,17 @@ and have been removed from this file.
    ❌ Delete TierModel union members without @deprecated; code depending on those literals breaks
    ❌ Union variant types (SubmitFundamentalAnalysisCached, SubmitNewsAnalysisError) re-exported in src/index.ts but still tagged @internal; IDE autocomplete hides them
    ❌ FundamentalProfileInput.mktCap renamed to marketCap without @deprecated alias; code using old field name breaks
+   ❌ FundamentalDataProvider.getGrades interface method removed without @deprecated retention (PR #76 B3)
    ✅ Keep old field with @deprecated JSDoc; implement fallback: const fn = deps.callAiProvider ?? deps.callGemini
    ✅ Export deprecated type alias: export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions
    ✅ Add deleted union members back with @deprecated tag; type checkers warn but code doesn't break
+   ✅ Mark removed interface methods as optional @deprecated; consumers may omit implementation but call sites keep compiling
    ✅ Remove @internal from types that are re-exported in src/index.ts; @internal must not appear on public contract types
    → Also requires package.json version bump to 0.x.0 (major in 0.x semver) and CHANGELOG.md entry documenting BREAKING CHANGES
-   → Recurring mistake (fix/post-210a423 Task 1 R1, Task 7 PR #75 R8): Type renames without deprecation (FundamentalProfileInput),
-      union variants missing from exports or wrongly tagged @internal (14 Raw* types, 8 SubmitXxx variants, OverallAxis).
-      Before marking types public, verify: (1) all variant types are exported, (2) @internal tags removed from exported types,
-      (3) old names preserved with @deprecated if renamed.
+   → Recurring (PR #76 B1+B3): Type removal without deprecation for both type aliases (FundamentalProfileInput) and interface methods (getGrades).
+      Pattern has appeared 3+ times across PR #75 R8, Task 1 R1, and PR #76; checkpoint needed in PR description template to verify
+      deprecation aliases before approval. Before marking types public, verify: (1) all variant types are exported, (2) @internal tags removed from exported types,
+      (3) old names preserved with @deprecated if renamed, (4) interface methods retained as optional @deprecated if removed.
 
 6.5. Internal implementation constants/types leaked to public API via src/index.ts
    → Library public API must export only symbols consumers actually use

@@ -22,7 +22,6 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
     FundamentalAnalysisResponse,
-    FundamentalSectorPerformanceInput,
     FundamentalSnapshot,
     Skill,
 } from '@/domain/types';
@@ -183,10 +182,8 @@ export async function submitFundamentalAnalysis(
             : [];
 
         const sectorToday =
-            sectorSnapshot.find(
-                (s: FundamentalSectorPerformanceInput) =>
-                    s.sector === sectorName
-            )?.changesPercentage ?? null;
+            sectorSnapshot.find(s => s.sector === sectorName)
+                ?.changesPercentage ?? null;
 
         snapshot = normalizeFundamentalSnapshot({
             profile,
