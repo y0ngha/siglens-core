@@ -6,6 +6,28 @@ import type {
     OverallDependencyInputs,
 } from '@/application/overall/types';
 
+/** Strip the `usage` key from an axis-options object without mutating it. */
+function omitUsage<T extends { usage?: unknown }>(opts: T): Omit<T, 'usage'> {
+    const { usage: _usage, ...rest } = opts;
+    return rest;
+}
+
+/**
+ * @internal Options that customize how the resolver translates
+ * {@link OverallDependencyInputs} into per-axis submit calls.
+ */
+export interface ResolveOverallDependenciesOptions {
+    /**
+     * When `true`, the resolver strips `usage` from each axis's forwarded
+     * options so the daily limit is neither checked nor recorded per axis.
+     * `submitOverallAnalysis` sets this to `true` to keep one overall request
+     * counted as exactly one analysis (otherwise three axis submits would each
+     * check + record, triple-counting). Standalone callers can leave it
+     * `false` (the default) to opt into per-axis tracking.
+     */
+    dropAxisUsage?: boolean;
+}
+
 /**
  * @internal Called by {@link submitOverallAnalysis} — consumers should not call this directly.
  *
@@ -42,7 +64,8 @@ import type {
  * @see submitOverallAnalysis
  */
 export async function resolveOverallDependencies(
-    inputs: OverallDependencyInputs
+    inputs: OverallDependencyInputs,
+    options: ResolveOverallDependenciesOptions = {}
 ): Promise<DependencyState> {
     const {
         symbol,
@@ -55,24 +78,32 @@ export async function resolveOverallDependencies(
         fundamental: fundamentalOptions,
         news: newsField,
     } = inputs;
-    // Intentional read of @deprecated `newsOptions` for backward compatibility
-    // until the legacy field is removed in a future major version. Cast strips
-    // the @deprecated tag so we don't surface the deprecation warning at this
-    // intentional fallback site.
-    const newsOptionsLegacy = (
-        inputs as { newsOptions?: typeof inputs.news }
-    ).newsOptions;
-
+    const dropAxisUsage = options.dropAxisUsage ?? false;
     // ── Backward-compat disambiguation for the renamed news fields ──
     // Old API: `news` (data: EnrichedNewsItem[]) + `newsOptions` (axis options).
     // New API: `newsItems` (data) + `news` (axis options).
     // The new `news` field accepts either shape — disambiguated at runtime
     // by Array.isArray to preserve callers using the legacy data alias.
+    type NewsAxisOptions = NonNullable<
+        Exclude<OverallDependencyInputs['news'], readonly unknown[]>
+    >;
+    // Intentional read of @deprecated `newsOptions` for backward compatibility
+    // until the legacy field is removed in a future major version. Cast strips
+    // the @deprecated tag so we don't surface the deprecation warning at this
+    // intentional fallback site.
+    const newsOptionsLegacy = (
+        inputs as { newsOptions?: NewsAxisOptions }
+    ).newsOptions;
+
     const newsFieldIsArray = Array.isArray(newsField);
     const resolvedNewsItems = newsItemsInput ?? (newsFieldIsArray ? newsField : undefined);
-    const resolvedNewsOptions = newsFieldIsArray
+    const newsFieldAsOptions: NewsAxisOptions | undefined =
+        !newsFieldIsArray && newsField !== undefined
+            ? (newsField as NewsAxisOptions)
+            : undefined;
+    const resolvedNewsOptions: NewsAxisOptions | undefined = newsFieldIsArray
         ? newsOptionsLegacy
-        : (newsField ?? newsOptionsLegacy);
+        : (newsFieldAsOptions ?? newsOptionsLegacy);
 
     if (resolvedNewsItems === undefined) {
         throw new Error(
@@ -87,24 +118,40 @@ export async function resolveOverallDependencies(
         ...technicalRest
     } = technicalOptions;
 
+    // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
+    // Triple-counting prevention: if the caller forwards `usage` here, three
+    // axis submits would each check + record one analysis. Overall owns the
+    // single check + single record at its layer (submitOverallAnalysis).
+    const technicalAxisOptions = dropAxisUsage
+        ? omitUsage(technicalRest)
+        : technicalRest;
+    const fundamentalAxisOptions =
+        dropAxisUsage && fundamentalOptions !== undefined
+            ? omitUsage(fundamentalOptions)
+            : fundamentalOptions;
+    const newsAxisOptions =
+        dropAxisUsage && resolvedNewsOptions !== undefined
+            ? omitUsage(resolvedNewsOptions)
+            : resolvedNewsOptions;
+
     // ── Kick off all three axes in parallel ──
     const [technicalResult, fundamentalResult, newsResult] = await Promise.all([
         submitAnalysis(symbol, timeframe, technicalForce, technicalFmpSymbol, {
-            ...technicalRest,
-            modelId: technicalRest.modelId ?? modelId,
+            ...technicalAxisOptions,
+            modelId: technicalAxisOptions.modelId ?? modelId,
         }),
         submitFundamentalAnalysis({
             symbol,
             modelId,
             dataProvider: fundamentalProvider,
-            ...fundamentalOptions,
+            ...fundamentalAxisOptions,
         }),
         submitNewsAnalysis({
             symbol,
             modelId,
             news: resolvedNewsItems,
             upcomingCalendar,
-            ...resolvedNewsOptions,
+            ...newsAxisOptions,
         }),
     ]);
 

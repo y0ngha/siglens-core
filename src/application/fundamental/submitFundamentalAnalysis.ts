@@ -1,5 +1,9 @@
 import { fireAndForget } from '@/application/background';
-import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
+import {
+    buildUsageLimitError,
+    checkAnalysisUsageAllowed,
+    recordAnalysisUsageSafely,
+} from '@/application/usage';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import type {
     SubmitFundamentalAnalysisOptions,
@@ -13,7 +17,6 @@ import { TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
@@ -70,16 +73,18 @@ export async function submitFundamentalAnalysis(
     options: SubmitFundamentalAnalysisOptions
 ): Promise<SubmitFundamentalAnalysisResult> {
     const { symbol, modelId, dataProvider } = options;
-    const occurredAt = options.now ?? new Date();
+    const usage = options.usage;
+    const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
     // ── 1. Usage limit check (only when both tier and usage are provided) ──
-    if (options.tier !== undefined && options.usage !== undefined) {
+    if (options.tier !== undefined && usage !== undefined) {
         const tier = options.tier;
         const tierConfig = options.tierConfig ?? TIER_CONFIG;
-        const ipHash = hashUsageIp(options.usage.clientIp, occurredAt);
-        const allowed = await checkAnalysisLimit(
-            { ipHash, tier, now: occurredAt, config: tierConfig },
-            { usage: options.usage.usageRepository }
+        const allowed = await checkAnalysisUsageAllowed(
+            usage,
+            tier,
+            occurredAt,
+            tierConfig
         );
         if (!allowed) {
             const limitError: SubmitFundamentalAnalysisLimitError = {
@@ -186,6 +191,7 @@ export async function submitFundamentalAnalysis(
             const cached =
                 await cache.get<FundamentalAnalysisResponse>(cacheKey);
             if (cached !== null) {
+                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -224,6 +230,8 @@ export async function submitFundamentalAnalysis(
         );
     });
     fireAndForget(dispatch, options);
+
+    await recordAnalysisUsageSafely(usage, modelId, occurredAt);
 
     return { status: 'submitted', jobId };
 }

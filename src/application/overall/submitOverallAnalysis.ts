@@ -5,8 +5,14 @@ import type {
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
 } from '@/application/overall/types';
+import {
+    buildUsageLimitError,
+    checkAnalysisUsageAllowed,
+    recordAnalysisUsageSafely,
+} from '@/application/usage';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
+import { TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -73,9 +79,38 @@ export async function submitOverallAnalysis(
     options: SubmitOverallAnalysisOptions
 ): Promise<SubmitOverallAnalysisResult> {
     const { symbol, timeframe, modelId } = options;
+    const usage = options.usage;
+    const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
+
+    // ── 0. Overall-scoped usage limit check ──
+    // Owned at this layer (not per axis) so one overall request counts as
+    // exactly one analysis. The dependency resolver drops `usage` from each
+    // axis's forwarded options (see dropAxisUsage below) to prevent
+    // triple-counting.
+    if (options.tier !== undefined && usage !== undefined) {
+        const tier = options.tier;
+        const tierConfig = options.tierConfig ?? TIER_CONFIG;
+        const allowed = await checkAnalysisUsageAllowed(
+            usage,
+            tier,
+            occurredAt,
+            tierConfig
+        );
+        if (!allowed) {
+            return {
+                status: 'error',
+                code: 'usage_limit_exceeded',
+                error: buildUsageLimitError('analysisPerDay', tier),
+            };
+        }
+    }
 
     // ── 1. Resolve all three dependency axes in parallel ──
-    const deps = await resolveOverallDependencies(options);
+    // `dropAxisUsage: true` ensures axis submits never check or record usage
+    // when invoked from overall — one overall call = one analysis recorded.
+    const deps = await resolveOverallDependencies(options, {
+        dropAxisUsage: true,
+    });
 
     if (deps.kind === 'error') {
         // One axis failed — return immediately without cache lookup or job submission.
@@ -121,6 +156,7 @@ export async function submitOverallAnalysis(
         try {
             const cached = await cache.get<OverallAnalysisResponse>(cacheKey);
             if (cached !== null) {
+                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -158,6 +194,8 @@ export async function submitOverallAnalysis(
         console.error('[submitOverallAnalysis] Worker request failed:', error);
     });
     fireAndForget(dispatch, options);
+
+    await recordAnalysisUsageSafely(usage, modelId, occurredAt);
 
     return { status: 'submitted', jobId };
 }

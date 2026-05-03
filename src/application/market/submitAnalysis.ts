@@ -1,11 +1,14 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import type {
-    AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
 } from '@/application/market/types';
-import { buildUsageLimitError, checkAnalysisLimit } from '@/application/usage';
+import {
+    buildUsageLimitError,
+    checkAnalysisUsageAllowed,
+    recordAnalysisUsageSafely,
+} from '@/application/usage';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
@@ -15,73 +18,17 @@ import {
     getAllowedTimeframes,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type {
-    AnalysisResponse,
-    Skill,
-    Tier,
-    TierConfig,
-    Timeframe,
-} from '@/domain/types';
+import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
 import {
     buildAnalysisCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
-
-async function checkAnalysisUsageAllowed(
-    usage: AnalysisUsageOptions,
-    tier: Tier,
-    occurredAt: Date,
-    tierConfig: TierConfig
-): Promise<boolean> {
-    const ipHash = hashUsageIp(usage.clientIp, occurredAt);
-    return checkAnalysisLimit(
-        {
-            ipHash,
-            tier,
-            now: occurredAt,
-            config: tierConfig,
-        },
-        { usage: usage.usageRepository }
-    );
-}
-
-async function recordAnalysisUsage(
-    usage: SubmitAnalysisOptions['usage'],
-    effectiveModelId: string,
-    occurredAt?: Date
-): Promise<void> {
-    if (usage === undefined) return;
-
-    await usage.usageRepository.recordUsage({
-        userId: usage.userId ?? null,
-        ipAddress: usage.clientIp,
-        actionType: 'analysis',
-        modelUsed: usage.modelUsed ?? effectiveModelId,
-        occurredAt,
-    });
-}
-
-async function recordAnalysisUsageSafely(
-    usage: SubmitAnalysisOptions['usage'],
-    effectiveModelId: string,
-    occurredAt?: Date
-): Promise<void> {
-    try {
-        await recordAnalysisUsage(usage, effectiveModelId, occurredAt);
-    } catch (error) {
-        console.warn(
-            '[recordAnalysisUsageSafely] Failed to record analysis usage:',
-            error
-        );
-    }
-}
 
 /**
  * Submit an analysis job for a given symbol/timeframe.

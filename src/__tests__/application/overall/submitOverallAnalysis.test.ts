@@ -18,6 +18,7 @@ import type {
     NewsAnalysisResponse,
 } from '@/domain/types';
 import type { SubmitOverallAnalysisOptions } from '@/application/overall/types';
+import type { TierConfig } from '@/domain/types';
 import {
     makeEnrichedNewsItem,
     makeCalendarItem,
@@ -136,7 +137,7 @@ describe('submitOverallAnalysis 함수는', () => {
             const result = await submitOverallAnalysis(makeOptions());
 
             expect(result.status).toBe('error');
-            if (result.status === 'error') {
+            if (result.status === 'error' && 'axis' in result) {
                 expect(result.axis).toBe('technical');
                 expect(result.error).toEqual({ code: 'timeframe_not_allowed' });
             }
@@ -355,6 +356,208 @@ describe('submitOverallAnalysis 함수는', () => {
             const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
 
             expect(firstCacheKey).not.toBe(secondCacheKey);
+        });
+    });
+
+    describe('overall-scoped usage 추적이', () => {
+        const restrictedTierConfig: TierConfig = {
+            limits: {
+                analysisPerDay: {
+                    free: 1,
+                    member: Infinity,
+                    pro: Infinity,
+                },
+                chatbotPerDay: {
+                    free: Infinity,
+                    member: Infinity,
+                    pro: Infinity,
+                },
+            },
+            timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
+            infoDepth: {
+                free: ['summary'],
+                member: ['summary'],
+                pro: ['summary'],
+            },
+            models: {
+                free: ['gemini-2.5-flash'],
+                member: ['gemini-2.5-flash'],
+                pro: ['gemini-2.5-flash'],
+            },
+            featureFlags: { enableTierRestrictions: true },
+        };
+
+        it('한도 초과 시 dependency resolver 를 호출하지 않고 limit error 를 반환한다', async () => {
+            const recordUsage = vi.fn();
+            const result = await submitOverallAnalysis(
+                makeOptions({
+                    tier: 'free',
+                    tierConfig: restrictedTierConfig,
+                    usage: {
+                        usageRepository: {
+                            recordUsage,
+                            getUsageToday: vi
+                                .fn()
+                                .mockResolvedValue({
+                                    analysis: 1,
+                                    chatbot: 0,
+                                }),
+                        },
+                        clientIp: '203.0.113.10',
+                    },
+                })
+            );
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error' && 'code' in result) {
+                expect(result.code).toBe('usage_limit_exceeded');
+            }
+            expect(mockResolveOverallDependencies).not.toHaveBeenCalled();
+            expect(recordUsage).not.toHaveBeenCalled();
+        });
+
+        it('overall 캐시 히트 경로에서 recordUsage 가 정확히 1회 호출된다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(cachedOverallResult);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            await submitOverallAnalysis(
+                makeOptions({
+                    usage: {
+                        usageRepository: {
+                            recordUsage,
+                            getUsageToday: vi
+                                .fn()
+                                .mockResolvedValue({
+                                    analysis: 0,
+                                    chatbot: 0,
+                                }),
+                        },
+                        clientIp: '203.0.113.10',
+                    },
+                })
+            );
+
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+            expect(recordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'analysis',
+                    ipAddress: '203.0.113.10',
+                    modelUsed: 'gemini-2.5-flash',
+                })
+            );
+        });
+
+        it('overall submitted 경로에서 recordUsage 가 정확히 1회 호출된다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({
+                    usage: {
+                        usageRepository: {
+                            recordUsage,
+                            getUsageToday: vi
+                                .fn()
+                                .mockResolvedValue({
+                                    analysis: 0,
+                                    chatbot: 0,
+                                }),
+                        },
+                        clientIp: '203.0.113.10',
+                    },
+                })
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+        });
+
+        it('pending_dependencies 경로에서는 recordUsage 가 호출되지 않는다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'pending',
+                pendingJobs: {
+                    technical: 'tech-job',
+                    fundamental: undefined,
+                    news: undefined,
+                },
+            });
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            await submitOverallAnalysis(
+                makeOptions({
+                    usage: {
+                        usageRepository: {
+                            recordUsage,
+                            getUsageToday: vi
+                                .fn()
+                                .mockResolvedValue({
+                                    analysis: 0,
+                                    chatbot: 0,
+                                }),
+                        },
+                        clientIp: '203.0.113.10',
+                    },
+                })
+            );
+
+            expect(recordUsage).not.toHaveBeenCalled();
+        });
+
+        it('axis-error 경로에서는 recordUsage 가 호출되지 않는다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'error',
+                axis: 'technical',
+                error: { code: 'timeframe_not_allowed' },
+            });
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            await submitOverallAnalysis(
+                makeOptions({
+                    usage: {
+                        usageRepository: {
+                            recordUsage,
+                            getUsageToday: vi
+                                .fn()
+                                .mockResolvedValue({
+                                    analysis: 0,
+                                    chatbot: 0,
+                                }),
+                        },
+                        clientIp: '203.0.113.10',
+                    },
+                })
+            );
+
+            expect(recordUsage).not.toHaveBeenCalled();
+        });
+
+        it('resolver 호출 시 dropAxisUsage: true 를 전달해 triple-counting 을 방지한다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(cachedOverallResult);
+
+            await submitOverallAnalysis(makeOptions());
+
+            expect(mockResolveOverallDependencies).toHaveBeenCalledWith(
+                expect.any(Object),
+                { dropAxisUsage: true }
+            );
         });
     });
 });

@@ -319,6 +319,89 @@ describe('submitNewsAnalysis 함수는', () => {
         });
     });
 
+    describe('usage 기록(recordUsage)이', () => {
+        beforeEach(() => {
+            // Reset the cache-get queue so prior describes don't leak values.
+            mockCacheGet.mockReset();
+        });
+
+        it('cached 경로에서 정확히 1회 호출된다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockCachedResult);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+            expect(recordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'analysis',
+                    ipAddress: '203.0.113.10',
+                    modelUsed: 'gemini-2.5-flash',
+                })
+            );
+        });
+
+        it('submitted 경로에서 정확히 1회 호출된다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+        });
+
+        it('no_news 경로에서는 호출되지 않는다', async () => {
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [],
+                upcomingCalendar: [],
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(recordUsage).not.toHaveBeenCalled();
+        });
+    });
+
     describe('입력 해시 결정성', () => {
         it('동일한 뉴스 셋은 순서가 달라도 동일한 캐시 키를 생성한다', async () => {
             const news1 = makeEnrichedNewsItem('news-aaa');

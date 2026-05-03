@@ -513,6 +513,7 @@ export type {
     SubmitOverallAnalysisPendingDependencies,
     SubmitOverallAnalysisSubmitted,
     SubmitOverallAnalysisError,
+    SubmitOverallAnalysisLimitError,
     DependencyState,
     DependencyStateCached,
     DependencyStatePending,
