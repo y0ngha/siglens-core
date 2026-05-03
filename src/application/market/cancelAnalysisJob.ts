@@ -10,7 +10,10 @@ const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
  * Cancel an in-flight analysis job.
  *
  * Sends two best-effort cancellation signals:
- * 1. Marks the job as cancelled in Redis so {@link pollAnalysis} reports it.
+ * 1. Marks the job as cancelled in Redis (sets the `cancelledKey`) so the
+ *    worker can observe it via `isJobCancelled` and self-abort. This does
+ *    NOT call `setJobStatus`, so the job's status stays whatever the worker
+ *    last wrote (typically `processing`).
  * 2. If a worker URL is configured, dispatches a background POST to `/cancel`
  *    to abort the in-progress AI call on the worker side (5-second timeout).
  *
@@ -19,10 +22,23 @@ const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
  * returns a 4xx/5xx. Callers can omit error handling. Stale jobs that
  * escape cancellation are cleaned up naturally via Redis TTL.
  *
+ * Cancel-after-poll behavior: because cancellation only sets the
+ * `cancelledKey` and never directly transitions the job's status,
+ * {@link pollAnalysis} will continue to return `processing` after a cancel
+ * until the worker observes the cancel signal on its next `isJobCancelled`
+ * check (and only then transitions the status to `error`/`done`). If the
+ * worker is dead, unreachable, or already finished, the status may never
+ * change and is reaped only by Redis TTL. Consumers that poll after
+ * cancellation MUST bound the loop with their own timeout to avoid
+ * indefinite polling.
+ *
  * @param jobId - The `jobId` returned by {@link submitAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
  *   so the worker `/cancel` request can continue after the response.
- * @returns Resolves once the Redis cancellation signal has settled.
+ * @returns A `Promise<void>` that resolves once the Redis cancellation
+ *   signal has settled. The promise resolves even if the signal failed
+ *   (errors are logged, not thrown), so a successful resolution does not
+ *   imply the worker has actually stopped.
  *
  * @see submitAnalysis
  * @see pollAnalysis
