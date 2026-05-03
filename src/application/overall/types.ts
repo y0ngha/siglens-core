@@ -14,7 +14,7 @@ import type {
 } from '@/domain/types';
 import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
 
-/** @internal Axis identifier for the three-axis overall analysis pipeline. */
+/** Axis identifier for the three-axis overall analysis pipeline. */
 export type OverallAxis = 'technical' | 'fundamental' | 'news';
 
 // ─────────────────────────────────────────
@@ -143,14 +143,13 @@ export type DependencyState =
 export interface SubmitOverallAnalysisOptions
     extends OverallDependencyInputs, BackgroundTaskOptions {}
 
-/** @internal The caller receives a cached overall analysis — no new job was created. */
+/** The caller receives a cached overall analysis — no new job was created. */
 export interface SubmitOverallAnalysisCached {
     status: 'cached';
     result: OverallAnalysisResponse;
 }
 
 /**
- * @internal
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
@@ -165,14 +164,13 @@ export interface SubmitOverallAnalysisPendingDependencies {
     pendingJobs: Record<OverallAxis, string | undefined>;
 }
 
-/** @internal A new overall analysis job was submitted; poll with `jobId` for the result. */
+/** A new overall analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitOverallAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
 /**
- * @internal
  * One of the dependency axes returned an error (tier gate, usage limit, or
  * fetch failure). The overall job is not submitted.
  */

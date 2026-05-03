@@ -472,6 +472,7 @@ export type {
     RequestChatCompletionResult,
 } from './application/chat/types';
 export type {
+    FundamentalAnalysisUsageOptions,
     PollFundamentalAnalysisResult,
     SubmitFundamentalAnalysisCached,
     SubmitFundamentalAnalysisFetchError,
@@ -489,6 +490,7 @@ export type {
     TierTimeframeAccessError,
 } from './application/market/types';
 export type {
+    NewsAnalysisUsageOptions,
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
     SubmitNewsAnalysisCached,
@@ -503,9 +505,14 @@ export type {
     SubmitNewsCardAnalysisSubmitted,
 } from './application/news/types';
 export type {
+    OverallAxis,
     PollOverallAnalysisResult,
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
+    SubmitOverallAnalysisCached,
+    SubmitOverallAnalysisPendingDependencies,
+    SubmitOverallAnalysisSubmitted,
+    SubmitOverallAnalysisError,
     DependencyState,
     DependencyStateCached,
     DependencyStatePending,
@@ -574,8 +581,8 @@ export type {
     FundamentalProfileInput,
     FundamentalRatiosInput,
     FundamentalSectorDirection,
-    FundamentalSectorHistoricalEntry,
-    FundamentalSectorPerformanceEntry,
+    FundamentalSectorHistoricalInput,
+    FundamentalSectorPerformanceInput,
     FundamentalSentiment,
     FundamentalSnapshot,
     FundamentalProfile,
