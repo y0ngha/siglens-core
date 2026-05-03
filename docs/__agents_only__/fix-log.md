@@ -563,3 +563,32 @@
 - Violation: SubmitNewsCardAnalysisOptions/Result and PollNewsCardAnalysisResult missing from src/index.ts despite being parameter/return types of public functions
 - Rule: Public API completeness — parameter and return types of public functions must themselves be public exports
 - Context: submitNewsCardAnalysis and pollNewsCardAnalysis are public but their option/result types were marked @internal and omitted from src/index.ts; added all 5 types to exports and removed @internal
+
+## [PR #75 R8 | feat/fundamental-news-analysis | 2026-05-03]
+- Violation: SubmitOverallAnalysisCached/Submitted/LimitError/FetchError and OverallAxis types missing from src/index.ts exports
+- Rule: MISTAKES.md Public API & Module Exports §8 — public union variant types and axis types must be re-exported
+- Context: Blockers B-1 and B-2; variants used in public SubmitOverallAnalysisResult union but not exported; OverallAxis used in dependency result types
+
+- Violation: @internal tags on public union variant types after re-export in src/index.ts
+- Rule: MISTAKES.md §9.5 — @internal contradicts re-export; public variant types have no @internal tag
+- Context: All 8 SubmitFundamental/News/Overall analysis result variants re-exported and @internal tags removed
+
+- Violation: FundamentalAnalysisUsageOptions / NewsAnalysisUsageOptions not exported despite sibling AnalysisUsageOptions being public
+- Rule: MISTAKES.md Public API §1 — sibling exports must be consistent
+- Context: Suggestion S-1; both usage options exported for API surface consistency
+
+- Violation: FundamentalProfile and FundamentalProfileInput define identical 8-field structure
+- Rule: MISTAKES.md TypeScript §6 — duplicate type structures should be unified or cross-referenced
+- Context: Suggestion S-2; structures kept separate per domain/input layer semantics, JSDoc added to document intentional separation
+
+- Violation: FundamentalSectorPerformanceEntry and HistoricalEntry exported but unused in public API
+- Rule: MISTAKES.md Dead Code §15 — unused public exports must be removed
+- Context: Suggestion S-3; types removed from src/index.ts exports
+
+- Violation: Dead re-export block in application/overall/dependencyResolver.ts
+- Rule: MISTAKES.md Dead Code §15 — remove dead exports after refactoring
+- Context: Suggestion S-4; re-export block removed after resolveOverallDependencies was made internal
+
+- Violation: FundamentalDataProvider returns Raw* types @internal but consumers must import them explicitly
+- Rule: MISTAKES.md API Usability — provider interface return types must be importable with clear intent
+- Context: Suggestion S-5; 13 provider methods return types changed from Raw* to Fundamental*Input aliases; provider interface now returns domain-neutral input shapes

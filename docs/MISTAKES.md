@@ -643,6 +643,17 @@ and have been removed from this file.
    ❌ PUBLIC_API.md documents a symbol that no longer exists in src/index.ts after refactoring
    ✅ After changing src/index.ts exports, update PUBLIC_API.md document to match actual exports
    ✅ Use the document as a checklist before commits: all symbols exported must be listed
+
+8. Public discriminated union variant types missing from src/index.ts or wrongly tagged @internal
+   → When a public function returns a discriminated union (e.g. Result<Success | Error>), all variant types must be re-exported in src/index.ts
+   → Union variants used as parameter or return types of public functions are themselves part of the public contract
+   → Variant types must NOT carry @internal JSDoc if they are re-exported; @internal contradicts re-export visibility
+   ❌ submitAnalysis returns SubmitAnalysisResult with variants (Cached|Submitted|LimitError), but only SubmitAnalysisResult exported; variants require explicit imports
+   ❌ SubmitOverallAnalysisPending, SubmitOverallAnalysisError, OverallAxis used in public type but @internal + not exported
+   ❌ Union variants re-exported in src/index.ts but still tagged /** @internal */ in source files — IDE hides them from autocomplete
+   ✅ All union variants (SubmitFundamentalAnalysisCached|Submitted|LimitError|FetchError) explicitly exported from src/index.ts
+   ✅ Variant types have no @internal tag if they are re-exported; keep @internal only for module-internal helpers
+   ✅ Parameter/return types of public functions are public contracts; audit every public function's type signature and ensure all referenced types are exported
 ```
 
 ---
