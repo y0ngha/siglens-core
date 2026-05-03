@@ -416,7 +416,9 @@ export type SkillCategory =
     | 'reversal_bearish'
     | 'continuation_bullish'
     | 'continuation_bearish'
-    | 'neutral';
+    | 'neutral'
+    | 'fundamental'
+    | 'news';
 
 /** Chart-rendering directive carried by a skill (color, label, style). */
 export interface SkillChartDisplay {
@@ -465,6 +467,8 @@ export interface SkillCounts {
     patterns: number;
     strategies: number;
     supportResistance: number;
+    fundamental: number;
+    news: number;
 }
 
 /** Origin marker carried by AnalysisSignal (currently always `'skill'`). */
@@ -1301,3 +1305,425 @@ export type WaitUntil = (promise: Promise<unknown>) => void;
 
 /** Canonical API key provider identifier. Single source of truth for key storage routing. */
 export type LlmProvider = 'anthropic' | 'google' | 'openai';
+
+// ─────────────────────────────────────────
+// Fundamental analysis
+// ─────────────────────────────────────────
+
+/** Sentiment label for a single fundamental analysis category or summary. Equivalent shape to {@link Trend} and {@link NewsSentiment}; kept separate for domain clarity. */
+export type FundamentalSentiment = 'bullish' | 'neutral' | 'bearish';
+
+/** Named union for the five fundamental analysis categories. */
+export type FundamentalCategory =
+    | 'valuation'
+    | 'profitability'
+    | 'growth'
+    | 'health'
+    | 'futureDirection';
+
+/** Per-category assessment summary used by the fundamental analysis response. */
+export interface FundamentalCategoryAssessment {
+    category: FundamentalCategory;
+    sentiment: FundamentalSentiment;
+    /** Per-category rationale paragraph (Korean output). */
+    rationaleKo: string;
+}
+
+/** LLM-generated fundamental analysis result returned to the caller. */
+export interface FundamentalAnalysisResponse {
+    /** Overall conclusion paragraph (Korean output). */
+    overallConclusionKo: string;
+    /** Per-category assessment list. */
+    categoryAssessments: FundamentalCategoryAssessment[];
+    /** Risk factor bullet points (Korean output). */
+    riskFactorsKo: string[];
+    /** Aggregate sentiment (bullish / neutral / bearish). */
+    overallSentiment: FundamentalSentiment;
+}
+
+/** Company profile fields included in the fundamental snapshot. */
+export interface FundamentalProfile {
+    symbol: string;
+    companyName: string;
+    sector: string;
+    industry: string;
+    marketCap: number;
+    ceo: string | null;
+    website: string | null;
+    description: string | null;
+}
+
+/** Valuation multiples. */
+export interface FundamentalValuation {
+    per: number | null;
+    psr: number | null;
+    pbr: number | null;
+    peg: number | null;
+    evToEbitda: number | null;
+    eps: number | null;
+}
+
+/** Single peer entry for relative valuation context. */
+export interface FundamentalPeer {
+    symbol: string;
+    companyName: string;
+    marketCap: number;
+}
+
+/** Profitability metrics. */
+export interface FundamentalProfitability {
+    roe: number | null;
+    roa: number | null;
+    operatingMargin: number | null;
+    netMargin: number | null;
+}
+
+/** Revenue and EPS year-over-year growth rates. */
+export interface FundamentalGrowth {
+    revenueYoy: number | null;
+    epsYoy: number | null;
+}
+
+/** Financial health and solvency metrics. */
+export interface FundamentalHealth {
+    debtRatio: number | null;
+    currentRatio: number | null;
+    operatingCashFlow: number | null;
+    altmanZScore: number | null;
+    piotroskiScore: number | null;
+}
+
+/** Analyst grade breakdown (buy/hold/sell counts). */
+export interface GradesConsensus {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+}
+
+/** Analyst price target consensus range. */
+export interface PriceTargetConsensus {
+    high: number | null;
+    low: number | null;
+    median: number | null;
+    consensus: number | null;
+}
+
+/** Rolling average price targets over recent months and year. */
+export interface PriceTargetSummary {
+    month1Avg: number | null;
+    month3Avg: number | null;
+    year1Avg: number | null;
+}
+
+/** Forward-looking metrics: earnings estimate, analyst grades, and price targets. */
+export interface FundamentalFutureDirection {
+    nextEarningsAt: string | null; // ISO date
+    analystEstimateEps: number | null;
+    analystEstimateRevenue: number | null;
+    gradesConsensus: GradesConsensus | null;
+    priceTargetConsensus: PriceTargetConsensus | null;
+    priceTargetSummary: PriceTargetSummary | null;
+}
+
+/** Single historical data point for sector performance. */
+export interface SectorHistoricalPoint {
+    date: string;
+    changePct: number;
+}
+
+/** Sector-level price direction including recent history. */
+export interface FundamentalSectorDirection {
+    todayChangePct: number | null;
+    historical: SectorHistoricalPoint[];
+}
+
+/** Normalized fundamental data fed into the analysis prompt. */
+export interface FundamentalSnapshot {
+    profile: FundamentalProfile;
+    valuation: FundamentalValuation;
+    peers: FundamentalPeer[];
+    profitability: FundamentalProfitability;
+    growth: FundamentalGrowth;
+    health: FundamentalHealth;
+    futureDirection: FundamentalFutureDirection;
+    sectorDirection: FundamentalSectorDirection;
+}
+
+// ─────────────────────────────────────────
+// Fundamental snapshot input shapes
+// ─────────────────────────────────────────
+
+/**
+ * Domain-neutral input shapes consumed by `normalizeFundamentalSnapshot`.
+ *
+ * These interfaces describe the _domain role_ of each input to the pure
+ * normalization function — not the wire format of any concrete HTTP provider.
+ * Infrastructure adapters (e.g. FMP) return objects that structurally satisfy
+ * these interfaces; domain never imports from infrastructure.
+ *
+ * Naming convention: `Fundamental<Role>Input` — describes what the field
+ * represents in the business domain, not which API it comes from.
+ */
+
+/**
+ * Company identity and market classification fields required for snapshot normalization.
+ * Alias of {@link FundamentalProfile} — both describe the same shape. `FundamentalProfileInput`
+ * is used as the provider/normalizer parameter type; `FundamentalProfile` is used in the
+ * normalized domain output ({@link FundamentalSnapshot}).
+ */
+export type FundamentalProfileInput = FundamentalProfile;
+
+/** Valuation multiples and per-share earnings metrics (trailing-twelve-month). */
+export interface FundamentalValuationMetrics {
+    peRatioTTM: number | null;
+    priceToSalesRatioTTM: number | null;
+    pbRatioTTM: number | null;
+    pegRatioTTM: number | null;
+    enterpriseValueOverEBITDATTM: number | null;
+    epsTTM: number | null;
+}
+
+/** Profitability and financial health ratios (trailing-twelve-month). */
+export interface FundamentalRatiosInput {
+    returnOnEquityTTM: number | null;
+    returnOnAssetsTTM: number | null;
+    operatingProfitMarginTTM: number | null;
+    netProfitMarginTTM: number | null;
+    debtRatioTTM: number | null;
+    currentRatioTTM: number | null;
+}
+
+/** Year-over-year income statement growth rates. */
+export interface FundamentalGrowthInput {
+    growthRevenue: number | null;
+    growthEPS: number | null;
+}
+
+/** Composite financial health scores (Altman Z-score + Piotroski F-score). */
+export interface FundamentalFinancialScoresInput {
+    altmanZScore: number | null;
+    piotroskiScore: number | null;
+}
+
+/** Peer company entry used for the peer comparison table. */
+export interface FundamentalPeerInput {
+    symbol: string;
+    companyName: string;
+    marketCap: number;
+}
+
+/**
+ * Consensus analyst estimate for the next reporting quarter.
+ * `estimatedEpsAvg` and `estimatedRevenueAvg` are the mean values.
+ */
+export interface FundamentalAnalystEstimateInput {
+    estimatedEpsAvg: number | null;
+    estimatedRevenueAvg: number | null;
+}
+
+/** Buy/hold/sell grade consensus breakdown from analyst ratings. */
+export interface FundamentalGradesConsensusInput {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+}
+
+/**
+ * Analyst price target consensus (high / low / median / mean).
+ * Maps to domain {@link PriceTargetConsensus} via `normalizeFundamentalSnapshot`.
+ */
+export interface FundamentalPriceTargetConsensusInput {
+    targetHigh: number | null;
+    targetLow: number | null;
+    targetMedian: number | null;
+    targetConsensus: number | null;
+}
+
+/** Single average price target bucket (1-month, 3-month, or 12-month window). */
+export interface PriceTargetAvg {
+    avgPriceTarget: number | null;
+}
+
+/**
+ * Rolling average price targets grouped by lookback window.
+ * `lastMonth` → 1-month avg, `lastQuarter` → 3-month avg, `lastYear` → 12-month avg.
+ * Maps to domain {@link PriceTargetSummary} via `normalizeFundamentalSnapshot`.
+ */
+export interface FundamentalPriceTargetSummaryInput {
+    lastMonth: PriceTargetAvg;
+    lastQuarter: PriceTargetAvg;
+    lastYear: PriceTargetAvg;
+}
+
+/** Sector performance snapshot entry for a single trading date. */
+export interface FundamentalSectorPerformanceInput {
+    sector: string;
+    changesPercentage: number;
+}
+
+/** Historical daily sector performance entry (one row per date per sector). */
+export interface FundamentalSectorHistoricalInput {
+    date: string;
+    sector: string;
+    changesPercentage: number;
+}
+
+/** Cash flow statement input (subset — operating cash flow only). */
+export interface FundamentalCashFlowInput {
+    operatingCashFlow: number | null;
+}
+
+/** Input bundle for {@link normalizeFundamentalSnapshot}. Each field corresponds to a single FMP-style fetch result, normalized to domain shapes. */
+export interface NormalizeFundamentalSnapshotInput {
+    profile: FundamentalProfileInput;
+    keyMetricsTtm: FundamentalValuationMetrics | null;
+    ratiosTtm: FundamentalRatiosInput | null;
+    cashFlow: FundamentalCashFlowInput | null;
+    incomeGrowth: FundamentalGrowthInput | null;
+    financialScores: FundamentalFinancialScoresInput | null;
+    peers: FundamentalPeerInput[];
+    analystEstimate: FundamentalAnalystEstimateInput | null;
+    gradesConsensus: FundamentalGradesConsensusInput | null;
+    priceTargetConsensus: FundamentalPriceTargetConsensusInput | null;
+    priceTargetSummary: FundamentalPriceTargetSummaryInput | null;
+    nextEarningsAt: string | null;
+    sectorTodayChangePct: number | null;
+    sectorHistorical: SectorHistoricalPoint[];
+}
+
+// ─────────────────────────────────────────
+// News analysis
+// ─────────────────────────────────────────
+
+/** Sentiment label for an individual news article or aggregate news flow. Equivalent shape to {@link Trend} and {@link FundamentalSentiment}; kept separate for domain clarity. */
+export type NewsSentiment = 'bullish' | 'neutral' | 'bearish';
+
+/** Dominant theme of a news article. Used for filtering and prompt context grouping (e.g. earnings results vs M&A vs regulatory action). */
+export type NewsCategory =
+    | 'earnings'
+    | 'm_and_a'
+    | 'guidance'
+    | 'regulation'
+    | 'macro'
+    | 'product'
+    | 'other';
+
+/** Raw news article fetched from the data provider before translation or analysis. */
+export interface NewsItem {
+    id: string;
+    symbol: string;
+    source: string;
+    url: string;
+    publishedAt: string; // ISO
+    titleEn: string;
+    bodyEn: string | null;
+}
+
+/** Per-card translation and sentiment result produced by the flash-lite model. */
+export interface NewsCardAnalysis {
+    titleKo: string;
+    bodyKo: string | null;
+    summaryKo: string; // single-line summary
+    sentiment: NewsSentiment;
+    category: NewsCategory;
+}
+
+/**
+ * News item paired with its LLM-analyzed card metadata (translation, sentiment, summary).
+ * Used as input to {@link buildNewsAnalysisPrompt} and downstream consumers that need
+ * pre-analyzed news flow.
+ */
+export type EnrichedNewsItem = NewsItem & { card: NewsCardAnalysis };
+
+/** LLM-generated aggregate news analysis result returned to the caller. */
+export interface NewsAnalysisResponse {
+    /** Opening paragraph explaining the news driver behind the current price action (Korean output). */
+    currentDriverKo: string;
+    /** Key event bullet points, 3–5 items (Korean output). */
+    keyEventsKo: string[];
+    /** Upcoming events to watch, as bullet points (Korean output). */
+    upcomingEventsKo: string[];
+    overallSentiment: NewsSentiment;
+}
+
+/** Scheduled or reported earnings event with actual vs. estimated figures. */
+export interface EarningsCalendarItem {
+    symbol: string;
+    earningsDate: string; // ISO date
+    epsActual: number | null;
+    epsEstimated: number | null;
+    revenueActual: number | null;
+    revenueEstimated: number | null;
+    lastUpdated: string; // ISO date
+}
+
+/** Raw earnings report payload as returned by the data provider. */
+export interface EarningsReport {
+    symbol: string;
+    earningsDate: string;
+}
+
+/** Named union for the action type on an analyst grade change event. */
+export type GradesAction =
+    | 'upgrade'
+    | 'downgrade'
+    | 'maintained'
+    | 'initiated'
+    | 'other';
+
+/** Single analyst grade change event for a symbol. */
+export interface GradesEvent {
+    symbol: string;
+    date: string;
+    gradingCompany: string;
+    previousGrade: string | null;
+    newGrade: string;
+    action: GradesAction;
+}
+
+// ─────────────────────────────────────────
+// Overall analysis
+// ─────────────────────────────────────────
+
+/** Scenario name for the three-axis overall analysis. Equivalent shape to {@link FundamentalSentiment} and {@link NewsSentiment}; kept separate for domain clarity (scenario direction vs. sentiment label). */
+export type OverallScenarioName = 'bullish' | 'neutral' | 'bearish';
+
+/** Single bullish/neutral/bearish scenario with trigger condition and price range. */
+export interface OverallScenario {
+    name: OverallScenarioName;
+    triggerConditionKo: string;
+    priceRangeKo: string;
+}
+
+/** LLM-generated 3-axis (technical + fundamental + news) overall analysis result. */
+export interface OverallAnalysisResponse {
+    /** One-line definition followed by a current-state paragraph (Korean output). */
+    headlineKo: string;
+    /** Technical analysis summary bullet points (Korean output). */
+    technicalBulletsKo: string[];
+    /** Fundamental analysis summary bullet points (Korean output). */
+    fundamentalBulletsKo: string[];
+    /** News analysis summary bullet points (Korean output). */
+    newsBulletsKo: string[];
+    /** 3-axis synthesis conclusion block, one or two paragraphs (Korean output). */
+    threeAxisConclusionKo: string;
+    /** Scenario analysis (bullish / neutral / bearish). */
+    scenarios: OverallScenario[];
+    /** Risk factor bullet points (Korean output). */
+    riskFactorsKo: string[];
+}
+
+/**
+ * Tagged union representing the analysis result currently in view by the chatbot.
+ * Injected as context into the chat system prompt so the assistant can reference
+ * live numbers from the user's current page.
+ */
+export type CurrentAnalysisContext =
+    | { kind: 'technical'; payload: AnalysisResponse }
+    | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
+    | { kind: 'news'; payload: NewsAnalysisResponse }
+    | { kind: 'overall'; payload: OverallAnalysisResponse };

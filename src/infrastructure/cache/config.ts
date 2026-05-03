@@ -123,3 +123,103 @@ export function buildSectorSignalsCacheKey(
 ): string {
     return `dashboard:signals:${timeframe}:${bucket}`;
 }
+
+/** @internal TTL for fundamental analysis cache results. Default: 24 hours. The submit path may use a shorter dynamic TTL when next earnings is imminent. */
+export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
+/** @internal TTL for news analysis aggregate cache results. Default: 24 hours. */
+export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
+/** @internal TTL for per-card news analysis cache (translation + sentiment + summary). Default: 30 days — effectively permanent for the lifetime of a news article. */
+export const NEWS_CARD_CACHE_TTL_SECONDS = 30 * SECONDS_PER_DAY;
+/** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
+export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
+
+/**
+ * Build the Redis key for a cached fundamental analysis result.
+ *
+ * Format: `analysis:fundamental:<symbol>:<modelId>:<inputHash>`.
+ * The `inputHash` is a short hash of the FundamentalSnapshot contents so that
+ * results from different data vintages are cached independently.
+ *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitFundamentalAnalysis`. Do not depend on this function from
+ *   outside the core library.
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param inputHash - Short hash of the prompt input data.
+ * @returns The cache key.
+ */
+export function buildFundamentalCacheKey(
+    symbol: string,
+    modelId: string,
+    inputHash: string
+): string {
+    return `analysis:fundamental:${symbol}:${modelId}:${inputHash}`;
+}
+
+/**
+ * Build the Redis key for a cached news analysis result.
+ *
+ * Format: `analysis:news:<symbol>:<modelId>:<inputHash>`.
+ *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitNewsAnalysis`. Do not depend on this function from outside
+ *   the core library.
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param inputHash - Short hash of the news items used as prompt input.
+ * @returns The cache key.
+ */
+export function buildNewsCacheKey(
+    symbol: string,
+    modelId: string,
+    inputHash: string
+): string {
+    return `analysis:news:${symbol}:${modelId}:${inputHash}`;
+}
+
+/**
+ * @internal Fixed model identifier used for per-news-card translation and sentiment analysis.
+ * Single source of truth — also consumed by `submitNewsCardAnalysis`.
+ */
+export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+
+/**
+ * Build the Redis key for a cached per-news-card analysis result.
+ *
+ * The model is fixed to {@link NEWS_CARD_MODEL_ID} (`gemini-2.5-flash-lite`)
+ * for translation and sentiment analysis.
+ * Format: `analysis:news-card:<newsId>:gemini-2.5-flash-lite`.
+ *
+ * @internal Keyed only by `newsId` — consumer cannot reuse this key without
+ *   knowing the fixed model. Do not depend on this function from outside the
+ *   core library.
+ * @param newsId - Stable unique identifier of the news article.
+ * @returns The cache key.
+ */
+export function buildNewsCardCacheKey(newsId: string): string {
+    return `analysis:news-card:${newsId}:${NEWS_CARD_MODEL_ID}`;
+}
+
+/**
+ * Build the Redis key for a cached overall (3-axis) analysis result.
+ *
+ * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<inputHash>`.
+ * The `timeframe` distinguishes analyses run with different chart contexts.
+ *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitOverallAnalysis`. Do not depend on this function from outside
+ *   the core library.
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param timeframe - Bar resolution used for the technical axis.
+ * @param modelId - LLM model identifier.
+ * @param inputHash - Short hash of the combined technical/fundamental/news inputs.
+ * @returns The cache key.
+ */
+export function buildOverallCacheKey(
+    symbol: string,
+    timeframe: Timeframe,
+    modelId: string,
+    inputHash: string
+): string {
+    return `analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}`;
+}

@@ -248,6 +248,15 @@ and have been removed from this file.
    ✅ type SkillProvider = Skill[];  // import Skill directly; explicit and preserves narrowing
    ✅ UsageLimitError as discriminated union: type AnalysisLimitError { code: 'analysis'; ... } | type ChatbotLimitError { code: 'chatbot'; ... }
       → callers can now narrow with type discriminator without runtime typeof/field checks
+
+9.5. Inline dynamic type import in generic argument instead of top-level static import
+   → Type imports used in generic arguments or type positions must be top-level imports, not inline dynamic imports
+   → Inline dynamic imports (import('...').Type) work at runtime but harm readability and type checking
+   ❌ type Result = T extends SomeCondition ? import('./module').DynamicType : null;
+   ❌ function process<T>(input: T): Promise<import('./other').PromiseType>  // dynamic type in return position
+   ✅ import type { DynamicType, PromiseType } from './module';
+      type Result = T extends SomeCondition ? DynamicType : null;
+      function process<T>(input: T): Promise<PromiseType>
 ```
 
 ---
@@ -270,6 +279,14 @@ and have been removed from this file.
 4. Date.now() / process.env / fetch called from domain/
    → domain/ must remain pure. All time / environment / I/O reads belong in infrastructure/.
    → If a calculation genuinely needs the current time, pass it as a parameter.
+
+4.5. Bare new Date() in domain/infrastructure bypasses injected clock parameter
+   → When a function accepts `now` or `occurredAt` as a parameter for testability and injection, use it consistently
+   → Mixing bare new Date() calls with injected time parameters breaks clock mocking in tests
+   ❌ function analyzeSnapshot(snapshot, options: { now?: Date }) { const time = new Date(); ... }
+      // ignores options.now, so tests cannot control time
+   ✅ function analyzeSnapshot(snapshot, options: { now?: Date }) { const time = options.now ?? new Date(); ... }
+   ✅ Better: if now is required, make it non-optional: (snapshot, options: { now: Date }) => { const time = options.now; ... }
 ```
 
 ---
@@ -316,9 +333,12 @@ and have been removed from this file.
 ```
 1. Fire-and-forget fetch requests must have timeouts
    → fetch() without timeout can block indefinitely on network delay
-   → Apply AbortSignal.timeout(ms) to prevent blocking
-   ❌ fetch('/cancel', { method: 'POST' })  // no timeout
+   → Apply AbortSignal.timeout(ms) to prevent blocking and allow cancellation via AbortController
+   → Match the timeout duration to the operation's criticality (e.g. 5sec for I/O ops, 30sec for polling)
+   ❌ fetch('/cancel', { method: 'POST' })  // no timeout; can block indefinitely
+   ❌ fetch(url, { signal: AbortSignal.timeout(Infinity) })  // infinite timeout defeats the purpose
    ✅ fetch('/cancel', { method: 'POST', signal: AbortSignal.timeout(5000) })
+   ✅ fetch(url, { method: 'POST', signal: AbortSignal.timeout(30000) })  // 30sec for batch jobs
 
 2. Fire-and-forget async calls must swallow errors
    → Error propagation from background tasks blocks the caller
@@ -536,6 +556,14 @@ and have been removed from this file.
    ✅ Remove type files when consumers of those types are deleted
    ✅ Don't export file-private helpers; keep them internal with no export keyword
    → Also audit and remove unnecessary re-exports from public API and module barrels after refactoring
+
+15. Dead code / unreachable fallback inside type-narrowed guard
+   → When TypeScript narrows a type inside a guard block, fallback code outside or after the guard becomes unreachable
+   → Remove dead fallback operators after establishing type safety
+   ❌ if (options.tier !== undefined) { useTier(options.tier); }
+      const tier = options.tier ?? DEFAULT_TIER;  // unreachable fallback; options.tier is already narrowed
+   ✅ const tier = options.tier ?? DEFAULT_TIER;  // guard uses narrowed value directly
+   ✅ Or better: if (options.tier === undefined) return; const tier = options.tier;  // non-null assertion guaranteed
 ```
 
 ---
@@ -592,6 +620,40 @@ and have been removed from this file.
    ✅ Export deprecated type alias: export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions
    ✅ Add deleted union members back with @deprecated tag; type checkers warn but code doesn't break
    → Also requires package.json version bump to 0.x.0 (major in 0.x semver) and CHANGELOG.md entry documenting BREAKING CHANGES
+
+6.5. Internal implementation constants/types leaked to public API via src/index.ts
+   → Library public API must export only symbols consumers actually use
+   → Implementation details (internal cache keys, Redis options, internal interfaces) must not be re-exported
+   → Leaking internal symbols causes breaking changes when internals are refactored
+   ❌ // cache/config.ts defines KOREAN_TICKERS_CACHE_KEY (internal implementation detail)
+      // src/index.ts exports { KOREAN_TICKERS_CACHE_KEY } from '@/infrastructure/cache/config'
+      // → consumers depend on internal constant; renaming breaks their code
+   ❌ // jobs/types.ts defines RedisSetOpts (internal Upstash API options)
+      // src/index.ts exports { RedisSetOpts } 
+      // → consumers never use this; breaks when Upstash API changes
+   ✅ Remove internal constants/types from src/index.ts export blocks
+   ✅ Only export interfaces and functions consumers explicitly call (e.g., JobQueue, SkillsProvider)
+
+7. PUBLIC_API.md documentation inventory becomes stale when exports change
+   → Maintain a PUBLIC_API.md document listing all Tier 1–4 public exports
+   → When refactoring or adding features to src/index.ts and sibling entrypoints, update PUBLIC_API.md the same commit
+   → PUBLIC_API.md serves as source-of-truth for what's officially public; checks prevent accidental internal-symbol leaks
+   ❌ src/index.ts exports SectorHistoricalPoint but PUBLIC_API.md lists it as internal-only
+   ❌ Task 1.18 promotes AnalysisProvider to public but PUBLIC_API.md still lists it under @internal
+   ❌ PUBLIC_API.md documents a symbol that no longer exists in src/index.ts after refactoring
+   ✅ After changing src/index.ts exports, update PUBLIC_API.md document to match actual exports
+   ✅ Use the document as a checklist before commits: all symbols exported must be listed
+
+8. Public discriminated union variant types missing from src/index.ts or wrongly tagged @internal
+   → When a public function returns a discriminated union (e.g. Result<Success | Error>), all variant types must be re-exported in src/index.ts
+   → Union variants used as parameter or return types of public functions are themselves part of the public contract
+   → Variant types must NOT carry @internal JSDoc if they are re-exported; @internal contradicts re-export visibility
+   ❌ submitAnalysis returns SubmitAnalysisResult with variants (Cached|Submitted|LimitError), but only SubmitAnalysisResult exported; variants require explicit imports
+   ❌ SubmitOverallAnalysisPending, SubmitOverallAnalysisError, OverallAxis used in public type but @internal + not exported
+   ❌ Union variants re-exported in src/index.ts but still tagged /** @internal */ in source files — IDE hides them from autocomplete
+   ✅ All union variants (SubmitFundamentalAnalysisCached|Submitted|LimitError|FetchError) explicitly exported from src/index.ts
+   ✅ Variant types have no @internal tag if they are re-exported; keep @internal only for module-internal helpers
+   ✅ Parameter/return types of public functions are public contracts; audit every public function's type signature and ensure all referenced types are exported
 ```
 
 ---

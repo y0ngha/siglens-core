@@ -8,7 +8,7 @@ import type {
     SkillDisplay,
     SkillType,
 } from '@/domain/types';
-import type { SkillsProvider } from './types';
+import type { LoadSkillsCachedResult, SkillsProvider } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
 
@@ -18,6 +18,8 @@ const SKILL_CATEGORIES: readonly SkillCategory[] = [
     'continuation_bullish',
     'continuation_bearish',
     'neutral',
+    'fundamental',
+    'news',
 ];
 
 const parseYamlValue = (value: string): unknown => {
@@ -186,21 +188,82 @@ const countMdFiles = async (subdir: string): Promise<number> => {
     return files.length;
 };
 
+// ─────────────────────────────────────────
+// Module-level cached loader
+// ─────────────────────────────────────────
+
+let _cachedSkills: Skill[] | null = null;
+let _cachedSkillsDegraded: boolean = false;
+
+/**
+ * Load all skills from disk, memoizing the result for the module lifetime.
+ *
+ * The first call invokes {@link FileSkillsLoader#loadSkills} and stores the
+ * result. Subsequent calls return the cached array without hitting the
+ * filesystem again. On failure the cache is set to `[]` so the second call
+ * does not retry the filesystem unnecessarily.
+ *
+ * Use {@link clearSkillsCache} in test setup/teardown to reset memoization.
+ *
+ * @returns `{ skills, skillsDegraded }` — `skillsDegraded` is `true` when
+ *   the filesystem load threw and the skills list is empty.
+ * @internal
+ */
+export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
+    if (_cachedSkills !== null) {
+        return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
+    }
+    try {
+        _cachedSkills = await new FileSkillsLoader().loadSkills();
+        _cachedSkillsDegraded = false;
+    } catch (error) {
+        console.error('[loadSkillsCached] Skills load failed:', error);
+        _cachedSkills = [];
+        _cachedSkillsDegraded = true;
+    }
+    return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
+}
+
+/**
+ * Reset the module-level skills cache.
+ *
+ * @internal Test-only. Call in `beforeEach`/`afterEach` to prevent cross-test
+ * cache pollution when mocking {@link FileSkillsLoader}.
+ */
+export function clearSkillsCache(): void {
+    _cachedSkills = null;
+    _cachedSkillsDegraded = false;
+}
+
+/**
+ * @internal Count `.md` files per skill category for diagnostic/test reporting.
+ */
 export async function countSkillFiles(): Promise<SkillCounts> {
-    const [indicators, candlesticks, patterns, strategies, supportResistance] =
-        await Promise.all([
-            countMdFiles('indicators'),
-            countMdFiles('candlesticks'),
-            countMdFiles('patterns'),
-            countMdFiles('strategies'),
-            countMdFiles('support-resistance'),
-        ]);
+    const [
+        indicators,
+        candlesticks,
+        patterns,
+        strategies,
+        supportResistance,
+        fundamental,
+        news,
+    ] = await Promise.all([
+        countMdFiles('indicators'),
+        countMdFiles('candlesticks'),
+        countMdFiles('patterns'),
+        countMdFiles('strategies'),
+        countMdFiles('support-resistance'),
+        countMdFiles('fundamental'),
+        countMdFiles('news'),
+    ]);
     return {
         indicators,
         candlesticks,
         patterns,
         strategies,
         supportResistance,
+        fundamental,
+        news,
     };
 }
 

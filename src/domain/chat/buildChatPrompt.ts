@@ -5,7 +5,11 @@ import type {
     AnalysisResponse,
     ChatMessage,
     ChatPromptPayload,
+    CurrentAnalysisContext,
+    FundamentalAnalysisResponse,
     KeyLevel,
+    NewsAnalysisResponse,
+    OverallAnalysisResponse,
     PriceScenario,
     Timeframe,
 } from '@/domain/types';
@@ -57,6 +61,107 @@ function formatStrategyResults(
 }
 
 /**
+ * Format a technical analysis context section for the system prompt.
+ *
+ * Surfaces the three most informative fields: overall trend, risk level,
+ * and the plain-language summary.
+ *
+ * @param payload - The technical {@link AnalysisResponse} to format.
+ * @returns A markdown section string.
+ */
+function formatTechnicalContext(payload: AnalysisResponse): string {
+    return [
+        `Trend: ${payload.trend}`,
+        `Risk Level: ${payload.riskLevel}`,
+        `Summary: ${payload.summary}`,
+    ].join('\n');
+}
+
+/**
+ * Format a fundamental analysis context section for the system prompt.
+ *
+ * Surfaces the two most informative fields: overall sentiment and the
+ * overall conclusion (in Korean, as produced by the LLM).
+ *
+ * @param payload - The {@link FundamentalAnalysisResponse} to format.
+ * @returns A markdown section string.
+ */
+function formatFundamentalContext(
+    payload: FundamentalAnalysisResponse
+): string {
+    return [
+        `Overall Sentiment: ${payload.overallSentiment}`,
+        `Overall Conclusion: ${payload.overallConclusionKo}`,
+    ].join('\n');
+}
+
+/**
+ * Format a news analysis context section for the system prompt.
+ *
+ * Surfaces the two most informative fields: overall sentiment and the
+ * current-driver summary (in Korean, as produced by the LLM).
+ *
+ * @param payload - The {@link NewsAnalysisResponse} to format.
+ * @returns A markdown section string.
+ */
+function formatNewsContext(payload: NewsAnalysisResponse): string {
+    return [
+        `Overall Sentiment: ${payload.overallSentiment}`,
+        `Current Driver: ${payload.currentDriverKo}`,
+    ].join('\n');
+}
+
+/**
+ * Format an overall (3-axis) analysis context section for the system prompt.
+ *
+ * Surfaces the two most informative fields: the headline summary and the
+ * three-axis conclusion (both in Korean, as produced by the LLM).
+ *
+ * @param payload - The {@link OverallAnalysisResponse} to format.
+ * @returns A markdown section string.
+ */
+function formatOverallContext(payload: OverallAnalysisResponse): string {
+    return [
+        `Headline: ${payload.headlineKo}`,
+        `Three-axis Conclusion: ${payload.threeAxisConclusionKo}`,
+    ].join('\n');
+}
+
+/**
+ * Build the `## Current analysis context` section for the system prompt
+ * from a {@link CurrentAnalysisContext} tagged union.
+ *
+ * Returns an empty string when `context` is `undefined` so that callers
+ * can safely concatenate without a conditional.
+ *
+ * @param context - The tagged-union analysis context, or `undefined`.
+ * @returns The formatted section string, or `""` when context is absent.
+ */
+function formatCurrentAnalysisContext(
+    context: CurrentAnalysisContext | undefined
+): string {
+    if (!context) return '';
+
+    let body: string;
+    switch (context.kind) {
+        case 'technical':
+            body = formatTechnicalContext(context.payload);
+            break;
+        case 'fundamental':
+            body = formatFundamentalContext(context.payload);
+            break;
+        case 'news':
+            body = formatNewsContext(context.payload);
+            break;
+        case 'overall':
+            body = formatOverallContext(context.payload);
+            break;
+    }
+
+    return `\n\n## Current analysis context\nKind: ${context.kind}\n${body}`;
+}
+
+/**
  * Build a chat prompt payload (system prompt + message history) for an
  * already-completed analysis.
  *
@@ -74,6 +179,11 @@ function formatStrategyResults(
  * @param history - Prior conversation turns; appended verbatim to the
  *   message list before `userMessage`.
  * @param userMessage - The user's latest input.
+ * @param currentAnalysisContext - Optional tagged union of the analysis result
+ *   currently displayed on the user's page (technical / fundamental / news /
+ *   overall). When provided, a `## Current analysis context` section is
+ *   appended to the system prompt so the LLM can reference live numbers
+ *   without re-fetching data. Omit to keep the original behavior.
  * @returns The prompt payload — see {@link ChatPromptPayload}.
  */
 export function buildChatPrompt(
@@ -81,7 +191,8 @@ export function buildChatPrompt(
     timeframe: Timeframe,
     analysis: AnalysisResponse,
     history: ChatMessage[],
-    userMessage: string
+    userMessage: string,
+    currentAnalysisContext?: CurrentAnalysisContext
 ): ChatPromptPayload {
     const rec = analysis.actionRecommendation;
 
@@ -135,7 +246,7 @@ ${formatIndicatorSignals(analysis.indicatorResults) || 'None'}
 Price Targets:
 - Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish)}
 - Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish)}
-=== END ANALYSIS DATA ===`;
+=== END ANALYSIS DATA ===${formatCurrentAnalysisContext(currentAnalysisContext)}`;
 
     const messages = [
         ...history.map(m => ({ role: m.role, content: m.content })),

@@ -23,14 +23,30 @@ export interface JobRedisClient {
 export interface JobMeta {
     /** U.S. equity ticker. */
     symbol: string;
-    /** Bar resolution. */
-    timeframe: Timeframe;
-    /** `true` if skills failed to load when the job was submitted. */
-    skillsDegraded: boolean;
+    /**
+     * Bar resolution. Required for technical-analysis jobs; omitted for
+     * fundamental, news, and overall analysis jobs that are not timeframe-bound.
+     */
+    timeframe?: Timeframe;
+    /**
+     * Set to `true` when the loaded skills failed to read from disk and the
+     * analysis ran with an empty skills list. Used by the worker / consumer
+     * to surface a degraded warning.
+     *
+     * Applies to all job types that load skills (technical, fundamental,
+     * news, and overall analysis jobs).
+     */
+    skillsDegraded?: boolean;
     /** Last bar close — used as the reconciliation reference for SL/TP validation when the AI omits an entry price. */
     lastClose?: number;
     /** Last ATR — used to derive fallback SL/TP levels; when absent the AI's original values are preserved. */
     atr?: number;
     /** LLM model identifier used to isolate analysis results by model in the cache. */
     modelId?: string;
+    /**
+     * Pre-computed cache key stored at job submission time so the poll step
+     * can write the result without recomputing the key. Used by fundamental,
+     * news, and overall analysis jobs whose cache keys include an input hash.
+     */
+    cacheKey?: string;
 }

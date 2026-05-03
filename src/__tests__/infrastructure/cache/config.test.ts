@@ -7,11 +7,19 @@ import {
     ANALYSIS_CACHE_TTL,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildFundamentalCacheKey,
+    buildNewsCacheKey,
+    buildNewsCardCacheKey,
+    buildOverallCacheKey,
     buildSectorSignalsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
+    FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
+    NEWS_CACHE_TTL_SECONDS,
+    NEWS_CARD_CACHE_TTL_SECONDS,
+    OVERALL_CACHE_TTL_SECONDS,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
@@ -99,5 +107,36 @@ describe('cache key builders', () => {
         expect(SECTOR_SIGNALS_TTL_BY_TIMEFRAME['15Min']).toBe(
             SECTOR_SIGNALS_15MIN_TTL_MINUTES * SECONDS_PER_MINUTE
         );
+    });
+});
+
+describe('new analysis cache keys', () => {
+    it('returns analysis:fundamental:{symbol}:{model}:{hash} format', () => {
+        const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
+        expect(a).toBe('analysis:fundamental:AAPL:gemini-2.5-pro:h1');
+    });
+
+    it('buildNewsCacheKey same shape', () => {
+        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')).toBe(
+            'analysis:news:AAPL:gemini-2.5-pro:h2'
+        );
+    });
+
+    it('buildNewsCardCacheKey is per-news-id (model fixed flash-lite)', () => {
+        const k = buildNewsCardCacheKey('news-12345');
+        expect(k).toBe('analysis:news-card:news-12345:gemini-2.5-flash-lite');
+    });
+
+    it('buildOverallCacheKey includes timeframe', () => {
+        expect(
+            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3')
+        ).toBe('analysis:overall:AAPL:5Min:gemini-2.5-pro:h3');
+    });
+
+    it('TTL constants match SECONDS_PER_DAY', () => {
+        expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+        expect(NEWS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+        expect(NEWS_CARD_CACHE_TTL_SECONDS).toBe(30 * SECONDS_PER_DAY);
+        expect(OVERALL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
     });
 });

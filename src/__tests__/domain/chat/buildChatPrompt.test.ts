@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
-import type { AnalysisResponse } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    CurrentAnalysisContext,
+    FundamentalAnalysisResponse,
+    NewsAnalysisResponse,
+    OverallAnalysisResponse,
+} from '@/domain/types';
 
 const MINIMAL_ANALYSIS: AnalysisResponse = {
     summary: 'AAPL is trending upward.',
@@ -311,5 +317,151 @@ describe('buildChatPrompt 함수는', () => {
             );
             expect(result.messages[2].content).toBe('더 쉽게 설명해줘');
         });
+    });
+});
+
+// ─── currentAnalysisContext 파라미터 테스트 ───────────────────────────────────
+
+const FUNDAMENTAL_PAYLOAD: FundamentalAnalysisResponse = {
+    overallConclusionKo: '재무 구조가 탄탄하고 성장성이 높습니다.',
+    categoryAssessments: [],
+    riskFactorsKo: [],
+    overallSentiment: 'bullish',
+};
+
+const NEWS_PAYLOAD: NewsAnalysisResponse = {
+    currentDriverKo: '실적 기대감이 주가를 견인하고 있습니다.',
+    keyEventsKo: [],
+    upcomingEventsKo: [],
+    overallSentiment: 'bullish',
+};
+
+const OVERALL_PAYLOAD: OverallAnalysisResponse = {
+    headlineKo: '3축 종합 분석: 강세 국면 진입 예상',
+    technicalBulletsKo: [],
+    fundamentalBulletsKo: [],
+    newsBulletsKo: [],
+    threeAxisConclusionKo: '기술·펀더·뉴스 모두 긍정적입니다.',
+    scenarios: [],
+    riskFactorsKo: [],
+};
+
+describe('buildChatPrompt — currentAnalysisContext', () => {
+    it('currentAnalysisContext가 없으면 섹션을 포함하지 않는다', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문'
+        );
+        expect(result.systemPrompt).not.toContain(
+            '## Current analysis context'
+        );
+    });
+
+    it('currentAnalysisContext가 undefined이면 기존 동작과 동일하다 (회귀 테스트)', () => {
+        const withContext = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            undefined
+        );
+        const withoutContext = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문'
+        );
+        expect(withContext.systemPrompt).toBe(withoutContext.systemPrompt);
+        expect(withContext.messages).toEqual(withoutContext.messages);
+    });
+
+    it('technical 컨텍스트가 제공되면 기술 분석 섹션을 포함한다', () => {
+        const context: CurrentAnalysisContext = {
+            kind: 'technical',
+            payload: MINIMAL_ANALYSIS,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: technical');
+        expect(result.systemPrompt).toContain('Trend: bullish');
+        expect(result.systemPrompt).toContain('Risk Level: medium');
+        expect(result.systemPrompt).toContain('AAPL is trending upward.');
+    });
+
+    it('fundamental 컨텍스트가 제공되면 펀더멘털 분석 섹션을 포함한다', () => {
+        const context: CurrentAnalysisContext = {
+            kind: 'fundamental',
+            payload: FUNDAMENTAL_PAYLOAD,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: fundamental');
+        expect(result.systemPrompt).toContain('Overall Sentiment: bullish');
+        expect(result.systemPrompt).toContain(
+            '재무 구조가 탄탄하고 성장성이 높습니다.'
+        );
+    });
+
+    it('news 컨텍스트가 제공되면 뉴스 분석 섹션을 포함한다', () => {
+        const context: CurrentAnalysisContext = {
+            kind: 'news',
+            payload: NEWS_PAYLOAD,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: news');
+        expect(result.systemPrompt).toContain('Overall Sentiment: bullish');
+        expect(result.systemPrompt).toContain(
+            '실적 기대감이 주가를 견인하고 있습니다.'
+        );
+    });
+
+    it('overall 컨텍스트가 제공되면 종합 분석 섹션을 포함한다', () => {
+        const context: CurrentAnalysisContext = {
+            kind: 'overall',
+            payload: OVERALL_PAYLOAD,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: overall');
+        expect(result.systemPrompt).toContain(
+            '3축 종합 분석: 강세 국면 진입 예상'
+        );
+        expect(result.systemPrompt).toContain(
+            '기술·펀더·뉴스 모두 긍정적입니다.'
+        );
     });
 });
