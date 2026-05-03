@@ -1467,17 +1467,13 @@ export interface FundamentalSnapshot {
  * represents in the business domain, not which API it comes from.
  */
 
-/** Company identity and market classification fields required for snapshot normalization. */
-export interface FundamentalProfileInput {
-    symbol: string;
-    companyName: string;
-    sector: string;
-    industry: string;
-    marketCap: number;
-    ceo: string | null;
-    website: string | null;
-    description: string | null;
-}
+/**
+ * Company identity and market classification fields required for snapshot normalization.
+ * Alias of {@link FundamentalProfile} — both describe the same shape. `FundamentalProfileInput`
+ * is used as the provider/normalizer parameter type; `FundamentalProfile` is used in the
+ * normalized domain output ({@link FundamentalSnapshot}).
+ */
+export type FundamentalProfileInput = FundamentalProfile;
 
 /** Valuation multiples and per-share earnings metrics (trailing-twelve-month). */
 export interface FundamentalValuationMetrics {
@@ -1564,13 +1560,13 @@ export interface FundamentalPriceTargetSummaryInput {
 }
 
 /** Sector performance snapshot entry for a single trading date. */
-export interface FundamentalSectorPerformanceEntry {
+export interface FundamentalSectorPerformanceInput {
     sector: string;
     changesPercentage: number;
 }
 
 /** Historical daily sector performance entry (one row per date per sector). */
-export interface FundamentalSectorHistoricalEntry {
+export interface FundamentalSectorHistoricalInput {
     date: string;
     sector: string;
     changesPercentage: number;
