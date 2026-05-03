@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.7.2](https://github.com/y0ngha/siglens-core/compare/v0.7.1...v0.7.2) (2026-05-03)
+
+
+### Bug Fixes
+
+* 사용되지 않는 import / 변수 제거 ([91e5bc6](https://github.com/y0ngha/siglens-core/commit/91e5bc6d6f2bd72247b6210e9950f75c711093a0))
+* 사용되지 않는 test import 제거 ([272185c](https://github.com/y0ngha/siglens-core/commit/272185c6eb464c11449a00ce71e76e46bd6dd4f6))
+* countSkillFiles에 fundamental/news 카테고리 추가 + 테스트 ([659eb0c](https://github.com/y0ngha/siglens-core/commit/659eb0c2edb43f60d3163fc7ab0ffe87279da1be))
+* PR [#75](https://github.com/y0ngha/siglens-core/issues/75) 인라인 1-5 반영 (userApiKey 전달, 의존성 error 처리, 단위 변환, FileSkillsLoader 캐싱, JSON fence 유연 매칭) ([afa3d86](https://github.com/y0ngha/siglens-core/commit/afa3d86ae2f23e7908c9d632cd3fabefb84b2456))
+* PR [#75](https://github.com/y0ngha/siglens-core/issues/75) R2 B-3 — loadSkillsCached console.error + 테스트 ([1aaadc0](https://github.com/y0ngha/siglens-core/commit/1aaadc024ee8f59ec110c286fe712eb665943374))
+* SectorHistoricalPoint public export 누락 + PUBLIC_API.md 내부 인벤토리 동기화 ([9f9ffbc](https://github.com/y0ngha/siglens-core/commit/9f9ffbc065e7df86dd8660bdd7c14f8b3106f70b))
+* submitNewsAnalysis 사용되지 않는 import 제거 ([6bb9a9d](https://github.com/y0ngha/siglens-core/commit/6bb9a9d86f57d59d62f5b404f6888800a580ca80))
+* submitNewsCardAnalysis 사용되지 않는 import 제거 ([690ca84](https://github.com/y0ngha/siglens-core/commit/690ca8421f82b27cdb3df78d27cbe1c1d9a4b011))
+
+
+### Features
+
+* 새 분석 3종 응답 정규화 함수 추가 ([7819955](https://github.com/y0ngha/siglens-core/commit/7819955f39c593119b7b75c94bf8e12f5177a76c))
+* 새 분석 4종 캐시 키 빌더 + TTL 상수 추가 ([dadd9c9](https://github.com/y0ngha/siglens-core/commit/dadd9c99fe4ff3d9163e84a0d77e99e71bc64907))
+* 새 분석 use-case + 타입 + Provider 인터페이스 public export ([ad810c7](https://github.com/y0ngha/siglens-core/commit/ad810c7198d191165268612c401dc1143b70a9e6))
+* 펀더/뉴스/종합 분석 도메인 타입 추가 ([14dde38](https://github.com/y0ngha/siglens-core/commit/14dde386b28aa33a038216eb7a190401a97d56b5))
+* buildChatPrompt에 currentAnalysisContext 파라미터 추가 ([e1a5722](https://github.com/y0ngha/siglens-core/commit/e1a5722b2ec940e1e3ce4303ee5d38a9a245f6ae))
+* buildFundamentalAnalysisPrompt 추가 ([1caf6db](https://github.com/y0ngha/siglens-core/commit/1caf6dbc1b53b6fd145109138dbb2f8504cc58da))
+* buildNewsAnalysisPrompt 추가 ([84a9fcd](https://github.com/y0ngha/siglens-core/commit/84a9fcd640f379b0a29f513b6c342130cd9ab067))
+* buildNewsCardAnalysisPrompt 추가 (flash-lite 묶음 호출용) ([9fd9930](https://github.com/y0ngha/siglens-core/commit/9fd9930e75683051567d1958aaca94ff23244c9a))
+* buildOverallAnalysisPrompt 추가 (3축 통합 + 타임프레임 맥락) ([ff94e87](https://github.com/y0ngha/siglens-core/commit/ff94e87a8feffc2d0a1df2b4948b2ae57f1c10df))
+* Fundamental analysis use-case (submit/poll/cancel) ([03d6533](https://github.com/y0ngha/siglens-core/commit/03d6533e915041f65fbdff4c29920e3c56dd186a))
+* FundamentalDataProvider 인터페이스 + snapshot 정규화 함수 ([f072297](https://github.com/y0ngha/siglens-core/commit/f0722979bc6190eca80be5df20b33ade0a12e35a))
+* News analysis use-case (submit/poll/cancel) ([79899de](https://github.com/y0ngha/siglens-core/commit/79899def35940cf79b88a5eb64f194569125f585))
+* News card 분석 use-case (flash-lite 묶음 호출, 영구 캐시) ([c42af29](https://github.com/y0ngha/siglens-core/commit/c42af29cb77a77ec6f3bd5f4e049380abd1db379))
+* NewsProvider 인터페이스 정의 ([a2f5d59](https://github.com/y0ngha/siglens-core/commit/a2f5d59d0fbf0ba38f192e244648a8c64be202b7))
+* Overall 의존성 resolver (캐시 룩업 + miss 백그라운드 트리거) ([27f3567](https://github.com/y0ngha/siglens-core/commit/27f35671a51f39321cb4e486ad88b5017b267a6f))
+* Overall analysis use-case (의존성 자동 처리 + submit/poll/cancel) ([5338e15](https://github.com/y0ngha/siglens-core/commit/5338e152e60de8495137309c80802fedcd5dff19))
+* PR [#75](https://github.com/y0ngha/siglens-core/issues/75) R3 B-6 — skillsDegraded를 loadSkillsCached + JobMeta로 노출 ([a26f7d2](https://github.com/y0ngha/siglens-core/commit/a26f7d22f5d159c82cc6edba554504b170bc0d94))
+* Skills loader fundamental/news 카테고리 지원 ([3d28ecc](https://github.com/y0ngha/siglens-core/commit/3d28eccbe674cf6b6451caa2d2bd6a01d20bb001))
+
 ## [0.7.1](https://github.com/y0ngha/siglens-core/compare/v0.7.0...v0.7.1) (2026-05-02)
 
 
