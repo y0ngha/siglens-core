@@ -32,7 +32,6 @@ const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  *
  * @param snapshot - Normalized fundamental snapshot.
  * @returns 16-character lowercase hex string.
- * @internal
  */
 function hashSnapshot(snapshot: object): string {
     return hashAnalysisInput(JSON.stringify(snapshot));

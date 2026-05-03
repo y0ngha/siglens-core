@@ -31,7 +31,6 @@ const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  * @param newsIds - Array of news item IDs.
  * @param earningsDates - Array of earnings calendar date strings.
  * @returns 16-character lowercase hex string.
- * @internal
  */
 function hashNewsInput(
     newsIds: readonly string[],

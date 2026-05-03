@@ -235,6 +235,9 @@ export function clearSkillsCache(): void {
     _cachedSkillsDegraded = false;
 }
 
+/**
+ * @internal Count `.md` files per skill category for diagnostic/test reporting.
+ */
 export async function countSkillFiles(): Promise<SkillCounts> {
     const [
         indicators,
