@@ -15,6 +15,16 @@ const AI_PROVIDER_TO_LLM_PROVIDER: Record<AIProvider, LlmProvider> = {
 /**
  * Resolve the LLM key-storage provider for any model identifier.
  *
+ * Returns the SDK / key-storage provider taxonomy (`'anthropic' | 'google' |
+ * 'openai'`) used by the LLM SDKs. Accepts the broader {@link ModelId} input
+ * domain (including deprecated aliases not present in `MODEL_SPECS`).
+ *
+ * For the internal `MODEL_SPECS` provider taxonomy (`'claude' | 'gemini' |
+ * 'chatgpt'`) limited to `ActiveModelId`, use `getProvider` from
+ * `domain/analysis/modelSpecs` instead. The two functions intentionally cover
+ * different layers and accept different input domains; neither is a drop-in
+ * replacement for the other.
+ *
  * @param modelId - Any {@link ModelId}, including deprecated aliases whose
  *   prefix (`claude-`, `gemini-`, `gpt-`) is still recognized.
  * @returns The {@link LlmProvider} that hosts the given model
@@ -24,6 +34,7 @@ const AI_PROVIDER_TO_LLM_PROVIDER: Record<AIProvider, LlmProvider> = {
  *   such inputs silently fell through to `'openai'`, which masked typos
  *   (e.g. `'glaude-haiku'`) by routing them to the wrong provider.
  *   Callers must validate `modelId` beforehand or catch this error.
+ * @see getProvider — returns {@link AIProvider} from {@link ActiveModelId}.
  */
 export function getProviderForModel(modelId: ModelId): LlmProvider {
     if (modelId in MODEL_SPECS) {

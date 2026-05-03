@@ -268,6 +268,27 @@ describe('submitOverallAnalysis 함수는', () => {
 
             expect(result.status).toBe('submitted');
         });
+
+        it('overall 캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
+            // Stale shape: missing the `headlineKo` and `scenarios` sentinel
+            // fields that the overall cache-hit guard requires. Submit must
+            // treat this as a miss and proceed with setJobMeta + fireAndForget.
+            const stalePoisonedCache = {
+                overallSentiment: 'bullish',
+                oldField: true,
+            };
+            mockCacheGet.mockResolvedValue(stalePoisonedCache);
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+                expect(result.jobId.length).toBeGreaterThan(0);
+            }
+            expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
+            expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('overall 캐시 키 안정성 (휘발성 필드 무시)', () => {

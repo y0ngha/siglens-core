@@ -1467,14 +1467,6 @@ export interface FundamentalSnapshot {
  * represents in the business domain, not which API it comes from.
  */
 
-/**
- * Company identity and market classification fields required for snapshot normalization.
- * Alias of {@link FundamentalProfile} — both describe the same shape. `FundamentalProfileInput`
- * is used as the provider/normalizer parameter type; `FundamentalProfile` is used in the
- * normalized domain output ({@link FundamentalSnapshot}).
- */
-export type FundamentalProfileInput = FundamentalProfile;
-
 /** Valuation multiples and per-share earnings metrics (trailing-twelve-month). */
 export interface FundamentalValuationMetrics {
     peRatioTTM: number | null;
@@ -1579,7 +1571,7 @@ export interface FundamentalCashFlowInput {
 
 /** Input bundle for {@link normalizeFundamentalSnapshot}. Each field corresponds to a single FMP-style fetch result, normalized to domain shapes. */
 export interface NormalizeFundamentalSnapshotInput {
-    profile: FundamentalProfileInput;
+    profile: FundamentalProfile;
     keyMetricsTtm: FundamentalValuationMetrics | null;
     ratiosTtm: FundamentalRatiosInput | null;
     cashFlow: FundamentalCashFlowInput | null;

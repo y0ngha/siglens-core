@@ -155,7 +155,17 @@ export async function submitOverallAnalysis(
     if (cache !== null) {
         try {
             const cached = await cache.get<OverallAnalysisResponse>(cacheKey);
-            if (cached !== null) {
+            // Lightweight structural validation — schema drift from a prior
+            // release should fall through as a cache miss rather than poison
+            // the response. The schema-version prefix on the cache key is the
+            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
+            // check is a belt-and-braces fallback.
+            if (
+                cached !== null &&
+                typeof cached === 'object' &&
+                'headlineKo' in cached &&
+                'scenarios' in cached
+            ) {
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result: cached };
             }

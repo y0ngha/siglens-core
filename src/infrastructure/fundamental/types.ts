@@ -23,12 +23,11 @@ import type {
     FundamentalPeerInput,
     FundamentalPriceTargetConsensusInput,
     FundamentalPriceTargetSummaryInput,
-    FundamentalProfileInput,
+    FundamentalProfile,
     FundamentalRatiosInput,
     FundamentalSectorHistoricalInput,
     FundamentalSectorPerformanceInput,
     FundamentalValuationMetrics,
-    GradesEvent,
 } from '@/domain/types';
 
 // ─────────────────────────────────────────
@@ -41,7 +40,7 @@ export interface RawProfile {
     companyName: string;
     sector: string;
     industry: string;
-    /** FMP-specific field name. Adapters must map this to `FundamentalProfileInput.marketCap` before returning from `getProfile`. */
+    /** FMP-specific field name. Adapters must map this to `FundamentalProfile.marketCap` before returning from `getProfile`. */
     mktCap: number;
     ceo: string | null;
     website: string | null;
@@ -173,13 +172,13 @@ export interface FundamentalDataProvider {
     /**
      * Fetch company profile (name, sector, industry, market cap, CEO, …).
      *
-     * Implementations must map source-specific field names to {@link FundamentalProfileInput}
+     * Implementations must map source-specific field names to {@link FundamentalProfile}
      * before returning (e.g. FMP's `mktCap` → `marketCap`).
      *
      * @param symbol - Ticker symbol (e.g. `"AAPL"`).
      * @returns Domain-neutral profile object, or `null` if unavailable.
      */
-    getProfile(symbol: string): Promise<FundamentalProfileInput | null>;
+    getProfile(symbol: string): Promise<FundamentalProfile | null>;
 
     /**
      * Fetch TTM key metrics (valuation multiples, EPS).
@@ -247,17 +246,12 @@ export interface FundamentalDataProvider {
         symbol: string
     ): Promise<FundamentalAnalystEstimateInput | null>;
 
-    /**
-     * Fetch the latest grading actions (analyst rating changes) for a symbol.
-     *
-     * @todo Reserved for a future analysis phase that surfaces individual rating events.
-     *   Current `submitFundamentalAnalysis` uses `getGradesConsensus` (aggregated counts) only.
-     *
-     * @param symbol - U.S. equity ticker.
-     * @param limit - Maximum number of recent grading events to return.
-     * @returns Recent grading actions sorted descending by date.
-     */
-    getGrades(symbol: string, limit?: number): Promise<GradesEvent[]>;
+    // TODO: Add `getGrades(symbol, limit?): Promise<GradesEvent[]>` here when
+    // a future analysis phase surfaces individual analyst rating events.
+    // Until then the interface stays minimal so consumers (e.g. siglens FMP
+    // adapter) are not forced to implement and stub a method that no
+    // use-case calls. The aggregated `getGradesConsensus` (next method) is
+    // sufficient for `submitFundamentalAnalysis` today.
 
     /**
      * Fetch the current buy/hold/sell grade consensus breakdown.

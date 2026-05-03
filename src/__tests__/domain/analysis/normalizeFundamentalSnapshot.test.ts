@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import type {
-    FundamentalProfileInput,
+    FundamentalProfile,
     FundamentalValuationMetrics,
     FundamentalRatiosInput,
     FundamentalCashFlowInput,
@@ -18,7 +18,7 @@ import type {
 // Fixtures
 // ─────────────────────────────────────────
 
-const baseProfile: FundamentalProfileInput = {
+const baseProfile: FundamentalProfile = {
     symbol: 'AAPL',
     companyName: 'Apple Inc.',
     sector: 'Technology',

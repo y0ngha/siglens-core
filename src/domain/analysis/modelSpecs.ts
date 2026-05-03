@@ -148,8 +148,20 @@ export function getThinkingBudgetSequence(initial: number): readonly number[] {
 /**
  * Resolve the hosting provider for an active model identifier.
  *
+ * Returns the internal {@link AIProvider} taxonomy (`'claude' | 'gemini' |
+ * 'chatgpt'`) used by `MODEL_SPECS`. Use this when you need the human-facing
+ * provider family for an `ActiveModelId` that is guaranteed to exist in
+ * `MODEL_SPECS` (e.g. UI labels, model selection screens).
+ *
+ * For the LLM key-storage / SDK provider taxonomy (`'anthropic' | 'google' |
+ * 'openai'`) — including legacy/deprecated model identifiers that are not in
+ * `MODEL_SPECS` — use {@link getProviderForModel} from `domain/llm/providers`
+ * instead. The two functions intentionally cover different layers and accept
+ * different input domains; neither is a drop-in replacement for the other.
+ *
  * @param model - Active model identifier to look up.
  * @returns The {@link AIProvider} that hosts the given model.
+ * @see getProviderForModel — returns {@link LlmProvider} from any {@link ModelId}.
  */
 export function getProvider(model: ActiveModelId): AIProvider {
     return MODEL_SPECS[model].provider;

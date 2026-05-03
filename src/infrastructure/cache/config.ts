@@ -134,6 +134,23 @@ export function buildSectorSignalsCacheKey(
     return `dashboard:signals:${timeframe}:${bucket}`;
 }
 
+/**
+ * Schema version prefix applied to every analysis cache key (fundamental,
+ * news, news-card, overall).
+ *
+ * Bump this string whenever any cached response shape changes; it serves as a
+ * global cache invalidation lever — old keys (e.g. `v1:...`) are simply never
+ * looked up after a bump and naturally expire via TTL.
+ *
+ * Examples of what should trigger a bump:
+ * - Adding/removing/renaming a field on `FundamentalAnalysisResponse`,
+ *   `NewsAnalysisResponse`, `NewsCardAnalysis`, or `OverallAnalysisResponse`.
+ * - Changing the semantics of an existing field (units, enum value, etc.).
+ *
+ * @internal
+ */
+export const CACHE_KEY_SCHEMA_VERSION = 'v1' as const;
+
 /** @internal TTL for fundamental analysis cache results. Default: 24 hours. */
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /** @internal TTL for news analysis aggregate cache results. Default: 24 hours. */
@@ -163,7 +180,7 @@ export function buildFundamentalCacheKey(
     modelId: string,
     inputHash: string
 ): string {
-    return `analysis:fundamental:${symbol}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${inputHash}`;
 }
 
 /**
@@ -184,7 +201,7 @@ export function buildNewsCacheKey(
     modelId: string,
     inputHash: string
 ): string {
-    return `analysis:news:${symbol}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${inputHash}`;
 }
 
 /**
@@ -207,7 +224,7 @@ export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * @returns The cache key.
  */
 export function buildNewsCardCacheKey(newsId: string): string {
-    return `analysis:news-card:${newsId}:${NEWS_CARD_MODEL_ID}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news-card:${newsId}:${NEWS_CARD_MODEL_ID}`;
 }
 
 /**
@@ -231,5 +248,5 @@ export function buildOverallCacheKey(
     modelId: string,
     inputHash: string
 ): string {
-    return `analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}`;
 }

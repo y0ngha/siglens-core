@@ -246,6 +246,32 @@ describe('submitNewsAnalysis 함수는', () => {
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
         });
+
+        it('캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
+            // Stale shape: missing the `overallSentiment` sentinel field that
+            // the cache-hit guard requires. Submit must treat this as a miss
+            // and proceed with setJobMeta + fireAndForget.
+            const stalePoisonedCache = {
+                currentDriverKo: '오래된 형태',
+                someOldField: true,
+            };
+            mockCacheGet.mockResolvedValueOnce(stalePoisonedCache);
+
+            const result = await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+            });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+                expect(result.jobId.length).toBeGreaterThan(0);
+            }
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
     });
 
     describe('사용량 제한이 적용될 때', () => {

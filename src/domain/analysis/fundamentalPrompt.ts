@@ -5,6 +5,7 @@ import type {
     FundamentalSnapshot,
     GradesConsensus,
     PriceTargetConsensus,
+    PriceTargetSummary,
     Skill,
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
@@ -28,6 +29,12 @@ function formatGrades(g: GradesConsensus | null): string {
 function formatPriceTarget(consensus: PriceTargetConsensus | null): string {
     if (!consensus) return 'N/A';
     return `Consensus: ${fmt(consensus.consensus)}, High: ${fmt(consensus.high)}, Low: ${fmt(consensus.low)}, Median: ${fmt(consensus.median)}`;
+}
+
+/** Render rolling-average price targets (1-month / 3-month / 12-month) into a compact inline string. */
+function formatPriceTargetSummary(summary: PriceTargetSummary | null): string {
+    if (!summary) return 'N/A';
+    return `1M Avg: ${fmt(summary.month1Avg)}, 3M Avg: ${fmt(summary.month3Avg)}, 1Y Avg: ${fmt(summary.year1Avg)}`;
 }
 
 /** Render sector direction as a compact inline string. */
@@ -142,6 +149,7 @@ ${peerLines}
 - Analyst Revenue Estimate: ${futureDirection.analystEstimateRevenue != null ? (futureDirection.analystEstimateRevenue / 1e9).toFixed(1) + 'B' : 'N/A'}
 - Analyst Grades: ${formatGrades(futureDirection.gradesConsensus)}
 - Price Target: ${formatPriceTarget(futureDirection.priceTargetConsensus)}
+- Price Target Trend: ${formatPriceTargetSummary(futureDirection.priceTargetSummary)}
 
 ## Sector Direction
 ${formatSectorDirection(sectorDirection)}

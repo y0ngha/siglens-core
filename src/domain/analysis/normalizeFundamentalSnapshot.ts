@@ -33,7 +33,7 @@ const toPercent = (v: number | null | undefined): number | null =>
  * return null.
  *
  * Infrastructure adapters (e.g. the siglens FMP client) must map
- * `RawProfile.mktCap` → `FundamentalProfileInput.marketCap` when constructing the
+ * `RawProfile.mktCap` → `FundamentalProfile.marketCap` when constructing the
  * input bundle, since `mktCap` is the FMP wire-format field name and `marketCap` is
  * the domain-neutral name used here.
  *

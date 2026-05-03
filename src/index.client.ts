@@ -379,7 +379,6 @@ export type {
     FundamentalPriceTargetConsensusInput,
     FundamentalPriceTargetSummaryInput,
     FundamentalProfile,
-    FundamentalProfileInput,
     FundamentalProfitability,
     FundamentalRatiosInput,
     FundamentalSectorDirection,

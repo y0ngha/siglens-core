@@ -63,7 +63,17 @@ export async function submitNewsCardAnalysis(
     if (cache !== null) {
         try {
             const cached = await cache.get<NewsCardAnalysis>(cacheKey);
-            if (cached !== null) {
+            // Lightweight structural validation — schema drift from a prior
+            // release should fall through as a cache miss rather than poison
+            // the response. The schema-version prefix on the cache key is the
+            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
+            // check is a belt-and-braces fallback.
+            if (
+                cached !== null &&
+                typeof cached === 'object' &&
+                'sentiment' in cached &&
+                'summaryKo' in cached
+            ) {
                 return { status: 'cached', result: cached };
             }
         } catch (error) {

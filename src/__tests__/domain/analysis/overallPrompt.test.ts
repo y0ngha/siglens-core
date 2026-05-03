@@ -142,4 +142,73 @@ describe('buildOverallAnalysisPrompt', () => {
         expect(prompt).toContain('Q1 인도량 예상 하회');
         expect(prompt).toContain('2025-07-30 실적 발표 예정');
     });
+
+    it('includes condensed candle / strategy / trendline summaries when present', () => {
+        const technicalWithSignals: AnalysisResponse = {
+            ...MOCK_TECHNICAL,
+            candlePatterns: [
+                {
+                    id: 'c1',
+                    patternName: 'bullish_engulfing',
+                    detected: true,
+                    trend: 'bullish',
+                    summary: '강세 장악형 패턴 발견',
+                },
+                {
+                    id: 'c2',
+                    patternName: 'doji',
+                    detected: false,
+                    trend: 'neutral',
+                    summary: '도지 캔들',
+                },
+            ],
+            strategyResults: [
+                {
+                    id: 's1',
+                    strategyName: 'rsi-divergence',
+                    trend: 'bullish',
+                    summary: 'RSI 다이버전스 발견',
+                    confidenceWeight: 1,
+                },
+                {
+                    id: 's2',
+                    strategyName: 'macd-cross',
+                    trend: 'bearish',
+                    summary: 'MACD 데드크로스',
+                    confidenceWeight: 1,
+                },
+            ],
+            trendlines: [
+                {
+                    direction: 'ascending',
+                    start: { time: 1700000000, price: 100 },
+                    end: { time: 1700100000, price: 110 },
+                },
+                {
+                    direction: 'ascending',
+                    start: { time: 1700200000, price: 105 },
+                    end: { time: 1700300000, price: 115 },
+                },
+                {
+                    direction: 'descending',
+                    start: { time: 1700400000, price: 120 },
+                    end: { time: 1700500000, price: 110 },
+                },
+            ],
+        };
+
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            technicalWithSignals,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Hour' as Timeframe
+        );
+
+        expect(prompt).toContain('Candle Patterns');
+        expect(prompt).toContain('bullish_engulfing');
+        expect(prompt).toContain('Strategy Signals');
+        expect(prompt).toContain('Trendlines');
+        expect(prompt).toContain('ascending'); // dominant
+    });
 });

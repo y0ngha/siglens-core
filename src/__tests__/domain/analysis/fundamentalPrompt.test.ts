@@ -143,6 +143,11 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('2025-07-30'); // Next earnings date
         // Analyst consensus
         expect(prompt).toContain('212'); // Price target consensus
+        // Price target trend (rolling averages)
+        expect(prompt).toContain('Price Target Trend');
+        expect(prompt).toContain('210'); // 1M avg
+        expect(prompt).toContain('208'); // 3M avg
+        expect(prompt).toContain('200'); // 1Y avg
         // Peer
         expect(prompt).toContain('MSFT');
     });

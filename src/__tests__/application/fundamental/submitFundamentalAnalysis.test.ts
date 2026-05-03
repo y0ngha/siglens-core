@@ -49,7 +49,6 @@ const mockDataProvider = {
     getFinancialScores: vi.fn().mockResolvedValue(null),
     getStockPeers: vi.fn().mockResolvedValue([]),
     getAnalystEstimates: vi.fn().mockResolvedValue(null),
-    getGrades: vi.fn().mockResolvedValue([]),
     getGradesConsensus: vi.fn().mockResolvedValue(null),
     getPriceTargetConsensus: vi.fn().mockResolvedValue(null),
     getPriceTargetSummary: vi.fn().mockResolvedValue(null),
@@ -95,7 +94,6 @@ describe('submitFundamentalAnalysis 함수는', () => {
         mockDataProvider.getFinancialScores.mockResolvedValue(null);
         mockDataProvider.getStockPeers.mockResolvedValue([]);
         mockDataProvider.getAnalystEstimates.mockResolvedValue(null);
-        mockDataProvider.getGrades.mockResolvedValue([]);
         mockDataProvider.getGradesConsensus.mockResolvedValue(null);
         mockDataProvider.getPriceTargetConsensus.mockResolvedValue(null);
         mockDataProvider.getPriceTargetSummary.mockResolvedValue(null);
@@ -125,6 +123,42 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
+            // Stale shape: missing the `overallSentiment` sentinel field that the
+            // cache-hit guard requires. Submit must treat this as a miss and
+            // proceed with the full submit flow (setJobMeta + fireAndForget).
+            const stalePoisonedCache = {
+                overallConclusionKo: 'old shape',
+                someOtherField: true,
+            };
+            mockCacheGet.mockResolvedValueOnce(stalePoisonedCache);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+                expect(result.jobId.length).toBeGreaterThan(0);
+            }
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+            expect(recordUsage).toHaveBeenCalledTimes(1);
         });
     });
 
