@@ -69,7 +69,9 @@ function toChatErrorResult(error: unknown): ChatActionResult {
 // `TierConfig`.
 function isValidChatModel(model: ModelId, config?: TierConfig): boolean {
     const allowed: readonly ModelId[] =
-        config === undefined ? VALID_CHAT_MODELS : getAllowedModels('pro', config);
+        config === undefined
+            ? VALID_CHAT_MODELS
+            : getAllowedModels('pro', config);
     return allowed.some(validModel => validModel === model);
 }
 
@@ -91,10 +93,10 @@ function isValidChatModel(model: ModelId, config?: TierConfig): boolean {
  *
  * @internal
  */
-function resolveApiKeys(params: {
-    freeApiKey?: string;
-    paidApiKey?: string;
-}): { primary: string | undefined; fallback: string } {
+function resolveApiKeys(params: { freeApiKey?: string; paidApiKey?: string }): {
+    primary: string | undefined;
+    fallback: string;
+} {
     if (params.paidApiKey === undefined) {
         // Guard in `requestChatCompletion` ensures `freeApiKey` is defined here.
         return { primary: undefined, fallback: params.freeApiKey! };

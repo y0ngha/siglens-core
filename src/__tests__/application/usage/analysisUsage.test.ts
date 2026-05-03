@@ -67,11 +67,7 @@ describe('recordAnalysisUsageSafely', () => {
         const usage = makeUsage(makeUsageRepository({ recordUsage }));
         const occurredAt = new Date('2026-04-29T00:00:00.000Z');
 
-        await recordAnalysisUsageSafely(
-            usage,
-            'gemini-2.5-flash',
-            occurredAt
-        );
+        await recordAnalysisUsageSafely(usage, 'gemini-2.5-flash', occurredAt);
 
         expect(recordUsage).toHaveBeenCalledTimes(1);
         expect(recordUsage).toHaveBeenCalledWith({

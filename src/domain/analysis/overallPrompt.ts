@@ -103,7 +103,8 @@ function formatTechnical(tech: AnalysisResponse): string {
     // otherwise lose when synthesising the overall verdict.
     if (tech.candlePatterns.length > 0) {
         const detected = tech.candlePatterns.filter(c => c.detected);
-        const latest = detected.length > 0 ? detected[0] : tech.candlePatterns[0];
+        const latest =
+            detected.length > 0 ? detected[0] : tech.candlePatterns[0];
         lines.push(
             `- Candle Patterns: ${detected.length}/${tech.candlePatterns.length} detected; latest "${latest.patternName}" [${latest.trend}]`
         );

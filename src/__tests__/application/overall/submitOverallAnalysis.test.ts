@@ -417,12 +417,10 @@ describe('submitOverallAnalysis 함수는', () => {
                     usage: {
                         usageRepository: {
                             recordUsage,
-                            getUsageToday: vi
-                                .fn()
-                                .mockResolvedValue({
-                                    analysis: 1,
-                                    chatbot: 0,
-                                }),
+                            getUsageToday: vi.fn().mockResolvedValue({
+                                analysis: 1,
+                                chatbot: 0,
+                            }),
                         },
                         clientIp: '203.0.113.10',
                     },
@@ -452,12 +450,10 @@ describe('submitOverallAnalysis 함수는', () => {
                     usage: {
                         usageRepository: {
                             recordUsage,
-                            getUsageToday: vi
-                                .fn()
-                                .mockResolvedValue({
-                                    analysis: 0,
-                                    chatbot: 0,
-                                }),
+                            getUsageToday: vi.fn().mockResolvedValue({
+                                analysis: 0,
+                                chatbot: 0,
+                            }),
                         },
                         clientIp: '203.0.113.10',
                     },
@@ -489,12 +485,10 @@ describe('submitOverallAnalysis 함수는', () => {
                     usage: {
                         usageRepository: {
                             recordUsage,
-                            getUsageToday: vi
-                                .fn()
-                                .mockResolvedValue({
-                                    analysis: 0,
-                                    chatbot: 0,
-                                }),
+                            getUsageToday: vi.fn().mockResolvedValue({
+                                analysis: 0,
+                                chatbot: 0,
+                            }),
                         },
                         clientIp: '203.0.113.10',
                     },
@@ -521,12 +515,10 @@ describe('submitOverallAnalysis 함수는', () => {
                     usage: {
                         usageRepository: {
                             recordUsage,
-                            getUsageToday: vi
-                                .fn()
-                                .mockResolvedValue({
-                                    analysis: 0,
-                                    chatbot: 0,
-                                }),
+                            getUsageToday: vi.fn().mockResolvedValue({
+                                analysis: 0,
+                                chatbot: 0,
+                            }),
                         },
                         clientIp: '203.0.113.10',
                     },
@@ -549,12 +541,10 @@ describe('submitOverallAnalysis 함수는', () => {
                     usage: {
                         usageRepository: {
                             recordUsage,
-                            getUsageToday: vi
-                                .fn()
-                                .mockResolvedValue({
-                                    analysis: 0,
-                                    chatbot: 0,
-                                }),
+                            getUsageToday: vi.fn().mockResolvedValue({
+                                analysis: 0,
+                                chatbot: 0,
+                            }),
                         },
                         clientIp: '203.0.113.10',
                     },

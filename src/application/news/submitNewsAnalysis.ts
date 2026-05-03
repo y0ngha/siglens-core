@@ -54,9 +54,7 @@ function hashNewsInput(
             .map(s => ({ name: s.name, content: s.content }))
             .toSorted((a, b) => a.name.localeCompare(b.name))
     );
-    return hashAnalysisInput(
-        `${sortedIds}|${sortedDates}|${skillFingerprint}`
-    );
+    return hashAnalysisInput(`${sortedIds}|${sortedDates}|${skillFingerprint}`);
 }
 
 /**

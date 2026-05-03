@@ -197,8 +197,7 @@ export type DependencyState =
  * {@link resolveOverallDependencies}.
  */
 export interface SubmitOverallAnalysisOptions
-    extends OverallDependencyInputs,
-        BackgroundTaskOptions {
+    extends OverallDependencyInputs, BackgroundTaskOptions {
     /**
      * Resolved subscription tier. Required only when `usage` is also provided;
      * omit before Phase 4 (siglens passes neither).

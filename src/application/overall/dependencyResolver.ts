@@ -91,12 +91,12 @@ export async function resolveOverallDependencies(
     // until the legacy field is removed in a future major version. Cast strips
     // the @deprecated tag so we don't surface the deprecation warning at this
     // intentional fallback site.
-    const newsOptionsLegacy = (
-        inputs as { newsOptions?: NewsAxisOptions }
-    ).newsOptions;
+    const newsOptionsLegacy = (inputs as { newsOptions?: NewsAxisOptions })
+        .newsOptions;
 
     const newsFieldIsArray = Array.isArray(newsField);
-    const resolvedNewsItems = newsItemsInput ?? (newsFieldIsArray ? newsField : undefined);
+    const resolvedNewsItems =
+        newsItemsInput ?? (newsFieldIsArray ? newsField : undefined);
     const newsFieldAsOptions: NewsAxisOptions | undefined =
         !newsFieldIsArray && newsField !== undefined
             ? (newsField as NewsAxisOptions)
