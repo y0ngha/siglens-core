@@ -13,7 +13,23 @@
  * Consumer (siglens) implements `FundamentalDataProvider` using FMP `/stable/*`
  * endpoints. Core depends only on the interface — never on the concrete HTTP client.
  */
-import type { FundamentalProfileInput, GradesEvent } from '@/domain/types';
+import type {
+    EarningsReport,
+    FundamentalAnalystEstimateInput,
+    FundamentalCashFlowInput,
+    FundamentalFinancialScoresInput,
+    FundamentalGradesConsensusInput,
+    FundamentalGrowthInput,
+    FundamentalPeerInput,
+    FundamentalPriceTargetConsensusInput,
+    FundamentalPriceTargetSummaryInput,
+    FundamentalProfileInput,
+    FundamentalRatiosInput,
+    FundamentalSectorHistoricalInput,
+    FundamentalSectorPerformanceInput,
+    FundamentalValuationMetrics,
+    GradesEvent,
+} from '@/domain/types';
 
 // ─────────────────────────────────────────
 // FMP-specific Raw* response shapes (infrastructure-owned)
@@ -169,57 +185,57 @@ export interface FundamentalDataProvider {
      * Fetch TTM key metrics (valuation multiples, EPS).
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw TTM key metrics, or `null` if unavailable.
+     * @returns Domain-neutral valuation metrics, or `null` if unavailable.
      */
-    getKeyMetricsTtm(symbol: string): Promise<RawKeyMetricsTtm | null>;
+    getKeyMetricsTtm(symbol: string): Promise<FundamentalValuationMetrics | null>;
 
     /**
      * Fetch TTM ratios (profitability margins, debt & current ratios).
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw TTM ratios, or `null` if unavailable.
+     * @returns Domain-neutral ratios, or `null` if unavailable.
      */
-    getRatiosTtm(symbol: string): Promise<RawRatiosTtm | null>;
+    getRatiosTtm(symbol: string): Promise<FundamentalRatiosInput | null>;
 
     /**
      * Fetch the latest annual cash flow statement (operating cash flow subset).
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw cash flow statement, or `null` if unavailable.
+     * @returns Domain-neutral cash flow input, or `null` if unavailable.
      */
-    getCashFlowStatement(symbol: string): Promise<RawCashFlowStatement | null>;
+    getCashFlowStatement(symbol: string): Promise<FundamentalCashFlowInput | null>;
 
     /**
      * Fetch year-over-year income statement growth (revenue + EPS).
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw income growth figures, or `null` if unavailable.
+     * @returns Domain-neutral income growth input, or `null` if unavailable.
      */
-    getIncomeStatementGrowth(symbol: string): Promise<RawIncomeGrowth | null>;
+    getIncomeStatementGrowth(symbol: string): Promise<FundamentalGrowthInput | null>;
 
     /**
      * Fetch Altman Z-score and Piotroski F-score for the symbol.
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw financial scores, or `null` if unavailable.
+     * @returns Domain-neutral financial scores input, or `null` if unavailable.
      */
-    getFinancialScores(symbol: string): Promise<RawFinancialScore | null>;
+    getFinancialScores(symbol: string): Promise<FundamentalFinancialScoresInput | null>;
 
     /**
      * Fetch the peer list.
      *
      * @param symbol - Ticker symbol.
-     * @returns Array of raw peer entries; empty array when peers are unavailable.
+     * @returns Array of domain-neutral peer inputs; empty array when peers are unavailable.
      */
-    getStockPeers(symbol: string): Promise<RawStockPeer[]>;
+    getStockPeers(symbol: string): Promise<FundamentalPeerInput[]>;
 
     /**
      * Fetch next-quarter analyst EPS + revenue consensus estimates.
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw analyst estimate, or `null` if unavailable.
+     * @returns Domain-neutral analyst estimate input, or `null` if unavailable.
      */
-    getAnalystEstimates(symbol: string): Promise<RawAnalystEstimate | null>;
+    getAnalystEstimates(symbol: string): Promise<FundamentalAnalystEstimateInput | null>;
 
     /**
      * Fetch the latest grading actions (analyst rating changes) for a symbol.
@@ -237,55 +253,55 @@ export interface FundamentalDataProvider {
      * Fetch the current buy/hold/sell grade consensus breakdown.
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw grades consensus, or `null` if unavailable.
+     * @returns Domain-neutral grades consensus input, or `null` if unavailable.
      */
-    getGradesConsensus(symbol: string): Promise<RawGradesConsensus | null>;
+    getGradesConsensus(symbol: string): Promise<FundamentalGradesConsensusInput | null>;
 
     /**
      * Fetch analyst price target consensus (high / low / median / mean).
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw price target consensus, or `null` if unavailable.
+     * @returns Domain-neutral price target consensus input, or `null` if unavailable.
      */
     getPriceTargetConsensus(
         symbol: string
-    ): Promise<RawPriceTargetConsensus | null>;
+    ): Promise<FundamentalPriceTargetConsensusInput | null>;
 
     /**
      * Fetch rolling average price targets (1-month, 3-month, 12-month).
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw price target summary, or `null` if unavailable.
+     * @returns Domain-neutral price target summary input, or `null` if unavailable.
      */
     getPriceTargetSummary(
         symbol: string
-    ): Promise<RawPriceTargetSummary | null>;
+    ): Promise<FundamentalPriceTargetSummaryInput | null>;
 
     /**
      * Fetch the sector performance snapshot for a single date.
      * FMP date-range is limited to the last 1 year.
      *
      * @param date - Trading date in `YYYY-MM-DD` format.
-     * @returns Array of sector performance entries for that date.
+     * @returns Array of domain-neutral sector performance entries for that date.
      */
-    getSectorPerformanceSnapshot(date: string): Promise<RawSectorPerformance[]>;
+    getSectorPerformanceSnapshot(date: string): Promise<FundamentalSectorPerformanceInput[]>;
 
     /**
      * Fetch historical daily sector performance for a given sector name.
      * Returns entries in reverse-chronological order (most recent first).
      *
      * @param sector - Sector name as returned by FMP (e.g. `"Technology"`).
-     * @returns Array of historical sector performance entries.
+     * @returns Array of domain-neutral historical sector performance entries.
      */
     getHistoricalSectorPerformance(
         sector: string
-    ): Promise<RawHistoricalSectorPerformance[]>;
+    ): Promise<FundamentalSectorHistoricalInput[]>;
 
     /**
      * Fetch the latest earnings report for a symbol.
      *
      * @param symbol - Ticker symbol.
-     * @returns Raw earnings report, or `null` if unavailable.
+     * @returns Domain-neutral earnings report, or `null` if unavailable.
      */
-    getEarningsReport(symbol: string): Promise<RawEarningsReport | null>;
+    getEarningsReport(symbol: string): Promise<EarningsReport | null>;
 }
