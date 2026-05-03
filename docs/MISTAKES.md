@@ -225,15 +225,24 @@ and have been removed from this file.
    ❌ const x = someString as SpecificLiteral;   // string may not satisfy the union at runtime
    ✅ // Object.keys widens to string[], but SKILL_STAT_CONFIG: Record<SkillType, …> guarantees keys
       const SKILL_TYPES = Object.keys(SKILL_STAT_CONFIG) as SkillType[];  // TS limitation, not runtime risk
-   → Mandatory: every safe-cast `as` must be accompanied by a comment explaining the guarantee.
+   → Mandatory: every safe-cast `as` must be accompanied by a comment explaining TWO elements:
+      (a) WHY the cast exists (the narrowing/structural guarantee)
+      (b) WHY it's safe at runtime (the runtime invariant that TS cannot express)
+   ❌ newsField as NewsAxisOptions  // comment only states "suppress TS error" without explaining runtime guarantee
+   ✅ // Array.isArray(newsField) narrowed to object branch; TS cannot auto-narrow object literal type,
+      //  but structural match with NewsAxisOptions is guaranteed
+      newsField as NewsAxisOptions
+   ❌ inputs as { newsOptions?: NewsAxisOptions }  // comment explains intent (suppress deprecation) but not safety
+   ✅ // Property spread from validated inputs; newsOptions when present is structurally identical to NewsAxisOptions
+      inputs as { newsOptions?: NewsAxisOptions }
    ⚠️  Test file exception: `as` casts in `*.test.ts` files (e.g. test stubs typed with
       `as unknown as SomeType`, `vi.fn() as Mock<...>`) do NOT require a comment.
       Test stubs intentionally implement only the subset of an interface exercised by the test;
       adding a comment to every stub cast adds noise without safety value.
       ✅ `}) as unknown as Dirent;` — no comment needed in test files
-   → Recurring mistake (fix/post-210a423 Tasks 1, 7): as-casts without accompanying safety comment,
+   → Recurring mistake (fix/post-210a423 Tasks 1, 7, PR #76 R2): as-casts without accompanying safety comment,
       especially in guard branches (normalize*.ts sentinel checks, dependency resolver type narrowing).
-      Review every `as` during code review to ensure inline explanation is present.
+      Review every `as` during code review to ensure inline explanation is present covering BOTH intent AND runtime guarantee.
 
 8. Sibling types in the same error/result shape follow inconsistent declaration patterns
    → When multiple related type fields appear in the same interface, they must all use the same strategy (domain alias or inline literal)
@@ -318,13 +327,15 @@ and have been removed from this file.
 2. Infrastructure functions must have 100% branch coverage
    → All if/else, optional chaining (?.), nullish coalescing (??) paths tested
    → Test edge cases like subsecond boundaries, zero values, Math.max guard behavior
-   → Includes guard branches and sentinel-check paths that appear to be dead code in the main flow
+   → Includes guard branches, sentinel-check paths, and throw branches that appear to be dead code in the main flow
    ❌ Math.max(1, Math.floor(diffMs / 1000)) guard that converts 0→1 untested
    ❌ Sentinel guard checking `in` predicate or exception handler lacks dedicated test case
+   ❌ throw new Error(...) path when guard condition fails not covered by any test case
    ✅ Add test case: diffMs = 500ms covers the Math.max(1, 0) = 1 path
    ✅ Sentinel guard paths: if (fieldName in object) return normalize(...) as SafeType; add test case triggering the guard
-   → Recurring mistake (fix/post-210a423 Tasks 2, 7): Guard and sentinel branches skipped in test coverage,
-      causing surprise bugs when guard condition occurs in production (Task 2 error paths, Task 7 r1 sentinel checks).
+   ✅ Throw paths: add test(..., () => { expect(fn()).toThrow(); }) for every error branch
+   → Recurring mistake (fix/post-210a423 Tasks 2, 7, PR #76 R2): Guard, sentinel, and throw branches skipped in test coverage,
+      causing surprise bugs when guard condition occurs in production (Task 2 error paths, Task 7 r1 sentinel checks, PR #76 B3 throw branch).
 
 3. No debug artifacts (console.log) in infrastructure files
    → Infrastructure functions are utilities; logging belongs in higher layers
@@ -415,6 +426,15 @@ and have been removed from this file.
     ❌ test('shouldShowAd', () => { const shouldShowAd = (x) => x.enabled; expect(shouldShowAd(mock)).toBe(true); })
     ✅ import { shouldShowAd } from '@/domain/ads'; test('shouldShowAd', () => { expect(shouldShowAd(mock)).toBe(true); })
     → Expected values from module exports must also be imported, not hardcoded
+
+13.5. Vacuous test assertions with no meaningful verification
+    → Every test must contain at least one meaningful assertion that exercises production logic
+    → Placeholder tests like `expect(true).toBe(true)` or `expect(fn).toBeDefined()` are dead and add no value
+    → Either delete the test or rewrite it to exercise the real behavior path being tested
+    ❌ test('usage 미제공 시', () => { expect(true).toBe(true); })  // placeholder, no actual assertion
+    ❌ test('result shape', () => { const result = submitAnalysis(...); expect(result).toBeDefined(); })  // trivial
+    ✅ test('usage 미제공 시', () => { const result = submitAnalysis(input, { /* no usage */ }); expect(result.status).toBe('submitted'); expect(result.jobId).toMatch(/^[a-z0-9-]+$/); })
+    → Recurring mistake (PR #76 R2 S1): submitFundamentalAnalysis test was a stub with expect(true).toBe(true); rewritten to assert status and jobId shape
 
 14. Time-dependent functions in tests must be explicitly mocked
     → Functions using Date.now(), new Date() must be mocked (vi.useFakeTimers / vi.setSystemTime)

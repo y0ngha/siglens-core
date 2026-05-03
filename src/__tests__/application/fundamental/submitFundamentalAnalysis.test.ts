@@ -336,16 +336,17 @@ describe('submitFundamentalAnalysis 함수는', () => {
             expect(recordUsage).toHaveBeenCalledTimes(1);
         });
 
-        it('usage 미제공 시 호출되지 않는다', async () => {
+        it('usage 미제공 시 한도 검사 없이 정상 제출된다', async () => {
             mockCacheGet.mockResolvedValueOnce(null);
-            await submitFundamentalAnalysis({
+            const result = await submitFundamentalAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-flash',
                 dataProvider: mockDataProvider,
             });
-            // No way to spy on recordUsage when no repo provided — covered by
-            // type system: function is no-op when usage === undefined.
-            expect(true).toBe(true);
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(result.jobId).toEqual(expect.any(String));
+            }
         });
 
         it('FundamentalAnalysisUsageOptions 별칭(@deprecated)도 동일하게 동작한다', async () => {

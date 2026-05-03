@@ -6,6 +6,14 @@ import type {
     OverallDependencyInputs,
 } from '@/application/overall/types';
 
+/**
+ * @internal Object branch of {@link OverallDependencyInputs.news} (per-axis
+ * options); excludes the legacy `ReadonlyArray<EnrichedNewsItem>` data shape.
+ */
+type NewsAxisOptions = NonNullable<
+    Exclude<OverallDependencyInputs['news'], readonly unknown[]>
+>;
+
 /** Strip the `usage` key from an axis-options object without mutating it. */
 function omitUsage<T extends { usage?: unknown }>(opts: T): Omit<T, 'usage'> {
     const { usage: _usage, ...rest } = opts;
@@ -84,19 +92,24 @@ export async function resolveOverallDependencies(
     // New API: `newsItems` (data) + `news` (axis options).
     // The new `news` field accepts either shape — disambiguated at runtime
     // by Array.isArray to preserve callers using the legacy data alias.
-    type NewsAxisOptions = NonNullable<
-        Exclude<OverallDependencyInputs['news'], readonly unknown[]>
-    >;
     // Intentional read of @deprecated `newsOptions` for backward compatibility
     // until the legacy field is removed in a future major version. Cast strips
     // the @deprecated tag so we don't surface the deprecation warning at this
     // intentional fallback site.
+    // Runtime guarantee: OverallDependencyInputs.newsOptions (when present) is
+    // typed as Pick<SubmitNewsAnalysisOptions,...>, which is structurally
+    // identical to NewsAxisOptions.
     const newsOptionsLegacy = (inputs as { newsOptions?: NewsAxisOptions })
         .newsOptions;
 
     const newsFieldIsArray = Array.isArray(newsField);
     const resolvedNewsItems =
         newsItemsInput ?? (newsFieldIsArray ? newsField : undefined);
+    // Runtime guarantee: the `!newsFieldIsArray && newsField !== undefined`
+    // guard above narrows newsField to the object branch of the union (i.e.
+    // Pick<SubmitNewsAnalysisOptions,...>), which is exactly NewsAxisOptions.
+    // TS cannot derive this through Array.isArray on a union member, so an
+    // explicit cast is required.
     const newsFieldAsOptions: NewsAxisOptions | undefined =
         !newsFieldIsArray && newsField !== undefined
             ? (newsField as NewsAxisOptions)

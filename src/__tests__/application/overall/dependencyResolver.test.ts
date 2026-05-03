@@ -586,4 +586,27 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(newsOpts).toMatchObject({ usage: fakeUsage });
         });
     });
+
+    describe('news 입력 누락 가드는', () => {
+        it('newsItems 와 news 배열 모두 미제공 시 명시적 에러를 던진다', async () => {
+            const inputs = makeInputs();
+            // Drop both data shapes: no `newsItems` and no array-form `news`.
+            const { newsItems: _drop, ...rest } = inputs;
+            const badInputs: OverallDependencyInputs = {
+                ...rest,
+                // `news` is the options-object branch (not the legacy array),
+                // so the resolver cannot recover an items array from either field.
+                news: {},
+            };
+
+            await expect(resolveOverallDependencies(badInputs)).rejects.toThrow(
+                /missing news items/
+            );
+
+            // Guard fires before any axis submit is dispatched.
+            expect(mockSubmitAnalysis).not.toHaveBeenCalled();
+            expect(mockSubmitFundamentalAnalysis).not.toHaveBeenCalled();
+            expect(mockSubmitNewsAnalysis).not.toHaveBeenCalled();
+        });
+    });
 });

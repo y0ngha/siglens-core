@@ -642,3 +642,4 @@
 - Violation: Explicit parameter type annotation on Array.prototype.find callback when type inference would suffice
 - Rule: CONVENTIONS.md Type Inference — prefer inference for callback parameters when surrounding code has sufficient type context
 - Context: Inline gemini-bot comment — submitFundamentalAnalysis sectorSnapshot.find callback reverted from explicit (s: FundamentalSectorPerformanceInput) to inferred parameter; FundamentalSectorPerformanceInput import dropped
+
