@@ -105,14 +105,19 @@ export async function pollAnalysis(
     const parsed = rawResult as RawAnalysisResponse;
 
     const skillsLoader = new FileSkillsLoader();
+    let pollSkillsDegraded = false;
     const skills = await skillsLoader.loadSkills().catch(error => {
         console.error(
             '[Poll] Skills loading failed, proceeding without skills:',
             error
         );
+        pollSkillsDegraded = true;
         return [] as Skill[];
     });
-    const skillsDegraded = meta?.skillsDegraded ?? false;
+    // `skillsDegraded` reflects the poll-time skill-load state (the load that
+    // produced the `skills` used by `enrichAnalysisWithConfidence` immediately
+    // below), so the cached label always matches the data actually used.
+    const skillsDegraded = pollSkillsDegraded;
 
     const enriched = enrichAnalysisWithConfidence(parsed, skills);
 

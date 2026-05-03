@@ -15,9 +15,15 @@ const AI_PROVIDER_TO_LLM_PROVIDER: Record<AIProvider, LlmProvider> = {
 /**
  * Resolve the LLM key-storage provider for any model identifier.
  *
- * @param modelId - Any {@link ModelId}, including deprecated aliases.
+ * @param modelId - Any {@link ModelId}, including deprecated aliases whose
+ *   prefix (`claude-`, `gemini-`, `gpt-`) is still recognized.
  * @returns The {@link LlmProvider} that hosts the given model
  *   (`'anthropic'`, `'google'`, or `'openai'`).
+ * @throws {Error} When `modelId` is not present in `MODEL_SPECS` and its
+ *   prefix is not one of the recognized deprecated families. Previously
+ *   such inputs silently fell through to `'openai'`, which masked typos
+ *   (e.g. `'glaude-haiku'`) by routing them to the wrong provider.
+ *   Callers must validate `modelId` beforehand or catch this error.
  */
 export function getProviderForModel(modelId: ModelId): LlmProvider {
     if (modelId in MODEL_SPECS) {
@@ -32,5 +38,10 @@ export function getProviderForModel(modelId: ModelId): LlmProvider {
     if (modelId.startsWith('gemini-')) {
         return 'google';
     }
-    return 'openai';
+    if (modelId.startsWith('gpt-')) {
+        return 'openai';
+    }
+    throw new Error(
+        `getProviderForModel: unknown modelId "${modelId}" — not present in MODEL_SPECS and prefix is not one of "claude-", "gemini-", "gpt-".`
+    );
 }
