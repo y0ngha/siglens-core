@@ -3,9 +3,6 @@ import { submitFundamentalAnalysis } from '@/application/fundamental/submitFunda
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import type {
     DependencyState,
-    DependencyStateCached,
-    DependencyStatePending,
-    DependencyStateError,
     OverallDependencyInputs,
 } from '@/application/overall/types';
 
@@ -135,13 +132,3 @@ export async function resolveOverallDependencies(
         },
     };
 }
-
-// Re-export types for direct imports from this module.
-// Primary export location is application/overall/types.ts.
-export type {
-    DependencyState,
-    DependencyStateCached,
-    DependencyStatePending,
-    DependencyStateError,
-    OverallDependencyInputs,
-};
