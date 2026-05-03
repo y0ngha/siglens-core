@@ -5,16 +5,45 @@ import type {
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
 } from '@/application/overall/types';
+import {
+    buildUsageLimitError,
+    checkAnalysisUsageAllowed,
+    recordAnalysisUsageSafely,
+} from '@/application/usage';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
+import { TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import type { OverallAnalysisResponse } from '@/domain/types';
+import type { AnalysisResponse, OverallAnalysisResponse } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+
+/**
+ * Strip volatile, write-time-only fields from a cached technical
+ * `AnalysisResponse` so the overall input hash stays stable across polls.
+ *
+ * `analyzedAt` is rewritten on every `pollAnalysis` call; `skillsDegraded`
+ * is a transient loader-health flag that is sometimes attached to the
+ * cached body. Neither belongs in the hashing surface.
+ */
+function stripVolatileTechnicalFields(
+    technical: AnalysisResponse
+): Omit<AnalysisResponse, 'analyzedAt'> {
+    // Cast widens the static AnalysisResponse type to include the runtime-only
+    // `skillsDegraded` field that pollAnalysis attaches before caching
+    // (see pollAnalysis.ts:134). Both volatile fields are then stripped via
+    // destructuring to avoid imperative mutation (no `delete`).
+    const {
+        analyzedAt: _analyzedAt,
+        skillsDegraded: _skillsDegraded,
+        ...rest
+    } = technical as AnalysisResponse & { skillsDegraded?: boolean };
+    return rest;
+}
 
 /**
  * Submit an overall (3-axis: technical + fundamental + news) analysis job.
@@ -50,9 +79,38 @@ export async function submitOverallAnalysis(
     options: SubmitOverallAnalysisOptions
 ): Promise<SubmitOverallAnalysisResult> {
     const { symbol, timeframe, modelId } = options;
+    const usage = options.usage;
+    const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
+
+    // ── 0. Overall-scoped usage limit check ──
+    // Owned at this layer (not per axis) so one overall request counts as
+    // exactly one analysis. The dependency resolver drops `usage` from each
+    // axis's forwarded options (see dropAxisUsage below) to prevent
+    // triple-counting.
+    if (options.tier !== undefined && usage !== undefined) {
+        const tier = options.tier;
+        const tierConfig = options.tierConfig ?? TIER_CONFIG;
+        const allowed = await checkAnalysisUsageAllowed(
+            usage,
+            tier,
+            occurredAt,
+            tierConfig
+        );
+        if (!allowed) {
+            return {
+                status: 'limit_error',
+                code: 'usage_limit_exceeded',
+                error: buildUsageLimitError('analysisPerDay', tier),
+            };
+        }
+    }
 
     // ── 1. Resolve all three dependency axes in parallel ──
-    const deps = await resolveOverallDependencies(options);
+    // `dropAxisUsage: true` ensures axis submits never check or record usage
+    // when invoked from overall — one overall call = one analysis recorded.
+    const deps = await resolveOverallDependencies(options, {
+        dropAxisUsage: true,
+    });
 
     if (deps.kind === 'error') {
         // One axis failed — return immediately without cache lookup or job submission.
@@ -72,8 +130,19 @@ export async function submitOverallAnalysis(
     }
 
     // ── 2. All three cached — hash combined inputs and check overall cache ──
+    // Strip volatile fields from each axis result before hashing so that
+    // re-polling a stable analysis produces the same overall cache key.
+    // - `analyzedAt` is set per poll on the technical axis (see pollAnalysis)
+    //   and would otherwise invalidate the overall cache on every poll.
+    // - `skillsDegraded` is a transient flag attached to the cached technical
+    //   result; it reflects loader health at write time, not analysis content.
+    const stableTechnical = stripVolatileTechnicalFields(deps.technical);
     const inputHash = hashAnalysisInput(
-        JSON.stringify({ t: deps.technical, f: deps.fundamental, n: deps.news })
+        JSON.stringify({
+            t: stableTechnical,
+            f: deps.fundamental,
+            n: deps.news,
+        })
     );
     const cacheKey = buildOverallCacheKey(
         symbol,
@@ -86,7 +155,18 @@ export async function submitOverallAnalysis(
     if (cache !== null) {
         try {
             const cached = await cache.get<OverallAnalysisResponse>(cacheKey);
-            if (cached !== null) {
+            // Lightweight structural validation — schema drift from a prior
+            // release should fall through as a cache miss rather than poison
+            // the response. The schema-version prefix on the cache key is the
+            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
+            // check is a belt-and-braces fallback.
+            if (
+                cached !== null &&
+                typeof cached === 'object' &&
+                'headlineKo' in cached &&
+                'scenarios' in cached
+            ) {
+                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -107,6 +187,7 @@ export async function submitOverallAnalysis(
 
     await setJobMeta(jobId, {
         symbol,
+        timeframe,
         modelId,
         cacheKey,
     });
@@ -123,6 +204,8 @@ export async function submitOverallAnalysis(
         console.error('[submitOverallAnalysis] Worker request failed:', error);
     });
     fireAndForget(dispatch, options);
+
+    await recordAnalysisUsageSafely(usage, modelId, occurredAt);
 
     return { status: 'submitted', jobId };
 }

@@ -28,6 +28,12 @@ import {
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).
  *
+ * Cancel-after-poll: a successful {@link cancelNewsAnalysisJob} call does
+ * NOT immediately flip the job status. This function will keep returning
+ * `processing` until the worker observes the cancel signal on its next
+ * `isJobCancelled` check and self-transitions. Bound your retry loop with
+ * a caller-side timeout to avoid polling indefinitely against a dead worker.
+ *
  * @param jobId - The `jobId` returned by {@link submitNewsCardAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
  *   so Redis cleanup and cache writes can continue after the response.
@@ -42,6 +48,7 @@ import {
  * ```
  *
  * @see submitNewsCardAnalysis
+ * @see cancelNewsAnalysisJob
  */
 export async function pollNewsCardAnalysis(
     jobId: string,

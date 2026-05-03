@@ -52,8 +52,13 @@ export { classifyTrend, detectSignals } from './domain/signals';
 
 // Prompt builders
 export { buildAnalysisPrompt } from './domain/analysis/prompt';
+export { buildFundamentalAnalysisPrompt } from './domain/analysis/fundamentalPrompt';
 export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
+export { buildNewsAnalysisPrompt } from './domain/analysis/newsPrompt';
+export { buildNewsCardAnalysisPrompt } from './domain/analysis/newsCardPrompt';
+export { buildOverallAnalysisPrompt } from './domain/analysis/overallPrompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
+export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export {
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
@@ -81,6 +86,13 @@ export {
 // Response normalization
 export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
 export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
+export { normalizeFundamentalAnalysisResponse } from './domain/analysis/normalizeFundamental';
+export { normalizeFundamentalSnapshot } from './domain/analysis/normalizeFundamentalSnapshot';
+export {
+    normalizeNewsAnalysisResponse,
+    normalizeNewsCardAnalysis,
+} from './domain/analysis/normalizeNews';
+export { normalizeOverallAnalysisResponse } from './domain/analysis/normalizeOverall';
 
 // Model spec helpers
 export {
@@ -348,7 +360,52 @@ export type {
 export type {
     AnalysisSignalType,
     ChatModel,
+    EarningsCalendarItem,
+    EarningsReport,
+    EnrichedNewsItem,
+    FundamentalAnalysisResponse,
+    FundamentalAnalystEstimateInput,
+    FundamentalCashFlowInput,
+    FundamentalCategory,
+    FundamentalCategoryAssessment,
+    FundamentalFinancialScoresInput,
+    FundamentalFutureDirection,
+    FundamentalGradesConsensusInput,
+    FundamentalGrowth,
+    FundamentalGrowthInput,
+    FundamentalHealth,
+    FundamentalPeer,
+    FundamentalPeerInput,
+    FundamentalPriceTargetConsensusInput,
+    FundamentalPriceTargetSummaryInput,
+    FundamentalProfile,
+    FundamentalProfileInput,
+    FundamentalProfitability,
+    FundamentalRatiosInput,
+    FundamentalSectorDirection,
+    FundamentalSectorHistoricalInput,
+    FundamentalSectorPerformanceInput,
+    FundamentalSentiment,
+    FundamentalSnapshot,
+    FundamentalValuation,
+    FundamentalValuationMetrics,
+    GradesAction,
+    GradesConsensus,
+    GradesEvent,
     ModelId,
+    NewsAnalysisResponse,
+    NewsCardAnalysis,
+    NewsCategory,
+    NewsItem,
+    NewsSentiment,
+    NormalizeFundamentalSnapshotInput,
+    OverallAnalysisResponse,
+    OverallScenario,
+    OverallScenarioName,
+    PriceTargetAvg,
+    PriceTargetConsensus,
+    PriceTargetSummary,
+    SectorHistoricalPoint,
     Timeframe,
     Tier,
     TierConfig,

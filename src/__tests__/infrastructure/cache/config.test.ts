@@ -13,6 +13,7 @@ import {
     buildOverallCacheKey,
     buildSectorSignalsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
+    CACHE_KEY_SCHEMA_VERSION,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
@@ -111,26 +112,37 @@ describe('cache key builders', () => {
 });
 
 describe('new analysis cache keys', () => {
-    it('returns analysis:fundamental:{symbol}:{model}:{hash} format', () => {
+    it('returns {v}:analysis:fundamental:{symbol}:{model}:{hash} format', () => {
         const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
-        expect(a).toBe('analysis:fundamental:AAPL:gemini-2.5-pro:h1');
-    });
-
-    it('buildNewsCacheKey same shape', () => {
-        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')).toBe(
-            'analysis:news:AAPL:gemini-2.5-pro:h2'
+        expect(a).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:h1`
         );
     });
 
-    it('buildNewsCardCacheKey is per-news-id (model fixed flash-lite)', () => {
-        const k = buildNewsCardCacheKey('news-12345');
-        expect(k).toBe('analysis:news-card:news-12345:gemini-2.5-flash-lite');
+    it('buildNewsCacheKey same shape with version prefix', () => {
+        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:AAPL:gemini-2.5-pro:h2`
+        );
     });
 
-    it('buildOverallCacheKey includes timeframe', () => {
+    it('buildNewsCardCacheKey is per-news-id (model fixed flash-lite) with version prefix', () => {
+        const k = buildNewsCardCacheKey('news-12345');
+        expect(k).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news-card:news-12345:gemini-2.5-flash-lite`
+        );
+    });
+
+    it('buildOverallCacheKey includes timeframe and version prefix', () => {
         expect(
             buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3')
-        ).toBe('analysis:overall:AAPL:5Min:gemini-2.5-pro:h3');
+        ).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-2.5-pro:h3`
+        );
+    });
+
+    it('CACHE_KEY_SCHEMA_VERSION is a non-empty string used as a global invalidation lever', () => {
+        expect(typeof CACHE_KEY_SCHEMA_VERSION).toBe('string');
+        expect(CACHE_KEY_SCHEMA_VERSION.length).toBeGreaterThan(0);
     });
 
     it('TTL constants match SECONDS_PER_DAY', () => {

@@ -7,6 +7,36 @@ import type {
 } from '@/application/overall/types';
 
 /**
+ * @internal Object branch of {@link OverallDependencyInputs.news} (per-axis
+ * options); excludes the legacy `ReadonlyArray<EnrichedNewsItem>` data shape.
+ */
+type NewsAxisOptions = NonNullable<
+    Exclude<OverallDependencyInputs['news'], readonly unknown[]>
+>;
+
+/** Strip the `usage` key from an axis-options object without mutating it. */
+function omitUsage<T extends { usage?: unknown }>(opts: T): Omit<T, 'usage'> {
+    const { usage: _usage, ...rest } = opts;
+    return rest;
+}
+
+/**
+ * @internal Options that customize how the resolver translates
+ * {@link OverallDependencyInputs} into per-axis submit calls.
+ */
+export interface ResolveOverallDependenciesOptions {
+    /**
+     * When `true`, the resolver strips `usage` from each axis's forwarded
+     * options so the daily limit is neither checked nor recorded per axis.
+     * `submitOverallAnalysis` sets this to `true` to keep one overall request
+     * counted as exactly one analysis (otherwise three axis submits would each
+     * check + record, triple-counting). Standalone callers can leave it
+     * `false` (the default) to opt into per-axis tracking.
+     */
+    dropAxisUsage?: boolean;
+}
+
+/**
  * @internal Called by {@link submitOverallAnalysis} — consumers should not call this directly.
  *
  * Resolve the three dependency axes (technical, fundamental, news) for an
@@ -42,38 +72,99 @@ import type {
  * @see submitOverallAnalysis
  */
 export async function resolveOverallDependencies(
-    inputs: OverallDependencyInputs
+    inputs: OverallDependencyInputs,
+    options: ResolveOverallDependenciesOptions = {}
 ): Promise<DependencyState> {
     const {
         symbol,
         timeframe,
         modelId,
         fundamentalProvider,
-        news,
+        newsItems: newsItemsInput,
         upcomingCalendar,
         technical: technicalOptions,
         fundamental: fundamentalOptions,
-        newsOptions,
+        news: newsField,
     } = inputs;
+    const dropAxisUsage = options.dropAxisUsage ?? false;
+    // ── Backward-compat disambiguation for the renamed news fields ──
+    // Old API: `news` (data: EnrichedNewsItem[]) + `newsOptions` (axis options).
+    // New API: `newsItems` (data) + `news` (axis options).
+    // The new `news` field accepts either shape — disambiguated at runtime
+    // by Array.isArray to preserve callers using the legacy data alias.
+    // Intentional read of @deprecated `newsOptions` for backward compatibility
+    // until the legacy field is removed in a future major version. Cast strips
+    // the @deprecated tag so we don't surface the deprecation warning at this
+    // intentional fallback site.
+    // Runtime guarantee: OverallDependencyInputs.newsOptions (when present) is
+    // typed as Pick<SubmitNewsAnalysisOptions,...>, which is structurally
+    // identical to NewsAxisOptions.
+    const newsOptionsLegacy = (inputs as { newsOptions?: NewsAxisOptions })
+        .newsOptions;
+
+    const newsFieldIsArray = Array.isArray(newsField);
+    const resolvedNewsItems =
+        newsItemsInput ?? (newsFieldIsArray ? newsField : undefined);
+    // Runtime guarantee: the `!newsFieldIsArray && newsField !== undefined`
+    // guard above narrows newsField to the object branch of the union (i.e.
+    // Pick<SubmitNewsAnalysisOptions,...>), which is exactly NewsAxisOptions.
+    // TS cannot derive this through Array.isArray on a union member, so an
+    // explicit cast is required.
+    const newsFieldAsOptions: NewsAxisOptions | undefined =
+        !newsFieldIsArray && newsField !== undefined
+            ? (newsField as NewsAxisOptions)
+            : undefined;
+    const resolvedNewsOptions: NewsAxisOptions | undefined = newsFieldIsArray
+        ? newsOptionsLegacy
+        : (newsFieldAsOptions ?? newsOptionsLegacy);
+
+    if (resolvedNewsItems === undefined) {
+        throw new Error(
+            "OverallDependencyInputs: missing news items — supply 'newsItems' (preferred) or the legacy 'news' array."
+        );
+    }
+
+    // ── Extract technical positional overrides (force, fmpSymbol) ──
+    const {
+        force: technicalForce = false,
+        fmpSymbol: technicalFmpSymbol,
+        ...technicalRest
+    } = technicalOptions;
+
+    // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
+    // Triple-counting prevention: if the caller forwards `usage` here, three
+    // axis submits would each check + record one analysis. Overall owns the
+    // single check + single record at its layer (submitOverallAnalysis).
+    const technicalAxisOptions = dropAxisUsage
+        ? omitUsage(technicalRest)
+        : technicalRest;
+    const fundamentalAxisOptions =
+        dropAxisUsage && fundamentalOptions !== undefined
+            ? omitUsage(fundamentalOptions)
+            : fundamentalOptions;
+    const newsAxisOptions =
+        dropAxisUsage && resolvedNewsOptions !== undefined
+            ? omitUsage(resolvedNewsOptions)
+            : resolvedNewsOptions;
 
     // ── Kick off all three axes in parallel ──
     const [technicalResult, fundamentalResult, newsResult] = await Promise.all([
-        submitAnalysis(symbol, timeframe, false, undefined, {
-            ...technicalOptions,
-            modelId: technicalOptions.modelId ?? modelId,
+        submitAnalysis(symbol, timeframe, technicalForce, technicalFmpSymbol, {
+            ...technicalAxisOptions,
+            modelId: technicalAxisOptions.modelId ?? modelId,
         }),
         submitFundamentalAnalysis({
             symbol,
             modelId,
             dataProvider: fundamentalProvider,
-            ...fundamentalOptions,
+            ...fundamentalAxisOptions,
         }),
         submitNewsAnalysis({
             symbol,
             modelId,
-            news,
+            news: resolvedNewsItems,
             upcomingCalendar,
-            ...newsOptions,
+            ...newsAxisOptions,
         }),
     ]);
 

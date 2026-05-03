@@ -36,6 +36,12 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
  * value). Skill loading at poll time is best-effort, falling back to an empty
  * skill list if it fails.
  *
+ * Cancel-after-poll: a successful {@link cancelAnalysisJob} call does NOT
+ * immediately flip the job status. This function will keep returning
+ * `processing` until the worker observes the cancel signal on its next
+ * `isJobCancelled` check and self-transitions. Bound your retry loop with
+ * a caller-side timeout to avoid polling indefinitely against a dead worker.
+ *
  * @param jobId - The `jobId` returned by {@link submitAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
  *   so Redis cleanup and cache writes can continue after the response.
@@ -99,14 +105,19 @@ export async function pollAnalysis(
     const parsed = rawResult as RawAnalysisResponse;
 
     const skillsLoader = new FileSkillsLoader();
-    const skills = await skillsLoader.loadSkills().catch(error => {
-        console.error(
-            '[Poll] Skills loading failed, proceeding without skills:',
-            error
-        );
-        return [] as Skill[];
-    });
-    const skillsDegraded = meta?.skillsDegraded ?? false;
+    // `skillsDegraded` reflects the poll-time skill-load state (the load that
+    // produced the `skills` used by `enrichAnalysisWithConfidence` immediately
+    // below), so the cached label always matches the data actually used.
+    const { skills, skillsDegraded } = await skillsLoader
+        .loadSkills()
+        .then(loaded => ({ skills: loaded, skillsDegraded: false }))
+        .catch((error: unknown) => {
+            console.error(
+                '[Poll] Skills loading failed, proceeding without skills:',
+                error
+            );
+            return { skills: [] as Skill[], skillsDegraded: true };
+        });
 
     const enriched = enrichAnalysisWithConfidence(parsed, skills);
 

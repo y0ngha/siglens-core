@@ -5,6 +5,7 @@ import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
     ChatMessage,
+    CurrentAnalysisContext,
     ModelId,
     TierConfig,
     Timeframe,
@@ -45,6 +46,14 @@ export interface RequestChatCompletionParams {
     paidApiKey?: string;
     occurredAt?: Date;
     tierContext?: UserTierContext;
+    /**
+     * Tagged union representing the analysis result currently displayed on the
+     * user's page (technical / fundamental / news / overall). When provided,
+     * the chat system prompt receives an extra `## Current analysis context`
+     * section so the assistant can reference the live numbers without
+     * re-fetching data. Omit to keep the original behavior.
+     */
+    currentAnalysisContext?: CurrentAnalysisContext;
 }
 
 export interface RequestChatCompletionDependencies {

@@ -1,5 +1,8 @@
 import type { BackgroundTaskOptions } from '@/application/types';
-import type { AnalysisLimitError } from '@/application/usage/types';
+import type {
+    AnalysisLimitError,
+    AnalysisUsageOptions,
+} from '@/application/usage/types';
 import type {
     FundamentalAnalysisResponse,
     ModelId,
@@ -7,19 +10,21 @@ import type {
     TierConfig,
 } from '@/domain/types';
 import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
-import type { UsageRepository } from '@/infrastructure/db';
 
 // ─────────────────────────────────────────
 // Submit
 // ─────────────────────────────────────────
 
-/** Usage tracking options for fundamental analysis submissions. */
-export interface FundamentalAnalysisUsageOptions {
-    /** Repository used to check today's count and record successful usage. */
-    usageRepository: UsageRepository;
-    /** Raw client IP. Hashed before persistence. */
-    clientIp: string;
-}
+/**
+ * @deprecated Use {@link AnalysisUsageOptions} instead. Kept as an alias for
+ *   one minor version so existing callers keep compiling. Will be removed in
+ *   a future minor release.
+ *
+ * The unified {@link AnalysisUsageOptions} adds optional `userId`,
+ * `modelUsed`, and `occurredAt` fields needed by `recordUsage` on cache-hit
+ * and post-submit paths.
+ */
+export type FundamentalAnalysisUsageOptions = AnalysisUsageOptions;
 
 /** Options controlling fundamental analysis submission behavior. */
 export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions {
@@ -41,10 +46,11 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
     tierConfig?: TierConfig;
     /**
      * Optional usage tracking. When provided together with `tier`, the daily
-     * analysis limit is checked before fetching data. Omit to skip all limit
-     * checks (pre-Phase 4 behavior).
+     * analysis limit is checked before fetching data, and one usage record is
+     * written on every path that returns a result (cache hit or successful
+     * submit). Omit to skip both checks and recording (pre-Phase 4 behavior).
      */
-    usage?: FundamentalAnalysisUsageOptions;
+    usage?: AnalysisUsageOptions;
     /**
      * Reference timestamp for limit checks. Defaults to `new Date()` at call
      * time. Useful in tests that need a fixed clock.

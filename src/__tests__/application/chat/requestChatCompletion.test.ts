@@ -9,7 +9,12 @@ import {
 import { requestChatCompletion } from '@/application/chat/requestChatCompletion';
 import type { RequestChatCompletionParams } from '@/application/chat/types';
 import { TIER_CONFIG } from '@/domain/tier';
-import type { AnalysisResponse, ModelId, TierConfig } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    CurrentAnalysisContext,
+    ModelId,
+    TierConfig,
+} from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 
@@ -53,6 +58,10 @@ function createParams(
         history: [],
         userMessage: '지금 사도 돼?',
         clientIp: '1.2.3.4',
+        // Default to the contract for non-pro users: server provides both
+        // `freeApiKey` (primary) and `paidApiKey` (fallback). Tests covering
+        // contract violations should override these.
+        freeApiKey: 'free-key',
         paidApiKey: 'paid-key',
         ...overrides,
     };
@@ -233,6 +242,22 @@ describe('requestChatCompletion', () => {
             })
         );
         expect(tryConsumeToken).toHaveBeenCalled();
+    });
+
+    it('returns server_error when a non-pro tier user receives a paidApiKey but no freeApiKey', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_FLASH_MODEL,
+                paidApiKey: 'paid-key',
+                freeApiKey: undefined,
+                tierContext: { userId: 'user-1', tier: 'member' },
+            }),
+            { tokenStore, callAiProvider }
+        );
+
+        expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(tryConsumeToken).not.toHaveBeenCalled();
+        expect(callAiProvider).not.toHaveBeenCalled();
     });
 
     it('returns server_error when a pro tier user has no paidApiKey and no freeApiKey', async () => {
@@ -622,6 +647,73 @@ describe('requestChatCompletion', () => {
         expect(refundConsumedToken).toHaveBeenCalledWith(
             '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c'
         );
+    });
+
+    it('passes currentAnalysisContext through to buildChatPrompt so the system prompt can reference live numbers', async () => {
+        const currentAnalysisContext: CurrentAnalysisContext = {
+            kind: 'technical',
+            payload: {
+                ...MINIMAL_ANALYSIS,
+                summary: 'AAPL is consolidating near 190.',
+                trend: 'neutral',
+                riskLevel: 'low',
+            },
+        };
+
+        const result = await requestChatCompletion(
+            createParams({ currentAnalysisContext }),
+            { tokenStore, callAiProvider }
+        );
+
+        expect(result.ok).toBe(true);
+        const firstCall = (callAiProvider as Mock).mock.calls[0]?.[0];
+        expect(firstCall.systemInstruction).toContain(
+            '## Current analysis context'
+        );
+        expect(firstCall.systemInstruction).toContain('Kind: technical');
+        expect(firstCall.systemInstruction).toContain(
+            'AAPL is consolidating near 190.'
+        );
+    });
+
+    it('omits the current analysis context section when not provided', async () => {
+        const result = await requestChatCompletion(createParams(), {
+            tokenStore,
+            callAiProvider,
+        });
+
+        expect(result.ok).toBe(true);
+        const firstCall = (callAiProvider as Mock).mock.calls[0]?.[0];
+        expect(firstCall.systemInstruction).not.toContain(
+            '## Current analysis context'
+        );
+    });
+
+    it('uses the injected tierConfig to validate model identifiers at runtime', async () => {
+        const flashOnlyTierConfig: TierConfig = {
+            ...restrictedTierConfig,
+            models: {
+                free: ['gemini-2.5-flash'],
+                member: ['gemini-2.5-flash'],
+                pro: ['gemini-2.5-flash'],
+            },
+        };
+
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                tierContext: { userId: 'user-1', tier: 'pro' },
+            }),
+            {
+                tokenStore,
+                callAiProvider,
+                tierConfig: flashOnlyTierConfig,
+            }
+        );
+
+        expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(tryConsumeToken).not.toHaveBeenCalled();
+        expect(callAiProvider).not.toHaveBeenCalled();
     });
 
     it('keeps the original server_error when token refund fails', async () => {

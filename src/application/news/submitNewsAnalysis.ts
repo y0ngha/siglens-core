@@ -1,6 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
-import { checkAnalysisLimit, buildUsageLimitError } from '@/application/usage';
+import {
+    buildUsageLimitError,
+    checkAnalysisUsageAllowed,
+    recordAnalysisUsageSafely,
+} from '@/application/usage';
 import type {
     SubmitNewsAnalysisLimitError,
     SubmitNewsAnalysisNoNewsError,
@@ -12,33 +16,45 @@ import { TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildNewsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import type { NewsAnalysisResponse } from '@/domain/types';
+import type { NewsAnalysisResponse, Skill } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the news analysis job. */
 const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
- * Derive a short deterministic hash of the news set and upcoming calendar.
+ * Derive a short deterministic hash of the news set, calendar, and active skills.
  *
- * Sorted news IDs joined with sorted earnings dates, delegated to
- * {@link hashAnalysisInput}. Deterministic across re-runs with the
- * same news set regardless of original ordering.
+ * Sorted news IDs joined with sorted earnings dates and a sorted skill
+ * fingerprint (`name + content`), delegated to {@link hashAnalysisInput}.
+ * Deterministic across re-runs with the same input regardless of original
+ * ordering.
  *
- * @param newsIds - Array of news item IDs.
+ * Skill fingerprint is included so that adding, removing, or editing a skill
+ * busts the cache — otherwise the same news set would keep returning the
+ * previous result for the full 24h TTL.
+ *
+ * @param newsIds       - Array of news item IDs.
  * @param earningsDates - Array of earnings calendar date strings.
+ * @param skills        - Skills loaded for the prompt; only `name` + `content`
+ *   are used for the hash.
  * @returns 16-character lowercase hex string.
  */
 function hashNewsInput(
     newsIds: readonly string[],
-    earningsDates: readonly string[]
+    earningsDates: readonly string[],
+    skills: readonly Skill[]
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
     const sortedDates = earningsDates.toSorted().join(',');
-    return hashAnalysisInput(`${sortedIds}|${sortedDates}`);
+    const skillFingerprint = JSON.stringify(
+        skills
+            .map(s => ({ name: s.name, content: s.content }))
+            .toSorted((a, b) => a.name.localeCompare(b.name))
+    );
+    return hashAnalysisInput(`${sortedIds}|${sortedDates}|${skillFingerprint}`);
 }
 
 /**
@@ -75,7 +91,8 @@ export async function submitNewsAnalysis(
     options: SubmitNewsAnalysisOptions
 ): Promise<SubmitNewsAnalysisResult> {
     const { symbol, modelId, news, upcomingCalendar } = options;
-    const occurredAt = options.now ?? new Date();
+    const usage = options.usage;
+    const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
     // ── 1. Empty news guard (before tier/cache/prompt) ──
     if (news.length === 0) {
@@ -88,13 +105,14 @@ export async function submitNewsAnalysis(
     }
 
     // ── 2. Usage limit check (only when both tier and usage are provided) ──
-    if (options.tier !== undefined && options.usage !== undefined) {
+    if (options.tier !== undefined && usage !== undefined) {
         const tier = options.tier;
         const tierConfig = options.tierConfig ?? TIER_CONFIG;
-        const ipHash = hashUsageIp(options.usage.clientIp, occurredAt);
-        const allowed = await checkAnalysisLimit(
-            { ipHash, tier, now: occurredAt, config: tierConfig },
-            { usage: options.usage.usageRepository }
+        const allowed = await checkAnalysisUsageAllowed(
+            usage,
+            tier,
+            occurredAt,
+            tierConfig
         );
         if (!allowed) {
             const limitError: SubmitNewsAnalysisLimitError = {
@@ -106,17 +124,31 @@ export async function submitNewsAnalysis(
         }
     }
 
-    // ── 3. Hash input → build cache key → check cache ──
+    // ── 3. Load skills, hash (news + skills) → build cache key → check cache ──
+    // Skills are loaded BEFORE hashing so that a skill change (add/remove/edit
+    // content) invalidates the cached analysis — otherwise the same news set
+    // would keep returning the previous result for the full 24h TTL.
+    const { skills, skillsDegraded } = await loadSkillsCached();
     const newsIds = news.map(n => n.id);
     const earningsDates = upcomingCalendar.map(c => c.earningsDate);
-    const inputHash = hashNewsInput(newsIds, earningsDates);
+    const inputHash = hashNewsInput(newsIds, earningsDates, skills);
     const cacheKey = buildNewsCacheKey(symbol, modelId, inputHash);
     const cache = createCacheProvider();
 
     if (cache !== null) {
         try {
             const cached = await cache.get<NewsAnalysisResponse>(cacheKey);
-            if (cached !== null) {
+            // Lightweight structural validation — schema drift from a prior
+            // release should fall through as a cache miss rather than poison
+            // the response. The schema-version prefix on the cache key is the
+            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
+            // check is a belt-and-braces fallback.
+            if (
+                cached !== null &&
+                typeof cached === 'object' &&
+                'overallSentiment' in cached
+            ) {
+                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result: cached };
             }
         } catch (error) {
@@ -124,9 +156,7 @@ export async function submitNewsAnalysis(
         }
     }
 
-    // ── 4. Load skills (best-effort, cached), build prompt, enqueue job, fire-and-forget ──
-    const { skills, skillsDegraded } = await loadSkillsCached();
-
+    // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildNewsAnalysisPrompt(
         symbol,
@@ -155,6 +185,8 @@ export async function submitNewsAnalysis(
         console.error('[submitNewsAnalysis] Worker request failed:', error);
     });
     fireAndForget(dispatch, options);
+
+    await recordAnalysisUsageSafely(usage, modelId, occurredAt);
 
     return { status: 'submitted', jobId };
 }

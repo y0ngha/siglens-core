@@ -36,4 +36,18 @@ describe('getProviderForModel', () => {
             );
         });
     });
+
+    describe('unknown modelId', () => {
+        it('throws for a typo that does not match any recognized prefix', () => {
+            expect(() =>
+                getProviderForModel('glaude-haiku' as ModelId)
+            ).toThrow(/unknown modelId/);
+        });
+
+        it('throws for an empty string', () => {
+            expect(() => getProviderForModel('' as ModelId)).toThrow(
+                /unknown modelId/
+            );
+        });
+    });
 });

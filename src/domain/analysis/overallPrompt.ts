@@ -97,6 +97,48 @@ function formatTechnical(tech: AnalysisResponse): string {
         );
     }
 
+    // Condensed summaries of the remaining technical signal axes — keep one
+    // line per axis to stay inside the prompt token budget while still
+    // surfacing candle / strategy / trendline context that the LLM would
+    // otherwise lose when synthesising the overall verdict.
+    if (tech.candlePatterns.length > 0) {
+        const detected = tech.candlePatterns.filter(c => c.detected);
+        const latest =
+            detected.length > 0 ? detected[0] : tech.candlePatterns[0];
+        lines.push(
+            `- Candle Patterns: ${detected.length}/${tech.candlePatterns.length} detected; latest "${latest.patternName}" [${latest.trend}]`
+        );
+    }
+
+    if (tech.strategyResults.length > 0) {
+        const trendCounts = tech.strategyResults.reduce<Record<string, number>>(
+            (acc, s) => ({ ...acc, [s.trend]: (acc[s.trend] ?? 0) + 1 }),
+            {}
+        );
+        const breakdown = Object.entries(trendCounts)
+            .map(([trend, count]) => `${count} ${trend}`)
+            .join(', ');
+        lines.push(
+            `- Strategy Signals: ${tech.strategyResults.length} active (${breakdown})`
+        );
+    }
+
+    if (tech.trendlines.length > 0) {
+        const ascending = tech.trendlines.filter(
+            t => t.direction === 'ascending'
+        ).length;
+        const descending = tech.trendlines.length - ascending;
+        const dominant =
+            ascending > descending
+                ? 'ascending'
+                : descending > ascending
+                  ? 'descending'
+                  : 'mixed';
+        lines.push(
+            `- Trendlines: ${tech.trendlines.length} (dominant: ${dominant})`
+        );
+    }
+
     return lines.join('\n');
 }
 

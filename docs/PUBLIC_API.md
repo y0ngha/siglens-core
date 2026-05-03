@@ -322,7 +322,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 새로 추가된 도메인 타입:
 - `CurrentAnalysisContext` — 챗봇 시스템 프롬프트에 주입되는 현재 분석 컨텍스트 tagged union (Task 1.17).
-- 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalSnapshot`, `FundamentalProfile`, `FundamentalValuation`, `FundamentalSectorAverages`, `FundamentalPeer`, `FundamentalProfitability`, `FundamentalGrowth`, `FundamentalHealth`, `FundamentalFutureDirection`, `GradesConsensus`, `GradesEvent`, `GradesAction`, `PriceTargetConsensus`, `PriceTargetSummary`, `FundamentalSectorDirection`, `SectorHistoricalPoint`.
+- 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalSnapshot`, `FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalProfitability`, `FundamentalGrowth`, `FundamentalHealth`, `FundamentalFutureDirection`, `GradesConsensus`, `GradesEvent`, `GradesAction`, `PriceTargetConsensus`, `PriceTargetSummary`, `FundamentalSectorDirection`, `SectorHistoricalPoint`.
 - 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
 - 종합: `OverallAnalysisResponse`, `OverallScenario`, `OverallScenarioName`.
 

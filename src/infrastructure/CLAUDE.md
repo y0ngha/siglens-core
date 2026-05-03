@@ -11,14 +11,18 @@ Each sub-directory corresponds to exactly **one** external system:
 
 | Sub-directory | External system |
 |---|---|
-| `ai/` | AI provider clients (Claude, Gemini) |
-| `cache/` | Upstash Redis — TTL-based cache |
-| `fmp/` | Financial Modeling Prep market data API |
-| `jobs/` | Redis-based job queue (enqueue / dequeue / status) |
-| `market/` | Market data provider abstraction |
+| `ai/` | AI provider client interface (Claude, Gemini, OpenAI) |
+| `cache/` | Upstash Redis — TTL-based cache + cache-key builders |
+| `chat/` | Chat token store (Upstash Redis-backed daily token bucket) |
+| `db/` | Persistence interfaces (Neon / PostgreSQL — usage logs, user tier) |
+| `fmp/` | Financial Modeling Prep market data API config + types |
+| `fundamental/` | Fundamental data provider interface (raw FMP shapes → domain) |
+| `hash/` | Deterministic input hashing helpers used in cache keys |
+| `jobs/` | Redis-based job queue (enqueue / dequeue / status / meta) |
+| `market/` | Market data provider abstraction (Alpaca / FMP adapters) |
+| `news/` | News provider interface (articles, earnings calendar, reports) |
 | `skills/` | Filesystem Skills loader (`skills/*.md` → `Skill[]`) |
-| `ticker/` | Ticker metadata persistence (Neon / PostgreSQL) |
-| `upstash/` | Upstash Redis client factory |
+| `upstash/` | Upstash Redis client factory + config |
 | `usage/` | Daily-salt IP hashing helper for cross-DB usage tracking |
 
 ## Dependency Rules

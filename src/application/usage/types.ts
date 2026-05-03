@@ -1,6 +1,38 @@
 import type { Tier, TierConfig } from '@/domain/types';
 import type { UsageRepository } from '@/infrastructure/db';
 
+/**
+ * Usage tracking and daily limit options shared by every analysis use-case
+ * (technical, fundamental, news, overall).
+ *
+ * Pass this once per request lifecycle. The owning use-case calls
+ * `checkAnalysisUsageAllowed` before doing any work and
+ * `recordAnalysisUsageSafely` after each path that should count toward the
+ * daily limit (cache hit or successful submit).
+ */
+export interface AnalysisUsageOptions {
+    /** Repository used to check today's count and record successful usage. */
+    usageRepository: UsageRepository;
+    /**
+     * Raw client IP address.
+     *
+     * - {@link checkAnalysisUsageAllowed} hashes this via `hashUsageIp` before
+     *   querying the usage repository — the limit-check path never reads or
+     *   stores the raw IP.
+     * - {@link recordAnalysisUsageSafely} forwards this value as-is to
+     *   `UsageRepository.recordUsage` (`ipAddress` field). Persistence
+     *   semantics (raw vs hashed storage) are owned by the repository
+     *   implementation; core does not assume either.
+     */
+    clientIp: string;
+    /** Authenticated user UUID, or null/undefined for anonymous usage. */
+    userId?: string | null;
+    /** Model/backend identifier stored in usage_logs.model_used. */
+    modelUsed?: string;
+    /** Clock injection for UTC-day tests. Defaults to infrastructure time. */
+    occurredAt?: Date;
+}
+
 /** Dependencies required by daily usage limit checks. */
 export interface UsageLimitDependencies {
     /** Repository that reads usage counts for a hashed IP. */

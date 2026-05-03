@@ -24,8 +24,9 @@ export interface JobMeta {
     /** U.S. equity ticker. */
     symbol: string;
     /**
-     * Bar resolution. Required for technical-analysis jobs; omitted for
-     * fundamental, news, and overall analysis jobs that are not timeframe-bound.
+     * Bar resolution. Required for technical-analysis jobs and overall
+     * analysis jobs (both are timeframe-bound). Omitted for fundamental and
+     * news analysis jobs that are not timeframe-bound.
      */
     timeframe?: Timeframe;
     /**
@@ -33,8 +34,10 @@ export interface JobMeta {
      * analysis ran with an empty skills list. Used by the worker / consumer
      * to surface a degraded warning.
      *
-     * Applies to all job types that load skills (technical, fundamental,
-     * news, and overall analysis jobs).
+     * Applies only to job types that load skills directly at submit time:
+     * technical, fundamental, and news analysis jobs. The overall analysis
+     * pipeline composes pre-computed axis results and does not load skills
+     * itself, so this field is not set on overall jobs.
      */
     skillsDegraded?: boolean;
     /** Last bar close — used as the reconciliation reference for SL/TP validation when the AI omits an entry price. */

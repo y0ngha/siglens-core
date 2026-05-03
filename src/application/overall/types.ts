@@ -3,6 +3,10 @@ import type { SubmitAnalysisOptions } from '@/application/market/types';
 import type { SubmitFundamentalAnalysisOptions } from '@/application/fundamental/types';
 import type { SubmitNewsAnalysisOptions } from '@/application/news/types';
 import type {
+    AnalysisLimitError,
+    AnalysisUsageOptions,
+} from '@/application/usage/types';
+import type {
     AnalysisResponse,
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -10,6 +14,8 @@ import type {
     ModelId,
     NewsAnalysisResponse,
     OverallAnalysisResponse,
+    Tier,
+    TierConfig,
     Timeframe,
 } from '@/domain/types';
 import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
@@ -40,9 +46,15 @@ export interface OverallDependencyInputs {
     fundamentalProvider: FundamentalDataProvider;
     /**
      * Enriched news items (already card-analyzed by flash-lite).
-     * Typed as `ReadonlyArray<EnrichedNewsItem>` to mirror `SubmitNewsAnalysisOptions.news`.
+     *
+     * Renamed from `news` to disambiguate from the per-axis options field
+     * (`news`, see below). Typed as `ReadonlyArray<EnrichedNewsItem>` to
+     * mirror `SubmitNewsAnalysisOptions.news`.
+     *
+     * Optional purely for backward compatibility — callers must supply
+     * either `newsItems` (preferred) or the `@deprecated` `news` array alias.
      */
-    news: ReadonlyArray<EnrichedNewsItem>;
+    newsItems?: ReadonlyArray<EnrichedNewsItem>;
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
     /**
@@ -53,7 +65,15 @@ export interface OverallDependencyInputs {
      * bars/indicators data it would otherwise need to fetch itself.
      *
      * Pass at minimum `{}` when no overrides are needed; `submitAnalysis`
-     * itself uses sensible defaults.
+     * itself uses sensible defaults. `force` and `fmpSymbol` are forwarded
+     * to `submitAnalysis`'s positional parameters of the same name.
+     *
+     * NOTE on `usage`: any `usage` set here is **dropped** by the resolver
+     * when the resolver is called from {@link submitOverallAnalysis} — usage
+     * tracking is owned at the overall layer to prevent triple-counting one
+     * overall call as three analyses. The field stays in the type for
+     * standalone resolver callers, but `submitOverallAnalysis` users should
+     * leave it unset.
      */
     technical: Pick<
         SubmitAnalysisOptions,
@@ -63,10 +83,17 @@ export interface OverallDependencyInputs {
         | 'modelId'
         | 'userApiKey'
         | 'waitUntil'
-    >;
+    > & {
+        /** Forwarded to `submitAnalysis(... , force, ...)`. Defaults to `false`. */
+        force?: boolean;
+        /** Forwarded to `submitAnalysis(... , fmpSymbol, ...)`. */
+        fmpSymbol?: string;
+    };
     /**
      * Options forwarded verbatim to `submitFundamentalAnalysis`.
      * Omit `symbol`, `modelId`, and `dataProvider` — those are derived from the top-level inputs.
+     *
+     * Same `usage`-drop rule applies as for `technical` — see above.
      */
     fundamental?: Pick<
         SubmitFundamentalAnalysisOptions,
@@ -75,6 +102,28 @@ export interface OverallDependencyInputs {
     /**
      * Options forwarded verbatim to `submitNewsAnalysis`.
      * Omit `symbol`, `modelId`, `news`, and `upcomingCalendar` — those are derived from the top-level inputs.
+     *
+     * Renamed from `newsOptions` for naming parity with `fundamental` and `technical`.
+     *
+     * Same `usage`-drop rule applies as for `technical` — see above.
+     *
+     * Backward-compat: this field also accepts `ReadonlyArray<EnrichedNewsItem>`,
+     * the legacy shape of the `news` *data* field (renamed to `newsItems`).
+     * The resolver disambiguates at runtime by checking `Array.isArray(news)`:
+     * - array → treated as enriched news items (legacy data alias)
+     * - object → treated as the new per-axis options
+     * Prefer the new fields (`newsItems` for data, `news` for options).
+     */
+    news?:
+        | Pick<
+              SubmitNewsAnalysisOptions,
+              'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+          >
+        | ReadonlyArray<EnrichedNewsItem>;
+    /**
+     * @deprecated Use `news` instead. Kept for one minor version for backward
+     *   compatibility with the previous field name. Will be removed in a
+     *   future minor release.
      */
     newsOptions?: Pick<
         SubmitNewsAnalysisOptions,
@@ -136,12 +185,40 @@ export type DependencyState =
 /**
  * Options controlling overall analysis submission behavior.
  *
- * Extends {@link OverallDependencyInputs} with background-task hooks.
- * The caller is responsible for constructing all three dependency-axis options
- * before invoking {@link submitOverallAnalysis}.
+ * Extends {@link OverallDependencyInputs} with background-task hooks plus an
+ * overall-scoped tier/usage gate. The caller is responsible for constructing
+ * all three dependency-axis options before invoking {@link submitOverallAnalysis}.
+ *
+ * Usage tracking is intentionally owned at this layer (not per axis): a
+ * single `submitOverallAnalysis` call must count as exactly one analysis,
+ * even though it dispatches three axis submits internally. The dependency
+ * resolver therefore drops any `usage` provided in `technical`/`fundamental`/
+ * `news` axis options when called from overall — see
+ * {@link resolveOverallDependencies}.
  */
 export interface SubmitOverallAnalysisOptions
-    extends OverallDependencyInputs, BackgroundTaskOptions {}
+    extends OverallDependencyInputs, BackgroundTaskOptions {
+    /**
+     * Resolved subscription tier. Required only when `usage` is also provided;
+     * omit before Phase 4 (siglens passes neither).
+     */
+    tier?: Tier;
+    /** Tier configuration override, mainly for tests and controlled rollouts. */
+    tierConfig?: TierConfig;
+    /**
+     * Optional usage tracking. When provided together with `tier`, the daily
+     * analysis limit is checked once before any axis submit, and one usage
+     * record is written on every path that returns a result (overall cache
+     * hit or successful overall submit). Pending-dependency and axis-error
+     * paths do not record.
+     */
+    usage?: AnalysisUsageOptions;
+    /**
+     * Reference timestamp for the overall-scoped limit check and usage record.
+     * Defaults to `usage?.occurredAt ?? new Date()`.
+     */
+    now?: Date;
+}
 
 /** The caller receives a cached overall analysis — no new job was created. */
 export interface SubmitOverallAnalysisCached {
@@ -183,6 +260,22 @@ export interface SubmitOverallAnalysisError {
 }
 
 /**
+ * Daily analysis limit was exceeded by the overall-scoped usage check.
+ * No axis submit was dispatched.
+ *
+ * Uses its own `status: 'limit_error'` discriminant (not `'error'`) so a
+ * consumer narrowing on `result.status === 'error'` keeps the existing
+ * `SubmitOverallAnalysisError` shape (with `axis` field) unaffected.
+ */
+export interface SubmitOverallAnalysisLimitError {
+    status: 'limit_error';
+    /** Machine-readable error code shared with per-axis usage limit errors. */
+    code: 'usage_limit_exceeded';
+    /** Structured limit error including the resolved tier. */
+    error: AnalysisLimitError;
+}
+
+/**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.
  *
  * - `cached` — a fresh analysis exists in the cache; result is embedded.
@@ -194,7 +287,8 @@ export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisCached
     | SubmitOverallAnalysisPendingDependencies
     | SubmitOverallAnalysisSubmitted
-    | SubmitOverallAnalysisError;
+    | SubmitOverallAnalysisError
+    | SubmitOverallAnalysisLimitError;
 
 // ─────────────────────────────────────────
 // Poll

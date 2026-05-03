@@ -592,3 +592,54 @@
 - Violation: FundamentalDataProvider returns Raw* types @internal but consumers must import them explicitly
 - Rule: MISTAKES.md API Usability — provider interface return types must be importable with clear intent
 - Context: Suggestion S-5; 13 provider methods return types changed from Raw* to Fundamental*Input aliases; provider interface now returns domain-neutral input shapes
+
+## [fix/post-210a423-comprehensive | 7-task comprehensive fix cycle | 2026-05-03]
+- Violation: Multiple public API type renames and @internal/public export contradictions across rounds
+- Rule: Public API consistency (MISTAKES.md Public API §3 + §8)
+- Context: Commits 2e08a08 (Task 1), 094b6ea (Task 3), 60bf52d (Task 6), 0e6096f (Task 7), 025c9fc (Task 7), plus PR #75 R8 — pattern repeated 5+ times: OverallDependencyInputs/News union variants missing exports, @internal tags contradicting re-exports, FundamentalProfileInput mktCap→marketCap rename without deprecation
+
+- Violation: Type assertions (`as` casts) lacking inline safety comments
+- Rule: TypeScript safety (MISTAKES.md TypeScript §7)
+- Context: Task 1 round 1 (OverallDependencyInputs as-cast), Task 7 round 1 (sentinel guard casts in normalize functions) — 3 instances across 2 commits; every cast must include comment explaining runtime guarantee
+
+- Violation: JSDoc statements contradict or mismatch actual implementation
+- Rule: Documentation Sync (MISTAKES.md Documentation Sync §3 + §4)
+- Context: Task 4 (cancel JSDoc @returns boolean lie, @example using wrong type, @param status discriminant mismatch), Task 6 (FUNDAMENTAL_CACHE_TTL claiming dynamic TTL that doesn't exist) — 4 instances across 2 commits; JSDoc must be verified against current code before approval
+
+- Violation: Guard and sentinel-check branches lack dedicated test coverage
+- Rule: Infrastructure/Domain test coverage (MISTAKES.md Tests §15 + Infrastructure §2)
+- Context: Task 2 (analysisUsage helper error paths), Task 7 round 1 (sentinel guard branches in 4 submit modules) — 5 branches across 2 commits; 100% coverage required including guard paths
+
+- Violation: Public function return type variants missing from src/index.ts or wrongly tagged @internal
+- Rule: Public API variant type exports (MISTAKES.md Public API §8)
+- Context: PR #75 R8 (SubmitFundamentalAnalysis/News/OverallAnalysis variants, OverallAxis type), Task 7 round 3 (14 Raw* types + 8 variant types) — 22+ type instances; all union variants used in public function returns must be exported without @internal
+
+## [PR #76 | fix/post-210a423-comprehensive | 2026-05-03]
+- Violation: FundamentalProfileInput public type alias removed without @deprecated alias retention
+- Rule: MISTAKES.md Public API §3 — Tier 4 type rename/deletion requires @deprecated alias for one minor version OR major semver bump
+- Context: Blocker B1 — alias was added in c7b77d2 (PR #75 R8 S-2) and exported in src/index.ts; restored as @deprecated FundamentalProfile alias in domain/types.ts plus re-export in both index files
+
+- Violation: SubmitOverallAnalysisLimitError shares status:'error' discriminant with SubmitOverallAnalysisError (which has axis field)
+- Rule: TypeScript discriminated union — narrowing by status must yield a single shape
+- Context: Blocker B2 — consumers narrowing on result.status==='error' to access .axis broke after limit-error variant was added; fixed by giving limit error its own status:'limit_error' discriminant
+
+- Violation: FundamentalDataProvider.getGrades public method removed without @deprecated retention
+- Rule: MISTAKES.md Public API §3 — interface public method removal requires deprecation alias OR major semver bump
+- Context: Blocker B3 — restored as optional getGrades?(...) with @deprecated JSDoc; consumers may omit implementation now (optional) but call sites that referenced it keep compiling
+
+- Violation: let + .catch() mutation pattern in pollAnalysis skill loading
+- Rule: MISTAKES.md Coding Paradigm §12 — replace let+if/catch reassignment with const expressions or .then().catch() chaining
+- Context: Blocker B4 — `let pollSkillsDegraded = false; ... .catch(() => { pollSkillsDegraded = true; ... })` rewritten as single .then().catch() returning {skills, skillsDegraded} object
+
+- Violation: reduce accumulator mutated directly via property assignment
+- Rule: CONVENTIONS.md Functional Programming — reduce accumulators must be replaced via spread, not mutated
+- Context: Suggestion S1 — overallPrompt.formatTechnical trendCounts reduce now returns {...acc, [s.trend]: ...+1} instead of acc[s.trend]=...
+
+- Violation: JSDoc claim "never stored" contradicts actual recordUsage forwarding behavior
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime behavior
+- Context: Suggestion S2 — AnalysisUsageOptions.clientIp JSDoc clarifies that checkAnalysisUsageAllowed hashes via hashUsageIp but recordAnalysisUsageSafely forwards raw IP to repository.recordUsage; persistence semantics owned by repository implementation
+
+- Violation: Explicit parameter type annotation on Array.prototype.find callback when type inference would suffice
+- Rule: CONVENTIONS.md Type Inference — prefer inference for callback parameters when surrounding code has sufficient type context
+- Context: Inline gemini-bot comment — submitFundamentalAnalysis sectorSnapshot.find callback reverted from explicit (s: FundamentalSectorPerformanceInput) to inferred parameter; FundamentalSectorPerformanceInput import dropped
+

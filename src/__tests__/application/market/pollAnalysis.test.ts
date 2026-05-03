@@ -232,6 +232,49 @@ describe('pollAnalysis 함수는', () => {
             consoleSpy.mockRestore();
         });
 
+        it('poll-time 스킬 로딩이 실패하면 캐시 본문에 skillsDegraded: true 가 부착된다', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            // submit-time 메타는 skillsDegraded: false 였더라도 poll-time 결과로 덮어쓴다
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                skillsDegraded: false,
+            });
+            mockLoadSkills.mockRejectedValueOnce(new Error('poll-time fail'));
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            await pollAnalysis('job-poll-skills-fail');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'analysis:AAPL:1Day:gemini-2.5-flash',
+                expect.objectContaining({ skillsDegraded: true }),
+                3600
+            );
+            consoleSpy.mockRestore();
+        });
+
+        it('poll-time 스킬 로딩이 성공하면 submit-time skillsDegraded: true 라도 캐시 본문에는 false 가 부착된다', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                skillsDegraded: true,
+            });
+            // mockLoadSkills 는 beforeEach 에서 [] 를 반환 (성공 분기)
+
+            await pollAnalysis('job-poll-skills-ok');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'analysis:AAPL:1Day:gemini-2.5-flash',
+                expect.objectContaining({ skillsDegraded: false }),
+                3600
+            );
+        });
+
         it('cleanup을 호출한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawResult);
 

@@ -93,6 +93,27 @@ describe('submitNewsCardAnalysis 함수는', () => {
                 expect.stringContaining(testNewsItem.id)
             );
         });
+
+        it('캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
+            // Stale shape: missing the `sentiment` and `summaryKo` sentinel
+            // fields that the cache-hit guard requires. Submit must treat
+            // this as a miss and proceed with setJobMeta + fireAndForget.
+            const stalePoisonedCache = {
+                headlineKo: '오래된 형태',
+                someOldField: true,
+            };
+            mockCacheGet.mockResolvedValueOnce(stalePoisonedCache);
+
+            const result = await submitNewsCardAnalysis({ item: testNewsItem });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+                expect(result.jobId.length).toBeGreaterThan(0);
+            }
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
     });
 
     describe('캐시 미스일 때', () => {

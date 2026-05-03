@@ -49,7 +49,6 @@ const mockDataProvider = {
     getFinancialScores: vi.fn().mockResolvedValue(null),
     getStockPeers: vi.fn().mockResolvedValue([]),
     getAnalystEstimates: vi.fn().mockResolvedValue(null),
-    getGrades: vi.fn().mockResolvedValue([]),
     getGradesConsensus: vi.fn().mockResolvedValue(null),
     getPriceTargetConsensus: vi.fn().mockResolvedValue(null),
     getPriceTargetSummary: vi.fn().mockResolvedValue(null),
@@ -95,7 +94,6 @@ describe('submitFundamentalAnalysis 함수는', () => {
         mockDataProvider.getFinancialScores.mockResolvedValue(null);
         mockDataProvider.getStockPeers.mockResolvedValue([]);
         mockDataProvider.getAnalystEstimates.mockResolvedValue(null);
-        mockDataProvider.getGrades.mockResolvedValue([]);
         mockDataProvider.getGradesConsensus.mockResolvedValue(null);
         mockDataProvider.getPriceTargetConsensus.mockResolvedValue(null);
         mockDataProvider.getPriceTargetSummary.mockResolvedValue(null);
@@ -125,6 +123,42 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
+            // Stale shape: missing the `overallSentiment` sentinel field that the
+            // cache-hit guard requires. Submit must treat this as a miss and
+            // proceed with the full submit flow (setJobMeta + fireAndForget).
+            const stalePoisonedCache = {
+                overallConclusionKo: 'old shape',
+                someOtherField: true,
+            };
+            mockCacheGet.mockResolvedValueOnce(stalePoisonedCache);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+                expect(result.jobId.length).toBeGreaterThan(0);
+            }
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+            expect(recordUsage).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -217,11 +251,21 @@ describe('submitFundamentalAnalysis 함수는', () => {
             mockDataProvider.getProfile.mockRejectedValueOnce(
                 new Error('FMP API error')
             );
+            const recordUsage = vi.fn();
 
             const result = await submitFundamentalAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-flash',
                 dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
             });
 
             expect(result.status).toBe('error');
@@ -230,11 +274,116 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
+            expect(recordUsage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('usage 기록(recordUsage)이', () => {
+        beforeEach(() => {
+            // Reset the cache-get queue so prior describes don't leak values.
+            mockCacheGet.mockReset();
+        });
+
+        it('cached 경로에서 정확히 1회 호출된다 (모델/IP 전달 포함)', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockCachedResult);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+            expect(recordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'analysis',
+                    ipAddress: '203.0.113.10',
+                    modelUsed: 'gemini-2.5-flash',
+                })
+            );
+        });
+
+        it('submitted 경로에서 정확히 1회 호출된다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+        });
+
+        it('usage 미제공 시 한도 검사 없이 정상 제출된다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(result.jobId).toEqual(expect.any(String));
+            }
+        });
+
+        it('FundamentalAnalysisUsageOptions 별칭(@deprecated)도 동일하게 동작한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+            // Imported as a type alias of AnalysisUsageOptions — same shape at runtime.
+            const usage = {
+                usageRepository: {
+                    recordUsage,
+                    getUsageToday: vi
+                        .fn()
+                        .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                },
+                clientIp: '203.0.113.10',
+                userId: 'user-abc',
+                modelUsed: 'override-model',
+            };
+
+            await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage,
+            });
+
+            expect(recordUsage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'user-abc',
+                    modelUsed: 'override-model',
+                })
+            );
         });
     });
 
     describe('사용량 제한이 적용될 때', () => {
         it('tier와 usage가 제공되고 한도 초과 시 error 상태를 반환한다', async () => {
+            const recordUsage = vi.fn();
             // TierConfig with restrictions enabled and analysisPerDay limit of 1 for free tier.
             const restrictedTierConfig = {
                 limits: {
@@ -271,7 +420,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
                 tierConfig: restrictedTierConfig,
                 usage: {
                     usageRepository: {
-                        recordUsage: vi.fn(),
+                        recordUsage,
                         // Returns analysis count already at the limit (1 >= 1)
                         getUsageToday: vi
                             .fn()
@@ -287,6 +436,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
                 expect(result.code).toBe('usage_limit_exceeded');
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(recordUsage).not.toHaveBeenCalled();
         });
     });
 });

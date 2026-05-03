@@ -92,10 +92,13 @@ and have been removed from this file.
     → Never suppress warnings with eslint-disable-next-line or inline comments
     → Always restructure the code to fix the actual issue
 
-12. Using let + if for conditional assignment instead of declarative const expressions
+12. Using let + if/catch for conditional assignment instead of declarative const expressions
     → Prefer ternary/conditional expressions (const) over imperative reassignment (let)
+    → Applies to both if-reassignment and .catch() handler reassignment patterns
     ❌ let result = value; if (condition) result = newValue; return result;
+    ❌ let skillsDegraded = false; loadSkills().catch(() => { skillsDegraded = true; });
     ✅ const result = condition ? newValue : value; return result;
+    ✅ const { skills, skillsDegraded } = await loadSkills().then(s => ({ skills: s, skillsDegraded: false })).catch(() => ({ skills: [], skillsDegraded: true }));
 
 13. Hardcoded literals in function names or calculations
     → All magic numbers and constant values must be extracted to module-level constants
@@ -191,6 +194,9 @@ and have been removed from this file.
    → When tests and implementation show a field is optional, update interface to `fieldName?`
    ❌ interface Bars { bars: BarData[] }  // but implementation checks bars ?? []
    ✅ interface Bars { bars?: BarData[] }  // interface reflects runtime reality
+   → Recurring mistake (fix/post-210a423 PR #75 R8): JSDoc field descriptions contradict actual type optionality.
+      When a field is optional (?), JSDoc must use conditional language ("Must be provided when...") not "Required".
+      Verified: Task 4 @param status discriminant mismatch, Task 6 FUNDAMENTAL_CACHE_TTL claims vs actual code.
 
 5. Inline type annotations used instead of named type aliases
    → Extract repeated or reusable type patterns to named type aliases
@@ -219,12 +225,24 @@ and have been removed from this file.
    ❌ const x = someString as SpecificLiteral;   // string may not satisfy the union at runtime
    ✅ // Object.keys widens to string[], but SKILL_STAT_CONFIG: Record<SkillType, …> guarantees keys
       const SKILL_TYPES = Object.keys(SKILL_STAT_CONFIG) as SkillType[];  // TS limitation, not runtime risk
-   → Mandatory: every safe-cast `as` must be accompanied by a comment explaining the guarantee.
+   → Mandatory: every safe-cast `as` must be accompanied by a comment explaining TWO elements:
+      (a) WHY the cast exists (the narrowing/structural guarantee)
+      (b) WHY it's safe at runtime (the runtime invariant that TS cannot express)
+   ❌ newsField as NewsAxisOptions  // comment only states "suppress TS error" without explaining runtime guarantee
+   ✅ // Array.isArray(newsField) narrowed to object branch; TS cannot auto-narrow object literal type,
+      //  but structural match with NewsAxisOptions is guaranteed
+      newsField as NewsAxisOptions
+   ❌ inputs as { newsOptions?: NewsAxisOptions }  // comment explains intent (suppress deprecation) but not safety
+   ✅ // Property spread from validated inputs; newsOptions when present is structurally identical to NewsAxisOptions
+      inputs as { newsOptions?: NewsAxisOptions }
    ⚠️  Test file exception: `as` casts in `*.test.ts` files (e.g. test stubs typed with
       `as unknown as SomeType`, `vi.fn() as Mock<...>`) do NOT require a comment.
       Test stubs intentionally implement only the subset of an interface exercised by the test;
       adding a comment to every stub cast adds noise without safety value.
       ✅ `}) as unknown as Dirent;` — no comment needed in test files
+   → Recurring mistake (fix/post-210a423 Tasks 1, 7, PR #76 R2): as-casts without accompanying safety comment,
+      especially in guard branches (normalize*.ts sentinel checks, dependency resolver type narrowing).
+      Review every `as` during code review to ensure inline explanation is present covering BOTH intent AND runtime guarantee.
 
 8. Sibling types in the same error/result shape follow inconsistent declaration patterns
    → When multiple related type fields appear in the same interface, they must all use the same strategy (domain alias or inline literal)
@@ -237,6 +255,11 @@ and have been removed from this file.
    ❌ { ok: false; error: ChatErrorCode | ChatUsageLimitError }  // error field accepts both; callers must typeof-guard
    ✅ Split into separate union branches:
       { ok: false; error: ChatErrorCode } | { ok: false; error: ChatUsageLimitError }
+   → Discriminator field values must be distinct across all union variants — colliding discriminants break type narrowing
+   ❌ type Result = { status: 'error'; message: string; axis?: string } | { status: 'error'; limitError: true }
+      // Both variants share status:'error'; result.status==='error' yields union, not single type
+   ✅ type Result = { status: 'error'; message: string; axis: OverallAxis } | { status: 'limit_error'; limitError: true }
+      // Each variant has unique status discriminant; narrowing resolves to single type (PR #76 B2)
 
 9. Complex type inference chains instead of importing direct types
    → When a function's return type can be expressed as an imported concrete type, prefer direct import over inference chains
@@ -304,8 +327,15 @@ and have been removed from this file.
 2. Infrastructure functions must have 100% branch coverage
    → All if/else, optional chaining (?.), nullish coalescing (??) paths tested
    → Test edge cases like subsecond boundaries, zero values, Math.max guard behavior
+   → Includes guard branches, sentinel-check paths, and throw branches that appear to be dead code in the main flow
    ❌ Math.max(1, Math.floor(diffMs / 1000)) guard that converts 0→1 untested
+   ❌ Sentinel guard checking `in` predicate or exception handler lacks dedicated test case
+   ❌ throw new Error(...) path when guard condition fails not covered by any test case
    ✅ Add test case: diffMs = 500ms covers the Math.max(1, 0) = 1 path
+   ✅ Sentinel guard paths: if (fieldName in object) return normalize(...) as SafeType; add test case triggering the guard
+   ✅ Throw paths: add test(..., () => { expect(fn()).toThrow(); }) for every error branch
+   → Recurring mistake (fix/post-210a423 Tasks 2, 7, PR #76 R2): Guard, sentinel, and throw branches skipped in test coverage,
+      causing surprise bugs when guard condition occurs in production (Task 2 error paths, Task 7 r1 sentinel checks, PR #76 B3 throw branch).
 
 3. No debug artifacts (console.log) in infrastructure files
    → Infrastructure functions are utilities; logging belongs in higher layers
@@ -397,6 +427,15 @@ and have been removed from this file.
     ✅ import { shouldShowAd } from '@/domain/ads'; test('shouldShowAd', () => { expect(shouldShowAd(mock)).toBe(true); })
     → Expected values from module exports must also be imported, not hardcoded
 
+13.5. Vacuous test assertions with no meaningful verification
+    → Every test must contain at least one meaningful assertion that exercises production logic
+    → Placeholder tests like `expect(true).toBe(true)` or `expect(fn).toBeDefined()` are dead and add no value
+    → Either delete the test or rewrite it to exercise the real behavior path being tested
+    ❌ test('usage 미제공 시', () => { expect(true).toBe(true); })  // placeholder, no actual assertion
+    ❌ test('result shape', () => { const result = submitAnalysis(...); expect(result).toBeDefined(); })  // trivial
+    ✅ test('usage 미제공 시', () => { const result = submitAnalysis(input, { /* no usage */ }); expect(result.status).toBe('submitted'); expect(result.jobId).toMatch(/^[a-z0-9-]+$/); })
+    → Recurring mistake (PR #76 R2 S1): submitFundamentalAnalysis test was a stub with expect(true).toBe(true); rewritten to assert status and jobId shape
+
 14. Time-dependent functions in tests must be explicitly mocked
     → Functions using Date.now(), new Date() must be mocked (vi.useFakeTimers / vi.setSystemTime)
     → Hard-coded expected values (e.g., TTL seconds) without mocking time sources cause flaky tests
@@ -450,10 +489,17 @@ and have been removed from this file.
 4.5. Tier 2 and Tier 4 public functions/methods missing @param/@returns JSDoc
    → Tier 2 functions and Tier 4 interface methods require @param and @returns JSDoc tags
    → Per-method documentation is mandatory for public contracts; single-line description alone is insufficient
+   → JSDoc statements must match actual implementation behavior: @returns type, @param discriminants, @example usage must be verified against current code
    ❌ export function getProvider(id) { ... }  // only description, no @param/@returns
    ❌ interface UserRepository { getUserTier(userId) { ... } }  // no per-method JSDoc
+   ❌ /** @returns boolean */ export function cancel(jobId) { ... } // actually returns void or Promise<void>
+   ❌ /** @param status The job status ('processing'|'completed') */ when status is actually 'submitted' not 'processing'
    ✅ /** Get provider by ID. @param id The model provider identifier. @returns The provider spec. */ export function getProvider(id) { ... }
    ✅ interface UserRepository { /** Get user tier. @param userId The user ID. @returns The tier or null. */ getUserTier(userId); }
+   → Recurring mistake (fix/post-210a423 Task 4, Task 6): JSDoc claims diverge from actual implementation.
+      Task 4: cancel @returns boolean (actually void), @example using wrong type (pendingJobs as array), @param status 'processing' (actually 'submitted').
+      Task 6: FUNDAMENTAL_CACHE_TTL JSDoc claims dynamic TTL (hardcoded constant, no dynamic behavior).
+      Always verify @returns type, @param discriminants, and @example code against actual function before approval.
 
 5. JSDoc tags reference specific call-sites instead of describing timeless purpose
    → @internal, @param, @returns must describe the function's role independent of any caller
@@ -613,13 +659,23 @@ and have been removed from this file.
 3. Tier 4 interface/type rename or deletion without deprecated alias (major semver bump required)
    → Renaming or deleting Tier 4 public types and interface fields breaks existing consumers at compile time (major version bump)
    → Must provide deprecated alias or fallback to maintain backward compatibility
+   → When promoting Tier 4 types from one export status to another (@internal ↔ public), ensure consistency: types exported in src/index.ts must NOT carry @internal JSDoc
    ❌ Rename RequestChatCompletionDependencies.callGemini → callAiProvider without @deprecated alias; consumers passing { callGemini: fn } silently fail
    ❌ Hard rename CallGeminiWithKeyFallbackOptions → CallAiProviderOptions without re-export; existing imports error at compile
    ❌ Delete TierModel union members without @deprecated; code depending on those literals breaks
+   ❌ Union variant types (SubmitFundamentalAnalysisCached, SubmitNewsAnalysisError) re-exported in src/index.ts but still tagged @internal; IDE autocomplete hides them
+   ❌ FundamentalProfileInput.mktCap renamed to marketCap without @deprecated alias; code using old field name breaks
+   ❌ FundamentalDataProvider.getGrades interface method removed without @deprecated retention (PR #76 B3)
    ✅ Keep old field with @deprecated JSDoc; implement fallback: const fn = deps.callAiProvider ?? deps.callGemini
    ✅ Export deprecated type alias: export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions
    ✅ Add deleted union members back with @deprecated tag; type checkers warn but code doesn't break
+   ✅ Mark removed interface methods as optional @deprecated; consumers may omit implementation but call sites keep compiling
+   ✅ Remove @internal from types that are re-exported in src/index.ts; @internal must not appear on public contract types
    → Also requires package.json version bump to 0.x.0 (major in 0.x semver) and CHANGELOG.md entry documenting BREAKING CHANGES
+   → Recurring (PR #76 B1+B3): Type removal without deprecation for both type aliases (FundamentalProfileInput) and interface methods (getGrades).
+      Pattern has appeared 3+ times across PR #75 R8, Task 1 R1, and PR #76; checkpoint needed in PR description template to verify
+      deprecation aliases before approval. Before marking types public, verify: (1) all variant types are exported, (2) @internal tags removed from exported types,
+      (3) old names preserved with @deprecated if renamed, (4) interface methods retained as optional @deprecated if removed.
 
 6.5. Internal implementation constants/types leaked to public API via src/index.ts
    → Library public API must export only symbols consumers actually use
@@ -648,12 +704,18 @@ and have been removed from this file.
    → When a public function returns a discriminated union (e.g. Result<Success | Error>), all variant types must be re-exported in src/index.ts
    → Union variants used as parameter or return types of public functions are themselves part of the public contract
    → Variant types must NOT carry @internal JSDoc if they are re-exported; @internal contradicts re-export visibility
+   → When a provider interface returns data types (Raw* or Fundamental*Input), consumers must be able to import those types explicitly for type annotations
    ❌ submitAnalysis returns SubmitAnalysisResult with variants (Cached|Submitted|LimitError), but only SubmitAnalysisResult exported; variants require explicit imports
    ❌ SubmitOverallAnalysisPending, SubmitOverallAnalysisError, OverallAxis used in public type but @internal + not exported
    ❌ Union variants re-exported in src/index.ts but still tagged /** @internal */ in source files — IDE hides them from autocomplete
+   ❌ FundamentalDataProvider.getIncomeStatement returns RawIncomeStatement @internal, but callers must type their variables — create domain-neutral IncomeStatementInput alias
    ✅ All union variants (SubmitFundamentalAnalysisCached|Submitted|LimitError|FetchError) explicitly exported from src/index.ts
    ✅ Variant types have no @internal tag if they are re-exported; keep @internal only for module-internal helpers
    ✅ Parameter/return types of public functions are public contracts; audit every public function's type signature and ensure all referenced types are exported
+   ✅ Provider interfaces return domain-neutral Input aliases (FundamentalProfileInput) not Raw* (@internal) types
+   → Recurring mistake (fix/post-210a423 PR #75 R8, Task 7 R3): 22+ union variant instances (14 Raw* types, 8 SubmitXxx variants, OverallAxis, usage option types).
+      Each submission or provider function round-trip misses variants or contradicts @internal status.
+      Process: (1) list all types in function signature, (2) verify each is exported from src/index.ts without @internal, (3) no aliases to internal types in public signatures.
 ```
 
 ---

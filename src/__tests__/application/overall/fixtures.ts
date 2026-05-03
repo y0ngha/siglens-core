@@ -45,7 +45,6 @@ export const minimalProvider: FundamentalDataProvider = {
     getFinancialScores: vi.fn(),
     getStockPeers: vi.fn(),
     getAnalystEstimates: vi.fn(),
-    getGrades: vi.fn(),
     getGradesConsensus: vi.fn(),
     getPriceTargetConsensus: vi.fn(),
     getPriceTargetSummary: vi.fn(),
