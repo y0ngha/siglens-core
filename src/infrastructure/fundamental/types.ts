@@ -187,7 +187,9 @@ export interface FundamentalDataProvider {
      * @param symbol - Ticker symbol.
      * @returns Domain-neutral valuation metrics, or `null` if unavailable.
      */
-    getKeyMetricsTtm(symbol: string): Promise<FundamentalValuationMetrics | null>;
+    getKeyMetricsTtm(
+        symbol: string
+    ): Promise<FundamentalValuationMetrics | null>;
 
     /**
      * Fetch TTM ratios (profitability margins, debt & current ratios).
@@ -203,7 +205,9 @@ export interface FundamentalDataProvider {
      * @param symbol - Ticker symbol.
      * @returns Domain-neutral cash flow input, or `null` if unavailable.
      */
-    getCashFlowStatement(symbol: string): Promise<FundamentalCashFlowInput | null>;
+    getCashFlowStatement(
+        symbol: string
+    ): Promise<FundamentalCashFlowInput | null>;
 
     /**
      * Fetch year-over-year income statement growth (revenue + EPS).
@@ -211,7 +215,9 @@ export interface FundamentalDataProvider {
      * @param symbol - Ticker symbol.
      * @returns Domain-neutral income growth input, or `null` if unavailable.
      */
-    getIncomeStatementGrowth(symbol: string): Promise<FundamentalGrowthInput | null>;
+    getIncomeStatementGrowth(
+        symbol: string
+    ): Promise<FundamentalGrowthInput | null>;
 
     /**
      * Fetch Altman Z-score and Piotroski F-score for the symbol.
@@ -219,7 +225,9 @@ export interface FundamentalDataProvider {
      * @param symbol - Ticker symbol.
      * @returns Domain-neutral financial scores input, or `null` if unavailable.
      */
-    getFinancialScores(symbol: string): Promise<FundamentalFinancialScoresInput | null>;
+    getFinancialScores(
+        symbol: string
+    ): Promise<FundamentalFinancialScoresInput | null>;
 
     /**
      * Fetch the peer list.
@@ -235,7 +243,9 @@ export interface FundamentalDataProvider {
      * @param symbol - Ticker symbol.
      * @returns Domain-neutral analyst estimate input, or `null` if unavailable.
      */
-    getAnalystEstimates(symbol: string): Promise<FundamentalAnalystEstimateInput | null>;
+    getAnalystEstimates(
+        symbol: string
+    ): Promise<FundamentalAnalystEstimateInput | null>;
 
     /**
      * Fetch the latest grading actions (analyst rating changes) for a symbol.
@@ -255,7 +265,9 @@ export interface FundamentalDataProvider {
      * @param symbol - Ticker symbol.
      * @returns Domain-neutral grades consensus input, or `null` if unavailable.
      */
-    getGradesConsensus(symbol: string): Promise<FundamentalGradesConsensusInput | null>;
+    getGradesConsensus(
+        symbol: string
+    ): Promise<FundamentalGradesConsensusInput | null>;
 
     /**
      * Fetch analyst price target consensus (high / low / median / mean).
@@ -284,7 +296,9 @@ export interface FundamentalDataProvider {
      * @param date - Trading date in `YYYY-MM-DD` format.
      * @returns Array of domain-neutral sector performance entries for that date.
      */
-    getSectorPerformanceSnapshot(date: string): Promise<FundamentalSectorPerformanceInput[]>;
+    getSectorPerformanceSnapshot(
+        date: string
+    ): Promise<FundamentalSectorPerformanceInput[]>;
 
     /**
      * Fetch historical daily sector performance for a given sector name.
