@@ -520,4 +520,70 @@ describe('resolveOverallDependencies 함수는', () => {
             );
         });
     });
+
+    describe('dropAxisUsage 옵션은', () => {
+        const fakeUsage = {
+            usageRepository: {
+                recordUsage: vi.fn(),
+                getUsageToday: vi.fn(),
+            },
+            clientIp: '203.0.113.10',
+        };
+
+        beforeEach(() => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+        });
+
+        it('true 일 때 세 축 모두 usage 옵션이 제거된 채로 전달된다', async () => {
+            await resolveOverallDependencies(
+                makeInputs({
+                    technical: { usage: fakeUsage },
+                    fundamental: { usage: fakeUsage },
+                    news: { usage: fakeUsage },
+                }),
+                { dropAxisUsage: true }
+            );
+
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[4];
+            expect(technicalOpts).not.toHaveProperty('usage');
+
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).not.toHaveProperty('usage');
+
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).not.toHaveProperty('usage');
+        });
+
+        it('기본값(false)일 때는 usage 가 그대로 각 축으로 전달된다', async () => {
+            await resolveOverallDependencies(
+                makeInputs({
+                    technical: { usage: fakeUsage },
+                    fundamental: { usage: fakeUsage },
+                    news: { usage: fakeUsage },
+                })
+            );
+
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[4];
+            expect(technicalOpts).toMatchObject({ usage: fakeUsage });
+
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).toMatchObject({ usage: fakeUsage });
+
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).toMatchObject({ usage: fakeUsage });
+        });
+    });
 });
