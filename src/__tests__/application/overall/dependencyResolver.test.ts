@@ -66,7 +66,7 @@ function makeInputs(
         timeframe: '1Day',
         modelId: 'gemini-2.5-flash',
         fundamentalProvider: minimalProvider,
-        news: [makeEnrichedNewsItem('n001')],
+        newsItems: [makeEnrichedNewsItem('n001')],
         upcomingCalendar: [makeCalendarItem('2026-07-25')],
         technical: {},
         ...overrides,
@@ -378,18 +378,145 @@ describe('resolveOverallDependencies 함수는', () => {
                 result: cachedNews,
             });
 
-            const news = [
+            const newsItems = [
                 makeEnrichedNewsItem('x1'),
                 makeEnrichedNewsItem('x2'),
             ];
             const upcomingCalendar = [makeCalendarItem('2026-08-01')];
 
             await resolveOverallDependencies(
-                makeInputs({ news, upcomingCalendar })
+                makeInputs({ newsItems, upcomingCalendar })
             );
 
             expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
-                expect.objectContaining({ news, upcomingCalendar })
+                expect.objectContaining({
+                    news: newsItems,
+                    upcomingCalendar,
+                })
+            );
+        });
+
+        it('technical.force 와 technical.fmpSymbol 이 submitAnalysis 의 위치 인자로 전달된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({
+                    technical: { force: true, fmpSymbol: 'AAPL.US' },
+                })
+            );
+
+            expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                true,
+                'AAPL.US',
+                expect.any(Object)
+            );
+        });
+
+        it('레거시 news (array) + newsOptions 필드도 후방호환으로 처리된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const legacyNews = [makeEnrichedNewsItem('legacy-1')];
+            const legacyNewsOptions = { tier: 'pro' as const };
+
+            // Build inputs without the new `newsItems` field — exercise the
+            // legacy `news` (array) + `newsOptions` aliases.
+            const baseline = makeInputs();
+            const { newsItems: _omit, ...rest } = baseline;
+            void _omit;
+            const legacyInputs = {
+                ...rest,
+                news: legacyNews,
+                newsOptions: legacyNewsOptions,
+            };
+
+            await resolveOverallDependencies(legacyInputs);
+
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    news: legacyNews,
+                    tier: 'pro',
+                })
+            );
+        });
+
+        it('신규 newsItems + news (options) 필드가 우선시된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const newItems = [makeEnrichedNewsItem('new-1')];
+            const newNewsOptions = { tier: 'free' as const };
+
+            await resolveOverallDependencies(
+                makeInputs({
+                    newsItems: newItems,
+                    news: newNewsOptions,
+                })
+            );
+
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    news: newItems,
+                    tier: 'free',
+                })
+            );
+        });
+
+        it('technical.force / fmpSymbol 미지정 시 기본 false / undefined 가 전달된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(makeInputs());
+
+            expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                false,
+                undefined,
+                expect.any(Object)
             );
         });
     });

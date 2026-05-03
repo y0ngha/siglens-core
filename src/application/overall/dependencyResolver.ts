@@ -49,18 +49,49 @@ export async function resolveOverallDependencies(
         timeframe,
         modelId,
         fundamentalProvider,
-        news,
+        newsItems: newsItemsInput,
         upcomingCalendar,
         technical: technicalOptions,
         fundamental: fundamentalOptions,
-        newsOptions,
+        news: newsField,
     } = inputs;
+    // Intentional read of @deprecated `newsOptions` for backward compatibility
+    // until the legacy field is removed in a future major version. Cast strips
+    // the @deprecated tag so we don't surface the deprecation warning at this
+    // intentional fallback site.
+    const newsOptionsLegacy = (
+        inputs as { newsOptions?: typeof inputs.news }
+    ).newsOptions;
+
+    // ── Backward-compat disambiguation for the renamed news fields ──
+    // Old API: `news` (data: EnrichedNewsItem[]) + `newsOptions` (axis options).
+    // New API: `newsItems` (data) + `news` (axis options).
+    // The new `news` field accepts either shape — disambiguated at runtime
+    // by Array.isArray to preserve callers using the legacy data alias.
+    const newsFieldIsArray = Array.isArray(newsField);
+    const resolvedNewsItems = newsItemsInput ?? (newsFieldIsArray ? newsField : undefined);
+    const resolvedNewsOptions = newsFieldIsArray
+        ? newsOptionsLegacy
+        : (newsField ?? newsOptionsLegacy);
+
+    if (resolvedNewsItems === undefined) {
+        throw new Error(
+            "OverallDependencyInputs: missing news items — supply 'newsItems' (preferred) or the legacy 'news' array."
+        );
+    }
+
+    // ── Extract technical positional overrides (force, fmpSymbol) ──
+    const {
+        force: technicalForce = false,
+        fmpSymbol: technicalFmpSymbol,
+        ...technicalRest
+    } = technicalOptions;
 
     // ── Kick off all three axes in parallel ──
     const [technicalResult, fundamentalResult, newsResult] = await Promise.all([
-        submitAnalysis(symbol, timeframe, false, undefined, {
-            ...technicalOptions,
-            modelId: technicalOptions.modelId ?? modelId,
+        submitAnalysis(symbol, timeframe, technicalForce, technicalFmpSymbol, {
+            ...technicalRest,
+            modelId: technicalRest.modelId ?? modelId,
         }),
         submitFundamentalAnalysis({
             symbol,
@@ -71,9 +102,9 @@ export async function resolveOverallDependencies(
         submitNewsAnalysis({
             symbol,
             modelId,
-            news,
+            news: resolvedNewsItems,
             upcomingCalendar,
-            ...newsOptions,
+            ...resolvedNewsOptions,
         }),
     ]);
 

@@ -40,9 +40,15 @@ export interface OverallDependencyInputs {
     fundamentalProvider: FundamentalDataProvider;
     /**
      * Enriched news items (already card-analyzed by flash-lite).
-     * Typed as `ReadonlyArray<EnrichedNewsItem>` to mirror `SubmitNewsAnalysisOptions.news`.
+     *
+     * Renamed from `news` to disambiguate from the per-axis options field
+     * (`news`, see below). Typed as `ReadonlyArray<EnrichedNewsItem>` to
+     * mirror `SubmitNewsAnalysisOptions.news`.
+     *
+     * Optional purely for backward compatibility — callers must supply
+     * either `newsItems` (preferred) or the `@deprecated` `news` array alias.
      */
-    news: ReadonlyArray<EnrichedNewsItem>;
+    newsItems?: ReadonlyArray<EnrichedNewsItem>;
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
     /**
@@ -53,7 +59,8 @@ export interface OverallDependencyInputs {
      * bars/indicators data it would otherwise need to fetch itself.
      *
      * Pass at minimum `{}` when no overrides are needed; `submitAnalysis`
-     * itself uses sensible defaults.
+     * itself uses sensible defaults. `force` and `fmpSymbol` are forwarded
+     * to `submitAnalysis`'s positional parameters of the same name.
      */
     technical: Pick<
         SubmitAnalysisOptions,
@@ -63,7 +70,12 @@ export interface OverallDependencyInputs {
         | 'modelId'
         | 'userApiKey'
         | 'waitUntil'
-    >;
+    > & {
+        /** Forwarded to `submitAnalysis(... , force, ...)`. Defaults to `false`. */
+        force?: boolean;
+        /** Forwarded to `submitAnalysis(... , fmpSymbol, ...)`. */
+        fmpSymbol?: string;
+    };
     /**
      * Options forwarded verbatim to `submitFundamentalAnalysis`.
      * Omit `symbol`, `modelId`, and `dataProvider` — those are derived from the top-level inputs.
@@ -75,6 +87,26 @@ export interface OverallDependencyInputs {
     /**
      * Options forwarded verbatim to `submitNewsAnalysis`.
      * Omit `symbol`, `modelId`, `news`, and `upcomingCalendar` — those are derived from the top-level inputs.
+     *
+     * Renamed from `newsOptions` for naming parity with `fundamental` and `technical`.
+     *
+     * Backward-compat: this field also accepts `ReadonlyArray<EnrichedNewsItem>`,
+     * the legacy shape of the `news` *data* field (renamed to `newsItems`).
+     * The resolver disambiguates at runtime by checking `Array.isArray(news)`:
+     * - array → treated as enriched news items (legacy data alias)
+     * - object → treated as the new per-axis options
+     * Prefer the new fields (`newsItems` for data, `news` for options).
+     */
+    news?:
+        | Pick<
+              SubmitNewsAnalysisOptions,
+              'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+          >
+        | ReadonlyArray<EnrichedNewsItem>;
+    /**
+     * @deprecated Use `news` instead. Kept for one minor version for backward
+     *   compatibility with the previous field name. Will be removed in a
+     *   future minor release.
      */
     newsOptions?: Pick<
         SubmitNewsAnalysisOptions,

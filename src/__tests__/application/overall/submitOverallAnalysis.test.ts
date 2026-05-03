@@ -89,7 +89,7 @@ function makeOptions(
         timeframe: '1Day',
         modelId: 'gemini-2.5-flash',
         fundamentalProvider: minimalProvider,
-        news: [makeEnrichedNewsItem('n001')],
+        newsItems: [makeEnrichedNewsItem('n001')],
         upcomingCalendar: [makeCalendarItem('2026-07-25')],
         technical: {},
         ...overrides,
@@ -227,7 +227,7 @@ describe('submitOverallAnalysis 함수는', () => {
             }
         });
 
-        it('캐시 미스 시 setJobMeta 를 호출한다', async () => {
+        it('캐시 미스 시 setJobMeta 를 호출한다 (timeframe 포함)', async () => {
             mockCacheGet.mockResolvedValue(null);
 
             await submitOverallAnalysis(makeOptions());
@@ -237,6 +237,7 @@ describe('submitOverallAnalysis 함수는', () => {
                 expect.any(String),
                 expect.objectContaining({
                     symbol: 'AAPL',
+                    timeframe: '1Day',
                     modelId: 'gemini-2.5-flash',
                 })
             );
@@ -265,6 +266,95 @@ describe('submitOverallAnalysis 함수는', () => {
             const result = await submitOverallAnalysis(makeOptions());
 
             expect(result.status).toBe('submitted');
+        });
+    });
+
+    describe('overall 캐시 키 안정성 (휘발성 필드 무시)', () => {
+        it('technical.analyzedAt 만 다르면 동일한 캐시 키로 조회된다', async () => {
+            // ── First call: technical has an analyzedAt timestamp ──
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: {
+                    ...cachedTechnical,
+                    analyzedAt: '2026-05-03T12:00:00.000Z',
+                },
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            // ── Second call: same content but different analyzedAt ──
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: {
+                    ...cachedTechnical,
+                    analyzedAt: '2026-05-03T13:30:00.000Z',
+                },
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).toBe(secondCacheKey);
+        });
+
+        it('technical.skillsDegraded 만 다르면 동일한 캐시 키로 조회된다', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: {
+                    ...cachedTechnical,
+                    // skillsDegraded는 public 타입에 없지만 pollAnalysis가 캐시 본문에 부착할 수 있음
+                    skillsDegraded: false,
+                } as typeof cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: {
+                    ...cachedTechnical,
+                    skillsDegraded: true,
+                } as typeof cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).toBe(secondCacheKey);
+        });
+
+        it('technical 본문(summary)이 달라지면 캐시 키가 달라진다', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: { ...cachedTechnical, summary: 'A' },
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: { ...cachedTechnical, summary: 'B' },
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).not.toBe(secondCacheKey);
         });
     });
 });

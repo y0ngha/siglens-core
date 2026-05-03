@@ -11,10 +11,33 @@ import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import type { OverallAnalysisResponse } from '@/domain/types';
+import type { AnalysisResponse, OverallAnalysisResponse } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+
+/**
+ * Strip volatile, write-time-only fields from a cached technical
+ * `AnalysisResponse` so the overall input hash stays stable across polls.
+ *
+ * `analyzedAt` is rewritten on every `pollAnalysis` call; `skillsDegraded`
+ * is a transient loader-health flag that is sometimes attached to the
+ * cached body. Neither belongs in the hashing surface.
+ */
+function stripVolatileTechnicalFields(
+    technical: AnalysisResponse
+): Omit<AnalysisResponse, 'analyzedAt'> {
+    // Cast widens the static AnalysisResponse type to include the runtime-only
+    // `skillsDegraded` field that pollAnalysis attaches before caching
+    // (see pollAnalysis.ts:134). Both volatile fields are then stripped via
+    // destructuring to avoid imperative mutation (no `delete`).
+    const {
+        analyzedAt: _analyzedAt,
+        skillsDegraded: _skillsDegraded,
+        ...rest
+    } = technical as AnalysisResponse & { skillsDegraded?: boolean };
+    return rest;
+}
 
 /**
  * Submit an overall (3-axis: technical + fundamental + news) analysis job.
@@ -72,8 +95,19 @@ export async function submitOverallAnalysis(
     }
 
     // ── 2. All three cached — hash combined inputs and check overall cache ──
+    // Strip volatile fields from each axis result before hashing so that
+    // re-polling a stable analysis produces the same overall cache key.
+    // - `analyzedAt` is set per poll on the technical axis (see pollAnalysis)
+    //   and would otherwise invalidate the overall cache on every poll.
+    // - `skillsDegraded` is a transient flag attached to the cached technical
+    //   result; it reflects loader health at write time, not analysis content.
+    const stableTechnical = stripVolatileTechnicalFields(deps.technical);
     const inputHash = hashAnalysisInput(
-        JSON.stringify({ t: deps.technical, f: deps.fundamental, n: deps.news })
+        JSON.stringify({
+            t: stableTechnical,
+            f: deps.fundamental,
+            n: deps.news,
+        })
     );
     const cacheKey = buildOverallCacheKey(
         symbol,
@@ -107,6 +141,7 @@ export async function submitOverallAnalysis(
 
     await setJobMeta(jobId, {
         symbol,
+        timeframe,
         modelId,
         cacheKey,
     });
