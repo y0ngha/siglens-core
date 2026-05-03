@@ -191,6 +191,9 @@ and have been removed from this file.
    → When tests and implementation show a field is optional, update interface to `fieldName?`
    ❌ interface Bars { bars: BarData[] }  // but implementation checks bars ?? []
    ✅ interface Bars { bars?: BarData[] }  // interface reflects runtime reality
+   → Recurring mistake (fix/post-210a423 PR #75 R8): JSDoc field descriptions contradict actual type optionality.
+      When a field is optional (?), JSDoc must use conditional language ("Must be provided when...") not "Required".
+      Verified: Task 4 @param status discriminant mismatch, Task 6 FUNDAMENTAL_CACHE_TTL claims vs actual code.
 
 5. Inline type annotations used instead of named type aliases
    → Extract repeated or reusable type patterns to named type aliases
@@ -225,6 +228,9 @@ and have been removed from this file.
       Test stubs intentionally implement only the subset of an interface exercised by the test;
       adding a comment to every stub cast adds noise without safety value.
       ✅ `}) as unknown as Dirent;` — no comment needed in test files
+   → Recurring mistake (fix/post-210a423 Tasks 1, 7): as-casts without accompanying safety comment,
+      especially in guard branches (normalize*.ts sentinel checks, dependency resolver type narrowing).
+      Review every `as` during code review to ensure inline explanation is present.
 
 8. Sibling types in the same error/result shape follow inconsistent declaration patterns
    → When multiple related type fields appear in the same interface, they must all use the same strategy (domain alias or inline literal)
@@ -304,8 +310,13 @@ and have been removed from this file.
 2. Infrastructure functions must have 100% branch coverage
    → All if/else, optional chaining (?.), nullish coalescing (??) paths tested
    → Test edge cases like subsecond boundaries, zero values, Math.max guard behavior
+   → Includes guard branches and sentinel-check paths that appear to be dead code in the main flow
    ❌ Math.max(1, Math.floor(diffMs / 1000)) guard that converts 0→1 untested
+   ❌ Sentinel guard checking `in` predicate or exception handler lacks dedicated test case
    ✅ Add test case: diffMs = 500ms covers the Math.max(1, 0) = 1 path
+   ✅ Sentinel guard paths: if (fieldName in object) return normalize(...) as SafeType; add test case triggering the guard
+   → Recurring mistake (fix/post-210a423 Tasks 2, 7): Guard and sentinel branches skipped in test coverage,
+      causing surprise bugs when guard condition occurs in production (Task 2 error paths, Task 7 r1 sentinel checks).
 
 3. No debug artifacts (console.log) in infrastructure files
    → Infrastructure functions are utilities; logging belongs in higher layers
@@ -450,10 +461,17 @@ and have been removed from this file.
 4.5. Tier 2 and Tier 4 public functions/methods missing @param/@returns JSDoc
    → Tier 2 functions and Tier 4 interface methods require @param and @returns JSDoc tags
    → Per-method documentation is mandatory for public contracts; single-line description alone is insufficient
+   → JSDoc statements must match actual implementation behavior: @returns type, @param discriminants, @example usage must be verified against current code
    ❌ export function getProvider(id) { ... }  // only description, no @param/@returns
    ❌ interface UserRepository { getUserTier(userId) { ... } }  // no per-method JSDoc
+   ❌ /** @returns boolean */ export function cancel(jobId) { ... } // actually returns void or Promise<void>
+   ❌ /** @param status The job status ('processing'|'completed') */ when status is actually 'submitted' not 'processing'
    ✅ /** Get provider by ID. @param id The model provider identifier. @returns The provider spec. */ export function getProvider(id) { ... }
    ✅ interface UserRepository { /** Get user tier. @param userId The user ID. @returns The tier or null. */ getUserTier(userId); }
+   → Recurring mistake (fix/post-210a423 Task 4, Task 6): JSDoc claims diverge from actual implementation.
+      Task 4: cancel @returns boolean (actually void), @example using wrong type (pendingJobs as array), @param status 'processing' (actually 'submitted').
+      Task 6: FUNDAMENTAL_CACHE_TTL JSDoc claims dynamic TTL (hardcoded constant, no dynamic behavior).
+      Always verify @returns type, @param discriminants, and @example code against actual function before approval.
 
 5. JSDoc tags reference specific call-sites instead of describing timeless purpose
    → @internal, @param, @returns must describe the function's role independent of any caller
@@ -613,13 +631,21 @@ and have been removed from this file.
 3. Tier 4 interface/type rename or deletion without deprecated alias (major semver bump required)
    → Renaming or deleting Tier 4 public types and interface fields breaks existing consumers at compile time (major version bump)
    → Must provide deprecated alias or fallback to maintain backward compatibility
+   → When promoting Tier 4 types from one export status to another (@internal ↔ public), ensure consistency: types exported in src/index.ts must NOT carry @internal JSDoc
    ❌ Rename RequestChatCompletionDependencies.callGemini → callAiProvider without @deprecated alias; consumers passing { callGemini: fn } silently fail
    ❌ Hard rename CallGeminiWithKeyFallbackOptions → CallAiProviderOptions without re-export; existing imports error at compile
    ❌ Delete TierModel union members without @deprecated; code depending on those literals breaks
+   ❌ Union variant types (SubmitFundamentalAnalysisCached, SubmitNewsAnalysisError) re-exported in src/index.ts but still tagged @internal; IDE autocomplete hides them
+   ❌ FundamentalProfileInput.mktCap renamed to marketCap without @deprecated alias; code using old field name breaks
    ✅ Keep old field with @deprecated JSDoc; implement fallback: const fn = deps.callAiProvider ?? deps.callGemini
    ✅ Export deprecated type alias: export type CallGeminiWithKeyFallbackOptions = CallAiProviderOptions
    ✅ Add deleted union members back with @deprecated tag; type checkers warn but code doesn't break
+   ✅ Remove @internal from types that are re-exported in src/index.ts; @internal must not appear on public contract types
    → Also requires package.json version bump to 0.x.0 (major in 0.x semver) and CHANGELOG.md entry documenting BREAKING CHANGES
+   → Recurring mistake (fix/post-210a423 Task 1 R1, Task 7 PR #75 R8): Type renames without deprecation (FundamentalProfileInput),
+      union variants missing from exports or wrongly tagged @internal (14 Raw* types, 8 SubmitXxx variants, OverallAxis).
+      Before marking types public, verify: (1) all variant types are exported, (2) @internal tags removed from exported types,
+      (3) old names preserved with @deprecated if renamed.
 
 6.5. Internal implementation constants/types leaked to public API via src/index.ts
    → Library public API must export only symbols consumers actually use
@@ -648,12 +674,18 @@ and have been removed from this file.
    → When a public function returns a discriminated union (e.g. Result<Success | Error>), all variant types must be re-exported in src/index.ts
    → Union variants used as parameter or return types of public functions are themselves part of the public contract
    → Variant types must NOT carry @internal JSDoc if they are re-exported; @internal contradicts re-export visibility
+   → When a provider interface returns data types (Raw* or Fundamental*Input), consumers must be able to import those types explicitly for type annotations
    ❌ submitAnalysis returns SubmitAnalysisResult with variants (Cached|Submitted|LimitError), but only SubmitAnalysisResult exported; variants require explicit imports
    ❌ SubmitOverallAnalysisPending, SubmitOverallAnalysisError, OverallAxis used in public type but @internal + not exported
    ❌ Union variants re-exported in src/index.ts but still tagged /** @internal */ in source files — IDE hides them from autocomplete
+   ❌ FundamentalDataProvider.getIncomeStatement returns RawIncomeStatement @internal, but callers must type their variables — create domain-neutral IncomeStatementInput alias
    ✅ All union variants (SubmitFundamentalAnalysisCached|Submitted|LimitError|FetchError) explicitly exported from src/index.ts
    ✅ Variant types have no @internal tag if they are re-exported; keep @internal only for module-internal helpers
    ✅ Parameter/return types of public functions are public contracts; audit every public function's type signature and ensure all referenced types are exported
+   ✅ Provider interfaces return domain-neutral Input aliases (FundamentalProfileInput) not Raw* (@internal) types
+   → Recurring mistake (fix/post-210a423 PR #75 R8, Task 7 R3): 22+ union variant instances (14 Raw* types, 8 SubmitXxx variants, OverallAxis, usage option types).
+      Each submission or provider function round-trip misses variants or contradicts @internal status.
+      Process: (1) list all types in function signature, (2) verify each is exported from src/index.ts without @internal, (3) no aliases to internal types in public signatures.
 ```
 
 ---

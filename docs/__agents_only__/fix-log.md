@@ -592,3 +592,24 @@
 - Violation: FundamentalDataProvider returns Raw* types @internal but consumers must import them explicitly
 - Rule: MISTAKES.md API Usability — provider interface return types must be importable with clear intent
 - Context: Suggestion S-5; 13 provider methods return types changed from Raw* to Fundamental*Input aliases; provider interface now returns domain-neutral input shapes
+
+## [fix/post-210a423-comprehensive | 7-task comprehensive fix cycle | 2026-05-03]
+- Violation: Multiple public API type renames and @internal/public export contradictions across rounds
+- Rule: Public API consistency (MISTAKES.md Public API §3 + §8)
+- Context: Commits 2e08a08 (Task 1), 094b6ea (Task 3), 60bf52d (Task 6), 0e6096f (Task 7), 025c9fc (Task 7), plus PR #75 R8 — pattern repeated 5+ times: OverallDependencyInputs/News union variants missing exports, @internal tags contradicting re-exports, FundamentalProfileInput mktCap→marketCap rename without deprecation
+
+- Violation: Type assertions (`as` casts) lacking inline safety comments
+- Rule: TypeScript safety (MISTAKES.md TypeScript §7)
+- Context: Task 1 round 1 (OverallDependencyInputs as-cast), Task 7 round 1 (sentinel guard casts in normalize functions) — 3 instances across 2 commits; every cast must include comment explaining runtime guarantee
+
+- Violation: JSDoc statements contradict or mismatch actual implementation
+- Rule: Documentation Sync (MISTAKES.md Documentation Sync §3 + §4)
+- Context: Task 4 (cancel JSDoc @returns boolean lie, @example using wrong type, @param status discriminant mismatch), Task 6 (FUNDAMENTAL_CACHE_TTL claiming dynamic TTL that doesn't exist) — 4 instances across 2 commits; JSDoc must be verified against current code before approval
+
+- Violation: Guard and sentinel-check branches lack dedicated test coverage
+- Rule: Infrastructure/Domain test coverage (MISTAKES.md Tests §15 + Infrastructure §2)
+- Context: Task 2 (analysisUsage helper error paths), Task 7 round 1 (sentinel guard branches in 4 submit modules) — 5 branches across 2 commits; 100% coverage required including guard paths
+
+- Violation: Public function return type variants missing from src/index.ts or wrongly tagged @internal
+- Rule: Public API variant type exports (MISTAKES.md Public API §8)
+- Context: PR #75 R8 (SubmitFundamentalAnalysis/News/OverallAnalysis variants, OverallAxis type), Task 7 round 3 (14 Raw* types + 8 variant types) — 22+ type instances; all union variants used in public function returns must be exported without @internal
