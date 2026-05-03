@@ -16,7 +16,7 @@ import type { UsageRepository } from '@/infrastructure/db';
 // Submit News Analysis
 // ─────────────────────────────────────────
 
-/** @internal Usage tracking options for news analysis submissions. */
+/** Usage tracking options for news analysis submissions. */
 export interface NewsAnalysisUsageOptions {
     /** Repository used to check today's count and record successful usage. */
     usageRepository: UsageRepository;

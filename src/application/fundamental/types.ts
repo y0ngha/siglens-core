@@ -13,7 +13,7 @@ import type { UsageRepository } from '@/infrastructure/db';
 // Submit
 // ─────────────────────────────────────────
 
-/** @internal Usage tracking options for fundamental analysis submissions. */
+/** Usage tracking options for fundamental analysis submissions. */
 export interface FundamentalAnalysisUsageOptions {
     /** Repository used to check today's count and record successful usage. */
     usageRepository: UsageRepository;
