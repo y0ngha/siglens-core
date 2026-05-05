@@ -25,15 +25,15 @@ const DEFAULT_TOP_P = 0.95 as const;
  *
  * Notes:
  * - Claude `maxOutputTokens` follow Anthropic SDK 0.92.0 caps
- *   (haiku-3-5: 8K, sonnet-4-6 / opus-4-7: 128K).
+ *   (haiku-4-5: 8K, sonnet-4-6 / opus-4-7: 128K).
  * - All Gemini models share `maxOutputTokens: 65_536` per existing policy.
  * - GPT-5 series use 128K max output tokens.
  * - `thinkingBudget: 0` indicates the model does not support thinking.
  */
 export const MODEL_SPECS = {
-    'claude-haiku-3-5': {
+    'claude-haiku-4-5': {
         provider: 'claude',
-        apiModelId: 'claude-haiku-3-5-20251001',
+        apiModelId: 'claude-haiku-4-5-20251001',
         maxOutputTokens: 8_192,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,

@@ -17,7 +17,7 @@ import type { ActiveModelId } from '@/domain/types';
 describe('MODEL_SPECS', () => {
     it('covers every active model identifier exactly once', () => {
         const expected: readonly ActiveModelId[] = [
-            'claude-haiku-3-5',
+            'claude-haiku-4-5',
             'claude-sonnet-4-6',
             'claude-opus-4-7',
             'gemini-2.5-flash',
@@ -42,7 +42,7 @@ describe('MODEL_SPECS', () => {
     });
 
     it('keeps Claude max output tokens aligned with the SDK 0.92 caps', () => {
-        expect(MODEL_SPECS['claude-haiku-3-5'].maxOutputTokens).toBe(8_192);
+        expect(MODEL_SPECS['claude-haiku-4-5'].maxOutputTokens).toBe(8_192);
         expect(MODEL_SPECS['claude-sonnet-4-6'].maxOutputTokens).toBe(128_000);
         expect(MODEL_SPECS['claude-opus-4-7'].maxOutputTokens).toBe(128_000);
     });
@@ -64,7 +64,7 @@ describe('MODEL_SPECS', () => {
     });
 
     it('disables thinking budget for haiku and the GPT-5 series', () => {
-        expect(MODEL_SPECS['claude-haiku-3-5'].thinkingBudget).toBe(0);
+        expect(MODEL_SPECS['claude-haiku-4-5'].thinkingBudget).toBe(0);
         expect(MODEL_SPECS['gpt-5-mini'].thinkingBudget).toBe(0);
         expect(MODEL_SPECS['gpt-5.4'].thinkingBudget).toBe(0);
         expect(MODEL_SPECS['gpt-5.5'].thinkingBudget).toBe(0);
@@ -91,7 +91,7 @@ describe('MODEL_SPECS', () => {
 
 describe('getProvider', () => {
     it('routes Claude models to the claude provider', () => {
-        expect(getProvider('claude-haiku-3-5')).toBe('claude');
+        expect(getProvider('claude-haiku-4-5')).toBe('claude');
         expect(getProvider('claude-sonnet-4-6')).toBe('claude');
         expect(getProvider('claude-opus-4-7')).toBe('claude');
     });
@@ -116,7 +116,7 @@ describe('provider type guards', () => {
 
     it('isGeminiModel matches only Gemini entries', () => {
         expect(isGeminiModel('gemini-2.5-pro')).toBe(true);
-        expect(isGeminiModel('claude-haiku-3-5')).toBe(false);
+        expect(isGeminiModel('claude-haiku-4-5')).toBe(false);
         expect(isGeminiModel('gpt-5.4')).toBe(false);
     });
 

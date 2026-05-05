@@ -15,7 +15,7 @@ import {
 import type { ModelId, TierConfig } from '@/domain/types';
 
 const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
-    'claude-haiku-3-5',
+    'claude-haiku-4-5',
     'claude-opus-4-7',
     'claude-sonnet-4-6',
     'gemini-2.5-flash',
@@ -157,9 +157,9 @@ describe('tier', () => {
             ).toBe(false);
         });
 
-        it('allows free-tier models (claude-haiku-3-5, gpt-5-mini)', () => {
+        it('allows free-tier models (claude-haiku-4-5, gpt-5-mini)', () => {
             expect(
-                isModelAllowed('free', 'claude-haiku-3-5', restrictedConfig)
+                isModelAllowed('free', 'claude-haiku-4-5', restrictedConfig)
             ).toBe(true);
             expect(isModelAllowed('free', 'gpt-5-mini', restrictedConfig)).toBe(
                 true

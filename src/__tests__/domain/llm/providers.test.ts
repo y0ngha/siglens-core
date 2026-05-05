@@ -8,8 +8,8 @@ describe('getProviderForModel', () => {
             expect(getProviderForModel('gemini-2.5-flash')).toBe('google');
         });
 
-        it('returns anthropic for claude-haiku-3-5', () => {
-            expect(getProviderForModel('claude-haiku-3-5')).toBe('anthropic');
+        it('returns anthropic for claude-haiku-4-5', () => {
+            expect(getProviderForModel('claude-haiku-4-5')).toBe('anthropic');
         });
 
         it('returns openai for gpt-5-mini', () => {

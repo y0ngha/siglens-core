@@ -1144,8 +1144,8 @@ export interface ModelSpec {
     /**
      * Actual model identifier sent to the provider API.
      *
-     * May differ from the internal `ActiveModelId` key (e.g. `claude-haiku-3-5`
-     * maps to `claude-haiku-3-5-20251001` on the Anthropic API). SDK callers
+     * May differ from the internal `ActiveModelId` key (e.g. `claude-haiku-4-5`
+     * maps to `claude-haiku-4-5-20251001` on the Anthropic API). SDK callers
      * must use this value — never the raw `ActiveModelId` key — when building
      * the provider request payload.
      */
@@ -1154,7 +1154,7 @@ export interface ModelSpec {
     maxOutputTokens: number;
     /**
      * Initial thinking budget. `0` means the model does not support thinking
-     * (e.g. `claude-haiku-3-5`, GPT-5 series).
+     * (e.g. `claude-haiku-4-5`, GPT-5 series).
      */
     thinkingBudget: number;
     /** Sampling temperature. */
@@ -1170,7 +1170,7 @@ export type TierModel =
     | 'gemini-2.5-pro'
     | 'gemini-3-flash-preview'
     | 'gemini-3.1-pro-preview'
-    | 'claude-haiku-3-5'
+    | 'claude-haiku-4-5'
     | 'claude-sonnet-4-6'
     | 'claude-opus-4-7'
     | 'gpt-5-mini'

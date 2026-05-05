@@ -45,7 +45,7 @@ const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
 const FREE_MODELS: readonly TierModel[] = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
-    'claude-haiku-3-5',
+    'claude-haiku-4-5',
     'gpt-5-mini',
 ];
 const MEMBER_MODELS: readonly TierModel[] = [
