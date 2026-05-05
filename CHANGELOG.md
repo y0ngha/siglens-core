@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.8](https://github.com/y0ngha/siglens-core/compare/v0.7.7...v0.7.8) (2026-05-05)
+
+
+### Bug Fixes
+
+* apiKeys 오류 수정 및 로그 추가 ([2509c98](https://github.com/y0ngha/siglens-core/commit/2509c98c05a45d6a97c79b4d4c92431677317f34))
+
 ## [0.7.7](https://github.com/y0ngha/siglens-core/compare/v0.7.6...v0.7.7) (2026-05-05)
 
 ## [0.7.6](https://github.com/y0ngha/siglens-core/compare/v0.7.5...v0.7.6) (2026-05-05)
