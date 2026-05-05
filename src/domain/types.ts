@@ -1141,6 +1141,15 @@ export type AIProvider = 'claude' | 'gemini' | 'chatgpt';
 export interface ModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: AIProvider;
+    /**
+     * Actual model identifier sent to the provider API.
+     *
+     * May differ from the internal `ActiveModelId` key (e.g. `claude-haiku-3-5`
+     * maps to `claude-haiku-3-5-20251001` on the Anthropic API). SDK callers
+     * must use this value — never the raw `ActiveModelId` key — when building
+     * the provider request payload.
+     */
+    apiModelId: string;
     /** Provider-side max output tokens cap. */
     maxOutputTokens: number;
     /**

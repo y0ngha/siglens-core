@@ -33,6 +33,7 @@ const DEFAULT_TOP_P = 0.95 as const;
 export const MODEL_SPECS = {
     'claude-haiku-3-5': {
         provider: 'claude',
+        apiModelId: 'claude-haiku-3-5-20251001',
         maxOutputTokens: 8_192,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
@@ -40,6 +41,7 @@ export const MODEL_SPECS = {
     },
     'claude-sonnet-4-6': {
         provider: 'claude',
+        apiModelId: 'claude-sonnet-4-6',
         maxOutputTokens: 128_000,
         thinkingBudget: 32_000,
         temperature: DEFAULT_TEMPERATURE,
@@ -47,6 +49,7 @@ export const MODEL_SPECS = {
     },
     'claude-opus-4-7': {
         provider: 'claude',
+        apiModelId: 'claude-opus-4-7',
         maxOutputTokens: 128_000,
         thinkingBudget: 32_000,
         temperature: DEFAULT_TEMPERATURE,
@@ -54,6 +57,7 @@ export const MODEL_SPECS = {
     },
     'gemini-2.5-flash': {
         provider: 'gemini',
+        apiModelId: 'gemini-2.5-flash',
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
@@ -61,6 +65,7 @@ export const MODEL_SPECS = {
     },
     'gemini-2.5-flash-lite': {
         provider: 'gemini',
+        apiModelId: 'gemini-2.5-flash-lite',
         maxOutputTokens: 65_536,
         thinkingBudget: 24_576,
         temperature: DEFAULT_TEMPERATURE,
@@ -68,6 +73,7 @@ export const MODEL_SPECS = {
     },
     'gemini-2.5-pro': {
         provider: 'gemini',
+        apiModelId: 'gemini-2.5-pro',
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
@@ -75,6 +81,7 @@ export const MODEL_SPECS = {
     },
     'gemini-3-flash-preview': {
         provider: 'gemini',
+        apiModelId: 'gemini-3-flash-preview',
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
@@ -82,6 +89,7 @@ export const MODEL_SPECS = {
     },
     'gemini-3.1-pro-preview': {
         provider: 'gemini',
+        apiModelId: 'gemini-3.1-pro-preview',
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
@@ -89,6 +97,7 @@ export const MODEL_SPECS = {
     },
     'gpt-5-mini': {
         provider: 'chatgpt',
+        apiModelId: 'gpt-5-mini',
         maxOutputTokens: 128_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
@@ -96,6 +105,7 @@ export const MODEL_SPECS = {
     },
     'gpt-5.4': {
         provider: 'chatgpt',
+        apiModelId: 'gpt-5.4',
         maxOutputTokens: 128_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
@@ -103,6 +113,7 @@ export const MODEL_SPECS = {
     },
     'gpt-5.5': {
         provider: 'chatgpt',
+        apiModelId: 'gpt-5.5',
         maxOutputTokens: 128_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
