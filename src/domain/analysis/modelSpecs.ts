@@ -16,32 +16,31 @@ const DEFAULT_TEMPERATURE = 0 as const;
  * downstream callers pick it up automatically on upgrade.
  *
  * Notes:
- * - Claude `maxOutputTokens` follow Anthropic SDK 0.92.0 caps
- *   (haiku-4-5: 8K, sonnet-4-6 / opus-4-7: 128K).
- * - All Gemini models share `maxOutputTokens: 65_536` per existing policy.
- * - GPT-5 series use 128K max output tokens.
- * - `thinkingBudget: 0` indicates the model does not support thinking.
+ * - Claude haiku: thinking 미지원 (`thinkingBudget: 0`), temperature 사용.
+ * - Claude sonnet/opus: adaptive thinking (`effort`), `budget_tokens` deprecated.
+ * - Gemini: `thinkingBudget` 그대로 사용.
+ * - GPT-5 series: `effort`로 Responses API `reasoning.effort` 지정.
  */
 export const MODEL_SPECS = {
     'claude-haiku-4-5': {
         provider: 'claude',
         apiModelId: 'claude-haiku-4-5-20251001',
-        maxOutputTokens: 8_192,
+        maxOutputTokens: 64_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
     },
     'claude-sonnet-4-6': {
         provider: 'claude',
         apiModelId: 'claude-sonnet-4-6',
-        maxOutputTokens: 128_000,
-        thinkingBudget: 32_000,
+        maxOutputTokens: 64_000,
+        effort: 'medium',
         temperature: DEFAULT_TEMPERATURE,
     },
     'claude-opus-4-7': {
         provider: 'claude',
         apiModelId: 'claude-opus-4-7',
         maxOutputTokens: 128_000,
-        thinkingBudget: 32_000,
+        effort: 'medium',
         temperature: DEFAULT_TEMPERATURE,
     },
     'gemini-2.5-flash': {
@@ -83,21 +82,21 @@ export const MODEL_SPECS = {
         provider: 'chatgpt',
         apiModelId: 'gpt-5-mini',
         maxOutputTokens: 128_000,
-        thinkingBudget: 0,
+        effort: 'low',
         temperature: DEFAULT_TEMPERATURE,
     },
     'gpt-5.4': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.4',
         maxOutputTokens: 128_000,
-        thinkingBudget: 0,
+        effort: 'medium',
         temperature: DEFAULT_TEMPERATURE,
     },
     'gpt-5.5': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.5',
         maxOutputTokens: 128_000,
-        thinkingBudget: 0,
+        effort: 'medium',
         temperature: DEFAULT_TEMPERATURE,
     },
 } as const satisfies Record<ActiveModelId, ModelSpec>;

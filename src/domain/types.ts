@@ -1130,6 +1130,9 @@ export type TierInfoDepth =
 /** AI provider that hosts a model. */
 export type AIProvider = 'claude' | 'gemini' | 'chatgpt';
 
+/** Effort level shared by Claude adaptive thinking and ChatGPT reasoning. */
+export type EffortLevel = 'low' | 'medium' | 'high';
+
 /**
  * Per-model SDK call parameters.
  *
@@ -1153,10 +1156,17 @@ export interface ModelSpec {
     /** Provider-side max output tokens cap. */
     maxOutputTokens: number;
     /**
-     * Initial thinking budget. `0` means the model does not support thinking
-     * (e.g. `claude-haiku-4-5`, GPT-5 series).
+     * Thinking budget tokens. `0` = thinking not supported (haiku).
+     * Gemini models only — Claude/ChatGPT use `effort` instead.
      */
-    thinkingBudget: number;
+    thinkingBudget?: number;
+    /**
+     * Reasoning effort level.
+     * Claude Sonnet/Opus: adaptive thinking effort.
+     * ChatGPT: maps to `reasoning.effort` in the Responses API.
+     * Absent on models that don't support reasoning (haiku, Gemini).
+     */
+    effort?: EffortLevel;
     /** Sampling temperature. */
     temperature: number;
 }
@@ -1629,6 +1639,16 @@ export interface NewsItem {
     bodyEn: string | null;
 }
 
+/**
+ * Estimated magnitude of price impact for the named symbol.
+ *
+ * - `high`       — likely to move price by a material amount (earnings miss/beat, regulatory action, M&A announcement)
+ * - `medium`     — noticeable but contained impact (guidance update, analyst upgrade/downgrade)
+ * - `low`        — minor relevance, unlikely to drive meaningful movement
+ * - `negligible` — background noise; no actionable price implication
+ */
+export type NewsImpact = 'high' | 'medium' | 'low' | 'negligible';
+
 /** Per-card translation and sentiment result produced by the flash-lite model. */
 export interface NewsCardAnalysis {
     titleKo: string;
@@ -1636,6 +1656,8 @@ export interface NewsCardAnalysis {
     summaryKo: string; // single-line summary
     sentiment: NewsSentiment;
     category: NewsCategory;
+    /** Estimated magnitude of price impact for the named symbol. */
+    priceImpact: NewsImpact;
 }
 
 /**
