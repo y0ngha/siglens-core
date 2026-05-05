@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.10](https://github.com/y0ngha/siglens-core/compare/v0.7.9...v0.7.10) (2026-05-05)
+
+
+### Features
+
+* AI 뉴스 기능 개발 ([70510f5](https://github.com/y0ngha/siglens-core/commit/70510f50dc83238a73657e5526cbdfa15a3db832))
+* top_p 제거 ([e73e456](https://github.com/y0ngha/siglens-core/commit/e73e456f153859474ecb86d2cbc2e3e7b47e53c4))
+
 ## [0.7.9](https://github.com/y0ngha/siglens-core/compare/v0.7.8...v0.7.9) (2026-05-05)
 
 
