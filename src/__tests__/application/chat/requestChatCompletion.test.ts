@@ -236,8 +236,8 @@ describe('requestChatCompletion', () => {
         });
         expect(callAiProvider).toHaveBeenCalledWith(
             expect.objectContaining({
-                primaryApiKey: undefined,
-                fallbackApiKey: 'server-key',
+                userApiKey: undefined,
+                serverApiKey: 'server-key',
                 model: GEMINI_2_5_PRO_MODEL,
             })
         );
@@ -332,8 +332,8 @@ describe('requestChatCompletion', () => {
         );
         expect(callAiProvider).toHaveBeenCalledWith(
             expect.objectContaining({
-                primaryApiKey: undefined,
-                fallbackApiKey: 'user-key',
+                userApiKey: undefined,
+                serverApiKey: 'user-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 contents: [
                     {

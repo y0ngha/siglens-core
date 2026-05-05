@@ -17,10 +17,10 @@ export type AiContents = string | GeminiContent[];
 
 /** Options accepted by the AI provider call (currently Gemini; shape is provider-neutral). */
 export interface CallAiProviderOptions {
-    /** Primary key tried first; pass `undefined` to skip the primary attempt and go straight to fallback. */
-    primaryApiKey: string | undefined;
-    /** Fallback key used when the primary attempt fails. */
-    fallbackApiKey: string;
+    /** User-owned BYOK key. Pass `undefined` to use the server key exclusively. */
+    userApiKey: string | undefined;
+    /** Server-owned key used when no `userApiKey` is present, or for pro-tier requests. */
+    serverApiKey: string;
     /** Model identifier (e.g. `'gemini-2.5-flash'`, `'gpt-5.5'`, `'claude-opus-4-7'`). */
     model: string;
     /** Prompt contents — plain string or role-tagged turn list. */

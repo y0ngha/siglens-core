@@ -66,7 +66,7 @@ function toChatErrorResult(error: unknown): ChatActionResult {
  *   → `serverApiKey` is the sole key.  The caller guards ensure this is only
  *   reached when `serverApiKey` is present.
  *
- * All cases set `primary` to `undefined` so the provider never attempts a
+ * All cases set `userApiKey` to `undefined` so the provider never attempts a
  * two-key cascade; only a single key is used per request.
  *
  * @internal
@@ -75,16 +75,16 @@ function resolveApiKeys(
     params: { serverApiKey?: string; userApiKey?: string },
     tier: Tier
 ): {
-    primary: string | undefined;
-    fallback: string;
+    userApiKey: string | undefined;
+    serverApiKey: string;
 } {
     // Pro tier or no userApiKey: use server key exclusively.
     if (tier === 'pro' || params.userApiKey === undefined) {
         // Guards in `requestChatCompletion` ensure `serverApiKey` is defined here.
-        return { primary: undefined, fallback: params.serverApiKey! };
+        return { userApiKey: undefined, serverApiKey: params.serverApiKey! };
     }
     // Non-pro + user BYOK: use only the user's key.
-    return { primary: undefined, fallback: params.userApiKey };
+    return { userApiKey: undefined, serverApiKey: params.userApiKey };
 }
 
 function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
@@ -162,8 +162,8 @@ async function checkChatbotUsageAllowed(
 }
 
 async function requestAiChatCompletion(
-    primaryApiKey: string | undefined,
-    fallbackApiKey: string,
+    userApiKey: string | undefined,
+    serverApiKey: string,
     tokenStore: ChatTokenStore,
     callAiProvider: RequestChatCompletionDependencies['callAiProvider'],
     model: ModelId,
@@ -172,8 +172,8 @@ async function requestAiChatCompletion(
 ): Promise<ChatActionResult> {
     try {
         const message = await callAiProvider({
-            primaryApiKey,
-            fallbackApiKey,
+            userApiKey,
+            serverApiKey,
             model,
             contents: toAiContents(prompt),
             systemInstruction: prompt.systemPrompt,
@@ -320,12 +320,12 @@ export async function requestChatCompletion(
         params.currentAnalysisContext
     );
 
-    const { primary: effectivePrimaryKey, fallback: effectiveFallbackKey } =
+    const { userApiKey: effectiveUserApiKey, serverApiKey: effectiveServerApiKey } =
         resolveApiKeys(params, tierContext.tier);
 
     const aiResult = await requestAiChatCompletion(
-        effectivePrimaryKey,
-        effectiveFallbackKey,
+        effectiveUserApiKey,
+        effectiveServerApiKey,
         tokenStore,
         callAiProvider,
         model,
