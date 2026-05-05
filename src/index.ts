@@ -332,7 +332,12 @@ export {
     type ClaudeModelId,
     type GeminiModelId,
 } from './domain/analysis/modelSpecs';
-export type { ActiveModelId, AIProvider, EffortLevel, ModelSpec } from './domain/types';
+export type {
+    ActiveModelId,
+    AIProvider,
+    EffortLevel,
+    ModelSpec,
+} from './domain/types';
 
 // Dashboard tickers / sectors
 export {
