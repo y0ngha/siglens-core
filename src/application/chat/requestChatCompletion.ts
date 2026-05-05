@@ -251,6 +251,10 @@ export async function requestChatCompletion(
     params: RequestChatCompletionParams,
     dependencies: RequestChatCompletionDependencies
 ): Promise<ChatActionResult> {
+    if (!params.serverApiKey) {
+        return { ok: false, error: 'server_error' };
+    }
+
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
     const userApiKey = params.userApiKey;
     const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
@@ -263,19 +267,9 @@ export async function requestChatCompletion(
     const isPremium = isPremiumChatModel(model, tierConfig);
 
     if (!userApiKey) {
-        if (isPremium) {
-            if (tierContext.tier !== 'pro') {
-                return { ok: false, error: 'user_api_key_required' };
-            }
+        if (isPremium && tierContext.tier !== 'pro') {
+            return { ok: false, error: 'user_api_key_required' };
         }
-        // Free model (any tier) or pro tier + premium model: serverApiKey alone
-        // is sufficient — server covers the provider cost.
-        if (!params.serverApiKey) {
-            return { ok: false, error: 'server_error' };
-        }
-    } else if (tierContext.tier === 'pro' && !params.serverApiKey) {
-        // Pro tier always uses the server key; it must be present.
-        return { ok: false, error: 'server_error' };
     }
 
     if (!isModelAllowed(tierContext.tier, model, tierConfig)) {
