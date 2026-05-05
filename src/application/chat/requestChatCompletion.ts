@@ -60,11 +60,13 @@ function toChatErrorResult(error: unknown): ChatActionResult {
  *
  * Routing rules (enforced by caller-side guards in {@link requestChatCompletion}):
  * - Pro tier: server always covers the cost → `serverApiKey` is the sole key.
- * - Non-pro tier + user BYOK registered (`userApiKey`): user pays with their
- *   own key → `userApiKey` is the sole key.  Server key is not used.
- * - Non-pro tier + no `userApiKey` (free model or missing BYOK): server key
- *   → `serverApiKey` is the sole key.  The caller guards ensure this is only
- *   reached when `serverApiKey` is present.
+ * - Free model (any non-pro tier): server always covers the cost → `serverApiKey`
+ *   is the sole key. BYOK is not used even if registered.
+ * - Non-pro tier + premium model + user BYOK registered (`userApiKey`): user pays
+ *   with their own key → `userApiKey` is the sole key. Server key is not used.
+ * - Non-pro tier + premium model + no `userApiKey`: server key → `serverApiKey`
+ *   is the sole key. The caller guards ensure this is only reached when
+ *   `serverApiKey` is present.
  *
  * All cases set `userApiKey` to `undefined` so the provider never attempts a
  * two-key cascade; only a single key is used per request.
@@ -73,17 +75,18 @@ function toChatErrorResult(error: unknown): ChatActionResult {
  */
 function resolveApiKeys(
     params: { serverApiKey?: string; userApiKey?: string },
-    tier: Tier
+    tier: Tier,
+    isPremium: boolean
 ): {
     userApiKey: string | undefined;
     serverApiKey: string;
 } {
-    // Pro tier or no userApiKey: use server key exclusively.
-    if (tier === 'pro' || params.userApiKey === undefined) {
+    // Pro tier, free model, or no userApiKey: use server key exclusively.
+    if (tier === 'pro' || !isPremium || params.userApiKey === undefined) {
         // Guards in `requestChatCompletion` ensure `serverApiKey` is defined here.
         return { userApiKey: undefined, serverApiKey: params.serverApiKey! };
     }
-    // Non-pro + user BYOK: use only the user's key.
+    // Non-pro + premium model + user BYOK: use only the user's key.
     return { userApiKey: undefined, serverApiKey: params.userApiKey };
 }
 
@@ -171,6 +174,10 @@ async function requestAiChatCompletion(
     prompt: ChatPromptPayload
 ): Promise<ChatActionResult> {
     try {
+        console.debug('[requestAiChatCompletion] calling AI provider', {
+            model,
+            keyType: userApiKey !== undefined ? 'userApiKey' : 'serverApiKey',
+        });
         const message = await callAiProvider({
             userApiKey,
             serverApiKey,
@@ -184,6 +191,11 @@ async function requestAiChatCompletion(
         return { ok: true, message, remainingTokens };
     } catch (error) {
         const result = toChatErrorResult(error);
+        console.warn('[requestAiChatCompletion] callAiProvider failed', {
+            model,
+            errorCode: !result.ok ? result.error : undefined,
+            error,
+        });
         if (shouldRefundConsumedToken(result)) {
             await callSafely(() =>
                 tokenStore.refundConsumedToken(hashedClientId)
@@ -323,7 +335,7 @@ export async function requestChatCompletion(
     const {
         userApiKey: effectiveUserApiKey,
         serverApiKey: effectiveServerApiKey,
-    } = resolveApiKeys(params, tierContext.tier);
+    } = resolveApiKeys(params, tierContext.tier, isPremium);
 
     const aiResult = await requestAiChatCompletion(
         effectiveUserApiKey,

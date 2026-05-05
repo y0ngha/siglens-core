@@ -333,7 +333,7 @@ describe('requestChatCompletion', () => {
         expect(callAiProvider).toHaveBeenCalledWith(
             expect.objectContaining({
                 userApiKey: undefined,
-                serverApiKey: 'user-key',
+                serverApiKey: 'server-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 contents: [
                     {
