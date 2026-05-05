@@ -76,32 +76,35 @@ function isValidChatModel(model: ModelId, config?: TierConfig): boolean {
 }
 
 /**
- * Resolve the primary / fallback API key pair forwarded to the AI provider.
+ * Resolve the API key to forward to the AI provider.
  *
- * Routing matrix — see JSDoc on
- * {@link RequestChatCompletionParams.freeApiKey} for the full contract.
- * Caller-side guards in {@link requestChatCompletion} ensure the keys
- * required by each branch are present before this helper runs:
- * - When `paidApiKey` is absent, the call site has already enforced
- *   pro tier + premium model + present `freeApiKey`, so `freeApiKey`
- *   is the sole server-owned credential and is used as the fallback
- *   (primary is undefined so the provider does not attempt a separate
- *   primary call).
- * - When `paidApiKey` is present, `freeApiKey` is the primary credential
- *   (may be undefined for pro-tier requests that skip the primary call)
- *   and `paidApiKey` is the fallback.
+ * Routing rules (enforced by caller-side guards in {@link requestChatCompletion}):
+ * - Pro tier: server always covers the cost → `freeApiKey` is the sole key.
+ * - Non-pro tier + user BYOK registered (`paidApiKey`): user pays with their
+ *   own key → `paidApiKey` is the sole key.  Server key is not used.
+ * - Non-pro tier + no `paidApiKey` (free model or missing BYOK): server key
+ *   → `freeApiKey` is the sole key.  The caller guards ensure this is only
+ *   reached when `freeApiKey` is present.
+ *
+ * All cases set `primary` to `undefined` so the provider never attempts a
+ * two-key cascade; only a single key is used per request.
  *
  * @internal
  */
-function resolveApiKeys(params: { freeApiKey?: string; paidApiKey?: string }): {
+function resolveApiKeys(
+    params: { freeApiKey?: string; paidApiKey?: string },
+    tier: Tier
+): {
     primary: string | undefined;
     fallback: string;
 } {
-    if (params.paidApiKey === undefined) {
-        // Guard in `requestChatCompletion` ensures `freeApiKey` is defined here.
+    // Pro tier or no paidApiKey: use server key exclusively.
+    if (tier === 'pro' || params.paidApiKey === undefined) {
+        // Guards in `requestChatCompletion` ensure `freeApiKey` is defined here.
         return { primary: undefined, fallback: params.freeApiKey! };
     }
-    return { primary: params.freeApiKey, fallback: params.paidApiKey };
+    // Non-pro + user BYOK: use only the user's key.
+    return { primary: undefined, fallback: params.paidApiKey };
 }
 
 function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
@@ -221,14 +224,17 @@ async function requestAiChatCompletion(
  * AI provider payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
  *
- * **API key routing** (`freeApiKey` = server-owned key; `paidApiKey` = user-owned key):
- * - `'pro'`-tier users: the server uses `freeApiKey` for premium models
- *   without requiring a user-registered `paidApiKey`; the pro tier covers
- *   premium AI costs server-side. `freeApiKey` must be present → else `server_error`.
- * - Non-pro users: both `freeApiKey` and `paidApiKey` must be provided by the
- *   server. `freeApiKey` is the primary key; `paidApiKey` is the fallback.
- *   Requesting a premium model without `paidApiKey` returns
- *   `user_api_key_required` so the caller can prompt the user to register a key.
+ * **API key routing** (`freeApiKey` = server-owned key; `paidApiKey` = user-owned BYOK key):
+ * - Pro tier (any model): `freeApiKey` alone is used; server covers all
+ *   AI costs. `paidApiKey` is ignored even if registered. Must be present
+ *   → else `server_error`.
+ * - Free models (non-pro tier): `freeApiKey` alone is used. `paidApiKey`
+ *   is not required.
+ * - Premium models + non-pro tier + `paidApiKey` registered: `paidApiKey`
+ *   alone is used; server key is not consulted.
+ * - Premium models + non-pro tier + no `paidApiKey`: returns
+ *   `user_api_key_required` so the caller can prompt the user to register
+ *   a BYOK key.
  *
  * Token refund: when the result is `server_busy` or `server_error`, the
  * consumed token is returned to the caller's bucket via a best-effort
@@ -280,22 +286,18 @@ export async function requestChatCompletion(
     const isPremium = isPremiumChatModel(model, tierConfig);
 
     if (!paidApiKey) {
-        if (!isPremium) {
-            return { ok: false, error: 'server_error' };
+        if (isPremium) {
+            if (tierContext.tier !== 'pro') {
+                return { ok: false, error: 'user_api_key_required' };
+            }
         }
-        if (tierContext.tier !== 'pro') {
-            return { ok: false, error: 'user_api_key_required' };
-        }
-        // Pro tier + premium model: freeApiKey is the server-owned key.
+        // Free model (any tier) or pro tier + premium model: freeApiKey alone
+        // is sufficient — server covers the provider cost.
         if (!params.freeApiKey) {
             return { ok: false, error: 'server_error' };
         }
-    } else if (tierContext.tier !== 'pro' && !params.freeApiKey) {
-        // Non-pro users must always receive both keys from the server
-        // (freeApiKey = primary, paidApiKey = fallback). Missing the primary
-        // here means the caller did not honor the contract on
-        // `RequestChatCompletionParams.freeApiKey`; refuse rather than silently
-        // routing fallback-only with primary=undefined.
+    } else if (tierContext.tier === 'pro' && !params.freeApiKey) {
+        // Pro tier always uses the server key; it must be present.
         return { ok: false, error: 'server_error' };
     }
 
@@ -348,7 +350,7 @@ export async function requestChatCompletion(
     );
 
     const { primary: effectivePrimaryKey, fallback: effectiveFallbackKey } =
-        resolveApiKeys(params);
+        resolveApiKeys(params, tierContext.tier);
 
     const aiResult = await requestAiChatCompletion(
         effectivePrimaryKey,
