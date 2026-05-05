@@ -320,8 +320,10 @@ export async function requestChatCompletion(
         params.currentAnalysisContext
     );
 
-    const { userApiKey: effectiveUserApiKey, serverApiKey: effectiveServerApiKey } =
-        resolveApiKeys(params, tierContext.tier);
+    const {
+        userApiKey: effectiveUserApiKey,
+        serverApiKey: effectiveServerApiKey,
+    } = resolveApiKeys(params, tierContext.tier);
 
     const aiResult = await requestAiChatCompletion(
         effectiveUserApiKey,
