@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.9](https://github.com/y0ngha/siglens-core/compare/v0.7.8...v0.7.9) (2026-05-05)
+
+
+### Features
+
+* claude 3.5 삭제 후 4.5로 변경 ([75a72e3](https://github.com/y0ngha/siglens-core/commit/75a72e3984781b38303119c338f962c763da1d3f))
+
 ## [0.7.8](https://github.com/y0ngha/siglens-core/compare/v0.7.7...v0.7.8) (2026-05-05)
 
 
