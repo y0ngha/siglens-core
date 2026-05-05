@@ -1,6 +1,3 @@
-import { constants } from 'node:http2';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Mock } from 'vitest';
 import {
     GEMINI_2_5_FLASH_LITE_MODEL,
     GEMINI_2_5_FLASH_MODEL,
@@ -17,6 +14,9 @@ import type {
 } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
+import { constants } from 'node:http2';
+import type { Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MINIMAL_ANALYSIS: AnalysisResponse = {
     summary: 'AAPL trending up.',
@@ -58,11 +58,10 @@ function createParams(
         history: [],
         userMessage: '지금 사도 돼?',
         clientIp: '1.2.3.4',
-        // Default to the contract for non-pro users: server provides both
-        // `freeApiKey` (primary) and `paidApiKey` (fallback). Tests covering
+        // Default: server key + user BYOK key both present. Tests that verify
         // contract violations should override these.
-        freeApiKey: 'free-key',
-        paidApiKey: 'paid-key',
+        serverApiKey: 'server-key',
+        userApiKey: 'user-key',
         ...overrides,
     };
 }
@@ -191,11 +190,11 @@ describe('requestChatCompletion', () => {
         consoleWarn.mockRestore();
     });
 
-    it('returns user_api_key_required when a non-pro tier user requests a premium model without a paid key', async () => {
+    it('returns user_api_key_required when a non-pro tier user requests a premium model without a user key', async () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
-                paidApiKey: undefined,
+                userApiKey: undefined,
                 tierContext: { userId: null, tier: 'member' },
             }),
             { tokenStore, callAiProvider }
@@ -205,11 +204,12 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).not.toHaveBeenCalled();
     });
 
-    it('returns server_error when a free model is requested without a paid key', async () => {
+    it('returns server_error when a free model is requested without a server key', async () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_FLASH_MODEL,
-                paidApiKey: undefined,
+                userApiKey: undefined,
+                serverApiKey: undefined,
             }),
             { tokenStore, callAiProvider }
         );
@@ -218,12 +218,12 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).not.toHaveBeenCalled();
     });
 
-    it('allows a pro tier user to call a premium model using freeApiKey when no paidApiKey is provided', async () => {
+    it('allows a pro tier user to call a premium model using serverApiKey when no userApiKey is provided', async () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
-                paidApiKey: undefined,
-                freeApiKey: 'server-key',
+                userApiKey: undefined,
+                serverApiKey: 'server-key',
                 tierContext: { userId: 'user-1', tier: 'pro' },
             }),
             { tokenStore, callAiProvider }
@@ -244,13 +244,13 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).toHaveBeenCalled();
     });
 
-    it('returns server_error when a non-pro tier user receives a paidApiKey but no freeApiKey', async () => {
+    it('returns server_error when a pro tier user has a userApiKey but no serverApiKey', async () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_FLASH_MODEL,
-                paidApiKey: 'paid-key',
-                freeApiKey: undefined,
-                tierContext: { userId: 'user-1', tier: 'member' },
+                userApiKey: 'paid-key',
+                serverApiKey: undefined,
+                tierContext: { userId: 'user-1', tier: 'pro' },
             }),
             { tokenStore, callAiProvider }
         );
@@ -260,12 +260,12 @@ describe('requestChatCompletion', () => {
         expect(callAiProvider).not.toHaveBeenCalled();
     });
 
-    it('returns server_error when a pro tier user has no paidApiKey and no freeApiKey', async () => {
+    it('returns server_error when a pro tier user has no userApiKey and no serverApiKey', async () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
-                paidApiKey: undefined,
-                freeApiKey: undefined,
+                userApiKey: undefined,
+                serverApiKey: undefined,
                 tierContext: { userId: 'user-1', tier: 'pro' },
             }),
             { tokenStore, callAiProvider }
@@ -275,13 +275,13 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).not.toHaveBeenCalled();
     });
 
-    it('returns server_error when the model is invalid at runtime', async () => {
+    it('returns model_not_allowed when the model is invalid at runtime', async () => {
         const result = await requestChatCompletion(
             createParams({ model: 'invalid-model' as ModelId }),
             { tokenStore, callAiProvider }
         );
 
-        expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(result).toEqual({ ok: false, error: 'model_not_allowed' });
         expect(tryConsumeToken).not.toHaveBeenCalled();
     });
 
@@ -309,7 +309,7 @@ describe('requestChatCompletion', () => {
             createParams({
                 history: [{ role: 'model', content: '이전 답변입니다.' }],
                 userMessage: 'RSI도 설명해줘',
-                freeApiKey: 'free-key',
+                serverApiKey: 'server-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
                 occurredAt,
@@ -332,8 +332,8 @@ describe('requestChatCompletion', () => {
         );
         expect(callAiProvider).toHaveBeenCalledWith(
             expect.objectContaining({
-                primaryApiKey: 'free-key',
-                fallbackApiKey: 'paid-key',
+                primaryApiKey: undefined,
+                fallbackApiKey: 'user-key',
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 contents: [
                     {
@@ -454,12 +454,12 @@ describe('requestChatCompletion', () => {
         });
     });
 
-    it('records premium usage for a pro tier user calling via freeApiKey without paidApiKey', async () => {
+    it('records premium usage for a pro tier user calling via serverApiKey without userApiKey', async () => {
         const result = await requestChatCompletion(
             createParams({
                 model: GEMINI_2_5_PRO_MODEL,
-                paidApiKey: undefined,
-                freeApiKey: 'server-key',
+                userApiKey: undefined,
+                serverApiKey: 'server-key',
                 tierContext: { userId: 'user-1', tier: 'pro' },
                 occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
@@ -711,7 +711,7 @@ describe('requestChatCompletion', () => {
             }
         );
 
-        expect(result).toEqual({ ok: false, error: 'server_error' });
+        expect(result).toEqual({ ok: false, error: 'model_not_allowed' });
         expect(tryConsumeToken).not.toHaveBeenCalled();
         expect(callAiProvider).not.toHaveBeenCalled();
     });

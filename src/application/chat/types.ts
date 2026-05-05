@@ -1,7 +1,4 @@
 import type { ChatbotLimitError } from '@/application/usage/types';
-import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import type {
     AnalysisResponse,
     ChatMessage,
@@ -11,6 +8,9 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
+import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
+import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 
 /** Error code produced by chat infrastructure or application policy. */
 export type ChatErrorCode =
@@ -31,19 +31,17 @@ export interface RequestChatCompletionParams {
     model?: ModelId;
     /**
      * Server-owned API key for all AI provider calls.
-     * When `paidApiKey` is also present, this key is the **primary** credential
-     * and `paidApiKey` is the fallback. For `'pro'`-tier users (who do not
-     * supply a `paidApiKey`), this is the sole credential forwarded to the AI
-     * provider.
+     * For `'pro'`-tier users this is the sole credential. For non-pro tiers it
+     * is used when no `userApiKey` is present (free models or missing BYOK).
      */
-    freeApiKey?: string;
+    serverApiKey?: string;
     /**
-     * User-registered API key. Must be provided when a non-`'pro'`-tier user
-     * requests a premium model. Omitting it in that case returns
+     * User-registered BYOK API key. Must be provided when a non-`'pro'`-tier
+     * user requests a premium model. Omitting it in that case returns
      * `user_api_key_required`. `'pro'`-tier users are exempt — the server
-     * covers all models via `freeApiKey` and never requires a personal key.
+     * covers all models via `serverApiKey` and never requires a personal key.
      */
-    paidApiKey?: string;
+    userApiKey?: string;
     occurredAt?: Date;
     tierContext?: UserTierContext;
     /**

@@ -1,8 +1,4 @@
-import { constants } from 'node:http2';
-import {
-    GEMINI_2_5_FLASH_MODEL,
-    VALID_CHAT_MODELS,
-} from '@/application/chat/constants';
+import { GEMINI_2_5_FLASH_MODEL } from '@/application/chat/constants';
 import type {
     ChatActionResult,
     ChatErrorCode,
@@ -11,12 +7,7 @@ import type {
 } from '@/application/chat/types';
 import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
-import {
-    DEFAULT_TIER,
-    TIER_CONFIG,
-    getAllowedModels,
-    isModelAllowed,
-} from '@/domain/tier';
+import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import type {
     ChatPromptPayload,
     ModelId,
@@ -31,6 +22,7 @@ import {
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import { type UsageRepository } from '@/infrastructure/db';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
+import { constants } from 'node:http2';
 
 const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
@@ -63,28 +55,16 @@ function toChatErrorResult(error: unknown): ChatActionResult {
     return { ok: false, error: 'server_error' };
 }
 
-// Runtime guard against `as ModelId` casts; rejects model identifiers not
-// present in the active tier configuration. Falls back to the static
-// `VALID_CHAT_MODELS` snapshot when the caller does not inject a custom
-// `TierConfig`.
-function isValidChatModel(model: ModelId, config?: TierConfig): boolean {
-    const allowed: readonly ModelId[] =
-        config === undefined
-            ? VALID_CHAT_MODELS
-            : getAllowedModels('pro', config);
-    return allowed.some(validModel => validModel === model);
-}
-
 /**
  * Resolve the API key to forward to the AI provider.
  *
  * Routing rules (enforced by caller-side guards in {@link requestChatCompletion}):
- * - Pro tier: server always covers the cost → `freeApiKey` is the sole key.
- * - Non-pro tier + user BYOK registered (`paidApiKey`): user pays with their
- *   own key → `paidApiKey` is the sole key.  Server key is not used.
- * - Non-pro tier + no `paidApiKey` (free model or missing BYOK): server key
- *   → `freeApiKey` is the sole key.  The caller guards ensure this is only
- *   reached when `freeApiKey` is present.
+ * - Pro tier: server always covers the cost → `serverApiKey` is the sole key.
+ * - Non-pro tier + user BYOK registered (`userApiKey`): user pays with their
+ *   own key → `userApiKey` is the sole key.  Server key is not used.
+ * - Non-pro tier + no `userApiKey` (free model or missing BYOK): server key
+ *   → `serverApiKey` is the sole key.  The caller guards ensure this is only
+ *   reached when `serverApiKey` is present.
  *
  * All cases set `primary` to `undefined` so the provider never attempts a
  * two-key cascade; only a single key is used per request.
@@ -92,19 +72,19 @@ function isValidChatModel(model: ModelId, config?: TierConfig): boolean {
  * @internal
  */
 function resolveApiKeys(
-    params: { freeApiKey?: string; paidApiKey?: string },
+    params: { serverApiKey?: string; userApiKey?: string },
     tier: Tier
 ): {
     primary: string | undefined;
     fallback: string;
 } {
-    // Pro tier or no paidApiKey: use server key exclusively.
-    if (tier === 'pro' || params.paidApiKey === undefined) {
-        // Guards in `requestChatCompletion` ensure `freeApiKey` is defined here.
-        return { primary: undefined, fallback: params.freeApiKey! };
+    // Pro tier or no userApiKey: use server key exclusively.
+    if (tier === 'pro' || params.userApiKey === undefined) {
+        // Guards in `requestChatCompletion` ensure `serverApiKey` is defined here.
+        return { primary: undefined, fallback: params.serverApiKey! };
     }
     // Non-pro + user BYOK: use only the user's key.
-    return { primary: undefined, fallback: params.paidApiKey };
+    return { primary: undefined, fallback: params.userApiKey };
 }
 
 function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
@@ -224,15 +204,15 @@ async function requestAiChatCompletion(
  * AI provider payload mapping, key fallback invocation, remaining-token lookup,
  * best-effort usage recording, and UI-facing error codes.
  *
- * **API key routing** (`freeApiKey` = server-owned key; `paidApiKey` = user-owned BYOK key):
- * - Pro tier (any model): `freeApiKey` alone is used; server covers all
- *   AI costs. `paidApiKey` is ignored even if registered. Must be present
+ * **API key routing** (`serverApiKey` = server-owned key; `userApiKey` = user-owned BYOK key):
+ * - Pro tier (any model): `serverApiKey` alone is used; server covers all
+ *   AI costs. `userApiKey` is ignored even if registered. Must be present
  *   → else `server_error`.
- * - Free models (non-pro tier): `freeApiKey` alone is used. `paidApiKey`
+ * - Free models (non-pro tier): `serverApiKey` alone is used. `userApiKey`
  *   is not required.
- * - Premium models + non-pro tier + `paidApiKey` registered: `paidApiKey`
+ * - Premium models + non-pro tier + `userApiKey` registered: `userApiKey`
  *   alone is used; server key is not consulted.
- * - Premium models + non-pro tier + no `paidApiKey`: returns
+ * - Premium models + non-pro tier + no `userApiKey`: returns
  *   `user_api_key_required` so the caller can prompt the user to register
  *   a BYOK key.
  *
@@ -272,31 +252,28 @@ export async function requestChatCompletion(
     dependencies: RequestChatCompletionDependencies
 ): Promise<ChatActionResult> {
     const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
-    const paidApiKey = params.paidApiKey;
+    const userApiKey = params.userApiKey;
     const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
-
-    if (!isValidChatModel(model, tierConfig)) {
-        return { ok: false, error: 'server_error' };
-    }
 
     const tierContext = params.tierContext ?? {
         userId: null,
         tier: DEFAULT_TIER,
     };
+
     const isPremium = isPremiumChatModel(model, tierConfig);
 
-    if (!paidApiKey) {
+    if (!userApiKey) {
         if (isPremium) {
             if (tierContext.tier !== 'pro') {
                 return { ok: false, error: 'user_api_key_required' };
             }
         }
-        // Free model (any tier) or pro tier + premium model: freeApiKey alone
+        // Free model (any tier) or pro tier + premium model: serverApiKey alone
         // is sufficient — server covers the provider cost.
-        if (!params.freeApiKey) {
+        if (!params.serverApiKey) {
             return { ok: false, error: 'server_error' };
         }
-    } else if (tierContext.tier === 'pro' && !params.freeApiKey) {
+    } else if (tierContext.tier === 'pro' && !params.serverApiKey) {
         // Pro tier always uses the server key; it must be present.
         return { ok: false, error: 'server_error' };
     }
