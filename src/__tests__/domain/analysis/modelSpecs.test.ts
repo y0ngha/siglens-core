@@ -34,16 +34,15 @@ describe('MODEL_SPECS', () => {
         );
     });
 
-    it('uses temperature 0 and top-p 0.95 for every model', () => {
+    it('uses temperature 0 for every model', () => {
         for (const spec of Object.values(MODEL_SPECS)) {
             expect(spec.temperature).toBe(0);
-            expect(spec.topP).toBe(0.95);
         }
     });
 
-    it('keeps Claude max output tokens aligned with the SDK 0.92 caps', () => {
-        expect(MODEL_SPECS['claude-haiku-4-5'].maxOutputTokens).toBe(8_192);
-        expect(MODEL_SPECS['claude-sonnet-4-6'].maxOutputTokens).toBe(128_000);
+    it('keeps Claude max output tokens aligned with current provider caps', () => {
+        expect(MODEL_SPECS['claude-haiku-4-5'].maxOutputTokens).toBe(64_000);
+        expect(MODEL_SPECS['claude-sonnet-4-6'].maxOutputTokens).toBe(64_000);
         expect(MODEL_SPECS['claude-opus-4-7'].maxOutputTokens).toBe(128_000);
     });
 
@@ -63,11 +62,16 @@ describe('MODEL_SPECS', () => {
         }
     });
 
-    it('disables thinking budget for haiku and the GPT-5 series', () => {
+    it('disables thinking budget for haiku', () => {
         expect(MODEL_SPECS['claude-haiku-4-5'].thinkingBudget).toBe(0);
-        expect(MODEL_SPECS['gpt-5-mini'].thinkingBudget).toBe(0);
-        expect(MODEL_SPECS['gpt-5.4'].thinkingBudget).toBe(0);
-        expect(MODEL_SPECS['gpt-5.5'].thinkingBudget).toBe(0);
+    });
+
+    it('uses effort instead of thinking budget for Claude adaptive thinking and GPT reasoning models', () => {
+        expect(MODEL_SPECS['claude-sonnet-4-6'].effort).toBe('medium');
+        expect(MODEL_SPECS['claude-opus-4-7'].effort).toBe('medium');
+        expect(MODEL_SPECS['gpt-5-mini'].effort).toBe('low');
+        expect(MODEL_SPECS['gpt-5.4'].effort).toBe('medium');
+        expect(MODEL_SPECS['gpt-5.5'].effort).toBe('medium');
     });
 
     it('keeps gemini-2.5-flash-lite at the documented 24_576 thinking budget', () => {
@@ -77,12 +81,12 @@ describe('MODEL_SPECS', () => {
     });
 
     it('uses 32_768 thinking budget for the remaining Gemini models', () => {
-        const otherGemini: readonly ActiveModelId[] = [
+        const otherGemini = [
             'gemini-2.5-flash',
             'gemini-2.5-pro',
             'gemini-3-flash-preview',
             'gemini-3.1-pro-preview',
-        ];
+        ] as const;
         for (const model of otherGemini) {
             expect(MODEL_SPECS[model].thinkingBudget, model).toBe(32_768);
         }

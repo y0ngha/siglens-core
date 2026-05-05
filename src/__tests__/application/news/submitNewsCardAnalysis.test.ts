@@ -43,6 +43,7 @@ const cachedCardAnalysis: NewsCardAnalysis = {
     summaryKo: '애플 신제품 라인업 발표',
     sentiment: 'bullish',
     category: 'product',
+    priceImpact: 'medium',
 };
 
 describe('submitNewsCardAnalysis 함수는', () => {

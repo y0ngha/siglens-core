@@ -25,6 +25,7 @@ const NEWS_ITEM_1: EnrichedNewsItem = {
         summaryKo: '실적 발표에서 시장 예상을 웃도는 호실적 기록',
         sentiment: 'bullish',
         category: 'earnings',
+        priceImpact: 'high',
     },
 };
 
@@ -42,6 +43,7 @@ const NEWS_ITEM_2: EnrichedNewsItem = {
         summaryKo: 'EU 반독점 조사로 인한 규제 리스크 부각',
         sentiment: 'bearish',
         category: 'regulation',
+        priceImpact: 'high',
     },
 };
 

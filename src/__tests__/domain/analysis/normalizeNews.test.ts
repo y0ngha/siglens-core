@@ -17,6 +17,7 @@ const validNewsCard = {
     summaryKo: '애플 어닝 서프라이즈',
     sentiment: 'bullish',
     category: 'earnings',
+    priceImpact: 'high',
 };
 
 describe('normalizeNewsAnalysisResponse 함수는', () => {
@@ -117,6 +118,7 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
             expect(result.summaryKo).toBe('애플 어닝 서프라이즈');
             expect(result.sentiment).toBe('bullish');
             expect(result.category).toBe('earnings');
+            expect(result.priceImpact).toBe('high');
         });
 
         it('bodyKo가 null인 경우도 허용한다', () => {
@@ -165,6 +167,13 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
                 normalizeNewsCardAnalysis(JSON.stringify(rest))
             ).toThrow();
         });
+
+        it('priceImpact가 없으면 에러를 던진다', () => {
+            const { priceImpact: _, ...rest } = validNewsCard;
+            expect(() =>
+                normalizeNewsCardAnalysis(JSON.stringify(rest))
+            ).toThrow();
+        });
     });
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
@@ -177,6 +186,13 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
 
         it('category가 유효하지 않으면 에러를 던진다', () => {
             const invalid = { ...validNewsCard, category: 'sports' };
+            expect(() =>
+                normalizeNewsCardAnalysis(JSON.stringify(invalid))
+            ).toThrow();
+        });
+
+        it('priceImpact가 유효하지 않으면 에러를 던진다', () => {
+            const invalid = { ...validNewsCard, priceImpact: 'critical' };
             expect(() =>
                 normalizeNewsCardAnalysis(JSON.stringify(invalid))
             ).toThrow();

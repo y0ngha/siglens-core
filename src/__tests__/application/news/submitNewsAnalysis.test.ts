@@ -48,6 +48,7 @@ function makeEnrichedNewsItem(id: string): EnrichedNewsItem {
             summaryKo: `애플 신제품 ${id} 발표`,
             sentiment: 'bullish',
             category: 'product',
+            priceImpact: 'medium',
         },
     };
 }

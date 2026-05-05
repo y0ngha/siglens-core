@@ -35,6 +35,7 @@ const rawCardJson = JSON.stringify({
     summaryKo: '애플 신제품 발표 요약',
     sentiment: 'bullish',
     category: 'product',
+    priceImpact: 'medium',
 });
 
 const mockMeta = {
@@ -139,6 +140,7 @@ describe('pollNewsCardAnalysis 함수는', () => {
             if (result.status === 'done') {
                 expect(result.result.titleKo).toBe('애플, 신제품 발표');
                 expect(result.result.sentiment).toBe('bullish');
+                expect(result.result.priceImpact).toBe('medium');
             }
         });
 

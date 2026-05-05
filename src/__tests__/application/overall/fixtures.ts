@@ -18,6 +18,7 @@ export function makeEnrichedNewsItem(id: string): EnrichedNewsItem {
             summaryKo: `요약 ${id}`,
             sentiment: 'neutral',
             category: 'other',
+            priceImpact: 'negligible',
         },
     };
 }
