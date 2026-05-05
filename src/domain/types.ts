@@ -1159,8 +1159,6 @@ export interface ModelSpec {
     thinkingBudget: number;
     /** Sampling temperature. */
     temperature: number;
-    /** Top-p nucleus sampling parameter. */
-    topP: number;
 }
 
 /** AI model identifiers allowed by tier gating. */

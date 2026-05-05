@@ -9,14 +9,6 @@ import type { ActiveModelId, AIProvider, ModelSpec } from '@/domain/types';
 const DEFAULT_TEMPERATURE = 0 as const;
 
 /**
- * Default top-p nucleus-sampling value applied to every model.
- *
- * `as const` preserves the literal `0.95` type so that
- * `MODEL_SPECS[X].topP` infers as `0.95` rather than widening to `number`.
- */
-const DEFAULT_TOP_P = 0.95 as const;
-
-/**
  * Per-model AI SDK call parameters keyed by {@link ActiveModelId}.
  *
  * Single source of truth for AI SDK callers (workers, server actions, UI).
@@ -37,7 +29,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 8_192,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'claude-sonnet-4-6': {
         provider: 'claude',
@@ -45,7 +36,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 128_000,
         thinkingBudget: 32_000,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'claude-opus-4-7': {
         provider: 'claude',
@@ -53,7 +43,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 128_000,
         thinkingBudget: 32_000,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gemini-2.5-flash': {
         provider: 'gemini',
@@ -61,7 +50,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gemini-2.5-flash-lite': {
         provider: 'gemini',
@@ -69,7 +57,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 65_536,
         thinkingBudget: 24_576,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gemini-2.5-pro': {
         provider: 'gemini',
@@ -77,7 +64,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gemini-3-flash-preview': {
         provider: 'gemini',
@@ -85,7 +71,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gemini-3.1-pro-preview': {
         provider: 'gemini',
@@ -93,7 +78,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 65_536,
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gpt-5-mini': {
         provider: 'chatgpt',
@@ -101,7 +85,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 128_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gpt-5.4': {
         provider: 'chatgpt',
@@ -109,7 +92,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 128_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
     'gpt-5.5': {
         provider: 'chatgpt',
@@ -117,7 +99,6 @@ export const MODEL_SPECS = {
         maxOutputTokens: 128_000,
         thinkingBudget: 0,
         temperature: DEFAULT_TEMPERATURE,
-        topP: DEFAULT_TOP_P,
     },
 } as const satisfies Record<ActiveModelId, ModelSpec>;
 
