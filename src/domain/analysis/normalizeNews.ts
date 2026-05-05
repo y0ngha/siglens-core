@@ -2,6 +2,7 @@ import type {
     NewsAnalysisResponse,
     NewsCardAnalysis,
     NewsCategory,
+    NewsImpact,
     NewsSentiment,
 } from '@/domain/types';
 import { extractJsonFromLlmResponse } from './promptFormat';
@@ -11,6 +12,14 @@ const VALID_NEWS_SENTIMENTS: readonly NewsSentiment[] = [
     'bullish',
     'neutral',
     'bearish',
+];
+
+/** Valid values for the {@link NewsImpact} enum. */
+const VALID_NEWS_IMPACTS: readonly NewsImpact[] = [
+    'high',
+    'medium',
+    'low',
+    'negligible',
 ];
 
 /** Valid values for the {@link NewsCategory} enum. */
@@ -60,6 +69,16 @@ function requireNewsCategory(value: unknown, field: string): NewsCategory {
     return value as NewsCategory;
 }
 
+function requireNewsImpact(value: unknown, field: string): NewsImpact {
+    if (!VALID_NEWS_IMPACTS.includes(value as NewsImpact)) {
+        throw new Error(
+            `Invalid NewsImpact for field "${field}": ${String(value)}. ` +
+                `Expected one of: ${VALID_NEWS_IMPACTS.join(', ')}`
+        );
+    }
+    return value as NewsImpact;
+}
+
 /**
  * Normalize a raw LLM response string into a typed {@link NewsCardAnalysis}.
  *
@@ -94,6 +113,7 @@ export function normalizeNewsCardAnalysis(raw: string): NewsCardAnalysis {
 
     const sentiment = requireNewsSentiment(o.sentiment, 'sentiment');
     const category = requireNewsCategory(o.category, 'category');
+    const priceImpact = requireNewsImpact(o.priceImpact, 'priceImpact');
 
     const bodyKo =
         o.bodyKo === null || o.bodyKo === undefined
@@ -108,6 +128,7 @@ export function normalizeNewsCardAnalysis(raw: string): NewsCardAnalysis {
         summaryKo: o.summaryKo,
         sentiment,
         category,
+        priceImpact,
     };
 }
 

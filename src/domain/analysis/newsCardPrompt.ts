@@ -41,7 +41,8 @@ ${bodySection}
   "bodyKo": "한국어 번역 본문 (body가 없으면 null)",
   "summaryKo": "한국어 한 줄 요약 (최대 60자)",
   "sentiment": "bullish" | "neutral" | "bearish",
-  "category": "earnings" | "m_and_a" | "guidance" | "regulation" | "macro" | "product" | "other"
+  "category": "earnings" | "m_and_a" | "guidance" | "regulation" | "macro" | "product" | "other",
+  "priceImpact": "high" | "medium" | "low" | "negligible"
 }
 
 Rules:
@@ -50,5 +51,10 @@ Rules:
 - bodyKo: natural Korean translation of the article body; null if no body was provided.
 - summaryKo: a single concise Korean sentence capturing the most important point (존댓말).
 - sentiment: the directional market implication for the named symbol — bullish if positive catalyst, bearish if negative, neutral if ambiguous or unrelated.
-- category: the dominant news theme from the provided options.`;
+- category: the dominant news theme from the provided options.
+- priceImpact: estimated magnitude of price movement for the named symbol.
+  - high: likely material mover — earnings miss/beat, regulatory action, major M&A, product recall.
+  - medium: noticeable but contained — analyst rating change, guidance update, sector news.
+  - low: minor relevance — routine filing, minor partnership, broad market commentary.
+  - negligible: background noise — no actionable price implication for this symbol.`;
 }

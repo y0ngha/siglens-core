@@ -21,7 +21,7 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
  * 2 minutes gives comfortable headroom for cold starts and retries without
  * holding the serverless function open longer than necessary.
  */
-const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS = 2 * MS_PER_MINUTE;
+const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS = 30 * MS_PER_MINUTE;
 
 /**
  * Submit a per-card news analysis job using the flash-lite model.
