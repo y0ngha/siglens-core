@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/y0ngha/siglens-core/compare/v0.7.3...v0.7.4) (2026-05-05)
+
+
+### Bug Fixes
+
+* api key 가져올 때 버그 수정 ([27471f7](https://github.com/y0ngha/siglens-core/commit/27471f7d74a82cc651c7aa930dd26ab20762bae4))
+
 ## [0.7.3](https://github.com/y0ngha/siglens-core/compare/v0.7.2...v0.7.3) (2026-05-03)
 
 
