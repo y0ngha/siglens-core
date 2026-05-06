@@ -141,7 +141,10 @@ export function enrichAnalysisWithConfidence(
     );
 
     return {
-        summary: asString(raw.summary, 'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'),
+        summary: asString(
+            raw.summary,
+            'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'
+        ),
         trend: normalizeTrend(raw.trend),
         indicatorResults,
         riskLevel: normalizeRiskLevel(raw.riskLevel),
@@ -272,7 +275,10 @@ export function normalizeCachedAnalysisResponse(
     const analyzedAt = asString(raw.analyzedAt);
 
     return {
-        summary: asString(raw.summary, 'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'),
+        summary: asString(
+            raw.summary,
+            'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'
+        ),
         trend: normalizeTrend(raw.trend),
         indicatorResults: compact(
             asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)

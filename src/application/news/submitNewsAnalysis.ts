@@ -91,7 +91,13 @@ function hashNewsInput(
 export async function submitNewsAnalysis(
     options: SubmitNewsAnalysisOptions
 ): Promise<SubmitNewsAnalysisResult> {
-    const { symbol, companyName = symbol, modelId, news, upcomingCalendar } = options;
+    const {
+        symbol,
+        companyName = symbol,
+        modelId,
+        news,
+        upcomingCalendar,
+    } = options;
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 

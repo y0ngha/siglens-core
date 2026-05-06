@@ -5,7 +5,13 @@ import type {
     OverallScenario,
     OverallScenarioName,
 } from '@/domain/types';
-import { asArray, asEnum, asObject, asString, compact } from './normalizePrimitives';
+import {
+    asArray,
+    asEnum,
+    asObject,
+    asString,
+    compact,
+} from './normalizePrimitives';
 import { extractJsonFromLlmResponse } from './promptFormat';
 
 /** Valid values for the {@link OverallScenarioName} enum. */

@@ -292,13 +292,25 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 rsi: [null, null, TEST_RSI_VALUE],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_RSI_VALUE.toFixed(2));
         });
 
         it('전부 null인 RSI 배열일 때 N/A를 표시한다', () => {
             const indicators = makeIndicators({ rsi: [null, null, null] });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(`RSI(${RSI_DEFAULT_PERIOD}): N/A`);
         });
 
@@ -317,7 +329,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 macd: [{ macd: null, signal: null, histogram: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain('MACD: N/A');
         });
 
@@ -331,7 +349,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_MACD_VALUE.toFixed(2));
             expect(result).toContain(TEST_SIGNAL_VALUE.toFixed(2));
             expect(result).toContain(TEST_HISTOGRAM_VALUE.toFixed(2));
@@ -352,7 +376,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 bollinger: [{ upper: null, middle: null, lower: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain('Bollinger Bands: Upper N/A');
         });
 
@@ -366,7 +396,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_BOLLINGER_UPPER.toFixed(2));
             expect(result).toContain(TEST_BOLLINGER_MIDDLE.toFixed(2));
             expect(result).toContain(TEST_BOLLINGER_LOWER.toFixed(2));
@@ -387,7 +423,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 dmi: [{ diPlus: null, diMinus: null, adx: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain('DMI: +DI N/A');
         });
 
@@ -401,7 +443,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_DI_PLUS.toFixed(2));
             expect(result).toContain(TEST_DI_MINUS.toFixed(2));
             expect(result).toContain(TEST_ADX_VALUE.toFixed(2));
@@ -424,7 +472,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 stochastic: [{ percentK: null, percentD: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(
                 `Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K N/A`
             );
@@ -439,7 +493,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_STOCHASTIC_K.toFixed(2));
             expect(result).toContain(TEST_STOCHASTIC_D.toFixed(2));
         });
@@ -461,7 +521,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 stochRsi: [{ k: null, d: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(
                 `StochRSI(${STOCH_RSI_RSI_PERIOD},${STOCH_RSI_STOCH_PERIOD},${STOCH_RSI_K_PERIOD},${STOCH_RSI_D_PERIOD}): K N/A`
             );
@@ -476,7 +542,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_STOCH_RSI_K.toFixed(2));
             expect(result).toContain(TEST_STOCH_RSI_D.toFixed(2));
         });
@@ -498,7 +570,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 cci: [null, null, null],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(`CCI(${CCI_DEFAULT_PERIOD}): N/A`);
         });
 
@@ -506,7 +584,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 cci: [null, TEST_CCI_VALUE],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_CCI_VALUE.toFixed(2));
         });
     });
@@ -534,7 +618,13 @@ describe('prompt', () => {
                     profile: [],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_VP_POC.toFixed(2));
             expect(result).toContain(TEST_VP_VAH.toFixed(2));
             expect(result).toContain(TEST_VP_VAL.toFixed(2));
@@ -565,7 +655,13 @@ describe('prompt', () => {
                     200: [null, null],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             MA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`MA(${p}): N/A`);
             });
@@ -581,7 +677,13 @@ describe('prompt', () => {
                     200: [null, TEST_MA_200_VALUE],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(`MA(5): ${TEST_MA_5_VALUE.toFixed(2)}`);
             expect(result).toContain(`MA(20): ${TEST_MA_20_VALUE.toFixed(2)}`);
             expect(result).toContain(`MA(60): ${TEST_MA_60_VALUE.toFixed(2)}`);
@@ -617,7 +719,13 @@ describe('prompt', () => {
                     60: [null, null],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             EMA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`EMA(${p}): N/A`);
             });
@@ -632,7 +740,13 @@ describe('prompt', () => {
                     60: [null, TEST_EMA_60_VALUE],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(`EMA(9): ${TEST_EMA_9_VALUE.toFixed(2)}`);
             expect(result).toContain(
                 `EMA(20): ${TEST_EMA_20_VALUE.toFixed(2)}`
@@ -672,7 +786,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(
                 `Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan N/A`
             );
@@ -690,7 +810,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
             expect(result).toContain(TEST_ICHIMOKU_TENKAN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_KIJUN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_SENKOU_A.toFixed(2));
@@ -2328,7 +2454,9 @@ describe('prompt', () => {
                 'trendlines.direction: "ascending" or "descending"'
             );
             expect(result).toContain('"direction": "ascending"');
-            expect(result).not.toContain('"direction": "ascending | descending"');
+            expect(result).not.toContain(
+                '"direction": "ascending | descending"'
+            );
         });
     });
 
@@ -2336,7 +2464,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], makeIndicators(), []);
+            result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
         });
 
         it('공통 Name Field Matching 섹션이 포함된다', () => {
@@ -2423,7 +2557,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], makeIndicators(), []);
+            result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
         });
 
         it('접근 가능한 언어 지시가 포함된다', () => {
@@ -2474,7 +2614,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], makeIndicators(), []);
+            result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
         });
 
         it('Action Recommendation Decision Tree 섹션이 포함된다', () => {
@@ -2504,9 +2650,7 @@ describe('prompt', () => {
             expect(result).toContain(
                 'For "avoid", state that no long entry range is valid under the current data'
             );
-            expect(result).toContain(
-                'For "avoid", do not invent exit prices'
-            );
+            expect(result).toContain('For "avoid", do not invent exit prices');
             expect(result).toContain(
                 'For "avoid", state that risk/reward cannot be calculated'
             );
@@ -3193,14 +3337,20 @@ describe('prompt', () => {
                 content: '## Alpha\n- content',
             });
 
-            const result1 = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, bars, indicators, [
-                skillA,
-                skillB,
-            ]);
-            const result2 = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, bars, indicators, [
-                skillB,
-                skillA,
-            ]);
+            const result1 = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                [skillA, skillB]
+            );
+            const result2 = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                [skillB, skillA]
+            );
 
             expect(result1).toBe(result2);
         });
@@ -3217,10 +3367,13 @@ describe('prompt', () => {
                 content: '## Apple\n- content',
             });
 
-            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, bars, indicators, [
-                skillA,
-                skillB,
-            ]);
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                [skillA, skillB]
+            );
 
             const zebraIndex = result.indexOf('Zebra Skill');
             const appleIndex = result.indexOf('Apple Skill');

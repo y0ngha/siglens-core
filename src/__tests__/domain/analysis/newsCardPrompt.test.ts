@@ -60,9 +60,7 @@ describe('buildNewsCardAnalysisPrompt', () => {
         expect(prompt).toContain('untrusted source data');
         expect(prompt).toContain('Do not fabricate missing article body text');
         expect(prompt).toContain('## Allowed Values');
-        expect(prompt).toContain(
-            'sentiment: "bullish", "neutral", "bearish"'
-        );
+        expect(prompt).toContain('sentiment: "bullish", "neutral", "bearish"');
         expect(prompt).toContain(
             'category: "earnings", "m_and_a", "guidance", "regulation", "macro", "product", "other"'
         );

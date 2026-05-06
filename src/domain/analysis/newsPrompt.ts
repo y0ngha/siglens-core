@@ -84,7 +84,9 @@ export function buildNewsAnalysisPrompt(
 export function buildNewsAnalysisPrompt(
     symbol: string,
     companyNameOrNews: string | ReadonlyArray<EnrichedNewsItem>,
-    newsOrCalendar: ReadonlyArray<EnrichedNewsItem> | readonly EarningsCalendarItem[],
+    newsOrCalendar:
+        | ReadonlyArray<EnrichedNewsItem>
+        | readonly EarningsCalendarItem[],
     calendarOrSkills: readonly EarningsCalendarItem[] | readonly Skill[],
     maybeSkills?: readonly Skill[]
 ): string {

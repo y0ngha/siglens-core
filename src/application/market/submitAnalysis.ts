@@ -92,7 +92,8 @@ function resolveSubmitAnalysisArgs(
                 : undefined,
         options:
             maybeOptions ??
-            (typeof fmpSymbolOrOptions === 'object' && fmpSymbolOrOptions !== null
+            (typeof fmpSymbolOrOptions === 'object' &&
+            fmpSymbolOrOptions !== null
                 ? fmpSymbolOrOptions
                 : {}),
     };

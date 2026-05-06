@@ -184,7 +184,11 @@ describe('submitAnalysis 함수는', () => {
         it('제한이 꺼져 있으면 기본 free tier도 모든 타임프레임으로 요청할 수 있다', async () => {
             mockCacheGet.mockResolvedValueOnce(null);
 
-            const result = await submitAnalysis(mockSymbol, mockCompanyName, '5Min');
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '5Min'
+            );
 
             expect(result.status).toBe('submitted');
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
@@ -199,7 +203,11 @@ describe('submitAnalysis 함수는', () => {
         it('cached 상태와 함께 결과를 반환한다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockResult);
 
-            const result = await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
@@ -212,9 +220,16 @@ describe('submitAnalysis 함수는', () => {
         it('modelId가 포함된 캐시 키로 조회한다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockResult);
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe, false, undefined, {
-                modelId: 'gemini-2.5-flash',
-            });
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
 
             expect(mockCacheGet).toHaveBeenCalledWith(
                 'analysis:AAPL:1Day:gemini-2.5-flash'
@@ -320,7 +335,11 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('fetchBarsWithIndicators를 호출하고 Worker에 요청을 보낸 뒤 jobId를 반환한다', async () => {
-            const result = await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
                 mockSymbol,
@@ -398,14 +417,21 @@ describe('submitAnalysis 함수는', () => {
         it('modelId가 있고 modelUsed가 없으면 effectiveModelId로 사용량을 기록한다', async () => {
             const occurredAt = new Date('2026-04-29T00:00:00.000Z');
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe, false, undefined, {
-                modelId: 'gemini-2.5-flash',
-                usage: {
-                    usageRepository: mockUsageRepository,
-                    clientIp: '203.0.113.10',
-                    occurredAt,
-                },
-            });
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    modelId: 'gemini-2.5-flash',
+                    usage: {
+                        usageRepository: mockUsageRepository,
+                        clientIp: '203.0.113.10',
+                        occurredAt,
+                    },
+                }
+            );
 
             expect(mockRecordUsage).toHaveBeenCalledWith(
                 expect.objectContaining({ modelUsed: 'gemini-2.5-flash' })
@@ -548,9 +574,16 @@ describe('submitAnalysis 함수는', () => {
         it('waitUntil이 제공되면 Worker 요청 promise를 등록한다', async () => {
             const waitUntil = vi.fn();
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe, false, undefined, {
-                waitUntil,
-            });
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    waitUntil,
+                }
+            );
 
             expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
         });
@@ -571,7 +604,11 @@ describe('submitAnalysis 함수는', () => {
                 .mockImplementation(() => {});
             mockLoadSkills.mockRejectedValueOnce(new Error('load failed'));
 
-            const result = await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
 
             expect(result.status).toBe('submitted');
             expect(mockFetch).toHaveBeenCalled();
@@ -579,9 +616,16 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('Worker body에 model을 포함한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe, false, undefined, {
-                modelId: 'gemini-2.5-flash',
-            });
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
 
             const body = JSON.parse(
                 mockFetch.mock.calls[0][1].body as string
@@ -590,9 +634,16 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('userApiKey가 있으면 X-AI-API-KEY 헤더를 포함한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe, false, undefined, {
-                userApiKey: 'sk-user-key-123',
-            });
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    userApiKey: 'sk-user-key-123',
+                }
+            );
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.any(String),
@@ -623,7 +674,13 @@ describe('submitAnalysis 함수는', () => {
         it('fetchBarsWithIndicators에 fmpSymbol을 전달한다', async () => {
             const mockFmpSymbol = '^SPX';
 
-            await submitAnalysis('SPX', 'S&P 500 Index', mockTimeframe, false, mockFmpSymbol);
+            await submitAnalysis(
+                'SPX',
+                'S&P 500 Index',
+                mockTimeframe,
+                false,
+                mockFmpSymbol
+            );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
                 'SPX',
@@ -637,7 +694,11 @@ describe('submitAnalysis 함수는', () => {
         it('캐시 조회를 건너뛰고 Worker에 요청을 보낸다', async () => {
             mockCreateCacheProvider.mockReturnValue(null);
 
-            const result = await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();
@@ -660,9 +721,16 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('modelId가 제공되면 jobMeta에 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe, false, undefined, {
-                modelId: 'gemini-2.5-flash',
-            });
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),

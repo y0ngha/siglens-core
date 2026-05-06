@@ -2,10 +2,7 @@ import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
-import type {
-    PollAnalysisResult,
-    Skill,
-} from '@/domain/types';
+import type { PollAnalysisResult, Skill } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildAnalysisCacheKey,
