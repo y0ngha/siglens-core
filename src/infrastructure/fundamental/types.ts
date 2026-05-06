@@ -257,10 +257,9 @@ export interface FundamentalDataProvider {
      *   in a future minor release once a caller exists.
      *
      * @param symbol - Ticker symbol.
-     * @param limit  - Maximum number of recent grading events to return.
      * @returns Recent analyst grading events for the symbol.
      */
-    getGrades?(symbol: string, limit?: number): Promise<GradesEvent[]>;
+    getGrades?(symbol: string): Promise<GradesEvent[]>;
 
     /**
      * Fetch the current buy/hold/sell grade consensus breakdown.
