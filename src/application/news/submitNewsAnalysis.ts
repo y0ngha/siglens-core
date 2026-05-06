@@ -11,6 +11,7 @@ import type {
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
 } from '@/application/news/types';
+import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
@@ -90,7 +91,7 @@ function hashNewsInput(
 export async function submitNewsAnalysis(
     options: SubmitNewsAnalysisOptions
 ): Promise<SubmitNewsAnalysisResult> {
-    const { symbol, modelId, news, upcomingCalendar } = options;
+    const { symbol, companyName = symbol, modelId, news, upcomingCalendar } = options;
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
@@ -143,13 +144,10 @@ export async function submitNewsAnalysis(
             // the response. The schema-version prefix on the cache key is the
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
-            if (
-                cached !== null &&
-                typeof cached === 'object' &&
-                'overallSentiment' in cached
-            ) {
+            if (cached !== null) {
+                const result = normalizeNewsAnalysisResponse(cached);
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
-                return { status: 'cached', result: cached };
+                return { status: 'cached', result };
             }
         } catch (error) {
             console.error('[submitNewsAnalysis] Cache read failed:', error);
@@ -160,6 +158,7 @@ export async function submitNewsAnalysis(
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildNewsAnalysisPrompt(
         symbol,
+        companyName,
         news,
         upcomingCalendar,
         skills

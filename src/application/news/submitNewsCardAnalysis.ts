@@ -3,6 +3,7 @@ import type {
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
 } from '@/application/news/types';
+import { normalizeNewsCardAnalysis } from '@/domain/analysis/normalizeNews';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import type { NewsCardAnalysis } from '@/domain/types';
@@ -68,13 +69,11 @@ export async function submitNewsCardAnalysis(
             // the response. The schema-version prefix on the cache key is the
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
-            if (
-                cached !== null &&
-                typeof cached === 'object' &&
-                'sentiment' in cached &&
-                'summaryKo' in cached
-            ) {
-                return { status: 'cached', result: cached };
+            if (cached !== null) {
+                return {
+                    status: 'cached',
+                    result: normalizeNewsCardAnalysis(cached),
+                };
             }
         } catch (error) {
             console.error('[submitNewsCardAnalysis] Cache read failed:', error);

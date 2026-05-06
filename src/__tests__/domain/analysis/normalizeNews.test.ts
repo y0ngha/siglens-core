@@ -53,45 +53,40 @@ describe('normalizeNewsAnalysisResponse 함수는', () => {
         });
     });
 
-    describe('필수 필드가 누락된 JSON이 주어졌을 때', () => {
-        it('currentDriverKo가 없으면 에러를 던진다', () => {
-            const { currentDriverKo: _, ...rest } = validNewsAnalysis;
-            expect(() =>
-                normalizeNewsAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
+    describe('필드가 누락된 JSON이 주어졌을 때', () => {
+        it('누락 필드를 기본값으로 채운다', () => {
+            const result = normalizeNewsAnalysisResponse('{}');
+
+            expect(result).toEqual({
+                currentDriverKo: '',
+                keyEventsKo: [],
+                upcomingEventsKo: [],
+                overallSentiment: 'neutral',
+            });
         });
 
-        it('keyEventsKo가 없으면 에러를 던진다', () => {
-            const { keyEventsKo: _, ...rest } = validNewsAnalysis;
-            expect(() =>
-                normalizeNewsAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
+        it('문자열 배열의 잘못된 자식 값은 제거한다', () => {
+            const result = normalizeNewsAnalysisResponse(
+                JSON.stringify({
+                    keyEventsKo: ['실적 발표', null, 1, ''],
+                    upcomingEventsKo: ['FOMC', {}, ''],
+                })
+            );
 
-        it('upcomingEventsKo가 없으면 에러를 던진다', () => {
-            const { upcomingEventsKo: _, ...rest } = validNewsAnalysis;
-            expect(() =>
-                normalizeNewsAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('overallSentiment가 없으면 에러를 던진다', () => {
-            const { overallSentiment: _, ...rest } = validNewsAnalysis;
-            expect(() =>
-                normalizeNewsAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
+            expect(result.keyEventsKo).toEqual(['실적 발표']);
+            expect(result.upcomingEventsKo).toEqual(['FOMC']);
         });
     });
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
-        it('overallSentiment가 유효하지 않으면 에러를 던진다', () => {
+        it('overallSentiment가 유효하지 않으면 neutral로 정규화한다', () => {
             const invalid = {
                 ...validNewsAnalysis,
                 overallSentiment: 'positive',
             };
-            expect(() =>
+            expect(
                 normalizeNewsAnalysisResponse(JSON.stringify(invalid))
-            ).toThrow();
+            ).toMatchObject({ overallSentiment: 'neutral' });
         });
     });
 
@@ -139,63 +134,46 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
         });
     });
 
-    describe('필수 필드가 누락된 JSON이 주어졌을 때', () => {
-        it('titleKo가 없으면 에러를 던진다', () => {
-            const { titleKo: _, ...rest } = validNewsCard;
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(rest))
-            ).toThrow();
+    describe('필드가 누락된 JSON이 주어졌을 때', () => {
+        it('누락 필드를 기본값으로 채운다', () => {
+            const result = normalizeNewsCardAnalysis('{}');
+
+            expect(result).toEqual({
+                titleKo: '',
+                bodyKo: null,
+                summaryKo: '',
+                sentiment: 'neutral',
+                category: 'other',
+                priceImpact: 'negligible',
+            });
         });
 
-        it('summaryKo가 없으면 에러를 던진다', () => {
-            const { summaryKo: _, ...rest } = validNewsCard;
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(rest))
-            ).toThrow();
-        });
+        it('bodyKo가 문자열이나 null이 아니면 null로 정규화한다', () => {
+            const result = normalizeNewsCardAnalysis(
+                JSON.stringify({ bodyKo: { text: '본문' } })
+            );
 
-        it('sentiment가 없으면 에러를 던진다', () => {
-            const { sentiment: _, ...rest } = validNewsCard;
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('category가 없으면 에러를 던진다', () => {
-            const { category: _, ...rest } = validNewsCard;
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('priceImpact가 없으면 에러를 던진다', () => {
-            const { priceImpact: _, ...rest } = validNewsCard;
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(rest))
-            ).toThrow();
+            expect(result.bodyKo).toBeNull();
         });
     });
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
-        it('sentiment가 유효하지 않으면 에러를 던진다', () => {
+        it('sentiment가 유효하지 않으면 neutral로 정규화한다', () => {
             const invalid = { ...validNewsCard, sentiment: 'positive' };
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(invalid))
-            ).toThrow();
+            const result = normalizeNewsCardAnalysis(JSON.stringify(invalid));
+            expect(result.sentiment).toBe('neutral');
         });
 
-        it('category가 유효하지 않으면 에러를 던진다', () => {
+        it('category가 유효하지 않으면 other로 정규화한다', () => {
             const invalid = { ...validNewsCard, category: 'sports' };
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(invalid))
-            ).toThrow();
+            const result = normalizeNewsCardAnalysis(JSON.stringify(invalid));
+            expect(result.category).toBe('other');
         });
 
-        it('priceImpact가 유효하지 않으면 에러를 던진다', () => {
+        it('priceImpact가 유효하지 않으면 negligible로 정규화한다', () => {
             const invalid = { ...validNewsCard, priceImpact: 'critical' };
-            expect(() =>
-                normalizeNewsCardAnalysis(JSON.stringify(invalid))
-            ).toThrow();
+            const result = normalizeNewsCardAnalysis(JSON.stringify(invalid));
+            expect(result.priceImpact).toBe('negligible');
         });
     });
 

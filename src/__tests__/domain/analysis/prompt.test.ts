@@ -50,6 +50,7 @@ import type {
 } from '@/domain/types';
 
 const TEST_SYMBOL = 'AAPL';
+const TEST_COMPANY_NAME = 'Apple Inc.';
 const TEST_BAR_BASE_HIGH = 110;
 const TEST_BAR_BASE_LOW = 90;
 const TEST_BAR_BASE_VOLUME = 1000;
@@ -185,6 +186,7 @@ describe('prompt', () => {
         it('문자열을 반환한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -197,6 +199,7 @@ describe('prompt', () => {
         it('symbol이 프롬프트에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -209,6 +212,7 @@ describe('prompt', () => {
         it('현재가, 변화율, 거래량 모두 N/A를 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -224,6 +228,7 @@ describe('prompt', () => {
             const bars = [makeBar(0, TEST_CLOSE_PRICE)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -238,6 +243,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -249,6 +255,7 @@ describe('prompt', () => {
             const bars = [makeBar(0, TEST_CLOSE_PRICE)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -260,6 +267,7 @@ describe('prompt', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -272,6 +280,7 @@ describe('prompt', () => {
         it('RSI 값이 없을 때 N/A를 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ rsi: [] }),
                 []
@@ -283,19 +292,20 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 rsi: [null, null, TEST_RSI_VALUE],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_RSI_VALUE.toFixed(2));
         });
 
         it('전부 null인 RSI 배열일 때 N/A를 표시한다', () => {
             const indicators = makeIndicators({ rsi: [null, null, null] });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(`RSI(${RSI_DEFAULT_PERIOD}): N/A`);
         });
 
         it('MACD 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ macd: [] }),
                 []
@@ -307,7 +317,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 macd: [{ macd: null, signal: null, histogram: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain('MACD: N/A');
         });
 
@@ -321,7 +331,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_MACD_VALUE.toFixed(2));
             expect(result).toContain(TEST_SIGNAL_VALUE.toFixed(2));
             expect(result).toContain(TEST_HISTOGRAM_VALUE.toFixed(2));
@@ -330,6 +340,7 @@ describe('prompt', () => {
         it('볼린저 밴드 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ bollinger: [] }),
                 []
@@ -341,7 +352,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 bollinger: [{ upper: null, middle: null, lower: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain('Bollinger Bands: Upper N/A');
         });
 
@@ -355,7 +366,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_BOLLINGER_UPPER.toFixed(2));
             expect(result).toContain(TEST_BOLLINGER_MIDDLE.toFixed(2));
             expect(result).toContain(TEST_BOLLINGER_LOWER.toFixed(2));
@@ -364,6 +375,7 @@ describe('prompt', () => {
         it('DMI 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ dmi: [] }),
                 []
@@ -375,7 +387,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 dmi: [{ diPlus: null, diMinus: null, adx: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain('DMI: +DI N/A');
         });
 
@@ -389,7 +401,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_DI_PLUS.toFixed(2));
             expect(result).toContain(TEST_DI_MINUS.toFixed(2));
             expect(result).toContain(TEST_ADX_VALUE.toFixed(2));
@@ -398,6 +410,7 @@ describe('prompt', () => {
         it('Stochastic 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ stochastic: [] }),
                 []
@@ -411,7 +424,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 stochastic: [{ percentK: null, percentD: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(
                 `Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K N/A`
             );
@@ -426,7 +439,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_STOCHASTIC_K.toFixed(2));
             expect(result).toContain(TEST_STOCHASTIC_D.toFixed(2));
         });
@@ -434,6 +447,7 @@ describe('prompt', () => {
         it('StochRSI 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ stochRsi: [] }),
                 []
@@ -447,7 +461,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 stochRsi: [{ k: null, d: null }],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(
                 `StochRSI(${STOCH_RSI_RSI_PERIOD},${STOCH_RSI_STOCH_PERIOD},${STOCH_RSI_K_PERIOD},${STOCH_RSI_D_PERIOD}): K N/A`
             );
@@ -462,7 +476,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_STOCH_RSI_K.toFixed(2));
             expect(result).toContain(TEST_STOCH_RSI_D.toFixed(2));
         });
@@ -472,6 +486,7 @@ describe('prompt', () => {
         it('CCI 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ cci: [] }),
                 []
@@ -483,7 +498,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 cci: [null, null, null],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(`CCI(${CCI_DEFAULT_PERIOD}): N/A`);
         });
 
@@ -491,7 +506,7 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 cci: [null, TEST_CCI_VALUE],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_CCI_VALUE.toFixed(2));
         });
     });
@@ -500,6 +515,7 @@ describe('prompt', () => {
         it('volumeProfile이 null일 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ volumeProfile: null }),
                 []
@@ -518,7 +534,7 @@ describe('prompt', () => {
                     profile: [],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_VP_POC.toFixed(2));
             expect(result).toContain(TEST_VP_VAH.toFixed(2));
             expect(result).toContain(TEST_VP_VAL.toFixed(2));
@@ -529,6 +545,7 @@ describe('prompt', () => {
         it('ma가 빈 객체일 때 모든 기간이 N/A로 표시된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ ma: {} }),
                 []
@@ -548,7 +565,7 @@ describe('prompt', () => {
                     200: [null, null],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             MA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`MA(${p}): N/A`);
             });
@@ -564,7 +581,7 @@ describe('prompt', () => {
                     200: [null, TEST_MA_200_VALUE],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(`MA(5): ${TEST_MA_5_VALUE.toFixed(2)}`);
             expect(result).toContain(`MA(20): ${TEST_MA_20_VALUE.toFixed(2)}`);
             expect(result).toContain(`MA(60): ${TEST_MA_60_VALUE.toFixed(2)}`);
@@ -581,6 +598,7 @@ describe('prompt', () => {
         it('ema가 빈 객체일 때 모든 기간이 N/A로 표시된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ ema: {} }),
                 []
@@ -599,7 +617,7 @@ describe('prompt', () => {
                     60: [null, null],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             EMA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`EMA(${p}): N/A`);
             });
@@ -614,7 +632,7 @@ describe('prompt', () => {
                     60: [null, TEST_EMA_60_VALUE],
                 },
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(`EMA(9): ${TEST_EMA_9_VALUE.toFixed(2)}`);
             expect(result).toContain(
                 `EMA(20): ${TEST_EMA_20_VALUE.toFixed(2)}`
@@ -632,6 +650,7 @@ describe('prompt', () => {
         it('ichimoku 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ ichimoku: [] }),
                 []
@@ -653,7 +672,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(
                 `Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan N/A`
             );
@@ -671,7 +690,7 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(TEST_SYMBOL, [], indicators, []);
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], indicators, []);
             expect(result).toContain(TEST_ICHIMOKU_TENKAN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_KIJUN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_SENKOU_A.toFixed(2));
@@ -684,6 +703,7 @@ describe('prompt', () => {
         it('atr 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ atr: [] }),
                 []
@@ -694,6 +714,7 @@ describe('prompt', () => {
         it('atr 값을 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ atr: [null, TEST_ATR_VALUE] }),
                 []
@@ -708,6 +729,7 @@ describe('prompt', () => {
         it('obv 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ obv: [] }),
                 []
@@ -718,6 +740,7 @@ describe('prompt', () => {
         it('obv 값을 comma 포매팅하여 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ obv: [TEST_OBV_VALUE] }),
                 []
@@ -730,6 +753,7 @@ describe('prompt', () => {
         it('parabolicSar 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ parabolicSar: [] }),
                 []
@@ -740,6 +764,7 @@ describe('prompt', () => {
         it('parabolicSar 값과 trend를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({
                     parabolicSar: [{ sar: TEST_PSAR_VALUE, trend: 'up' }],
@@ -756,6 +781,7 @@ describe('prompt', () => {
         it('williamsR 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ williamsR: [] }),
                 []
@@ -768,6 +794,7 @@ describe('prompt', () => {
         it('williamsR 값을 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ williamsR: [null, TEST_WILLIAMS_R_VALUE] }),
                 []
@@ -782,6 +809,7 @@ describe('prompt', () => {
         it('supertrend 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ supertrend: [] }),
                 []
@@ -794,6 +822,7 @@ describe('prompt', () => {
         it('supertrend 값과 trend를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({
                     supertrend: [
@@ -812,6 +841,7 @@ describe('prompt', () => {
         it('mfi 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ mfi: [] }),
                 []
@@ -822,6 +852,7 @@ describe('prompt', () => {
         it('mfi 값을 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ mfi: [null, TEST_MFI_VALUE] }),
                 []
@@ -836,6 +867,7 @@ describe('prompt', () => {
         it('keltnerChannel 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ keltnerChannel: [] }),
                 []
@@ -848,6 +880,7 @@ describe('prompt', () => {
         it('keltnerChannel 값을 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({
                     keltnerChannel: [
@@ -870,6 +903,7 @@ describe('prompt', () => {
         it('cmf 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ cmf: [] }),
                 []
@@ -880,6 +914,7 @@ describe('prompt', () => {
         it('cmf 값을 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ cmf: [null, TEST_CMF_VALUE] }),
                 []
@@ -894,6 +929,7 @@ describe('prompt', () => {
         it('donchianChannel 배열이 비어있을 때 N/A를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({ donchianChannel: [] }),
                 []
@@ -906,6 +942,7 @@ describe('prompt', () => {
         it('donchianChannel 값을 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators({
                     donchianChannel: [
@@ -928,6 +965,7 @@ describe('prompt', () => {
         it('패턴 분석 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -938,6 +976,7 @@ describe('prompt', () => {
         it('활성화된 Skills 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -954,6 +993,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -968,6 +1008,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -982,6 +1023,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -996,6 +1038,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -1013,6 +1056,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1028,6 +1072,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1044,6 +1089,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1059,6 +1105,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1073,6 +1120,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1093,6 +1141,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1106,6 +1155,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1119,6 +1169,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1132,6 +1183,7 @@ describe('prompt', () => {
             const skill = makeSkill({ name: 'Wyckoff Theory' });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1145,6 +1197,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1163,6 +1216,7 @@ describe('prompt', () => {
             const regularSkill = makeSkill({ name: 'RSI Divergence' });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [patternSkill, regularSkill]
@@ -1180,6 +1234,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -1201,6 +1256,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -1214,6 +1270,7 @@ describe('prompt', () => {
         it('데이터 없음을 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1228,6 +1285,7 @@ describe('prompt', () => {
             const bars = [makeBar(0, TEST_CLOSE_PRICE)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1243,6 +1301,7 @@ describe('prompt', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1254,6 +1313,7 @@ describe('prompt', () => {
             const bars = Array.from({ length: 31 }, (_, i) => makeBar(i));
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1265,6 +1325,7 @@ describe('prompt', () => {
             const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1277,6 +1338,7 @@ describe('prompt', () => {
         it('데이터 없음을 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1291,6 +1353,7 @@ describe('prompt', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({
                     buySellVolume: [{ buyVolume: 600, sellVolume: 400 }],
@@ -1305,6 +1368,7 @@ describe('prompt', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({
                     buySellVolume: [{ buyVolume: 600, sellVolume: 400 }],
@@ -1319,6 +1383,7 @@ describe('prompt', () => {
         it('지지/저항 판단 가이드라인이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1329,6 +1394,7 @@ describe('prompt', () => {
         it('가격 목표 산출 가이드라인이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1339,6 +1405,7 @@ describe('prompt', () => {
         it('가이드라인 섹션은 분석 요청 섹션보다 앞에 위치한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1353,6 +1420,7 @@ describe('prompt', () => {
         it('JSON 형식 응답을 요청한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1363,6 +1431,7 @@ describe('prompt', () => {
         it('trend 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1373,6 +1442,7 @@ describe('prompt', () => {
         it('signals 필드는 요청에 포함되지 않는다 (deprecated)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1385,6 +1455,7 @@ describe('prompt', () => {
         it('indicatorResults 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1395,6 +1466,7 @@ describe('prompt', () => {
         it('keyLevels 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1405,6 +1477,7 @@ describe('prompt', () => {
         it('patternSummaries 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1415,6 +1488,7 @@ describe('prompt', () => {
         it('strategyResults 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1425,6 +1499,7 @@ describe('prompt', () => {
         it('riskLevel 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1435,6 +1510,7 @@ describe('prompt', () => {
         it('patternSummaries 스키마에 detected 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1445,6 +1521,7 @@ describe('prompt', () => {
         it('patternSummaries 스키마에 keyPrices 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1456,6 +1533,7 @@ describe('prompt', () => {
         it('patternSummaries 스키마에 patternLines 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1468,6 +1546,7 @@ describe('prompt', () => {
         it('patternSummaries 스키마의 keyPrices가 label/price 구조를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1478,6 +1557,7 @@ describe('prompt', () => {
         it('patternSummaries 스키마에 timeRange 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1488,6 +1568,7 @@ describe('prompt', () => {
         it('keyLevels 스키마에 reason 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1498,6 +1579,7 @@ describe('prompt', () => {
         it('keyLevels 스키마에 poc 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1508,6 +1590,7 @@ describe('prompt', () => {
         it('priceTargets 필드가 요청에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1518,6 +1601,7 @@ describe('prompt', () => {
         it('priceTargets 스키마에 bullish와 bearish 시나리오가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1531,6 +1615,7 @@ describe('prompt', () => {
         it('candlePatterns 스키마 키가 프롬프트에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1541,6 +1626,7 @@ describe('prompt', () => {
         it('가이드라인에 patternSummaries는 Skills 전용이라는 안내 문구가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1555,16 +1641,24 @@ describe('prompt', () => {
         it('trendlines 스키마 키가 프롬프트에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"direction": "ascending | descending"');
+            expect(result).toContain('"direction": "ascending"');
+            expect(result).toContain(
+                '- trendlines[].direction: "ascending", "descending"'
+            );
+            expect(result).not.toContain(
+                '"direction": "ascending | descending"'
+            );
         });
 
         it('가이드라인에 추세선 감지 지침이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1581,6 +1675,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1595,6 +1690,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1610,6 +1706,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -1621,6 +1718,7 @@ describe('prompt', () => {
         it('패턴 skill이 없을 때 patternSummaries 작성 규칙 안내가 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1635,6 +1733,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1651,6 +1750,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1665,6 +1765,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1680,6 +1781,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1692,12 +1794,14 @@ describe('prompt', () => {
         it('skills 파라미터를 생략하면 빈 배열과 동일하게 동작한다', () => {
             const withEmpty = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
             );
             const withDefault = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators()
             );
@@ -1709,6 +1813,7 @@ describe('prompt', () => {
         it('분석 요청 섹션에 한국어 응답 지시가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1719,6 +1824,7 @@ describe('prompt', () => {
         it('한국어 응답 지시는 JSON 스키마보다 앞에 위치한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1734,6 +1840,7 @@ describe('prompt', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1746,6 +1853,7 @@ describe('prompt', () => {
             const bars = makeEngulfingBars();
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1758,6 +1866,7 @@ describe('prompt', () => {
             const bars = makeEngulfingBars();
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1769,6 +1878,7 @@ describe('prompt', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1791,6 +1901,7 @@ describe('prompt', () => {
             const bars = [hammerBar, engulfingPrev, engulfingCurr];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1809,6 +1920,7 @@ describe('prompt', () => {
             const bars = makeEngulfingBars();
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1863,6 +1975,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 []
@@ -1879,6 +1992,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1894,6 +2008,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1908,6 +2023,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1918,6 +2034,7 @@ describe('prompt', () => {
         it('indicator_guide skill이 없을 때 Indicator Signal Guides 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -1938,6 +2055,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -1962,6 +2080,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [indicatorGuideSkill, patternSkill, regularSkill]
@@ -1982,6 +2101,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -1999,6 +2119,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2011,6 +2132,7 @@ describe('prompt', () => {
         it('indicator_guide skill이 없을 때 indicatorResults Writing Rules for Indicator Guides 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2033,6 +2155,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -2051,6 +2174,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2067,6 +2191,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2087,6 +2212,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [indicatorGuideSkill, patternSkill]
@@ -2108,6 +2234,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2125,6 +2252,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2140,6 +2268,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2155,6 +2284,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2171,6 +2301,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2184,11 +2315,20 @@ describe('prompt', () => {
         it('indicatorResults 스키마에 trend 필드가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"trend": "bullish | bearish | neutral"');
+            expect(result).toContain('"trend": "neutral"');
+            expect(result).toContain(
+                'trend and signal trend: "bullish", "bearish", or "neutral"'
+            );
+            expect(result).toContain(
+                'trendlines.direction: "ascending" or "descending"'
+            );
+            expect(result).toContain('"direction": "ascending"');
+            expect(result).not.toContain('"direction": "ascending | descending"');
         });
     });
 
@@ -2196,7 +2336,7 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(TEST_SYMBOL, [], makeIndicators(), []);
+            result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], makeIndicators(), []);
         });
 
         it('공통 Name Field Matching 섹션이 포함된다', () => {
@@ -2234,6 +2374,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2253,6 +2394,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2268,6 +2410,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2280,7 +2423,7 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(TEST_SYMBOL, [], makeIndicators(), []);
+            result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], makeIndicators(), []);
         });
 
         it('접근 가능한 언어 지시가 포함된다', () => {
@@ -2331,7 +2474,7 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(TEST_SYMBOL, [], makeIndicators(), []);
+            result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, [], makeIndicators(), []);
         });
 
         it('Action Recommendation Decision Tree 섹션이 포함된다', () => {
@@ -2347,13 +2490,26 @@ describe('prompt', () => {
 
         it('결정 트리 Step 2: 가격 계산 규칙이 포함된다', () => {
             expect(result).toContain('Step 2');
-            expect(result).toContain('REQUIRED for "enter" and "wait"');
-            expect(result).toContain('empty ONLY for "avoid"');
+            expect(result).toContain(
+                'For "enter" and "wait": entryPrices, stopLoss, and takeProfitPrices are REQUIRED.'
+            );
+            expect(result).toContain(
+                'For "avoid": entryPrices must be [], takeProfitPrices must be [], and stopLoss must be omitted.'
+            );
         });
 
         it('결정 트리 Step 3: 텍스트 필드 작성 지시가 포함된다', () => {
             expect(result).toContain('Step 3');
             expect(result).toContain('positionAnalysis');
+            expect(result).toContain(
+                'For "avoid", state that no long entry range is valid under the current data'
+            );
+            expect(result).toContain(
+                'For "avoid", do not invent exit prices'
+            );
+            expect(result).toContain(
+                'For "avoid", state that risk/reward cannot be calculated'
+            );
         });
 
         it('actionRecommendation 텍스트 필드를 문단과 목록으로 작성하도록 지시한다', () => {
@@ -2408,6 +2564,7 @@ describe('prompt', () => {
         it('Strategy Analysis 섹션에 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2419,6 +2576,7 @@ describe('prompt', () => {
         it('Active Skills 섹션에는 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2429,6 +2587,7 @@ describe('prompt', () => {
         it('Pattern Analysis 섹션에는 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2439,6 +2598,7 @@ describe('prompt', () => {
         it('strategy skill에 대한 strategyResults Writing Rules 지시사항이 생성된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2452,6 +2612,7 @@ describe('prompt', () => {
         it('strategyResults summary를 한 줄 나열이 아닌 마크다운 줄 단위로 작성하도록 지시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2467,6 +2628,7 @@ describe('prompt', () => {
         it('strategy skill이 없으면 strategyResults Writing Rules 지시사항이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2484,6 +2646,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2507,6 +2670,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [patternSkill, strategySkill, regularSkill]
@@ -2522,6 +2686,7 @@ describe('prompt', () => {
         it('strategyInstruction에 trend 필드 필수 + neutral fallback을 명시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2533,6 +2698,7 @@ describe('prompt', () => {
         it('strategyInstruction에 REQUIRED FIELDS 지시가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [strategySkill]
@@ -2549,6 +2715,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2564,6 +2731,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2578,6 +2746,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2588,6 +2757,7 @@ describe('prompt', () => {
         it('candlestick skill이 없을 때 Candlestick Pattern Guides 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2608,6 +2778,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -2640,6 +2811,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [
@@ -2670,6 +2842,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2687,6 +2860,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2699,6 +2873,7 @@ describe('prompt', () => {
         it('candlestick skill이 없을 때 candlePatterns Writing Rules 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2721,6 +2896,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -2741,6 +2917,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2756,6 +2933,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2766,6 +2944,7 @@ describe('prompt', () => {
         it('support_resistance skill이 없을 때 Support/Resistance Tool Guides 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2786,6 +2965,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -2803,6 +2983,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2820,6 +3001,7 @@ describe('prompt', () => {
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 [skill]
@@ -2832,6 +3014,7 @@ describe('prompt', () => {
         it('support_resistance skill이 없을 때 keyLevels Writing Rules 섹션이 포함되지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2854,6 +3037,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
@@ -2868,6 +3052,7 @@ describe('prompt', () => {
         it('분석 요청에 빈 배열 + null 방지 규칙이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2881,6 +3066,7 @@ describe('prompt', () => {
         it('분석 요청에 null 금지 + 빈 배열 사용 규칙이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2892,6 +3078,7 @@ describe('prompt', () => {
         it('분석 요청에 Critical Response Rules 섹션이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2904,6 +3091,7 @@ describe('prompt', () => {
         it('프롬프트에 Analysis Intent 블록이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2915,6 +3103,7 @@ describe('prompt', () => {
         it('Analysis Intent 블록이 데이터 분석 지시를 포함한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2926,6 +3115,7 @@ describe('prompt', () => {
         it('Analysis Intent 블록이 Timeframe 뒤에 위치한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2941,6 +3131,7 @@ describe('prompt', () => {
         it('Analysis Intent 블록이 Indicator Values 섹션보다 앞에 위치한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2956,6 +3147,7 @@ describe('prompt', () => {
         it('스키마에 예시 값 복사 금지 안내가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 []
@@ -2973,12 +3165,14 @@ describe('prompt', () => {
 
             const result1 = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 indicators,
                 skills
             );
             const result2 = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 indicators,
                 skills
@@ -2999,11 +3193,11 @@ describe('prompt', () => {
                 content: '## Alpha\n- content',
             });
 
-            const result1 = buildAnalysisPrompt(TEST_SYMBOL, bars, indicators, [
+            const result1 = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, bars, indicators, [
                 skillA,
                 skillB,
             ]);
-            const result2 = buildAnalysisPrompt(TEST_SYMBOL, bars, indicators, [
+            const result2 = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, bars, indicators, [
                 skillB,
                 skillA,
             ]);
@@ -3023,7 +3217,7 @@ describe('prompt', () => {
                 content: '## Apple\n- content',
             });
 
-            const result = buildAnalysisPrompt(TEST_SYMBOL, bars, indicators, [
+            const result = buildAnalysisPrompt(TEST_SYMBOL, TEST_COMPANY_NAME, bars, indicators, [
                 skillA,
                 skillB,
             ]);
@@ -3041,6 +3235,7 @@ describe('prompt', () => {
         it('should show insufficient data message when SMC is empty', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators()
             );
@@ -3067,6 +3262,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3104,6 +3300,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3127,6 +3324,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3155,6 +3353,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3184,6 +3383,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3209,6 +3409,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3229,6 +3430,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3249,6 +3451,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3270,6 +3473,7 @@ describe('prompt', () => {
             };
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ smc })
             );
@@ -3303,6 +3507,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3316,6 +3521,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3330,6 +3536,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3344,6 +3551,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3358,6 +3566,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3372,6 +3581,7 @@ describe('prompt', () => {
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3381,6 +3591,7 @@ describe('prompt', () => {
         it('should handle empty squeezeMomentum array', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: [] })
             );
@@ -3400,6 +3611,7 @@ describe('prompt', () => {
             );
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ squeezeMomentum: data })
             );
@@ -3413,6 +3625,7 @@ describe('prompt', () => {
         it('should include Confluence Assessment guidelines', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators()
             );
@@ -3435,6 +3648,7 @@ describe('prompt', () => {
         it('5Min 타임프레임에서는 해당 타임프레임의 recentBarsCount만큼 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 [],
@@ -3448,6 +3662,7 @@ describe('prompt', () => {
         it('1Day 타임프레임에서는 해당 타임프레임의 recentBarsCount만큼 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 [],
@@ -3461,6 +3676,7 @@ describe('prompt', () => {
         it('1Hour 타임프레임에서는 해당 타임프레임의 recentBarsCount만큼 표시한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
                 [],
@@ -3478,6 +3694,7 @@ describe('prompt', () => {
             }));
             const result5Min = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ buySellVolume }),
                 [],
@@ -3485,6 +3702,7 @@ describe('prompt', () => {
             );
             const result1Day = buildAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 bars,
                 makeIndicators({ buySellVolume }),
                 [],

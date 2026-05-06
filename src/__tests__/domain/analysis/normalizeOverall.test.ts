@@ -76,59 +76,40 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
         });
     });
 
-    describe('필수 필드가 누락된 JSON이 주어졌을 때', () => {
-        it('headlineKo가 없으면 에러를 던진다', () => {
-            const { headlineKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
+    describe('필드가 누락된 JSON이 주어졌을 때', () => {
+        it('누락 필드를 기본값으로 채운다', () => {
+            const result = normalizeOverallAnalysisResponse('{}');
+
+            expect(result).toEqual({
+                headlineKo: '',
+                technicalBulletsKo: [],
+                fundamentalBulletsKo: [],
+                newsBulletsKo: [],
+                threeAxisConclusionKo: '',
+                scenarios: [],
+                riskFactorsKo: [],
+            });
         });
 
-        it('technicalBulletsKo가 없으면 에러를 던진다', () => {
-            const { technicalBulletsKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
+        it('문자열 배열의 잘못된 자식 값은 제거한다', () => {
+            const result = normalizeOverallAnalysisResponse(
+                JSON.stringify({
+                    technicalBulletsKo: ['RSI 개선', null, 1, ''],
+                    fundamentalBulletsKo: ['EPS 성장', {}, ''],
+                    newsBulletsKo: ['실적 발표', false, ''],
+                    riskFactorsKo: ['금리 위험', [], ''],
+                })
+            );
 
-        it('fundamentalBulletsKo가 없으면 에러를 던진다', () => {
-            const { fundamentalBulletsKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('newsBulletsKo가 없으면 에러를 던진다', () => {
-            const { newsBulletsKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('threeAxisConclusionKo가 없으면 에러를 던진다', () => {
-            const { threeAxisConclusionKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('scenarios가 없으면 에러를 던진다', () => {
-            const { scenarios: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('riskFactorsKo가 없으면 에러를 던진다', () => {
-            const { riskFactorsKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeOverallAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
+            expect(result.technicalBulletsKo).toEqual(['RSI 개선']);
+            expect(result.fundamentalBulletsKo).toEqual(['EPS 성장']);
+            expect(result.newsBulletsKo).toEqual(['실적 발표']);
+            expect(result.riskFactorsKo).toEqual(['금리 위험']);
         });
     });
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
-        it('scenario name이 유효하지 않으면 에러를 던진다', () => {
+        it('scenario name이 유효하지 않으면 neutral로 정규화한다', () => {
             const invalid = {
                 ...validPayload,
                 scenarios: [
@@ -139,9 +120,41 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                     },
                 ],
             };
-            expect(() =>
+            expect(
                 normalizeOverallAnalysisResponse(JSON.stringify(invalid))
-            ).toThrow();
+            ).toMatchObject({
+                scenarios: [
+                    {
+                        name: 'neutral',
+                        triggerConditionKo: '조건',
+                        priceRangeKo: '범위',
+                    },
+                ],
+            });
+        });
+
+        it('객체가 아닌 scenario 자식은 제거한다', () => {
+            const result = normalizeOverallAnalysisResponse(
+                JSON.stringify({
+                    scenarios: [
+                        null,
+                        'bad',
+                        {
+                            name: 'bearish',
+                            triggerConditionKo: '지지선 이탈',
+                            priceRangeKo: '160~170달러',
+                        },
+                    ],
+                })
+            );
+
+            expect(result.scenarios).toEqual([
+                {
+                    name: 'bearish',
+                    triggerConditionKo: '지지선 이탈',
+                    priceRangeKo: '160~170달러',
+                },
+            ]);
         });
     });
 

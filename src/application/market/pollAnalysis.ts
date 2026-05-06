@@ -4,7 +4,6 @@ import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import type {
     PollAnalysisResult,
-    RawAnalysisResponse,
     Skill,
 } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -25,8 +24,7 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
  *
  * Returns one of three outcomes:
  * - `processing`: the worker has not finished yet. Caller should retry.
- * - `error`: the worker reported a failure, the result was missing, or the
- *   payload was malformed (`summary` / `trend` / `riskLevel` field absent).
+ * - `error`: the worker reported a failure or the result was missing.
  * - `done`: the result is ready. The raw worker response is enriched with
  *   skill-confidence weighting and reconciled against the latest close/ATR,
  *   then cached for the remaining timeframe-aware TTL before being returned.
@@ -93,17 +91,6 @@ export async function pollAnalysis(
         return { status: 'error', error: 'Result not found' };
     }
 
-    // getJobResult는 JSON.parse 결과를 반환하므로 unknown에서 Record<string, unknown>으로의
-    // 캐스트는 필드 존재 확인을 위한 안전한 타입 축소이다.
-    const candidate = rawResult as Record<string, unknown>;
-    if (!candidate.summary || !candidate.trend || !candidate.riskLevel) {
-        cleanupInBackground(jobId, '[Poll]', options);
-        return { status: 'error', error: 'Invalid response from worker' };
-    }
-    // summary/trend/riskLevel 필드 확인 통과; submitAnalysis가 JSON.stringify(RawAnalysisResponse)로
-    // 저장하고 getJobResult가 JSON.parse 후 반환하므로 구조가 RawAnalysisResponse와 일치한다.
-    const parsed = rawResult as RawAnalysisResponse;
-
     const skillsLoader = new FileSkillsLoader();
     // `skillsDegraded` reflects the poll-time skill-load state (the load that
     // produced the `skills` used by `enrichAnalysisWithConfidence` immediately
@@ -119,7 +106,7 @@ export async function pollAnalysis(
             return { skills: [] as Skill[], skillsDegraded: true };
         });
 
-    const enriched = enrichAnalysisWithConfidence(parsed, skills);
+    const enriched = enrichAnalysisWithConfidence(rawResult, skills);
 
     const reconciled = postProcessAnalysisWithReconcile(
         enriched,

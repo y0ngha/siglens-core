@@ -162,17 +162,6 @@ describe('pollAnalysis 함수는', () => {
             expect(mockCleanupJob).toHaveBeenCalled();
         });
 
-        it('summary가 없는 결과이면 Invalid response 에러를 반환한다', async () => {
-            mockGetJobResult.mockResolvedValueOnce({ trend: 'bullish' });
-
-            const result = await pollAnalysis('job-invalid');
-
-            expect(result.status).toBe('error');
-            if (result.status === 'error') {
-                expect(result.error).toBe('Invalid response from worker');
-            }
-        });
-
         it('meta가 있으면 모델 ID 포함 캐시 키로 저장한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));

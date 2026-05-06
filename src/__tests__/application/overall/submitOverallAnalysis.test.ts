@@ -269,10 +269,7 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(result.status).toBe('submitted');
         });
 
-        it('overall 캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
-            // Stale shape: missing the `headlineKo` and `scenarios` sentinel
-            // fields that the overall cache-hit guard requires. Submit must
-            // treat this as a miss and proceed with setJobMeta + fireAndForget.
+        it('overall 캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
             const stalePoisonedCache = {
                 overallSentiment: 'bullish',
                 oldField: true,
@@ -281,13 +278,20 @@ describe('submitOverallAnalysis 함수는', () => {
 
             const result = await submitOverallAnalysis(makeOptions());
 
-            expect(result.status).toBe('submitted');
-            if (result.status === 'submitted') {
-                expect(typeof result.jobId).toBe('string');
-                expect(result.jobId.length).toBeGreaterThan(0);
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                expect(result.result).toEqual({
+                    headlineKo: '',
+                    technicalBulletsKo: [],
+                    fundamentalBulletsKo: [],
+                    newsBulletsKo: [],
+                    threeAxisConclusionKo: '',
+                    scenarios: [],
+                    riskFactorsKo: [],
+                });
             }
-            expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
-            expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
         });
     });
 

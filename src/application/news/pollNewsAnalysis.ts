@@ -85,11 +85,7 @@ export async function pollNewsAnalysis(
     // Normalize it through the news response normalizer.
     let result: NewsAnalysisResponse;
     try {
-        const rawString =
-            typeof rawResult === 'string'
-                ? rawResult
-                : JSON.stringify(rawResult);
-        result = normalizeNewsAnalysisResponse(rawString);
+        result = normalizeNewsAnalysisResponse(rawResult);
     } catch (error) {
         console.error('[PollNews] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollNews]', options);

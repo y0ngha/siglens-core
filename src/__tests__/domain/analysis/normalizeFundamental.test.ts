@@ -56,48 +56,39 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
         });
     });
 
-    describe('필수 필드가 누락된 JSON이 주어졌을 때', () => {
-        it('overallConclusionKo가 없으면 에러를 던진다', () => {
-            const { overallConclusionKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeFundamentalAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
+    describe('필드가 누락된 JSON이 주어졌을 때', () => {
+        it('누락 필드를 기본값으로 채운다', () => {
+            const result = normalizeFundamentalAnalysisResponse('{}');
+
+            expect(result).toEqual({
+                overallConclusionKo: '',
+                categoryAssessments: [],
+                riskFactorsKo: [],
+                overallSentiment: 'neutral',
+            });
         });
 
-        it('categoryAssessments가 없으면 에러를 던진다', () => {
-            const { categoryAssessments: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeFundamentalAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
+        it('문자열 배열의 잘못된 자식 값은 제거한다', () => {
+            const result = normalizeFundamentalAnalysisResponse(
+                JSON.stringify({ riskFactorsKo: ['금리 위험', null, 1, ''] })
+            );
 
-        it('riskFactorsKo가 없으면 에러를 던진다', () => {
-            const { riskFactorsKo: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeFundamentalAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
-        });
-
-        it('overallSentiment가 없으면 에러를 던진다', () => {
-            const { overallSentiment: _, ...rest } = validPayload;
-            expect(() =>
-                normalizeFundamentalAnalysisResponse(JSON.stringify(rest))
-            ).toThrow();
+            expect(result.riskFactorsKo).toEqual(['금리 위험']);
         });
     });
 
     describe('잘못된 enum 값이 주어졌을 때', () => {
-        it('overallSentiment가 유효하지 않으면 에러를 던진다', () => {
+        it('overallSentiment가 유효하지 않으면 neutral로 정규화한다', () => {
             const invalid = {
                 ...validPayload,
                 overallSentiment: 'very_bullish',
             };
-            expect(() =>
+            expect(
                 normalizeFundamentalAnalysisResponse(JSON.stringify(invalid))
-            ).toThrow();
+            ).toMatchObject({ overallSentiment: 'neutral' });
         });
 
-        it('categoryAssessment의 sentiment가 유효하지 않으면 에러를 던진다', () => {
+        it('categoryAssessment의 sentiment가 유효하지 않으면 neutral로 정규화한다', () => {
             const invalid = {
                 ...validPayload,
                 categoryAssessments: [
@@ -107,12 +98,20 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
                     },
                 ],
             };
-            expect(() =>
+            expect(
                 normalizeFundamentalAnalysisResponse(JSON.stringify(invalid))
-            ).toThrow();
+            ).toMatchObject({
+                categoryAssessments: [
+                    {
+                        category: 'valuation',
+                        sentiment: 'neutral',
+                        rationaleKo: '밸류에이션이 합리적입니다.',
+                    },
+                ],
+            });
         });
 
-        it('categoryAssessment의 category가 유효하지 않으면 에러를 던진다', () => {
+        it('categoryAssessment의 category가 유효하지 않으면 valuation으로 정규화한다', () => {
             const invalid = {
                 ...validPayload,
                 categoryAssessments: [
@@ -122,9 +121,41 @@ describe('normalizeFundamentalAnalysisResponse 함수는', () => {
                     },
                 ],
             };
-            expect(() =>
+            expect(
                 normalizeFundamentalAnalysisResponse(JSON.stringify(invalid))
-            ).toThrow();
+            ).toMatchObject({
+                categoryAssessments: [
+                    {
+                        category: 'valuation',
+                        sentiment: 'bullish',
+                        rationaleKo: '밸류에이션이 합리적입니다.',
+                    },
+                ],
+            });
+        });
+
+        it('객체가 아닌 categoryAssessment 자식은 제거한다', () => {
+            const result = normalizeFundamentalAnalysisResponse(
+                JSON.stringify({
+                    categoryAssessments: [
+                        null,
+                        'bad',
+                        {
+                            category: 'growth',
+                            sentiment: 'bullish',
+                            rationaleKo: '성장성이 높습니다.',
+                        },
+                    ],
+                })
+            );
+
+            expect(result.categoryAssessments).toEqual([
+                {
+                    category: 'growth',
+                    sentiment: 'bullish',
+                    rationaleKo: '성장성이 높습니다.',
+                },
+            ]);
         });
     });
 

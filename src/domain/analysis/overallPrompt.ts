@@ -191,6 +191,7 @@ function formatNews(news: NewsAnalysisResponse): string {
  * (5Min–30Min) or positional (1Hour–1Day) interpretation weighting.
  *
  * @param symbol      - Stock ticker (e.g. `'AAPL'`).
+ * @param companyName - Full company name (e.g. `'Apple Inc.'`).
  * @param technical   - Completed technical analysis result.
  * @param fundamental - Completed fundamental analysis result.
  * @param news        - Completed news analysis result.
@@ -203,10 +204,46 @@ export function buildOverallAnalysisPrompt(
     fundamental: FundamentalAnalysisResponse,
     news: NewsAnalysisResponse,
     timeframe: Timeframe
+): string;
+export function buildOverallAnalysisPrompt(
+    symbol: string,
+    companyName: string,
+    technical: AnalysisResponse,
+    fundamental: FundamentalAnalysisResponse,
+    news: NewsAnalysisResponse,
+    timeframe: Timeframe
+): string;
+export function buildOverallAnalysisPrompt(
+    symbol: string,
+    companyNameOrTechnical: string | AnalysisResponse,
+    technicalOrFundamental: AnalysisResponse | FundamentalAnalysisResponse,
+    fundamentalOrNews: FundamentalAnalysisResponse | NewsAnalysisResponse,
+    newsOrTimeframe: NewsAnalysisResponse | Timeframe,
+    maybeTimeframe?: Timeframe
 ): string {
+    const companyName =
+        typeof companyNameOrTechnical === 'string'
+            ? companyNameOrTechnical
+            : symbol;
+    const technical =
+        typeof companyNameOrTechnical === 'string'
+            ? (technicalOrFundamental as AnalysisResponse)
+            : companyNameOrTechnical;
+    const fundamental =
+        typeof companyNameOrTechnical === 'string'
+            ? (fundamentalOrNews as FundamentalAnalysisResponse)
+            : (technicalOrFundamental as FundamentalAnalysisResponse);
+    const news =
+        typeof companyNameOrTechnical === 'string'
+            ? (newsOrTimeframe as NewsAnalysisResponse)
+            : (fundamentalOrNews as NewsAnalysisResponse);
+    const timeframe =
+        typeof companyNameOrTechnical === 'string'
+            ? (maybeTimeframe as Timeframe)
+            : (newsOrTimeframe as Timeframe);
     const { label, context } = TIMEFRAME_CONFIG[timeframe];
 
-    return `You are a senior equity analyst integrating technical, fundamental, and news analysis into a unified investment verdict. Analyse the three-axis data for ${symbol} on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
+    return `You are a senior equity analyst integrating technical, fundamental, and news analysis into a unified investment verdict. Analyse the three-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
 
 ## Timeframe Context
 ${context}

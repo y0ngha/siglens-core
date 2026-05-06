@@ -86,11 +86,7 @@ export async function pollOverallAnalysis(
     // Normalize the raw LLM response through the overall response normalizer.
     let result: OverallAnalysisResponse;
     try {
-        const rawString =
-            typeof rawResult === 'string'
-                ? rawResult
-                : JSON.stringify(rawResult);
-        result = normalizeOverallAnalysisResponse(rawString);
+        result = normalizeOverallAnalysisResponse(rawResult);
     } catch (error) {
         console.error('[PollOverall] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollOverall]', options);

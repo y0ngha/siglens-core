@@ -86,11 +86,7 @@ export async function pollFundamentalAnalysis(
     // Normalize it through the fundamental response normalizer.
     let result: FundamentalAnalysisResponse;
     try {
-        const rawString =
-            typeof rawResult === 'string'
-                ? rawResult
-                : JSON.stringify(rawResult);
-        result = normalizeFundamentalAnalysisResponse(rawString);
+        result = normalizeFundamentalAnalysisResponse(rawResult);
     } catch (error) {
         console.error('[PollFundamental] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollFundamental]', options);

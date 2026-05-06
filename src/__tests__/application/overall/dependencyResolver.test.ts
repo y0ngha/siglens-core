@@ -304,6 +304,7 @@ describe('resolveOverallDependencies 함수는', () => {
 
             expect(mockSubmitAnalysis).toHaveBeenCalledWith(
                 'TSLA',
+                'TSLA',
                 '4Hour',
                 false,
                 undefined,
@@ -330,6 +331,7 @@ describe('resolveOverallDependencies 함수는', () => {
             );
 
             expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.any(String),
                 expect.any(String),
                 false,
@@ -417,6 +419,7 @@ describe('resolveOverallDependencies 함수는', () => {
             );
 
             expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.any(String),
                 expect.any(String),
                 true,
@@ -514,6 +517,7 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(mockSubmitAnalysis).toHaveBeenCalledWith(
                 expect.any(String),
                 expect.any(String),
+                expect.any(String),
                 false,
                 undefined,
                 expect.any(Object)
@@ -555,7 +559,7 @@ describe('resolveOverallDependencies 함수는', () => {
                 { dropAxisUsage: true }
             );
 
-            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[4];
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
             expect(technicalOpts).not.toHaveProperty('usage');
 
             const fundamentalOpts =
@@ -575,7 +579,7 @@ describe('resolveOverallDependencies 함수는', () => {
                 })
             );
 
-            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[4];
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
             expect(technicalOpts).toMatchObject({ usage: fakeUsage });
 
             const fundamentalOpts =

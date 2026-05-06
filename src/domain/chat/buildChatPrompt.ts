@@ -14,9 +14,29 @@ import type {
     Timeframe,
 } from '@/domain/types';
 
+const TIMEFRAMES: readonly Timeframe[] = [
+    '5Min',
+    '15Min',
+    '30Min',
+    '1Hour',
+    '4Hour',
+    '1Day',
+];
+
+function isTimeframe(value: unknown): value is Timeframe {
+    return (
+        typeof value === 'string' &&
+        (TIMEFRAMES as readonly string[]).includes(value)
+    );
+}
+
 function formatKeyLevels(levels: KeyLevel[]): string {
     if (levels.length === 0) return 'None detected';
     return levels.map(l => `${l.price.toFixed(2)} (${l.reason})`).join(', ');
+}
+
+function formatPoc(poc: KeyLevel | undefined): string {
+    return poc ? `${poc.price.toFixed(2)} (${poc.reason})` : 'None detected';
 }
 
 function formatPriceTargets(
@@ -174,6 +194,7 @@ function formatCurrentAnalysisContext(
  * answer without re-fetching anything.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param companyName - Full company name (e.g. `"Apple Inc."`).
  * @param timeframe - The timeframe of the analysis being discussed.
  * @param analysis - The `AnalysisResponse` from a previously completed job.
  * @param history - Prior conversation turns; appended verbatim to the
@@ -193,16 +214,55 @@ export function buildChatPrompt(
     history: ChatMessage[],
     userMessage: string,
     currentAnalysisContext?: CurrentAnalysisContext
+): ChatPromptPayload;
+export function buildChatPrompt(
+    symbol: string,
+    companyName: string,
+    timeframe: Timeframe,
+    analysis: AnalysisResponse,
+    history: ChatMessage[],
+    userMessage: string,
+    currentAnalysisContext?: CurrentAnalysisContext
+): ChatPromptPayload;
+export function buildChatPrompt(
+    symbol: string,
+    companyNameOrTimeframe: string,
+    timeframeOrAnalysis: Timeframe | AnalysisResponse,
+    analysisOrHistory: AnalysisResponse | ChatMessage[],
+    historyOrUserMessage: ChatMessage[] | string,
+    userMessageOrContext?: string | CurrentAnalysisContext,
+    maybeCurrentAnalysisContext?: CurrentAnalysisContext
 ): ChatPromptPayload {
-    const rec = analysis.actionRecommendation;
+    const oldSignature = isTimeframe(companyNameOrTimeframe);
+    const companyName = oldSignature ? symbol : companyNameOrTimeframe;
+    const timeframe = oldSignature
+        ? companyNameOrTimeframe
+        : (timeframeOrAnalysis as Timeframe);
+    const analysis = oldSignature
+        ? (timeframeOrAnalysis as AnalysisResponse)
+        : (analysisOrHistory as AnalysisResponse);
+    const history = oldSignature
+        ? (analysisOrHistory as ChatMessage[])
+        : (historyOrUserMessage as ChatMessage[]);
+    const userMessage = oldSignature
+        ? (historyOrUserMessage as string)
+        : (userMessageOrContext as string);
+    const currentAnalysisContext = oldSignature
+        ? (userMessageOrContext as CurrentAnalysisContext | undefined)
+        : maybeCurrentAnalysisContext;
 
-    const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${symbol}.
+    const rec = analysis.actionRecommendation;
+    const subject =
+        companyName === symbol ? symbol : `${symbol} (${companyName})`;
+
+    const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject}.
 Ground every answer in the analysis data provided below.
+If a requested price, indicator, event, or market fact is not present in the provided analysis data, say in Korean that the data is not included instead of guessing.
 You MAY answer follow-up questions when they are clearly connected to this analysis, including:
 - a price level, support/resistance, target, stop, trend, risk, signal, pattern, indicator, or scenario mentioned in the analysis;
 - a concept that appeared in your previous answer in this conversation;
 - general technical-analysis knowledge needed to explain what the analysis means or how to monitor a related signal.
-When using general technical-analysis knowledge, clearly connect it back to ${symbol}'s provided analysis and avoid inventing new market data.
+When using general technical-analysis knowledge, clearly connect it back to ${subject}'s provided analysis and avoid inventing new market data.
 If asked about anything unrelated to this analysis (other stocks, unrelated macro topics, personal portfolio advice, or predictions that require data not provided here), politely decline in Korean: "이 분석 결과와 관련된 질문만 답변할 수 있어요."
 Do not refuse a question only because the exact wording is absent from the report if the question naturally follows from the analysis context.
 
@@ -215,7 +275,9 @@ When the answer contains multiple contexts, format it with readable markdown:
 - avoid returning one dense paragraph.
 
 === ANALYSIS DATA ===
-Symbol: ${symbol} | Timeframe: ${timeframe}
+Symbol: ${symbol}
+Company: ${companyName}
+Timeframe: ${timeframe}
 Overall Trend: ${analysis.trend} | Risk Level: ${analysis.riskLevel}
 
 Summary:
@@ -234,6 +296,7 @@ Trading Strategy:
 Key Levels:
 - Resistance: ${formatKeyLevels(analysis.keyLevels.resistance)}
 - Support: ${formatKeyLevels(analysis.keyLevels.support)}
+- POC: ${formatPoc(analysis.keyLevels.poc)}
 
 Detected Patterns: ${formatDetectedPatterns(analysis.patternSummaries)}
 

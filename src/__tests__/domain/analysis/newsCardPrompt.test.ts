@@ -56,6 +56,19 @@ describe('buildNewsCardAnalysisPrompt', () => {
 
         // Instruction to return JSON only
         expect(prompt).toContain('JSON');
+        expect(prompt).toContain('Data Boundary');
+        expect(prompt).toContain('untrusted source data');
+        expect(prompt).toContain('Do not fabricate missing article body text');
+        expect(prompt).toContain('## Allowed Values');
+        expect(prompt).toContain(
+            'sentiment: "bullish", "neutral", "bearish"'
+        );
+        expect(prompt).toContain(
+            'category: "earnings", "m_and_a", "guidance", "regulation", "macro", "product", "other"'
+        );
+        expect(prompt).toContain(
+            'priceImpact: "high", "medium", "low", "negligible"'
+        );
     });
 
     it('handles a news item with null body by omitting body section gracefully', () => {
@@ -71,5 +84,8 @@ describe('buildNewsCardAnalysisPrompt', () => {
         // Should not throw or include "null" as a raw literal in article body
         expect(prompt).not.toContain('\nbodyEn: null');
         expect(prompt).not.toContain('Body: null');
+        expect(prompt).toContain(
+            'prefer sentiment: "neutral" and priceImpact: "negligible" rather than guessing'
+        );
     });
 });

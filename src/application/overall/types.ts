@@ -38,6 +38,8 @@ export type OverallAxis = 'technical' | 'fundamental' | 'news';
 export interface OverallDependencyInputs {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
+    /** Company display name used by the technical-analysis prompt. Defaults to `symbol`. */
+    companyName?: string;
     /** Bar resolution used for the technical analysis axis. */
     timeframe: Timeframe;
     /** LLM model identifier scoped across all three axes. */

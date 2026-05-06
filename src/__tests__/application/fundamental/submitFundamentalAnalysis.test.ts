@@ -119,16 +119,13 @@ describe('submitFundamentalAnalysis 함수는', () => {
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
-                expect(result.result).toBe(mockCachedResult);
+                expect(result.result).toEqual(mockCachedResult);
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
-        it('캐시에 stale 한 형태가 들어 있으면 cache miss 처리 후 재제출한다', async () => {
-            // Stale shape: missing the `overallSentiment` sentinel field that the
-            // cache-hit guard requires. Submit must treat this as a miss and
-            // proceed with the full submit flow (setJobMeta + fireAndForget).
+        it('캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
             const stalePoisonedCache = {
                 overallConclusionKo: 'old shape',
                 someOtherField: true,
@@ -151,13 +148,17 @@ describe('submitFundamentalAnalysis 함수는', () => {
                 },
             });
 
-            expect(result.status).toBe('submitted');
-            if (result.status === 'submitted') {
-                expect(typeof result.jobId).toBe('string');
-                expect(result.jobId.length).toBeGreaterThan(0);
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                expect(result.result).toEqual({
+                    overallConclusionKo: 'old shape',
+                    categoryAssessments: [],
+                    riskFactorsKo: [],
+                    overallSentiment: 'neutral',
+                });
             }
-            expect(mockSetJobMeta).toHaveBeenCalled();
-            expect(mockFireAndForget).toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
             expect(recordUsage).toHaveBeenCalledTimes(1);
         });
     });

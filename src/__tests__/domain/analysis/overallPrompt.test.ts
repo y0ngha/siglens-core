@@ -10,6 +10,7 @@ import type {
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const TEST_SYMBOL = 'TSLA';
+const TEST_COMPANY_NAME = 'Tesla, Inc.';
 
 const MOCK_TECHNICAL: AnalysisResponse = {
     summary: '기술적 분석 요약입니다. RSI 과매도, MACD 하락 추세.',
@@ -84,6 +85,7 @@ describe('buildOverallAnalysisPrompt', () => {
     it('produces prompt with intraday timeframe context for 5Min', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,
+            TEST_COMPANY_NAME,
             MOCK_TECHNICAL,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,
@@ -105,6 +107,7 @@ describe('buildOverallAnalysisPrompt', () => {
     it('produces prompt with positional context for 1Day', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,
+            TEST_COMPANY_NAME,
             MOCK_TECHNICAL,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,
@@ -125,6 +128,7 @@ describe('buildOverallAnalysisPrompt', () => {
     it('embeds technical, fundamental, and news summary content in the prompt', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,
+            TEST_COMPANY_NAME,
             MOCK_TECHNICAL,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,
@@ -199,6 +203,7 @@ describe('buildOverallAnalysisPrompt', () => {
 
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,
+            TEST_COMPANY_NAME,
             technicalWithSignals,
             MOCK_FUNDAMENTAL,
             MOCK_NEWS,

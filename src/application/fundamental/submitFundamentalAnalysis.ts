@@ -11,6 +11,7 @@ import type {
     SubmitFundamentalAnalysisLimitError,
     SubmitFundamentalAnalysisFetchError,
 } from '@/application/fundamental/types';
+import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { TIER_CONFIG } from '@/domain/tier';
@@ -235,13 +236,10 @@ export async function submitFundamentalAnalysis(
             // the response. The schema-version prefix on the cache key is the
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
-            if (
-                cached !== null &&
-                typeof cached === 'object' &&
-                'overallSentiment' in cached
-            ) {
+            if (cached !== null) {
+                const result = normalizeFundamentalAnalysisResponse(cached);
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
-                return { status: 'cached', result: cached };
+                return { status: 'cached', result };
             }
         } catch (error) {
             console.error(

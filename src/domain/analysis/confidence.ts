@@ -13,6 +13,8 @@ import type {
 } from '@/domain/types';
 import {
     asArray,
+    asNumber,
+    asObject,
     asString,
     compact,
 } from '@/domain/analysis/normalizePrimitives';
@@ -28,6 +30,7 @@ import {
     normalizeTrend,
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
+import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
 
 interface SkillLookup {
     byName: Map<string, Skill>;
@@ -138,7 +141,7 @@ export function enrichAnalysisWithConfidence(
     );
 
     return {
-        summary: asString(raw.summary),
+        summary: asString(raw.summary, 'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'),
         trend: normalizeTrend(raw.trend),
         indicatorResults,
         riskLevel: normalizeRiskLevel(raw.riskLevel),
@@ -170,5 +173,120 @@ export function enrichAnalysisWithConfidence(
                 id: candlePatternIds[index],
             })
         ),
+    };
+}
+
+function normalizeCachedPatternResult(
+    item: unknown,
+    fallbackId: string
+): PatternResult | null {
+    const base = normalizePatternSummary(item);
+    if (!base) return null;
+
+    const raw = asObject(item);
+    const renderConfig = asObject(raw?.renderConfig)
+        ? (raw?.renderConfig as PatternResult['renderConfig'])
+        : undefined;
+
+    return {
+        ...base,
+        id: asString(raw?.id, fallbackId),
+        confidenceWeight:
+            asNumber(raw?.confidenceWeight) ??
+            UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
+        renderConfig,
+    };
+}
+
+function normalizeCachedStrategyResult(
+    item: unknown,
+    fallbackId: string
+): StrategyResult | null {
+    const base = normalizeStrategyResult(item);
+    if (!base) return null;
+
+    const raw = asObject(item);
+
+    return {
+        ...base,
+        id: asString(raw?.id, fallbackId),
+        confidenceWeight:
+            asNumber(raw?.confidenceWeight) ??
+            UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
+    };
+}
+
+function normalizeCachedCandlePattern(
+    item: unknown,
+    fallbackId: string
+): CandlePatternSummary | null {
+    const base = normalizeCandlePatternSummary(item);
+    if (!base) return null;
+
+    const raw = asObject(item);
+
+    return {
+        ...base,
+        id: asString(raw?.id, fallbackId),
+    };
+}
+
+function parseCachedPayload(raw: unknown): unknown {
+    return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
+}
+
+/**
+ * Normalize an already-cached technical analysis response without re-matching
+ * it against the current skills list.
+ *
+ * Cache entries are normally written after `enrichAnalysisWithConfidence`, so
+ * they may already contain stable ids, confidence weights, render config, and
+ * reconciliation metadata. This path preserves those fields when present while
+ * still filling missing top-level and child fields with safe defaults.
+ *
+ * @param rawInput - Cached analysis payload read from Redis.
+ * @returns A fully-normalized {@link AnalysisResponse}.
+ */
+export function normalizeCachedAnalysisResponse(
+    rawInput: unknown
+): AnalysisResponse {
+    const raw = (asObject(parseCachedPayload(rawInput)) ??
+        {}) as RawAnalysisResponse;
+
+    const patternSummaries = compact(
+        asArray(raw.patternSummaries).map((item, index) =>
+            normalizeCachedPatternResult(item, `pattern_${index}`)
+        )
+    );
+    const strategyResults = compact(
+        asArray(raw.strategyResults).map((item, index) =>
+            normalizeCachedStrategyResult(item, `strategy_${index}`)
+        )
+    );
+    const candlePatterns = compact(
+        asArray(raw.candlePatterns).map((item, index) =>
+            normalizeCachedCandlePattern(item, `candle_${index}`)
+        )
+    );
+
+    const analyzedAt = asString(raw.analyzedAt);
+
+    return {
+        summary: asString(raw.summary, 'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'),
+        trend: normalizeTrend(raw.trend),
+        indicatorResults: compact(
+            asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)
+        ),
+        riskLevel: normalizeRiskLevel(raw.riskLevel),
+        keyLevels: normalizeKeyLevels(raw.keyLevels),
+        priceTargets: normalizePriceTargets(raw.priceTargets),
+        trendlines: compact(asArray(raw.trendlines).map(normalizeTrendline)),
+        actionRecommendation: normalizeActionRecommendation(
+            raw.actionRecommendation
+        ),
+        patternSummaries,
+        strategyResults,
+        candlePatterns,
+        ...(analyzedAt ? { analyzedAt } : {}),
     };
 }

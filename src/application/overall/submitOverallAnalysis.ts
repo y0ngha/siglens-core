@@ -10,6 +10,7 @@ import {
     checkAnalysisUsageAllowed,
     recordAnalysisUsageSafely,
 } from '@/application/usage';
+import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { TIER_CONFIG } from '@/domain/tier';
@@ -78,7 +79,7 @@ function stripVolatileTechnicalFields(
 export async function submitOverallAnalysis(
     options: SubmitOverallAnalysisOptions
 ): Promise<SubmitOverallAnalysisResult> {
-    const { symbol, timeframe, modelId } = options;
+    const { symbol, companyName = symbol, timeframe, modelId } = options;
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
@@ -160,14 +161,10 @@ export async function submitOverallAnalysis(
             // the response. The schema-version prefix on the cache key is the
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
-            if (
-                cached !== null &&
-                typeof cached === 'object' &&
-                'headlineKo' in cached &&
-                'scenarios' in cached
-            ) {
+            if (cached !== null) {
+                const result = normalizeOverallAnalysisResponse(cached);
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
-                return { status: 'cached', result: cached };
+                return { status: 'cached', result };
             }
         } catch (error) {
             console.error('[submitOverallAnalysis] Cache read failed:', error);
@@ -178,6 +175,7 @@ export async function submitOverallAnalysis(
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildOverallAnalysisPrompt(
         symbol,
+        companyName,
         deps.technical,
         deps.fundamental,
         deps.news,

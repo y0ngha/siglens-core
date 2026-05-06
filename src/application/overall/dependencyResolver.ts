@@ -77,6 +77,7 @@ export async function resolveOverallDependencies(
 ): Promise<DependencyState> {
     const {
         symbol,
+        companyName = symbol,
         timeframe,
         modelId,
         fundamentalProvider,
@@ -149,10 +150,17 @@ export async function resolveOverallDependencies(
 
     // ── Kick off all three axes in parallel ──
     const [technicalResult, fundamentalResult, newsResult] = await Promise.all([
-        submitAnalysis(symbol, timeframe, technicalForce, technicalFmpSymbol, {
-            ...technicalAxisOptions,
-            modelId: technicalAxisOptions.modelId ?? modelId,
-        }),
+        submitAnalysis(
+            symbol,
+            companyName,
+            timeframe,
+            technicalForce,
+            technicalFmpSymbol,
+            {
+                ...technicalAxisOptions,
+                modelId: technicalAxisOptions.modelId ?? modelId,
+            }
+        ),
         submitFundamentalAnalysis({
             symbol,
             modelId,

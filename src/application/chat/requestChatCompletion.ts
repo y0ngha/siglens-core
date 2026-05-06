@@ -325,6 +325,7 @@ export async function requestChatCompletion(
 
     const prompt = buildChatPrompt(
         params.symbol,
+        params.companyName ?? params.symbol,
         params.timeframe,
         params.analysis,
         params.history,

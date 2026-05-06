@@ -652,26 +652,26 @@ const ANALYSIS_RESPONSE_SCHEMA: Record<
 > = {
     summary:
         '"A comprehensive, accessible Korean markdown summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock and what does it mean for the investor? Use \\n\\n between paragraphs, and use short bullet lists only when they improve readability."',
-    trend: '"bullish | bearish | neutral"',
+    trend: '"neutral"',
     indicatorResults:
-        '[{ "indicatorName": "RSI Signal Guide", "signals": [{ "type": "skill", "description": "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능", "strength": "strong | moderate | weak", "trend": "bullish | bearish | neutral" }] }]',
-    riskLevel: '"low | medium | high"',
+        '[{ "indicatorName": "RSI Signal Guide", "signals": [{ "type": "skill", "description": "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능", "strength": "moderate", "trend": "neutral" }] }]',
+    riskLevel: '"medium"',
     keyLevels:
         '{ "support": [{ "price": 150.00, "reason": "..." }], "resistance": [{ "price": 160.00, "reason": "..." }], "poc": { "price": 155.00, "reason": "..." } }',
     priceTargets:
         '{ "bullish": { "targets": [{ "price": 165.00, "basis": "..." }], "condition": "..." }, "bearish": { "targets": [{ "price": 145.00, "basis": "..." }], "condition": "..." } }',
     patternSummaries:
         // Only chart patterns defined in skills/*.md. Candle patterns go in candlePatterns.
-        '[{ "patternName": "...", "skillName": "...", "detected": true, "trend": "bullish | bearish | neutral", "summary": "...", "keyPrices": [{ "label": "넥라인", "price": 150.00 }], "patternLines": [{ "label": "상단 추세선", "start": { "time": 1700000000, "price": 155.00 }, "end": { "time": 1700100000, "price": 152.00 } }, { "label": "하단 추세선", "start": { "time": 1700000000, "price": 148.00 }, "end": { "time": 1700100000, "price": 146.00 } }], "timeRange": { "start": 1700000000, "end": 1700100000 } }]',
+        '[{ "patternName": "...", "skillName": "...", "detected": true, "trend": "neutral", "summary": "...", "keyPrices": [{ "label": "넥라인", "price": 150.00 }], "patternLines": [{ "label": "상단 추세선", "start": { "time": 1700000000, "price": 155.00 }, "end": { "time": 1700100000, "price": 152.00 } }, { "label": "하단 추세선", "start": { "time": 1700000000, "price": 148.00 }, "end": { "time": 1700100000, "price": 146.00 } }], "timeRange": { "start": 1700000000, "end": 1700100000 } }]',
     strategyResults:
-        '[{ "strategyName": "...", "trend": "bullish | bearish | neutral (REQUIRED — never omit)", "summary": "Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes" }]',
+        '[{ "strategyName": "...", "trend": "neutral", "summary": "Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes" }]',
     candlePatterns:
         // Only candle patterns detected from bar data. Skills patterns go in patternSummaries.
         '[{ "patternName": "three_outside_down", "detected": true, "trend": "bearish", "summary": "..." }]',
     trendlines:
-        '[{ "direction": "ascending | descending", "start": { "time": 1700000000, "price": 150.00 }, "end": { "time": 1700100000, "price": 155.00 } }]',
+        '[{ "direction": "ascending", "start": { "time": 1700000000, "price": 150.00 }, "end": { "time": 1700100000, "price": 155.00 } }]',
     actionRecommendation:
-        '{ "positionAnalysis": "Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n", "entry": "Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n", "exit": "Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n", "riskReward": "Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence", "entryRecommendation": "enter | wait | avoid", "entryPrices": [165.00, 167.00], "stopLoss": 160.00, "takeProfitPrices": [180.00, 195.00] }',
+        '{ "positionAnalysis": "Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n", "entry": "Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n", "exit": "Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n", "riskReward": "Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence", "entryRecommendation": "wait", "entryPrices": [165.00, 167.00], "stopLoss": 160.00, "takeProfitPrices": [180.00, 195.00] }',
 };
 
 const ANALYSIS_INTENT_BLOCK = [
@@ -782,15 +782,17 @@ const ANALYSIS_GUIDELINES = [
     '  - "enter": price near support + bullish confluence from 2+ categories + risk level not high',
     '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals)',
     '  - "avoid": price extended from support, strong resistance overhead, risk high, or bearish confluence dominates',
-    '- Step 2 — Compute prices (REQUIRED for "enter" and "wait"; empty ONLY for "avoid"):',
+    '- Step 2 — Compute prices:',
+    '  - For "enter" and "wait": entryPrices, stopLoss, and takeProfitPrices are REQUIRED.',
+    '  - For "avoid": entryPrices must be [], takeProfitPrices must be [], and stopLoss must be omitted. Do not use null, 0, or made-up placeholder prices.',
     '  - entryPrices: [low, high] range near support. Must match the entry text field exactly.',
     '  - stopLoss: single number below nearest support. Must match the exit text field exactly.',
     '  - takeProfitPrices: ascending order (lowest first). Must match the exit text field exactly.',
     '- Step 3 — Write text fields in plain Korean:',
     '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
-    '  - entry: specific long buy price ranges with reasoning. Always provide specific prices, not vague descriptions.',
-    '  - exit: take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry)',
-    '  - riskReward: ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3")',
+    '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state that no long entry range is valid under the current data and explain why.',
+    '  - exit: for "enter" and "wait", provide take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry). For "avoid", do not invent exit prices; state that exit planning is not applicable without a valid long entry.',
+    '  - riskReward: for "enter" and "wait", provide a ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3"). For "avoid", state that risk/reward cannot be calculated because there is no valid long setup.',
     '- Step 3 formatting: each actionRecommendation text field must be readable markdown Korean. Use \\n\\n between context paragraphs, and use bullet lists for multiple prices or conditions.',
     '- Consistency: entryPrices, stopLoss, takeProfitPrices must numerically match the text in entry/exit fields — they are the same prices in structured form for chart rendering.',
     '',
@@ -803,10 +805,18 @@ const CRITICAL_RESPONSE_RULES = [
     '',
     '### Critical Response Rules',
     '- For array fields that have no results, return an empty array []. Never return null or omit the field.',
-    '- For optional object fields (poc in keyLevels, actionRecommendation), provide the full object or omit the field entirely. Never set to null.',
+    '- For optional object fields (poc in keyLevels, actionRecommendation), provide an object that follows the field rules or omit the field entirely. Never set the object itself to null.',
     '- Array elements must be valid objects. Never include null or undefined inside arrays.',
     '- All numeric price values must be plain numbers (e.g., 150.25), not strings.',
     '- All Unix timestamp values must be integers copied verbatim from the [ts:<number>] markers in the bar data.',
+    '- Enum fields must contain exactly one allowed literal, never pipe-separated text. trend and signal trend: "bullish", "bearish", or "neutral"; riskLevel: "low", "medium", or "high"; signal strength: "strong", "moderate", or "weak"; entryRecommendation: "enter", "wait", or "avoid"; trendlines.direction: "ascending" or "descending".',
+    '',
+    '### Allowed Enum Values',
+    '- trend / signals[].trend / patternSummaries[].trend / strategyResults[].trend / candlePatterns[].trend: "bullish", "bearish", "neutral"',
+    '- riskLevel: "low", "medium", "high"',
+    '- indicatorResults[].signals[].strength: "strong", "moderate", "weak"',
+    '- actionRecommendation.entryRecommendation: "enter", "wait", "avoid"',
+    '- trendlines[].direction: "ascending", "descending"',
 ].join('\n');
 
 const buildAnalysisRequest = (
@@ -872,7 +882,7 @@ const buildAnalysisRequest = (
                   '- Use the Indicator Signal Guides above to interpret the current indicator values in ## Indicator Values.',
                   '- For each indicator guide, evaluate whether the current values meet any signal condition described in its Signal Interpretation section.',
                   '- For every detected signal, add one entry to the indicatorResults array in the following exact format:',
-                  '    { "indicatorName": "<exact skill name from the list below>", "signals": [{ "type": "skill", "description": "<Korean explanation>", "strength": "strong | moderate | weak", "trend": "bullish | bearish | neutral" }] }',
+                  '    { "indicatorName": "<exact skill name from the list below>", "signals": [{ "type": "skill", "description": "<Korean explanation>", "strength": "moderate", "trend": "neutral" }] }',
                   '- CRITICAL RULES (never violate):',
                   '  1. indicatorName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST be a non-empty string — never use an empty string, a translated name, or a generic label.',
                   '  2. Each indicatorResults entry corresponds to EXACTLY ONE indicator guide. Never combine multiple indicators (e.g., "MACD and Bollinger") into one entry. Create separate entries for separate indicators.',
@@ -981,6 +991,7 @@ function byName(a: Skill, b: Skill): number {
  * `PROMPT_CONFIG_BY_TIMEFRAME`.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
+ * @param companyName - Full English company name (e.g. `"Apple Inc."`).
  * @param bars - OHLCV bars sorted oldest-first.
  * @param indicators - Indicator suite produced by {@link calculateIndicators}.
  * @param skills - Skill definitions to inject (defaults to none).
@@ -992,6 +1003,7 @@ function byName(a: Skill, b: Skill): number {
  */
 export function buildAnalysisPrompt(
     symbol: string,
+    companyName: string,
     bars: Bar[],
     indicators: IndicatorResult,
     skills: Skill[] = [],
@@ -1023,7 +1035,7 @@ export function buildAnalysisPrompt(
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
     const sections = [
-        `Symbol: ${symbol}`,
+        `Symbol: ${symbol}\nCompany: ${companyName}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
         ANALYSIS_INTENT_BLOCK,
         ANALYSIS_GUIDELINES,

@@ -9,6 +9,7 @@ import {
     checkAnalysisUsageAllowed,
     recordAnalysisUsageSafely,
 } from '@/application/usage';
+import { normalizeCachedAnalysisResponse } from '@/domain/analysis/confidence';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { lastNonNull } from '@/domain/indicators/utils';
@@ -29,6 +30,73 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+const TIMEFRAMES: readonly Timeframe[] = [
+    '5Min',
+    '15Min',
+    '30Min',
+    '1Hour',
+    '4Hour',
+    '1Day',
+];
+
+function isTimeframe(value: unknown): value is Timeframe {
+    return (
+        typeof value === 'string' &&
+        (TIMEFRAMES as readonly string[]).includes(value)
+    );
+}
+
+interface ResolvedSubmitAnalysisArgs {
+    companyName: string;
+    timeframe: Timeframe;
+    force: boolean;
+    fmpSymbol: string | undefined;
+    options: SubmitAnalysisOptions;
+}
+
+function resolveSubmitAnalysisArgs(
+    symbol: string,
+    companyNameOrTimeframe: string,
+    timeframeOrForce?: Timeframe | boolean,
+    forceOrFmpSymbol?: boolean | string,
+    fmpSymbolOrOptions?: string | SubmitAnalysisOptions,
+    maybeOptions?: SubmitAnalysisOptions
+): ResolvedSubmitAnalysisArgs {
+    if (isTimeframe(companyNameOrTimeframe)) {
+        return {
+            companyName: symbol,
+            timeframe: companyNameOrTimeframe,
+            force:
+                typeof timeframeOrForce === 'boolean'
+                    ? timeframeOrForce
+                    : false,
+            fmpSymbol:
+                typeof forceOrFmpSymbol === 'string'
+                    ? forceOrFmpSymbol
+                    : undefined,
+            options:
+                typeof fmpSymbolOrOptions === 'object' &&
+                fmpSymbolOrOptions !== null
+                    ? fmpSymbolOrOptions
+                    : {},
+        };
+    }
+
+    return {
+        companyName: companyNameOrTimeframe,
+        timeframe: timeframeOrForce as Timeframe,
+        force: typeof forceOrFmpSymbol === 'boolean' ? forceOrFmpSymbol : false,
+        fmpSymbol:
+            typeof fmpSymbolOrOptions === 'string'
+                ? fmpSymbolOrOptions
+                : undefined,
+        options:
+            maybeOptions ??
+            (typeof fmpSymbolOrOptions === 'object' && fmpSymbolOrOptions !== null
+                ? fmpSymbolOrOptions
+                : {}),
+    };
+}
 
 /**
  * Submit an analysis job for a given symbol/timeframe.
@@ -68,6 +136,8 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  * @example
  * ```ts
  * const submission = await submitAnalysis('AAPL', '1Day');
+ * // or include a company display name for the prompt:
+ * const named = await submitAnalysis('AAPL', 'Apple Inc.', '1Day');
  * if (submission.status === 'cached') return submission.result;
  * if (submission.status === 'error') return submission.error;
  * const polled = await pollAnalysis(submission.jobId);
@@ -79,10 +149,36 @@ const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 export async function submitAnalysis(
     symbol: string,
     timeframe: Timeframe,
-    force: boolean = false,
+    force?: boolean,
     fmpSymbol?: string,
-    options: SubmitAnalysisOptions = {}
+    options?: SubmitAnalysisOptions
+): Promise<SubmitAnalysisGatedResult>;
+export async function submitAnalysis(
+    symbol: string,
+    companyName: string,
+    timeframe: Timeframe,
+    force?: boolean,
+    fmpSymbol?: string,
+    options?: SubmitAnalysisOptions
+): Promise<SubmitAnalysisGatedResult>;
+export async function submitAnalysis(
+    symbol: string,
+    companyNameOrTimeframe: string,
+    timeframeOrForce?: Timeframe | boolean,
+    forceOrFmpSymbol?: boolean | string,
+    fmpSymbolOrOptions?: string | SubmitAnalysisOptions,
+    maybeOptions?: SubmitAnalysisOptions
 ): Promise<SubmitAnalysisGatedResult> {
+    const { companyName, timeframe, force, fmpSymbol, options } =
+        resolveSubmitAnalysisArgs(
+            symbol,
+            companyNameOrTimeframe,
+            timeframeOrForce,
+            forceOrFmpSymbol,
+            fmpSymbolOrOptions,
+            maybeOptions
+        );
+
     const tier = options.tierContext?.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
@@ -125,12 +221,13 @@ export async function submitAnalysis(
         try {
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
+                const result = normalizeCachedAnalysisResponse(cached);
                 await recordAnalysisUsageSafely(
                     usage,
                     effectiveModelId,
                     usageOccurredAt
                 );
-                return { status: 'cached', result: cached };
+                return { status: 'cached', result };
             }
         } catch (error) {
             console.error('[Submit] Cache read failed:', error);
@@ -159,6 +256,7 @@ export async function submitAnalysis(
 
     const prompt = buildAnalysisPrompt(
         symbol,
+        companyName,
         bars,
         indicators,
         skills,

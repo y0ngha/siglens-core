@@ -23,6 +23,8 @@ export type ChatErrorCode =
 
 export interface RequestChatCompletionParams {
     symbol: string;
+    /** Full company name forwarded to the chat prompt. Defaults to `symbol` when omitted. */
+    companyName?: string;
     timeframe: Timeframe;
     analysis: AnalysisResponse;
     history: ChatMessage[];

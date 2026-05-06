@@ -11,6 +11,7 @@ import type {
     PriceScenario,
     PriceTarget,
     PriceTargets,
+    ReconciledActionLevels,
     RawPatternSummary,
     RawStrategyResult,
     RiskLevel,
@@ -274,5 +275,21 @@ export function normalizeActionRecommendation(
         entryPrices: normalizeNumberArray(o.entryPrices),
         stopLoss: asNumber(o.stopLoss),
         takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
+        reconciledLevels: normalizeReconciledActionLevels(o.reconciledLevels),
+    };
+}
+
+export function normalizeReconciledActionLevels(
+    raw: unknown
+): ReconciledActionLevels | undefined {
+    const o = asObject(raw);
+    if (!o) return undefined;
+
+    return {
+        stopLoss: asNumber(o.stopLoss),
+        takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
+        exit: asString(o.exit),
+        riskReward: asString(o.riskReward),
+        reason: asString(o.reason),
     };
 }

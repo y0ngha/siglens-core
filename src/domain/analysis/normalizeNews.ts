@@ -4,7 +4,10 @@ import type {
     NewsCategory,
     NewsImpact,
     NewsSentiment,
+    RawNewsAnalysisResponse,
+    RawNewsCardAnalysis,
 } from '@/domain/types';
+import { asArray, asEnum, asObject, asString } from './normalizePrimitives';
 import { extractJsonFromLlmResponse } from './promptFormat';
 
 /** Valid values for the {@link NewsSentiment} enum. */
@@ -33,87 +36,42 @@ const VALID_NEWS_CATEGORIES: readonly NewsCategory[] = [
     'other',
 ];
 
-/**
- * Validate and coerce a raw value to a {@link NewsSentiment}.
- *
- * @param value - Candidate value from parsed JSON.
- * @param field - Field name used in the thrown error message.
- * @throws {Error} When `value` is not a valid {@link NewsSentiment}.
- */
-function requireNewsSentiment(value: unknown, field: string): NewsSentiment {
-    if (!VALID_NEWS_SENTIMENTS.includes(value as NewsSentiment)) {
-        throw new Error(
-            `Invalid NewsSentiment for field "${field}": ${String(value)}. ` +
-                `Expected one of: ${VALID_NEWS_SENTIMENTS.join(', ')}`
-        );
-    }
-    // .includes() guard above guarantees value is a valid NewsSentiment at runtime
-    return value as NewsSentiment;
+function parseLlmPayload(raw: unknown): unknown {
+    return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
 }
 
-/**
- * Validate and coerce a raw value to a {@link NewsCategory}.
- *
- * @param value - Candidate value from parsed JSON.
- * @param field - Field name used in the thrown error message.
- * @throws {Error} When `value` is not a valid {@link NewsCategory}.
- */
-function requireNewsCategory(value: unknown, field: string): NewsCategory {
-    if (!VALID_NEWS_CATEGORIES.includes(value as NewsCategory)) {
-        throw new Error(
-            `Invalid NewsCategory for field "${field}": ${String(value)}. ` +
-                `Expected one of: ${VALID_NEWS_CATEGORIES.join(', ')}`
-        );
-    }
-    // .includes() guard above guarantees value is a valid NewsCategory at runtime
-    return value as NewsCategory;
+function normalizeStringArray(raw: unknown): string[] {
+    return asArray(raw)
+        .map(item => asString(item))
+        .filter(item => item.length > 0);
 }
 
-function requireNewsImpact(value: unknown, field: string): NewsImpact {
-    if (!VALID_NEWS_IMPACTS.includes(value as NewsImpact)) {
-        throw new Error(
-            `Invalid NewsImpact for field "${field}": ${String(value)}. ` +
-                `Expected one of: ${VALID_NEWS_IMPACTS.join(', ')}`
-        );
-    }
-    return value as NewsImpact;
+function normalizeNewsSentiment(value: unknown): NewsSentiment {
+    return asEnum(value, VALID_NEWS_SENTIMENTS, 'neutral');
+}
+
+function normalizeNewsCategory(value: unknown): NewsCategory {
+    return asEnum(value, VALID_NEWS_CATEGORIES, 'other');
+}
+
+function normalizeNewsImpact(value: unknown): NewsImpact {
+    return asEnum(value, VALID_NEWS_IMPACTS, 'negligible');
 }
 
 /**
  * Normalize a raw LLM response string into a typed {@link NewsCardAnalysis}.
  *
- * Strips optional markdown code fences, parses JSON, and validates all required
- * fields and enum values. `bodyKo` may be `null` (the LLM may omit a body for
- * brief news items). Throws a descriptive error on missing required fields or
- * invalid enum values.
+ * Strips optional markdown code fences, parses JSON, and defensively normalizes
+ * every field. Missing strings become `''`, missing body becomes `null`, and
+ * invalid enum values fall back to conservative defaults.
  *
- * @param raw - Raw string from the LLM worker response.
+ * @param raw - Raw string/object from the LLM worker or cache.
  * @returns A fully-typed {@link NewsCardAnalysis}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
- * @throws {Error} When required fields are missing or enum values are invalid.
  */
-export function normalizeNewsCardAnalysis(raw: string): NewsCardAnalysis {
-    const parsed = extractJsonFromLlmResponse(raw);
-
-    if (
-        parsed === null ||
-        typeof parsed !== 'object' ||
-        Array.isArray(parsed)
-    ) {
-        throw new Error('NewsCardAnalysis: payload must be a JSON object');
-    }
-    const o = parsed as Record<string, unknown>;
-
-    if (typeof o.titleKo !== 'string') {
-        throw new Error('NewsCardAnalysis: missing required field "titleKo"');
-    }
-    if (typeof o.summaryKo !== 'string') {
-        throw new Error('NewsCardAnalysis: missing required field "summaryKo"');
-    }
-
-    const sentiment = requireNewsSentiment(o.sentiment, 'sentiment');
-    const category = requireNewsCategory(o.category, 'category');
-    const priceImpact = requireNewsImpact(o.priceImpact, 'priceImpact');
+export function normalizeNewsCardAnalysis(raw: unknown): NewsCardAnalysis {
+    const parsed = parseLlmPayload(raw);
+    const o = (asObject(parsed) ?? {}) as RawNewsCardAnalysis;
 
     const bodyKo =
         o.bodyKo === null || o.bodyKo === undefined
@@ -123,66 +81,36 @@ export function normalizeNewsCardAnalysis(raw: string): NewsCardAnalysis {
               : null;
 
     return {
-        titleKo: o.titleKo,
+        titleKo: asString(o.titleKo),
         bodyKo,
-        summaryKo: o.summaryKo,
-        sentiment,
-        category,
-        priceImpact,
+        summaryKo: asString(o.summaryKo),
+        sentiment: normalizeNewsSentiment(o.sentiment),
+        category: normalizeNewsCategory(o.category),
+        priceImpact: normalizeNewsImpact(o.priceImpact),
     };
 }
 
 /**
  * Normalize a raw LLM response string into a typed {@link NewsAnalysisResponse}.
  *
- * Strips optional markdown code fences, parses JSON, and validates all required
- * fields and enum values. Throws a descriptive error on missing required fields
- * or invalid enum values so the caller can surface a meaningful failure.
+ * Strips optional markdown code fences, parses JSON, and defensively normalizes
+ * every field. Missing strings become `''`, missing arrays become `[]`, and
+ * invalid sentiment values fall back to `"neutral"`.
  *
- * @param raw - Raw string from the LLM worker response.
+ * @param raw - Raw string/object from the LLM worker or cache.
  * @returns A fully-typed {@link NewsAnalysisResponse}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
- * @throws {Error} When required fields are missing or enum values are invalid.
  */
 export function normalizeNewsAnalysisResponse(
-    raw: string
+    raw: unknown
 ): NewsAnalysisResponse {
-    const parsed = extractJsonFromLlmResponse(raw);
-
-    if (
-        parsed === null ||
-        typeof parsed !== 'object' ||
-        Array.isArray(parsed)
-    ) {
-        throw new Error('NewsAnalysisResponse: payload must be a JSON object');
-    }
-    const o = parsed as Record<string, unknown>;
-
-    if (typeof o.currentDriverKo !== 'string') {
-        throw new Error(
-            'NewsAnalysisResponse: missing required field "currentDriverKo"'
-        );
-    }
-    if (!Array.isArray(o.keyEventsKo)) {
-        throw new Error(
-            'NewsAnalysisResponse: missing required field "keyEventsKo"'
-        );
-    }
-    if (!Array.isArray(o.upcomingEventsKo)) {
-        throw new Error(
-            'NewsAnalysisResponse: missing required field "upcomingEventsKo"'
-        );
-    }
-
-    const overallSentiment = requireNewsSentiment(
-        o.overallSentiment,
-        'overallSentiment'
-    );
+    const parsed = parseLlmPayload(raw);
+    const o = (asObject(parsed) ?? {}) as RawNewsAnalysisResponse;
 
     return {
-        currentDriverKo: o.currentDriverKo,
-        keyEventsKo: (o.keyEventsKo as unknown[]).map(String),
-        upcomingEventsKo: (o.upcomingEventsKo as unknown[]).map(String),
-        overallSentiment,
+        currentDriverKo: asString(o.currentDriverKo),
+        keyEventsKo: normalizeStringArray(o.keyEventsKo),
+        upcomingEventsKo: normalizeStringArray(o.upcomingEventsKo),
+        overallSentiment: normalizeNewsSentiment(o.overallSentiment),
     };
 }

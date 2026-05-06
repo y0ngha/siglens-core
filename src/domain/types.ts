@@ -956,6 +956,58 @@ export interface RawAnalysisResponse {
     candlePatterns?: unknown;
     trendlines?: unknown;
     actionRecommendation?: unknown;
+    analyzedAt?: unknown;
+}
+
+/** @internal Raw LLM/news-card response before runtime normalization. */
+export interface RawNewsCardAnalysis {
+    titleKo?: unknown;
+    bodyKo?: unknown;
+    summaryKo?: unknown;
+    sentiment?: unknown;
+    category?: unknown;
+    priceImpact?: unknown;
+}
+
+/** @internal Raw aggregate news response before runtime normalization. */
+export interface RawNewsAnalysisResponse {
+    currentDriverKo?: unknown;
+    keyEventsKo?: unknown;
+    upcomingEventsKo?: unknown;
+    overallSentiment?: unknown;
+}
+
+/** @internal Raw fundamental category child before runtime normalization. */
+export interface RawFundamentalCategoryAssessment {
+    category?: unknown;
+    sentiment?: unknown;
+    rationaleKo?: unknown;
+}
+
+/** @internal Raw fundamental response before runtime normalization. */
+export interface RawFundamentalAnalysisResponse {
+    overallConclusionKo?: unknown;
+    categoryAssessments?: unknown;
+    riskFactorsKo?: unknown;
+    overallSentiment?: unknown;
+}
+
+/** @internal Raw overall scenario child before runtime normalization. */
+export interface RawOverallScenario {
+    name?: unknown;
+    triggerConditionKo?: unknown;
+    priceRangeKo?: unknown;
+}
+
+/** @internal Raw overall response before runtime normalization. */
+export interface RawOverallAnalysisResponse {
+    headlineKo?: unknown;
+    technicalBulletsKo?: unknown;
+    fundamentalBulletsKo?: unknown;
+    newsBulletsKo?: unknown;
+    threeAxisConclusionKo?: unknown;
+    scenarios?: unknown;
+    riskFactorsKo?: unknown;
 }
 
 // --- Job Result Types (submit + poll 패턴) ---

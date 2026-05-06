@@ -76,6 +76,7 @@ describe('buildChatPrompt 함수는', () => {
                 keyLevels: {
                     resistance: [{ price: 195.5, reason: 'Previous high' }],
                     support: [{ price: 180.0, reason: 'Moving average' }],
+                    poc: { price: 188.25, reason: 'Volume profile POC' },
                 },
             };
             const result = buildChatPrompt(
@@ -87,6 +88,23 @@ describe('buildChatPrompt 함수는', () => {
             );
             expect(result.systemPrompt).toContain('195.50');
             expect(result.systemPrompt).toContain('180.00');
+            expect(result.systemPrompt).toContain('188.25');
+            expect(result.systemPrompt).toContain('Volume profile POC');
+        });
+
+        it('제공되지 않은 데이터는 추측하지 않도록 지시한다', () => {
+            const result = buildChatPrompt(
+                'AAPL',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                [],
+                '질문'
+            );
+
+            expect(result.systemPrompt).toContain(
+                'not present in the provided analysis data'
+            );
+            expect(result.systemPrompt).toContain('- POC: None detected');
         });
 
         it('indicatorResults가 있으면 시그널을 포함한다', () => {

@@ -33,6 +33,8 @@ export type NewsAnalysisUsageOptions = AnalysisUsageOptions;
 export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
+    /** Full company name forwarded to the news analysis prompt. Defaults to `symbol` when omitted. */
+    companyName?: string;
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;
     /**

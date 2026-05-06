@@ -85,11 +85,7 @@ export async function pollNewsCardAnalysis(
     // Normalize the raw LLM response through the news-card normalizer.
     let result: NewsCardAnalysis;
     try {
-        const rawString =
-            typeof rawResult === 'string'
-                ? rawResult
-                : JSON.stringify(rawResult);
-        result = normalizeNewsCardAnalysis(rawString);
+        result = normalizeNewsCardAnalysis(rawResult);
     } catch (error) {
         console.error('[PollNewsCard] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollNewsCard]', options);

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     enrichAnalysisWithConfidence,
     filterPatterns,
+    normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
 import type {
     PatternResult,
@@ -488,6 +489,24 @@ describe('confidence', () => {
             });
         });
 
+        describe('summary 필드 fallback', () => {
+            it('summary가 없으면 안내 메시지를 반환한다', () => {
+                const analysis = makeAnalysisResponse({ summary: undefined });
+                const result = enrichAnalysisWithConfidence(analysis, []);
+                expect(result.summary).toBe(
+                    'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'
+                );
+            });
+
+            it('summary가 있으면 그대로 반환한다', () => {
+                const analysis = makeAnalysisResponse({
+                    summary: '정상 분석 결과',
+                });
+                const result = enrichAnalysisWithConfidence(analysis, []);
+                expect(result.summary).toBe('정상 분석 결과');
+            });
+        });
+
         describe('불변성', () => {
             it('원본 analysis 객체를 변경하지 않는다', () => {
                 const patternSummary = makePatternSummary({
@@ -607,4 +626,121 @@ describe('confidence', () => {
             });
         });
     }); // enrichAnalysisWithConfidence
+
+    describe('normalizeCachedAnalysisResponse', () => {
+        it('캐시된 id, confidenceWeight, renderConfig를 보존하면서 누락 필드를 정규화한다', () => {
+            const renderConfig = makeSkillChartDisplay({ color: '#22c55e' });
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'cached-pattern-id',
+                        patternName: '캐시 패턴',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '캐시 요약',
+                        confidenceWeight: 0.91,
+                        renderConfig,
+                    },
+                ],
+                strategyResults: [
+                    {
+                        id: 'cached-strategy-id',
+                        strategyName: '캐시 전략',
+                        trend: 'invalid',
+                        summary: '전략 요약',
+                        confidenceWeight: 0.81,
+                    },
+                ],
+                candlePatterns: [
+                    {
+                        id: 'cached-candle-id',
+                        patternName: 'hammer',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '캔들 요약',
+                    },
+                ],
+                analyzedAt: '2026-05-06T00:00:00.000Z',
+            });
+
+            expect(result.summary).toBe(
+                'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'
+            );
+            expect(result.patternSummaries[0]).toMatchObject({
+                id: 'cached-pattern-id',
+                confidenceWeight: 0.91,
+                renderConfig,
+            });
+            expect(result.strategyResults[0]).toMatchObject({
+                id: 'cached-strategy-id',
+                trend: 'neutral',
+                confidenceWeight: 0.81,
+            });
+            expect(result.candlePatterns[0].id).toBe('cached-candle-id');
+            expect(result.analyzedAt).toBe('2026-05-06T00:00:00.000Z');
+        });
+
+        it('문자열로 저장된 캐시 JSON도 파싱한 뒤 정규화한다', () => {
+            const result = normalizeCachedAnalysisResponse(
+                JSON.stringify({
+                    summary: '문자열 캐시',
+                    trend: 'bullish',
+                    patternSummaries: [
+                        {
+                            id: 'string-pattern-id',
+                            patternName: '문자열 패턴',
+                            skillName: '테스트 스킬',
+                            detected: true,
+                            trend: 'bullish',
+                            summary: '패턴 요약',
+                            confidenceWeight: 0.77,
+                        },
+                    ],
+                    analyzedAt: '2026-05-06T00:00:00.000Z',
+                })
+            );
+
+            expect(result.summary).toBe('문자열 캐시');
+            expect(result.trend).toBe('bullish');
+            expect(result.patternSummaries[0]).toMatchObject({
+                id: 'string-pattern-id',
+                confidenceWeight: 0.77,
+            });
+            expect(result.analyzedAt).toBe('2026-05-06T00:00:00.000Z');
+        });
+
+        it('캐시 항목의 child 필드가 누락되면 보수적인 기본값으로 채운다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                actionRecommendation: {
+                    positionAnalysis: '현재가 분석',
+                    entry: '진입',
+                    exit: '청산',
+                    riskReward: '1:2',
+                    entryRecommendation: 'invalid',
+                    entryPrices: [100, 'bad', 101],
+                    reconciledLevels: {
+                        stopLoss: 95,
+                        takeProfitPrices: [110, null, 120],
+                        exit: '보정 청산',
+                    },
+                },
+            });
+
+            expect(result.trend).toBe('neutral');
+            expect(result.riskLevel).toBe('medium');
+            expect(result.actionRecommendation).toMatchObject({
+                positionAnalysis: '현재가 분석',
+                entryRecommendation: undefined,
+                entryPrices: [100, 101],
+                reconciledLevels: {
+                    stopLoss: 95,
+                    takeProfitPrices: [110, 120],
+                    exit: '보정 청산',
+                    riskReward: '',
+                    reason: '',
+                },
+            });
+        });
+    });
 });
