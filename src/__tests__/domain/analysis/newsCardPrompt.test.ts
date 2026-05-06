@@ -44,6 +44,16 @@ describe('buildNewsCardAnalysisPrompt', () => {
         expect(prompt).toContain('titleKo');
         expect(prompt).toContain('bodyKo');
         expect(prompt).toContain('summaryKo');
+        expect(prompt).toContain(
+            'what happened, why it matters for the named symbol, and what investors should watch'
+        );
+        expect(prompt).toContain('must add substance beyond the title');
+        expect(prompt).toContain('reported figures, growth rates, guidance');
+        expect(prompt).toContain(
+            'never omit material information merely to satisfy brevity'
+        );
+        expect(prompt).not.toContain('80-140');
+        expect(prompt).toContain('Preserve important numbers');
         expect(prompt).toContain('sentiment');
         expect(prompt).toContain('category');
 
@@ -84,6 +94,9 @@ describe('buildNewsCardAnalysisPrompt', () => {
         expect(prompt).not.toContain('Body: null');
         expect(prompt).toContain(
             'prefer sentiment: "neutral" and priceImpact: "negligible" rather than guessing'
+        );
+        expect(prompt).toContain(
+            'based only on the headline and avoid guessing missing details'
         );
     });
 });

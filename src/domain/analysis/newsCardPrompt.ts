@@ -44,7 +44,7 @@ ${bodySection}
 {
   "titleKo": "한국어 번역 제목",
   "bodyKo": "한국어 번역 본문 (body가 없으면 null)",
-  "summaryKo": "한국어 한 줄 요약 (최대 60자)",
+  "summaryKo": "한국어 핵심 요약",
   "sentiment": "neutral",
   "category": "other",
   "priceImpact": "negligible"
@@ -59,7 +59,13 @@ Rules:
 - Respond with valid JSON only. No markdown fences.
 - titleKo: natural Korean translation of the English title.
 - bodyKo: natural Korean translation of the article body; null if no body was provided.
-- summaryKo: a single concise Korean sentence capturing the most important point (존댓말).
+- summaryKo: an informative Korean summary (존댓말) that explains what happened, why it matters for the named symbol, and what investors should watch.
+- summaryKo must add substance beyond the title. Do not copy, lightly paraphrase, or translate teaser phrases such as "what investors need to know"; resolve the actual point from the body instead.
+- When the body contains evidence, summaryKo should be as detailed as needed to preserve the most decision-useful specifics: reported figures, growth rates, guidance, investor reaction, regulatory risk, management comment, or next catalyst.
+- Keep summaryKo concise, but never omit material information merely to satisfy brevity.
+- Preserve important numbers and comparisons from the article body when they are material to the news implication.
+- If the title and body conflict, base summaryKo on the body and mention the tension only if it is explicit in the article.
+- If no body was provided, summaryKo may be shorter, but it must clearly state that the judgment is based only on the headline and avoid guessing missing details.
 - sentiment must be exactly one of: "bullish", "neutral", "bearish".
 - category must be exactly one of: "earnings", "m_and_a", "guidance", "regulation", "macro", "product", "other".
 - priceImpact must be exactly one of: "high", "medium", "low", "negligible".

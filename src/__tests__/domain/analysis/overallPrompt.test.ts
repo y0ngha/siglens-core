@@ -102,6 +102,12 @@ describe('buildOverallAnalysisPrompt', () => {
         expect(prompt).toContain('threeAxisConclusionKo');
         expect(prompt).toContain('scenarios');
         expect(prompt).toContain('riskFactorsKo');
+        expect(prompt).toContain('## Data Boundary');
+        expect(prompt).toContain('intermediate analysis data');
+        expect(prompt).toContain('Do not fabricate new price levels');
+        expect(prompt).toContain(
+            'Scenario price ranges must come from provided technical key levels or price targets'
+        );
     });
 
     it('produces prompt with positional context for 1Day', () => {
