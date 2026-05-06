@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.11](https://github.com/y0ngha/siglens-core/compare/v0.7.10...v0.7.11) (2026-05-06)
+
+
+### Features
+
+* 프롬프트 개선 및 여러가지 수정... ([21d5fba](https://github.com/y0ngha/siglens-core/commit/21d5fbac87a632fff0d51ce1569d7f5e0d0dd3fd))
+
 ## [0.7.10](https://github.com/y0ngha/siglens-core/compare/v0.7.9...v0.7.10) (2026-05-05)
 
 
