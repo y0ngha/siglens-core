@@ -1185,17 +1185,7 @@ export type AIProvider = 'claude' | 'gemini' | 'chatgpt';
 /** Effort level shared by Claude adaptive thinking and ChatGPT reasoning. */
 export type EffortLevel = 'low' | 'medium' | 'high';
 
-/**
- * Per-model SDK call parameters.
- *
- * Single source of truth for everything an AI SDK caller (workers, server
- * actions, UI) needs to invoke the model — provider routing, output limits,
- * thinking budget, sampling parameters. New model additions add a row to the
- * spec map and downstream callers pick them up automatically.
- */
-export interface ModelSpec {
-    /** Provider that hosts the model (drives SDK selection). */
-    provider: AIProvider;
+interface BaseModelSpec {
     /**
      * Actual model identifier sent to the provider API.
      *
@@ -1207,21 +1197,76 @@ export interface ModelSpec {
     apiModelId: string;
     /** Provider-side max output tokens cap. */
     maxOutputTokens: number;
+}
+
+/** Claude model without adaptive thinking. */
+export interface ClaudeSamplingModelSpec extends BaseModelSpec {
+    /** Provider that hosts the model (drives SDK selection). */
+    provider: 'claude';
     /**
-     * Thinking budget tokens. `0` = thinking not supported (haiku).
-     * Gemini models only — Claude/ChatGPT use `effort` instead.
+     * Thinking budget tokens. `0` = thinking not supported.
+     * Currently used by Claude haiku.
      */
-    thinkingBudget?: number;
-    /**
-     * Reasoning effort level.
-     * Claude Sonnet/Opus: adaptive thinking effort.
-     * ChatGPT: maps to `reasoning.effort` in the Responses API.
-     * Absent on models that don't support reasoning (haiku, Gemini).
-     */
-    effort?: EffortLevel;
+    thinkingBudget: 0;
+    /** Adaptive thinking is not supported by this model. */
+    effort?: undefined;
     /** Sampling temperature. */
     temperature: number;
 }
+
+/** Claude model using adaptive thinking effort. */
+export interface ClaudeReasoningModelSpec extends BaseModelSpec {
+    /** Provider that hosts the model (drives SDK selection). */
+    provider: 'claude';
+    /** Adaptive thinking effort level. */
+    effort: EffortLevel;
+    /** Adaptive-thinking Claude models do not accept sampling temperature. */
+    temperature?: undefined;
+    /** Adaptive-thinking Claude models do not use explicit thinking budgets. */
+    thinkingBudget?: undefined;
+}
+
+/** Gemini model using thinking-budget controls and sampling temperature. */
+export interface GeminiModelSpec extends BaseModelSpec {
+    /** Provider that hosts the model (drives SDK selection). */
+    provider: 'gemini';
+    /** Thinking budget tokens. */
+    thinkingBudget: number;
+    /** Gemini uses thinking budget instead of reasoning effort. */
+    effort?: undefined;
+    /** Sampling temperature. */
+    temperature: number;
+}
+
+/** ChatGPT Responses API reasoning model. */
+export interface ChatGPTModelSpec extends BaseModelSpec {
+    /** Provider that hosts the model (drives SDK selection). */
+    provider: 'chatgpt';
+    /**
+     * Reasoning effort level.
+     * ChatGPT: maps to `reasoning.effort` in the Responses API.
+     */
+    effort: EffortLevel;
+    /** GPT reasoning models do not accept sampling temperature. */
+    temperature?: undefined;
+    /** GPT reasoning models do not use thinking budgets. */
+    thinkingBudget?: undefined;
+}
+
+/**
+ * Per-model SDK call parameters.
+ *
+ * Single source of truth for everything an AI SDK caller (workers, server
+ * actions, UI) needs to invoke the model — provider routing, output limits,
+ * thinking budget, reasoning effort, and sampling parameters. New model
+ * additions add a row to the spec map and downstream callers pick them up
+ * automatically.
+ */
+export type ModelSpec =
+    | ClaudeSamplingModelSpec
+    | ClaudeReasoningModelSpec
+    | GeminiModelSpec
+    | ChatGPTModelSpec;
 
 /** AI model identifiers allowed by tier gating. */
 export type TierModel =

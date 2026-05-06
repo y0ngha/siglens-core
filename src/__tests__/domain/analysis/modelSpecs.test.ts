@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import {
     DISABLED_THINKING_BUDGET,
     getProvider,
@@ -13,6 +12,7 @@ import {
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
 import type { ActiveModelId } from '@/domain/types';
+import { describe, expect, it } from 'vitest';
 
 describe('MODEL_SPECS', () => {
     it('covers every active model identifier exactly once', () => {
@@ -34,9 +34,16 @@ describe('MODEL_SPECS', () => {
         );
     });
 
-    it('uses temperature 0 for every model', () => {
-        for (const spec of Object.values(MODEL_SPECS)) {
-            expect(spec.temperature).toBe(0);
+    it('uses temperature only for providers that support sampling temperature', () => {
+        for (const [model, spec] of Object.entries(MODEL_SPECS)) {
+            if (spec.provider === 'gemini' || model === 'claude-haiku-4-5') {
+                expect('temperature' in spec, model).toBe(true);
+                if ('temperature' in spec) {
+                    expect(spec.temperature, model).toBe(0);
+                }
+            } else {
+                expect('temperature' in spec, model).toBe(false);
+            }
         }
     });
 
@@ -67,11 +74,17 @@ describe('MODEL_SPECS', () => {
     });
 
     it('uses effort instead of thinking budget for Claude adaptive thinking and GPT reasoning models', () => {
-        expect(MODEL_SPECS['claude-sonnet-4-6'].effort).toBe('medium');
-        expect(MODEL_SPECS['claude-opus-4-7'].effort).toBe('medium');
-        expect(MODEL_SPECS['gpt-5-mini'].effort).toBe('low');
-        expect(MODEL_SPECS['gpt-5.4'].effort).toBe('medium');
-        expect(MODEL_SPECS['gpt-5.5'].effort).toBe('medium');
+        expect(MODEL_SPECS['claude-sonnet-4-6'].effort).toBe('high');
+        expect(MODEL_SPECS['claude-opus-4-7'].effort).toBe('high');
+        expect(MODEL_SPECS['gpt-5-mini'].effort).toBe('medium');
+        expect(MODEL_SPECS['gpt-5.4'].effort).toBe('high');
+        expect(MODEL_SPECS['gpt-5.5'].effort).toBe('high');
+    });
+
+    it('does not include temperature on GPT reasoning model specs', () => {
+        expect('temperature' in MODEL_SPECS['gpt-5-mini']).toBe(false);
+        expect('temperature' in MODEL_SPECS['gpt-5.4']).toBe(false);
+        expect('temperature' in MODEL_SPECS['gpt-5.5']).toBe(false);
     });
 
     it('keeps gemini-2.5-flash-lite at the documented 24_576 thinking budget', () => {

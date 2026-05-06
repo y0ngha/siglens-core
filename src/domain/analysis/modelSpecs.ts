@@ -1,10 +1,11 @@
 import type { ActiveModelId, AIProvider, ModelSpec } from '@/domain/types';
 
 /**
- * Default sampling temperature applied to every model.
+ * Default sampling temperature applied to models whose provider APIs accept it.
  *
  * `as const` preserves the literal `0` type so that
- * `MODEL_SPECS[X].temperature` infers as `0` rather than widening to `number`.
+ * supported `MODEL_SPECS[X].temperature` values infer as `0` rather than
+ * widening to `number`.
  */
 const DEFAULT_TEMPERATURE = 0 as const;
 
@@ -17,9 +18,9 @@ const DEFAULT_TEMPERATURE = 0 as const;
  *
  * Notes:
  * - Claude haiku: thinking 미지원 (`thinkingBudget: 0`), temperature 사용.
- * - Claude sonnet/opus: adaptive thinking (`effort`), `budget_tokens` deprecated.
+ * - Claude sonnet/opus: adaptive thinking (`effort`), `budget_tokens`/temperature 미사용.
  * - Gemini: `thinkingBudget` 그대로 사용.
- * - GPT-5 series: `effort`로 Responses API `reasoning.effort` 지정.
+ * - GPT-5 series: `effort`로 Responses API `reasoning.effort` 지정, temperature 미지원.
  */
 export const MODEL_SPECS = {
     'claude-haiku-4-5': {
@@ -33,15 +34,13 @@ export const MODEL_SPECS = {
         provider: 'claude',
         apiModelId: 'claude-sonnet-4-6',
         maxOutputTokens: 64_000,
-        effort: 'medium',
-        temperature: DEFAULT_TEMPERATURE,
+        effort: 'high',
     },
     'claude-opus-4-7': {
         provider: 'claude',
         apiModelId: 'claude-opus-4-7',
         maxOutputTokens: 128_000,
-        effort: 'medium',
-        temperature: DEFAULT_TEMPERATURE,
+        effort: 'high',
     },
     'gemini-2.5-flash': {
         provider: 'gemini',
@@ -82,22 +81,19 @@ export const MODEL_SPECS = {
         provider: 'chatgpt',
         apiModelId: 'gpt-5-mini',
         maxOutputTokens: 128_000,
-        effort: 'low',
-        temperature: DEFAULT_TEMPERATURE,
+        effort: 'medium',
     },
     'gpt-5.4': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.4',
         maxOutputTokens: 128_000,
-        effort: 'medium',
-        temperature: DEFAULT_TEMPERATURE,
+        effort: 'high',
     },
     'gpt-5.5': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.5',
         maxOutputTokens: 128_000,
-        effort: 'medium',
-        temperature: DEFAULT_TEMPERATURE,
+        effort: 'high',
     },
 } as const satisfies Record<ActiveModelId, ModelSpec>;
 
