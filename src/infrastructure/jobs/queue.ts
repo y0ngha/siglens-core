@@ -345,6 +345,12 @@ export async function claimOrJoinInFlightJob(
             }
             // Exhausted retries — treat as fresh claim. Loses dedup for this one
             // call but keeps the call stack and Redis traffic bounded.
+            //
+            // Refcount must still be initialized here so that subsequent
+            // joiners who DECR via cancel never push the count below zero
+            // and prematurely cancel a job other clients still depend on.
+            await redis.incr(refCountKey(newJobId));
+            await redis.expire(refCountKey(newJobId), JOB_TTL_SECONDS);
             return { status: 'claimed', jobId: newJobId };
         },
         { status: 'claimed', jobId: newJobId }

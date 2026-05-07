@@ -308,6 +308,27 @@ describe('job queue — with redis', () => {
             expect(claim).toEqual({ status: 'claimed', jobId: 'new-job' });
             expect(mockSetNx).toHaveBeenCalledTimes(2);
         });
+
+        it('initializes refcount on the fall-through claim after retries are exhausted', async () => {
+            // Every attempt: SET NX returns null and GET returns null too →
+            // loop runs CLAIM_OR_JOIN_MAX_ATTEMPTS times then falls through.
+            mockSetNx.mockResolvedValue(null);
+            mockGet.mockResolvedValue(null);
+            mockIncr.mockResolvedValueOnce(1);
+            mockExpire.mockResolvedValueOnce(1);
+
+            const claim = await claimOrJoinInFlightJob('cache-key', 'new-job');
+
+            expect(claim).toEqual({ status: 'claimed', jobId: 'new-job' });
+            // Refcount must still be incremented on the fall-through path so
+            // that a later cancel from a joiner cannot push it negative and
+            // prematurely terminate the job.
+            expect(mockIncr).toHaveBeenCalledWith('job:new-job:refcount');
+            expect(mockExpire).toHaveBeenCalledWith(
+                'job:new-job:refcount',
+                SECONDS_PER_HOUR
+            );
+        });
     });
 
     describe('releaseInFlightJob', () => {
