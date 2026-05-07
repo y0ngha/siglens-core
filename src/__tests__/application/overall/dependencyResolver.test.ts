@@ -414,7 +414,10 @@ describe('resolveOverallDependencies 함수는', () => {
             });
 
             await resolveOverallDependencies(
-                makeInputs({ symbol: 'NVDA', companyName: 'NVIDIA Corporation' })
+                makeInputs({
+                    symbol: 'NVDA',
+                    companyName: 'NVIDIA Corporation',
+                })
             );
 
             expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(

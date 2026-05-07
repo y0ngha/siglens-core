@@ -5,7 +5,11 @@ import {
     EMPTY_ANALYSIS_FALLBACK_SUMMARY,
 } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
-import type { AnalysisResponse, PollAnalysisResult, Skill } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    PollAnalysisResult,
+    Skill,
+} from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildAnalysisCacheKey,

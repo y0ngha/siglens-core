@@ -370,9 +370,9 @@ describe('isClaudeReasoningModelSpec', () => {
         expect(
             isClaudeReasoningModelSpec(MODEL_SPECS['claude-sonnet-4-6'])
         ).toBe(true);
-        expect(
-            isClaudeReasoningModelSpec(MODEL_SPECS['claude-opus-4-7'])
-        ).toBe(true);
+        expect(isClaudeReasoningModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(
+            true
+        );
     });
 
     it('returns false for Claude sampling model', () => {
@@ -386,9 +386,9 @@ describe('isClaudeReasoningModelSpec', () => {
     });
 
     it('returns false for Gemini models', () => {
-        expect(
-            isClaudeReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])
-        ).toBe(false);
+        expect(isClaudeReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(
+            false
+        );
     });
 
     it('narrows the type to ClaudeReasoningModelSpec exactly', () => {
@@ -396,7 +396,9 @@ describe('isClaudeReasoningModelSpec', () => {
         if (isClaudeReasoningModelSpec(spec)) {
             const _narrowed: ClaudeReasoningModelSpec = spec;
             void _narrowed;
-            expectTypeOf(spec.effort).toEqualTypeOf<'low' | 'medium' | 'high'>();
+            expectTypeOf(spec.effort).toEqualTypeOf<
+                'low' | 'medium' | 'high'
+            >();
             expectTypeOf(spec.provider).toEqualTypeOf<'claude'>();
         }
     });
@@ -404,24 +406,24 @@ describe('isClaudeReasoningModelSpec', () => {
 
 describe('isClaudeSamplingModelSpec', () => {
     it('returns true for claude-haiku-4-5', () => {
-        expect(
-            isClaudeSamplingModelSpec(MODEL_SPECS['claude-haiku-4-5'])
-        ).toBe(true);
+        expect(isClaudeSamplingModelSpec(MODEL_SPECS['claude-haiku-4-5'])).toBe(
+            true
+        );
     });
 
     it('returns false for Claude adaptive-thinking models', () => {
         expect(
             isClaudeSamplingModelSpec(MODEL_SPECS['claude-sonnet-4-6'])
         ).toBe(false);
-        expect(
-            isClaudeSamplingModelSpec(MODEL_SPECS['claude-opus-4-7'])
-        ).toBe(false);
+        expect(isClaudeSamplingModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(
+            false
+        );
     });
 
     it('returns false for Gemini models', () => {
-        expect(
-            isClaudeSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash'])
-        ).toBe(false);
+        expect(isClaudeSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash'])).toBe(
+            false
+        );
     });
 
     it('returns false for ChatGPT models', () => {

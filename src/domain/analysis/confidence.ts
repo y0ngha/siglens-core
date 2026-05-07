@@ -210,7 +210,10 @@ function normalizePatternRenderConfig(
     const obj = asObject(value);
     if (!obj) return undefined;
 
-    const type = asOptionalEnum<ChartDisplayType>(obj.type, CHART_DISPLAY_TYPES);
+    const type = asOptionalEnum<ChartDisplayType>(
+        obj.type,
+        CHART_DISPLAY_TYPES
+    );
     const color = typeof obj.color === 'string' ? obj.color : undefined;
     const label = typeof obj.label === 'string' ? obj.label : undefined;
     const show = typeof obj.show === 'boolean' ? obj.show : undefined;
