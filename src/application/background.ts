@@ -24,10 +24,7 @@ export function fireAndForget(
  * `inflight:{cacheKey}` would force later submitters to attach to a job
  * that has already produced its result.
  */
-async function executeCleanup(
-    jobId: string,
-    logPrefix: string
-): Promise<void> {
+async function executeCleanup(jobId: string, logPrefix: string): Promise<void> {
     const meta = await getJobMeta(jobId).catch(error => {
         console.warn(`${logPrefix} cleanup meta read failed:`, error);
         return null;

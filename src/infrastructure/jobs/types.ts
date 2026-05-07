@@ -21,11 +21,7 @@ export interface JobRedisClient {
      * the `nx` and non-`nx` paths and cannot be reconciled into a single
      * `set` signature.
      */
-    setNx<T>(
-        key: string,
-        value: T,
-        opts: RedisSetOpts
-    ): Promise<string | null>;
+    setNx<T>(key: string, value: T, opts: RedisSetOpts): Promise<string | null>;
     del(...keys: string[]): Promise<number>;
     /**
      * `INCR key` — atomically increment and return the new integer value.
