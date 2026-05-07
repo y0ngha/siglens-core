@@ -7,7 +7,10 @@ import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 import { buildBriefingCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
-import { claimOrJoinInFlightJob } from '@/infrastructure/jobs/queue';
+import {
+    claimOrJoinInFlightJob,
+    setJobMeta,
+} from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 
@@ -70,8 +73,8 @@ export async function submitBriefing(
 
     const prompt = buildMarketBriefingPrompt(data.indices, data.sectors);
     const newJobId = crypto.randomUUID();
-    // Dedup: 같은 시간대(cacheKey)에 동시 요청이 들어와도 worker 호출은 1번만.
-    // 다른 submitter는 기존 jobId만 받아서 polling한다.
+    // Dedup: when another submitter is already in flight for the same cache
+    // key, reuse their jobId rather than spawning a duplicate worker call.
     const claim = await claimOrJoinInFlightJob(cacheKey, newJobId);
 
     if (claim.status === 'joined') {
@@ -79,10 +82,11 @@ export async function submitBriefing(
     }
 
     const { jobId } = claim;
-    // briefing은 symbol에 묶이지 않으므로 setJobMeta는 의도적으로 생략한다.
-    // 결과적으로 cleanup이 cacheKey를 모르므로 in-flight 슬롯은 1시간 TTL로
-    // 자연 정리되는데, briefing cacheKey 자체가 시간 단위이므로 다음 시간대로
-    // 넘어가면 어차피 새 키를 사용한다 — TTL 정리는 동작상 안전하다.
+    // Persist `cacheKey` so that terminal-status cleanup and the last-cancel
+    // path can release the in-flight slot. Without this the slot would only
+    // expire via TTL and intermediate failures would force same-hour retries
+    // to attach to a dead job — the regression flagged in PR #82 review B-2.
+    await setJobMeta(jobId, { cacheKey });
 
     // fire-and-forget: serverless 환경에선 options.waitUntil로 응답 후 promise 종료 보장.
     const dispatch = fetch(`${workerUrl}/briefing`, {

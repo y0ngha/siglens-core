@@ -45,13 +45,32 @@ export interface JobRedisClient {
 }
 
 /**
+ * @internal Outcome of an in-flight job claim attempt — see
+ * {@link claimOrJoinInFlightJob} in `queue.ts`.
+ *
+ * `claimed` means the caller is the first submitter for `cacheKey` and owns
+ * the worker dispatch responsibility. `joined` means an existing job was
+ * already in flight for the same input; the caller should reuse `jobId`
+ * without creating a new worker job.
+ */
+export interface InFlightClaim {
+    status: 'claimed' | 'joined';
+    jobId: string;
+}
+
+/**
  * Per-job metadata stored alongside the result so {@link pollAnalysis} can
  * reconstruct cache keys and run domain-side reconciliation without fetching
  * the bars again.
  */
 export interface JobMeta {
-    /** U.S. equity ticker. */
-    symbol: string;
+    /**
+     * U.S. equity ticker. Optional because briefing jobs are not symbol-bound;
+     * analysis submit functions (technical / fundamental / news / overall)
+     * always set it, so downstream poll handlers can rely on it within their
+     * own flow.
+     */
+    symbol?: string;
     /**
      * Bar resolution. Required for technical-analysis jobs and overall
      * analysis jobs (both are timeframe-bound). Omitted for fundamental and

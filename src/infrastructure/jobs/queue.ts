@@ -1,5 +1,6 @@
 import { createJobRedis } from '@/infrastructure/jobs/redis';
 import type {
+    InFlightClaim,
     JobMeta,
     JobRedisClient,
     JobStatus,
@@ -248,20 +249,6 @@ export async function cleanupJob(jobId: string): Promise<void> {
             refCountKey(jobId)
         );
     }, undefined);
-}
-
-/**
- * @internal Outcome of an in-flight job claim attempt — see
- * {@link claimOrJoinInFlightJob}.
- *
- * `claimed` means the caller is the first submitter for `cacheKey` and owns
- * the worker dispatch responsibility. `joined` means an existing job was
- * already in flight for the same input; the caller should reuse `jobId`
- * without creating a new worker job.
- */
-export interface InFlightClaim {
-    status: 'claimed' | 'joined';
-    jobId: string;
 }
 
 /**

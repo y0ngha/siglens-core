@@ -173,13 +173,19 @@ describe('cancelAnalysisJob', () => {
 
             await cancelAnalysisJob('last-job');
 
-            // 슬롯 정리는 cancelJob 신호 전에 수행되어야 한다 — 그래야 같은 입력의
-            // 신규 submitter가 이 취소된 jobId에 join되는 회귀가 없다.
             expect(mockClearInFlightJob).toHaveBeenCalledWith(
                 'last-job',
                 'cache-abc'
             );
             expect(mockCancelJob).toHaveBeenCalledWith('last-job');
+            // 슬롯 정리는 cancelJob 신호 전에 수행되어야 한다 — 그래야 같은
+            // 입력의 신규 submitter가 이 취소된 jobId에 join되는 회귀가 없다.
+            // invocationCallOrder는 vitest mock이 호출된 글로벌 순번이므로
+            // 작은 값일수록 먼저 호출됨을 보장한다.
+            const clearOrder =
+                mockClearInFlightJob.mock.invocationCallOrder[0];
+            const cancelOrder = mockCancelJob.mock.invocationCallOrder[0];
+            expect(clearOrder).toBeLessThan(cancelOrder);
         });
 
         it('마지막 구독자 cancel 시 meta 조회가 실패해도 cancel은 진행된다', async () => {

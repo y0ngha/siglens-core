@@ -60,7 +60,6 @@ const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
  *
  * @see submitAnalysis
  * @see pollAnalysis
- * @see releaseInFlightJob
  */
 export async function cancelAnalysisJob(
     jobId: string,
