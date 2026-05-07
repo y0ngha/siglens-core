@@ -14,8 +14,20 @@ export function createJobRedis(): JobRedisClient | null {
         get: <T>(key: string) => redis.get<T>(key),
         set: <T>(key: string, value: T, opts: RedisSetOpts) =>
             redis.set(key, value, { ex: opts.ex }),
-        setNx: <T>(key: string, value: T, opts: RedisSetOpts) =>
-            redis.set(key, value, { ex: opts.ex, nx: true }),
+        setNx: async <T>(
+            key: string,
+            value: T,
+            opts: RedisSetOpts
+        ): Promise<string | null> => {
+            // Upstash's typed `set` overload widens the return to T | "OK" | null
+            // because of the `get: true` variant; with nx the runtime contract is
+            // strictly "OK" | null, so narrow to `string | null` at the boundary.
+            const reply = await redis.set(key, value, {
+                ex: opts.ex,
+                nx: true,
+            });
+            return typeof reply === 'string' ? reply : null;
+        },
         del: (...keys: string[]) => redis.del(...keys),
         incr: (key: string) => redis.incr(key),
         decr: (key: string) => redis.decr(key),

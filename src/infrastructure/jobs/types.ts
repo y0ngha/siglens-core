@@ -25,7 +25,7 @@ export interface JobRedisClient {
         key: string,
         value: T,
         opts: RedisSetOpts
-    ): Promise<unknown | null>;
+    ): Promise<string | null>;
     del(...keys: string[]): Promise<number>;
     /**
      * `INCR key` — atomically increment and return the new integer value.
@@ -81,8 +81,9 @@ export interface JobMeta {
     modelId?: string;
     /**
      * Pre-computed cache key stored at job submission time so the poll step
-     * can write the result without recomputing the key. Used by fundamental,
-     * news, and overall analysis jobs whose cache keys include an input hash.
+     * can write the result without recomputing the key, and so cancel can
+     * release the in-flight slot keyed by `cacheKey` without rebuilding it.
+     * Set on technical, fundamental, news, and overall analysis jobs.
      */
     cacheKey?: string;
 }

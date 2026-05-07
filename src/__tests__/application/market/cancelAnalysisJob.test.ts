@@ -4,10 +4,17 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/jobs/queue');
 
 import { cancelAnalysisJob } from '@/application/market/cancelAnalysisJob';
-import { cancelJob, releaseInFlightJob } from '@/infrastructure/jobs/queue';
+import {
+    cancelJob,
+    clearInFlightJob,
+    getJobMeta,
+    releaseInFlightJob,
+} from '@/infrastructure/jobs/queue';
 
 const mockCancelJob = cancelJob as Mock;
 const mockReleaseInFlightJob = releaseInFlightJob as Mock;
+const mockClearInFlightJob = clearInFlightJob as Mock;
+const mockGetJobMeta = getJobMeta as Mock;
 const mockFetch = vi.fn<() => Promise<Response>>();
 
 describe('cancelAnalysisJob', () => {
@@ -16,9 +23,13 @@ describe('cancelAnalysisJob', () => {
     beforeEach(() => {
         mockCancelJob.mockReset();
         mockReleaseInFlightJob.mockReset();
+        mockClearInFlightJob.mockReset();
+        mockGetJobMeta.mockReset();
         // Default: every cancel is the last subscriber so legacy behavior is
         // exercised. Refcount-aware tests override per-test.
         mockReleaseInFlightJob.mockResolvedValue(true);
+        mockClearInFlightJob.mockResolvedValue(undefined);
+        mockGetJobMeta.mockResolvedValue(null);
         mockFetch.mockReset();
         global.fetch = mockFetch;
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -137,6 +148,40 @@ describe('cancelAnalysisJob', () => {
             await cancelAnalysisJob('last-job');
 
             expect(mockReleaseInFlightJob).toHaveBeenCalledWith('last-job');
+            expect(mockCancelJob).toHaveBeenCalledWith('last-job');
+        });
+
+        it('마지막 구독자 cancel 시 cacheKey로 인플라이트 슬롯을 정리한다', async () => {
+            mockReleaseInFlightJob.mockResolvedValueOnce(true);
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'AAPL',
+                cacheKey: 'cache-abc',
+            });
+            mockCancelJob.mockResolvedValueOnce(undefined);
+
+            await cancelAnalysisJob('last-job');
+
+            // 슬롯 정리는 cancelJob 신호 전에 수행되어야 한다 — 그래야 같은 입력의
+            // 신규 submitter가 이 취소된 jobId에 join되는 회귀가 없다.
+            expect(mockClearInFlightJob).toHaveBeenCalledWith(
+                'last-job',
+                'cache-abc'
+            );
+            expect(mockCancelJob).toHaveBeenCalledWith('last-job');
+        });
+
+        it('마지막 구독자 cancel 시 meta 조회가 실패해도 cancel은 진행된다', async () => {
+            mockReleaseInFlightJob.mockResolvedValueOnce(true);
+            mockGetJobMeta.mockRejectedValueOnce(new Error('Redis down'));
+            mockCancelJob.mockResolvedValueOnce(undefined);
+
+            await cancelAnalysisJob('last-job');
+
+            // cacheKey 없이도 호출하여 refcount 키만이라도 정리한다.
+            expect(mockClearInFlightJob).toHaveBeenCalledWith(
+                'last-job',
+                undefined
+            );
             expect(mockCancelJob).toHaveBeenCalledWith('last-job');
         });
 

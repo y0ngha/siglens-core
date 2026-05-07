@@ -484,28 +484,39 @@ describe('submitNewsAnalysis 함수는', () => {
     });
 
     describe('dedup으로 기존 in-flight job에 join되면', () => {
-        it('worker로 dispatch하지 않고 기존 jobId를 반환한다', async () => {
+        it('worker로 dispatch하지 않고 기존 jobId를 반환하며 usage도 기록하지 않는다', async () => {
             mockCacheGet.mockResolvedValueOnce(null);
             mockClaimOrJoinInFlightJob.mockImplementationOnce(async () => ({
                 status: 'joined',
                 jobId: 'existing-shared-job',
             }));
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
 
             const result = await submitNewsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-flash',
                 news: [singleNewsItem],
                 upcomingCalendar: [singleCalendarItem],
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
             });
 
             expect(result).toEqual({
                 status: 'submitted',
                 jobId: 'existing-shared-job',
             });
-            // setJobMeta and worker fetch are skipped on the joined path —
-            // only the original claimer owns those.
+            // setJobMeta, worker fetch, and usage recording are all skipped on
+            // the joined path — only the original claimer owns those.
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+            expect(recordUsage).not.toHaveBeenCalled();
         });
     });
 });

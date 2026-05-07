@@ -1,7 +1,12 @@
 import { fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { MS_PER_SECOND } from '@/domain/constants/time';
-import { cancelJob, releaseInFlightJob } from '@/infrastructure/jobs/queue';
+import {
+    cancelJob,
+    clearInFlightJob,
+    getJobMeta,
+    releaseInFlightJob,
+} from '@/infrastructure/jobs/queue';
 import { tryReadWorkerConfig } from '@/infrastructure/market/config';
 
 const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
@@ -9,12 +14,12 @@ const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
 /**
  * Cancel an in-flight analysis job, with subscriber refcount semantics.
  *
- * Issue #81 dedup means multiple submitters may share a single `jobId`.
- * Each submitter holds one subscription via {@link claimOrJoinInFlightJob};
- * each cancel releases exactly one subscription via
- * {@link releaseInFlightJob}. Only the LAST cancel — the one that takes the
- * refcount to zero — propagates to the actual worker job. Otherwise one
- * client closing a tab would terminate analyses other clients still want.
+ * The dedup mechanism means multiple submitters may share a single `jobId`.
+ * Each submitter holds one subscription; each cancel releases exactly one
+ * subscription via {@link releaseInFlightJob}. Only the LAST cancel — the
+ * one that takes the refcount to zero — propagates to the actual worker
+ * job. Otherwise one client closing a tab would terminate analyses other
+ * clients still want.
  *
  * When the cancel is the last subscriber's, sends two best-effort signals:
  * 1. Marks the job as cancelled in Redis (sets the `cancelledKey`) so the
@@ -76,6 +81,27 @@ export async function cancelAnalysisJob(
         // Other subscribers are still polling this job — don't terminate it.
         return;
     }
+
+    // Free the in-flight slot immediately so a fresh submitter for the same
+    // cacheKey starts a new job rather than joining this cancelled one.
+    // Without this, a re-submit between cancel and TTL expiration would
+    // attach to the worker job that's already shutting down — a regression
+    // versus pre-dedup behavior where every submit produced a new job.
+    const meta = await getJobMeta(jobId).catch(reason => {
+        console.warn(
+            '[cancelAnalysisJob] Failed to read job meta during cleanup:',
+            jobId,
+            reason
+        );
+        return null;
+    });
+    await clearInFlightJob(jobId, meta?.cacheKey).catch(reason =>
+        console.warn(
+            '[cancelAnalysisJob] Failed to clear in-flight slot:',
+            jobId,
+            reason
+        )
+    );
 
     const workerConfig = tryReadWorkerConfig();
 

@@ -296,8 +296,8 @@ describe('job queue — with redis', () => {
         });
 
         it('retries with a fresh claim when the slot disappears between SET NX and GET', async () => {
-            // First attempt: SET NX returns null (slot taken), GET returns null (slot gone).
-            // Recursion's second attempt: SET NX succeeds.
+            // First iteration: SET NX returns null (slot taken), GET returns null (slot gone).
+            // Second iteration: SET NX succeeds (slot re-claimed after race).
             mockSetNx.mockResolvedValueOnce(null).mockResolvedValueOnce('OK');
             mockGet.mockResolvedValueOnce(null);
             mockIncr.mockResolvedValueOnce(1);

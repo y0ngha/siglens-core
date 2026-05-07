@@ -227,7 +227,7 @@ export async function isJobCancelled(jobId: string): Promise<boolean> {
 
 /**
  * Delete every Redis key associated with a job (status, result, error,
- * meta, cancelled).
+ * meta, cancelled, refcount).
  *
  * Called from `pollAnalysis` once a terminal outcome (`done` or `error`)
  * has been observed and consumed by the caller. Cleanup failures are
@@ -276,8 +276,8 @@ const CLAIM_OR_JOIN_MAX_ATTEMPTS = 3;
  * @internal Atomically claim an in-flight slot for `cacheKey`, or join an
  * existing one.
  *
- * Backs the dedup half of the issue #81 design: when two submitters race for
- * the same `cacheKey` (same symbol/timeframe/model + input hash), only the
+ * Backs the in-flight dedup mechanism: when two submitters race for the
+ * same `cacheKey` (same symbol/timeframe/model + input hash), only the
  * first allocates a worker job; the rest piggyback on its `jobId`. Both
  * paths bump the subscriber refcount so a single cancel from one client
  * cannot terminate a job another client still wants — see
@@ -362,7 +362,7 @@ export async function claimOrJoinInFlightJob(
  * `true` when the caller was the last subscriber and the worker job is now
  * safe to cancel.
  *
- * Backs the cancel-refcount half of the issue #81 design: when N clients
+ * Backs the cancel-refcount half of the dedup mechanism: when N clients
  * share a `jobId`, each cancel only releases one subscription. Only the
  * final release should propagate to the worker `/cancel` endpoint and the
  * Redis cancellation flag — otherwise one user's tab close would terminate
