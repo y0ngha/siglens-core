@@ -312,32 +312,26 @@ export async function claimOrJoinInFlightJob(
 ): Promise<InFlightClaim> {
     return withJobRedis<InFlightClaim>(
         async redis => {
+            const slotKey = inFlightKey(cacheKey);
+            const newJobRcKey = refCountKey(newJobId);
             for (
                 let attempt = 0;
                 attempt < CLAIM_OR_JOIN_MAX_ATTEMPTS;
                 attempt++
             ) {
-                const claimed = await redis.setNx(
-                    inFlightKey(cacheKey),
-                    newJobId,
-                    {
-                        ex: JOB_TTL_SECONDS,
-                    }
-                );
+                const claimed = await redis.setNx(slotKey, newJobId, {
+                    ex: JOB_TTL_SECONDS,
+                });
                 if (claimed !== null) {
-                    await redis.incr(refCountKey(newJobId));
-                    await redis.expire(refCountKey(newJobId), JOB_TTL_SECONDS);
+                    await redis.incr(newJobRcKey);
+                    await redis.expire(newJobRcKey, JOB_TTL_SECONDS);
                     return { status: 'claimed', jobId: newJobId };
                 }
-                const existingJobId = await redis.get<string>(
-                    inFlightKey(cacheKey)
-                );
+                const existingJobId = await redis.get<string>(slotKey);
                 if (existingJobId !== null) {
-                    await redis.incr(refCountKey(existingJobId));
-                    await redis.expire(
-                        refCountKey(existingJobId),
-                        JOB_TTL_SECONDS
-                    );
+                    const existingJobRcKey = refCountKey(existingJobId);
+                    await redis.incr(existingJobRcKey);
+                    await redis.expire(existingJobRcKey, JOB_TTL_SECONDS);
                     return { status: 'joined', jobId: existingJobId };
                 }
                 // The slot was released between our NX attempt and the GET.
@@ -349,8 +343,8 @@ export async function claimOrJoinInFlightJob(
             // Refcount must still be initialized here so that subsequent
             // joiners who DECR via cancel never push the count below zero
             // and prematurely cancel a job other clients still depend on.
-            await redis.incr(refCountKey(newJobId));
-            await redis.expire(refCountKey(newJobId), JOB_TTL_SECONDS);
+            await redis.incr(newJobRcKey);
+            await redis.expire(newJobRcKey, JOB_TTL_SECONDS);
             return { status: 'claimed', jobId: newJobId };
         },
         { status: 'claimed', jobId: newJobId }

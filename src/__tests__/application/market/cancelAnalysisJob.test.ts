@@ -129,9 +129,21 @@ describe('cancelAnalysisJob', () => {
     });
 
     describe('refcount semantics', () => {
-        it('마지막 구독자가 아닐 때 cancelJob과 fetch를 호출하지 않는다', async () => {
+        beforeEach(() => {
             process.env.WORKER_URL = 'https://worker.test';
             process.env.WORKER_SECRET = 'test-secret';
+            // worker URL이 설정된 분기에서는 fetch가 호출되므로 기본 응답 제공.
+            mockFetch.mockResolvedValue(
+                new Response(JSON.stringify({ status: 'ok' }))
+            );
+        });
+
+        afterEach(() => {
+            delete process.env.WORKER_URL;
+            delete process.env.WORKER_SECRET;
+        });
+
+        it('마지막 구독자가 아닐 때 cancelJob과 fetch를 호출하지 않는다', async () => {
             mockReleaseInFlightJob.mockResolvedValueOnce(false);
 
             await cancelAnalysisJob('shared-job');

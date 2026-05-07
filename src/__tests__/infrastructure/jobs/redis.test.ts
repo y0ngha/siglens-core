@@ -90,4 +90,32 @@ describe('createJobRedis', () => {
         await expect(wrapper.expire('rc', 60)).resolves.toBe(1);
         expect(expire).toHaveBeenCalledWith('rc', 60);
     });
+
+    it('setNx returns null when SET NX fails (key already exists)', async () => {
+        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
+        // Upstash returns null when the NX condition fails (key already
+        // exists). The wrapper's typeof-string check must funnel that to
+        // null so callers can rely on null === contention.
+        const set = vi.fn().mockResolvedValue(null);
+        MockRedis.mockImplementation(() => ({
+            get: vi.fn(),
+            set,
+            del: vi.fn(),
+            incr: vi.fn(),
+            decr: vi.fn(),
+            expire: vi.fn(),
+        }));
+
+        const wrapper = createJobRedis();
+        if (wrapper === null) throw new Error('expected non-null wrapper');
+
+        await expect(
+            wrapper.setNx('inflight:cache-key', 'job-1', { ex: 60 })
+        ).resolves.toBeNull();
+        expect(set).toHaveBeenCalledWith('inflight:cache-key', 'job-1', {
+            ex: 60,
+            nx: true,
+        });
+    });
 });
