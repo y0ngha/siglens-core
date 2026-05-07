@@ -35,7 +35,7 @@ type ProviderFetchResult =
           status: 'ok';
           snapshot: FundamentalSnapshot;
           skills: readonly Skill[];
-          skillsDegraded: boolean | undefined;
+          skillsDegraded: true | undefined;
       }
     | SubmitFundamentalAnalysisFetchError;
 
@@ -120,11 +120,11 @@ async function fetchProviderData(
             status: 'ok',
             snapshot,
             skills: skillsResult.skills,
-            skillsDegraded: skillsResult.skillsDegraded || undefined,
+            skillsDegraded: skillsResult.skillsDegraded ? true : undefined,
         };
     } catch (error) {
         console.error(
-            '[submitFundamentalAnalysis] Provider fetch failed:',
+            '[submitFundamentalAnalysis] Provider or skills fetch failed:',
             error
         );
         return { status: 'error', code: 'fetch_failed', error: String(error) };
