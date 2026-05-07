@@ -1,5 +1,8 @@
 import type { Bar, BuySellVolumeResult } from '@/domain/types';
-import { computeFactorsAtT } from '@/domain/indicators/fearGreed/factors';
+import {
+    computeFactorsAtT,
+    POC_WINDOW_DEFAULT,
+} from '@/domain/indicators/fearGreed/factors';
 import {
     composeSnapshot,
     FEAR_GREED_CONFIDENCE_THRESHOLDS,
@@ -10,8 +13,6 @@ import type {
     FearGreedHistoryPoint,
     FearGreedSnapshot,
 } from '@/domain/indicators/fearGreed/types';
-
-const POC_WINDOW_DEFAULT = 60;
 
 function buildFactorTS(
     bars: Bar[],
@@ -28,9 +29,25 @@ function isoDate(unixSec: number): string {
 }
 
 /**
- * Snapshot at the latest bar. Walk-forward distribution = factor TS up to t-1.
- * Returns null when the latest factor is uncomputable or sample is below the
- * NORMAL confidence threshold (insufficient data for a reliable percentile).
+ * Snapshot at the latest bar. Walk-forward distribution = factor TS at indices [0..t),
+ * where t = bars.length - 1.
+ *
+ * Returns null when:
+ * - bars is empty
+ * - the latest factor is uncomputable (e.g. window guards in computeFactorsAtT not met)
+ * - composeSnapshot rejects (sample size < LIMITED → confidence 'insufficient')
+ *
+ * For larger but still-thin samples (LIMITED ≤ sample < NORMAL), the snapshot is
+ * returned with confidence='limited' so callers can show a reduced-confidence badge.
+ *
+ * @param bars - Daily OHLCV bars in chronological order. Must include enough history
+ *   for factor windows (≥ MA200/52w window) plus a walk-forward sample.
+ * @param buySellVolume - Per-bar buy/sell volume classification, indexed parallel to bars.
+ *   Empty entries (`{buyVolume: 0, sellVolume: 0}`) yield buy/sell imbalance = 0.
+ * @param options - Optional configuration. `pocWindow` overrides the default 60-bar
+ *   Volume Profile window for the POC distance factor.
+ * @returns FearGreedSnapshot with score, label, group breakdown, confidence, and warning,
+ *   or null when the data is insufficient.
  */
 export function computeFearGreedIndex(
     bars: Bar[],
@@ -53,11 +70,18 @@ export function computeFearGreedIndex(
 }
 
 /**
- * Walk-forward history. For each t, distribution = valid factor TS in [0..t).
- * No look-ahead: subsequent bars never affect score at earlier indices.
+ * Walk-forward score history. For each bar t, the distribution = valid factor TS in [0..t).
+ * No look-ahead: bars added beyond index i never change `history[i]`.
  *
- * History entries with score=null indicate the warm-up period (sample below the
- * NORMAL confidence threshold). UI renders these as gaps in the time series.
+ * History entries with `score: null` indicate either (a) the factor at t was uncomputable
+ * (warm-up before factor windows fully populate) or (b) the walk-forward sample at t was
+ * below NORMAL (sample.length < FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL). UI renders these
+ * as gaps in the time series.
+ *
+ * @param bars - Daily OHLCV bars in chronological order.
+ * @param buySellVolume - Per-bar buy/sell volume classification, indexed parallel to bars.
+ * @param options - Optional configuration. `pocWindow` overrides the default 60.
+ * @returns Array of FearGreedHistoryPoint, length = bars.length.
  */
 export function computeFearGreedHistory(
     bars: Bar[],
@@ -68,6 +92,7 @@ export function computeFearGreedHistory(
     const factorTS = buildFactorTS(bars, buySellVolume, pocWindow);
     const sample: FactorValues[] = [];
     const out: FearGreedHistoryPoint[] = new Array(bars.length);
+    const NORMAL_THRESHOLD = FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL;
 
     for (let t = 0; t < bars.length; t++) {
         const date = isoDate(bars[t].time);
@@ -78,7 +103,7 @@ export function computeFearGreedHistory(
             continue;
         }
 
-        if (sample.length < FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL) {
+        if (sample.length < NORMAL_THRESHOLD) {
             sample.push(current);
             out[t] = { date, score: null, label: null };
             continue;

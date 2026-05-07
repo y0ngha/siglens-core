@@ -3,7 +3,8 @@ import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 import type { FactorValues } from '@/domain/indicators/fearGreed/types';
 
 const VOL_Z_WINDOW = 20;
-const POC_WINDOW_DEFAULT = 60;
+/** Default Volume Profile window for POC distance factor. Must match the value used by walkForward. */
+export const POC_WINDOW_DEFAULT = 60;
 const MA200_WINDOW = 200;
 const RANGE_WINDOW = 252;
 
