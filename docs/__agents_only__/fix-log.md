@@ -499,3 +499,43 @@
 - Rule: MISTAKES.md Tests #9 "Test description must match actual behavior under test"
 - Context: walkForward.test.ts. Renamed and clarified comment.
 
+## [PR #79 | refactor/news-card-result-cache-removal | 2026-05-07] Round 2
+
+- S1: Exported NEWS_CARD_MODEL_ID as @internal from submitNewsCardAnalysis.ts. Tests (submitNewsCardAnalysis.test.ts, pollNewsCardAnalysis.test.ts) now import it instead of hardcoding 'gemini-2.5-flash-lite'.
+- Rule: MISTAKES.md Constants & Literals §6.5 / Test Patterns — hardcoded literals must be extracted to named constants; tests should import from source rather than hardcoding values
+- Context: NEWS_CARD_MODEL_ID constant added as @internal; both test files updated to import and reference it, improving maintainability and single-source-of-truth for the model identifier
+
+- S2: Made JSDoc consumer-neutral in submitNewsCardAnalysis.ts and pollNewsCardAnalysis.ts — removed references to "siglens app", "attachAnalysis", "analyzedAt" and replaced with "caller is responsible for...via their own persistence layer".
+- Rule: MISTAKES.md Public API §2 — public API JSDoc must be consumer-agnostic; avoid embedding assumptions about specific calling context or dependent fields
+- Context: JSDoc updated to document the contract in abstract terms, allowing any caller (siglens app or other consumer) to use the API without feeling like documentation was written for a specific client
+
+- S3: Removed changelog content ("Redis result caching was removed in favor of DB persistence") from SubmitNewsCardAnalysisResult JSDoc in types.ts. Now documents current behavior only.
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must document current behavior, not historical migration narratives or changelog notes
+- Context: Historical migration note removed; JSDoc now focuses on what SubmitNewsCardAnalysisResult represents today, not implementation history of how caching was removed
+
+## [PR #79 | refactor/news-card-result-cache-removal | 2026-05-07] Round 1
+
+- Violation: Breaking public type removal SubmitNewsCardAnalysisCached shipped without major semver bump (version stayed 0.7.11)
+- Rule: MISTAKES.md Public API §3 — removal of public Tier 4 types in 0.x semver requires major bump to 0.8.0
+- Context: Blocker B-1 — SubmitNewsCardAnalysisCached removed as unused public type alias; bumped package.json version from 0.7.12 to 0.8.0 per breaking change semver policy
+
+- Violation: Breaking public type removal not retained as @deprecated alias for backward compile compatibility
+- Rule: MISTAKES.md Public API §3 — removed Tier 4 types should be re-exported as @deprecated aliases for one minor version before hard removal
+- Context: Blocker B-2 — added `export type SubmitNewsCardAnalysisCached = never` with @deprecated JSDoc in src/application/news/types.ts; re-exported from src/index.ts to maintain compile compatibility across 0.7.11→0.8.0 transition
+
+- Violation: Removed @internal constants and cache-key builder not documented in PUBLIC_API.md as removal in 0.8.0
+- Rule: MISTAKES.md Documentation Sync §3 — API document must track breaking removals and changelog must reference deprecation/removal milestones
+- Context: Suggestion S-1 — NEWS_CARD_CACHE_TTL_SECONDS and buildNewsCardCacheKey marked as removed in 0.8.0 in PUBLIC_API.md @internal section; CHANGELOG entry added under 0.8.0 BREAKING CHANGES
+
+- Violation: NEWS_CARD_MODEL_ID JSDoc explained internal constant lifecycle instead of consumer-facing purpose
+- Rule: MISTAKES.md Documentation Sync §4 — JSDoc must document WHY (consumer intent) not WHAT (implementation history); explain only constraints that affect usage
+- Context: Suggestion S-2 — submitNewsCardAnalysis.ts NEWS_CARD_MODEL_ID JSDoc simplified from multi-line historical note to single-line intent: "The model ID used for news card analysis"
+
+- Violation: Test comment "cacheKey는 더 이상 job meta에 포함되지 않는다" described implementation state rather than test intent
+- Rule: MISTAKES.md Comments §1 / CONVENTIONS.md — test comments must explain WHY the test exists, not WHAT the code does; what-comments should be in code comments or removed
+- Context: Suggestion S-3 — removed task-context comment from pollNewsCardAnalysis.test.ts; test intent is already clear from test name "완료 후 Redis 캐시에 저장하지 않는다" (no Redis cache write after completion)
+
+- Violation: Test lacked explicit assertion that cache write did not occur after background task completion
+- Rule: MISTAKES.md Tests §15 — negative assertions (absence of action) must be explicit; implicit reliance on absence of side effects is error-prone and unreadable
+- Context: Blocker B-3 — pollNewsCardAnalysis.test.ts "완료 후 Redis 캐시에 저장하지 않는다" test added `mockFireAndForget` mock + `expect(mockFireAndForget).not.toHaveBeenCalled()` assertion to explicitly verify no cache-persist call occurs
+

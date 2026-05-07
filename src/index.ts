@@ -516,10 +516,10 @@ export type {
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
     SubmitNewsAnalysisSubmitted,
-    SubmitNewsCardAnalysisCached,
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
     SubmitNewsCardAnalysisSubmitted,
+    SubmitNewsCardAnalysisCached,
 } from './application/news/types';
 export type {
     OverallAxis,

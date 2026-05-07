@@ -155,8 +155,6 @@ export const CACHE_KEY_SCHEMA_VERSION = 'v1' as const;
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /** @internal TTL for news analysis aggregate cache results. Default: 24 hours. */
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** @internal TTL for per-card news analysis cache (translation + sentiment + summary). Default: 30 days — effectively permanent for the lifetime of a news article. */
-export const NEWS_CARD_CACHE_TTL_SECONDS = 30 * SECONDS_PER_DAY;
 /** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
 export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
@@ -202,29 +200,6 @@ export function buildNewsCacheKey(
     inputHash: string
 ): string {
     return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${inputHash}`;
-}
-
-/**
- * @internal Fixed model identifier used for per-news-card translation and sentiment analysis.
- * Single source of truth — also consumed by `submitNewsCardAnalysis`.
- */
-export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
-
-/**
- * Build the Redis key for a cached per-news-card analysis result.
- *
- * The model is fixed to {@link NEWS_CARD_MODEL_ID} (`gemini-2.5-flash-lite`)
- * for translation and sentiment analysis.
- * Format: `analysis:news-card:<newsId>:gemini-2.5-flash-lite`.
- *
- * @internal Keyed only by `newsId` — consumer cannot reuse this key without
- *   knowing the fixed model. Do not depend on this function from outside the
- *   core library.
- * @param newsId - Stable unique identifier of the news article.
- * @returns The cache key.
- */
-export function buildNewsCardCacheKey(newsId: string): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news-card:${newsId}:${NEWS_CARD_MODEL_ID}`;
 }
 
 /**

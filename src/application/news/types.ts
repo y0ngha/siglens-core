@@ -127,22 +127,26 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     thinkingBudget?: number;
 }
 
-/** The caller receives a cached card analysis — no new job was created. */
-export interface SubmitNewsCardAnalysisCached {
-    status: 'cached';
-    result: NewsCardAnalysis;
-}
-
 /** A new card analysis job was submitted; poll with `jobId` for the result. */
 export interface SubmitNewsCardAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** Union of all possible outcomes from {@link submitNewsCardAnalysis}. */
-export type SubmitNewsCardAnalysisResult =
-    | SubmitNewsCardAnalysisCached
-    | SubmitNewsCardAnalysisSubmitted;
+/**
+ * Result of {@link submitNewsCardAnalysis}.
+ *
+ * Always `submitted`. The caller is responsible for filtering
+ * already-analyzed items via their own persistence layer before calling
+ * this function.
+ */
+export type SubmitNewsCardAnalysisResult = SubmitNewsCardAnalysisSubmitted;
+
+/**
+ * @deprecated Redis result caching was removed in 0.8.0. `submitNewsCardAnalysis`
+ * always returns `submitted`. Remove this check from your call sites.
+ */
+export type SubmitNewsCardAnalysisCached = never;
 
 // ─────────────────────────────────────────
 // Poll News Card Analysis

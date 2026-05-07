@@ -9,7 +9,6 @@ import {
     buildBriefingCacheKey,
     buildFundamentalCacheKey,
     buildNewsCacheKey,
-    buildNewsCardCacheKey,
     buildOverallCacheKey,
     buildSectorSignalsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
@@ -19,7 +18,6 @@ import {
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
     NEWS_CACHE_TTL_SECONDS,
-    NEWS_CARD_CACHE_TTL_SECONDS,
     OVERALL_CACHE_TTL_SECONDS,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
@@ -125,13 +123,6 @@ describe('new analysis cache keys', () => {
         );
     });
 
-    it('buildNewsCardCacheKey is per-news-id (model fixed flash-lite) with version prefix', () => {
-        const k = buildNewsCardCacheKey('news-12345');
-        expect(k).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news-card:news-12345:gemini-2.5-flash-lite`
-        );
-    });
-
     it('buildOverallCacheKey includes timeframe and version prefix', () => {
         expect(
             buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3')
@@ -148,7 +139,6 @@ describe('new analysis cache keys', () => {
     it('TTL constants match SECONDS_PER_DAY', () => {
         expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
         expect(NEWS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
-        expect(NEWS_CARD_CACHE_TTL_SECONDS).toBe(30 * SECONDS_PER_DAY);
         expect(OVERALL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
     });
 });

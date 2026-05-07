@@ -3,15 +3,8 @@ import type {
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
 } from '@/application/news/types';
-import { normalizeNewsCardAnalysis } from '@/domain/analysis/normalizeNews';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
-import type { NewsCardAnalysis } from '@/domain/types';
-import {
-    buildNewsCardCacheKey,
-    NEWS_CARD_MODEL_ID,
-} from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 
@@ -27,20 +20,22 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS =
     SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES * MS_PER_MINUTE;
 
 /**
+ * @internal
+ * Fixed model identifier for per-card news translation and sentiment analysis.
+ */
+export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+
+/**
  * Submit a per-card news analysis job using the flash-lite model.
  *
- * Resolves to one of two outcomes:
- * - `cached`: a permanent per-card analysis already exists in Redis. The
- *   cache is keyed by `item.id` only; model is fixed to `NEWS_CARD_MODEL_ID`.
- * - `submitted`: a `jobId` was registered and a fire-and-forget POST was
- *   sent to the configured worker. Poll the result with
- *   {@link pollNewsCardAnalysis}.
+ * Always returns `submitted` — there is no cache check. The caller is
+ * responsible for:
+ * 1. Filtering out already-analyzed items via their own persistence layer
+ *    before calling this function.
+ * 2. Persisting the result after polling completes.
  *
  * Unlike full news analysis, this call has **no tier or usage gate** — it
  * is a lightweight per-item call that is bundled into the news data pipeline.
- *
- * The result cache TTL is {@link NEWS_CARD_CACHE_TTL_SECONDS} (30 days),
- * making it effectively permanent for the lifetime of a news article.
  *
  * @param options - Options object containing the raw news item and optional background-task hooks.
  *   Pass Vercel's `waitUntil` so the worker dispatch can continue after the response.
@@ -49,7 +44,6 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS =
  * @example
  * ```ts
  * const res = await submitNewsCardAnalysis({ item: newsItem });
- * if (res.status === 'cached') return res.result;
  * const polled = await pollNewsCardAnalysis(res.jobId);
  * ```
  *
@@ -59,30 +53,8 @@ export async function submitNewsCardAnalysis(
     options: SubmitNewsCardAnalysisOptions
 ): Promise<SubmitNewsCardAnalysisResult> {
     const { item, thinkingBudget } = options;
-    const cacheKey = buildNewsCardCacheKey(item.id);
-    const cache = createCacheProvider();
 
-    // ── 1. Check permanent cache (no tier/usage gate for card analysis) ──
-    if (cache !== null) {
-        try {
-            const cached = await cache.get<NewsCardAnalysis>(cacheKey);
-            // Lightweight structural validation — schema drift from a prior
-            // release should fall through as a cache miss rather than poison
-            // the response. The schema-version prefix on the cache key is the
-            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
-            // check is a belt-and-braces fallback.
-            if (cached !== null) {
-                return {
-                    status: 'cached',
-                    result: normalizeNewsCardAnalysis(cached),
-                };
-            }
-        } catch (error) {
-            console.error('[submitNewsCardAnalysis] Cache read failed:', error);
-        }
-    }
-
-    // ── 2. Build prompt, enqueue job, fire-and-forget worker POST ──
+    // Build prompt, enqueue job, fire-and-forget worker POST
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildNewsCardAnalysisPrompt(item);
     const jobId = crypto.randomUUID();
@@ -90,7 +62,6 @@ export async function submitNewsCardAnalysis(
     await setJobMeta(jobId, {
         symbol: item.symbol,
         modelId: NEWS_CARD_MODEL_ID,
-        cacheKey,
     });
 
     const dispatch = fetch(`${workerUrl}/analyze`, {

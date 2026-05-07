@@ -1,32 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 
-vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
 
 import { pollNewsCardAnalysis } from '@/application/news/pollNewsCardAnalysis';
+import { NEWS_CARD_MODEL_ID } from '@/application/news/submitNewsCardAnalysis';
 import {
     getJobStatus,
     getJobError,
     getJobResult,
     getJobMeta,
-    cleanupJob,
 } from '@/infrastructure/jobs/queue';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { fireAndForget, cleanupInBackground } from '@/application/background';
+import { cleanupInBackground } from '@/application/background';
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
 const mockGetJobResult = getJobResult as Mock;
 const mockGetJobMeta = getJobMeta as Mock;
-const mockCleanupJob = cleanupJob as Mock;
-const mockCreateCacheProvider = createCacheProvider as Mock;
-const mockFireAndForget = fireAndForget as Mock;
 const mockCleanupInBackground = cleanupInBackground as Mock;
-
-const mockCacheSet = vi.fn();
-const mockCacheProvider = { get: vi.fn(), set: mockCacheSet, delete: vi.fn() };
 
 /** Minimal valid raw news card analysis result. */
 const rawCardJson = JSON.stringify({
@@ -40,17 +32,12 @@ const rawCardJson = JSON.stringify({
 
 const mockMeta = {
     symbol: 'AAPL',
-    modelId: 'gemini-2.5-flash-lite',
-    cacheKey: 'news-card:news-001',
+    modelId: NEWS_CARD_MODEL_ID,
 };
 
 describe('pollNewsCardAnalysis 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
-        mockCacheSet.mockResolvedValue(undefined);
-        mockCleanupJob.mockResolvedValue(undefined);
-        mockFireAndForget.mockImplementation(() => undefined);
         mockCleanupInBackground.mockImplementation(() => undefined);
     });
 
@@ -144,34 +131,17 @@ describe('pollNewsCardAnalysis 함수는', () => {
             }
         });
 
-        it('meta.cacheKey가 있으면 fireAndForget으로 캐시에 저장한다', async () => {
+        it('완료 후 Redis 캐시에 저장하지 않는다 (DB persistence는 호출 측 책임)', async () => {
             mockGetJobResult.mockResolvedValueOnce(rawCardJson);
 
-            await pollNewsCardAnalysis('job-cache');
-
-            expect(mockFireAndForget).toHaveBeenCalled();
-        });
-
-        it('meta.cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
-            mockGetJobMeta.mockResolvedValueOnce({
-                symbol: 'AAPL',
-                modelId: 'flash-lite',
-            });
-            mockGetJobResult.mockResolvedValueOnce(rawCardJson);
-
-            await pollNewsCardAnalysis('job-no-key');
-
-            expect(mockFireAndForget).not.toHaveBeenCalled();
-        });
-
-        it('캐시 프로바이더가 null이면 캐시 저장을 건너뛴다', async () => {
-            mockCreateCacheProvider.mockReturnValueOnce(null);
-            mockGetJobResult.mockResolvedValueOnce(rawCardJson);
-
-            const result = await pollNewsCardAnalysis('job-no-provider');
+            const result = await pollNewsCardAnalysis('job-done-no-cache');
 
             expect(result.status).toBe('done');
-            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(mockCleanupInBackground).toHaveBeenCalledWith(
+                'job-done-no-cache',
+                '[PollNewsCard]',
+                undefined
+            );
         });
 
         it('빈 응답이 감지되면 경고를 로그하고 done을 반환한다', async () => {
