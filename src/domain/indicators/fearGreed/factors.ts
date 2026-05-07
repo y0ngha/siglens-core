@@ -3,12 +3,20 @@ import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 import type { FactorValues } from '@/domain/indicators/fearGreed/types';
 
 const VOL_Z_WINDOW = 20;
-/** Default Volume Profile window for POC distance factor. Must match the value used by walkForward. */
+/**
+ * Default Volume Profile window for POC distance factor. Must match the value used by walkForward.
+ *
+ * @internal Imported by walkForward.ts; not part of the public API.
+ */
 export const POC_WINDOW_DEFAULT = 60;
 const MA200_WINDOW = 200;
 const RANGE_WINDOW = 252;
 
-/** Minimum sample size required for MA200/52w-position factor windows to produce a value. */
+/**
+ * Minimum sample size required for MA200/52w-position factor windows to produce a value.
+ *
+ * @internal Imported by walkForward.ts; not part of the public API.
+ */
 export const FEAR_GREED_MIN_FACTOR_WINDOW = 30;
 
 /**
@@ -20,6 +28,8 @@ export const FEAR_GREED_MIN_FACTOR_WINDOW = 30;
  * look-ahead avoidance: rolling stats use bars[wStart..t) (current bar excluded).
  * Exception per spec §2.3: 52w high/low includes the current bar by definition,
  * so the result stays within [0, 1] even on new highs/lows.
+ *
+ * @internal Used by walkForward; not part of the public API.
  */
 export function computeFactorsAtT(
     bars: Bar[],
