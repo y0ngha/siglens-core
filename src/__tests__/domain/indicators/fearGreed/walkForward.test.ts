@@ -5,6 +5,7 @@ import {
     computeFearGreedHistory,
 } from '@/domain/indicators/fearGreed/walkForward';
 import { FEAR_GREED_CONFIDENCE_THRESHOLDS } from '@/domain/indicators/fearGreed/composition';
+import type { FearGreedHistoryPoint } from '@/domain/indicators/fearGreed/types';
 
 function genBars(count: number, basePrice = 100): Bar[] {
     return Array.from({ length: count }, (_, i) => {
@@ -67,7 +68,9 @@ describe('computeFearGreedHistory', () => {
         const h2 = computeFearGreedHistory(bars2, genBsv(500));
 
         // Find the first index where h1 has a non-null score (post-warmup boundary)
-        const firstStableIdx = h1.findIndex(p => p.score !== null);
+        const firstStableIdx = h1.findIndex(
+            (p: FearGreedHistoryPoint) => p.score !== null
+        );
         expect(firstStableIdx).toBeGreaterThan(0);
 
         // Verify multiple indices: warm-up boundary, mid-history, last index of h1
