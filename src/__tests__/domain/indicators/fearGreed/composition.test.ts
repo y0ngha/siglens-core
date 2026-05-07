@@ -3,6 +3,7 @@ import {
     scoreToLabel,
     detectWarning,
     composeSnapshot,
+    FEAR_GREED_CONFIDENCE_THRESHOLDS,
 } from '@/domain/indicators/fearGreed/composition';
 import type { FactorValues } from '@/domain/indicators/fearGreed/types';
 
@@ -18,11 +19,16 @@ const NEUTRAL_RAW: FactorValues = {
  * Build a sample where half the entries are below `current` and half above.
  * With strict-less-than percentile, this places `current` at exactly the 50th
  * percentile for every factor — yielding score 50 (NEUTRAL).
+ *
+ * Requires `count` to be even; throws otherwise.
  */
 function makeMedianSample(
     count: number,
     current: FactorValues
 ): FactorValues[] {
+    if (count % 2 !== 0) {
+        throw new Error(`makeMedianSample requires even count, got ${count}`);
+    }
     return Array.from({ length: count }, (_, i) => {
         const offset = i < count / 2 ? -1 : 1;
         return {
@@ -96,23 +102,36 @@ describe('detectWarning', () => {
 
 describe('composeSnapshot', () => {
     it('returns null when current factors are null', () => {
-        expect(composeSnapshot(null, [], 0)).toBeNull();
+        expect(composeSnapshot(null, [])).toBeNull();
     });
 
-    it('returns null when sample size < 10 (insufficient confidence)', () => {
-        const samples = makeMedianSample(5, NEUTRAL_RAW);
-        expect(composeSnapshot(NEUTRAL_RAW, samples, 5)).toBeNull();
+    it('returns null when sample size < LIMITED threshold (insufficient confidence)', () => {
+        const samples = makeMedianSample(
+            FEAR_GREED_CONFIDENCE_THRESHOLDS.LIMITED - 4,
+            NEUTRAL_RAW
+        );
+        expect(composeSnapshot(NEUTRAL_RAW, samples)).toBeNull();
     });
 
-    it('returns confidence "limited" when 10 <= sample size < 60', () => {
-        const samples = makeMedianSample(30, NEUTRAL_RAW);
-        const snap = composeSnapshot(NEUTRAL_RAW, samples, 30);
+    it('returns confidence "limited" with score/label/warning when LIMITED <= sample size < NORMAL', () => {
+        const t = FEAR_GREED_CONFIDENCE_THRESHOLDS;
+        // Pick an even sample size strictly between LIMITED and NORMAL.
+        const mid = Math.floor((t.LIMITED + t.NORMAL) / 2);
+        const sampleSize = mid % 2 === 0 ? mid : mid + 1; // ensure even
+        const samples = makeMedianSample(sampleSize, NEUTRAL_RAW);
+        const snap = composeSnapshot(NEUTRAL_RAW, samples);
         expect(snap?.confidence).toBe('limited');
+        expect(snap?.score).toBeCloseTo(50, 1);
+        expect(snap?.label).toBe('NEUTRAL');
+        expect(snap?.warning).toBeNull();
     });
 
     it('returns confidence "normal" and score ≈ 50 with median-balanced sample', () => {
-        const samples = makeMedianSample(60, NEUTRAL_RAW);
-        const snap = composeSnapshot(NEUTRAL_RAW, samples, 60);
+        const samples = makeMedianSample(
+            FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL,
+            NEUTRAL_RAW
+        );
+        const snap = composeSnapshot(NEUTRAL_RAW, samples);
         expect(snap?.confidence).toBe('normal');
         expect(snap?.score).toBeCloseTo(50, 1);
         expect(snap?.label).toBe('NEUTRAL');

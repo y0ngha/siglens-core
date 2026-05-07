@@ -10,25 +10,67 @@ import type {
 } from '@/domain/indicators/fearGreed/types';
 import { percentile } from '@/domain/indicators/fearGreed/percentile';
 
+/** 5-stage cutoffs (strict less-than). 0..100 score → label. */
+export const FEAR_GREED_LABEL_CUTOFFS = {
+    EXTREME_FEAR_MAX: 25,
+    FEAR_MAX: 45,
+    NEUTRAL_MAX: 55,
+    GREED_MAX: 75,
+} as const;
+
+/** §4.5 self-norm warning thresholds. */
+export const FEAR_GREED_WARNING_THRESHOLDS = {
+    /** 52w position below this AND ma200 < 0 AND score >= score floor → CHRONIC_WEAKNESS */
+    WEAK_RANGE_MAX: 0.3,
+    /** 52w position above this AND ma200 > 0 AND score <= score ceiling → CHRONIC_STRENGTH */
+    STRONG_RANGE_MIN: 0.7,
+    /** Minimum score for CHRONIC_WEAKNESS to trigger */
+    WEAK_SCORE_MIN: 55,
+    /** Maximum score for CHRONIC_STRENGTH to trigger */
+    STRONG_SCORE_MAX: 45,
+} as const;
+
+/** Confidence classification thresholds (sample size). */
+export const FEAR_GREED_CONFIDENCE_THRESHOLDS = {
+    NORMAL: 60,
+    LIMITED: 10,
+} as const;
+
+/**
+ * Map a 0..100 score to a 5-stage label.
+ *
+ * @internal Used internally by composeSnapshot and walkForward.
+ */
 export function scoreToLabel(score: number): FearGreedLabel {
-    if (score < 25) return 'EXTREME_FEAR';
-    if (score < 45) return 'FEAR';
-    if (score < 55) return 'NEUTRAL';
-    if (score < 75) return 'GREED';
+    if (score < FEAR_GREED_LABEL_CUTOFFS.EXTREME_FEAR_MAX) return 'EXTREME_FEAR';
+    if (score < FEAR_GREED_LABEL_CUTOFFS.FEAR_MAX) return 'FEAR';
+    if (score < FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX) return 'NEUTRAL';
+    if (score < FEAR_GREED_LABEL_CUTOFFS.GREED_MAX) return 'GREED';
     return 'EXTREME_GREED';
 }
 
 /**
  * Spec §4.5 self-norm warning detection. Symmetric chronic weakness/strength.
+ *
+ * @internal Used internally by composeSnapshot and walkForward.
  */
 export function detectWarning(
     score: number,
     raw: FactorValues
 ): FearGreedWarning {
-    if (raw.ma200Dist < 0 && raw.rangePosition < 0.3 && score >= 55) {
+    const t = FEAR_GREED_WARNING_THRESHOLDS;
+    if (
+        raw.ma200Dist < 0 &&
+        raw.rangePosition < t.WEAK_RANGE_MAX &&
+        score >= t.WEAK_SCORE_MIN
+    ) {
         return 'CHRONIC_WEAKNESS';
     }
-    if (raw.ma200Dist > 0 && raw.rangePosition > 0.7 && score <= 45) {
+    if (
+        raw.ma200Dist > 0 &&
+        raw.rangePosition > t.STRONG_RANGE_MIN &&
+        score <= t.STRONG_SCORE_MAX
+    ) {
         return 'CHRONIC_STRENGTH';
     }
     return null;
@@ -37,18 +79,10 @@ export function detectWarning(
 const FLOW_KEYS = ['volume_z', 'buysell_imbalance', 'poc_distance'] as const;
 const TREND_KEYS = ['ma200_distance', 'range_position'] as const;
 
-interface PctlByKey {
-    volume_z: number;
-    buysell_imbalance: number;
-    poc_distance: number;
-    ma200_distance: number;
-    range_position: number;
-}
-
 function computePctls(
     current: FactorValues,
     sample: FactorValues[]
-): PctlByKey {
+): Record<FearGreedFactorKey, number> {
     return {
         volume_z: percentile(
             current.volumeZ,
@@ -90,7 +124,7 @@ function rawValue(current: FactorValues, key: FearGreedFactorKey): number {
 
 function buildFactors(
     current: FactorValues,
-    pctls: PctlByKey,
+    pctls: Record<FearGreedFactorKey, number>,
     keys: ReadonlyArray<FearGreedFactorKey>
 ): FearGreedFactor[] {
     return keys.map(k => ({
@@ -101,8 +135,9 @@ function buildFactors(
 }
 
 function classifyConfidence(sampleSize: number): FearGreedConfidence {
-    if (sampleSize >= 60) return 'normal';
-    if (sampleSize >= 10) return 'limited';
+    const t = FEAR_GREED_CONFIDENCE_THRESHOLDS;
+    if (sampleSize >= t.NORMAL) return 'normal';
+    if (sampleSize >= t.LIMITED) return 'limited';
     return 'insufficient';
 }
 
@@ -111,15 +146,16 @@ function classifyConfidence(sampleSize: number): FearGreedConfidence {
  *
  * @param current - current bar's raw factor values, or null when uncomputable
  * @param sample - factor values from prior bars (current excluded)
- * @param sampleSize - sample.length (passed explicitly for clarity in callers)
  * @returns snapshot, or null when current is null or confidence is insufficient
+ *
+ * @internal Used internally by walkForward.
  */
 export function composeSnapshot(
     current: FactorValues | null,
-    sample: FactorValues[],
-    sampleSize: number
+    sample: FactorValues[]
 ): FearGreedSnapshot | null {
     if (!current) return null;
+    const sampleSize = sample.length;
     const confidence = classifyConfidence(sampleSize);
     if (confidence === 'insufficient') return null;
 
@@ -128,11 +164,9 @@ export function composeSnapshot(
     const trendFactors = buildFactors(current, pctls, TREND_KEYS);
 
     const flowScore =
-        flowFactors.reduce((a, f) => a + f.percentile, 0) /
-        flowFactors.length;
+        flowFactors.reduce((a, f) => a + f.percentile, 0) / FLOW_KEYS.length;
     const trendScore =
-        trendFactors.reduce((a, f) => a + f.percentile, 0) /
-        trendFactors.length;
+        trendFactors.reduce((a, f) => a + f.percentile, 0) / TREND_KEYS.length;
     const score = 0.5 * flowScore + 0.5 * trendScore;
     const label = scoreToLabel(score);
     const warning = detectWarning(score, current);
