@@ -64,10 +64,6 @@
 
 ## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 3
 
-- Violation: 새로 추가된 도메인 함수 `isFallbackAnalysis`에 전용 단위 테스트 블록 없음
-- Rule: domain/CLAUDE.md "Coverage target: 100% branch coverage (required)" / MISTAKES.md §15 Tests
-- Context: `isFallbackAnalysis`는 10개의 `&&` 조건을 가진 순수 함수인데 `confidence.test.ts`에 `describe('isFallbackAnalysis')` 블록이 없어 각 조건의 단독 false 분기가 미커버 상태였음. 11개 테스트 케이스 추가로 100% 분기 커버리지 달성.
-
 - Violation: `requestChatCompletion.ts` 내 라우팅 매트릭스 인라인 주석이 함수 JSDoc과 동일한 WHAT 내용을 반복 설명
 - Rule: CLAUDE.md — "Don't explain WHAT the code does" / "Only add a comment when the WHY is non-obvious"
 - Context: 4줄 주석(1~4번 케이스)이 함수 JSDoc의 API key routing 섹션과 중복. 주석 제거.
@@ -219,10 +215,6 @@
 - Rule: MISTAKES.md Domain Functions §4 — all time reads must use passed parameter, never new Date()
 - Context: Replaced bare new Date() with occurredAt parameter for clock injection consistency
 
-- Violation: Dead code in narrowed guard (Math.max fallback after !== undefined check)
-- Rule: MISTAKES.md Dead Code §15 — unreachable fallback inside type narrowing guard must be removed
-- Context: Removed || fallback after narrowing guard made fallback unreachable
-
 ## [Fundamental & News Analysis Phase 1 | Task Batch 5 | 2026-05-02]
 - Violation: .sort() mutable instead of .toSorted()
 - Rule: MISTAKES.md Coding Paradigm §10 — .sort() mutates the original array; use .toSorted()
@@ -232,18 +224,10 @@
 - Rule: MISTAKES.md Coding Paradigm §6 — identical helper patterns must be extracted to shared utility
 - Context: Both hashSnapshot and hashNewsInput use same SHA-256+truncation pattern; extracted to domain/hash/
 
-- Violation: Inline dynamic type import in generic argument
-- Rule: MISTAKES.md TypeScript §9 — complex type inference chains instead of direct imports
-- Context: Replaced inline dynamic import('...').Type with top-level static import in type position
-
 ## [Fundamental & News Analysis Phase 1 | Task Batch 6 | 2026-05-02]
 - Violation: Test fixture duplication across multiple test files
 - Rule: MISTAKES.md Tests §8 — repeated test data must be extracted to shared fixtures.ts
 - Context: Created __fixtures__/newsFixtures.ts with reusable mock data, imported into all news test files
-
-- Violation: Sibling type shape inconsistency (Record<...> vs optional fields)
-- Rule: MISTAKES.md TypeScript §8 — sibling types must follow consistent declaration patterns
-- Context: Unified snapshot hashing result type shape across FundamentalResult and NewsResult
 
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 8 | 2026-05-02]
@@ -275,22 +259,6 @@
 - Rule: LLM robustness — multi-line fence matching must be flexible
 - Context: Fence matching + brace fallback two-stage extraction (IC-5)
 
-- Violation: 4 poll functions lacked unit tests
-- Rule: MISTAKES.md §15 / CONVENTIONS.md — 100% branch coverage required
-- Context: 4 test files created, 6 branches each covered (B-1)
-
-- Violation: SubmitNewsCardAnalysisOptions type vs function signature mismatch (dead type)
-- Rule: MISTAKES.md §15 — dead code
-- Context: Function signature unified to single options object (B-2)
-
-- Violation: UsageOptions dead fields (occurredAt/userId/modelUsed)
-- Rule: MISTAKES.md §15 — dead code / §4.5 clock injection parameter inconsistency
-- Context: 3 dead fields removed; SubmitXxxOptions.now standardized (B-3)
-
-- Violation: FundamentalDataProvider dead methods (getIncomeStatement/getBalanceSheetStatement)
-- Rule: MISTAKES.md §15 / Interface Segregation
-- Context: Removed from interface (B-4)
-
 - Violation: JobMeta.timeframe optional but pollAnalysis missing timeframe undefined guard
 - Rule: Type change requires test coverage
 - Context: Added timeframe undefined test case to pollAnalysis.test.ts (B-5)
@@ -303,37 +271,17 @@
 - Rule: CONVENTIONS.md — explicit type annotations required
 - Context: Type annotations added to all poll result variables (S-2)
 
-- Violation: OverallScenarioName JSDoc missing cross-reference to sibling types
-- Rule: MISTAKES.md Documentation Sync §3 / FF Readability — viewpoint shift
-- Context: Cross-link JSDoc added to FundamentalSentiment/NewsSentiment pattern (S-3)
-
 - Violation: RawEarningsReport.date vs earningsDate field name inconsistency
 - Rule: MISTAKES.md §8 — sibling type shape must be consistent
 - Context: Renamed date → earningsDate (S-4)
-
-- Violation: FundamentalValuation.sectorAverages dead optional field (not filled by normalizer)
-- Rule: MISTAKES.md §15 + dead branch
-- Context: Field + "Sector Averages" prompt branch removed (S-5)
 
 ## [PR #75 Round 2 | feat/fundamental-news-analysis | 2026-05-02]
 
 ### Blockers (4 findings)
 
-- Violation: 14 Raw* (FMP-shaped) interfaces located in domain layer
-- Rule: MISTAKES.md Architecture §4 — Infrastructure-provided Raw types must not reside in domain/
-- Context: RawFundamentalSnapshot, RawEarningsReport, etc. moved from domain/analysis/types.ts to infrastructure/fundamental/types.ts; new domain-neutral FundamentalSnapshotInput interface added for provider handoff
-
 - Violation: resolveOverallDependencies typed public but return/parameter types not exported from src/index.ts
 - Rule: MISTAKES.md Architecture §6.5 — public function types must be exported to prevent caller type-safety loss
 - Context: OverallDependencyInputs, DependencyState, DependencyStateCached, DependencyStatePending, DependencyStateError added to src/index.ts Tier 4 exports
-
-- Violation: loadSkillsCached catch block silently swallows errors without console.error
-- Rule: MISTAKES.md Domain Functions §2 — degradation must be exposed to caller; silent fallback forbidden
-- Context: console.error added to error handler; loader.test.ts added coverage for error path with console.error spy verification
-
-- Violation: Test file inline dynamic type import (`) } as import('@/domain/types').TierConfig;`)
-- Rule: MISTAKES.md TypeScript §9.5 — dynamic type imports in generic arguments prohibited; must use top-level static import
-- Context: Top-level `import type { TierConfig }` added; inline dynamic import removed from test assertion
 
 ### Suggestions (4 findings, already-documented patterns)
 
@@ -345,29 +293,9 @@
 
 ### Blockers (9 findings)
 
-- Violation: 5 public types defined in implementation file (application/overall/dependencyResolver.ts, src/index.ts)
-- Rule: MISTAKES.md Architecture §4 — public interfaces must be defined in types.ts, not implementation files
-- Context: OverallDependencyInputs, DependencyState variants moved to application/overall/types.ts; src/index.ts updated to import from types.ts
-
-- Violation: Inline `Array<{date: string; changePct: number}>` instead of named `SectorHistoricalPoint[]` type
-- Rule: MISTAKES.md TypeScript §5 — inline shapes must be extracted to named type aliases
-- Context: SectorHistoricalPoint[] imported and used in normalizeFundamentalSnapshot.ts
-
-- Violation: Mixed-shape error union prevents type narrowing (application/{fundamental,news}/types.ts)
-- Rule: MISTAKES.md TypeScript §8 — sibling error types must use discriminated union pattern
-- Context: Error union split into discriminated LimitError / FetchError / NoNewsError variants with distinct code fields; submit functions return variant-specific types
-
-- Violation: `loadSkillsCached` failure not exposed as `skillsDegraded` flag (infrastructure/skills/loader.ts + submit functions + jobs/types.ts)
-- Rule: MISTAKES.md Domain Functions §2 — silent fallback forbidden; degradation must be exposed to caller
-- Context: loadSkillsCached() now returns { skills, skillsDegraded: boolean }; submit functions propagate to JobMeta
-
 - Violation: Duplicate `'gemini-2.5-flash-lite'` literal in two locations (infrastructure/cache/config.ts + application/news/submitNewsCardAnalysis.ts)
 - Rule: MISTAKES.md Public API & Module Exports §6.5 / Coding Paradigm §13 — hardcoded literals must be extracted to named constants
 - Context: NEWS_CARD_MODEL_ID constant exported from cache/config.ts (@internal); submitNewsCardAnalysis.ts imports it
-
-- Violation: Tier 1 public functions missing JSDoc (application/{fundamental,news}/cancelXxxAnalysisJob.ts)
-- Rule: MISTAKES.md Documentation Sync §4 — Tier 1 public exports require full JSDoc (@param, @returns, @see)
-- Context: Full JSDoc with parameter/returns/see tags added to cancelFundamentalAnalysisJob and cancelNewsAnalysisJob
 
 - Violation: Inline callback type annotation when TS could infer (application/fundamental/submitFundamentalAnalysis.ts)
 - Rule: CONVENTIONS.md / TypeScript best practices — prefer inference over redundant explicit annotations
@@ -391,27 +319,11 @@
 
 ### Blockers (5 findings)
 
-- Violation: `ReturnType<typeof normalizeFundamentalSnapshot>` used instead of explicit named type
-- Rule: MISTAKES.md TypeScript §9 — complex ReturnType<typeof fn> inference chains must be replaced with the named return type directly
-- Context: snapshot variable in submitFundamentalAnalysis.ts typed as `FundamentalSnapshot` directly; `FundamentalSnapshot` added to import from `@/domain/types`
-
 - Violation: Two separate `export type { ... } from './application/overall/types'` blocks in src/index.ts
 - Rule: MISTAKES.md Components §0 / ESLint import/no-duplicates — multiple export blocks from the same module must be merged
 - Context: SubmitOverallAnalysis*/PollOverallAnalysisResult and DependencyState*/OverallDependencyInputs merged into single block
 
-- Violation: `PollFundamentalAnalysisResultStatus` dead type with zero usages
-- Rule: MISTAKES.md §15 / Dead Code — types with no consumers must be deleted
-- Context: Dead type removed from application/fundamental/types.ts; confirmed zero grep hits across src/
-
-- Violation: `cancelOverallAnalysisJob.ts` Tier 1 JSDoc missing @param and @returns
-- Rule: MISTAKES.md Documentation Sync §4 — Tier 1 public exports require full JSDoc
-- Context: Full JSDoc with @param jobId, @returns, @see tags added to cancelOverallAnalysisJob
-
 ### Suggestions (5 findings)
-
-- Violation: `'technical' | 'fundamental' | 'news'` literal union repeated in 4 type shapes
-- Rule: MISTAKES.md TypeScript §5 — repeated union literals must be extracted to named type alias
-- Context: OverallAxis type alias extracted; applied to DependencyStatePending.pendingJobs, DependencyStateError.axis, SubmitOverallAnalysisPendingDependencies.pendingJobs, SubmitOverallAnalysisError.axis
 
 - Violation: Misleading "existing consumers" comment in dependencyResolver.ts re-export block
 - Rule: FF Principle 2-A Predictability / CONVENTIONS.md — comments must reflect current intent, not historical state
@@ -432,22 +344,6 @@
 - Violation: `node:crypto` (`createHash`) used inside `application/analysisInputHash.ts`
 - Rule: ARCHITECTURE.md — I/O and system modules (node:crypto, node:fs) belong in `infrastructure/`, not `application/`
 - Context: hashAnalysisInput moved to src/infrastructure/hash/analysisInput.ts; all callers updated; test mirrored to __tests__/infrastructure/hash/
-
-- Violation: `EarningsReport.raw: unknown` field on a public domain type
-- Rule: MISTAKES.md Architecture §4 — raw provider payloads must not leak into domain types; domain shapes carry only domain-meaningful fields
-- Context: raw field removed from EarningsReport; no consumer reads it; infrastructure RawEarningsReport retains raw for FMP adapter use
-
-- Violation: `FundamentalEarningsReportInput` dead type — never used as a function parameter
-- Rule: MISTAKES.md §15 — dead code (types with zero usage) must be deleted
-- Context: normalizeFundamentalSnapshot accepts nextEarningsAt: string | null directly; FundamentalEarningsReportInput deleted from domain/types.ts and src/index.ts
-
-- Violation: `normalizeFundamentalSnapshot` took a 14-field inline object parameter instead of a named interface
-- Rule: MISTAKES.md TypeScript §5 — inline shapes with 3+ fields must be extracted to named interfaces
-- Context: NormalizeFundamentalSnapshotInput named interface defined in domain/types.ts; function signature updated; exported from src/index.ts (Tier 4)
-
-- Violation: `FundamentalPriceTargetSummaryInput` repeated `{ avgPriceTarget: number | null }` inline 3 times
-- Rule: MISTAKES.md TypeScript §5 — repeated inline shapes must be extracted to named type aliases
-- Context: PriceTargetAvg interface extracted; FundamentalPriceTargetSummaryInput updated to reference it; PriceTargetAvg exported from src/index.ts (Tier 4)
 
 ### Suggestions (7 findings)
 
@@ -527,27 +423,11 @@
 - Rule: MISTAKES.md TypeScript §6 — duplicate type structures should be unified or cross-referenced
 - Context: Suggestion S-2; structures kept separate per domain/input layer semantics, JSDoc added to document intentional separation
 
-- Violation: FundamentalSectorPerformanceEntry and HistoricalEntry exported but unused in public API
-- Rule: MISTAKES.md Dead Code §15 — unused public exports must be removed
-- Context: Suggestion S-3; types removed from src/index.ts exports
-
-- Violation: Dead re-export block in application/overall/dependencyResolver.ts
-- Rule: MISTAKES.md Dead Code §15 — remove dead exports after refactoring
-- Context: Suggestion S-4; re-export block removed after resolveOverallDependencies was made internal
-
 - Violation: FundamentalDataProvider returns Raw* types @internal but consumers must import them explicitly
 - Rule: MISTAKES.md API Usability — provider interface return types must be importable with clear intent
 - Context: Suggestion S-5; 13 provider methods return types changed from Raw* to Fundamental*Input aliases; provider interface now returns domain-neutral input shapes
 
 ## [fix/post-210a423-comprehensive | 7-task comprehensive fix cycle | 2026-05-03]
-- Violation: Multiple public API type renames and @internal/public export contradictions across rounds
-- Rule: Public API consistency (MISTAKES.md Public API §3 + §8)
-- Context: Commits 2e08a08 (Task 1), 094b6ea (Task 3), 60bf52d (Task 6), 0e6096f (Task 7), 025c9fc (Task 7), plus PR #75 R8 — pattern repeated 5+ times: OverallDependencyInputs/News union variants missing exports, @internal tags contradicting re-exports, FundamentalProfileInput mktCap→marketCap rename without deprecation
-
-- Violation: JSDoc statements contradict or mismatch actual implementation
-- Rule: Documentation Sync (MISTAKES.md Documentation Sync §3 + §4)
-- Context: Task 4 (cancel JSDoc @returns boolean lie, @example using wrong type, @param status discriminant mismatch), Task 6 (FUNDAMENTAL_CACHE_TTL claiming dynamic TTL that doesn't exist) — 4 instances across 2 commits; JSDoc must be verified against current code before approval
-
 - Violation: Guard and sentinel-check branches lack dedicated test coverage
 - Rule: Infrastructure/Domain test coverage (MISTAKES.md Tests §15 + Infrastructure §2)
 - Context: Task 2 (analysisUsage helper error paths), Task 7 round 1 (sentinel guard branches in 4 submit modules) — 5 branches across 2 commits; 100% coverage required including guard paths
@@ -557,17 +437,9 @@
 - Context: PR #75 R8 (SubmitFundamentalAnalysis/News/OverallAnalysis variants, OverallAxis type), Task 7 round 3 (14 Raw* types + 8 variant types) — 22+ type instances; all union variants used in public function returns must be exported without @internal
 
 ## [PR #76 | fix/post-210a423-comprehensive | 2026-05-03]
-- Violation: FundamentalProfileInput public type alias removed without @deprecated alias retention
-- Rule: MISTAKES.md Public API §3 — Tier 4 type rename/deletion requires @deprecated alias for one minor version OR major semver bump
-- Context: Blocker B1 — alias was added in c7b77d2 (PR #75 R8 S-2) and exported in src/index.ts; restored as @deprecated FundamentalProfile alias in domain/types.ts plus re-export in both index files
-
 - Violation: SubmitOverallAnalysisLimitError shares status:'error' discriminant with SubmitOverallAnalysisError (which has axis field)
 - Rule: TypeScript discriminated union — narrowing by status must yield a single shape
 - Context: Blocker B2 — consumers narrowing on result.status==='error' to access .axis broke after limit-error variant was added; fixed by giving limit error its own status:'limit_error' discriminant
-
-- Violation: FundamentalDataProvider.getGrades public method removed without @deprecated retention
-- Rule: MISTAKES.md Public API §3 — interface public method removal requires deprecation alias OR major semver bump
-- Context: Blocker B3 — restored as optional getGrades?(...) with @deprecated JSDoc; consumers may omit implementation now (optional) but call sites that referenced it keep compiling
 
 - Violation: let + .catch() mutation pattern in pollAnalysis skill loading
 - Rule: MISTAKES.md Coding Paradigm §12 — replace let+if/catch reassignment with const expressions or .then().catch() chaining
@@ -577,32 +449,12 @@
 - Rule: CONVENTIONS.md Functional Programming — reduce accumulators must be replaced via spread, not mutated
 - Context: Suggestion S1 — overallPrompt.formatTechnical trendCounts reduce now returns {...acc, [s.trend]: ...+1} instead of acc[s.trend]=...
 
-- Violation: JSDoc claim "never stored" contradicts actual recordUsage forwarding behavior
-- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime behavior
-- Context: Suggestion S2 — AnalysisUsageOptions.clientIp JSDoc clarifies that checkAnalysisUsageAllowed hashes via hashUsageIp but recordAnalysisUsageSafely forwards raw IP to repository.recordUsage; persistence semantics owned by repository implementation
-
 - Violation: Explicit parameter type annotation on Array.prototype.find callback when type inference would suffice
 - Rule: CONVENTIONS.md Type Inference — prefer inference for callback parameters when surrounding code has sufficient type context
 - Context: Inline gemini-bot comment — submitFundamentalAnalysis sectorSnapshot.find callback reverted from explicit (s: FundamentalSectorPerformanceInput) to inferred parameter; FundamentalSectorPerformanceInput import dropped
 
 ## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07]
-- Violation: isFallbackAnalysis predicate JSDoc claims "every array field is empty" but nested arrays (keyLevels.support, keyLevels.resistance, priceTargets.bullish.targets, priceTargets.bearish.targets) were not checked
-- Rule: MISTAKES.md Documentation Sync §3 — JSDoc statements must enumerate every condition the implementation actually checks; predicates listing "every X" must walk truly every X (top-level AND nested)
-- Context: Inline review comment — round 1 fix added top-level candlePatterns/trendlines to the predicate but missed support/resistance and bullish/bearish targets that live two levels deep on AnalysisResponse; a result with the fallback summary but a non-empty nested array would still have been cached. Predicate now checks all four nested arrays as well.
-
-- Violation: Tier 4 public interface field type widening (string → string | undefined) shipped without CHANGELOG BREAKING CHANGES entry
-- Rule: MISTAKES.md Public API §3 (extended) — interface field type widening breaks consumer implementations of the interface; the Tier 4 contract change must be flagged in CHANGELOG even when no symbol is renamed or deleted
-- Context: Blocker B-2 — CallAiProviderOptions.serverApiKey was widened in this PR (T1) so the BYOK branch can leave serverApiKey undefined; consumers implementing callAiProvider must now handle undefined. CHANGELOG.md 0.7.11 BREAKING CHANGES section updated to flag the contract change.
-
 ## [PR #77 round 2 | chore/0/post-bde84f3-cleanup | 2026-05-07]
-- Violation: BREAKING CHANGES landed in PR without a corresponding package.json semver bump
-- Rule: MISTAKES.md Public API §3 — Tier 4 contract changes must include both CHANGELOG entry AND package.json bump (in 0.x semver, breaking → MINOR bump i.e. 0.7.x → 0.8.0)
-- Context: Blocker B-2 (round 2) — CallAiProviderOptions.serverApiKey widening was documented in CHANGELOG 0.7.11 in round 1 but package.json stayed at 0.7.11; reviewer flagged that a 0.7.11 → 0.8.0 bump is required for the breaking change. Bumped to 0.8.0.
-
-- Violation: New domain helper merged with incomplete branch coverage in unit tests
-- Rule: MISTAKES.md §15 — every new domain function must reach 100% branch coverage; not just the happy path
-- Context: Blocker B-1 (round 2) — normalizePatternRenderConfig has 5 branches (non-object → undefined, missing/invalid type → undefined, missing color, missing label, missing show) but only the all-fields-present branch was tested in normalizeCachedAnalysisResponse cases. Added 4 dedicated tests covering each missing-field default and the invalid-type branch.
-
 - Violation: Pure helper placed in application/ instead of domain/
 - Rule: docs/domain/CLAUDE.md — "If it can be expressed as a pure function, it belongs here"
 - Context: Suggestion S-2 (round 2) — isFallbackAnalysis only references AnalysisResponse and EMPTY_ANALYSIS_FALLBACK_SUMMARY (both already in domain/analysis/confidence.ts); moved out of pollAnalysis.ts into confidence.ts so the predicate co-locates with the constant it consumes.
@@ -610,10 +462,6 @@
 - Violation: Test file used vi.mock(module) auto-mock pattern that masked moved exports
 - Rule: MISTAKES.md Tests — auto-mocking a whole module replaces ALL exports with vi.fn()/undefined; when only one export needs to be mocked, use partial mock with vi.importActual
 - Context: Side effect of S-2 — pollAnalysis.test.ts had `vi.mock('@/domain/analysis/confidence')` which auto-mocked the newly-moved isFallbackAnalysis (returned undefined → cache write was no longer skipped). Converted to a partial mock that keeps isFallbackAnalysis / EMPTY_ANALYSIS_FALLBACK_SUMMARY as their real implementations and only stubs enrichAnalysisWithConfidence.
-
-- Violation: JSDoc described an unreachable code path
-- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime reachability; do not document branches the caller's guards rule out
-- Context: Suggestion S-1 (round 2) — resolveApiKeys JSDoc listed a "Non-pro + premium + no userApiKey → server key" case, but requestChatCompletion now returns user_api_key_required before reaching this helper, making that branch dead. Trimmed the JSDoc to the three reachable cases and added a callout that the missing case is short-circuited by the caller.
 
 ## [PR #78 round 2 | feat/per-stock-fear-greed-index | 2026-05-07]
 - Violation: duplicate import type block from same module (B1)
