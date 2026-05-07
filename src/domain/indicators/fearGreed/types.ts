@@ -18,6 +18,8 @@ export type FearGreedFactorKey =
     | 'ma200_distance'
     | 'range_position';
 
+export type FearGreedGroupName = 'Flow' | 'Trend';
+
 export interface FearGreedFactor {
     key: FearGreedFactorKey;
     rawValue: number;
@@ -26,7 +28,7 @@ export interface FearGreedFactor {
 }
 
 export interface FearGreedGroup {
-    name: 'Flow' | 'Trend';
+    name: FearGreedGroupName;
     score: number;
     factors: FearGreedFactor[];
 }
@@ -43,6 +45,7 @@ export interface FearGreedSnapshot {
 export interface FearGreedHistoryPoint {
     /** ISO 'YYYY-MM-DD' */
     date: string;
+    /** null during warm-up or when sample is insufficient */
     score: number | null;
     label: FearGreedLabel | null;
 }
@@ -52,7 +55,7 @@ export interface ComputeFearGreedOptions {
     pocWindow?: number;
 }
 
-/** 내부 5-factor raw 값 묶음 (private; export 안 함) */
+/** @internal Helper — 5-factor raw value bundle used by factors, composition, and walkForward modules only. */
 export interface FactorValues {
     volumeZ: number;
     buySellImb: number;
@@ -61,7 +64,7 @@ export interface FactorValues {
     rangePosition: number;
 }
 
-/** 입력 묶음 — 컨슈머 호출부 단순화에 도움 */
+/** @internal Input bundle convenience type — not re-exported from the public API. */
 export interface FearGreedInput {
     bars: Bar[];
     buySellVolume: BuySellVolumeResult[];
