@@ -25,7 +25,8 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 /**
  * Returns `true` when `result` was synthesised from an empty or malformed
- * worker payload — i.e. every array field is empty and the summary is the
+ * worker payload — i.e. every array field is empty (including nested support /
+ * resistance levels and bullish / bearish price targets) and the summary is the
  * Korean fallback string. Used by {@link pollAnalysis} to skip the Redis cache
  * write so a subsequent retry can succeed.
  */
@@ -36,7 +37,11 @@ function isFallbackAnalysis(result: AnalysisResponse): boolean {
         result.patternSummaries.length === 0 &&
         result.strategyResults.length === 0 &&
         result.candlePatterns.length === 0 &&
-        result.trendlines.length === 0
+        result.trendlines.length === 0 &&
+        result.keyLevels.support.length === 0 &&
+        result.keyLevels.resistance.length === 0 &&
+        (result.priceTargets.bullish?.targets.length ?? 0) === 0 &&
+        (result.priceTargets.bearish?.targets.length ?? 0) === 0
     );
 }
 

@@ -34,7 +34,7 @@ export interface RequestChatCompletionParams {
     /**
      * Server-owned API key for AI provider calls.
      *
-     * Required when:
+     * Must be provided when:
      * - `tierContext.tier === 'pro'` (any model) — `server_error` if absent.
      * - Non-pro tier + free model — `server_error` if absent.
      *
@@ -45,7 +45,7 @@ export interface RequestChatCompletionParams {
     /**
      * User-registered BYOK API key.
      *
-     * Required when:
+     * Must be provided when:
      * - Non-`'pro'`-tier user requests a premium model and `serverApiKey` is
      *   absent — omitting it returns `user_api_key_required`.
      *

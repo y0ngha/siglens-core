@@ -643,3 +643,12 @@
 - Rule: CONVENTIONS.md Type Inference — prefer inference for callback parameters when surrounding code has sufficient type context
 - Context: Inline gemini-bot comment — submitFundamentalAnalysis sectorSnapshot.find callback reverted from explicit (s: FundamentalSectorPerformanceInput) to inferred parameter; FundamentalSectorPerformanceInput import dropped
 
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07]
+- Violation: isFallbackAnalysis predicate JSDoc claims "every array field is empty" but nested arrays (keyLevels.support, keyLevels.resistance, priceTargets.bullish.targets, priceTargets.bearish.targets) were not checked
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc statements must enumerate every condition the implementation actually checks; predicates listing "every X" must walk truly every X (top-level AND nested)
+- Context: Inline review comment — round 1 fix added top-level candlePatterns/trendlines to the predicate but missed support/resistance and bullish/bearish targets that live two levels deep on AnalysisResponse; a result with the fallback summary but a non-empty nested array would still have been cached. Predicate now checks all four nested arrays as well.
+
+- Violation: Tier 4 public interface field type widening (string → string | undefined) shipped without CHANGELOG BREAKING CHANGES entry
+- Rule: MISTAKES.md Public API §3 (extended) — interface field type widening breaks consumer implementations of the interface; the Tier 4 contract change must be flagged in CHANGELOG even when no symbol is renamed or deleted
+- Context: Blocker B-2 — CallAiProviderOptions.serverApiKey was widened in this PR (T1) so the BYOK branch can leave serverApiKey undefined; consumers implementing callAiProvider must now handle undefined. CHANGELOG.md 0.7.11 BREAKING CHANGES section updated to flag the contract change.
+

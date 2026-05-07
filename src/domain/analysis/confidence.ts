@@ -76,7 +76,7 @@ function buildUniqueIds<T, K extends keyof T>(items: T[], key: K): string[] {
     return ids;
 }
 
-/** @internal */
+/** @internal Drops pattern entries whose confidence weight falls below `MIN_CONFIDENCE_WEIGHT`. */
 export function filterPatterns(patterns: PatternResult[]): PatternResult[] {
     return patterns.filter(p => MIN_CONFIDENCE_WEIGHT <= p.confidenceWeight);
 }

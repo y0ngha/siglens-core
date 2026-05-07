@@ -277,20 +277,13 @@ export async function requestChatCompletion(
     // 2. Non-pro + free model: serverApiKey required → server_error if absent. userApiKey ignored.
     // 3. Non-pro + premium model + userApiKey present: BYOK path — serverApiKey not required.
     // 4. Non-pro + premium model + no userApiKey: user_api_key_required.
-    if (tierContext.tier === 'pro') {
+    if (tierContext.tier === 'pro' || !isPremium) {
         if (!params.serverApiKey) {
             return { ok: false, error: 'server_error' };
         }
-    } else if (!isPremium) {
-        // Non-pro + free model
-        if (!params.serverApiKey) {
-            return { ok: false, error: 'server_error' };
-        }
-    } else {
-        // Non-pro + premium model
-        if (!params.userApiKey) {
-            return { ok: false, error: 'user_api_key_required' };
-        }
+    } else if (!params.userApiKey) {
+        // Non-pro + premium model: BYOK is required.
+        return { ok: false, error: 'user_api_key_required' };
     }
 
     if (!isModelAllowed(tierContext.tier, model, tierConfig)) {

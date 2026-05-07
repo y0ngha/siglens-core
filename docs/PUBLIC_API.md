@@ -246,7 +246,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeStockSignalResult` | `domain/dashboard.ts` |
 | `lookbackIsoFromNow` | `domain/dashboard.ts` |
 
-**모델 스펙 헬퍼 (5)** — `getProvider`, `isClaudeModel`, `isGeminiModel`, `isChatGPTModel`, `getThinkingBudgetSequence` (`domain/analysis/modelSpecs.ts`).
+**모델 스펙 헬퍼 (9)** — `getProvider`, `isClaudeModel`, `isGeminiModel`, `isChatGPTModel`, `getThinkingBudgetSequence` (`domain/analysis/modelSpecs.ts`), `isReasoningModelSpec`, `isSamplingModelSpec`, `isClaudeReasoningModelSpec`, `isClaudeSamplingModelSpec` (`domain/types.ts`). `is*ModelSpec` 가드는 `ModelSpec` union을 effort-bearing 변종 또는 sampling 변종으로 좁히는 데 사용한다.
 
 ### Tier 3 — Infrastructure Factories & Config
 
@@ -348,7 +348,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **티어 제한 상수** — `DEFAULT_TIER`, `TIER_CONFIG` (`domain/tier.ts`).
 
-**모델 스펙 (단일 source of truth)** — `MODEL_SPECS`, `THINKING_BUDGET_FALLBACK_STEPS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId` (`domain/analysis/modelSpecs.ts`, types in `domain/types.ts`). AI SDK 호출자(워커, 서버 액션, UI)가 직접 lookup하는 단일 source of truth — provider 라우팅, max output tokens, thinking budget, sampling 파라미터를 모델 식별자(`ActiveModelId`) 별로 보관한다. provider-specific subset 타입(`ClaudeModelId` 등)은 `is*Model` 타입 predicate가 narrowing할 때 노출된다. 새 모델 추가는 이 맵에 한 줄 추가 + core publish로 끝난다.
+**모델 스펙 (단일 source of truth)** — `MODEL_SPECS`, `THINKING_BUDGET_FALLBACK_STEPS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `ClaudeSamplingModelSpec`, `ClaudeReasoningModelSpec`, `GeminiModelSpec`, `ChatGPTModelSpec`, `EffortLevel`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId` (`domain/analysis/modelSpecs.ts`, types in `domain/types.ts`). AI SDK 호출자(워커, 서버 액션, UI)가 직접 lookup하는 단일 source of truth — provider 라우팅, max output tokens, thinking budget(`ClaudeSamplingModelSpec` / `GeminiModelSpec`) 또는 reasoning effort(`ClaudeReasoningModelSpec` / `ChatGPTModelSpec`), sampling 파라미터를 모델 식별자(`ActiveModelId`) 별로 보관한다. `EffortLevel` (`'low' | 'medium' | 'high'`)은 reasoning 변종에서 effort 필드 타입으로 사용된다. provider-specific subset 타입(`ClaudeModelId` 등)은 `is*Model` 타입 predicate가 narrowing할 때 노출된다. spec 변종 narrowing은 `is*ModelSpec` 가드(Tier 2)를 사용한다. 새 모델 추가는 이 맵에 한 줄 추가 + core publish로 끝난다.
 
 **고급 도메인 헬퍼** — 개별 신호 감지기, 신호 상수, 정규화 함수, AI 레벨 보정, 추세선/키레벨/action recommendation 보조 함수는 외부 consumer의 세부 렌더링·검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다. 공개 정규화 헬퍼: `asString`, `asArray`, `compact`, `normalizeTrend`, `normalizeRiskLevel`, `normalizeKeyLevels`, `normalizePriceTargets`, `normalizeIndicatorGuideResult`.
 

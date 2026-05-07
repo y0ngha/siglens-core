@@ -12,6 +12,7 @@
 * **New `EffortLevel` type:** exported from `@y0ngha/siglens-core`. Consumers building provider request payloads should import and use this type.
 * **`apiModelId` added to every `ModelSpec`:** the field holds the exact model string required by the provider SDK. SDK callers must use `spec.apiModelId` (not the `ActiveModelId` map key) when constructing the provider request payload.
 * **`MODEL_SPECS` shape changed:** any code that spreads or iterates `ModelSpec` values will need to handle the new `apiModelId` field and the absence of `topP`.
+* **`CallAiProviderOptions.serverApiKey` is now `string | undefined`:** previously typed as `string`, this field is now `string | undefined`. Consumer implementations of `callAiProvider` must handle `undefined` — exactly one of `userApiKey` / `serverApiKey` is defined per call (enforced by the application layer). Update your implementation to check which key is present before using it.
 
 
 ### Features
