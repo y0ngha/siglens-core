@@ -1,10 +1,10 @@
 # Fix Log
 
-## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 5
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 6
 
-- Violation: `modelSpecs.test.ts`에서 동일한 `@/domain/types` specifier로부터 두 개의 분리된 import 블록 사용
-- Rule: MISTAKES.md TypeScript §3.5 — 동일한 specifier의 모든 import는 하나의 블록으로 병합
-- Context: `import type { ... }` 블록과 `import { ... }` 블록이 분리되어 있었음. `import { type X, Y }` 혼합 문법으로 단일 블록으로 병합.
+- Violation: `pollAnalysis.test.ts`의 `describe('B-5: meta.timeframe undefined 분기')` — describe 이름에 리뷰어 버그 태그 접두사 "B-5:" 포함
+- Rule: PR_FIX_FLOW.md Test Layer Checklist — "describe/it text is human-readable, not code expressions"
+- Context: 리뷰어 태그는 PR 맥락 한정이므로 테스트 코드에 남기지 않음. "meta.timeframe undefined 분기"로 변경.
 
 ## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 4
 
@@ -22,38 +22,6 @@
 - Rule: CLAUDE.md — "Don't explain WHAT the code does" / "Only add a comment when the WHY is non-obvious"
 - Context: 4줄 주석(1~4번 케이스)이 함수 JSDoc의 API key routing 섹션과 중복. 주석 제거.
 
-## [feat/fundamental-news-analysis | Phase 1 Tasks 1.1+1.2+1.3 | 2026-05-02]
-- Violation: 13 deeply nested inline shapes in `FundamentalSnapshot`
-- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — named interfaces required over inline return types
-- Context: Extracted 13 named interfaces (`FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalScore`, `FundamentalGradesSnapshot`, `NewsSentimentData`, `NewsCategory`, etc.)
-
-- Violation: `FundamentalSentiment` / `NewsSentiment` shape duplication with `Trend` type
-- Rule: MISTAKES.md TypeScript §6 — duplicated type structures must be cross-referenced or unified
-- Context: Added JSDoc cross-reference to document intentional separation per domain clarity spec
-
-- Violation: TTL constants computed via magic numbers (`24*60*60`) instead of importing `SECONDS_PER_DAY`
-- Rule: FF Principle 1-D / MISTAKES.md §13 — magic numbers must be extracted to named constants
-- Context: Replaced inline computation with imported `SECONDS_PER_DAY` constant
-
-- Violation: TTL test only checked sign (`toBeGreaterThan(0)`) without concrete value assertion
-- Rule: MISTAKES.md Tests §12 — concrete value checks required for computed constants
-- Context: Changed to `toBe(SECONDS_PER_DAY)` exact value assertion
-
-- Violation: Mixed `test()` and `it()` function names in same file
-- Rule: CONVENTIONS.md Test Rules — test function naming must be uniform within a file
-- Context: Standardized to `it()` throughout
-
-- Violation: Tautological test for pure function (testing signature behavior without meaningful assertion)
-- Rule: MISTAKES.md Tests §13 — remove tests that test nothing
-- Context: Removed tautological assertions; kept only format/regex validation tests
-
-- Violation: Hardcoded `'gemini-2.5-flash-lite'` inside `buildNewsCardCacheKey` function
-- Rule: FF Principle 1-D / MISTAKES.md §13 — hardcoded literals must be extracted to module-level constants
-- Context: Extracted to `NEWS_CARD_MODEL_ID` constant
-
-- Violation: `toMatch(regex)` cache key tests inconsistent with `toBe(string)` pattern in other keys
-- Rule: FF Principle 2-B / CONVENTIONS.md — same-family return types must use uniform test assertions
-- Context: Switched fundamental/news cache key tests to `toBe(exact-string)` for consistency with sector signals tests
 
 ## [Issue #2 | chore/2/초기-개발-환경-설정 | 2026-04-24]
 - Violation: release-it config used `${version}` (JS template literal) instead of `{{version}}` (Handlebars) for commitMessage, tagName, tagAnnotation
@@ -147,8 +115,6 @@
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
 
 
-
-
 ## [PR #71 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Shared domain types (`ModelSpec`, `AIProvider`, `ActiveModelId`) were defined inside `domain/analysis/modelSpecs.ts` instead of `domain/types.ts`
 - Rule: ARCHITECTURE Mistake #1 / domain/CLAUDE.md — shared domain types must live in `domain/types.ts`
@@ -169,10 +135,6 @@
 - Context: First `getThinkingBudgetSequence` test comment rewrote to "8192 skipped, >= previous" to match the `if (result.length === 0 || budget < result[result.length - 1])` non-decreasing-skip rule.
 
 ## [PR #74 Round 2 | main | 2026-05-02]
-- Violation: Two separate import blocks from the same `@/domain/types` specifier in `domain/llm/providers.ts`
-- Rule: MISTAKES.md TypeScript #3.5 — multiple import blocks from the same module must be merged into one
-- Context: `LlmProvider` was added in a separate import block from the existing `AIProvider, ActiveModelId, ModelId` block after the B3 fix moved the type to `domain/types`
-
 - Violation: `isPremiumChatModel(model, tierConfig)` called twice in `requestChatCompletion` — once in the guard block and once in `shouldRecordPremiumUsage`
 - Rule: MISTAKES.md Coding Paradigm #2 — identical values computed multiple times must be extracted to a const
 - Context: `model` and `tierConfig` are immutable within the function; hoisted to `const isPremium` before the guard block
@@ -187,14 +149,6 @@
 - Rule: ARCHITECTURE.md — domain은 application에서 import 금지 (ESLint 강제); 동일 규칙이 domain 테스트에도 적용됨
 - Context: S1 Suggestion을 반영하면서 `GEMINI_2_5_FLASH_MODEL`을 application 레이어에서 import했으나, domain 테스트는 application 레이어 심볼에 의존해서는 안 됨
 
-## [Fundamental & News Analysis Phase 1 | Task Batch 1 | 2026-05-02]
-- Violation: Deeply nested inline shapes in FundamentalSnapshot
-- Rule: MISTAKES.md TypeScript §5 — named interfaces required over inline return types
-- Context: 13 deeply nested interfaces extracted (FundamentalProfile, FundamentalValuation, FundamentalPeer, FundamentalScore, FundamentalGradesSnapshot, NewsSentimentData, NewsCategory, etc.)
-
-- Violation: Magic numbers in TTL calculations (24*60*60)
-- Rule: MISTAKES.md Coding Paradigm §13 — magic numbers must be extracted to named constants
-- Context: Replaced inline computation with imported SECONDS_PER_DAY constant
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 2 | 2026-05-02]
 - Violation: Pure domain function placed in infrastructure layer
@@ -205,10 +159,6 @@
 - Rule: MISTAKES.md Coding Paradigm §6.5 — functions and state must stay synchronized
 - Context: SKILL_CATEGORIES whitelist and countSkillFiles function now both use same pattern
 
-## [Fundamental & News Analysis Phase 1 | Task Batch 3 | 2026-05-02]
-- Violation: DRY violation — duplicated helpers (fmt formatter across prompt builders)
-- Rule: MISTAKES.md Coding Paradigm §6 — identical functions repeating across modules must be extracted
-- Context: Extracted fmt formatter to shared infrastructure/ai/utils.ts or domain/formatting/
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 4 | 2026-05-02]
 - Violation: Fire-and-forget fetch missing AbortSignal.timeout
@@ -245,14 +195,6 @@
 - Rule: MISTAKES.md TypeScript §8 — sibling types must follow consistent declaration patterns
 - Context: Unified snapshot hashing result type shape across FundamentalResult and NewsResult
 
-## [Fundamental & News Analysis Phase 1 | Task Batch 7 | 2026-05-02]
-- Violation: PUBLIC_API.md exports list stale — functions listed as internal but promoted to public
-- Rule: MISTAKES.md Public API & Module Exports §6.5 — PUBLIC_API.md document must stay synchronized with src/index.ts exports
-- Context: Updated PUBLIC_API.md document inventory to match actual promoted exports in Task 1.18
-
-- Violation: PUBLIC_API.md inventory drift — SectorHistoricalPoint listed but missing from src/index.ts
-- Rule: MISTAKES.md Public API & Module Exports §1 — src/index.ts re-exports must stay synchronized with documentation
-- Context: Verified all items in PUBLIC_API.md document are actually exported from src/index.ts; removed or added missing entries
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 8 | 2026-05-02]
 - Violation: Validation logic incomplete — edge cases in shape validation not covered
@@ -356,10 +298,6 @@
 - Violation: 5 public types defined in implementation file (application/overall/dependencyResolver.ts, src/index.ts)
 - Rule: MISTAKES.md Architecture §4 — public interfaces must be defined in types.ts, not implementation files
 - Context: OverallDependencyInputs, DependencyState variants moved to application/overall/types.ts; src/index.ts updated to import from types.ts
-
-- Violation: `as XxxSentiment` type casts post-`.includes()` guard lacking guarantee comments
-- Rule: MISTAKES.md TypeScript §7 — safe-cast `as` must be accompanied by guarantee comment
-- Context: Added guarantee comments to all 3 cast locations (normalize{Fundamental,News,Overall}.ts) documenting that .includes() guard ensures the type
 
 - Violation: Inline `Array<{date: string; changePct: number}>` instead of named `SectorHistoricalPoint[]` type
 - Rule: MISTAKES.md TypeScript §5 — inline shapes must be extracted to named type aliases
@@ -555,10 +493,6 @@
 - Violation: Multiple public API type renames and @internal/public export contradictions across rounds
 - Rule: Public API consistency (MISTAKES.md Public API §3 + §8)
 - Context: Commits 2e08a08 (Task 1), 094b6ea (Task 3), 60bf52d (Task 6), 0e6096f (Task 7), 025c9fc (Task 7), plus PR #75 R8 — pattern repeated 5+ times: OverallDependencyInputs/News union variants missing exports, @internal tags contradicting re-exports, FundamentalProfileInput mktCap→marketCap rename without deprecation
-
-- Violation: Type assertions (`as` casts) lacking inline safety comments
-- Rule: TypeScript safety (MISTAKES.md TypeScript §7)
-- Context: Task 1 round 1 (OverallDependencyInputs as-cast), Task 7 round 1 (sentinel guard casts in normalize functions) — 3 instances across 2 commits; every cast must include comment explaining runtime guarantee
 
 - Violation: JSDoc statements contradict or mismatch actual implementation
 - Rule: Documentation Sync (MISTAKES.md Documentation Sync §3 + §4)

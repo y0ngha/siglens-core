@@ -387,9 +387,13 @@ describe('pollAnalysis 함수는', () => {
         });
     });
 
-    describe('B-5: meta.timeframe undefined 분기', () => {
+    describe('meta.timeframe undefined 분기', () => {
         beforeEach(() => {
             mockGetJobStatus.mockResolvedValue('done');
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
         });
 
         it('meta.timeframe이 undefined이면 캐시 저장을 건너뛴다', async () => {
@@ -417,7 +421,6 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-with-timeframe');
 
             expect(mockCacheSet).toHaveBeenCalled();
-            vi.useRealTimers();
         });
     });
 });
