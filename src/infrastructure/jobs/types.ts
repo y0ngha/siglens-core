@@ -98,7 +98,7 @@ export interface JobMeta {
      * Pre-computed cache key stored at job submission time so the poll step
      * can write the result without recomputing the key, and so cancel can
      * release the in-flight slot keyed by `cacheKey` without rebuilding it.
-     * Set on technical, fundamental, news, and overall analysis jobs.
+     * Set on technical, fundamental, news, briefing, and overall analysis jobs.
      */
     cacheKey?: string;
 }

@@ -8,13 +8,17 @@ vi.mock('@/domain/analysis/marketBriefingPrompt');
 
 import { submitBriefing } from '@/application/market/submitBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { claimOrJoinInFlightJob } from '@/infrastructure/jobs/queue';
+import {
+    claimOrJoinInFlightJob,
+    setJobMeta,
+} from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import type { MarketSummaryData, MarketBriefingResponse } from '@/domain/types';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockClaimOrJoinInFlightJob = claimOrJoinInFlightJob as Mock;
+const mockSetJobMeta = setJobMeta as Mock;
 const mockNormalizeMarketBriefing = normalizeMarketBriefing as Mock;
 const mockBuildMarketBriefingPrompt = buildMarketBriefingPrompt as Mock;
 
@@ -65,6 +69,7 @@ describe('submitBriefing 함수는', () => {
                 jobId: newJobId,
             })
         );
+        mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockBuildMarketBriefingPrompt.mockReturnValue('mock prompt');
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
@@ -121,6 +126,17 @@ describe('submitBriefing 함수는', () => {
             }
         });
 
+        it('claim한 새 jobId에 cacheKey만 담은 setJobMeta를 호출한다', async () => {
+            // 에러 경로에서 cleanupInBackground이 inflight 슬롯을 정확히 해제할 수
+            // 있도록 cacheKey만 저장한다. briefing은 symbol에 묶이지 않는다.
+            await submitBriefing(mockData);
+
+            expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
+            const [jobIdArg, metaArg] = mockSetJobMeta.mock.calls[0];
+            expect(typeof jobIdArg).toBe('string');
+            expect(metaArg).toEqual({ cacheKey: expect.any(String) });
+        });
+
         it('waitUntil이 제공되면 Worker 요청 promise를 등록한다', async () => {
             const waitUntil = vi.fn();
 
@@ -175,6 +191,8 @@ describe('submitBriefing 함수는', () => {
             // 같은 시간대(briefing cacheKey)에 동시 submit이 들어와도 worker
             // 호출은 한 번만 발생해야 한다 — 나머지는 기존 jobId만 polling.
             expect(mockFetch).not.toHaveBeenCalled();
+            // setJobMeta는 claim한 submitter만 책임진다 — joined 경로는 스킵.
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
         });
     });
 });
