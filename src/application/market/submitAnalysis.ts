@@ -13,7 +13,6 @@ import { normalizeCachedAnalysisResponse } from '@/domain/analysis/confidence';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import { lastNonNull } from '@/domain/indicators/utils';
 import {
     DEFAULT_TIER,
@@ -21,7 +20,12 @@ import {
     getAllowedTimeframes,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    FearGreedSnapshot,
+    Skill,
+    Timeframe,
+} from '@/domain/types';
 import {
     buildAnalysisCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
@@ -260,22 +264,20 @@ export async function submitAnalysis(
     // 일봉 fearGreed snapshot — 분석 프롬프트의 sentiment 컨텍스트로 주입.
     // 일봉이면 이미 fetch한 bars 재사용; 다른 TF면 별도 일봉 fetch.
     // 산출 실패 시(예: 일봉 데이터 부족) null로 fallback해 분석 자체는 진행.
-    let fearGreed: FearGreedSnapshot | null = null;
-    try {
-        const dailyData =
-            timeframe === '1Day'
-                ? { bars, indicators }
-                : await fetchBarsWithIndicators(symbol, '1Day', fmpSymbol);
-        fearGreed = computeFearGreedIndex(
-            dailyData.bars,
-            dailyData.indicators.buySellVolume
-        );
-    } catch (error) {
-        console.error(
-            '[Submit] FearGreed daily fetch/compute failed; proceeding without sentiment:',
-            error
-        );
-    }
+    const dailyDataPromise =
+        timeframe === '1Day'
+            ? Promise.resolve({ bars, indicators })
+            : fetchBarsWithIndicators(symbol, '1Day', fmpSymbol);
+
+    const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
+        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
+        .catch(error => {
+            console.error(
+                '[Submit] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                error
+            );
+            return null;
+        });
 
     const prompt = buildAnalysisPrompt(
         symbol,

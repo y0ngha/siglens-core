@@ -1,5 +1,55 @@
 # Fix Log
 
+## [PR #78 | feat/per-stock-fear-greed-index | 2026-05-07]
+
+- Violation: AI-facing prompt section in Korean despite repo convention requiring English (gemini #1)
+- Rule: prompt.ts file header convention "All AI-facing prompt strings must be in English"
+- Context: New formatFearGreedSection in fearGreedSection.ts had Korean heading + warning text. Translated to English to match other prompt sections.
+
+- Violation: history threshold mismatch with snapshot (gemini #2)
+- Rule: spec consistency between snapshot (LIMITED) and history (was NORMAL)
+- Context: computeFearGreedHistory used NORMAL=60 warm-up but composeSnapshot returns at LIMITED=10. Removed history-side threshold, relying on composeSnapshot's internal check.
+
+- Violation: dead code FearGreedInput interface (claude B1)
+- Rule: MISTAKES.md Design & Cohesion #6 "dead code"
+- Context: Defined in types.ts but never imported. Removed.
+
+- Violation: missing @internal JSDoc on module-internal exports (claude B2)
+- Rule: MISTAKES.md Coding Paradigm #9.5 "Module-internal exports missing @internal JSDoc tag"
+- Context: 3 threshold constants in composition.ts exported but not in src/index.ts. Added @internal.
+
+- Violation: public-facing JSDoc in Korean (claude B3)
+- Rule: CONVENTIONS.md "Public-facing JSDoc is written in English"
+- Context: FearGreedFactor.percentile and ComputeFearGreedOptions.pocWindow had Korean. Translated.
+
+- Violation: let + if conditional reassignment (claude B4)
+- Rule: MISTAKES.md Coding Paradigm #12 "let + if/catch for conditional assignment instead of declarative const"
+- Context: factors.ts buySellImb + submitAnalysis.ts/submitOverallAnalysis.ts fearGreed. Refactored to declarative const + .catch chain.
+
+- Violation: indicator test missing toBeCloseTo deterministic assertion (claude B6)
+- Rule: MISTAKES.md Tests #12 "Period-based indicator tests only verify sign without toBeCloseTo reference values"
+- Context: walkForward.test.ts only checked score range, not actual value. Added captured-value assertion.
+
+- Violation: Tier 4 public types missing type-level JSDoc (claude B7)
+- Rule: CONVENTIONS.md "Tier 4 (types): type-level description, one-line per field"
+- Context: 10 public types in fearGreed/types.ts had partial JSDoc. Added complete English descriptions.
+
+- Violation: snapshot confidence type includes runtime-impossible value (claude S1)
+- Rule: TypeScript predictability — types should reflect runtime behavior
+- Context: FearGreedSnapshot.confidence narrowed to Exclude<FearGreedConfidence, 'insufficient'>.
+
+- Violation: Type import path inconsistency (claude S3)
+- Rule: cohesion — match neighboring import sources
+- Context: 4 files imported FearGreedSnapshot directly from /fearGreed/types. Changed to umbrella @/domain/types.
+
+- Violation: missing zero-guards on financial division (claude S4)
+- Rule: MISTAKES.md #16 "financial values require explicit guards before division"
+- Context: factors.ts pocDist + ma200Dist divisions added zero-guards.
+
+- Violation: missing boundary test cases for confidence transitions (claude S5)
+- Rule: MISTAKES.md Tests "boundary cases for each branch"
+- Context: walkForward.test.ts now tests LIMITED..NORMAL boundary.
+
 ## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 6
 
 - Violation: `pollAnalysis.test.ts`의 `describe('B-5: meta.timeframe undefined 분기')` — describe 이름에 리뷰어 버그 태그 접두사 "B-5:" 포함

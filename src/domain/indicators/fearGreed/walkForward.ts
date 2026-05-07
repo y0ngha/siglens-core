@@ -3,10 +3,7 @@ import {
     computeFactorsAtT,
     POC_WINDOW_DEFAULT,
 } from '@/domain/indicators/fearGreed/factors';
-import {
-    composeSnapshot,
-    FEAR_GREED_CONFIDENCE_THRESHOLDS,
-} from '@/domain/indicators/fearGreed/composition';
+import { composeSnapshot } from '@/domain/indicators/fearGreed/composition';
 import type {
     ComputeFearGreedOptions,
     FactorValues,
@@ -74,9 +71,11 @@ export function computeFearGreedIndex(
  * No look-ahead: bars added beyond index i never change `history[i]`.
  *
  * History entries with `score: null` indicate either (a) the factor at t was uncomputable
- * (warm-up before factor windows fully populate) or (b) the walk-forward sample at t was
- * below NORMAL (sample.length < FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL). UI renders these
- * as gaps in the time series.
+ * (warm-up before factor windows fully populate) or (b) `composeSnapshot` rejected the
+ * sample as insufficient (sample.length below the LIMITED threshold). UI renders these
+ * as gaps in the time series. Sample sizes between LIMITED and NORMAL produce a value
+ * (consistent with the snapshot API), letting the UI surface a reduced-confidence
+ * series during the early walk-forward window.
  *
  * @param bars - Daily OHLCV bars in chronological order.
  * @param buySellVolume - Per-bar buy/sell volume classification, indexed parallel to bars.
@@ -92,19 +91,12 @@ export function computeFearGreedHistory(
     const factorTS = buildFactorTS(bars, buySellVolume, pocWindow);
     const sample: FactorValues[] = [];
     const out: FearGreedHistoryPoint[] = new Array(bars.length);
-    const NORMAL_THRESHOLD = FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL;
 
     for (let t = 0; t < bars.length; t++) {
         const date = isoDate(bars[t].time);
         const current = factorTS[t];
 
         if (!current) {
-            out[t] = { date, score: null, label: null };
-            continue;
-        }
-
-        if (sample.length < NORMAL_THRESHOLD) {
-            sample.push(current);
             out[t] = { date, score: null, label: null };
             continue;
         }

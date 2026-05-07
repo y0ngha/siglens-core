@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import type {
     AnalysisResponse,
+    FearGreedSnapshot,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     Timeframe,
@@ -234,7 +234,7 @@ describe('buildOverallAnalysisPrompt', () => {
                 MOCK_NEWS,
                 '1Day' as Timeframe
             );
-            expect(prompt).not.toContain('공포·탐욕 지수');
+            expect(prompt).not.toContain('Fear & Greed Index');
         });
 
         it('includes fear-greed section when snapshot is provided', () => {
@@ -258,11 +258,11 @@ describe('buildOverallAnalysisPrompt', () => {
                 '1Day' as Timeframe,
                 fg
             );
-            expect(prompt).toContain('공포·탐욕 지수');
+            expect(prompt).toContain('Fear & Greed Index');
             expect(prompt).toContain('22');
             expect(prompt).toContain('EXTREME_FEAR');
-            expect(prompt).toContain('Flow 그룹: 28');
-            expect(prompt).toContain('Trend 그룹: 16');
+            expect(prompt).toContain('Flow Group: 28');
+            expect(prompt).toContain('Trend Group: 16');
         });
 
         it('appends warning text when warning is set (CHRONIC_WEAKNESS)', () => {
@@ -287,7 +287,7 @@ describe('buildOverallAnalysisPrompt', () => {
                 fg
             );
             expect(prompt).toContain(
-                '이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+                'This stock is in a long-term bearish cycle. The score represents its relative position within its own distribution.'
             );
         });
 
@@ -313,7 +313,7 @@ describe('buildOverallAnalysisPrompt', () => {
                 fg
             );
             expect(prompt).toContain(
-                '이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+                'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
             );
         });
     });

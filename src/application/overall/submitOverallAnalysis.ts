@@ -15,13 +15,16 @@ import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOve
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import { TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import type { AnalysisResponse, OverallAnalysisResponse } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    FearGreedSnapshot,
+    OverallAnalysisResponse,
+} from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -180,25 +183,21 @@ export async function submitOverallAnalysis(
     // 일봉 fearGreed snapshot — overall 프롬프트의 sentiment 컨텍스트로 주입.
     // technical 축의 결과를 그대로 사용하지 않고 일봉 raw 데이터로부터 직접
     // 산출해 daily-only 가정을 유지한다 (timeframe과 무관). 산출 실패 시
-    // fearGreed=undefined 로 fallback해 overall 분석 자체는 진행한다.
+    // fearGreed=null 로 fallback해 overall 분석 자체는 진행한다.
     const fmpSymbol = options.technical.fmpSymbol;
-    let fearGreed: FearGreedSnapshot | null = null;
-    try {
-        const dailyData = await fetchBarsWithIndicators(
-            symbol,
-            '1Day',
-            fmpSymbol
-        );
-        fearGreed = computeFearGreedIndex(
-            dailyData.bars,
-            dailyData.indicators.buySellVolume
-        );
-    } catch (error) {
-        console.error(
-            '[submitOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
-            error
-        );
-    }
+    const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
+        symbol,
+        '1Day',
+        fmpSymbol
+    )
+        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
+        .catch(error => {
+            console.error(
+                '[submitOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                error
+            );
+            return null;
+        });
 
     const prompt = buildOverallAnalysisPrompt(
         symbol,

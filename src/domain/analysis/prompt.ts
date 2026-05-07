@@ -55,7 +55,7 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
+import type { FearGreedSnapshot } from '@/domain/types';
 
 type SkillGroupKey = SkillType | 'regular';
 
@@ -998,7 +998,7 @@ function byName(a: Skill, b: Skill): number {
  * @param indicators - Indicator suite produced by {@link calculateIndicators}.
  * @param skills - Skill definitions to inject (defaults to none).
  * @param timeframe - Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
- * @param fearGreed - Optional Fear & Greed snapshot. When provided, a "공포·탐욕 지수 (참고)" section is appended.
+ * @param fearGreed - Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)" section is appended.
  * @returns The fully-rendered prompt string.
  *
  * @see calculateIndicators

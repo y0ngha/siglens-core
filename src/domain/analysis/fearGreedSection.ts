@@ -1,19 +1,24 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
-// Exception: the Fear & Greed section is intentionally Korean because it is rendered
-// as a sentiment hint for the analyst LLM whose final output is Korean.
 
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
+import type { FearGreedSnapshot, FearGreedWarning } from '@/domain/types';
+
+const WARNING_NOTE: Partial<Record<NonNullable<FearGreedWarning>, string>> = {
+    CHRONIC_WEAKNESS:
+        '\n- Note: This stock is in a long-term bearish cycle. The score represents its relative position within its own distribution.',
+    CHRONIC_STRENGTH:
+        '\n- Note: This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.',
+};
 
 /**
- * Format a fearGreed snapshot as a Korean prompt section.
+ * Format a fearGreed snapshot as an English prompt section.
  *
  * Emits the spec §4.4 / §4.5 sentiment block:
- *   ## 공포·탐욕 지수 (참고)
- *   - 점수: {score} / 100 ({label})
- *   - Flow 그룹: {flow_score} | Trend 그룹: {trend_score}
- *   [- 주의: {warning_text}]
+ *   ## Fear & Greed Index (Reference)
+ *   - Score: {score} / 100 ({label})
+ *   - Flow Group: {flow_score} | Trend Group: {trend_score}
+ *   [- Note: {warning_text}]
  *
- *   위 sentiment를 위 가격·거래량 분석과 종합해 해석해 주세요.
+ *   Please interpret this sentiment in conjunction with the price and volume analysis above.
  *
  * Used by both the technical analysis prompt (`buildAnalysisPrompt`) and the
  * overall analysis prompt (`buildOverallAnalysisPrompt`) to surface the same
@@ -30,17 +35,12 @@ export function formatFearGreedSection(fg: FearGreedSnapshot): string {
             'FearGreedSnapshot must contain both Flow and Trend groups'
         );
     }
-    const warningNote =
-        fg.warning === 'CHRONIC_WEAKNESS'
-            ? '\n- 주의: 이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
-            : fg.warning === 'CHRONIC_STRENGTH'
-              ? '\n- 주의: 이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
-              : '';
+    const warningNote = fg.warning ? (WARNING_NOTE[fg.warning] ?? '') : '';
     return (
-        `## 공포·탐욕 지수 (참고)\n` +
-        `- 점수: ${Math.round(fg.score)} / 100 (${fg.label})\n` +
-        `- Flow 그룹: ${Math.round(flowGroup.score)} | Trend 그룹: ${Math.round(trendGroup.score)}` +
+        '## Fear & Greed Index (Reference)\n' +
+        `- Score: ${Math.round(fg.score)} / 100 (${fg.label})\n` +
+        `- Flow Group: ${Math.round(flowGroup.score)} | Trend Group: ${Math.round(trendGroup.score)}` +
         warningNote +
-        `\n\n위 sentiment를 위 가격·거래량 분석과 종합해 해석해 주세요.`
+        '\n\nPlease interpret this sentiment in conjunction with the price and volume analysis above.'
     );
 }

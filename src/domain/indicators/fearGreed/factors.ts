@@ -55,26 +55,24 @@ export function computeFactorsAtT(
     const sign = dailyReturn === 0 ? 0 : Math.sign(dailyReturn);
     const volumeZ = z * sign;
 
-    let buySellImb = 0;
     const bsv = buySellVolume[t];
-    if (bsv) {
-        const total = bsv.buyVolume + bsv.sellVolume;
-        if (total > 0) {
-            buySellImb = (bsv.buyVolume - bsv.sellVolume) / total;
-        }
-    }
+    const total = bsv ? bsv.buyVolume + bsv.sellVolume : 0;
+    const buySellImb =
+        bsv && total > 0 ? (bsv.buyVolume - bsv.sellVolume) / total : 0;
 
     const pocStart = Math.max(0, t - pocWindow);
     const pocBars = bars.slice(pocStart, t);
     if (pocBars.length < 5) return null;
     const vp = calculateVolumeProfile(pocBars);
     if (!vp) return null;
+    if (vp.poc === 0) return null;
     const pocDist = (bar.close - vp.poc) / vp.poc;
 
     const ma200Start = Math.max(0, t - MA200_WINDOW);
     const ma200Closes = bars.slice(ma200Start, t).map(b => b.close);
     if (ma200Closes.length < FEAR_GREED_MIN_FACTOR_WINDOW) return null;
     const ma200 = ma200Closes.reduce((a, b) => a + b, 0) / ma200Closes.length;
+    if (ma200 === 0) return null;
     const ma200Dist = (bar.close - ma200) / ma200;
 
     const rangeStart = Math.max(0, t - RANGE_WINDOW + 1);

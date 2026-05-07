@@ -43,12 +43,12 @@ import {
 } from '@/__tests__/fixtures/candle';
 import type {
     Bar,
+    FearGreedSnapshot,
     IndicatorResult,
     Skill,
     SMCResult,
     SqueezeMomentumResult,
 } from '@/domain/types';
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 
 const TEST_SYMBOL = 'AAPL';
 const TEST_COMPANY_NAME = 'Apple Inc.';
@@ -3880,7 +3880,7 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(prompt).not.toContain('공포·탐욕 지수');
+            expect(prompt).not.toContain('Fear & Greed Index');
         });
 
         it('includes fear-greed section when snapshot is provided', () => {
@@ -3904,11 +3904,11 @@ describe('prompt', () => {
                 '1Day',
                 fg
             );
-            expect(prompt).toContain('공포·탐욕 지수');
+            expect(prompt).toContain('Fear & Greed Index');
             expect(prompt).toContain('18');
             expect(prompt).toContain('EXTREME_FEAR');
-            expect(prompt).toContain('Flow 그룹: 30');
-            expect(prompt).toContain('Trend 그룹: 6');
+            expect(prompt).toContain('Flow Group: 30');
+            expect(prompt).toContain('Trend Group: 6');
         });
 
         it('appends chronic-weakness warning text when warning is CHRONIC_WEAKNESS', () => {
@@ -3933,7 +3933,7 @@ describe('prompt', () => {
                 fg
             );
             expect(prompt).toContain(
-                '이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+                'This stock is in a long-term bearish cycle. The score represents its relative position within its own distribution.'
             );
         });
 
@@ -3959,7 +3959,7 @@ describe('prompt', () => {
                 fg
             );
             expect(prompt).toContain(
-                '이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+                'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
             );
         });
     });

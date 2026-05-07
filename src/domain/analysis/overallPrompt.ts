@@ -1,9 +1,9 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
-import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import type {
     AnalysisResponse,
+    FearGreedSnapshot,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     Timeframe,
@@ -198,7 +198,7 @@ function formatNews(news: NewsAnalysisResponse): string {
  * @param fundamental - Completed fundamental analysis result.
  * @param news        - Completed news analysis result.
  * @param timeframe   - The chart timeframe; determines interpretation context.
- * @param fearGreed   - Optional Fear & Greed snapshot. When provided, a "공포·탐욕 지수 (참고)" section is appended after the technical axis to surface sentiment context to the LLM.
+ * @param fearGreed   - Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)" section is appended after the technical axis to surface sentiment context to the LLM.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 export function buildOverallAnalysisPrompt(

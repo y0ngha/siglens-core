@@ -10,7 +10,10 @@ import type {
 } from '@/domain/indicators/fearGreed/types';
 import { percentile } from '@/domain/indicators/fearGreed/percentile';
 
-/** 5-stage cutoffs (strict less-than). 0..100 score → label. */
+/**
+ * @internal 5-stage cutoffs (strict less-than). 0..100 score → label.
+ * Used internally by composeSnapshot and walkForward; not part of the public API.
+ */
 export const FEAR_GREED_LABEL_CUTOFFS = {
     EXTREME_FEAR_MAX: 25,
     FEAR_MAX: 45,
@@ -18,7 +21,10 @@ export const FEAR_GREED_LABEL_CUTOFFS = {
     GREED_MAX: 75,
 } as const;
 
-/** §4.5 self-norm warning thresholds. */
+/**
+ * @internal §4.5 self-norm warning thresholds.
+ * Used internally by composeSnapshot and walkForward; not part of the public API.
+ */
 export const FEAR_GREED_WARNING_THRESHOLDS = {
     /** 52w position below this AND ma200 < 0 AND score >= score floor → CHRONIC_WEAKNESS */
     WEAK_RANGE_MAX: 0.3,
@@ -30,7 +36,10 @@ export const FEAR_GREED_WARNING_THRESHOLDS = {
     STRONG_SCORE_MAX: 45,
 } as const;
 
-/** Confidence classification thresholds (sample size). */
+/**
+ * @internal Confidence classification thresholds (sample size).
+ * Used internally by composeSnapshot and walkForward; not part of the public API.
+ */
 export const FEAR_GREED_CONFIDENCE_THRESHOLDS = {
     NORMAL: 60,
     LIMITED: 10,
