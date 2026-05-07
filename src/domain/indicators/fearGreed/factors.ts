@@ -38,12 +38,10 @@ export function computeFactorsAtT(
     const variance =
         window.reduce((a, v) => a + (v - mean) ** 2, 0) / window.length;
     const std = Math.sqrt(variance);
+    if (std === 0) return null;
+    const z = (bar.volume - mean) / std;
     const dailyReturn = bar.close - prev.close;
     const sign = dailyReturn === 0 ? 0 : Math.sign(dailyReturn);
-    // std=0 means uniform volume in window — z is undefined.
-    // Fall back to sign(bar.volume - mean) so spikes still register as ±1.
-    const z =
-        std === 0 ? Math.sign(bar.volume - mean) : (bar.volume - mean) / std;
     const volumeZ = z * sign;
 
     // Buy/Sell 불균형 — t bar 자체 분류
@@ -56,25 +54,26 @@ export function computeFactorsAtT(
         }
     }
 
-    // POC 거리 — 60-bar window (현재 미포함). VP가 산출 불가능하면 중립(0).
+    // POC 거리 — 60-bar window (현재 미포함)
     const pocStart = Math.max(0, t - pocWindow);
     const pocBars = bars.slice(pocStart, t);
     if (pocBars.length < 5) return null;
     const vp = calculateVolumeProfile(pocBars);
-    const pocDist = vp && vp.poc !== 0 ? (bar.close - vp.poc) / vp.poc : 0;
+    if (!vp) return null;
+    const pocDist = (bar.close - vp.poc) / vp.poc;
 
-    // MA200 거리 — 직전 200 close (현재 미포함). 5 미만이면 null.
+    // MA200 거리 — 직전 200 close (현재 미포함). 30 미만이면 null.
     const ma200Start = Math.max(0, t - MA200_WINDOW);
     const ma200Closes = bars.slice(ma200Start, t).map(b => b.close);
-    if (ma200Closes.length < 5) return null;
+    if (ma200Closes.length < 30) return null;
     const ma200 =
         ma200Closes.reduce((a, b) => a + b, 0) / ma200Closes.length;
     const ma200Dist = (bar.close - ma200) / ma200;
 
-    // 52w 위치 — 현재 bar 포함 252 윈도우 (factor 정의상). 5 미만이면 null.
+    // 52w 위치 — 현재 bar 포함 252 윈도우 (factor 정의상). 30 미만이면 null.
     const rangeStart = Math.max(0, t - RANGE_WINDOW + 1);
     const rangeBars = bars.slice(rangeStart, t + 1);
-    if (rangeBars.length < 5) return null;
+    if (rangeBars.length < 30) return null;
     const high = Math.max(...rangeBars.map(b => b.high));
     const low = Math.min(...rangeBars.map(b => b.low));
     const rangePosition =
