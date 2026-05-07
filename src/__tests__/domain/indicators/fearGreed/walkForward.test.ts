@@ -33,9 +33,10 @@ describe('computeFearGreedIndex', () => {
         expect(computeFearGreedIndex([], [])).toBeNull();
     });
 
-    it('returns null when bars are below the LIMITED confidence threshold', () => {
-        // 8 bars: below LIMITED (10). Even if a factor were computable, the
-        // walk-forward sample would be < LIMITED so composeSnapshot returns null.
+    it('returns null when bars are insufficient for factor windows', () => {
+        // 8 bars: factor windows (FEAR_GREED_MIN_FACTOR_WINDOW=30) cannot populate
+        // at the latest bar, so computeFactorsAtT returns null and computeFearGreedIndex
+        // short-circuits via the !current guard.
         const bars = genBars(8);
         expect(computeFearGreedIndex(bars, genBsv(bars.length))).toBeNull();
     });

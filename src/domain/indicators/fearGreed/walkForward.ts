@@ -16,7 +16,7 @@ function buildFactorTS(
     buySellVolume: BuySellVolumeResult[],
     pocWindow: number
 ): Array<FactorValues | null> {
-    return bars.map((_, t) =>
+    return Array.from({ length: bars.length }, (_, t) =>
         computeFactorsAtT(bars, buySellVolume, t, pocWindow)
     );
 }

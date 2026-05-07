@@ -51,10 +51,11 @@ export function computeFactorsAtT(
 
     const wStart = Math.max(0, t - VOL_Z_WINDOW);
     const volSamples = bars.slice(wStart, t).map(b => b.volume);
-    if (volSamples.length < MIN_ROLLING_GUARD) return null;
-    const mean = volSamples.reduce((a, b) => a + b, 0) / volSamples.length;
+    const volCount = volSamples.length;
+    if (volCount < MIN_ROLLING_GUARD) return null;
+    const mean = volSamples.reduce((a, b) => a + b, 0) / volCount;
     const variance =
-        volSamples.reduce((a, v) => a + (v - mean) ** 2, 0) / volSamples.length;
+        volSamples.reduce((a, v) => a + (v - mean) ** 2, 0) / volCount;
     const std = Math.sqrt(variance);
     if (std === 0) return null;
     const z = (bar.volume - mean) / std;
@@ -77,8 +78,9 @@ export function computeFactorsAtT(
 
     const ma200Start = Math.max(0, t - MA200_WINDOW);
     const ma200Closes = bars.slice(ma200Start, t).map(b => b.close);
-    if (ma200Closes.length < FEAR_GREED_MIN_FACTOR_WINDOW) return null;
-    const ma200 = ma200Closes.reduce((a, b) => a + b, 0) / ma200Closes.length;
+    const ma200Count = ma200Closes.length;
+    if (ma200Count < FEAR_GREED_MIN_FACTOR_WINDOW) return null;
+    const ma200 = ma200Closes.reduce((a, b) => a + b, 0) / ma200Count;
     if (ma200 === 0) return null;
     const ma200Dist = (bar.close - ma200) / ma200;
 

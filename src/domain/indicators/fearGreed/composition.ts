@@ -117,19 +117,16 @@ function computePctls(
     };
 }
 
+const FACTOR_FIELD: Record<FearGreedFactorKey, keyof FactorValues> = {
+    volume_z: 'volumeZ',
+    buysell_imbalance: 'buySellImb',
+    poc_distance: 'pocDist',
+    ma200_distance: 'ma200Dist',
+    range_position: 'rangePosition',
+};
+
 function rawValue(current: FactorValues, key: FearGreedFactorKey): number {
-    switch (key) {
-        case 'volume_z':
-            return current.volumeZ;
-        case 'buysell_imbalance':
-            return current.buySellImb;
-        case 'poc_distance':
-            return current.pocDist;
-        case 'ma200_distance':
-            return current.ma200Dist;
-        case 'range_position':
-            return current.rangePosition;
-    }
+    return current[FACTOR_FIELD[key]];
 }
 
 function buildFactors(

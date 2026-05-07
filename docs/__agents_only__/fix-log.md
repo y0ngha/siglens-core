@@ -485,3 +485,17 @@
 - Rule: MISTAKES.md Coding Paradigm #13 "Magic numbers must be extracted to named constants"
 - Context: factors.ts volSamples and pocBars guards used literal 5. Extracted to MIN_ROLLING_GUARD.
 
+## [PR #78 round 4 | feat/per-stock-fear-greed-index | 2026-05-07]
+- Violation: .map((_, t) => ...) ignoring callback element (S1)
+- Rule: Idiom — Array.from for index-only generation
+- Context: walkForward.ts buildFactorTS rewrote as Array.from.
+- Violation: .length accessed multiple times (S2)
+- Rule: MISTAKES.md Coding Paradigm #2 "Identical values queried multiple times → extract local const"
+- Context: factors.ts volSamples/ma200Closes. Extracted volCount/ma200Count.
+- Violation: switch-case where Record lookup is preferred (S3)
+- Rule: CONVENTIONS.md "Object map preferred over nested conditionals"
+- Context: composition.ts rawValue. Replaced with FACTOR_FIELD Record.
+- Violation: test description misleading (S5)
+- Rule: MISTAKES.md Tests #9 "Test description must match actual behavior under test"
+- Context: walkForward.test.ts. Renamed and clarified comment.
+
