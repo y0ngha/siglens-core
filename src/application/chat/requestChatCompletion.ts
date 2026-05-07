@@ -275,11 +275,6 @@ export async function requestChatCompletion(
 
     const isPremium = isPremiumChatModel(model, tierConfig);
 
-    // Routing matrix (enforced in order):
-    // 1. Pro tier: serverApiKey required → server_error if absent. userApiKey ignored.
-    // 2. Non-pro + free model: serverApiKey required → server_error if absent. userApiKey ignored.
-    // 3. Non-pro + premium model + userApiKey present: BYOK path — serverApiKey not required.
-    // 4. Non-pro + premium model + no userApiKey: user_api_key_required.
     if (tierContext.tier === 'pro' || !isPremium) {
         if (!params.serverApiKey) {
             return { ok: false, error: 'server_error' };

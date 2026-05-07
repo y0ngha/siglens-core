@@ -27,6 +27,15 @@ import {
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).
  *
+ * **Empty-response handling:** unlike {@link pollAnalysis}, this function does
+ * not skip the cache write when the worker returns a sparse or empty result.
+ * Fundamental analysis lacks a stable sentinel shape (no canonical fallback
+ * string + all-empty-arrays invariant), so a reliable "is this a fallback?"
+ * predicate cannot be defined without risking false positives on legitimately
+ * sparse results. Malformed payloads are already handled upstream:
+ * {@link normalizeFundamentalAnalysisResponse} throws, which transitions the
+ * job to the `error` path before any cache write occurs.
+ *
  * Cancel-after-poll: a successful {@link cancelFundamentalAnalysisJob} call
  * does NOT immediately flip the job status. This function will keep
  * returning `processing` until the worker observes the cancel signal on

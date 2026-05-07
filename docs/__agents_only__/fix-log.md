@@ -1,5 +1,15 @@
 # Fix Log
 
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 3
+
+- Violation: 새로 추가된 도메인 함수 `isFallbackAnalysis`에 전용 단위 테스트 블록 없음
+- Rule: domain/CLAUDE.md "Coverage target: 100% branch coverage (required)" / MISTAKES.md §15 Tests
+- Context: `isFallbackAnalysis`는 10개의 `&&` 조건을 가진 순수 함수인데 `confidence.test.ts`에 `describe('isFallbackAnalysis')` 블록이 없어 각 조건의 단독 false 분기가 미커버 상태였음. 11개 테스트 케이스 추가로 100% 분기 커버리지 달성.
+
+- Violation: `requestChatCompletion.ts` 내 라우팅 매트릭스 인라인 주석이 함수 JSDoc과 동일한 WHAT 내용을 반복 설명
+- Rule: CLAUDE.md — "Don't explain WHAT the code does" / "Only add a comment when the WHY is non-obvious"
+- Context: 4줄 주석(1~4번 케이스)이 함수 JSDoc의 API key routing 섹션과 중복. 주석 제거.
+
 ## [feat/fundamental-news-analysis | Phase 1 Tasks 1.1+1.2+1.3 | 2026-05-02]
 - Violation: Union literals `'up' | 'down'` in `FundamentalCategory` and other inline shapes
 - Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
