@@ -93,6 +93,10 @@ export async function pollOverallAnalysis(
         return { status: 'error', error: 'Invalid response from worker' };
     }
 
+    if (result.headlineKo === '' && result.scenarios.length === 0) {
+        console.warn('[PollOverall] Empty overall analysis', { jobId });
+    }
+
     // Cache the normalized result if a pre-computed cache key is available.
     if (meta?.cacheKey) {
         const cache = createCacheProvider();

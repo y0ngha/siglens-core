@@ -93,6 +93,13 @@ export async function pollFundamentalAnalysis(
         return { status: 'error', error: 'Invalid response from worker' };
     }
 
+    if (
+        result.overallConclusionKo === '' &&
+        result.categoryAssessments.length === 0
+    ) {
+        console.warn('[PollFundamental] Empty fundamental analysis', { jobId });
+    }
+
     // Cache the normalized result if a pre-computed cache key is available.
     if (meta?.cacheKey) {
         const cache = createCacheProvider();

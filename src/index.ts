@@ -335,8 +335,18 @@ export {
 export type {
     ActiveModelId,
     AIProvider,
+    ChatGPTModelSpec,
+    ClaudeReasoningModelSpec,
+    ClaudeSamplingModelSpec,
     EffortLevel,
+    GeminiModelSpec,
     ModelSpec,
+} from './domain/types';
+export {
+    isClaudeReasoningModelSpec,
+    isClaudeSamplingModelSpec,
+    isReasoningModelSpec,
+    isSamplingModelSpec,
 } from './domain/types';
 
 // Dashboard tickers / sectors

@@ -17,10 +17,18 @@ export type AiContents = string | GeminiContent[];
 
 /** Options accepted by the AI provider call (currently Gemini; shape is provider-neutral). */
 export interface CallAiProviderOptions {
-    /** User-owned BYOK key. Pass `undefined` to use the server key exclusively. */
+    /**
+     * User-owned BYOK key.
+     * Exactly one of `userApiKey` / `serverApiKey` is defined per call;
+     * the application layer enforces this invariant.
+     */
     userApiKey: string | undefined;
-    /** Server-owned key used when no `userApiKey` is present, or for pro-tier requests. */
-    serverApiKey: string;
+    /**
+     * Server-owned key used for pro-tier requests and free-model calls.
+     * Exactly one of `userApiKey` / `serverApiKey` is defined per call;
+     * the application layer enforces this invariant.
+     */
+    serverApiKey: string | undefined;
     /** Model identifier (e.g. `'gemini-2.5-flash'`, `'gpt-5.5'`, `'claude-opus-4-7'`). */
     model: string;
     /** Prompt contents — plain string or role-tagged turn list. */

@@ -92,6 +92,13 @@ export async function pollNewsAnalysis(
         return { status: 'error', error: 'Invalid response from worker' };
     }
 
+    if (result.currentDriverKo === '' && result.keyEventsKo.length === 0) {
+        console.warn(
+            '[PollNews] Empty news analysis; raw payload likely malformed',
+            { jobId }
+        );
+    }
+
     // Cache the normalized result if a pre-computed cache key is available.
     if (meta?.cacheKey) {
         const cache = createCacheProvider();

@@ -169,6 +169,7 @@ export async function resolveOverallDependencies(
         }),
         submitNewsAnalysis({
             symbol,
+            companyName,
             modelId,
             news: resolvedNewsItems,
             upcomingCalendar,

@@ -92,6 +92,10 @@ export async function pollNewsCardAnalysis(
         return { status: 'error', error: 'Invalid response from worker' };
     }
 
+    if (result.titleKo === '' && result.summaryKo === '') {
+        console.warn('[PollNewsCard] Empty news card analysis', { jobId });
+    }
+
     // Permanently cache the result if a pre-computed cache key is available.
     if (meta?.cacheKey) {
         const cache = createCacheProvider();

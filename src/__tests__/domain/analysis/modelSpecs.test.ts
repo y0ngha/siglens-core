@@ -11,8 +11,21 @@ import {
     type ClaudeModelId,
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
-import type { ActiveModelId } from '@/domain/types';
-import { describe, expect, it } from 'vitest';
+import type {
+    ActiveModelId,
+    ChatGPTModelSpec,
+    ClaudeReasoningModelSpec,
+    ClaudeSamplingModelSpec,
+    GeminiModelSpec,
+    ModelSpec,
+} from '@/domain/types';
+import {
+    isClaudeReasoningModelSpec,
+    isClaudeSamplingModelSpec,
+    isReasoningModelSpec,
+    isSamplingModelSpec,
+} from '@/domain/types';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 describe('MODEL_SPECS', () => {
     it('covers every active model identifier exactly once', () => {
@@ -252,5 +265,179 @@ describe('getThinkingBudgetSequence', () => {
 
     it('exposes the standard fallback steps tuple unchanged', () => {
         expect(THINKING_BUDGET_FALLBACK_STEPS).toEqual([8192, 4096, 2048]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// ModelSpec type guards
+// ---------------------------------------------------------------------------
+
+describe('isReasoningModelSpec', () => {
+    it('returns true for Claude reasoning models', () => {
+        expect(isReasoningModelSpec(MODEL_SPECS['claude-sonnet-4-6'])).toBe(
+            true
+        );
+        expect(isReasoningModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(true);
+    });
+
+    it('returns true for ChatGPT reasoning models', () => {
+        expect(isReasoningModelSpec(MODEL_SPECS['gpt-5-mini'])).toBe(true);
+        expect(isReasoningModelSpec(MODEL_SPECS['gpt-5.4'])).toBe(true);
+        expect(isReasoningModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(true);
+    });
+
+    it('returns false for Claude sampling model', () => {
+        expect(isReasoningModelSpec(MODEL_SPECS['claude-haiku-4-5'])).toBe(
+            false
+        );
+    });
+
+    it('returns false for Gemini models', () => {
+        expect(isReasoningModelSpec(MODEL_SPECS['gemini-2.5-flash'])).toBe(
+            false
+        );
+        expect(isReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(false);
+    });
+
+    it('narrows the type to ClaudeReasoningModelSpec | ChatGPTModelSpec and exposes effort as EffortLevel', () => {
+        const spec: ModelSpec = MODEL_SPECS['claude-opus-4-7'];
+        if (isReasoningModelSpec(spec)) {
+            // After narrowing, spec is assignable to the reasoning union.
+            const _narrowed: ClaudeReasoningModelSpec | ChatGPTModelSpec = spec;
+            void _narrowed;
+            // effort must be EffortLevel — not undefined
+            expectTypeOf(spec.effort).toEqualTypeOf<
+                'low' | 'medium' | 'high'
+            >();
+        }
+    });
+});
+
+describe('isSamplingModelSpec', () => {
+    it('returns true for Claude haiku (sampling)', () => {
+        expect(isSamplingModelSpec(MODEL_SPECS['claude-haiku-4-5'])).toBe(true);
+    });
+
+    it('returns true for all Gemini models', () => {
+        expect(isSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash'])).toBe(true);
+        expect(isSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash-lite'])).toBe(
+            true
+        );
+        expect(isSamplingModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(true);
+    });
+
+    it('returns false for Claude reasoning models', () => {
+        expect(isSamplingModelSpec(MODEL_SPECS['claude-sonnet-4-6'])).toBe(
+            false
+        );
+        expect(isSamplingModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(false);
+    });
+
+    it('returns false for ChatGPT models', () => {
+        expect(isSamplingModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(false);
+    });
+
+    it('narrows the type to ClaudeSamplingModelSpec | GeminiModelSpec and exposes temperature as number', () => {
+        const spec: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
+        if (isSamplingModelSpec(spec)) {
+            // After narrowing, spec is assignable to the sampling union.
+            const _narrowed: ClaudeSamplingModelSpec | GeminiModelSpec = spec;
+            void _narrowed;
+            // temperature must be a number — not undefined
+            expectTypeOf(spec.temperature).toEqualTypeOf<number>();
+            // thinkingBudget is 0 (ClaudeSamplingModelSpec) | number (GeminiModelSpec)
+            // — both extend number, neither is undefined.
+            // Use assignability check rather than toEqualTypeOf because the
+            // narrowed union resolves to `0 | number`, which is structurally
+            // equivalent to `number` but not literally identical.
+            const _budget: number = spec.thinkingBudget;
+            void _budget;
+        }
+    });
+
+    it('narrows Gemini spec correctly: thinkingBudget is number, temperature is number', () => {
+        const spec: ModelSpec = MODEL_SPECS['gemini-2.5-flash'];
+        if (isSamplingModelSpec(spec)) {
+            expectTypeOf(spec.temperature).toEqualTypeOf<number>();
+            const _budget: number = spec.thinkingBudget;
+            void _budget;
+        }
+    });
+});
+
+describe('isClaudeReasoningModelSpec', () => {
+    it('returns true only for Claude adaptive-thinking models', () => {
+        expect(
+            isClaudeReasoningModelSpec(MODEL_SPECS['claude-sonnet-4-6'])
+        ).toBe(true);
+        expect(
+            isClaudeReasoningModelSpec(MODEL_SPECS['claude-opus-4-7'])
+        ).toBe(true);
+    });
+
+    it('returns false for Claude sampling model', () => {
+        expect(
+            isClaudeReasoningModelSpec(MODEL_SPECS['claude-haiku-4-5'])
+        ).toBe(false);
+    });
+
+    it('returns false for ChatGPT models even though they have effort', () => {
+        expect(isClaudeReasoningModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(false);
+    });
+
+    it('returns false for Gemini models', () => {
+        expect(
+            isClaudeReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])
+        ).toBe(false);
+    });
+
+    it('narrows the type to ClaudeReasoningModelSpec exactly', () => {
+        const spec: ModelSpec = MODEL_SPECS['claude-opus-4-7'];
+        if (isClaudeReasoningModelSpec(spec)) {
+            const _narrowed: ClaudeReasoningModelSpec = spec;
+            void _narrowed;
+            expectTypeOf(spec.effort).toEqualTypeOf<'low' | 'medium' | 'high'>();
+            expectTypeOf(spec.provider).toEqualTypeOf<'claude'>();
+        }
+    });
+});
+
+describe('isClaudeSamplingModelSpec', () => {
+    it('returns true for claude-haiku-4-5', () => {
+        expect(
+            isClaudeSamplingModelSpec(MODEL_SPECS['claude-haiku-4-5'])
+        ).toBe(true);
+    });
+
+    it('returns false for Claude adaptive-thinking models', () => {
+        expect(
+            isClaudeSamplingModelSpec(MODEL_SPECS['claude-sonnet-4-6'])
+        ).toBe(false);
+        expect(
+            isClaudeSamplingModelSpec(MODEL_SPECS['claude-opus-4-7'])
+        ).toBe(false);
+    });
+
+    it('returns false for Gemini models', () => {
+        expect(
+            isClaudeSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash'])
+        ).toBe(false);
+    });
+
+    it('returns false for ChatGPT models', () => {
+        expect(isClaudeSamplingModelSpec(MODEL_SPECS['gpt-5-mini'])).toBe(
+            false
+        );
+    });
+
+    it('narrows the type to ClaudeSamplingModelSpec exactly', () => {
+        const spec: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
+        if (isClaudeSamplingModelSpec(spec)) {
+            const _narrowed: ClaudeSamplingModelSpec = spec;
+            void _narrowed;
+            expectTypeOf(spec.temperature).toEqualTypeOf<number>();
+            expectTypeOf(spec.thinkingBudget).toEqualTypeOf<0>();
+            expectTypeOf(spec.provider).toEqualTypeOf<'claude'>();
+        }
     });
 });
