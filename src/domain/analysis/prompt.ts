@@ -54,6 +54,7 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
 } from '@/domain/types';
+import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 
 type SkillGroupKey = SkillType | 'regular';
@@ -975,24 +976,6 @@ const buildAnalysisRequest = (
 function byName(a: Skill, b: Skill): number {
     return a.name.localeCompare(b.name, 'en');
 }
-
-const formatFearGreedSection = (fg: FearGreedSnapshot): string => {
-    const flowGroup = fg.groups.find(g => g.name === 'Flow');
-    const trendGroup = fg.groups.find(g => g.name === 'Trend');
-    const warningNote =
-        fg.warning === 'CHRONIC_WEAKNESS'
-            ? '\n- 주의: 이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
-            : fg.warning === 'CHRONIC_STRENGTH'
-              ? '\n- 주의: 이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
-              : '';
-    return (
-        `## 공포·탐욕 지수 (참고)\n` +
-        `- 점수: ${Math.round(fg.score)} / 100 (${fg.label})\n` +
-        `- Flow 그룹: ${Math.round(flowGroup?.score ?? 0)} | Trend 그룹: ${Math.round(trendGroup?.score ?? 0)}` +
-        warningNote +
-        `\n\n위 sentiment를 위 가격·거래량 분석과 종합해 해석해 주세요.`
-    );
-};
 
 /**
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.

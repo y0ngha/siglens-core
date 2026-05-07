@@ -1,5 +1,7 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
+import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import type {
     AnalysisResponse,
     FundamentalAnalysisResponse,
@@ -196,6 +198,7 @@ function formatNews(news: NewsAnalysisResponse): string {
  * @param fundamental - Completed fundamental analysis result.
  * @param news        - Completed news analysis result.
  * @param timeframe   - The chart timeframe; determines interpretation context.
+ * @param fearGreed   - Optional Fear & Greed snapshot. When provided, a "공포·탐욕 지수 (참고)" section is appended after the technical axis to surface sentiment context to the LLM.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 export function buildOverallAnalysisPrompt(
@@ -203,7 +206,8 @@ export function buildOverallAnalysisPrompt(
     technical: AnalysisResponse,
     fundamental: FundamentalAnalysisResponse,
     news: NewsAnalysisResponse,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    fearGreed?: FearGreedSnapshot
 ): string;
 export function buildOverallAnalysisPrompt(
     symbol: string,
@@ -211,7 +215,8 @@ export function buildOverallAnalysisPrompt(
     technical: AnalysisResponse,
     fundamental: FundamentalAnalysisResponse,
     news: NewsAnalysisResponse,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    fearGreed?: FearGreedSnapshot
 ): string;
 export function buildOverallAnalysisPrompt(
     symbol: string,
@@ -219,29 +224,35 @@ export function buildOverallAnalysisPrompt(
     technicalOrFundamental: AnalysisResponse | FundamentalAnalysisResponse,
     fundamentalOrNews: FundamentalAnalysisResponse | NewsAnalysisResponse,
     newsOrTimeframe: NewsAnalysisResponse | Timeframe,
-    maybeTimeframe?: Timeframe
+    maybeTimeframeOrFearGreed?: Timeframe | FearGreedSnapshot,
+    maybeFearGreed?: FearGreedSnapshot
 ): string {
-    const companyName =
-        typeof companyNameOrTechnical === 'string'
-            ? companyNameOrTechnical
-            : symbol;
-    const technical =
-        typeof companyNameOrTechnical === 'string'
-            ? (technicalOrFundamental as AnalysisResponse)
-            : companyNameOrTechnical;
-    const fundamental =
-        typeof companyNameOrTechnical === 'string'
-            ? (fundamentalOrNews as FundamentalAnalysisResponse)
-            : (technicalOrFundamental as FundamentalAnalysisResponse);
-    const news =
-        typeof companyNameOrTechnical === 'string'
-            ? (newsOrTimeframe as NewsAnalysisResponse)
-            : (fundamentalOrNews as NewsAnalysisResponse);
-    const timeframe =
-        typeof companyNameOrTechnical === 'string'
-            ? (maybeTimeframe as Timeframe)
-            : (newsOrTimeframe as Timeframe);
+    const hasCompanyName = typeof companyNameOrTechnical === 'string';
+    const companyName = hasCompanyName ? companyNameOrTechnical : symbol;
+    const technical = hasCompanyName
+        ? (technicalOrFundamental as AnalysisResponse)
+        : companyNameOrTechnical;
+    const fundamental = hasCompanyName
+        ? (fundamentalOrNews as FundamentalAnalysisResponse)
+        : (technicalOrFundamental as FundamentalAnalysisResponse);
+    const news = hasCompanyName
+        ? (newsOrTimeframe as NewsAnalysisResponse)
+        : (fundamentalOrNews as NewsAnalysisResponse);
+    const timeframe = hasCompanyName
+        ? (maybeTimeframeOrFearGreed as Timeframe)
+        : (newsOrTimeframe as Timeframe);
+    // The 6th positional argument is `timeframe` (with-companyName overload) or
+    // `fearGreed` (without-companyName overload). Disambiguate via the chosen
+    // overload using `hasCompanyName`.
+    const fearGreed: FearGreedSnapshot | undefined = hasCompanyName
+        ? maybeFearGreed
+        : (maybeTimeframeOrFearGreed as FearGreedSnapshot | undefined);
     const { label, context } = TIMEFRAME_CONFIG[timeframe];
+
+    const fearGreedBlock =
+        fearGreed !== undefined
+            ? `\n\n${formatFearGreedSection(fearGreed)}`
+            : '';
 
     return `You are a senior equity analyst integrating technical, fundamental, and news analysis into a unified investment verdict. Analyse the three-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
 
@@ -256,7 +267,7 @@ export function buildOverallAnalysisPrompt(
 ${context}
 
 ## Axis 1 — Technical Analysis
-${formatTechnical(technical)}
+${formatTechnical(technical)}${fearGreedBlock}
 
 ## Axis 2 — Fundamental Analysis
 ${formatFundamental(fundamental)}

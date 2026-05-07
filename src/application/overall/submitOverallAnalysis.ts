@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type {
@@ -13,6 +14,8 @@ import {
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
+import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import { TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -173,13 +176,38 @@ export async function submitOverallAnalysis(
 
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
+
+    // 일봉 fearGreed snapshot — overall 프롬프트의 sentiment 컨텍스트로 주입.
+    // technical 축의 결과를 그대로 사용하지 않고 일봉 raw 데이터로부터 직접
+    // 산출해 daily-only 가정을 유지한다 (timeframe과 무관). 산출 실패 시
+    // fearGreed=undefined 로 fallback해 overall 분석 자체는 진행한다.
+    const fmpSymbol = options.technical.fmpSymbol;
+    let fearGreed: FearGreedSnapshot | null = null;
+    try {
+        const dailyData = await fetchBarsWithIndicators(
+            symbol,
+            '1Day',
+            fmpSymbol
+        );
+        fearGreed = computeFearGreedIndex(
+            dailyData.bars,
+            dailyData.indicators.buySellVolume
+        );
+    } catch (error) {
+        console.error(
+            '[submitOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+            error
+        );
+    }
+
     const prompt = buildOverallAnalysisPrompt(
         symbol,
         companyName,
         deps.technical,
         deps.fundamental,
         deps.news,
-        timeframe
+        timeframe,
+        fearGreed ?? undefined
     );
     const jobId = crypto.randomUUID();
 

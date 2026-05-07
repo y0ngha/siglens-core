@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
+import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 import type {
     AnalysisResponse,
     FundamentalAnalysisResponse,
@@ -221,5 +222,99 @@ describe('buildOverallAnalysisPrompt', () => {
         expect(prompt).toContain('Strategy Signals');
         expect(prompt).toContain('Trendlines');
         expect(prompt).toContain('ascending'); // dominant
+    });
+
+    describe('buildOverallAnalysisPrompt — fearGreed integration', () => {
+        it('omits fear-greed section when fearGreed is undefined', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe
+            );
+            expect(prompt).not.toContain('공포·탐욕 지수');
+        });
+
+        it('includes fear-greed section when snapshot is provided', () => {
+            const fg: FearGreedSnapshot = {
+                score: 22,
+                label: 'EXTREME_FEAR',
+                groups: [
+                    { name: 'Flow', score: 28, factors: [] },
+                    { name: 'Trend', score: 16, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 412,
+                warning: null,
+            };
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                fg
+            );
+            expect(prompt).toContain('공포·탐욕 지수');
+            expect(prompt).toContain('22');
+            expect(prompt).toContain('EXTREME_FEAR');
+            expect(prompt).toContain('Flow 그룹: 28');
+            expect(prompt).toContain('Trend 그룹: 16');
+        });
+
+        it('appends warning text when warning is set (CHRONIC_WEAKNESS)', () => {
+            const fg: FearGreedSnapshot = {
+                score: 78,
+                label: 'EXTREME_GREED',
+                groups: [
+                    { name: 'Flow', score: 80, factors: [] },
+                    { name: 'Trend', score: 76, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 412,
+                warning: 'CHRONIC_WEAKNESS',
+            };
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                fg
+            );
+            expect(prompt).toContain(
+                '이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+            );
+        });
+
+        it('appends warning text when warning is set (CHRONIC_STRENGTH)', () => {
+            const fg: FearGreedSnapshot = {
+                score: 32,
+                label: 'FEAR',
+                groups: [
+                    { name: 'Flow', score: 36, factors: [] },
+                    { name: 'Trend', score: 28, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 412,
+                warning: 'CHRONIC_STRENGTH',
+            };
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                fg
+            );
+            expect(prompt).toContain(
+                '이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+            );
+        });
     });
 });
