@@ -464,3 +464,16 @@
 - Context: Side effect of S-2 — pollAnalysis.test.ts had `vi.mock('@/domain/analysis/confidence')` which auto-mocked the newly-moved isFallbackAnalysis (returned undefined → cache write was no longer skipped). Converted to a partial mock that keeps isFallbackAnalysis / EMPTY_ANALYSIS_FALLBACK_SUMMARY as their real implementations and only stubs enrichAnalysisWithConfidence.
 
 
+
+## [Issue #81 | feat/81/job-dedup-and-cancel-refcount | 2026-05-08]
+- Violation: New module-internal exports (`InFlightClaim`, `claimOrJoinInFlightJob`, `releaseInFlightJob`, `clearInFlightJob` in `infrastructure/jobs/queue.ts`) lacked `/** @internal */` JSDoc tags despite not being re-exported from `src/index.ts`
+- Rule: MISTAKES.md rule 9.5 — module-internal exports must carry `@internal` so consumers / typedoc don't surface them as public API
+- Context: PR R1 finding — added `@internal` to the type and three function JSDoc blocks; package public surface still goes through `src/index.ts`
+
+- Violation: `claimOrJoinInFlightJob` recursive retry on TOCTOU race had no depth bound
+- Rule: FF Predictability (2-C) — hidden control flow that could grow the call stack without limit must be made visible
+- Context: PR R1 recommended — replaced recursion with bounded `for` loop (CLAIM_OR_JOIN_MAX_RETRIES=3) that falls through to a fresh claimed slot on exhaustion; trades occasional duplicate dedup for guaranteed bounded resource use
+
+- Violation: `joined` early-return branch in submit functions skipped `setJobMeta`, worker dispatch, and `recordAnalysisUsageSafely`, but this asymmetry was undocumented at the usage-recording call site
+- Rule: MISTAKES.md Infrastructure rule 2 (100% branch coverage) AND FF Readability — the new branch path needs both test coverage and a comment so future readers don't misread the late `recordAnalysisUsageSafely` as a missing guard
+- Context: PR R1 — added a `'dedup으로 기존 in-flight job에 join되면'` describe block per submit test (4 files) that mocks `claimOrJoinInFlightJob` to return `joined`, asserts setJobMeta/fetch/usage are skipped; added a comment above each `recordAnalysisUsageSafely` call explaining the joined-path skip is intentional

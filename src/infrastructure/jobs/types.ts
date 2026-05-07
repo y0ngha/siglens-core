@@ -12,7 +12,40 @@ export interface RedisSetOpts {
 export interface JobRedisClient {
     get<T>(key: string): Promise<T | null>;
     set<T>(key: string, value: T, opts: RedisSetOpts): Promise<unknown>;
+    /**
+     * `SET key value NX EX` — atomic claim that only succeeds when the key
+     * does not already exist. Returns a truthy reply on success and `null`
+     * when the key was already taken. Used by in-flight job dedup.
+     *
+     * Split from {@link set} because Upstash's typed overloads diverge for
+     * the `nx` and non-`nx` paths and cannot be reconciled into a single
+     * `set` signature.
+     */
+    setNx<T>(
+        key: string,
+        value: T,
+        opts: RedisSetOpts
+    ): Promise<unknown | null>;
     del(...keys: string[]): Promise<number>;
+    /**
+     * `INCR key` — atomically increment and return the new integer value.
+     * Treats a missing key as zero; the first call returns 1.
+     * Used by job subscriber-count refcounting.
+     */
+    incr(key: string): Promise<number>;
+    /**
+     * `DECR key` — atomically decrement and return the new integer value.
+     * May return 0 or a negative integer when called more times than `incr`.
+     * Used by job subscriber-count refcounting.
+     */
+    decr(key: string): Promise<number>;
+    /**
+     * `EXPIRE key seconds` — refresh a key's TTL. Returns the integer 1 when
+     * the TTL was set and 0 when the key did not exist. Used after `incr` so
+     * the refcount key inherits the same 1-hour TTL as the rest of the job
+     * keys, even when `INCR` creates the key (no per-set TTL inheritance).
+     */
+    expire(key: string, seconds: number): Promise<number>;
 }
 
 /**

@@ -10,12 +10,16 @@ vi.mock('@/infrastructure/skills/loader');
 
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { setJobMeta } from '@/infrastructure/jobs/queue';
+import {
+    claimOrJoinInFlightJob,
+    setJobMeta,
+} from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
+const mockClaimOrJoinInFlightJob = claimOrJoinInFlightJob as Mock;
 const mockFireAndForget = fireAndForget as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
 
@@ -79,6 +83,12 @@ describe('submitFundamentalAnalysis 함수는', () => {
 
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockSetJobMeta.mockResolvedValue(undefined);
+        mockClaimOrJoinInFlightJob.mockImplementation(
+            async (_cacheKey: string, newJobId: string) => ({
+                status: 'claimed' as const,
+                jobId: newJobId,
+            })
+        );
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFireAndForget.mockImplementation(() => undefined);
         mockLoadSkillsCached.mockResolvedValue({
@@ -497,6 +507,31 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(recordUsage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('dedup으로 기존 in-flight job에 join되면', () => {
+        it('worker로 dispatch하지 않고 기존 jobId를 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+            mockClaimOrJoinInFlightJob.mockImplementationOnce(async () => ({
+                status: 'joined',
+                jobId: 'existing-shared-job',
+            }));
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result).toEqual({
+                status: 'submitted',
+                jobId: 'existing-shared-job',
+            });
+            // setJobMeta and worker fetch are skipped on the joined path —
+            // only the original claimer owns those.
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
         });
     });
 });

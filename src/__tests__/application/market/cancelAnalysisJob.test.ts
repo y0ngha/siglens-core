@@ -4,9 +4,10 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/jobs/queue');
 
 import { cancelAnalysisJob } from '@/application/market/cancelAnalysisJob';
-import { cancelJob } from '@/infrastructure/jobs/queue';
+import { cancelJob, releaseInFlightJob } from '@/infrastructure/jobs/queue';
 
 const mockCancelJob = cancelJob as Mock;
+const mockReleaseInFlightJob = releaseInFlightJob as Mock;
 const mockFetch = vi.fn<() => Promise<Response>>();
 
 describe('cancelAnalysisJob', () => {
@@ -14,6 +15,10 @@ describe('cancelAnalysisJob', () => {
 
     beforeEach(() => {
         mockCancelJob.mockReset();
+        mockReleaseInFlightJob.mockReset();
+        // Default: every cancel is the last subscriber so legacy behavior is
+        // exercised. Refcount-aware tests override per-test.
+        mockReleaseInFlightJob.mockResolvedValue(true);
         mockFetch.mockReset();
         global.fetch = mockFetch;
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -107,6 +112,46 @@ describe('cancelAnalysisJob', () => {
             expect(console.warn).toHaveBeenCalledWith(
                 '[cancelAnalysisJob] Failed to signal cancellation:',
                 'job-net-fail',
+                expect.any(Error)
+            );
+        });
+    });
+
+    describe('refcount semantics', () => {
+        it('마지막 구독자가 아닐 때 cancelJob과 fetch를 호출하지 않는다', async () => {
+            process.env.WORKER_URL = 'https://worker.test';
+            process.env.WORKER_SECRET = 'test-secret';
+            mockReleaseInFlightJob.mockResolvedValueOnce(false);
+
+            await cancelAnalysisJob('shared-job');
+
+            expect(mockReleaseInFlightJob).toHaveBeenCalledWith('shared-job');
+            expect(mockCancelJob).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('마지막 구독자일 때 cancelJob을 호출한다', async () => {
+            mockReleaseInFlightJob.mockResolvedValueOnce(true);
+            mockCancelJob.mockResolvedValueOnce(undefined);
+
+            await cancelAnalysisJob('last-job');
+
+            expect(mockReleaseInFlightJob).toHaveBeenCalledWith('last-job');
+            expect(mockCancelJob).toHaveBeenCalledWith('last-job');
+        });
+
+        it('refcount 조회가 실패하면 안전하게 cancel을 전파한다', async () => {
+            mockReleaseInFlightJob.mockRejectedValueOnce(
+                new Error('Redis down')
+            );
+            mockCancelJob.mockResolvedValueOnce(undefined);
+
+            await cancelAnalysisJob('redis-fail-job');
+
+            expect(mockCancelJob).toHaveBeenCalledWith('redis-fail-job');
+            expect(console.warn).toHaveBeenCalledWith(
+                '[cancelAnalysisJob] Failed to release subscriber refcount:',
+                'redis-fail-job',
                 expect.any(Error)
             );
         });

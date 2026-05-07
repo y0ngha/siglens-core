@@ -30,6 +30,24 @@ function cancelledKey(jobId: string): string {
     return `job:${jobId}:cancelled`;
 }
 
+/**
+ * Indexed by `cacheKey` so concurrent submitters that hash to the same input
+ * coalesce onto a single in-flight job. The stored value is the canonical
+ * `jobId` shared by all subscribers.
+ */
+function inFlightKey(cacheKey: string): string {
+    return `job:inflight:${cacheKey}`;
+}
+
+/**
+ * Subscriber count for a deduplicated job. Bumped on every claim/join,
+ * decremented on every release (cancel or terminal poll). When it reaches
+ * zero the job is eligible for actual cancellation and slot cleanup.
+ */
+function refCountKey(jobId: string): string {
+    return `job:${jobId}:refcount`;
+}
+
 // Upstash는 HTTP REST 기반 — TCP 연결 없음, 함수마다 인스턴스 생성해도 성능 영향 없음.
 async function withJobRedis<T>(
     fn: (redis: JobRedisClient) => Promise<T>,
@@ -226,7 +244,163 @@ export async function cleanupJob(jobId: string): Promise<void> {
             resultKey(jobId),
             errorKey(jobId),
             metaKey(jobId),
-            cancelledKey(jobId)
+            cancelledKey(jobId),
+            refCountKey(jobId)
         );
+    }, undefined);
+}
+
+/**
+ * @internal Outcome of an in-flight job claim attempt — see
+ * {@link claimOrJoinInFlightJob}.
+ *
+ * `claimed` means the caller is the first submitter for `cacheKey` and owns
+ * the worker dispatch responsibility. `joined` means an existing job was
+ * already in flight for the same input; the caller should reuse `jobId`
+ * without creating a new worker job.
+ */
+export interface InFlightClaim {
+    status: 'claimed' | 'joined';
+    jobId: string;
+}
+
+/**
+ * Hard cap on the TOCTOU retry loop in {@link claimOrJoinInFlightJob} —
+ * total attempts (initial + retries). Each iteration should be
+ * microsecond-narrow; needing more than a few is a pathological contention
+ * storm and is treated as "give up and claim fresh".
+ */
+const CLAIM_OR_JOIN_MAX_ATTEMPTS = 3;
+
+/**
+ * @internal Atomically claim an in-flight slot for `cacheKey`, or join an
+ * existing one.
+ *
+ * Backs the dedup half of the issue #81 design: when two submitters race for
+ * the same `cacheKey` (same symbol/timeframe/model + input hash), only the
+ * first allocates a worker job; the rest piggyback on its `jobId`. Both
+ * paths bump the subscriber refcount so a single cancel from one client
+ * cannot terminate a job another client still wants — see
+ * {@link releaseInFlightJob}.
+ *
+ * Implementation:
+ * 1. `SET inflight:{cacheKey} {newJobId} NX EX 1h` — atomic claim. Success
+ *    returns `{ status: 'claimed', jobId: newJobId }`; the caller dispatches
+ *    to the worker.
+ * 2. On contention, read the existing jobId from `inflight:{cacheKey}` and
+ *    `INCR refcount:{existingJobId}`. The `EXPIRE` after `INCR` keeps the
+ *    refcount key on the same 1h TTL as the rest of the job keys.
+ * 3. If the inflight key disappeared between steps 1 and 2 (e.g. job
+ *    completed, slot released), fall through to a bounded retry. After
+ *    {@link CLAIM_OR_JOIN_MAX_ATTEMPTS} total attempts the caller is treated
+ *    as a fresh claimer with its own jobId rather than looping further —
+ *    losing a small amount of dedup is preferable to a pathological
+ *    contention storm holding the request open.
+ *
+ * No-op (returns `claimed` with the requested jobId) when Upstash env is not
+ * configured — without Redis there is no shared state to dedup against, so
+ * each submitter proceeds with its own jobId as before.
+ *
+ * @param cacheKey - Stable hash of the analysis inputs; same key ⇒ same job.
+ * @param newJobId - The jobId to register if this caller wins the claim.
+ * @returns `{ status, jobId }` describing whether a new job was started or
+ *   joined.
+ */
+export async function claimOrJoinInFlightJob(
+    cacheKey: string,
+    newJobId: string
+): Promise<InFlightClaim> {
+    return withJobRedis<InFlightClaim>(async redis => {
+        for (let attempt = 0; attempt < CLAIM_OR_JOIN_MAX_ATTEMPTS; attempt++) {
+            const claimed = await redis.setNx(inFlightKey(cacheKey), newJobId, {
+                ex: JOB_TTL_SECONDS,
+            });
+            if (claimed !== null) {
+                await redis.incr(refCountKey(newJobId));
+                await redis.expire(refCountKey(newJobId), JOB_TTL_SECONDS);
+                return { status: 'claimed', jobId: newJobId };
+            }
+            const existingJobId = await redis.get<string>(
+                inFlightKey(cacheKey)
+            );
+            if (existingJobId !== null) {
+                await redis.incr(refCountKey(existingJobId));
+                await redis.expire(
+                    refCountKey(existingJobId),
+                    JOB_TTL_SECONDS
+                );
+                return { status: 'joined', jobId: existingJobId };
+            }
+            // The slot was released between our NX attempt and the GET.
+            // Loop body retries the SET NX so we never attach to a stale job.
+        }
+        // Exhausted retries — treat as fresh claim. Loses dedup for this one
+        // call but keeps the call stack and Redis traffic bounded.
+        return { status: 'claimed', jobId: newJobId };
+    }, { status: 'claimed', jobId: newJobId });
+}
+
+/**
+ * @internal Decrement the subscriber count for a deduplicated job. Returns
+ * `true` when the caller was the last subscriber and the worker job is now
+ * safe to cancel.
+ *
+ * Backs the cancel-refcount half of the issue #81 design: when N clients
+ * share a `jobId`, each cancel only releases one subscription. Only the
+ * final release should propagate to the worker `/cancel` endpoint and the
+ * Redis cancellation flag — otherwise one user's tab close would terminate
+ * another user's analysis.
+ *
+ * Implementation: a single `DECR` on `refcount:{jobId}`. The atomic decrement
+ * means concurrent releases linearize correctly — at most one caller observes
+ * the transition to `0` and is signalled `true`. When refcount goes negative
+ * (more releases than claims, e.g. release after the slot was already
+ * cleared) the function still returns `true` so the caller still posts the
+ * worker cancel — there is no harm in re-cancelling an already-cancelled or
+ * completed job.
+ *
+ * Returns `true` when Upstash env is not configured — without shared state
+ * there is no dedup, so every cancel must propagate.
+ *
+ * @param jobId - The shared `jobId` whose subscription is being released.
+ * @returns `true` when this caller is responsible for the actual cancel.
+ */
+export async function releaseInFlightJob(jobId: string): Promise<boolean> {
+    return withJobRedis(async redis => {
+        const remaining = await redis.decr(refCountKey(jobId));
+        return remaining <= 0;
+    }, true);
+}
+
+/**
+ * @internal Release the in-flight slot for `jobId` and reset its refcount.
+ *
+ * Called from `pollAnalysis` and the other axis polls when a terminal status
+ * (`done` or `error`) is observed: at that point the worker job is finished,
+ * so the slot should be freed for the next submitter and the refcount reset
+ * regardless of how many subscribers polled. Without this, a stale
+ * `inflight:{cacheKey}` key would force later submitters to attach to a job
+ * that has already produced its result.
+ *
+ * Compare-and-delete: only clears `inflight:{cacheKey}` when its current
+ * value is still `jobId`. Avoids wiping a fresh slot that a later submitter
+ * already claimed for the same `cacheKey`.
+ *
+ * @param jobId - The completed (or errored) job's identifier.
+ * @param cacheKey - The cache key used during claim, read from job meta.
+ *   Pass `undefined` to skip the in-flight slot release (refcount only).
+ */
+export async function clearInFlightJob(
+    jobId: string,
+    cacheKey: string | undefined
+): Promise<void> {
+    return withJobRedis(async redis => {
+        await redis.del(refCountKey(jobId));
+        if (cacheKey !== undefined) {
+            const current = await redis.get<string>(inFlightKey(cacheKey));
+            if (current === jobId) {
+                await redis.del(inFlightKey(cacheKey));
+            }
+        }
     }, undefined);
 }
