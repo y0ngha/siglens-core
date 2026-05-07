@@ -27,6 +27,15 @@ import {
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).
  *
+ * **Empty-response handling:** this function does not skip the cache write when
+ * the worker returns a sparse result. Overall analysis lacks a canonical
+ * fallback sentinel shape, so a reliable empty-detection predicate cannot be
+ * defined without risking false positives on legitimately sparse responses.
+ * Malformed payloads are handled upstream:
+ * {@link normalizeOverallAnalysisResponse} throws, transitioning the job to
+ * the `error` path before any cache write occurs. A `console.warn` is emitted
+ * when heuristic empty-field checks fire.
+ *
  * Cancel-after-poll: a successful {@link cancelOverallAnalysisJob} call
  * does NOT immediately flip the job status. This function will keep
  * returning `processing` until the worker observes the cancel signal on
@@ -91,6 +100,10 @@ export async function pollOverallAnalysis(
         console.error('[PollOverall] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollOverall]', options);
         return { status: 'error', error: 'Invalid response from worker' };
+    }
+
+    if (result.headlineKo === '' && result.scenarios.length === 0) {
+        console.warn('[PollOverall] Empty overall analysis', { jobId });
     }
 
     // Cache the normalized result if a pre-computed cache key is available.

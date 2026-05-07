@@ -28,6 +28,14 @@ import {
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).
  *
+ * **Empty-response handling:** this function does not skip the cache write when
+ * the worker returns a sparse result. News-card analysis lacks a canonical
+ * fallback sentinel shape, so a reliable empty-detection predicate cannot be
+ * defined without risking false positives on legitimately sparse responses.
+ * Malformed payloads are handled upstream: {@link normalizeNewsCardAnalysis}
+ * throws, transitioning the job to the `error` path before any cache write
+ * occurs. A `console.warn` is emitted when heuristic empty-field checks fire.
+ *
  * Cancel-after-poll: a successful {@link cancelNewsAnalysisJob} call does
  * NOT immediately flip the job status. This function will keep returning
  * `processing` until the worker observes the cancel signal on its next
@@ -90,6 +98,10 @@ export async function pollNewsCardAnalysis(
         console.error('[PollNewsCard] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollNewsCard]', options);
         return { status: 'error', error: 'Invalid response from worker' };
+    }
+
+    if (result.titleKo === '' && result.summaryKo === '') {
+        console.warn('[PollNewsCard] Empty news card analysis', { jobId });
     }
 
     // Permanently cache the result if a pre-computed cache key is available.

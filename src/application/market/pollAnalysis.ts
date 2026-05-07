@@ -1,6 +1,9 @@
 import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
-import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
+import {
+    enrichAnalysisWithConfidence,
+    isFallbackAnalysis,
+} from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import type { PollAnalysisResult, Skill } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -25,6 +28,11 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
  * - `done`: the result is ready. The raw worker response is enriched with
  *   skill-confidence weighting and reconciled against the latest close/ATR,
  *   then cached for the remaining timeframe-aware TTL before being returned.
+ *
+ * When the worker returns an empty/malformed payload, the result is filled
+ * with safe defaults and a Korean fallback summary, and the cache write is
+ * skipped so a retry can succeed. The `done` status is still returned so
+ * the caller can surface the placeholder to the user.
  *
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return
@@ -116,22 +124,29 @@ export async function pollAnalysis(
     const result = { ...reconciled, analyzedAt };
 
     if (meta && meta.timeframe !== undefined) {
-        const cache = createCacheProvider();
-        if (cache !== null) {
-            const cacheKey = buildAnalysisCacheKey(
-                meta.symbol,
-                meta.timeframe,
-                meta.modelId
+        if (isFallbackAnalysis(reconciled)) {
+            console.warn(
+                '[Poll] Worker returned empty analysis; skipping cache write',
+                { jobId, symbol: meta.symbol }
             );
-            const ttl = computeEffectiveTtl(meta.timeframe, now);
-            fireAndForget(
-                cache
-                    .set(cacheKey, { ...result, skillsDegraded }, ttl)
-                    .catch(error =>
-                        console.error('[Poll] Cache write failed:', error)
-                    ),
-                options
-            );
+        } else {
+            const cache = createCacheProvider();
+            if (cache !== null) {
+                const cacheKey = buildAnalysisCacheKey(
+                    meta.symbol,
+                    meta.timeframe,
+                    meta.modelId
+                );
+                const ttl = computeEffectiveTtl(meta.timeframe, now);
+                fireAndForget(
+                    cache
+                        .set(cacheKey, { ...result, skillsDegraded }, ttl)
+                        .catch(error =>
+                            console.error('[Poll] Cache write failed:', error)
+                        ),
+                    options
+                );
+            }
         }
     }
 

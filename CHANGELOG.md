@@ -3,6 +3,18 @@
 ## [0.7.11](https://github.com/y0ngha/siglens-core/compare/v0.7.10...v0.7.11) (2026-05-06)
 
 
+### BREAKING CHANGES
+
+* **Model removed — `claude-haiku-3-5`:** the model identifier `claude-haiku-3-5` has been removed from `ActiveModelId` and `MODEL_SPECS`. Consumers must migrate to `claude-haiku-4-5` (wire identifier `claude-haiku-4-5-20251001`).
+* **`claude-haiku-4-5` limits:** `maxOutputTokens` is 64 000; no thinking budget; `temperature` is still supported.
+* **`ModelSpec.topP` removed:** the `topP` field no longer exists on any `ModelSpec` entry. Sampling-based models (Gemini, Haiku) now expose only `temperature`.
+* **`ModelSpec` effort field:** reasoning variants (Claude Sonnet/Opus 4.x and ChatGPT models) now expose `effort: EffortLevel` (`'low' | 'medium' | 'high'`) in place of the former `thinkingBudget` / `temperature` fields.
+* **New `EffortLevel` type:** exported from `@y0ngha/siglens-core`. Consumers building provider request payloads should import and use this type.
+* **`apiModelId` added to every `ModelSpec`:** the field holds the exact model string required by the provider SDK. SDK callers must use `spec.apiModelId` (not the `ActiveModelId` map key) when constructing the provider request payload.
+* **`MODEL_SPECS` shape changed:** any code that spreads or iterates `ModelSpec` values will need to handle the new `apiModelId` field and the absence of `topP`.
+* **`CallAiProviderOptions.serverApiKey` is now `string | undefined`:** previously typed as `string`, this field is now `string | undefined`. Consumer implementations of `callAiProvider` must handle `undefined` — exactly one of `userApiKey` / `serverApiKey` is defined per call (enforced by the application layer). Update your implementation to check which key is present before using it.
+
+
 ### Features
 
 * 프롬프트 개선 및 여러가지 수정... ([21d5fba](https://github.com/y0ngha/siglens-core/commit/21d5fbac87a632fff0d51ce1569d7f5e0d0dd3fd))

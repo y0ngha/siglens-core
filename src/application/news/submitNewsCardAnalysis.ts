@@ -18,11 +18,13 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 /**
  * Per-card worker timeout.
  *
- * Flash-lite is fast — typical wall-clock latency is <10 s per card.
- * 2 minutes gives comfortable headroom for cold starts and retries without
- * holding the serverless function open longer than necessary.
+ * 30 minutes gives the dispatcher enough headroom for fire-and-forget dispatch:
+ * per-card calls share a single background POST, and the worker can take longer
+ * than typical when news bodies are large or rate-limit retries kick in.
  */
-const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS = 30 * MS_PER_MINUTE;
+const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES = 30;
+const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS =
+    SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES * MS_PER_MINUTE;
 
 /**
  * Submit a per-card news analysis job using the flash-lite model.

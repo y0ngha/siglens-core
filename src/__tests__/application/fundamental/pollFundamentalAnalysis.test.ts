@@ -196,5 +196,21 @@ describe('pollFundamentalAnalysis 함수는', () => {
             expect(result.status).toBe('done');
             expect(mockCacheSet).not.toHaveBeenCalled();
         });
+
+        it('빈 응답이 감지되면 경고를 로그하고 done을 반환한다', async () => {
+            mockGetJobResult.mockResolvedValueOnce(JSON.stringify({}));
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+
+            const result = await pollFundamentalAnalysis('job-empty');
+
+            expect(result.status).toBe('done');
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[PollFundamental] Empty fundamental analysis',
+                { jobId: 'job-empty' }
+            );
+            warnSpy.mockRestore();
+        });
     });
 });

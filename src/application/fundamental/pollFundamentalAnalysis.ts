@@ -27,6 +27,20 @@ import {
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).
  *
+ * **Empty-response handling:** unlike {@link pollAnalysis}, this function does
+ * not skip the cache write when the worker returns a sparse or empty result.
+ * Fundamental analysis lacks a stable sentinel shape (no canonical fallback
+ * string + all-empty-arrays invariant), so a reliable "is this a fallback?"
+ * predicate cannot be defined without risking false positives on legitimately
+ * sparse results. There are two distinct empty-payload scenarios:
+ * - **Structurally malformed** (unparseable JSON or wrong field types):
+ *   {@link normalizeFundamentalAnalysisResponse} throws → job transitions to
+ *   the `error` path before any cache write occurs.
+ * - **Content-empty** (valid JSON that normalises to empty strings / empty
+ *   arrays, e.g. `{}`): normalization succeeds, the heuristic check below
+ *   emits a `console.warn`, and the result is still cached and returned as
+ *   `done` so the caller can surface it to the user.
+ *
  * Cancel-after-poll: a successful {@link cancelFundamentalAnalysisJob} call
  * does NOT immediately flip the job status. This function will keep
  * returning `processing` until the worker observes the cancel signal on
@@ -91,6 +105,13 @@ export async function pollFundamentalAnalysis(
         console.error('[PollFundamental] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollFundamental]', options);
         return { status: 'error', error: 'Invalid response from worker' };
+    }
+
+    if (
+        result.overallConclusionKo === '' &&
+        result.categoryAssessments.length === 0
+    ) {
+        console.warn('[PollFundamental] Empty fundamental analysis', { jobId });
     }
 
     // Cache the normalized result if a pre-computed cache key is available.

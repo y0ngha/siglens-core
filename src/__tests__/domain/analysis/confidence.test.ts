@@ -2,15 +2,21 @@ import { describe, it, expect } from 'vitest';
 import {
     enrichAnalysisWithConfidence,
     filterPatterns,
+    isFallbackAnalysis,
     normalizeCachedAnalysisResponse,
+    EMPTY_ANALYSIS_FALLBACK_SUMMARY,
 } from '@/domain/analysis/confidence';
 import type {
+    AnalysisResponse,
+    CandlePatternSummary,
     PatternResult,
     RawAnalysisResponse,
     RawPatternSummary,
     RawStrategyResult,
     Skill,
     SkillChartDisplay,
+    StrategyResult,
+    Trendline,
 } from '@/domain/types';
 import {
     HIGH_CONFIDENCE_WEIGHT,
@@ -710,6 +716,97 @@ describe('confidence', () => {
             expect(result.analyzedAt).toBe('2026-05-06T00:00:00.000Z');
         });
 
+        it('renderConfig.type이 유효하지 않으면 renderConfig를 undefined로 떨어뜨린다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'no-type-pattern',
+                        patternName: '타입없는패턴',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: { show: true, color: '#abc' },
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toBeUndefined();
+        });
+
+        it('renderConfig가 객체가 아니면 undefined로 떨어뜨린다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'string-render',
+                        patternName: '문자열렌더',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: 'not-an-object',
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toBeUndefined();
+        });
+
+        it('renderConfig에 type만 있으면 show/color/label에 기본값을 채운다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'type-only-pattern',
+                        patternName: '타입만',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: { type: 'line' },
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toEqual({
+                type: 'line',
+                show: false,
+                color: '',
+                label: '',
+            });
+        });
+
+        it('renderConfig 필드 타입이 잘못되면 해당 필드만 기본값으로 떨어뜨린다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'wrong-types-pattern',
+                        patternName: '잘못된타입',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: {
+                            type: 'marker',
+                            show: 'truthy',
+                            color: 123,
+                            label: null,
+                        },
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toEqual({
+                type: 'marker',
+                show: false,
+                color: '',
+                label: '',
+            });
+        });
+
         it('캐시 항목의 child 필드가 누락되면 보수적인 기본값으로 채운다', () => {
             const result = normalizeCachedAnalysisResponse({
                 actionRecommendation: {
@@ -741,6 +838,149 @@ describe('confidence', () => {
                     reason: '',
                 },
             });
+        });
+    });
+
+    describe('isFallbackAnalysis', () => {
+        const base = (): AnalysisResponse => ({
+            summary: EMPTY_ANALYSIS_FALLBACK_SUMMARY,
+            trend: 'neutral',
+            indicatorResults: [],
+            riskLevel: 'medium',
+            keyLevels: { support: [], resistance: [] },
+            priceTargets: {
+                bullish: { targets: [], condition: '' },
+                bearish: { targets: [], condition: '' },
+            },
+            patternSummaries: [],
+            strategyResults: [],
+            candlePatterns: [],
+            trendlines: [],
+        });
+
+        it('summary와 모든 배열이 비어 있으면 true를 반환한다', () => {
+            expect(isFallbackAnalysis(base())).toBe(true);
+        });
+
+        it('summary가 fallback 문자열이 아니면 false를 반환한다', () => {
+            expect(
+                isFallbackAnalysis({ ...base(), summary: '실제 분석 내용' })
+            ).toBe(false);
+        });
+
+        it('indicatorResults가 비어 있지 않으면 false를 반환한다', () => {
+            expect(
+                isFallbackAnalysis({
+                    ...base(),
+                    indicatorResults: [{ indicatorName: 'RSI', signals: [] }],
+                })
+            ).toBe(false);
+        });
+
+        it('patternSummaries가 비어 있지 않으면 false를 반환한다', () => {
+            const pattern: PatternResult = {
+                id: 'p_0',
+                patternName: 'head_and_shoulders',
+                skillName: '헤드앤숄더',
+                detected: true,
+                trend: 'bearish',
+                summary: '패턴 요약',
+                confidenceWeight: 0.8,
+            };
+            expect(
+                isFallbackAnalysis({ ...base(), patternSummaries: [pattern] })
+            ).toBe(false);
+        });
+
+        it('strategyResults가 비어 있지 않으면 false를 반환한다', () => {
+            const strategy: StrategyResult = {
+                id: 's_0',
+                strategyName: '모멘텀 전략',
+                trend: 'bullish',
+                summary: '전략 요약',
+                confidenceWeight: 0.7,
+            };
+            expect(
+                isFallbackAnalysis({ ...base(), strategyResults: [strategy] })
+            ).toBe(false);
+        });
+
+        it('candlePatterns가 비어 있지 않으면 false를 반환한다', () => {
+            const candle: CandlePatternSummary = {
+                id: 'c_0',
+                patternName: 'doji',
+                detected: true,
+                trend: 'neutral',
+                summary: '캔들 요약',
+            };
+            expect(
+                isFallbackAnalysis({ ...base(), candlePatterns: [candle] })
+            ).toBe(false);
+        });
+
+        it('trendlines가 비어 있지 않으면 false를 반환한다', () => {
+            const trendline: Trendline = {
+                direction: 'ascending',
+                start: { time: 0, price: 100 },
+                end: { time: 1, price: 110 },
+            };
+            expect(
+                isFallbackAnalysis({ ...base(), trendlines: [trendline] })
+            ).toBe(false);
+        });
+
+        it('keyLevels.support가 비어 있지 않으면 false를 반환한다', () => {
+            expect(
+                isFallbackAnalysis({
+                    ...base(),
+                    keyLevels: {
+                        support: [{ price: 100, reason: '지지선' }],
+                        resistance: [],
+                    },
+                })
+            ).toBe(false);
+        });
+
+        it('keyLevels.resistance가 비어 있지 않으면 false를 반환한다', () => {
+            expect(
+                isFallbackAnalysis({
+                    ...base(),
+                    keyLevels: {
+                        support: [],
+                        resistance: [{ price: 110, reason: '저항선' }],
+                    },
+                })
+            ).toBe(false);
+        });
+
+        it('priceTargets.bullish.targets가 비어 있지 않으면 false를 반환한다', () => {
+            expect(
+                isFallbackAnalysis({
+                    ...base(),
+                    priceTargets: {
+                        bullish: {
+                            targets: [{ price: 120, basis: '목표가' }],
+                            condition: '돌파 시',
+                        },
+                        bearish: null,
+                    },
+                })
+            ).toBe(false);
+        });
+
+        it('priceTargets.bearish.targets가 비어 있지 않으면 false를 반환한다', () => {
+            expect(
+                isFallbackAnalysis({
+                    ...base(),
+                    priceTargets: {
+                        bullish: null,
+                        bearish: {
+                            targets: [{ price: 90, basis: '하방 목표' }],
+                            condition: '이탈 시',
+                        },
+                    },
+                })
+            ).toBe(false);
         });
     });
 });

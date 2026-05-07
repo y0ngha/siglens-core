@@ -32,16 +32,27 @@ export interface RequestChatCompletionParams {
     clientIp: string;
     model?: ModelId;
     /**
-     * Server-owned API key for all AI provider calls.
-     * For `'pro'`-tier users this is the sole credential. For non-pro tiers it
-     * is used when no `userApiKey` is present (free models or missing BYOK).
+     * Server-owned API key for AI provider calls.
+     *
+     * Must be provided when:
+     * - `tierContext.tier === 'pro'` (any model) — `server_error` if absent.
+     * - Non-pro tier + free model — `server_error` if absent.
+     *
+     * Not required (and not used) when:
+     * - Non-pro tier + premium model + `userApiKey` present (BYOK path).
      */
     serverApiKey?: string;
     /**
-     * User-registered BYOK API key. Must be provided when a non-`'pro'`-tier
-     * user requests a premium model. Omitting it in that case returns
-     * `user_api_key_required`. `'pro'`-tier users are exempt — the server
-     * covers all models via `serverApiKey` and never requires a personal key.
+     * User-registered BYOK API key.
+     *
+     * Must be provided when:
+     * - Non-`'pro'`-tier user requests a premium model and `serverApiKey` is
+     *   absent — omitting it returns `user_api_key_required`.
+     *
+     * Ignored when:
+     * - `tierContext.tier === 'pro'` — server covers all models via
+     *   `serverApiKey`; this field is never forwarded.
+     * - Non-pro tier + free model — server key is used; this field is ignored.
      */
     userApiKey?: string;
     occurredAt?: Date;

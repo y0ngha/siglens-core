@@ -387,14 +387,41 @@ describe('resolveOverallDependencies 함수는', () => {
             const upcomingCalendar = [makeCalendarItem('2026-08-01')];
 
             await resolveOverallDependencies(
-                makeInputs({ newsItems, upcomingCalendar })
+                makeInputs({ symbol: 'NVDA', newsItems, upcomingCalendar })
             );
 
             expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
                 expect.objectContaining({
                     news: newsItems,
                     upcomingCalendar,
+                    companyName: 'NVDA',
                 })
+            );
+        });
+
+        it('submitNewsAnalysis 에 companyName 이 전달된다 (명시적으로 지정된 경우)', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({
+                    symbol: 'NVDA',
+                    companyName: 'NVIDIA Corporation',
+                })
+            );
+
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ companyName: 'NVIDIA Corporation' })
             );
         });
 

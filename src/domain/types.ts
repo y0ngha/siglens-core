@@ -1268,6 +1268,66 @@ export type ModelSpec =
     | GeminiModelSpec
     | ChatGPTModelSpec;
 
+/**
+ * Narrows a `ModelSpec` to the reasoning variants (`ClaudeReasoningModelSpec |
+ * ChatGPTModelSpec`). Use this guard whenever you need to read `spec.effort`
+ * without a cast — both variants require `effort: EffortLevel` and do not
+ * accept a sampling temperature.
+ *
+ * @param spec - The model spec to narrow.
+ * @returns `true` when `spec` is a `ClaudeReasoningModelSpec` or `ChatGPTModelSpec`.
+ */
+export function isReasoningModelSpec(
+    spec: ModelSpec
+): spec is ClaudeReasoningModelSpec | ChatGPTModelSpec {
+    return spec.effort !== undefined;
+}
+
+/**
+ * Narrows a `ModelSpec` to the sampling variants (`ClaudeSamplingModelSpec |
+ * GeminiModelSpec`). Use this guard whenever you need to read
+ * `spec.temperature` or `spec.thinkingBudget` safely — both variants carry a
+ * numeric `temperature` field and an explicit `thinkingBudget`.
+ *
+ * @param spec - The model spec to narrow.
+ * @returns `true` when `spec` is a `ClaudeSamplingModelSpec` or `GeminiModelSpec`.
+ */
+export function isSamplingModelSpec(
+    spec: ModelSpec
+): spec is ClaudeSamplingModelSpec | GeminiModelSpec {
+    return spec.effort === undefined;
+}
+
+/**
+ * Narrows a `ModelSpec` to `ClaudeReasoningModelSpec` specifically. Use this
+ * guard when you need both `provider === 'claude'` and adaptive-thinking
+ * semantics — i.e., you intend to pass `budget_tokens` via the Anthropic SDK's
+ * thinking block but not a sampling temperature.
+ *
+ * @param spec - The model spec to narrow.
+ * @returns `true` when `spec` is a `ClaudeReasoningModelSpec`.
+ */
+export function isClaudeReasoningModelSpec(
+    spec: ModelSpec
+): spec is ClaudeReasoningModelSpec {
+    return spec.provider === 'claude' && spec.effort !== undefined;
+}
+
+/**
+ * Narrows a `ModelSpec` to `ClaudeSamplingModelSpec` specifically. Use this
+ * guard when you need both `provider === 'claude'` and sampling-temperature
+ * semantics — the model does not support adaptive thinking and requires a
+ * numeric `temperature` in the API call.
+ *
+ * @param spec - The model spec to narrow.
+ * @returns `true` when `spec` is a `ClaudeSamplingModelSpec`.
+ */
+export function isClaudeSamplingModelSpec(
+    spec: ModelSpec
+): spec is ClaudeSamplingModelSpec {
+    return spec.provider === 'claude' && spec.effort === undefined;
+}
+
 /** AI model identifiers allowed by tier gating. */
 export type TierModel =
     | 'gemini-2.5-flash'

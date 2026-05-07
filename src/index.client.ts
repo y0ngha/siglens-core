@@ -253,7 +253,22 @@ export {
     type ClaudeModelId,
     type GeminiModelId,
 } from './domain/analysis/modelSpecs';
-export type { ActiveModelId, AIProvider, ModelSpec } from './domain/types';
+export type {
+    ActiveModelId,
+    AIProvider,
+    ChatGPTModelSpec,
+    ClaudeReasoningModelSpec,
+    ClaudeSamplingModelSpec,
+    EffortLevel,
+    GeminiModelSpec,
+    ModelSpec,
+} from './domain/types';
+export {
+    isClaudeReasoningModelSpec,
+    isClaudeSamplingModelSpec,
+    isReasoningModelSpec,
+    isSamplingModelSpec,
+} from './domain/types';
 
 // Indicator constants
 export {

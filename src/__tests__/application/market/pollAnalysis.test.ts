@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { RawAnalysisResponse } from '@/domain/types';
+import type { AnalysisResponse, RawAnalysisResponse } from '@/domain/types';
+import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
-vi.mock('@/domain/analysis/confidence');
+// Partial mock: only `enrichAnalysisWithConfidence` is mocked. Keep
+// `isFallbackAnalysis` and `EMPTY_ANALYSIS_FALLBACK_SUMMARY` as the real
+// implementations so the cache-skip predicate runs against actual logic.
+vi.mock('@/domain/analysis/confidence', async () => {
+    const actual = await vi.importActual<
+        typeof import('@/domain/analysis/confidence')
+    >('@/domain/analysis/confidence');
+    return { ...actual, enrichAnalysisWithConfidence: vi.fn() };
+});
 vi.mock('@/domain/analysis/ai-levels');
 vi.mock('@/infrastructure/cache/config', async () => {
     const actual = await vi.importActual<
@@ -303,9 +312,88 @@ describe('pollAnalysis 함수는', () => {
         });
     });
 
-    describe('B-5: meta.timeframe undefined 분기', () => {
+    describe('fallback analysis 캐시 스킵', () => {
+        const fallbackResult: AnalysisResponse = {
+            summary: EMPTY_ANALYSIS_FALLBACK_SUMMARY,
+            trend: 'neutral',
+            indicatorResults: [],
+            riskLevel: 'medium',
+            keyLevels: { support: [], resistance: [] },
+            priceTargets: {
+                bullish: { targets: [], condition: '' },
+                bearish: { targets: [], condition: '' },
+            },
+            patternSummaries: [],
+            strategyResults: [],
+            candlePatterns: [],
+            trendlines: [],
+        };
+
         beforeEach(() => {
             mockGetJobStatus.mockResolvedValue('done');
+            mockGetJobMeta.mockResolvedValue(mockMeta);
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('워커가 빈 분석을 반환하면 캐시 쓰기를 건너뛴다', async () => {
+            mockGetJobResult.mockResolvedValueOnce({});
+            mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
+                fallbackResult
+            );
+            mockPostProcessAnalysisWithReconcile.mockReturnValueOnce(
+                fallbackResult
+            );
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+
+            const result = await pollAnalysis('job-fallback');
+
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.summary).toBe(
+                    EMPTY_ANALYSIS_FALLBACK_SUMMARY
+                );
+            }
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[Poll] Worker returned empty analysis; skipping cache write',
+                expect.objectContaining({ jobId: 'job-fallback' })
+            );
+            warnSpy.mockRestore();
+        });
+
+        it('워커가 실제 분석을 반환하면 캐시에 정상적으로 저장한다', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            // rawResult has a real summary and non-empty arrays are not required
+            // for the positive path — what matters is isFallbackAnalysis returns false
+            mockEnrichAnalysisWithConfidence.mockReturnValueOnce(rawResult);
+            mockPostProcessAnalysisWithReconcile.mockReturnValueOnce(rawResult);
+
+            await pollAnalysis('job-real-analysis');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'analysis:AAPL:1Day:gemini-2.5-flash',
+                expect.objectContaining({
+                    analyzedAt: '2025-01-15T12:00:00.000Z',
+                }),
+                3600
+            );
+        });
+    });
+
+    describe('meta.timeframe undefined 분기', () => {
+        beforeEach(() => {
+            mockGetJobStatus.mockResolvedValue('done');
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
         });
 
         it('meta.timeframe이 undefined이면 캐시 저장을 건너뛴다', async () => {
@@ -333,7 +421,6 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-with-timeframe');
 
             expect(mockCacheSet).toHaveBeenCalled();
-            vi.useRealTimers();
         });
     });
 });

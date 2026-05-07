@@ -218,6 +218,31 @@ describe('requestChatCompletion', () => {
         expect(tryConsumeToken).not.toHaveBeenCalled();
     });
 
+    it('succeeds for non-pro tier + premium model + userApiKey even when serverApiKey is absent', async () => {
+        const result = await requestChatCompletion(
+            createParams({
+                model: GEMINI_2_5_PRO_MODEL,
+                userApiKey: 'user-key',
+                serverApiKey: undefined,
+                tierContext: { userId: null, tier: 'member' },
+            }),
+            { tokenStore, callAiProvider }
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            message: '분석 기준으로는 조금 기다리는 편이 좋아요.',
+            remainingTokens: 4,
+        });
+        expect(callAiProvider).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userApiKey: 'user-key',
+                serverApiKey: undefined,
+                model: GEMINI_2_5_PRO_MODEL,
+            })
+        );
+    });
+
     it('allows a pro tier user to call a premium model using serverApiKey when no userApiKey is provided', async () => {
         const result = await requestChatCompletion(
             createParams({

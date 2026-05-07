@@ -1,53 +1,27 @@
 # Fix Log
 
-## [feat/fundamental-news-analysis | Phase 1 Tasks 1.1+1.2+1.3 | 2026-05-02]
-- Violation: Union literals `'up' | 'down'` in `FundamentalCategory` and other inline shapes
-- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
-- Context: Extracted `FundamentalCategory`, `GradesAction` to dedicated named types for reusability and consistency
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 6
 
-- Violation: 13 deeply nested inline shapes in `FundamentalSnapshot`
-- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — named interfaces required over inline return types
-- Context: Extracted 13 named interfaces (`FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalScore`, `FundamentalGradesSnapshot`, `NewsSentimentData`, `NewsCategory`, etc.)
+- Violation: `pollAnalysis.test.ts`의 `describe('B-5: meta.timeframe undefined 분기')` — describe 이름에 리뷰어 버그 태그 접두사 "B-5:" 포함
+- Rule: PR_FIX_FLOW.md Test Layer Checklist — "describe/it text is human-readable, not code expressions"
+- Context: 리뷰어 태그는 PR 맥락 한정이므로 테스트 코드에 남기지 않음. "meta.timeframe undefined 분기"로 변경.
 
-- Violation: `FundamentalSentiment` / `NewsSentiment` shape duplication with `Trend` type
-- Rule: MISTAKES.md TypeScript §6 — duplicated type structures must be cross-referenced or unified
-- Context: Added JSDoc cross-reference to document intentional separation per domain clarity spec
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 4
 
-- Violation: TTL constants computed via magic numbers (`24*60*60`) instead of importing `SECONDS_PER_DAY`
-- Rule: FF Principle 1-D / MISTAKES.md §13 — magic numbers must be extracted to named constants
-- Context: Replaced inline computation with imported `SECONDS_PER_DAY` constant
+- Violation: `pollFundamentalAnalysis`, `pollNewsAnalysis`, `pollNewsCardAnalysis`, `pollOverallAnalysis` 4개 함수에 추가된 빈-응답 감지 `if` 분기(true 경로)에 대한 테스트 케이스 부재
+- Rule: application/CLAUDE.md "Coverage target: 100% branch coverage (required)"
+- Context: 각 함수의 `console.warn` 경고 분기가 기존 테스트에서 커버되지 않아 각 테스트 파일에 빈 응답 케이스를 추가함.
 
-- Violation: TTL test only checked sign (`toBeGreaterThan(0)`) without concrete value assertion
-- Rule: MISTAKES.md Tests §12 — concrete value checks required for computed constants
-- Context: Changed to `toBe(SECONDS_PER_DAY)` exact value assertion
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 3
 
-- Violation: Mixed `test()` and `it()` function names in same file
-- Rule: CONVENTIONS.md Test Rules — test function naming must be uniform within a file
-- Context: Standardized to `it()` throughout
+- Violation: 새로 추가된 도메인 함수 `isFallbackAnalysis`에 전용 단위 테스트 블록 없음
+- Rule: domain/CLAUDE.md "Coverage target: 100% branch coverage (required)" / MISTAKES.md §15 Tests
+- Context: `isFallbackAnalysis`는 10개의 `&&` 조건을 가진 순수 함수인데 `confidence.test.ts`에 `describe('isFallbackAnalysis')` 블록이 없어 각 조건의 단독 false 분기가 미커버 상태였음. 11개 테스트 케이스 추가로 100% 분기 커버리지 달성.
 
-- Violation: Tautological test for pure function (testing signature behavior without meaningful assertion)
-- Rule: MISTAKES.md Tests §13 — remove tests that test nothing
-- Context: Removed tautological assertions; kept only format/regex validation tests
+- Violation: `requestChatCompletion.ts` 내 라우팅 매트릭스 인라인 주석이 함수 JSDoc과 동일한 WHAT 내용을 반복 설명
+- Rule: CLAUDE.md — "Don't explain WHAT the code does" / "Only add a comment when the WHY is non-obvious"
+- Context: 4줄 주석(1~4번 케이스)이 함수 JSDoc의 API key routing 섹션과 중복. 주석 제거.
 
-- Violation: New `FundamentalSnapshot` interfaces missing JSDoc documentation
-- Rule: MISTAKES.md Documentation Sync §4 / §4.5 — all new exports require JSDoc tags
-- Context: Added one-line JSDoc on every new named interface export
-
-- Violation: Hardcoded `'gemini-2.5-flash-lite'` inside `buildNewsCardCacheKey` function
-- Rule: FF Principle 1-D / MISTAKES.md §13 — hardcoded literals must be extracted to module-level constants
-- Context: Extracted to `NEWS_CARD_MODEL_ID` constant
-
-- Violation: `toMatch(regex)` cache key tests inconsistent with `toBe(string)` pattern in other keys
-- Rule: FF Principle 2-B / CONVENTIONS.md — same-family return types must use uniform test assertions
-- Context: Switched fundamental/news cache key tests to `toBe(exact-string)` for consistency with sector signals tests
-
-- Violation: `NewsCategory` type missing JSDoc description
-- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 2 and Tier 4 types require JSDoc
-- Context: Added one-line JSDoc description
-
-- Violation: Round 2 discovery — `NewsCategory` JSDoc still missing
-- Rule: MISTAKES.md Documentation Sync §4.5 — all new types require JSDoc
-- Context: Added one-line description in Round 2 follow-up
 
 ## [Issue #2 | chore/2/초기-개발-환경-설정 | 2026-04-24]
 - Violation: release-it config used `${version}` (JS template literal) instead of `{{version}}` (Handlebars) for commitMessage, tagName, tagAnnotation
@@ -141,8 +115,6 @@
 - Context: `DEFAULT_ANALYSIS_MODEL_USED` constant was inserted after the first import in `pollAnalysis.ts`; moved to after all import statements
 
 
-
-
 ## [PR #71 | refactor/model-specs-consolidation | 2026-05-02]
 - Violation: Shared domain types (`ModelSpec`, `AIProvider`, `ActiveModelId`) were defined inside `domain/analysis/modelSpecs.ts` instead of `domain/types.ts`
 - Rule: ARCHITECTURE Mistake #1 / domain/CLAUDE.md — shared domain types must live in `domain/types.ts`
@@ -163,10 +135,6 @@
 - Context: First `getThinkingBudgetSequence` test comment rewrote to "8192 skipped, >= previous" to match the `if (result.length === 0 || budget < result[result.length - 1])` non-decreasing-skip rule.
 
 ## [PR #74 Round 2 | main | 2026-05-02]
-- Violation: Two separate import blocks from the same `@/domain/types` specifier in `domain/llm/providers.ts`
-- Rule: MISTAKES.md TypeScript #3.5 — multiple import blocks from the same module must be merged into one
-- Context: `LlmProvider` was added in a separate import block from the existing `AIProvider, ActiveModelId, ModelId` block after the B3 fix moved the type to `domain/types`
-
 - Violation: `isPremiumChatModel(model, tierConfig)` called twice in `requestChatCompletion` — once in the guard block and once in `shouldRecordPremiumUsage`
 - Rule: MISTAKES.md Coding Paradigm #2 — identical values computed multiple times must be extracted to a const
 - Context: `model` and `tierConfig` are immutable within the function; hoisted to `const isPremium` before the guard block
@@ -181,22 +149,6 @@
 - Rule: ARCHITECTURE.md — domain은 application에서 import 금지 (ESLint 강제); 동일 규칙이 domain 테스트에도 적용됨
 - Context: S1 Suggestion을 반영하면서 `GEMINI_2_5_FLASH_MODEL`을 application 레이어에서 import했으나, domain 테스트는 application 레이어 심볼에 의존해서는 안 됨
 
-## [Fundamental & News Analysis Phase 1 | Task Batch 1 | 2026-05-02]
-- Violation: Inline union literals with 2+ members not extracted to named type aliases
-- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
-- Context: FundamentalCategory ('up' | 'down'), GradesAction ('upgrade' | 'downgrade' | 'maintain') extracted to dedicated named types for reusability
-
-- Violation: Deeply nested inline shapes in FundamentalSnapshot
-- Rule: MISTAKES.md TypeScript §5 — named interfaces required over inline return types
-- Context: 13 deeply nested interfaces extracted (FundamentalProfile, FundamentalValuation, FundamentalPeer, FundamentalScore, FundamentalGradesSnapshot, NewsSentimentData, NewsCategory, etc.)
-
-- Violation: Magic numbers in TTL calculations (24*60*60)
-- Rule: MISTAKES.md Coding Paradigm §13 — magic numbers must be extracted to named constants
-- Context: Replaced inline computation with imported SECONDS_PER_DAY constant
-
-- Violation: Missing JSDoc on new type exports
-- Rule: MISTAKES.md Documentation Sync §4.5 — all new types require JSDoc
-- Context: Added one-line JSDoc description on every new named interface export
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 2 | 2026-05-02]
 - Violation: Pure domain function placed in infrastructure layer
@@ -207,14 +159,6 @@
 - Rule: MISTAKES.md Coding Paradigm §6.5 — functions and state must stay synchronized
 - Context: SKILL_CATEGORIES whitelist and countSkillFiles function now both use same pattern
 
-- Violation: Missing @param/@returns JSDoc on Tier 4 interface methods
-- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 4 interface methods require @param and @returns
-- Context: Added per-method JSDoc with parameter and return type documentation
-
-## [Fundamental & News Analysis Phase 1 | Task Batch 3 | 2026-05-02]
-- Violation: DRY violation — duplicated helpers (fmt formatter across prompt builders)
-- Rule: MISTAKES.md Coding Paradigm §6 — identical functions repeating across modules must be extracted
-- Context: Extracted fmt formatter to shared infrastructure/ai/utils.ts or domain/formatting/
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 4 | 2026-05-02]
 - Violation: Fire-and-forget fetch missing AbortSignal.timeout
@@ -251,14 +195,6 @@
 - Rule: MISTAKES.md TypeScript §8 — sibling types must follow consistent declaration patterns
 - Context: Unified snapshot hashing result type shape across FundamentalResult and NewsResult
 
-## [Fundamental & News Analysis Phase 1 | Task Batch 7 | 2026-05-02]
-- Violation: PUBLIC_API.md exports list stale — functions listed as internal but promoted to public
-- Rule: MISTAKES.md Public API & Module Exports §6.5 — PUBLIC_API.md document must stay synchronized with src/index.ts exports
-- Context: Updated PUBLIC_API.md document inventory to match actual promoted exports in Task 1.18
-
-- Violation: PUBLIC_API.md inventory drift — SectorHistoricalPoint listed but missing from src/index.ts
-- Rule: MISTAKES.md Public API & Module Exports §1 — src/index.ts re-exports must stay synchronized with documentation
-- Context: Verified all items in PUBLIC_API.md document are actually exported from src/index.ts; removed or added missing entries
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 8 | 2026-05-02]
 - Violation: Validation logic incomplete — edge cases in shape validation not covered
@@ -329,10 +265,6 @@
 - Rule: MISTAKES.md §15 + dead branch
 - Context: Field + "Sector Averages" prompt branch removed (S-5)
 
-- Violation: hashAnalysisInput internal helper exported without @internal JSDoc
-- Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
-- Context: @internal JSDoc added (S-6)
-
 ## [PR #75 Round 2 | feat/fundamental-news-analysis | 2026-05-02]
 
 ### Blockers (4 findings)
@@ -355,18 +287,6 @@
 
 ### Suggestions (4 findings, already-documented patterns)
 
-- Violation: 14 Raw* types missing @internal JSDoc
-- Rule: MISTAKES.md §9.5 — module-internal infrastructure types require @internal tag
-- Context: @internal JSDoc added to all RawFundamental*, RawNews*, RawOverall* type exports
-
-- Violation: SubmitFundamental/SubmitNews/SubmitOverall error code and variant types missing @internal
-- Rule: MISTAKES.md §9.5 — internal type aliases require @internal tag
-- Context: @internal JSDoc added to SubmitFundamentalErrorCode, SubmitNewsErrorCode, SubmitOverallErrorCode, and all Cached/Submitted/Error variant types
-
-- Violation: New TTL constants (FUNDAMENTAL/NEWS/NEWS_CARD/OVERALL_TTL) JSDoc written in Korean
-- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
-- Context: All 4 TTL constant JSDoc comments translated to English per npm packaging standard
-
 - Violation: SkillCategory type has inline Korean comments on 'fundamental' and 'news' members
 - Rule: FF Principle 2-B Consistency — mixed comment patterns (some members documented, others not) break readability consistency
 - Context: Inline Korean comments removed; SkillCategory JSDoc relies on type name for clarity per existing pattern in domain/types.ts
@@ -375,17 +295,9 @@
 
 ### Blockers (9 findings)
 
-- Violation: 8 internal cache helpers/constants leaked to public API (src/index.ts)
-- Rule: MISTAKES.md Public API & Module Exports §6.5 — internal implementation constants must not be re-exported
-- Context: Cache helpers (ANALYSIS_CACHE_KEY, NEWS_CACHE_KEY, etc.) removed from src/index.ts; marked @internal in cache/config.ts
-
 - Violation: 5 public types defined in implementation file (application/overall/dependencyResolver.ts, src/index.ts)
 - Rule: MISTAKES.md Architecture §4 — public interfaces must be defined in types.ts, not implementation files
 - Context: OverallDependencyInputs, DependencyState variants moved to application/overall/types.ts; src/index.ts updated to import from types.ts
-
-- Violation: `as XxxSentiment` type casts post-`.includes()` guard lacking guarantee comments
-- Rule: MISTAKES.md TypeScript §7 — safe-cast `as` must be accompanied by guarantee comment
-- Context: Added guarantee comments to all 3 cast locations (normalize{Fundamental,News,Overall}.ts) documenting that .includes() guard ensures the type
 
 - Violation: Inline `Array<{date: string; changePct: number}>` instead of named `SectorHistoricalPoint[]` type
 - Rule: MISTAKES.md TypeScript §5 — inline shapes must be extracted to named type aliases
@@ -437,10 +349,6 @@
 - Rule: MISTAKES.md Components §0 / ESLint import/no-duplicates — multiple export blocks from the same module must be merged
 - Context: SubmitOverallAnalysis*/PollOverallAnalysisResult and DependencyState*/OverallDependencyInputs merged into single block
 
-- Violation: `LoadSkillsCachedResult` missing `@internal` JSDoc tag
-- Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
-- Context: @internal prepended to LoadSkillsCachedResult JSDoc in infrastructure/skills/loader.ts
-
 - Violation: `PollFundamentalAnalysisResultStatus` dead type with zero usages
 - Rule: MISTAKES.md §15 / Dead Code — types with no consumers must be deleted
 - Context: Dead type removed from application/fundamental/types.ts; confirmed zero grep hits across src/
@@ -454,10 +362,6 @@
 - Violation: `'technical' | 'fundamental' | 'news'` literal union repeated in 4 type shapes
 - Rule: MISTAKES.md TypeScript §5 — repeated union literals must be extracted to named type alias
 - Context: OverallAxis type alias extracted; applied to DependencyStatePending.pendingJobs, DependencyStateError.axis, SubmitOverallAnalysisPendingDependencies.pendingJobs, SubmitOverallAnalysisError.axis
-
-- Violation: Korean JSDoc on public-exported types in domain/types.ts
-- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
-- Context: FundamentalSnapshot, FundamentalAnalysisResponse fields, NewsAnalysisResponse fields, OverallAnalysisResponse fields translated to English
 
 - Violation: Misleading "existing consumers" comment in dependencyResolver.ts re-export block
 - Rule: FF Principle 2-A Predictability / CONVENTIONS.md — comments must reflect current intent, not historical state
@@ -556,10 +460,6 @@
 - Context: resolveOverallDependencies removed from src/index.ts; remains internal infrastructure function
 
 ## [PR #75 | feat/fundamental-news-analysis | 2026-05-03]
-- Violation: @internal tags on public union variant types (SubmitFundamentalAnalysisCached/Submitted/LimitError/FetchError, SubmitNewsAnalysisCached/Submitted/NoNewsError/LimitError)
-- Rule: MISTAKES.md §9.5 — @internal must not appear on types that are re-exported in src/index.ts; consumers must be able to use them explicitly
-- Context: These variants were already in src/index.ts public exports but still had @internal JSDoc; removed the tag from all 8 variant types
-
 - Violation: SubmitNewsCardAnalysisOptions/Result and PollNewsCardAnalysisResult missing from src/index.ts despite being parameter/return types of public functions
 - Rule: Public API completeness — parameter and return types of public functions must themselves be public exports
 - Context: submitNewsCardAnalysis and pollNewsCardAnalysis are public but their option/result types were marked @internal and omitted from src/index.ts; added all 5 types to exports and removed @internal
@@ -568,10 +468,6 @@
 - Violation: SubmitOverallAnalysisCached/Submitted/LimitError/FetchError and OverallAxis types missing from src/index.ts exports
 - Rule: MISTAKES.md Public API & Module Exports §8 — public union variant types and axis types must be re-exported
 - Context: Blockers B-1 and B-2; variants used in public SubmitOverallAnalysisResult union but not exported; OverallAxis used in dependency result types
-
-- Violation: @internal tags on public union variant types after re-export in src/index.ts
-- Rule: MISTAKES.md §9.5 — @internal contradicts re-export; public variant types have no @internal tag
-- Context: All 8 SubmitFundamental/News/Overall analysis result variants re-exported and @internal tags removed
 
 - Violation: FundamentalAnalysisUsageOptions / NewsAnalysisUsageOptions not exported despite sibling AnalysisUsageOptions being public
 - Rule: MISTAKES.md Public API §1 — sibling exports must be consistent
@@ -597,10 +493,6 @@
 - Violation: Multiple public API type renames and @internal/public export contradictions across rounds
 - Rule: Public API consistency (MISTAKES.md Public API §3 + §8)
 - Context: Commits 2e08a08 (Task 1), 094b6ea (Task 3), 60bf52d (Task 6), 0e6096f (Task 7), 025c9fc (Task 7), plus PR #75 R8 — pattern repeated 5+ times: OverallDependencyInputs/News union variants missing exports, @internal tags contradicting re-exports, FundamentalProfileInput mktCap→marketCap rename without deprecation
-
-- Violation: Type assertions (`as` casts) lacking inline safety comments
-- Rule: TypeScript safety (MISTAKES.md TypeScript §7)
-- Context: Task 1 round 1 (OverallDependencyInputs as-cast), Task 7 round 1 (sentinel guard casts in normalize functions) — 3 instances across 2 commits; every cast must include comment explaining runtime guarantee
 
 - Violation: JSDoc statements contradict or mismatch actual implementation
 - Rule: Documentation Sync (MISTAKES.md Documentation Sync §3 + §4)
@@ -642,4 +534,34 @@
 - Violation: Explicit parameter type annotation on Array.prototype.find callback when type inference would suffice
 - Rule: CONVENTIONS.md Type Inference — prefer inference for callback parameters when surrounding code has sufficient type context
 - Context: Inline gemini-bot comment — submitFundamentalAnalysis sectorSnapshot.find callback reverted from explicit (s: FundamentalSectorPerformanceInput) to inferred parameter; FundamentalSectorPerformanceInput import dropped
+
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07]
+- Violation: isFallbackAnalysis predicate JSDoc claims "every array field is empty" but nested arrays (keyLevels.support, keyLevels.resistance, priceTargets.bullish.targets, priceTargets.bearish.targets) were not checked
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc statements must enumerate every condition the implementation actually checks; predicates listing "every X" must walk truly every X (top-level AND nested)
+- Context: Inline review comment — round 1 fix added top-level candlePatterns/trendlines to the predicate but missed support/resistance and bullish/bearish targets that live two levels deep on AnalysisResponse; a result with the fallback summary but a non-empty nested array would still have been cached. Predicate now checks all four nested arrays as well.
+
+- Violation: Tier 4 public interface field type widening (string → string | undefined) shipped without CHANGELOG BREAKING CHANGES entry
+- Rule: MISTAKES.md Public API §3 (extended) — interface field type widening breaks consumer implementations of the interface; the Tier 4 contract change must be flagged in CHANGELOG even when no symbol is renamed or deleted
+- Context: Blocker B-2 — CallAiProviderOptions.serverApiKey was widened in this PR (T1) so the BYOK branch can leave serverApiKey undefined; consumers implementing callAiProvider must now handle undefined. CHANGELOG.md 0.7.11 BREAKING CHANGES section updated to flag the contract change.
+
+## [PR #77 round 2 | chore/0/post-bde84f3-cleanup | 2026-05-07]
+- Violation: BREAKING CHANGES landed in PR without a corresponding package.json semver bump
+- Rule: MISTAKES.md Public API §3 — Tier 4 contract changes must include both CHANGELOG entry AND package.json bump (in 0.x semver, breaking → MINOR bump i.e. 0.7.x → 0.8.0)
+- Context: Blocker B-2 (round 2) — CallAiProviderOptions.serverApiKey widening was documented in CHANGELOG 0.7.11 in round 1 but package.json stayed at 0.7.11; reviewer flagged that a 0.7.11 → 0.8.0 bump is required for the breaking change. Bumped to 0.8.0.
+
+- Violation: New domain helper merged with incomplete branch coverage in unit tests
+- Rule: MISTAKES.md §15 — every new domain function must reach 100% branch coverage; not just the happy path
+- Context: Blocker B-1 (round 2) — normalizePatternRenderConfig has 5 branches (non-object → undefined, missing/invalid type → undefined, missing color, missing label, missing show) but only the all-fields-present branch was tested in normalizeCachedAnalysisResponse cases. Added 4 dedicated tests covering each missing-field default and the invalid-type branch.
+
+- Violation: Pure helper placed in application/ instead of domain/
+- Rule: docs/domain/CLAUDE.md — "If it can be expressed as a pure function, it belongs here"
+- Context: Suggestion S-2 (round 2) — isFallbackAnalysis only references AnalysisResponse and EMPTY_ANALYSIS_FALLBACK_SUMMARY (both already in domain/analysis/confidence.ts); moved out of pollAnalysis.ts into confidence.ts so the predicate co-locates with the constant it consumes.
+
+- Violation: Test file used vi.mock(module) auto-mock pattern that masked moved exports
+- Rule: MISTAKES.md Tests — auto-mocking a whole module replaces ALL exports with vi.fn()/undefined; when only one export needs to be mocked, use partial mock with vi.importActual
+- Context: Side effect of S-2 — pollAnalysis.test.ts had `vi.mock('@/domain/analysis/confidence')` which auto-mocked the newly-moved isFallbackAnalysis (returned undefined → cache write was no longer skipped). Converted to a partial mock that keeps isFallbackAnalysis / EMPTY_ANALYSIS_FALLBACK_SUMMARY as their real implementations and only stubs enrichAnalysisWithConfidence.
+
+- Violation: JSDoc described an unreachable code path
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime reachability; do not document branches the caller's guards rule out
+- Context: Suggestion S-1 (round 2) — resolveApiKeys JSDoc listed a "Non-pro + premium + no userApiKey → server key" case, but requestChatCompletion now returns user_api_key_required before reaching this helper, making that branch dead. Trimmed the JSDoc to the three reachable cases and added a callout that the missing case is short-circuited by the caller.
 

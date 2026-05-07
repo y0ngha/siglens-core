@@ -7,14 +7,13 @@ export const GEMINI_2_5_PRO_MODEL = 'gemini-2.5-pro';
 
 /**
  * All valid chat models, derived from the default tier configuration at module
- * load time. Kept exported for backward-compatibility (see `index.ts` and
- * `index.client.ts`).
+ * load time. Re-exported from `index.ts` and `index.client.ts` for consumer
+ * convenience — do not remove without a semver-major bump.
  *
- * NOTE: This is a static snapshot of `getAllowedModels('pro', TIER_CONFIG)`
- * captured when this module is first evaluated. Consumers that wire up a
- * custom `TierConfig` via dependency injection (for example, when calling
- * `requestChatCompletion`) should rely on the use-case's runtime model check,
- * which derives the allowed list from the resolved tier configuration on each
- * call rather than from this constant.
+ * **Static snapshot only.** This list is captured once when this module is
+ * first evaluated. Consumers that pass a custom `TierConfig` via dependency
+ * injection (e.g. when calling `requestChatCompletion`) should not rely on
+ * this constant for runtime model validation — the use-case derives its allowed
+ * list from the resolved tier configuration on each call.
  */
 export const VALID_CHAT_MODELS: readonly ModelId[] = getAllowedModels('pro');

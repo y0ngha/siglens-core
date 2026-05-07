@@ -5,19 +5,23 @@ import {
 import type {
     AnalysisResponse,
     CandlePatternSummary,
+    ChartDisplayType,
     PatternResult,
     PatternSummary,
     RawAnalysisResponse,
     Skill,
+    SkillChartDisplay,
     StrategyResult,
 } from '@/domain/types';
 import {
     asArray,
     asNumber,
     asObject,
+    asOptionalEnum,
     asString,
     compact,
 } from '@/domain/analysis/normalizePrimitives';
+
 import {
     normalizeActionRecommendation,
     normalizeCandlePatternSummary,
@@ -31,6 +35,41 @@ import {
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
 import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
+
+/**
+ * @internal
+ * The Korean fallback summary emitted when the worker returns an empty or
+ * malformed payload. Exported so callers can detect whether the result is a
+ * real LLM response or a synthesised default.
+ */
+export const EMPTY_ANALYSIS_FALLBACK_SUMMARY =
+    'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.';
+
+/**
+ * @internal
+ * Returns `true` when `result` was synthesised from an empty or malformed
+ * worker payload — i.e. every array field is empty (including nested support /
+ * resistance levels and bullish / bearish price targets) and the summary is the
+ * Korean fallback string. Can be used by callers to skip side effects (e.g.
+ * cache writes) so a subsequent retry can succeed.
+ *
+ * @param result - A normalized {@link AnalysisResponse}.
+ * @returns `true` when the result is a fallback shape with no analytical content.
+ */
+export function isFallbackAnalysis(result: AnalysisResponse): boolean {
+    return (
+        result.summary === EMPTY_ANALYSIS_FALLBACK_SUMMARY &&
+        result.indicatorResults.length === 0 &&
+        result.patternSummaries.length === 0 &&
+        result.strategyResults.length === 0 &&
+        result.candlePatterns.length === 0 &&
+        result.trendlines.length === 0 &&
+        result.keyLevels.support.length === 0 &&
+        result.keyLevels.resistance.length === 0 &&
+        (result.priceTargets.bullish?.targets.length ?? 0) === 0 &&
+        (result.priceTargets.bearish?.targets.length ?? 0) === 0
+    );
+}
 
 interface SkillLookup {
     byName: Map<string, Skill>;
@@ -63,6 +102,7 @@ function buildUniqueIds<T, K extends keyof T>(items: T[], key: K): string[] {
     return ids;
 }
 
+/** @internal Drops pattern entries whose confidence weight falls below `MIN_CONFIDENCE_WEIGHT`. */
 export function filterPatterns(patterns: PatternResult[]): PatternResult[] {
     return patterns.filter(p => MIN_CONFIDENCE_WEIGHT <= p.confidenceWeight);
 }
@@ -141,10 +181,7 @@ export function enrichAnalysisWithConfidence(
     );
 
     return {
-        summary: asString(
-            raw.summary,
-            'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'
-        ),
+        summary: asString(raw.summary, EMPTY_ANALYSIS_FALLBACK_SUMMARY),
         trend: normalizeTrend(raw.trend),
         indicatorResults,
         riskLevel: normalizeRiskLevel(raw.riskLevel),
@@ -179,6 +216,46 @@ export function enrichAnalysisWithConfidence(
     };
 }
 
+const CHART_DISPLAY_TYPES: readonly ChartDisplayType[] = [
+    'line',
+    'marker',
+    'region',
+];
+
+/**
+ * Safely parse a cached `renderConfig` value into a {@link SkillChartDisplay}.
+ *
+ * Copies only the four known fields declared by {@link SkillChartDisplay}
+ * (`show`, `type`, `color`, `label`) using explicit type guards. Unknown or
+ * extra keys are dropped. Returns `undefined` when the value is not an object
+ * or when every required field is absent/invalid.
+ */
+function normalizePatternRenderConfig(
+    value: unknown
+): SkillChartDisplay | undefined {
+    const obj = asObject(value);
+    if (!obj) return undefined;
+
+    const type = asOptionalEnum<ChartDisplayType>(
+        obj.type,
+        CHART_DISPLAY_TYPES
+    );
+    const color = typeof obj.color === 'string' ? obj.color : undefined;
+    const label = typeof obj.label === 'string' ? obj.label : undefined;
+    const show = typeof obj.show === 'boolean' ? obj.show : undefined;
+
+    // Require at least `type` to be present and valid; without it the
+    // chart renderer cannot determine how to draw the overlay.
+    if (type === undefined) return undefined;
+
+    return {
+        show: show ?? false,
+        type,
+        color: color ?? '',
+        label: label ?? '',
+    };
+}
+
 function normalizeCachedPatternResult(
     item: unknown,
     fallbackId: string
@@ -187,9 +264,7 @@ function normalizeCachedPatternResult(
     if (!base) return null;
 
     const raw = asObject(item);
-    const renderConfig = asObject(raw?.renderConfig)
-        ? (raw?.renderConfig as PatternResult['renderConfig'])
-        : undefined;
+    const renderConfig = normalizePatternRenderConfig(raw?.renderConfig);
 
     return {
         ...base,
@@ -239,6 +314,7 @@ function parseCachedPayload(raw: unknown): unknown {
 }
 
 /**
+ * @internal
  * Normalize an already-cached technical analysis response without re-matching
  * it against the current skills list.
  *
@@ -275,10 +351,7 @@ export function normalizeCachedAnalysisResponse(
     const analyzedAt = asString(raw.analyzedAt);
 
     return {
-        summary: asString(
-            raw.summary,
-            'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.'
-        ),
+        summary: asString(raw.summary, EMPTY_ANALYSIS_FALLBACK_SUMMARY),
         trend: normalizeTrend(raw.trend),
         indicatorResults: compact(
             asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)
