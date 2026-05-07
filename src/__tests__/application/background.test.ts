@@ -97,4 +97,30 @@ describe('background helpers', () => {
 
         warnSpy.mockRestore();
     });
+
+    it('cleanupInBackground는 clearInFlightJob 실패 시에도 cleanupJob을 호출한다', async () => {
+        let registered: Promise<unknown> | undefined;
+        const waitUntil = vi.fn((promise: Promise<unknown>) => {
+            registered = promise;
+        });
+        mockGetJobMeta.mockResolvedValue({
+            symbol: 'AAPL',
+            cacheKey: 'cache-key',
+        });
+        // clearInFlightJob이 reject되더라도 cleanupJob은 계속 호출되어야 한다 —
+        // 한 단계 실패가 잡 라이프사이클 키 정리 자체를 막으면 키가 TTL까지 남는다.
+        mockClearInFlightJob.mockRejectedValueOnce(new Error('redis down'));
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        cleanupInBackground('job-1', '[Test]', { waitUntil });
+        await registered;
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            '[Test] clearInFlightJob failed:',
+            expect.any(Error)
+        );
+        expect(mockCleanupJob).toHaveBeenCalledWith('job-1');
+
+        warnSpy.mockRestore();
+    });
 });
