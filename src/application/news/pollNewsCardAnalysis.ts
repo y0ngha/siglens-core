@@ -19,8 +19,8 @@ import {
  * - `error`: the worker reported a failure, the result was missing, or the
  *   payload could not be normalized.
  * - `done`: the result is ready. The raw worker response is normalized via
- *   {@link normalizeNewsCardAnalysis} and returned. The caller (siglens app)
- *   is responsible for persisting the result to DB via `attachAnalysis`.
+ *   {@link normalizeNewsCardAnalysis} and returned. The caller is responsible
+ *   for persisting the result via their own persistence layer.
  *
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).

@@ -4,7 +4,7 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
 
-import { submitNewsCardAnalysis } from '@/application/news/submitNewsCardAnalysis';
+import { submitNewsCardAnalysis, NEWS_CARD_MODEL_ID } from '@/application/news/submitNewsCardAnalysis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import type { NewsItem } from '@/domain/types';
@@ -65,7 +65,7 @@ describe('submitNewsCardAnalysis 함수는', () => {
             expect.any(String),
             expect.objectContaining({
                 symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash-lite',
+                modelId: NEWS_CARD_MODEL_ID,
             })
         );
         expect(mockSetJobMeta).toHaveBeenCalledWith(

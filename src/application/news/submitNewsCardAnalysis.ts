@@ -19,17 +19,20 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES = 30;
 const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS =
     SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES * MS_PER_MINUTE;
 
-/** Fixed model identifier for per-card news translation and sentiment analysis. */
-const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+/**
+ * @internal
+ * Fixed model identifier for per-card news translation and sentiment analysis.
+ */
+export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
 
 /**
  * Submit a per-card news analysis job using the flash-lite model.
  *
- * Always returns `submitted` — there is no Redis cache check. The caller
- * (siglens app) is responsible for:
- * 1. Filtering out already-analyzed items (via `analyzedAt` in DB) before
- *    calling this function.
- * 2. Persisting the result to DB via `attachAnalysis` after polling done.
+ * Always returns `submitted` — there is no cache check. The caller is
+ * responsible for:
+ * 1. Filtering out already-analyzed items via their own persistence layer
+ *    before calling this function.
+ * 2. Persisting the result after polling completes.
  *
  * Unlike full news analysis, this call has **no tier or usage gate** — it
  * is a lightweight per-item call that is bundled into the news data pipeline.

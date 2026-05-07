@@ -5,6 +5,7 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
 
 import { pollNewsCardAnalysis } from '@/application/news/pollNewsCardAnalysis';
+import { NEWS_CARD_MODEL_ID } from '@/application/news/submitNewsCardAnalysis';
 import {
     getJobStatus,
     getJobError,
@@ -34,7 +35,7 @@ const rawCardJson = JSON.stringify({
 
 const mockMeta = {
     symbol: 'AAPL',
-    modelId: 'gemini-2.5-flash-lite',
+    modelId: NEWS_CARD_MODEL_ID,
 };
 
 describe('pollNewsCardAnalysis 함수는', () => {

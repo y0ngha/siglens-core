@@ -136,9 +136,9 @@ export interface SubmitNewsCardAnalysisSubmitted {
 /**
  * Result of {@link submitNewsCardAnalysis}.
  *
- * Always `submitted` — Redis result caching was removed in favor of DB
- * persistence. The caller is responsible for filtering already-analyzed items
- * (via `analyzedAt` in DB) before calling this function.
+ * Always `submitted`. The caller is responsible for filtering
+ * already-analyzed items via their own persistence layer before calling
+ * this function.
  */
 export type SubmitNewsCardAnalysisResult = SubmitNewsCardAnalysisSubmitted;
 
