@@ -1,5 +1,11 @@
 # Fix Log
 
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 4
+
+- Violation: `pollFundamentalAnalysis`, `pollNewsAnalysis`, `pollNewsCardAnalysis`, `pollOverallAnalysis` 4개 함수에 추가된 빈-응답 감지 `if` 분기(true 경로)에 대한 테스트 케이스 부재
+- Rule: application/CLAUDE.md "Coverage target: 100% branch coverage (required)"
+- Context: 각 함수의 `console.warn` 경고 분기가 기존 테스트에서 커버되지 않아 각 테스트 파일에 빈 응답 케이스를 추가함.
+
 ## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 3
 
 - Violation: 새로 추가된 도메인 함수 `isFallbackAnalysis`에 전용 단위 테스트 블록 없음
@@ -11,10 +17,6 @@
 - Context: 4줄 주석(1~4번 케이스)이 함수 JSDoc의 API key routing 섹션과 중복. 주석 제거.
 
 ## [feat/fundamental-news-analysis | Phase 1 Tasks 1.1+1.2+1.3 | 2026-05-02]
-- Violation: Union literals `'up' | 'down'` in `FundamentalCategory` and other inline shapes
-- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
-- Context: Extracted `FundamentalCategory`, `GradesAction` to dedicated named types for reusability and consistency
-
 - Violation: 13 deeply nested inline shapes in `FundamentalSnapshot`
 - Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — named interfaces required over inline return types
 - Context: Extracted 13 named interfaces (`FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalScore`, `FundamentalGradesSnapshot`, `NewsSentimentData`, `NewsCategory`, etc.)
@@ -39,10 +41,6 @@
 - Rule: MISTAKES.md Tests §13 — remove tests that test nothing
 - Context: Removed tautological assertions; kept only format/regex validation tests
 
-- Violation: New `FundamentalSnapshot` interfaces missing JSDoc documentation
-- Rule: MISTAKES.md Documentation Sync §4 / §4.5 — all new exports require JSDoc tags
-- Context: Added one-line JSDoc on every new named interface export
-
 - Violation: Hardcoded `'gemini-2.5-flash-lite'` inside `buildNewsCardCacheKey` function
 - Rule: FF Principle 1-D / MISTAKES.md §13 — hardcoded literals must be extracted to module-level constants
 - Context: Extracted to `NEWS_CARD_MODEL_ID` constant
@@ -50,14 +48,6 @@
 - Violation: `toMatch(regex)` cache key tests inconsistent with `toBe(string)` pattern in other keys
 - Rule: FF Principle 2-B / CONVENTIONS.md — same-family return types must use uniform test assertions
 - Context: Switched fundamental/news cache key tests to `toBe(exact-string)` for consistency with sector signals tests
-
-- Violation: `NewsCategory` type missing JSDoc description
-- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 2 and Tier 4 types require JSDoc
-- Context: Added one-line JSDoc description
-
-- Violation: Round 2 discovery — `NewsCategory` JSDoc still missing
-- Rule: MISTAKES.md Documentation Sync §4.5 — all new types require JSDoc
-- Context: Added one-line description in Round 2 follow-up
 
 ## [Issue #2 | chore/2/초기-개발-환경-설정 | 2026-04-24]
 - Violation: release-it config used `${version}` (JS template literal) instead of `{{version}}` (Handlebars) for commitMessage, tagName, tagAnnotation
@@ -192,10 +182,6 @@
 - Context: S1 Suggestion을 반영하면서 `GEMINI_2_5_FLASH_MODEL`을 application 레이어에서 import했으나, domain 테스트는 application 레이어 심볼에 의존해서는 안 됨
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 1 | 2026-05-02]
-- Violation: Inline union literals with 2+ members not extracted to named type aliases
-- Rule: MISTAKES.md TypeScript §5 / CONVENTIONS.md — union literals with 2+ members must be extracted to named type aliases
-- Context: FundamentalCategory ('up' | 'down'), GradesAction ('upgrade' | 'downgrade' | 'maintain') extracted to dedicated named types for reusability
-
 - Violation: Deeply nested inline shapes in FundamentalSnapshot
 - Rule: MISTAKES.md TypeScript §5 — named interfaces required over inline return types
 - Context: 13 deeply nested interfaces extracted (FundamentalProfile, FundamentalValuation, FundamentalPeer, FundamentalScore, FundamentalGradesSnapshot, NewsSentimentData, NewsCategory, etc.)
@@ -203,10 +189,6 @@
 - Violation: Magic numbers in TTL calculations (24*60*60)
 - Rule: MISTAKES.md Coding Paradigm §13 — magic numbers must be extracted to named constants
 - Context: Replaced inline computation with imported SECONDS_PER_DAY constant
-
-- Violation: Missing JSDoc on new type exports
-- Rule: MISTAKES.md Documentation Sync §4.5 — all new types require JSDoc
-- Context: Added one-line JSDoc description on every new named interface export
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 2 | 2026-05-02]
 - Violation: Pure domain function placed in infrastructure layer
@@ -216,10 +198,6 @@
 - Violation: State/function divergence when adding to a whitelist
 - Rule: MISTAKES.md Coding Paradigm §6.5 — functions and state must stay synchronized
 - Context: SKILL_CATEGORIES whitelist and countSkillFiles function now both use same pattern
-
-- Violation: Missing @param/@returns JSDoc on Tier 4 interface methods
-- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 4 interface methods require @param and @returns
-- Context: Added per-method JSDoc with parameter and return type documentation
 
 ## [Fundamental & News Analysis Phase 1 | Task Batch 3 | 2026-05-02]
 - Violation: DRY violation — duplicated helpers (fmt formatter across prompt builders)
@@ -339,10 +317,6 @@
 - Rule: MISTAKES.md §15 + dead branch
 - Context: Field + "Sector Averages" prompt branch removed (S-5)
 
-- Violation: hashAnalysisInput internal helper exported without @internal JSDoc
-- Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
-- Context: @internal JSDoc added (S-6)
-
 ## [PR #75 Round 2 | feat/fundamental-news-analysis | 2026-05-02]
 
 ### Blockers (4 findings)
@@ -365,18 +339,6 @@
 
 ### Suggestions (4 findings, already-documented patterns)
 
-- Violation: 14 Raw* types missing @internal JSDoc
-- Rule: MISTAKES.md §9.5 — module-internal infrastructure types require @internal tag
-- Context: @internal JSDoc added to all RawFundamental*, RawNews*, RawOverall* type exports
-
-- Violation: SubmitFundamental/SubmitNews/SubmitOverall error code and variant types missing @internal
-- Rule: MISTAKES.md §9.5 — internal type aliases require @internal tag
-- Context: @internal JSDoc added to SubmitFundamentalErrorCode, SubmitNewsErrorCode, SubmitOverallErrorCode, and all Cached/Submitted/Error variant types
-
-- Violation: New TTL constants (FUNDAMENTAL/NEWS/NEWS_CARD/OVERALL_TTL) JSDoc written in Korean
-- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
-- Context: All 4 TTL constant JSDoc comments translated to English per npm packaging standard
-
 - Violation: SkillCategory type has inline Korean comments on 'fundamental' and 'news' members
 - Rule: FF Principle 2-B Consistency — mixed comment patterns (some members documented, others not) break readability consistency
 - Context: Inline Korean comments removed; SkillCategory JSDoc relies on type name for clarity per existing pattern in domain/types.ts
@@ -384,10 +346,6 @@
 ## [PR #75 Round 3 | feat/fundamental-news-analysis | 2026-05-02]
 
 ### Blockers (9 findings)
-
-- Violation: 8 internal cache helpers/constants leaked to public API (src/index.ts)
-- Rule: MISTAKES.md Public API & Module Exports §6.5 — internal implementation constants must not be re-exported
-- Context: Cache helpers (ANALYSIS_CACHE_KEY, NEWS_CACHE_KEY, etc.) removed from src/index.ts; marked @internal in cache/config.ts
 
 - Violation: 5 public types defined in implementation file (application/overall/dependencyResolver.ts, src/index.ts)
 - Rule: MISTAKES.md Architecture §4 — public interfaces must be defined in types.ts, not implementation files
@@ -447,10 +405,6 @@
 - Rule: MISTAKES.md Components §0 / ESLint import/no-duplicates — multiple export blocks from the same module must be merged
 - Context: SubmitOverallAnalysis*/PollOverallAnalysisResult and DependencyState*/OverallDependencyInputs merged into single block
 
-- Violation: `LoadSkillsCachedResult` missing `@internal` JSDoc tag
-- Rule: MISTAKES.md §9.5 — module-internal exports require @internal tag
-- Context: @internal prepended to LoadSkillsCachedResult JSDoc in infrastructure/skills/loader.ts
-
 - Violation: `PollFundamentalAnalysisResultStatus` dead type with zero usages
 - Rule: MISTAKES.md §15 / Dead Code — types with no consumers must be deleted
 - Context: Dead type removed from application/fundamental/types.ts; confirmed zero grep hits across src/
@@ -464,10 +418,6 @@
 - Violation: `'technical' | 'fundamental' | 'news'` literal union repeated in 4 type shapes
 - Rule: MISTAKES.md TypeScript §5 — repeated union literals must be extracted to named type alias
 - Context: OverallAxis type alias extracted; applied to DependencyStatePending.pendingJobs, DependencyStateError.axis, SubmitOverallAnalysisPendingDependencies.pendingJobs, SubmitOverallAnalysisError.axis
-
-- Violation: Korean JSDoc on public-exported types in domain/types.ts
-- Rule: CONVENTIONS.md JSDoc Rules — public npm package exports require English documentation
-- Context: FundamentalSnapshot, FundamentalAnalysisResponse fields, NewsAnalysisResponse fields, OverallAnalysisResponse fields translated to English
 
 - Violation: Misleading "existing consumers" comment in dependencyResolver.ts re-export block
 - Rule: FF Principle 2-A Predictability / CONVENTIONS.md — comments must reflect current intent, not historical state
@@ -566,10 +516,6 @@
 - Context: resolveOverallDependencies removed from src/index.ts; remains internal infrastructure function
 
 ## [PR #75 | feat/fundamental-news-analysis | 2026-05-03]
-- Violation: @internal tags on public union variant types (SubmitFundamentalAnalysisCached/Submitted/LimitError/FetchError, SubmitNewsAnalysisCached/Submitted/NoNewsError/LimitError)
-- Rule: MISTAKES.md §9.5 — @internal must not appear on types that are re-exported in src/index.ts; consumers must be able to use them explicitly
-- Context: These variants were already in src/index.ts public exports but still had @internal JSDoc; removed the tag from all 8 variant types
-
 - Violation: SubmitNewsCardAnalysisOptions/Result and PollNewsCardAnalysisResult missing from src/index.ts despite being parameter/return types of public functions
 - Rule: Public API completeness — parameter and return types of public functions must themselves be public exports
 - Context: submitNewsCardAnalysis and pollNewsCardAnalysis are public but their option/result types were marked @internal and omitted from src/index.ts; added all 5 types to exports and removed @internal
@@ -578,10 +524,6 @@
 - Violation: SubmitOverallAnalysisCached/Submitted/LimitError/FetchError and OverallAxis types missing from src/index.ts exports
 - Rule: MISTAKES.md Public API & Module Exports §8 — public union variant types and axis types must be re-exported
 - Context: Blockers B-1 and B-2; variants used in public SubmitOverallAnalysisResult union but not exported; OverallAxis used in dependency result types
-
-- Violation: @internal tags on public union variant types after re-export in src/index.ts
-- Rule: MISTAKES.md §9.5 — @internal contradicts re-export; public variant types have no @internal tag
-- Context: All 8 SubmitFundamental/News/Overall analysis result variants re-exported and @internal tags removed
 
 - Violation: FundamentalAnalysisUsageOptions / NewsAnalysisUsageOptions not exported despite sibling AnalysisUsageOptions being public
 - Rule: MISTAKES.md Public API §1 — sibling exports must be consistent

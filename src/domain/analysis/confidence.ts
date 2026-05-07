@@ -39,8 +39,8 @@ import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
 /**
  * @internal
  * The Korean fallback summary emitted when the worker returns an empty or
- * malformed payload. Exported so callers (e.g. `pollAnalysis`) can detect
- * whether the result is a real LLM response or a synthesised default.
+ * malformed payload. Exported so callers can detect whether the result is a
+ * real LLM response or a synthesised default.
  */
 export const EMPTY_ANALYSIS_FALLBACK_SUMMARY =
     'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.';
@@ -50,8 +50,8 @@ export const EMPTY_ANALYSIS_FALLBACK_SUMMARY =
  * Returns `true` when `result` was synthesised from an empty or malformed
  * worker payload — i.e. every array field is empty (including nested support /
  * resistance levels and bullish / bearish price targets) and the summary is the
- * Korean fallback string. Used by `pollAnalysis` to skip the Redis cache write
- * so a subsequent retry can succeed.
+ * Korean fallback string. Can be used by callers to skip side effects (e.g.
+ * cache writes) so a subsequent retry can succeed.
  *
  * @param result - A normalized {@link AnalysisResponse}.
  * @returns `true` when the result is a fallback shape with no analytical content.
