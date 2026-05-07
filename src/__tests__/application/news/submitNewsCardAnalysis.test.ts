@@ -4,7 +4,10 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
 
-import { submitNewsCardAnalysis, NEWS_CARD_MODEL_ID } from '@/application/news/submitNewsCardAnalysis';
+import {
+    submitNewsCardAnalysis,
+    NEWS_CARD_MODEL_ID,
+} from '@/application/news/submitNewsCardAnalysis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import type { NewsItem } from '@/domain/types';

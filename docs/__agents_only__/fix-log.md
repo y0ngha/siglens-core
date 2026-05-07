@@ -565,6 +565,20 @@
 - Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime reachability; do not document branches the caller's guards rule out
 - Context: Suggestion S-1 (round 2) — resolveApiKeys JSDoc listed a "Non-pro + premium + no userApiKey → server key" case, but requestChatCompletion now returns user_api_key_required before reaching this helper, making that branch dead. Trimmed the JSDoc to the three reachable cases and added a callout that the missing case is short-circuited by the caller.
 
+## [PR #79 | refactor/news-card-result-cache-removal | 2026-05-07] Round 2
+
+- S1: Exported NEWS_CARD_MODEL_ID as @internal from submitNewsCardAnalysis.ts. Tests (submitNewsCardAnalysis.test.ts, pollNewsCardAnalysis.test.ts) now import it instead of hardcoding 'gemini-2.5-flash-lite'.
+- Rule: MISTAKES.md Constants & Literals §6.5 / Test Patterns — hardcoded literals must be extracted to named constants; tests should import from source rather than hardcoding values
+- Context: NEWS_CARD_MODEL_ID constant added as @internal; both test files updated to import and reference it, improving maintainability and single-source-of-truth for the model identifier
+
+- S2: Made JSDoc consumer-neutral in submitNewsCardAnalysis.ts and pollNewsCardAnalysis.ts — removed references to "siglens app", "attachAnalysis", "analyzedAt" and replaced with "caller is responsible for...via their own persistence layer".
+- Rule: MISTAKES.md Public API §2 — public API JSDoc must be consumer-agnostic; avoid embedding assumptions about specific calling context or dependent fields
+- Context: JSDoc updated to document the contract in abstract terms, allowing any caller (siglens app or other consumer) to use the API without feeling like documentation was written for a specific client
+
+- S3: Removed changelog content ("Redis result caching was removed in favor of DB persistence") from SubmitNewsCardAnalysisResult JSDoc in types.ts. Now documents current behavior only.
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must document current behavior, not historical migration narratives or changelog notes
+- Context: Historical migration note removed; JSDoc now focuses on what SubmitNewsCardAnalysisResult represents today, not implementation history of how caching was removed
+
 ## [PR #79 | refactor/news-card-result-cache-removal | 2026-05-07] Round 1
 
 - Violation: Breaking public type removal SubmitNewsCardAnalysisCached shipped without major semver bump (version stayed 0.7.11)
