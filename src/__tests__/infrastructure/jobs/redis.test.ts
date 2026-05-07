@@ -67,14 +67,12 @@ describe('createJobRedis', () => {
         await expect(wrapper.get<string>('a')).resolves.toBe('got');
         expect(get).toHaveBeenCalledWith('a');
 
-        await expect(
-            wrapper.set('a', { v: 1 }, { ex: 60 })
-        ).resolves.toBe('OK');
+        await expect(wrapper.set('a', { v: 1 }, { ex: 60 })).resolves.toBe(
+            'OK'
+        );
         expect(set).toHaveBeenLastCalledWith('a', { v: 1 }, { ex: 60 });
 
-        await expect(
-            wrapper.setNx('a', 'job', { ex: 60 })
-        ).resolves.toBe('OK');
+        await expect(wrapper.setNx('a', 'job', { ex: 60 })).resolves.toBe('OK');
         expect(set).toHaveBeenLastCalledWith('a', 'job', {
             ex: 60,
             nx: true,

@@ -310,34 +310,45 @@ export async function claimOrJoinInFlightJob(
     cacheKey: string,
     newJobId: string
 ): Promise<InFlightClaim> {
-    return withJobRedis<InFlightClaim>(async redis => {
-        for (let attempt = 0; attempt < CLAIM_OR_JOIN_MAX_ATTEMPTS; attempt++) {
-            const claimed = await redis.setNx(inFlightKey(cacheKey), newJobId, {
-                ex: JOB_TTL_SECONDS,
-            });
-            if (claimed !== null) {
-                await redis.incr(refCountKey(newJobId));
-                await redis.expire(refCountKey(newJobId), JOB_TTL_SECONDS);
-                return { status: 'claimed', jobId: newJobId };
-            }
-            const existingJobId = await redis.get<string>(
-                inFlightKey(cacheKey)
-            );
-            if (existingJobId !== null) {
-                await redis.incr(refCountKey(existingJobId));
-                await redis.expire(
-                    refCountKey(existingJobId),
-                    JOB_TTL_SECONDS
+    return withJobRedis<InFlightClaim>(
+        async redis => {
+            for (
+                let attempt = 0;
+                attempt < CLAIM_OR_JOIN_MAX_ATTEMPTS;
+                attempt++
+            ) {
+                const claimed = await redis.setNx(
+                    inFlightKey(cacheKey),
+                    newJobId,
+                    {
+                        ex: JOB_TTL_SECONDS,
+                    }
                 );
-                return { status: 'joined', jobId: existingJobId };
+                if (claimed !== null) {
+                    await redis.incr(refCountKey(newJobId));
+                    await redis.expire(refCountKey(newJobId), JOB_TTL_SECONDS);
+                    return { status: 'claimed', jobId: newJobId };
+                }
+                const existingJobId = await redis.get<string>(
+                    inFlightKey(cacheKey)
+                );
+                if (existingJobId !== null) {
+                    await redis.incr(refCountKey(existingJobId));
+                    await redis.expire(
+                        refCountKey(existingJobId),
+                        JOB_TTL_SECONDS
+                    );
+                    return { status: 'joined', jobId: existingJobId };
+                }
+                // The slot was released between our NX attempt and the GET.
+                // Loop body retries the SET NX so we never attach to a stale job.
             }
-            // The slot was released between our NX attempt and the GET.
-            // Loop body retries the SET NX so we never attach to a stale job.
-        }
-        // Exhausted retries — treat as fresh claim. Loses dedup for this one
-        // call but keeps the call stack and Redis traffic bounded.
-        return { status: 'claimed', jobId: newJobId };
-    }, { status: 'claimed', jobId: newJobId });
+            // Exhausted retries — treat as fresh claim. Loses dedup for this one
+            // call but keeps the call stack and Redis traffic bounded.
+            return { status: 'claimed', jobId: newJobId };
+        },
+        { status: 'claimed', jobId: newJobId }
+    );
 }
 
 /**
