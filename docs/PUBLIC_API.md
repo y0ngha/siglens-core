@@ -193,6 +193,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `detectSignals` | `domain/signals/index.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
+**Fear & Greed Index (per-stock) (2)**
+| Symbol | Source |
+|---|---|
+| `computeFearGreedIndex(bars, buySellVolume, options?)` — per-stock Fear & Greed snapshot. Returns `FearGreedSnapshot \| null`. | `domain/indicators/fearGreed/walkForward.ts` |
+| `computeFearGreedHistory(bars, buySellVolume, options?)` — walk-forward 1-year score history. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/fearGreed/walkForward.ts` |
+
 **프롬프트 빌더 (7 + 1 상수)**
 | Symbol | Source |
 |---|---|
@@ -325,6 +331,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalSnapshot`, `FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalProfitability`, `FundamentalGrowth`, `FundamentalHealth`, `FundamentalFutureDirection`, `GradesConsensus`, `GradesEvent`, `GradesAction`, `PriceTargetConsensus`, `PriceTargetSummary`, `FundamentalSectorDirection`, `SectorHistoricalPoint`.
 - 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
 - 종합: `OverallAnalysisResponse`, `OverallScenario`, `OverallScenarioName`.
+- Fear & Greed Index (per-stock):
+    - `FearGreedLabel`, `FearGreedConfidence`, `FearGreedWarning`
+    - `FearGreedFactorKey`, `FearGreedGroupName`
+    - `FearGreedFactor`, `FearGreedGroup`
+    - `FearGreedSnapshot`, `FearGreedHistoryPoint`
+    - `ComputeFearGreedOptions`
 
 새로 추가된 Provider 인터페이스:
 - `FundamentalDataProvider` — `infrastructure/fundamental/types.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).

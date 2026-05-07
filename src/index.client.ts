@@ -48,6 +48,10 @@ export {
     stdDev,
     typicalPrice,
 } from './domain/indicators';
+export {
+    computeFearGreedIndex,
+    computeFearGreedHistory,
+} from './domain/indicators/fearGreed';
 export { classifyTrend, detectSignals } from './domain/signals';
 
 // Prompt builders
@@ -378,6 +382,16 @@ export type {
     EarningsCalendarItem,
     EarningsReport,
     EnrichedNewsItem,
+    ComputeFearGreedOptions,
+    FearGreedConfidence,
+    FearGreedFactor,
+    FearGreedFactorKey,
+    FearGreedGroup,
+    FearGreedGroupName,
+    FearGreedHistoryPoint,
+    FearGreedLabel,
+    FearGreedSnapshot,
+    FearGreedWarning,
     FundamentalAnalysisResponse,
     FundamentalAnalystEstimateInput,
     FundamentalCashFlowInput,
