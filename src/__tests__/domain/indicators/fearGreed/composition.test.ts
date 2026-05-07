@@ -4,6 +4,7 @@ import {
     detectWarning,
     composeSnapshot,
     FEAR_GREED_CONFIDENCE_THRESHOLDS,
+    FEAR_GREED_WARNING_THRESHOLDS,
 } from '@/domain/indicators/fearGreed/composition';
 import type { FactorValues } from '@/domain/indicators/fearGreed/types';
 
@@ -59,42 +60,44 @@ describe('scoreToLabel', () => {
 });
 
 describe('detectWarning', () => {
-    it('returns CHRONIC_WEAKNESS when MA200 < 0 AND 52w < 0.30 AND score >= 55', () => {
+    const t = FEAR_GREED_WARNING_THRESHOLDS;
+
+    it('returns CHRONIC_WEAKNESS when MA200 < 0 AND 52w < WEAK_RANGE_MAX AND score >= WEAK_SCORE_MIN', () => {
         expect(
-            detectWarning(60, {
+            detectWarning(t.WEAK_SCORE_MIN + 5, {
                 ...NEUTRAL_RAW,
                 ma200Dist: -0.05,
-                rangePosition: 0.2,
+                rangePosition: t.WEAK_RANGE_MAX - 0.1,
             })
         ).toBe('CHRONIC_WEAKNESS');
     });
 
-    it('returns CHRONIC_STRENGTH when MA200 > 0 AND 52w > 0.70 AND score <= 45', () => {
+    it('returns CHRONIC_STRENGTH when MA200 > 0 AND 52w > STRONG_RANGE_MIN AND score <= STRONG_SCORE_MAX', () => {
         expect(
-            detectWarning(40, {
+            detectWarning(t.STRONG_SCORE_MAX - 5, {
                 ...NEUTRAL_RAW,
                 ma200Dist: 0.05,
-                rangePosition: 0.85,
+                rangePosition: t.STRONG_RANGE_MIN + 0.15,
             })
         ).toBe('CHRONIC_STRENGTH');
     });
 
     it('returns null in NEUTRAL or non-paradox cases', () => {
         expect(detectWarning(50, NEUTRAL_RAW)).toBeNull();
-        // MA200 < 0 but score < 55 → null
+        // MA200 < 0 but score < WEAK_SCORE_MIN → null
         expect(
-            detectWarning(40, {
+            detectWarning(t.WEAK_SCORE_MIN - 15, {
                 ...NEUTRAL_RAW,
                 ma200Dist: -0.05,
-                rangePosition: 0.2,
+                rangePosition: t.WEAK_RANGE_MAX - 0.1,
             })
         ).toBeNull();
-        // 52w boundary 0.30 (strict <) — should NOT trigger
+        // 52w boundary == WEAK_RANGE_MAX (strict <) — should NOT trigger
         expect(
-            detectWarning(60, {
+            detectWarning(t.WEAK_SCORE_MIN + 5, {
                 ...NEUTRAL_RAW,
                 ma200Dist: -0.05,
-                rangePosition: 0.3,
+                rangePosition: t.WEAK_RANGE_MAX,
             })
         ).toBeNull();
     });

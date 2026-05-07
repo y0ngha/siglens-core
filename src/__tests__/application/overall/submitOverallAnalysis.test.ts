@@ -684,9 +684,11 @@ describe('submitOverallAnalysis 함수는', () => {
             // mock한 FearGreedSnapshot 객체와 정확히 동일해야 함.
             expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
             const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
-            expect(args.length).toBeGreaterThanOrEqual(7);
+            // Positional-arg assertion: if buildOverallAnalysisPrompt's signature ever
+            // switches to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
+            expect(args.length).toBe(7);
         });
 
         it('일봉 fetch가 throw해도 overall 분석은 fearGreed=undefined로 계속 진행된다', async () => {

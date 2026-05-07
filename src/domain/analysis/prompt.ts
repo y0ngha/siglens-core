@@ -45,6 +45,7 @@ import type {
     CandlePatternEntry,
     AnalysisResponse,
     Bar,
+    FearGreedSnapshot,
     IndicatorResult,
     PromptConfig,
     Skill,
@@ -55,7 +56,6 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
-import type { FearGreedSnapshot } from '@/domain/types';
 
 type SkillGroupKey = SkillType | 'regular';
 

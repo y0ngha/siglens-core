@@ -615,3 +615,23 @@
 - Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime reachability; do not document branches the caller's guards rule out
 - Context: Suggestion S-1 (round 2) — resolveApiKeys JSDoc listed a "Non-pro + premium + no userApiKey → server key" case, but requestChatCompletion now returns user_api_key_required before reaching this helper, making that branch dead. Trimmed the JSDoc to the three reachable cases and added a callout that the missing case is short-circuited by the caller.
 
+## [PR #78 round 2 | feat/per-stock-fear-greed-index | 2026-05-07]
+- Violation: duplicate import type block from same module (B1)
+- Rule: MISTAKES.md TypeScript #3.5 "Imports from the same module must be merged"
+- Context: prompt.ts had two `import type ... from '@/domain/types'` blocks. Merged.
+- Violation: JSDoc references implementation-task number (B2)
+- Rule: MISTAKES.md Documentation #5 "JSDoc must describe permanent role, not call-site or task numbers"
+- Context: fearGreedSection.ts @throws mentioned "Task 4's composeSnapshot". Removed task number.
+- Violation: Partial<Record<...>> on fully-covered union + ?? '' dead code (B3)
+- Rule: MISTAKES.md Coding Paradigm #4 "Catch-all unreachable conditions must be removed"
+- Context: WARNING_NOTE in fearGreedSection.ts. Removed Partial; removed ?? '' fallback.
+- Violation: as cast missing (a)+(b) safety comment (B4)
+- Rule: MISTAKES.md TypeScript #7 "as casts must explain (a) why and (b) why runtime-safe"
+- Context: overallPrompt.ts overload disambiguation casts. Added two-line comment block.
+- Violation: test boundary literals not derived from source constants (S1)
+- Rule: MISTAKES.md Tests #4 "Boundary constants must be imported from source"
+- Context: composition.test.ts detectWarning literals. Imported FEAR_GREED_WARNING_THRESHOLDS.
+- Violation: positional-arg assertion uses >= 7 instead of === 7 (S3)
+- Rule: Test rigidity — positional length must be exact for fragility detection
+- Context: submitAnalysis.test.ts and submitOverallAnalysis.test.ts. Tightened to === 7 with comment.
+

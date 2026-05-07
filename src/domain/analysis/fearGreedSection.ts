@@ -2,7 +2,7 @@
 
 import type { FearGreedSnapshot, FearGreedWarning } from '@/domain/types';
 
-const WARNING_NOTE: Partial<Record<NonNullable<FearGreedWarning>, string>> = {
+const WARNING_NOTE: Record<NonNullable<FearGreedWarning>, string> = {
     CHRONIC_WEAKNESS:
         '\n- Note: This stock is in a long-term bearish cycle. The score represents its relative position within its own distribution.',
     CHRONIC_STRENGTH:
@@ -26,8 +26,8 @@ const WARNING_NOTE: Partial<Record<NonNullable<FearGreedWarning>, string>> = {
  * two prompts in lock-step whenever the spec text changes.
  *
  * @throws {Error} When the snapshot is missing the Flow or Trend group.
- *   Task 4's `composeSnapshot` always emits both, so this only fires for
- *   manually constructed or corrupted snapshots — protective contract for callers.
+ *   `composeSnapshot` always emits both Flow and Trend groups; this guard
+ *   fires only for manually constructed or externally corrupted snapshots.
  *
  * @internal Used by analysis prompt builders; not part of the public API.
  */
@@ -39,7 +39,7 @@ export function formatFearGreedSection(fg: FearGreedSnapshot): string {
             'FearGreedSnapshot must contain both Flow and Trend groups'
         );
     }
-    const warningNote = fg.warning ? (WARNING_NOTE[fg.warning] ?? '') : '';
+    const warningNote = fg.warning ? WARNING_NOTE[fg.warning] : '';
     return (
         '## Fear & Greed Index (Reference)\n' +
         `- Score: ${Math.round(fg.score)} / 100 (${fg.label})\n` +

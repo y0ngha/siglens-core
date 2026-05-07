@@ -845,9 +845,11 @@ describe('submitAnalysis 함수는', () => {
             // FearGreedSnapshot 객체와 정확히 동일해야 함.
             expect(mockBuildAnalysisPrompt).toHaveBeenCalledTimes(1);
             const args = mockBuildAnalysisPrompt.mock.calls[0];
-            expect(args.length).toBeGreaterThanOrEqual(7);
+            // Positional-arg assertion: if buildAnalysisPrompt's signature ever switches
+            // to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
+            expect(args.length).toBe(7);
         });
 
         it('1Day가 아닌 타임프레임이면 일봉 데이터를 추가로 fetch한다', async () => {

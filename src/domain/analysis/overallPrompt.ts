@@ -238,12 +238,15 @@ export function buildOverallAnalysisPrompt(
     const news = hasCompanyName
         ? (newsOrTimeframe as NewsAnalysisResponse)
         : (fundamentalOrNews as NewsAnalysisResponse);
+    // (a) TS cannot narrow Timeframe|FearGreedSnapshot|undefined to Timeframe from a property check on `hasCompanyName`.
+    // (b) Safe: with-companyName overload guarantees arg 6 (maybeTimeframeOrFearGreed) is Timeframe;
+    //     without-companyName overload guarantees arg 5 (newsOrTimeframe) is Timeframe.
     const timeframe = hasCompanyName
         ? (maybeTimeframeOrFearGreed as Timeframe)
         : (newsOrTimeframe as Timeframe);
-    // The 6th positional argument is `timeframe` (with-companyName overload) or
-    // `fearGreed` (without-companyName overload). Disambiguate via the chosen
-    // overload using `hasCompanyName`.
+    // (a) TS cannot narrow Timeframe|FearGreedSnapshot|undefined to FearGreedSnapshot|undefined from `hasCompanyName`.
+    // (b) Safe: without-companyName overload signature places FearGreedSnapshot|undefined at arg 6
+    //     (i.e. maybeTimeframeOrFearGreed); with-companyName overload places it at arg 7 (maybeFearGreed).
     const fearGreed: FearGreedSnapshot | undefined = hasCompanyName
         ? maybeFearGreed
         : (maybeTimeframeOrFearGreed as FearGreedSnapshot | undefined);
