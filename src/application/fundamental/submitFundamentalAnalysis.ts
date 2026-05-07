@@ -212,7 +212,11 @@ export async function submitFundamentalAnalysis(
         }
     }
 
-    const providerData = await fetchProviderData(dataProvider, symbol, occurredAt);
+    const providerData = await fetchProviderData(
+        dataProvider,
+        symbol,
+        occurredAt
+    );
     if (providerData.status === 'error') return providerData;
     const { snapshot, skills, skillsDegraded } = providerData;
 
