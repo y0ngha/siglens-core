@@ -482,3 +482,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-04-26 | 최초 작성 — Tier 정의, 인벤토리, 워크플로우, 버전 정책. |
 | 2026-05-02 | Phase 0~6 완료. 인증/OAuth/이메일/문의/BYOK/Tier CRUD/한국어 티커/Drizzle·Neon DB/Gemini SDK 어댑터가 모두 siglens로 이전됨. core는 분석 도메인 + 분석 직결 infrastructure + Skills + 추상 repository 인터페이스만 보유. |
 | 2026-05-02 | Task 1.17~1.18: 펀더멘털/뉴스/종합 분석 use-case 12종 + 프롬프트 빌더 4종 + 정규화 함수 5종 + 캐시 키/TTL 7종 + Provider 인터페이스 2종 + 도메인 타입 30여종 public export 추가. `buildChatPrompt`에 `currentAnalysisContext` 파라미터 추가 (`CurrentAnalysisContext` tagged union). |
+| 2026-05-07 | Tier 2/4 추가 — `computeFearGreedIndex`, `computeFearGreedHistory` (per-stock Fear & Greed Index) 및 관련 도메인 타입 10종(`FearGreedLabel`, `FearGreedConfidence`, `FearGreedWarning`, `FearGreedFactorKey`, `FearGreedGroupName`, `FearGreedFactor`, `FearGreedGroup`, `FearGreedSnapshot`, `FearGreedHistoryPoint`, `ComputeFearGreedOptions`)을 Tier 2/4 인벤토리에 등록. |

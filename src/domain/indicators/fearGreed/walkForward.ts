@@ -46,8 +46,8 @@ function isoDate(unixSec: number): string {
  *   Empty entries (`{buyVolume: 0, sellVolume: 0}`) yield buy/sell imbalance = 0.
  * @param options - Optional configuration. `pocWindow` overrides the default 60-bar
  *   Volume Profile window for the POC distance factor.
- * @returns FearGreedSnapshot with score, label, group breakdown, confidence, and warning,
- *   or null when the data is insufficient.
+ * @returns {FearGreedSnapshot | null} FearGreedSnapshot with score, label, group breakdown,
+ *   confidence, and warning, or null when the data is insufficient.
  */
 export function computeFearGreedIndex(
     bars: Bar[],
@@ -81,7 +81,7 @@ export function computeFearGreedIndex(
  * @param bars - Daily OHLCV bars in chronological order.
  * @param buySellVolume - Per-bar buy/sell volume classification, indexed parallel to bars.
  * @param options - Optional configuration. `pocWindow` overrides the default 60.
- * @returns Array of FearGreedHistoryPoint, length = bars.length.
+ * @returns {FearGreedHistoryPoint[]} Array of FearGreedHistoryPoint, length = bars.length.
  */
 export function computeFearGreedHistory(
     bars: Bar[],
