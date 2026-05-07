@@ -25,6 +25,10 @@ const WARNING_NOTE: Partial<Record<NonNullable<FearGreedWarning>, string>> = {
  * sentiment context to the LLM. Centralising the formatting here keeps the
  * two prompts in lock-step whenever the spec text changes.
  *
+ * @throws {Error} When the snapshot is missing the Flow or Trend group.
+ *   Task 4's `composeSnapshot` always emits both, so this only fires for
+ *   manually constructed or corrupted snapshots — protective contract for callers.
+ *
  * @internal Used by analysis prompt builders; not part of the public API.
  */
 export function formatFearGreedSection(fg: FearGreedSnapshot): string {

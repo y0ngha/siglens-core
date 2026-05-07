@@ -180,10 +180,10 @@ export async function submitOverallAnalysis(
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
 
-    // 일봉 fearGreed snapshot — overall 프롬프트의 sentiment 컨텍스트로 주입.
-    // technical 축의 결과를 그대로 사용하지 않고 일봉 raw 데이터로부터 직접
-    // 산출해 daily-only 가정을 유지한다 (timeframe과 무관). 산출 실패 시
-    // fearGreed=null 로 fallback해 overall 분석 자체는 진행한다.
+    // Daily fearGreed snapshot — injected as the sentiment context for the overall prompt.
+    // Computed directly from daily raw data rather than reusing the technical-axis
+    // result, so the daily-only assumption holds regardless of timeframe.
+    // On compute failure, log and fall back to fearGreed=null so the overall analysis proceeds.
     const fmpSymbol = options.technical.fmpSymbol;
     const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
         symbol,

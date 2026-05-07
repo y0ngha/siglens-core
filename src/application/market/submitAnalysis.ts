@@ -261,9 +261,9 @@ export async function submitAnalysis(
             return [[] as Skill[], true] as const;
         });
 
-    // 일봉 fearGreed snapshot — 분석 프롬프트의 sentiment 컨텍스트로 주입.
-    // 일봉이면 이미 fetch한 bars 재사용; 다른 TF면 별도 일봉 fetch.
-    // 산출 실패 시(예: 일봉 데이터 부족) null로 fallback해 분석 자체는 진행.
+    // Daily fearGreed snapshot — injected as the sentiment context for the analysis prompt.
+    // When timeframe is '1Day', reuse the already-fetched bars; otherwise fetch daily separately.
+    // On daily-fetch failure, log and fall back to fearGreed=null so the analysis itself proceeds.
     const dailyDataPromise =
         timeframe === '1Day'
             ? Promise.resolve({ bars, indicators })

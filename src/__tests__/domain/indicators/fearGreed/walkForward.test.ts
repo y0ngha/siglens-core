@@ -125,7 +125,9 @@ describe('computeFearGreedHistory', () => {
         const bars = genBars(45);
         const history = computeFearGreedHistory(bars, genBsv(45));
         expect(history).toHaveLength(45);
-        const nonNullCount = history.filter(p => p.score !== null).length;
+        const nonNullCount = history.filter(
+            (p: FearGreedHistoryPoint) => p.score !== null
+        ).length;
         expect(nonNullCount).toBeGreaterThan(0);
         // Final entry should carry a score because the latest bar's snapshot
         // (sample=14, confidence='limited') is non-null in this fixture.

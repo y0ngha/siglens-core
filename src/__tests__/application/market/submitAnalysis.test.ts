@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    FearGreedSnapshot,
+    TierConfig,
+    Timeframe,
+} from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type { UsageRepository } from '@/infrastructure/db';
@@ -12,6 +17,9 @@ vi.mock('@/application/market/barsApi');
 vi.mock('@/domain/analysis/prompt', () => ({
     buildAnalysisPrompt: vi.fn(() => 'mock-prompt'),
 }));
+vi.mock('@/domain/indicators/fearGreed', () => ({
+    computeFearGreedIndex: vi.fn(),
+}));
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
@@ -20,11 +28,13 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
+const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -136,6 +146,11 @@ describe('submitAnalysis 함수는', () => {
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
+        // Default fearGreed compute → null (matches real behavior on the
+        // 1-bar fixture where walk-forward sampling is insufficient).
+        // Individual tests override with mockReturnValueOnce when they need
+        // a deterministic snapshot.
+        mockComputeFearGreedIndex.mockReturnValue(null);
         mockGetUsageToday.mockResolvedValue({ analysis: 0, chatbot: 0 });
         mockRecordUsage.mockResolvedValue({
             id: 'usage-1',
@@ -799,6 +814,19 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('1Day 타임프레임이면 추가 fetch 없이 buildAnalysisPrompt 7번째 인자로 fearGreed가 전달된다', async () => {
+            const mockSnapshot: FearGreedSnapshot = {
+                score: 50,
+                label: 'NEUTRAL',
+                groups: [
+                    { name: 'Flow', score: 50, factors: [] },
+                    { name: 'Trend', score: 50, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 100,
+                warning: null,
+            };
+            mockComputeFearGreedIndex.mockReturnValueOnce(mockSnapshot);
+
             await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
@@ -813,18 +841,13 @@ describe('submitAnalysis 함수는', () => {
                 undefined
             );
 
-            // buildAnalysisPrompt가 호출되었고, 7번째 인자(fearGreed) 슬롯이
-            // 전달되어야 함 (FearGreedSnapshot 객체 또는 산출 불가 시 undefined).
+            // buildAnalysisPrompt가 호출되었고, 7번째 인자(fearGreed)는 mock한
+            // FearGreedSnapshot 객체와 정확히 동일해야 함.
             expect(mockBuildAnalysisPrompt).toHaveBeenCalledTimes(1);
             const args = mockBuildAnalysisPrompt.mock.calls[0];
-            expect(args.length).toBeGreaterThanOrEqual(6);
+            expect(args.length).toBeGreaterThanOrEqual(7);
             const seventh = args[6];
-            // 1-bar mock 데이터는 walk-forward 샘플 부족으로 null → undefined로 fallback.
-            // 실제 환경에서는 객체. 둘 중 하나면 통과.
-            const validShape =
-                seventh === undefined ||
-                (typeof seventh === 'object' && seventh !== null);
-            expect(validShape).toBe(true);
+            expect(seventh).toBe(mockSnapshot);
         });
 
         it('1Day가 아닌 타임프레임이면 일봉 데이터를 추가로 fetch한다', async () => {
