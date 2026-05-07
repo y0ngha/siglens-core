@@ -54,6 +54,7 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
 } from '@/domain/types';
+import type { FearGreedSnapshot } from '@/domain/indicators/fearGreed/types';
 
 type SkillGroupKey = SkillType | 'regular';
 
@@ -975,6 +976,24 @@ function byName(a: Skill, b: Skill): number {
     return a.name.localeCompare(b.name, 'en');
 }
 
+const formatFearGreedSection = (fg: FearGreedSnapshot): string => {
+    const flowGroup = fg.groups.find(g => g.name === 'Flow');
+    const trendGroup = fg.groups.find(g => g.name === 'Trend');
+    const warningNote =
+        fg.warning === 'CHRONIC_WEAKNESS'
+            ? '\n- 주의: 장기 약세 사이클 종목입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+            : fg.warning === 'CHRONIC_STRENGTH'
+              ? '\n- 주의: 장기 강세 사이클 종목입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+              : '';
+    return (
+        `## 공포·탐욕 지수 (참고)\n` +
+        `- 점수: ${Math.round(fg.score)} / 100 (${fg.label})\n` +
+        `- Flow 그룹: ${Math.round(flowGroup?.score ?? 0)} | Trend 그룹: ${Math.round(trendGroup?.score ?? 0)}` +
+        warningNote +
+        `\n\n위 sentiment를 위 가격·거래량 분석과 종합해 해석해 주세요.`
+    );
+};
+
 /**
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
@@ -996,6 +1015,7 @@ function byName(a: Skill, b: Skill): number {
  * @param indicators - Indicator suite produced by {@link calculateIndicators}.
  * @param skills - Skill definitions to inject (defaults to none).
  * @param timeframe - Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
+ * @param fearGreed - Optional Fear & Greed snapshot. When provided, a "공포·탐욕 지수 (참고)" section is appended.
  * @returns The fully-rendered prompt string.
  *
  * @see calculateIndicators
@@ -1007,7 +1027,8 @@ export function buildAnalysisPrompt(
     bars: Bar[],
     indicators: IndicatorResult,
     skills: Skill[] = [],
-    timeframe: Timeframe = '1Day'
+    timeframe: Timeframe = '1Day',
+    fearGreed?: FearGreedSnapshot
 ): string {
     const activeSkills = skills
         .filter(s => s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT)
@@ -1075,6 +1096,7 @@ export function buildAnalysisPrompt(
                   `## Active Skills\n${regularSkills.map(buildSkillBlock).join('\n\n')}`,
               ]
             : []),
+        ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
         buildAnalysisRequest(
             patternSkills,
             strategySkills,
