@@ -83,6 +83,24 @@ describe('submitNewsCardAnalysis 함수는', () => {
         expect(mockFireAndForget).toHaveBeenCalled();
     });
 
+    it('워커 fetch 실패 시 console.error를 출력하고 submitted를 반환한다', async () => {
+        mockFetch.mockRejectedValueOnce(new Error('Network error'));
+        const consoleSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        const result = await submitNewsCardAnalysis({ item: testNewsItem });
+        // flush microtasks so the .catch() handler runs
+        await Promise.resolve();
+
+        expect(result.status).toBe('submitted');
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[submitNewsCardAnalysis] Worker request failed:',
+            expect.any(Error)
+        );
+        consoleSpy.mockRestore();
+    });
+
     describe('BackgroundTaskOptions를 받을 때', () => {
         it('waitUntil 옵션이 fireAndForget으로 전달된다', async () => {
             const waitUntil = vi.fn();
