@@ -517,6 +517,7 @@ export type {
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
     SubmitNewsCardAnalysisSubmitted,
+    SubmitNewsCardAnalysisCached,
 } from './application/news/types';
 export type {
     OverallAxis,

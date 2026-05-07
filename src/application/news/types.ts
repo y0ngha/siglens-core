@@ -142,6 +142,12 @@ export interface SubmitNewsCardAnalysisSubmitted {
  */
 export type SubmitNewsCardAnalysisResult = SubmitNewsCardAnalysisSubmitted;
 
+/**
+ * @deprecated Redis result caching was removed in 0.8.0. `submitNewsCardAnalysis`
+ * always returns `submitted`. Remove this check from your call sites.
+ */
+export type SubmitNewsCardAnalysisCached = never;
+
 // ─────────────────────────────────────────
 // Poll News Card Analysis
 // ─────────────────────────────────────────

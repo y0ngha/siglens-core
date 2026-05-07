@@ -262,9 +262,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
 
 > **@internal (not exported)**: `FUNDAMENTAL_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS`,
-> `NEWS_CARD_CACHE_TTL_SECONDS`, `OVERALL_CACHE_TTL_SECONDS`, `buildFundamentalCacheKey`,
-> `buildNewsCacheKey`, `buildNewsCardCacheKey`, `buildOverallCacheKey` — consumer cannot
+> `OVERALL_CACHE_TTL_SECONDS`, `buildFundamentalCacheKey`,
+> `buildNewsCacheKey`, `buildOverallCacheKey` — consumer cannot
 > construct the `inputHash` parameter; these are internal to the submit use-cases.
+>
+> **Removed in 0.8.0**: `NEWS_CARD_CACHE_TTL_SECONDS`, `buildNewsCardCacheKey` — news-card
+> result caching was moved to DB persistence (siglens `analyzedAt` column).
 
 > 티커 관련 캐시 키 — `TICKER_SEARCH_CACHE_TTL`, `ASSET_INFO_CACHE_TTL_WITH_KOREAN`,
 > `ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN`, `buildTickerSearchCacheKey`,

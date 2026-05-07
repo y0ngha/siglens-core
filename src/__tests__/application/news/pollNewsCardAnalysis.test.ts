@@ -12,7 +12,7 @@ import {
     getJobMeta,
     cleanupJob,
 } from '@/infrastructure/jobs/queue';
-import { cleanupInBackground } from '@/application/background';
+import { cleanupInBackground, fireAndForget } from '@/application/background';
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
@@ -20,6 +20,7 @@ const mockGetJobResult = getJobResult as Mock;
 const mockGetJobMeta = getJobMeta as Mock;
 const mockCleanupJob = cleanupJob as Mock;
 const mockCleanupInBackground = cleanupInBackground as Mock;
+const mockFireAndForget = fireAndForget as Mock;
 
 /** Minimal valid raw news card analysis result. */
 const rawCardJson = JSON.stringify({
@@ -41,6 +42,7 @@ describe('pollNewsCardAnalysis 함수는', () => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
         mockCleanupInBackground.mockImplementation(() => undefined);
+        mockFireAndForget.mockImplementation(() => undefined);
     });
 
     describe('status가 null이거나 processing일 때', () => {
@@ -139,7 +141,7 @@ describe('pollNewsCardAnalysis 함수는', () => {
             const result = await pollNewsCardAnalysis('job-done-no-cache');
 
             expect(result.status).toBe('done');
-            // cleanupInBackground만 호출되어야 함 — fireAndForget(cache.set) 없음
+            expect(mockFireAndForget).not.toHaveBeenCalled();
             expect(mockCleanupInBackground).toHaveBeenCalledWith(
                 'job-done-no-cache',
                 '[PollNewsCard]',

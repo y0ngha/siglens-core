@@ -19,13 +19,7 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES = 30;
 const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS =
     SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MINUTES * MS_PER_MINUTE;
 
-/**
- * Fixed model identifier for per-news-card translation and sentiment analysis.
- *
- * Defined locally — no longer exported from cache/config since news-card
- * results are now persisted to DB by the caller (siglens app) and not cached
- * in Redis.
- */
+/** Fixed model identifier for per-card news translation and sentiment analysis. */
 const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
 
 /**

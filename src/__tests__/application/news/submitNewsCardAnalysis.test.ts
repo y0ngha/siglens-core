@@ -68,7 +68,6 @@ describe('submitNewsCardAnalysis 함수는', () => {
                 modelId: 'gemini-2.5-flash-lite',
             })
         );
-        // cacheKey는 더 이상 job meta에 포함되지 않는다
         expect(mockSetJobMeta).toHaveBeenCalledWith(
             expect.any(String),
             expect.not.objectContaining({ cacheKey: expect.anything() })
