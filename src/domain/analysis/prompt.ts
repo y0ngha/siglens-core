@@ -981,9 +981,9 @@ const formatFearGreedSection = (fg: FearGreedSnapshot): string => {
     const trendGroup = fg.groups.find(g => g.name === 'Trend');
     const warningNote =
         fg.warning === 'CHRONIC_WEAKNESS'
-            ? '\n- 주의: 장기 약세 사이클 종목입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+            ? '\n- 주의: 이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
             : fg.warning === 'CHRONIC_STRENGTH'
-              ? '\n- 주의: 장기 강세 사이클 종목입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+              ? '\n- 주의: 이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
               : '';
     return (
         `## 공포·탐욕 지수 (참고)\n` +

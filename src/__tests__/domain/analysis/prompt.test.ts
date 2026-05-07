@@ -3932,7 +3932,9 @@ describe('prompt', () => {
                 '1Day',
                 fg
             );
-            expect(prompt).toMatch(/장기 약세 사이클/);
+            expect(prompt).toContain(
+                '이 종목은 장기 약세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+            );
         });
 
         it('appends chronic-strength warning text when warning is CHRONIC_STRENGTH', () => {
@@ -3956,7 +3958,9 @@ describe('prompt', () => {
                 '1Day',
                 fg
             );
-            expect(prompt).toMatch(/장기 강세 사이클/);
+            expect(prompt).toContain(
+                '이 종목은 장기 강세 사이클입니다. 점수는 자기 분포 대비 상대적 위치를 의미합니다.'
+            );
         });
     });
 });
