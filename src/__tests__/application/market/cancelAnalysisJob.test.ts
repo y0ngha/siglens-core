@@ -182,8 +182,7 @@ describe('cancelAnalysisJob', () => {
             // 입력의 신규 submitter가 이 취소된 jobId에 join되는 회귀가 없다.
             // invocationCallOrder는 vitest mock이 호출된 글로벌 순번이므로
             // 작은 값일수록 먼저 호출됨을 보장한다.
-            const clearOrder =
-                mockClearInFlightJob.mock.invocationCallOrder[0];
+            const clearOrder = mockClearInFlightJob.mock.invocationCallOrder[0];
             const cancelOrder = mockCancelJob.mock.invocationCallOrder[0];
             expect(clearOrder).toBeLessThan(cancelOrder);
         });
