@@ -179,4 +179,45 @@ describe('submitNewsCardAnalysis 함수는', () => {
             );
         });
     });
+
+    describe('thinkingBudget 옵션을 받을 때', () => {
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('thinkingBudget: 0을 전달하면 워커 POST body에 포함된다', async () => {
+            await submitNewsCardAnalysis({
+                item: testNewsItem,
+                thinkingBudget: 0,
+            });
+
+            expect(mockFetch).toHaveBeenCalled();
+            const fetchBody = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(fetchBody).toHaveProperty('thinkingBudget', 0);
+        });
+
+        it('thinkingBudget을 전달하지 않으면 워커 POST body에 포함되지 않는다', async () => {
+            await submitNewsCardAnalysis({ item: testNewsItem });
+
+            expect(mockFetch).toHaveBeenCalled();
+            const fetchBody = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(fetchBody).not.toHaveProperty('thinkingBudget');
+        });
+
+        it('양수 thinkingBudget을 전달하면 워커 POST body에 포함된다', async () => {
+            await submitNewsCardAnalysis({
+                item: testNewsItem,
+                thinkingBudget: 8192,
+            });
+
+            const fetchBody = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(fetchBody).toHaveProperty('thinkingBudget', 8192);
+        });
+    });
 });
