@@ -116,6 +116,15 @@ export type PollNewsAnalysisResult =
 export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     /** The raw news item to analyze. */
     item: NewsItem;
+    /**
+     * Override for the model's default thinking budget (tokens).
+     * Pass `0` to disable extended thinking entirely — recommended for
+     * translation and sentiment classification tasks where chain-of-thought
+     * adds latency and cost without a quality benefit.
+     *
+     * When omitted the worker uses `MODEL_SPECS[model].thinkingBudget`.
+     */
+    thinkingBudget?: number;
 }
 
 /** The caller receives a cached card analysis — no new job was created. */

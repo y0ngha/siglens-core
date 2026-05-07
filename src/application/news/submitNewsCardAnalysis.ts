@@ -58,7 +58,7 @@ const SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS =
 export async function submitNewsCardAnalysis(
     options: SubmitNewsCardAnalysisOptions
 ): Promise<SubmitNewsCardAnalysisResult> {
-    const { item } = options;
+    const { item, thinkingBudget } = options;
     const cacheKey = buildNewsCardCacheKey(item.id);
     const cache = createCacheProvider();
 
@@ -99,7 +99,12 @@ export async function submitNewsCardAnalysis(
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
         },
-        body: JSON.stringify({ jobId, prompt, model: NEWS_CARD_MODEL_ID }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: NEWS_CARD_MODEL_ID,
+            ...(thinkingBudget !== undefined && { thinkingBudget }),
+        }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitNewsCardAnalysis] Worker request failed:', error);
