@@ -24,10 +24,10 @@ function fakeBar(time: number, close: number, volume: number): Bar {
 function genBars(
     count: number,
     options: {
-        priceTrend?: number;     // per-bar increment, default 0.1
-        baseVolume?: number;     // base volume, default 1_000_000
-        volumeJitter?: number;   // ± volume variance, default 50_000
-        priceJitter?: number;    // ± price wiggle, default 0.5
+        priceTrend?: number; // per-bar increment, default 0.1
+        baseVolume?: number; // base volume, default 1_000_000
+        volumeJitter?: number; // ± volume variance, default 50_000
+        priceJitter?: number; // ± price wiggle, default 0.5
     } = {}
 ): Bar[] {
     const {

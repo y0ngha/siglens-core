@@ -74,8 +74,7 @@ export function computeFactorsAtT(
     const ma200Start = Math.max(0, t - MA200_WINDOW);
     const ma200Closes = bars.slice(ma200Start, t).map(b => b.close);
     if (ma200Closes.length < FEAR_GREED_MIN_FACTOR_WINDOW) return null;
-    const ma200 =
-        ma200Closes.reduce((a, b) => a + b, 0) / ma200Closes.length;
+    const ma200 = ma200Closes.reduce((a, b) => a + b, 0) / ma200Closes.length;
     const ma200Dist = (bar.close - ma200) / ma200;
 
     const rangeStart = Math.max(0, t - RANGE_WINDOW + 1);
@@ -89,8 +88,7 @@ export function computeFactorsAtT(
         (acc, b) => (b.low < acc ? b.low : acc),
         Infinity
     );
-    const rangePosition =
-        high === low ? 0.5 : (bar.close - low) / (high - low);
+    const rangePosition = high === low ? 0.5 : (bar.close - low) / (high - low);
 
     return { volumeZ, buySellImb, pocDist, ma200Dist, rangePosition };
 }

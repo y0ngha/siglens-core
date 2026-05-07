@@ -42,7 +42,8 @@ export const FEAR_GREED_CONFIDENCE_THRESHOLDS = {
  * @internal Used internally by composeSnapshot and walkForward.
  */
 export function scoreToLabel(score: number): FearGreedLabel {
-    if (score < FEAR_GREED_LABEL_CUTOFFS.EXTREME_FEAR_MAX) return 'EXTREME_FEAR';
+    if (score < FEAR_GREED_LABEL_CUTOFFS.EXTREME_FEAR_MAX)
+        return 'EXTREME_FEAR';
     if (score < FEAR_GREED_LABEL_CUTOFFS.FEAR_MAX) return 'FEAR';
     if (score < FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX) return 'NEUTRAL';
     if (score < FEAR_GREED_LABEL_CUTOFFS.GREED_MAX) return 'GREED';
