@@ -4,7 +4,6 @@ import {
     checkAnalysisUsageAllowed,
     recordAnalysisUsageSafely,
 } from '@/application/usage';
-import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import type {
     SubmitFundamentalAnalysisOptions,
     SubmitFundamentalAnalysisResult,
@@ -31,61 +30,16 @@ import type {
 const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
- * Derive a short deterministic hash of the normalized snapshot + active skills.
- *
- * Provider response order is not guaranteed — `peers` and `sectorHistorical` are
- * sorted into a normalized copy before hashing so the same logical snapshot
- * always produces the same hash regardless of upstream ordering. The actual
- * snapshot passed to the prompt is left untouched (provider-ordered) — only
- * the HASH input is normalized here.
- *
- * Skill identifiers are appended (sorted by name) so that adding, removing, or
- * editing a skill busts the cache. Skills are content-addressed via `name +
- * content` so a skill content change also invalidates prior cached results.
- *
- * @param snapshot - Normalized fundamental snapshot.
- * @param skills   - Skills loaded for the prompt; only `name` + `content` are
- *   used for the hash.
- * @returns 16-character lowercase hex string.
- */
-function hashSnapshot(
-    snapshot: FundamentalSnapshot,
-    skills: readonly Skill[]
-): string {
-    // Normalize provider-dependent ordering before hashing. `toSorted()` is
-    // immutable so the original snapshot is preserved for prompt rendering.
-    const normalizedSnapshot = {
-        ...snapshot,
-        peers: snapshot.peers.toSorted((a, b) =>
-            a.symbol.localeCompare(b.symbol)
-        ),
-        sectorDirection: {
-            ...snapshot.sectorDirection,
-            historical: snapshot.sectorDirection.historical.toSorted((a, b) =>
-                b.date.localeCompare(a.date)
-            ),
-        },
-    };
-    const skillFingerprint = skills
-        .map(s => ({ name: s.name, content: s.content }))
-        .toSorted((a, b) => a.name.localeCompare(b.name));
-    return hashAnalysisInput(
-        JSON.stringify({
-            snapshot: normalizedSnapshot,
-            skills: skillFingerprint,
-        })
-    );
-}
-
-/**
  * Submit a fundamental analysis job for the given symbol.
  *
  * Resolves to one of three outcomes:
- * - `cached`: a recent analysis is reused (keyed by `symbol` + `modelId` +
- *   an input hash of the normalized snapshot).
- * - `submitted`: all 13 provider sub-fetches completed, the prompt was built,
- *   a `jobId` was registered, and a fire-and-forget HTTP POST was sent to the
- *   configured worker. Poll the result with {@link pollFundamentalAnalysis}.
+ * - `cached`: a recent analysis is reused (keyed by `symbol` + `modelId`).
+ *   The Redis check happens before any FMP data fetch, so cache hits avoid
+ *   all 13 parallel provider calls.
+ * - `submitted`: all provider sub-fetches completed (in parallel with skills
+ *   loading), the prompt was built, a `jobId` was registered, and a
+ *   fire-and-forget HTTP POST was sent to the configured worker. Poll the
+ *   result with {@link pollFundamentalAnalysis}.
  * - `error`: the daily analysis limit was exceeded (when `tier` + `usage` are
  *   both provided), or the data provider threw during the parallel fetch.
  *
@@ -113,7 +67,6 @@ export async function submitFundamentalAnalysis(
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
-    // ── 1. Usage limit check (only when both tier and usage are provided) ──
     if (options.tier !== undefined && usage !== undefined) {
         const tier = options.tier;
         const tierConfig = options.tierConfig ?? TIER_CONFIG;
@@ -133,8 +86,35 @@ export async function submitFundamentalAnalysis(
         }
     }
 
-    // ── 2. Fetch all provider sub-fetches in parallel (13 total) ──
+    const cacheKey = buildFundamentalCacheKey(symbol, modelId);
+    const cache = createCacheProvider();
+
+    if (cache !== null) {
+        try {
+            const cached =
+                await cache.get<FundamentalAnalysisResponse>(cacheKey);
+            // Lightweight structural validation — schema drift from a prior
+            // release should fall through as a cache miss rather than poison
+            // the response. The schema-version prefix on the cache key is the
+            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
+            // check is a belt-and-braces fallback.
+            if (cached !== null) {
+                const result = normalizeFundamentalAnalysisResponse(cached);
+                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
+                return { status: 'cached', result };
+            }
+        } catch (error) {
+            console.error(
+                '[submitFundamentalAnalysis] Cache read failed:',
+                error
+            );
+        }
+    }
+
     let snapshot: FundamentalSnapshot;
+    let skills: readonly Skill[];
+    let skillsDegraded: boolean | undefined;
+
     try {
         const [
             profile,
@@ -150,6 +130,7 @@ export async function submitFundamentalAnalysis(
             priceTargetSummary,
             earningsReport,
             sectorSnapshot,
+            skillsResult,
         ] = await Promise.all([
             dataProvider.getProfile(symbol),
             dataProvider.getKeyMetricsTtm(symbol),
@@ -166,6 +147,7 @@ export async function submitFundamentalAnalysis(
             dataProvider.getSectorPerformanceSnapshot(
                 occurredAt.toISOString().slice(0, 10)
             ),
+            loadSkillsCached(),
         ]);
 
         if (profile === null) {
@@ -205,6 +187,9 @@ export async function submitFundamentalAnalysis(
                 changePct: h.changesPercentage,
             })),
         });
+
+        skills = skillsResult.skills;
+        skillsDegraded = skillsResult.skillsDegraded || undefined;
     } catch (error) {
         console.error(
             '[submitFundamentalAnalysis] Provider fetch failed:',
@@ -218,38 +203,6 @@ export async function submitFundamentalAnalysis(
         return fetchError;
     }
 
-    // ── 3. Load skills, hash (snapshot + skills) → build cache key → check cache ──
-    // Skills are loaded BEFORE hashing so that a skill change (add/remove/edit
-    // content) invalidates the cached analysis — otherwise the same snapshot
-    // would keep returning the previous result for the full 24h TTL.
-    const { skills, skillsDegraded } = await loadSkillsCached();
-    const inputHash = hashSnapshot(snapshot, skills);
-    const cacheKey = buildFundamentalCacheKey(symbol, modelId, inputHash);
-    const cache = createCacheProvider();
-
-    if (cache !== null) {
-        try {
-            const cached =
-                await cache.get<FundamentalAnalysisResponse>(cacheKey);
-            // Lightweight structural validation — schema drift from a prior
-            // release should fall through as a cache miss rather than poison
-            // the response. The schema-version prefix on the cache key is the
-            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
-            // check is a belt-and-braces fallback.
-            if (cached !== null) {
-                const result = normalizeFundamentalAnalysisResponse(cached);
-                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
-                return { status: 'cached', result };
-            }
-        } catch (error) {
-            console.error(
-                '[submitFundamentalAnalysis] Cache read failed:',
-                error
-            );
-        }
-    }
-
-    // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, skills);
     const jobId = crypto.randomUUID();

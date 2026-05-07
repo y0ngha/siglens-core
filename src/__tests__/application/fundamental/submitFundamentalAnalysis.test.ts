@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { TierConfig } from '@/domain/types';
+import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -108,7 +109,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
     });
 
     describe('캐시 히트일 때', () => {
-        it('cached 상태와 함께 결과를 반환한다', async () => {
+        it('cached 상태와 함께 결과를 반환하고 provider를 호출하지 않는다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockCachedResult);
 
             const result = await submitFundamentalAnalysis({
@@ -119,10 +120,19 @@ describe('submitFundamentalAnalysis 함수는', () => {
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
-                expect(result.result).toEqual(mockCachedResult);
+                // Derive expected via the same normalization path the function uses
+                // so that a regression in normalizeFundamentalAnalysisResponse is
+                // caught rather than masked by a matching default fallback.
+                expect(result.result).toEqual(
+                    normalizeFundamentalAnalysisResponse(mockCachedResult)
+                );
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+            // Cache hit must not trigger any FMP data fetches — verify all methods.
+            for (const method of Object.values(mockDataProvider) as Mock[]) {
+                expect(method).not.toHaveBeenCalled();
+            }
         });
 
         it('캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
