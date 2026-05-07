@@ -161,24 +161,26 @@ export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /**
  * Build the Redis key for a cached fundamental analysis result.
  *
- * Format: `analysis:fundamental:<symbol>:<modelId>:<inputHash>`.
- * The `inputHash` is a short hash of the FundamentalSnapshot contents so that
- * results from different data vintages are cached independently.
+ * Format: `{version}:analysis:fundamental:<symbol>:<modelId>`.
  *
- * @internal Consumer cannot construct `inputHash` themselves — it is derived
- *   inside `submitFundamentalAnalysis`. Do not depend on this function from
- *   outside the core library.
+ * The key is intentionally free of an input hash so that the cache lookup
+ * can happen before any FMP data fetch — avoiding 13 parallel API calls on
+ * every page load when a warm result already exists. Cache freshness is
+ * governed solely by the 24-hour TTL ({@link FUNDAMENTAL_CACHE_TTL_SECONDS})
+ * and the schema-version prefix ({@link CACHE_KEY_SCHEMA_VERSION}): bump the
+ * version whenever the response shape or prompt logic changes in a way that
+ * would make old cached results incorrect.
+ *
+ * @internal
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
- * @param inputHash - Short hash of the prompt input data.
  * @returns The cache key.
  */
 export function buildFundamentalCacheKey(
     symbol: string,
-    modelId: string,
-    inputHash: string
+    modelId: string
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}`;
 }
 
 /**

@@ -110,10 +110,10 @@ describe('cache key builders', () => {
 });
 
 describe('new analysis cache keys', () => {
-    it('returns {v}:analysis:fundamental:{symbol}:{model}:{hash} format', () => {
-        const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', 'h1');
+    it('returns {v}:analysis:fundamental:{symbol}:{model} format', () => {
+        const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
         expect(a).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:h1`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro`
         );
     });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { TierConfig } from '@/domain/types';
+import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -108,7 +109,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
     });
 
     describe('캐시 히트일 때', () => {
-        it('cached 상태와 함께 결과를 반환한다', async () => {
+        it('cached 상태와 함께 결과를 반환하고 provider를 호출하지 않는다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockCachedResult);
 
             const result = await submitFundamentalAnalysis({
@@ -119,10 +120,19 @@ describe('submitFundamentalAnalysis 함수는', () => {
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
-                expect(result.result).toEqual(mockCachedResult);
+                // Derive expected via the same normalization path the function uses
+                // so that a regression in normalizeFundamentalAnalysisResponse is
+                // caught rather than masked by a matching default fallback.
+                expect(result.result).toEqual(
+                    normalizeFundamentalAnalysisResponse(mockCachedResult)
+                );
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+            // Cache hit must not trigger any FMP data fetches — verify all methods.
+            Object.values(mockDataProvider).forEach(method =>
+                expect(method as Mock).not.toHaveBeenCalled()
+            );
         });
 
         it('캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
@@ -159,6 +169,38 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+        });
+
+        it('캐시 결과의 overallConclusionKo가 비어 있으면 캐시 미스로 처리하고 provider를 호출한다', async () => {
+            const emptyConclusion = {
+                overallConclusionKo: '',
+                categoryAssessments: [],
+                riskFactorsKo: [],
+                overallSentiment: 'neutral' as const,
+            };
+            mockCacheGet.mockResolvedValueOnce(emptyConclusion);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockDataProvider.getProfile).toHaveBeenCalled();
+            // Empty conclusion is not billed on the cache path — usage is
+            // recorded only after a successful submit.
             expect(recordUsage).toHaveBeenCalledTimes(1);
         });
     });
@@ -246,6 +288,23 @@ describe('submitFundamentalAnalysis 함수는', () => {
                     skillsDegraded: expect.anything(),
                 })
             );
+        });
+
+        it('getProfile이 null을 반환하면 fetch_failed error를 반환한다', async () => {
+            mockDataProvider.getProfile.mockResolvedValueOnce(null);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error') {
+                expect(result.code).toBe('fetch_failed');
+            }
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
         });
 
         it('provider getProfile 호출 시 에러가 발생하면 error 상태를 반환한다', async () => {
