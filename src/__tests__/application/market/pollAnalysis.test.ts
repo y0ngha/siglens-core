@@ -334,6 +334,10 @@ describe('pollAnalysis 함수는', () => {
             mockGetJobMeta.mockResolvedValue(mockMeta);
         });
 
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
         it('워커가 빈 분석을 반환하면 캐시 쓰기를 건너뛴다', async () => {
             mockGetJobResult.mockResolvedValueOnce({});
             mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
@@ -380,7 +384,6 @@ describe('pollAnalysis 함수는', () => {
                 }),
                 3600
             );
-            vi.useRealTimers();
         });
     });
 

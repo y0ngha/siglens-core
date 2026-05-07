@@ -1,5 +1,11 @@
 # Fix Log
 
+## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 5
+
+- Violation: `modelSpecs.test.ts`에서 동일한 `@/domain/types` specifier로부터 두 개의 분리된 import 블록 사용
+- Rule: MISTAKES.md TypeScript §3.5 — 동일한 specifier의 모든 import는 하나의 블록으로 병합
+- Context: `import type { ... }` 블록과 `import { ... }` 블록이 분리되어 있었음. `import { type X, Y }` 혼합 문법으로 단일 블록으로 병합.
+
 ## [PR #77 | chore/0/post-bde84f3-cleanup | 2026-05-07] Round 4
 
 - Violation: `pollFundamentalAnalysis`, `pollNewsAnalysis`, `pollNewsCardAnalysis`, `pollOverallAnalysis` 4개 함수에 추가된 빈-응답 감지 `if` 분기(true 경로)에 대한 테스트 케이스 부재

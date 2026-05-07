@@ -11,15 +11,13 @@ import {
     type ClaudeModelId,
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
-import type {
-    ActiveModelId,
-    ChatGPTModelSpec,
-    ClaudeReasoningModelSpec,
-    ClaudeSamplingModelSpec,
-    GeminiModelSpec,
-    ModelSpec,
-} from '@/domain/types';
 import {
+    type ActiveModelId,
+    type ChatGPTModelSpec,
+    type ClaudeReasoningModelSpec,
+    type ClaudeSamplingModelSpec,
+    type GeminiModelSpec,
+    type ModelSpec,
     isClaudeReasoningModelSpec,
     isClaudeSamplingModelSpec,
     isReasoningModelSpec,

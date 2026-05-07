@@ -32,9 +32,14 @@ import {
  * Fundamental analysis lacks a stable sentinel shape (no canonical fallback
  * string + all-empty-arrays invariant), so a reliable "is this a fallback?"
  * predicate cannot be defined without risking false positives on legitimately
- * sparse results. Malformed payloads are already handled upstream:
- * {@link normalizeFundamentalAnalysisResponse} throws, which transitions the
- * job to the `error` path before any cache write occurs.
+ * sparse results. There are two distinct empty-payload scenarios:
+ * - **Structurally malformed** (unparseable JSON or wrong field types):
+ *   {@link normalizeFundamentalAnalysisResponse} throws → job transitions to
+ *   the `error` path before any cache write occurs.
+ * - **Content-empty** (valid JSON that normalises to empty strings / empty
+ *   arrays, e.g. `{}`): normalization succeeds, the heuristic check below
+ *   emits a `console.warn`, and the result is still cached and returned as
+ *   `done` so the caller can surface it to the user.
  *
  * Cancel-after-poll: a successful {@link cancelFundamentalAnalysisJob} call
  * does NOT immediately flip the job status. This function will keep
