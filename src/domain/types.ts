@@ -249,6 +249,19 @@ export interface BuySellVolumeResult {
     sellVolume: number;
 }
 
+export type {
+    FearGreedLabel,
+    FearGreedConfidence,
+    FearGreedWarning,
+    FearGreedFactorKey,
+    FearGreedGroupName,
+    FearGreedFactor,
+    FearGreedGroup,
+    FearGreedSnapshot,
+    FearGreedHistoryPoint,
+    ComputeFearGreedOptions,
+} from '@/domain/indicators/fearGreed/types';
+
 // ─── Smart Money Concepts ────────────────────────────────────────────────────
 // Concept reference: Smart Money Concepts (SMC) / ICT methodology
 // Original TradingView indicator: "Smart Money Concepts [LuxAlgo]" by LuxAlgo

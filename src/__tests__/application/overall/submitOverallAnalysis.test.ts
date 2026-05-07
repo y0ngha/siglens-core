@@ -6,14 +6,26 @@ vi.mock('@/application/overall/dependencyResolver');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
+vi.mock('@/application/market/barsApi');
+vi.mock('@/domain/analysis/overallPrompt', () => ({
+    buildOverallAnalysisPrompt: vi.fn(() => 'mock-overall-prompt'),
+}));
+vi.mock('@/domain/indicators/fearGreed', () => ({
+    computeFearGreedIndex: vi.fn(),
+}));
 
 import { submitOverallAnalysis } from '@/application/overall/submitOverallAnalysis';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
+import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import type {
     AnalysisResponse,
+    FearGreedSnapshot,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
 } from '@/domain/types';
@@ -29,6 +41,56 @@ const mockResolveOverallDependencies = resolveOverallDependencies as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFireAndForget = fireAndForget as Mock;
+const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
+const mockBuildOverallAnalysisPrompt = buildOverallAnalysisPrompt as Mock;
+const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
+
+/**
+ * Minimal bars+indicators fixture for the daily fearGreed fetch.
+ *
+ * Single-bar data is intentionally insufficient for walk-forward sampling,
+ * which causes `computeFearGreedIndex` to return null. Both the success and
+ * failure paths in submitOverallAnalysis are exercised either way (the
+ * snapshot is forwarded as `undefined` when the compute fails).
+ */
+const mockDailyBarsData = {
+    bars: [
+        {
+            time: 1705312200,
+            open: 100,
+            high: 105,
+            low: 99,
+            close: 103,
+            volume: 1_000_000,
+        },
+    ],
+    indicators: {
+        macd: [],
+        bollinger: [],
+        dmi: [],
+        stochastic: [],
+        stochRsi: [],
+        rsi: [],
+        cci: [],
+        vwap: [],
+        ma: {},
+        ema: {},
+        volumeProfile: null,
+        ichimoku: [],
+        atr: [],
+        obv: [],
+        parabolicSar: [],
+        williamsR: [],
+        supertrend: [],
+        mfi: [],
+        keltnerChannel: [],
+        cmf: [],
+        donchianChannel: [],
+        buySellVolume: [],
+        squeezeMomentum: [],
+        smc: EMPTY_SMC_RESULT,
+    },
+};
 
 // ─────────────────────────────────────────
 // Fixtures
@@ -119,6 +181,13 @@ describe('submitOverallAnalysis 함수는', () => {
         mockFireAndForget.mockImplementation(() => undefined);
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
+        mockFetchBarsWithIndicators.mockResolvedValue(mockDailyBarsData);
+        // Default fearGreed compute → null (matches real behavior on the
+        // 1-bar fixture where walk-forward sampling is insufficient).
+        // Individual tests override with mockReturnValueOnce when they need
+        // a deterministic snapshot.
+        mockComputeFearGreedIndex.mockReturnValue(null);
+        mockBuildOverallAnalysisPrompt.mockReturnValue('mock-overall-prompt');
     });
 
     afterEach(() => {
@@ -572,6 +641,92 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(mockResolveOverallDependencies).toHaveBeenCalledWith(
                 expect.any(Object),
                 { dropAxisUsage: true }
+            );
+        });
+    });
+
+    describe('FearGreed 주입 시', () => {
+        beforeEach(() => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null); // overall cache miss → submit path
+        });
+
+        it('일봉 bars를 fetch해 buildOverallAnalysisPrompt 7번째 인자로 fearGreed가 전달된다', async () => {
+            const mockSnapshot: FearGreedSnapshot = {
+                score: 50,
+                label: 'NEUTRAL',
+                groups: [
+                    { name: 'Flow', score: 50, factors: [] },
+                    { name: 'Trend', score: 50, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 100,
+                warning: null,
+            };
+            mockComputeFearGreedIndex.mockReturnValueOnce(mockSnapshot);
+
+            await submitOverallAnalysis(makeOptions());
+
+            // 일봉 데이터가 정확히 1번 fetch됨 (overall은 daily-only).
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                'AAPL',
+                '1Day',
+                undefined
+            );
+
+            // buildOverallAnalysisPrompt가 호출되었고, 7번째 인자(fearGreed)는
+            // mock한 FearGreedSnapshot 객체와 정확히 동일해야 함.
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            // Positional-arg assertion: if buildOverallAnalysisPrompt's signature ever
+            // switches to an options object, replace args[6] with args[0].fearGreed.
+            const seventh = args[6];
+            expect(seventh).toBe(mockSnapshot);
+            expect(args.length).toBe(7);
+        });
+
+        it('일봉 fetch가 throw해도 overall 분석은 fearGreed=undefined로 계속 진행된다', async () => {
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            mockFetchBarsWithIndicators.mockRejectedValueOnce(
+                new Error('daily fetch failed')
+            );
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('submitted');
+            expect(consoleSpy).toHaveBeenCalledWith(
+                '[submitOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                expect.any(Error)
+            );
+
+            // buildOverallAnalysisPrompt 7번째 인자는 undefined여야 함.
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            expect(args[6]).toBeUndefined();
+
+            consoleSpy.mockRestore();
+        });
+
+        it('options.technical.fmpSymbol이 일봉 fetch에 전달된다', async () => {
+            await submitOverallAnalysis(
+                makeOptions({
+                    technical: { fmpSymbol: 'AAPL.US' },
+                })
+            );
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                'AAPL',
+                '1Day',
+                'AAPL.US'
             );
         });
     });

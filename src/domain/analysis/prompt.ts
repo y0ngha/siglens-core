@@ -45,6 +45,7 @@ import type {
     CandlePatternEntry,
     AnalysisResponse,
     Bar,
+    FearGreedSnapshot,
     IndicatorResult,
     PromptConfig,
     Skill,
@@ -54,6 +55,7 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
 } from '@/domain/types';
+import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 
 type SkillGroupKey = SkillType | 'regular';
 
@@ -996,6 +998,7 @@ function byName(a: Skill, b: Skill): number {
  * @param indicators - Indicator suite produced by {@link calculateIndicators}.
  * @param skills - Skill definitions to inject (defaults to none).
  * @param timeframe - Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
+ * @param fearGreed - Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)" section is appended.
  * @returns The fully-rendered prompt string.
  *
  * @see calculateIndicators
@@ -1007,7 +1010,8 @@ export function buildAnalysisPrompt(
     bars: Bar[],
     indicators: IndicatorResult,
     skills: Skill[] = [],
-    timeframe: Timeframe = '1Day'
+    timeframe: Timeframe = '1Day',
+    fearGreed?: FearGreedSnapshot
 ): string {
     const activeSkills = skills
         .filter(s => s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT)
@@ -1075,6 +1079,7 @@ export function buildAnalysisPrompt(
                   `## Active Skills\n${regularSkills.map(buildSkillBlock).join('\n\n')}`,
               ]
             : []),
+        ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
         buildAnalysisRequest(
             patternSkills,
             strategySkills,

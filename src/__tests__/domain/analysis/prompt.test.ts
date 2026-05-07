@@ -43,6 +43,7 @@ import {
 } from '@/__tests__/fixtures/candle';
 import type {
     Bar,
+    FearGreedSnapshot,
     IndicatorResult,
     Skill,
     SMCResult,
@@ -3866,6 +3867,99 @@ describe('prompt', () => {
             );
             expect(result1Day).toContain(
                 `Last ${PROMPT_CONFIG_BY_TIMEFRAME['1Day'].recentBarsCount}-bar cumulative`
+            );
+        });
+    });
+
+    describe('buildAnalysisPrompt — fearGreed integration', () => {
+        it('omits fear-greed section when not provided', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(prompt).not.toContain('Fear & Greed Index');
+        });
+
+        it('includes fear-greed section when snapshot is provided', () => {
+            const fg: FearGreedSnapshot = {
+                score: 18,
+                label: 'EXTREME_FEAR',
+                groups: [
+                    { name: 'Flow', score: 30, factors: [] },
+                    { name: 'Trend', score: 6, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 412,
+                warning: null,
+            };
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                fg
+            );
+            expect(prompt).toContain('Fear & Greed Index');
+            expect(prompt).toContain('18');
+            expect(prompt).toContain('EXTREME_FEAR');
+            expect(prompt).toContain('Flow Group: 30');
+            expect(prompt).toContain('Trend Group: 6');
+        });
+
+        it('appends chronic-weakness warning text when warning is CHRONIC_WEAKNESS', () => {
+            const fg: FearGreedSnapshot = {
+                score: 75,
+                label: 'EXTREME_GREED',
+                groups: [
+                    { name: 'Flow', score: 80, factors: [] },
+                    { name: 'Trend', score: 70, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 412,
+                warning: 'CHRONIC_WEAKNESS',
+            };
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                fg
+            );
+            expect(prompt).toContain(
+                'This stock is in a long-term bearish cycle. The score represents its relative position within its own distribution.'
+            );
+        });
+
+        it('appends chronic-strength warning text when warning is CHRONIC_STRENGTH', () => {
+            const fg: FearGreedSnapshot = {
+                score: 35,
+                label: 'FEAR',
+                groups: [
+                    { name: 'Flow', score: 40, factors: [] },
+                    { name: 'Trend', score: 30, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 412,
+                warning: 'CHRONIC_STRENGTH',
+            };
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                fg
+            );
+            expect(prompt).toContain(
+                'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
             );
         });
     });

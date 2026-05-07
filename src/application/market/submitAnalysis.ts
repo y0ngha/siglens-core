@@ -12,6 +12,7 @@ import {
 import { normalizeCachedAnalysisResponse } from '@/domain/analysis/confidence';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
+import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
 import {
     DEFAULT_TIER,
@@ -19,7 +20,12 @@ import {
     getAllowedTimeframes,
     isTimeframeAllowed,
 } from '@/domain/tier';
-import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    FearGreedSnapshot,
+    Skill,
+    Timeframe,
+} from '@/domain/types';
 import {
     buildAnalysisCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
@@ -255,13 +261,32 @@ export async function submitAnalysis(
             return [[] as Skill[], true] as const;
         });
 
+    // Daily fearGreed snapshot — injected as the sentiment context for the analysis prompt.
+    // When timeframe is '1Day', reuse the already-fetched bars; otherwise fetch daily separately.
+    // On daily-fetch failure, log and fall back to fearGreed=null so the analysis itself proceeds.
+    const dailyDataPromise =
+        timeframe === '1Day'
+            ? Promise.resolve({ bars, indicators })
+            : fetchBarsWithIndicators(symbol, '1Day', fmpSymbol);
+
+    const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
+        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
+        .catch(error => {
+            console.error(
+                '[Submit] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                error
+            );
+            return null;
+        });
+
     const prompt = buildAnalysisPrompt(
         symbol,
         companyName,
         bars,
         indicators,
         skills,
-        timeframe
+        timeframe,
+        fearGreed ?? undefined
     );
 
     const jobId = crypto.randomUUID();

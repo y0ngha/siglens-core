@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type {
@@ -13,12 +14,17 @@ import {
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
+import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import type { AnalysisResponse, OverallAnalysisResponse } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    FearGreedSnapshot,
+    OverallAnalysisResponse,
+} from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -173,13 +179,34 @@ export async function submitOverallAnalysis(
 
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
+
+    // Daily fearGreed snapshot — injected as the sentiment context for the overall prompt.
+    // Computed directly from daily raw data rather than reusing the technical-axis
+    // result, so the daily-only assumption holds regardless of timeframe.
+    // On compute failure, log and fall back to fearGreed=null so the overall analysis proceeds.
+    const fmpSymbol = options.technical.fmpSymbol;
+    const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
+        symbol,
+        '1Day',
+        fmpSymbol
+    )
+        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
+        .catch(error => {
+            console.error(
+                '[submitOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                error
+            );
+            return null;
+        });
+
     const prompt = buildOverallAnalysisPrompt(
         symbol,
         companyName,
         deps.technical,
         deps.fundamental,
         deps.news,
-        timeframe
+        timeframe,
+        fearGreed ?? undefined
     );
     const jobId = crypto.randomUUID();
 

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    FearGreedSnapshot,
+    TierConfig,
+    Timeframe,
+} from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type { UsageRepository } from '@/infrastructure/db';
@@ -9,6 +14,12 @@ vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/application/market/barsApi');
+vi.mock('@/domain/analysis/prompt', () => ({
+    buildAnalysisPrompt: vi.fn(() => 'mock-prompt'),
+}));
+vi.mock('@/domain/indicators/fearGreed', () => ({
+    computeFearGreedIndex: vi.fn(),
+}));
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
@@ -16,10 +27,14 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
+const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
+const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -131,6 +146,11 @@ describe('submitAnalysis 함수는', () => {
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
+        // Default fearGreed compute → null (matches real behavior on the
+        // 1-bar fixture where walk-forward sampling is insufficient).
+        // Individual tests override with mockReturnValueOnce when they need
+        // a deterministic snapshot.
+        mockComputeFearGreedIndex.mockReturnValue(null);
         mockGetUsageToday.mockResolvedValue({ analysis: 0, chatbot: 0 });
         mockRecordUsage.mockResolvedValue({
             id: 'usage-1',
@@ -785,6 +805,102 @@ describe('submitAnalysis 함수는', () => {
                 expect.any(String),
                 expect.objectContaining({ atr: undefined })
             );
+        });
+    });
+
+    describe('FearGreed snapshot 주입 시', () => {
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('1Day 타임프레임이면 추가 fetch 없이 buildAnalysisPrompt 7번째 인자로 fearGreed가 전달된다', async () => {
+            const mockSnapshot: FearGreedSnapshot = {
+                score: 50,
+                label: 'NEUTRAL',
+                groups: [
+                    { name: 'Flow', score: 50, factors: [] },
+                    { name: 'Trend', score: 50, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 100,
+                warning: null,
+            };
+            mockComputeFearGreedIndex.mockReturnValueOnce(mockSnapshot);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Day' as Timeframe
+            );
+
+            // 추가 일봉 fetch 없이 1번만 호출됨.
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                mockSymbol,
+                '1Day',
+                undefined
+            );
+
+            // buildAnalysisPrompt가 호출되었고, 7번째 인자(fearGreed)는 mock한
+            // FearGreedSnapshot 객체와 정확히 동일해야 함.
+            expect(mockBuildAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildAnalysisPrompt.mock.calls[0];
+            // Positional-arg assertion: if buildAnalysisPrompt's signature ever switches
+            // to an options object, replace args[6] with args[0].fearGreed.
+            const seventh = args[6];
+            expect(seventh).toBe(mockSnapshot);
+            expect(args.length).toBe(7);
+        });
+
+        it('1Day가 아닌 타임프레임이면 일봉 데이터를 추가로 fetch한다', async () => {
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '4Hour' as Timeframe
+            );
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
+            expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
+                1,
+                mockSymbol,
+                '4Hour',
+                undefined
+            );
+            expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
+                2,
+                mockSymbol,
+                '1Day',
+                undefined
+            );
+        });
+
+        it('일봉 fetch가 throw해도 분석은 fearGreed=undefined로 계속 진행된다', async () => {
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            mockFetchBarsWithIndicators
+                .mockResolvedValueOnce(mockBarsData) // 1차: 4Hour 정상
+                .mockRejectedValueOnce(new Error('daily fetch failed')); // 2차: 1Day 실패
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '4Hour' as Timeframe
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(consoleSpy).toHaveBeenCalledWith(
+                '[Submit] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                expect.any(Error)
+            );
+
+            // buildAnalysisPrompt 7번째 인자는 undefined여야 함.
+            expect(mockBuildAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildAnalysisPrompt.mock.calls[0];
+            expect(args[6]).toBeUndefined();
+
+            consoleSpy.mockRestore();
         });
     });
 });

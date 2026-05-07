@@ -1,7 +1,9 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import type {
     AnalysisResponse,
+    FearGreedSnapshot,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     Timeframe,
@@ -196,6 +198,7 @@ function formatNews(news: NewsAnalysisResponse): string {
  * @param fundamental - Completed fundamental analysis result.
  * @param news        - Completed news analysis result.
  * @param timeframe   - The chart timeframe; determines interpretation context.
+ * @param fearGreed   - Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)" section is appended after the technical axis to surface sentiment context to the LLM.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 export function buildOverallAnalysisPrompt(
@@ -203,7 +206,8 @@ export function buildOverallAnalysisPrompt(
     technical: AnalysisResponse,
     fundamental: FundamentalAnalysisResponse,
     news: NewsAnalysisResponse,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    fearGreed?: FearGreedSnapshot
 ): string;
 export function buildOverallAnalysisPrompt(
     symbol: string,
@@ -211,7 +215,8 @@ export function buildOverallAnalysisPrompt(
     technical: AnalysisResponse,
     fundamental: FundamentalAnalysisResponse,
     news: NewsAnalysisResponse,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    fearGreed?: FearGreedSnapshot
 ): string;
 export function buildOverallAnalysisPrompt(
     symbol: string,
@@ -219,29 +224,44 @@ export function buildOverallAnalysisPrompt(
     technicalOrFundamental: AnalysisResponse | FundamentalAnalysisResponse,
     fundamentalOrNews: FundamentalAnalysisResponse | NewsAnalysisResponse,
     newsOrTimeframe: NewsAnalysisResponse | Timeframe,
-    maybeTimeframe?: Timeframe
+    maybeTimeframeOrFearGreed?: Timeframe | FearGreedSnapshot,
+    maybeFearGreed?: FearGreedSnapshot
 ): string {
-    const companyName =
-        typeof companyNameOrTechnical === 'string'
-            ? companyNameOrTechnical
-            : symbol;
-    const technical =
-        typeof companyNameOrTechnical === 'string'
-            ? (technicalOrFundamental as AnalysisResponse)
-            : companyNameOrTechnical;
-    const fundamental =
-        typeof companyNameOrTechnical === 'string'
-            ? (fundamentalOrNews as FundamentalAnalysisResponse)
-            : (technicalOrFundamental as FundamentalAnalysisResponse);
-    const news =
-        typeof companyNameOrTechnical === 'string'
-            ? (newsOrTimeframe as NewsAnalysisResponse)
-            : (fundamentalOrNews as NewsAnalysisResponse);
-    const timeframe =
-        typeof companyNameOrTechnical === 'string'
-            ? (maybeTimeframe as Timeframe)
-            : (newsOrTimeframe as Timeframe);
+    const hasCompanyName = typeof companyNameOrTechnical === 'string';
+    const companyName = hasCompanyName ? companyNameOrTechnical : symbol;
+    // (a) TS cannot narrow AnalysisResponse|FundamentalAnalysisResponse union from `hasCompanyName` boolean.
+    // (b) Safe: with-companyName overload places technical at arg 3 (technicalOrFundamental); without-companyName overload places technical at arg 2 (companyNameOrTechnical, already narrowed away from string here).
+    const technical = hasCompanyName
+        ? (technicalOrFundamental as AnalysisResponse)
+        : companyNameOrTechnical;
+    // (a) TS cannot narrow AnalysisResponse|FundamentalAnalysisResponse|NewsAnalysisResponse union from `hasCompanyName` boolean.
+    // (b) Safe: with-companyName overload places fundamental at arg 4 (fundamentalOrNews); without-companyName overload places fundamental at arg 3 (technicalOrFundamental).
+    const fundamental = hasCompanyName
+        ? (fundamentalOrNews as FundamentalAnalysisResponse)
+        : (technicalOrFundamental as FundamentalAnalysisResponse);
+    // (a) TS cannot narrow FundamentalAnalysisResponse|NewsAnalysisResponse|Timeframe union from `hasCompanyName` boolean.
+    // (b) Safe: with-companyName overload places news at arg 5 (newsOrTimeframe); without-companyName overload places news at arg 4 (fundamentalOrNews).
+    const news = hasCompanyName
+        ? (newsOrTimeframe as NewsAnalysisResponse)
+        : (fundamentalOrNews as NewsAnalysisResponse);
+    // (a) TS cannot narrow Timeframe|FearGreedSnapshot|undefined to Timeframe from a property check on `hasCompanyName`.
+    // (b) Safe: with-companyName overload guarantees arg 6 (maybeTimeframeOrFearGreed) is Timeframe;
+    //     without-companyName overload guarantees arg 5 (newsOrTimeframe) is Timeframe.
+    const timeframe = hasCompanyName
+        ? (maybeTimeframeOrFearGreed as Timeframe)
+        : (newsOrTimeframe as Timeframe);
+    // (a) TS cannot narrow Timeframe|FearGreedSnapshot|undefined to FearGreedSnapshot|undefined from `hasCompanyName`.
+    // (b) Safe: without-companyName overload signature places FearGreedSnapshot|undefined at arg 6
+    //     (i.e. maybeTimeframeOrFearGreed); with-companyName overload places it at arg 7 (maybeFearGreed).
+    const fearGreed: FearGreedSnapshot | undefined = hasCompanyName
+        ? maybeFearGreed
+        : (maybeTimeframeOrFearGreed as FearGreedSnapshot | undefined);
     const { label, context } = TIMEFRAME_CONFIG[timeframe];
+
+    const fearGreedBlock =
+        fearGreed !== undefined
+            ? `\n\n${formatFearGreedSection(fearGreed)}`
+            : '';
 
     return `You are a senior equity analyst integrating technical, fundamental, and news analysis into a unified investment verdict. Analyse the three-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
 
@@ -256,7 +276,7 @@ export function buildOverallAnalysisPrompt(
 ${context}
 
 ## Axis 1 — Technical Analysis
-${formatTechnical(technical)}
+${formatTechnical(technical)}${fearGreedBlock}
 
 ## Axis 2 — Fundamental Analysis
 ${formatFundamental(fundamental)}
