@@ -652,3 +652,24 @@
 - Rule: MISTAKES.md Public API §3 (extended) — interface field type widening breaks consumer implementations of the interface; the Tier 4 contract change must be flagged in CHANGELOG even when no symbol is renamed or deleted
 - Context: Blocker B-2 — CallAiProviderOptions.serverApiKey was widened in this PR (T1) so the BYOK branch can leave serverApiKey undefined; consumers implementing callAiProvider must now handle undefined. CHANGELOG.md 0.7.11 BREAKING CHANGES section updated to flag the contract change.
 
+## [PR #77 round 2 | chore/0/post-bde84f3-cleanup | 2026-05-07]
+- Violation: BREAKING CHANGES landed in PR without a corresponding package.json semver bump
+- Rule: MISTAKES.md Public API §3 — Tier 4 contract changes must include both CHANGELOG entry AND package.json bump (in 0.x semver, breaking → MINOR bump i.e. 0.7.x → 0.8.0)
+- Context: Blocker B-2 (round 2) — CallAiProviderOptions.serverApiKey widening was documented in CHANGELOG 0.7.11 in round 1 but package.json stayed at 0.7.11; reviewer flagged that a 0.7.11 → 0.8.0 bump is required for the breaking change. Bumped to 0.8.0.
+
+- Violation: New domain helper merged with incomplete branch coverage in unit tests
+- Rule: MISTAKES.md §15 — every new domain function must reach 100% branch coverage; not just the happy path
+- Context: Blocker B-1 (round 2) — normalizePatternRenderConfig has 5 branches (non-object → undefined, missing/invalid type → undefined, missing color, missing label, missing show) but only the all-fields-present branch was tested in normalizeCachedAnalysisResponse cases. Added 4 dedicated tests covering each missing-field default and the invalid-type branch.
+
+- Violation: Pure helper placed in application/ instead of domain/
+- Rule: docs/domain/CLAUDE.md — "If it can be expressed as a pure function, it belongs here"
+- Context: Suggestion S-2 (round 2) — isFallbackAnalysis only references AnalysisResponse and EMPTY_ANALYSIS_FALLBACK_SUMMARY (both already in domain/analysis/confidence.ts); moved out of pollAnalysis.ts into confidence.ts so the predicate co-locates with the constant it consumes.
+
+- Violation: Test file used vi.mock(module) auto-mock pattern that masked moved exports
+- Rule: MISTAKES.md Tests — auto-mocking a whole module replaces ALL exports with vi.fn()/undefined; when only one export needs to be mocked, use partial mock with vi.importActual
+- Context: Side effect of S-2 — pollAnalysis.test.ts had `vi.mock('@/domain/analysis/confidence')` which auto-mocked the newly-moved isFallbackAnalysis (returned undefined → cache write was no longer skipped). Converted to a partial mock that keeps isFallbackAnalysis / EMPTY_ANALYSIS_FALLBACK_SUMMARY as their real implementations and only stubs enrichAnalysisWithConfidence.
+
+- Violation: JSDoc described an unreachable code path
+- Rule: MISTAKES.md Documentation Sync §3 — JSDoc must match runtime reachability; do not document branches the caller's guards rule out
+- Context: Suggestion S-1 (round 2) — resolveApiKeys JSDoc listed a "Non-pro + premium + no userApiKey → server key" case, but requestChatCompletion now returns user_api_key_required before reaching this helper, making that branch dead. Trimmed the JSDoc to the three reachable cases and added a callout that the missing case is short-circuited by the caller.
+

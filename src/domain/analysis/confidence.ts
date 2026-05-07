@@ -45,6 +45,32 @@ import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
 export const EMPTY_ANALYSIS_FALLBACK_SUMMARY =
     'AI로부터 분석 결과를 받지 못했습니다. 재분석을 시도해 주세요.';
 
+/**
+ * @internal
+ * Returns `true` when `result` was synthesised from an empty or malformed
+ * worker payload — i.e. every array field is empty (including nested support /
+ * resistance levels and bullish / bearish price targets) and the summary is the
+ * Korean fallback string. Used by `pollAnalysis` to skip the Redis cache write
+ * so a subsequent retry can succeed.
+ *
+ * @param result - A normalized {@link AnalysisResponse}.
+ * @returns `true` when the result is a fallback shape with no analytical content.
+ */
+export function isFallbackAnalysis(result: AnalysisResponse): boolean {
+    return (
+        result.summary === EMPTY_ANALYSIS_FALLBACK_SUMMARY &&
+        result.indicatorResults.length === 0 &&
+        result.patternSummaries.length === 0 &&
+        result.strategyResults.length === 0 &&
+        result.candlePatterns.length === 0 &&
+        result.trendlines.length === 0 &&
+        result.keyLevels.support.length === 0 &&
+        result.keyLevels.resistance.length === 0 &&
+        (result.priceTargets.bullish?.targets.length ?? 0) === 0 &&
+        (result.priceTargets.bearish?.targets.length ?? 0) === 0
+    );
+}
+
 interface SkillLookup {
     byName: Map<string, Skill>;
     byPattern: Map<string, Skill>;

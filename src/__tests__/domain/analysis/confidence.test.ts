@@ -710,6 +710,97 @@ describe('confidence', () => {
             expect(result.analyzedAt).toBe('2026-05-06T00:00:00.000Z');
         });
 
+        it('renderConfig.type이 유효하지 않으면 renderConfig를 undefined로 떨어뜨린다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'no-type-pattern',
+                        patternName: '타입없는패턴',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: { show: true, color: '#abc' },
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toBeUndefined();
+        });
+
+        it('renderConfig가 객체가 아니면 undefined로 떨어뜨린다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'string-render',
+                        patternName: '문자열렌더',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: 'not-an-object',
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toBeUndefined();
+        });
+
+        it('renderConfig에 type만 있으면 show/color/label에 기본값을 채운다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'type-only-pattern',
+                        patternName: '타입만',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: { type: 'line' },
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toEqual({
+                type: 'line',
+                show: false,
+                color: '',
+                label: '',
+            });
+        });
+
+        it('renderConfig 필드 타입이 잘못되면 해당 필드만 기본값으로 떨어뜨린다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        id: 'wrong-types-pattern',
+                        patternName: '잘못된타입',
+                        skillName: '테스트 스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                        confidenceWeight: 0.5,
+                        renderConfig: {
+                            type: 'marker',
+                            show: 'truthy',
+                            color: 123,
+                            label: null,
+                        },
+                    },
+                ],
+            });
+
+            expect(result.patternSummaries[0].renderConfig).toEqual({
+                type: 'marker',
+                show: false,
+                color: '',
+                label: '',
+            });
+        });
+
         it('캐시 항목의 child 필드가 누락되면 보수적인 기본값으로 채운다', () => {
             const result = normalizeCachedAnalysisResponse({
                 actionRecommendation: {

@@ -6,7 +6,15 @@ import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
-vi.mock('@/domain/analysis/confidence');
+// Partial mock: only `enrichAnalysisWithConfidence` is mocked. Keep
+// `isFallbackAnalysis` and `EMPTY_ANALYSIS_FALLBACK_SUMMARY` as the real
+// implementations so the cache-skip predicate runs against actual logic.
+vi.mock('@/domain/analysis/confidence', async () => {
+    const actual = await vi.importActual<
+        typeof import('@/domain/analysis/confidence')
+    >('@/domain/analysis/confidence');
+    return { ...actual, enrichAnalysisWithConfidence: vi.fn() };
+});
 vi.mock('@/domain/analysis/ai-levels');
 vi.mock('@/infrastructure/cache/config', async () => {
     const actual = await vi.importActual<

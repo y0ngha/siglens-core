@@ -58,15 +58,18 @@ function toChatErrorResult(error: unknown): ChatActionResult {
 /**
  * Resolve the API key to forward to the AI provider.
  *
- * Routing rules (enforced by caller-side guards in {@link requestChatCompletion}):
- * - Pro tier: server always covers the cost → `serverApiKey` is the sole key.
- * - Free model (any non-pro tier): server always covers the cost → `serverApiKey`
- *   is the sole key. BYOK is not used even if registered.
- * - Non-pro tier + premium model + user BYOK registered (`userApiKey`): user pays
- *   with their own key → `userApiKey` is the sole key. `serverApiKey` is `undefined`.
- * - Non-pro tier + premium model + no `userApiKey`: server key → `serverApiKey`
- *   is the sole key. The caller guards ensure this is only reached when
- *   `serverApiKey` is present.
+ * Routing rules (caller-side guards in {@link requestChatCompletion} reject the
+ * "no key at all" case before this helper runs):
+ * - Pro tier (any model): server covers the cost → `serverApiKey` is the sole key.
+ * - Free model (any non-pro tier): server covers the cost → `serverApiKey` is
+ *   the sole key. BYOK is not used even if registered.
+ * - Non-pro tier + premium model + user BYOK (`userApiKey`) registered: user
+ *   pays with their own key → `userApiKey` is the sole key, `serverApiKey` is
+ *   `undefined`.
+ *
+ * The "non-pro + premium + no `userApiKey`" case is unreachable here because
+ * {@link requestChatCompletion} returns `user_api_key_required` before calling
+ * this helper.
  *
  * Exactly one of `userApiKey` / `serverApiKey` is defined in the return value;
  * the other is always `undefined`.

@@ -2,14 +2,10 @@ import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import {
     enrichAnalysisWithConfidence,
-    EMPTY_ANALYSIS_FALLBACK_SUMMARY,
+    isFallbackAnalysis,
 } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
-import type {
-    AnalysisResponse,
-    PollAnalysisResult,
-    Skill,
-} from '@/domain/types';
+import type { PollAnalysisResult, Skill } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildAnalysisCacheKey,
@@ -22,28 +18,6 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
-
-/**
- * Returns `true` when `result` was synthesised from an empty or malformed
- * worker payload — i.e. every array field is empty (including nested support /
- * resistance levels and bullish / bearish price targets) and the summary is the
- * Korean fallback string. Used by {@link pollAnalysis} to skip the Redis cache
- * write so a subsequent retry can succeed.
- */
-function isFallbackAnalysis(result: AnalysisResponse): boolean {
-    return (
-        result.summary === EMPTY_ANALYSIS_FALLBACK_SUMMARY &&
-        result.indicatorResults.length === 0 &&
-        result.patternSummaries.length === 0 &&
-        result.strategyResults.length === 0 &&
-        result.candlePatterns.length === 0 &&
-        result.trendlines.length === 0 &&
-        result.keyLevels.support.length === 0 &&
-        result.keyLevels.resistance.length === 0 &&
-        (result.priceTargets.bullish?.targets.length ?? 0) === 0 &&
-        (result.priceTargets.bearish?.targets.length ?? 0) === 0
-    );
-}
 
 /**
  * Poll the result of an analysis job submitted via {@link submitAnalysis}.
