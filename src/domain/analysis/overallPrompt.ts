@@ -229,12 +229,18 @@ export function buildOverallAnalysisPrompt(
 ): string {
     const hasCompanyName = typeof companyNameOrTechnical === 'string';
     const companyName = hasCompanyName ? companyNameOrTechnical : symbol;
+    // (a) TS cannot narrow AnalysisResponse|FundamentalAnalysisResponse union from `hasCompanyName` boolean.
+    // (b) Safe: with-companyName overload places technical at arg 3 (technicalOrFundamental); without-companyName overload places technical at arg 2 (companyNameOrTechnical, already narrowed away from string here).
     const technical = hasCompanyName
         ? (technicalOrFundamental as AnalysisResponse)
         : companyNameOrTechnical;
+    // (a) TS cannot narrow AnalysisResponse|FundamentalAnalysisResponse|NewsAnalysisResponse union from `hasCompanyName` boolean.
+    // (b) Safe: with-companyName overload places fundamental at arg 4 (fundamentalOrNews); without-companyName overload places fundamental at arg 3 (technicalOrFundamental).
     const fundamental = hasCompanyName
         ? (fundamentalOrNews as FundamentalAnalysisResponse)
         : (technicalOrFundamental as FundamentalAnalysisResponse);
+    // (a) TS cannot narrow FundamentalAnalysisResponse|NewsAnalysisResponse|Timeframe union from `hasCompanyName` boolean.
+    // (b) Safe: with-companyName overload places news at arg 5 (newsOrTimeframe); without-companyName overload places news at arg 4 (fundamentalOrNews).
     const news = hasCompanyName
         ? (newsOrTimeframe as NewsAnalysisResponse)
         : (fundamentalOrNews as NewsAnalysisResponse);

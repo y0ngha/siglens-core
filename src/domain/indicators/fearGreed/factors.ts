@@ -13,6 +13,13 @@ const MA200_WINDOW = 200;
 const RANGE_WINDOW = 252;
 
 /**
+ * Minimum sample count for short rolling windows (volume z, POC bars).
+ *
+ * @internal Local guard for narrow-window factor computations; not part of the public API.
+ */
+const MIN_ROLLING_GUARD = 5;
+
+/**
  * Minimum sample size required for MA200/52w-position factor windows to produce a value.
  *
  * @internal Imported by walkForward.ts; not part of the public API.
@@ -44,7 +51,7 @@ export function computeFactorsAtT(
 
     const wStart = Math.max(0, t - VOL_Z_WINDOW);
     const volSamples = bars.slice(wStart, t).map(b => b.volume);
-    if (volSamples.length < 5) return null;
+    if (volSamples.length < MIN_ROLLING_GUARD) return null;
     const mean = volSamples.reduce((a, b) => a + b, 0) / volSamples.length;
     const variance =
         volSamples.reduce((a, v) => a + (v - mean) ** 2, 0) / volSamples.length;
@@ -62,7 +69,7 @@ export function computeFactorsAtT(
 
     const pocStart = Math.max(0, t - pocWindow);
     const pocBars = bars.slice(pocStart, t);
-    if (pocBars.length < 5) return null;
+    if (pocBars.length < MIN_ROLLING_GUARD) return null;
     const vp = calculateVolumeProfile(pocBars);
     if (!vp) return null;
     if (vp.poc === 0) return null;

@@ -29,6 +29,10 @@ function genBsv(count: number): BuySellVolumeResult[] {
 }
 
 describe('computeFearGreedIndex', () => {
+    it('returns null for empty bars array', () => {
+        expect(computeFearGreedIndex([], [])).toBeNull();
+    });
+
     it('returns null when bars are below the LIMITED confidence threshold', () => {
         // 8 bars: below LIMITED (10). Even if a factor were computable, the
         // walk-forward sample would be < LIMITED so composeSnapshot returns null.
