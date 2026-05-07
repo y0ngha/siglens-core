@@ -171,6 +171,38 @@ describe('submitFundamentalAnalysis 함수는', () => {
             expect(mockFireAndForget).not.toHaveBeenCalled();
             expect(recordUsage).toHaveBeenCalledTimes(1);
         });
+
+        it('캐시 결과의 overallConclusionKo가 비어 있으면 캐시 미스로 처리하고 provider를 호출한다', async () => {
+            const emptyConclusion = {
+                overallConclusionKo: '',
+                categoryAssessments: [],
+                riskFactorsKo: [],
+                overallSentiment: 'neutral' as const,
+            };
+            mockCacheGet.mockResolvedValueOnce(emptyConclusion);
+            const recordUsage = vi.fn().mockResolvedValue(undefined);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                usage: {
+                    usageRepository: {
+                        recordUsage,
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockDataProvider.getProfile).toHaveBeenCalled();
+            // Empty conclusion is not billed on the cache path — usage is
+            // recorded only after a successful submit.
+            expect(recordUsage).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('캐시 미스일 때', () => {
@@ -256,6 +288,23 @@ describe('submitFundamentalAnalysis 함수는', () => {
                     skillsDegraded: expect.anything(),
                 })
             );
+        });
+
+        it('getProfile이 null을 반환하면 fetch_failed error를 반환한다', async () => {
+            mockDataProvider.getProfile.mockResolvedValueOnce(null);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error') {
+                expect(result.code).toBe('fetch_failed');
+            }
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
         });
 
         it('provider getProfile 호출 시 에러가 발생하면 error 상태를 반환한다', async () => {
