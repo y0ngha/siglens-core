@@ -1,5 +1,55 @@
 # Changelog
 
+# [0.8.0](https://github.com/y0ngha/siglens-core/compare/v0.7.11...v0.8.0) (2026-05-07)
+
+
+### Bug Fixes
+
+* **fearGreed:** address composition review findings ([584ced4](https://github.com/y0ngha/siglens-core/commit/584ced4c8a2772809cd03aea7a87dd0398739f52))
+* **fearGreed:** address factors review findings ([a99aa04](https://github.com/y0ngha/siglens-core/commit/a99aa046ebffe7aaaa2eba6db88ea81ef5cddafa))
+* **fearGreed:** address percentile review findings ([2090654](https://github.com/y0ngha/siglens-core/commit/2090654929f0f6121af1d8ae2e6abd92f66a9965))
+* **fearGreed:** address PR [#78](https://github.com/y0ngha/siglens-core/issues/78) review findings (14 items) ([1d1d3ca](https://github.com/y0ngha/siglens-core/commit/1d1d3caae2559f51fc2f9a279932eb5a6a95ef83))
+* **fearGreed:** address PR [#78](https://github.com/y0ngha/siglens-core/issues/78) round 2 review (4 blockers + 2 suggestions) ([56d6f03](https://github.com/y0ngha/siglens-core/commit/56d6f03045bd7d1fa6b2df4aa5c292d5adfeea04))
+* **fearGreed:** address PR [#78](https://github.com/y0ngha/siglens-core/issues/78) round 3 review (4 blockers) ([faf52a6](https://github.com/y0ngha/siglens-core/commit/faf52a6e861f226d178919339b41d2612902d23b))
+* **fearGreed:** address types review findings ([20319ac](https://github.com/y0ngha/siglens-core/commit/20319ac3673f3f7cc4b8a934628779c4ce7a759e))
+* **fearGreed:** address walkForward review findings ([a6b90ed](https://github.com/y0ngha/siglens-core/commit/a6b90ed7679194515f9203ca191dc18d2929d4a1))
+* **fearGreed:** address wiring review findings (test coverage + English comments) ([187296a](https://github.com/y0ngha/siglens-core/commit/187296af0271c151ef8b39f2d59c25577dff6761))
+* **fearGreed:** annotate findIndex callback to satisfy noImplicitAny ([6c54e91](https://github.com/y0ngha/siglens-core/commit/6c54e9114509039403d1cb87f97c33b7c8ea499c))
+* **fearGreed:** merge into indicators barrel + revision history + [@returns](https://github.com/returns) types ([66d6640](https://github.com/y0ngha/siglens-core/commit/66d6640c0cf590a1d4f8a7080d098166ecb7ce61))
+* **fearGreed:** restore spec impl and use 250-bar fixtures ([606d831](https://github.com/y0ngha/siglens-core/commit/606d831877afc9c22d390b3439ad5099587e2431))
+* **fearGreed:** tag module-internal factors exports with [@internal](https://github.com/internal) ([c7a6ba3](https://github.com/y0ngha/siglens-core/commit/c7a6ba3a7a686fff7fc547ae285579d43b6824b8))
+* **fearGreed:** use spec-verbatim warning strings ([d6f3f12](https://github.com/y0ngha/siglens-core/commit/d6f3f124fb9dfb5de1f9c3451b9819d2471276ed))
+* PR [#77](https://github.com/y0ngha/siglens-core/issues/77) 라운드 2 리뷰 코멘트 반영 (semver bump, branch coverage, isFallbackAnalysis 도메인 이동 등) ([c4d68c0](https://github.com/y0ngha/siglens-core/commit/c4d68c0c6551f19e631c424697331653b9c51743))
+* PR [#77](https://github.com/y0ngha/siglens-core/issues/77) 라운드 3 리뷰 코멘트 반영 (isFallbackAnalysis 단위 테스트, WHAT 주석 제거) ([b29b811](https://github.com/y0ngha/siglens-core/commit/b29b811561a366eae73948ca99a86b032b90f6f6))
+* PR [#77](https://github.com/y0ngha/siglens-core/issues/77) 라운드 4 리뷰 코멘트 반영 (빈 응답 분기 테스트, 상수 추출, JSDoc 개선) ([3e953d3](https://github.com/y0ngha/siglens-core/commit/3e953d3030a4d0560302c59a0540ccb4c0a0bb9b))
+* PR [#77](https://github.com/y0ngha/siglens-core/issues/77) 라운드 5 리뷰 코멘트 반영 (import 블록 병합, JSDoc 정확도 개선, timer leak 방지) ([b6e6430](https://github.com/y0ngha/siglens-core/commit/b6e64302d647b13c43d845f535882542063ed291))
+* PR [#77](https://github.com/y0ngha/siglens-core/issues/77) 라운드 6 Suggestion 적용 (B-5 describe 이름 정규화, timer afterEach 이동) ([8cc2b22](https://github.com/y0ngha/siglens-core/commit/8cc2b22ada4daf319911d5602a8ccc35d67ddf9c))
+* PR [#77](https://github.com/y0ngha/siglens-core/issues/77) 리뷰 코멘트 반영 (Tier 2 JSDoc, BYOK widening CHANGELOG, PUBLIC_API 동기화 외) ([be937ec](https://github.com/y0ngha/siglens-core/commit/be937ecc8460f261fa3c4e43f06a35cb4b471bbc))
+* PR [#79](https://github.com/y0ngha/siglens-core/issues/79) review 반영 — 0.8.0 bump, deprecated alias, docs 정리 ([3f7ad2b](https://github.com/y0ngha/siglens-core/commit/3f7ad2b30e2923fe0a83070f7014f406d6a56ddd))
+* PR [#79](https://github.com/y0ngha/siglens-core/issues/79) round 2 — NEWS_CARD_MODEL_ID export, JSDoc 소비자 중립화 ([1002db0](https://github.com/y0ngha/siglens-core/commit/1002db0e8f87db036f95abecd519fec958a35046))
+* PR [#79](https://github.com/y0ngha/siglens-core/issues/79) round 3 — dead mock 제거, fetch 실패 경로 테스트 추가 ([6e9aa62](https://github.com/y0ngha/siglens-core/commit/6e9aa6233fe511c199256938671bf7214fdb3afd))
+
+
+### Features
+
+* 뉴스 분석시 thinkingBudget 을 옵션으로 받을 수 있도록 처리 ([890e007](https://github.com/y0ngha/siglens-core/commit/890e0078a681fd4dc46597467ce9f0893384fbdc))
+* AI Effort 조절 및 타입 변경 ([977be14](https://github.com/y0ngha/siglens-core/commit/977be14e3836058e6746480f288dc36babd3b254))
+* **fearGreed:** add 5-factor raw computation ([a87a471](https://github.com/y0ngha/siglens-core/commit/a87a471e47cfc401eecf0ddf20db8eba562ca737))
+* **fearGreed:** add barrel and re-export types from domain/types ([f9bef99](https://github.com/y0ngha/siglens-core/commit/f9bef9911d400ef7843357c096095a4e81152cac))
+* **fearGreed:** add composition (groups, score, label, warning) ([c475f27](https://github.com/y0ngha/siglens-core/commit/c475f273cf28f401b8cecdf9c6d094fe493825cd))
+* **fearGreed:** add domain types ([f6eff8a](https://github.com/y0ngha/siglens-core/commit/f6eff8a8dd1255afa32d8fb08b93651215b749bd))
+* **fearGreed:** add percentile utility ([62bdc1d](https://github.com/y0ngha/siglens-core/commit/62bdc1de7f60a7740c6099e1322b783a5b934f7b))
+* **fearGreed:** add walk-forward snapshot and history ([5393447](https://github.com/y0ngha/siglens-core/commit/5393447566d1fd2f349343b4944a6c6341e1cf0d))
+* **fearGreed:** export computeFearGreedIndex/History as Tier 1 ([68a76c1](https://github.com/y0ngha/siglens-core/commit/68a76c1ce27e15f5baa87f1d2a07c699d5709ad7))
+* **fearGreed:** inject fearGreed context into buildAnalysisPrompt ([15b18b2](https://github.com/y0ngha/siglens-core/commit/15b18b223634a5825067fef7f879c76224fb22f9))
+* **fearGreed:** inject fearGreed into overall analysis + DRY shared helper ([db8b645](https://github.com/y0ngha/siglens-core/commit/db8b6450349279aa1423085e952a813d2a51bb88))
+* **fearGreed:** wire fearGreed snapshot into submitAnalysis ([37a599e](https://github.com/y0ngha/siglens-core/commit/37a599e20205133cbdde266fb998b01cf66643d4))
+
+
+### Performance Improvements
+
+* 프롬프트 개선 ([38aaf5b](https://github.com/y0ngha/siglens-core/commit/38aaf5b2b535dc227619d09cf53e74ca02a2f530))
+
 ## [0.7.11](https://github.com/y0ngha/siglens-core/compare/v0.7.10...v0.7.11) (2026-05-06)
 
 
