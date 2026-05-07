@@ -17,6 +17,7 @@ import { TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
@@ -28,6 +29,107 @@ import type {
 
 /** Maximum time to wait for the worker to accept the fundamental analysis job. */
 const SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+
+type ProviderFetchResult =
+    | {
+          status: 'ok';
+          snapshot: FundamentalSnapshot;
+          skills: readonly Skill[];
+          skillsDegraded: boolean | undefined;
+      }
+    | SubmitFundamentalAnalysisFetchError;
+
+async function fetchProviderData(
+    dataProvider: FundamentalDataProvider,
+    symbol: string,
+    occurredAt: Date
+): Promise<ProviderFetchResult> {
+    try {
+        const [
+            profile,
+            keyMetricsTtm,
+            ratiosTtm,
+            cashFlow,
+            incomeGrowth,
+            financialScores,
+            peers,
+            analystEstimate,
+            gradesConsensus,
+            priceTargetConsensus,
+            priceTargetSummary,
+            earningsReport,
+            sectorSnapshot,
+            skillsResult,
+        ] = await Promise.all([
+            dataProvider.getProfile(symbol),
+            dataProvider.getKeyMetricsTtm(symbol),
+            dataProvider.getRatiosTtm(symbol),
+            dataProvider.getCashFlowStatement(symbol),
+            dataProvider.getIncomeStatementGrowth(symbol),
+            dataProvider.getFinancialScores(symbol),
+            dataProvider.getStockPeers(symbol),
+            dataProvider.getAnalystEstimates(symbol),
+            dataProvider.getGradesConsensus(symbol),
+            dataProvider.getPriceTargetConsensus(symbol),
+            dataProvider.getPriceTargetSummary(symbol),
+            dataProvider.getEarningsReport(symbol),
+            dataProvider.getSectorPerformanceSnapshot(
+                occurredAt.toISOString().slice(0, 10)
+            ),
+            loadSkillsCached(),
+        ]);
+
+        if (profile === null) {
+            return {
+                status: 'error',
+                code: 'fetch_failed',
+                error: `Profile not found for symbol: ${symbol}`,
+            };
+        }
+
+        const sectorName = profile.sector;
+        const sectorHistorical = sectorName
+            ? await dataProvider.getHistoricalSectorPerformance(sectorName)
+            : [];
+
+        const sectorToday =
+            sectorSnapshot.find(s => s.sector === sectorName)
+                ?.changesPercentage ?? null;
+
+        const snapshot = normalizeFundamentalSnapshot({
+            profile,
+            keyMetricsTtm,
+            ratiosTtm,
+            cashFlow,
+            incomeGrowth,
+            financialScores,
+            peers,
+            analystEstimate,
+            gradesConsensus,
+            priceTargetConsensus,
+            priceTargetSummary,
+            nextEarningsAt: earningsReport?.earningsDate ?? null,
+            sectorTodayChangePct: sectorToday,
+            sectorHistorical: sectorHistorical.map(h => ({
+                date: h.date,
+                changePct: h.changesPercentage,
+            })),
+        });
+
+        return {
+            status: 'ok',
+            snapshot,
+            skills: skillsResult.skills,
+            skillsDegraded: skillsResult.skillsDegraded || undefined,
+        };
+    } catch (error) {
+        console.error(
+            '[submitFundamentalAnalysis] Provider fetch failed:',
+            error
+        );
+        return { status: 'error', code: 'fetch_failed', error: String(error) };
+    }
+}
 
 /**
  * Submit a fundamental analysis job for the given symbol.
@@ -93,15 +195,14 @@ export async function submitFundamentalAnalysis(
         try {
             const cached =
                 await cache.get<FundamentalAnalysisResponse>(cacheKey);
-            // Lightweight structural validation — schema drift from a prior
-            // release should fall through as a cache miss rather than poison
-            // the response. The schema-version prefix on the cache key is the
-            // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
-            // check is a belt-and-braces fallback.
             if (cached !== null) {
                 const result = normalizeFundamentalAnalysisResponse(cached);
-                await recordAnalysisUsageSafely(usage, modelId, occurredAt);
-                return { status: 'cached', result };
+                // Treat an empty conclusion as a cache miss — a blank result is
+                // worse than re-running the analysis and should not be billed.
+                if (result.overallConclusionKo) {
+                    await recordAnalysisUsageSafely(usage, modelId, occurredAt);
+                    return { status: 'cached', result };
+                }
             }
         } catch (error) {
             console.error(
@@ -111,97 +212,9 @@ export async function submitFundamentalAnalysis(
         }
     }
 
-    let snapshot: FundamentalSnapshot;
-    let skills: readonly Skill[];
-    let skillsDegraded: boolean | undefined;
-
-    try {
-        const [
-            profile,
-            keyMetricsTtm,
-            ratiosTtm,
-            cashFlow,
-            incomeGrowth,
-            financialScores,
-            peers,
-            analystEstimate,
-            gradesConsensus,
-            priceTargetConsensus,
-            priceTargetSummary,
-            earningsReport,
-            sectorSnapshot,
-            skillsResult,
-        ] = await Promise.all([
-            dataProvider.getProfile(symbol),
-            dataProvider.getKeyMetricsTtm(symbol),
-            dataProvider.getRatiosTtm(symbol),
-            dataProvider.getCashFlowStatement(symbol),
-            dataProvider.getIncomeStatementGrowth(symbol),
-            dataProvider.getFinancialScores(symbol),
-            dataProvider.getStockPeers(symbol),
-            dataProvider.getAnalystEstimates(symbol),
-            dataProvider.getGradesConsensus(symbol),
-            dataProvider.getPriceTargetConsensus(symbol),
-            dataProvider.getPriceTargetSummary(symbol),
-            dataProvider.getEarningsReport(symbol),
-            dataProvider.getSectorPerformanceSnapshot(
-                occurredAt.toISOString().slice(0, 10)
-            ),
-            loadSkillsCached(),
-        ]);
-
-        if (profile === null) {
-            const fetchError: SubmitFundamentalAnalysisFetchError = {
-                status: 'error',
-                code: 'fetch_failed',
-                error: `Profile not found for symbol: ${symbol}`,
-            };
-            return fetchError;
-        }
-
-        const sectorName = profile.sector;
-        const sectorHistorical = sectorName
-            ? await dataProvider.getHistoricalSectorPerformance(sectorName)
-            : [];
-
-        const sectorToday =
-            sectorSnapshot.find(s => s.sector === sectorName)
-                ?.changesPercentage ?? null;
-
-        snapshot = normalizeFundamentalSnapshot({
-            profile,
-            keyMetricsTtm,
-            ratiosTtm,
-            cashFlow,
-            incomeGrowth,
-            financialScores,
-            peers,
-            analystEstimate,
-            gradesConsensus,
-            priceTargetConsensus,
-            priceTargetSummary,
-            nextEarningsAt: earningsReport?.earningsDate ?? null,
-            sectorTodayChangePct: sectorToday,
-            sectorHistorical: sectorHistorical.map(h => ({
-                date: h.date,
-                changePct: h.changesPercentage,
-            })),
-        });
-
-        skills = skillsResult.skills;
-        skillsDegraded = skillsResult.skillsDegraded || undefined;
-    } catch (error) {
-        console.error(
-            '[submitFundamentalAnalysis] Provider fetch failed:',
-            error
-        );
-        const fetchError: SubmitFundamentalAnalysisFetchError = {
-            status: 'error',
-            code: 'fetch_failed',
-            error: String(error),
-        };
-        return fetchError;
-    }
+    const providerData = await fetchProviderData(dataProvider, symbol, occurredAt);
+    if (providerData.status === 'error') return providerData;
+    const { snapshot, skills, skillsDegraded } = providerData;
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, skills);

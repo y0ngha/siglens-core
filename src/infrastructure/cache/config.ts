@@ -83,7 +83,7 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     );
 }
 
-/** Fallback model identifier used in cache keys when no specific model is tracked. */
+/** @internal Fallback model identifier used in cache keys when no specific model is tracked. */
 export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
@@ -151,11 +151,11 @@ export function buildSectorSignalsCacheKey(
  */
 export const CACHE_KEY_SCHEMA_VERSION = 'v1' as const;
 
-/** TTL for fundamental analysis cache results. Default: 24 hours. */
+/** @internal TTL for fundamental analysis cache results. Default: 24 hours. */
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** TTL for news analysis aggregate cache results. Default: 24 hours. */
+/** @internal TTL for news analysis aggregate cache results. Default: 24 hours. */
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/** TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
+/** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
 export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
 /**

@@ -130,9 +130,9 @@ describe('submitFundamentalAnalysis 함수는', () => {
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
             // Cache hit must not trigger any FMP data fetches — verify all methods.
-            for (const method of Object.values(mockDataProvider) as Mock[]) {
-                expect(method).not.toHaveBeenCalled();
-            }
+            Object.values(mockDataProvider).forEach(method =>
+                expect(method as Mock).not.toHaveBeenCalled()
+            );
         });
 
         it('캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
