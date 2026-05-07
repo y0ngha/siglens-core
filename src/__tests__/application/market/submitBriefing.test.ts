@@ -2,16 +2,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/cache/redis');
+vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
 import { submitBriefing } from '@/application/market/submitBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { claimOrJoinInFlightJob } from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import type { MarketSummaryData, MarketBriefingResponse } from '@/domain/types';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
+const mockClaimOrJoinInFlightJob = claimOrJoinInFlightJob as Mock;
 const mockNormalizeMarketBriefing = normalizeMarketBriefing as Mock;
 const mockBuildMarketBriefingPrompt = buildMarketBriefingPrompt as Mock;
 
@@ -55,6 +58,13 @@ describe('submitBriefing 함수는', () => {
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
+        // Default: 새 슬롯을 claim한 것으로 가정. dedup 분기는 per-test에서 override.
+        mockClaimOrJoinInFlightJob.mockImplementation(
+            async (_cacheKey: string, newJobId: string) => ({
+                status: 'claimed' as const,
+                jobId: newJobId,
+            })
+        );
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockBuildMarketBriefingPrompt.mockReturnValue('mock prompt');
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
@@ -146,6 +156,25 @@ describe('submitBriefing 함수는', () => {
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('dedup으로 기존 in-flight job에 join되면', () => {
+        it('worker로 dispatch하지 않고 기존 jobId를 반환한다', async () => {
+            mockClaimOrJoinInFlightJob.mockImplementationOnce(async () => ({
+                status: 'joined',
+                jobId: 'existing-briefing-job',
+            }));
+
+            const result = await submitBriefing(mockData);
+
+            expect(result).toEqual({
+                status: 'submitted',
+                jobId: 'existing-briefing-job',
+            });
+            // 같은 시간대(briefing cacheKey)에 동시 submit이 들어와도 worker
+            // 호출은 한 번만 발생해야 한다 — 나머지는 기존 jobId만 polling.
+            expect(mockFetch).not.toHaveBeenCalled();
         });
     });
 });
