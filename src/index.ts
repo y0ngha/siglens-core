@@ -514,7 +514,6 @@ export type {
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
     SubmitNewsAnalysisSubmitted,
-    SubmitNewsCardAnalysisCached,
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
     SubmitNewsCardAnalysisSubmitted,
