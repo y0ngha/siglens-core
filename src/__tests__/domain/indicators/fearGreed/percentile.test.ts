@@ -18,4 +18,13 @@ describe('percentile', () => {
     it('handles unsorted input', () => {
         expect(percentile(2, [3, 1, 0, 2])).toBe(50);
     });
+    it('returns 0 for value equal to the sole element of single-element sample (strict <)', () => {
+        expect(percentile(5, [5])).toBe(0);
+    });
+    it('returns 100 when value is above the sole element of single-element sample', () => {
+        expect(percentile(10, [5])).toBe(100);
+    });
+    it('returns 0 when sample is all duplicates of value (strict-less-than semantics)', () => {
+        expect(percentile(2, [2, 2, 2])).toBe(0);
+    });
 });
