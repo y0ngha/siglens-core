@@ -473,9 +473,6 @@
 - Violation: Partial<Record<...>> on fully-covered union + ?? '' dead code (B3)
 - Rule: MISTAKES.md Coding Paradigm #4 "Catch-all unreachable conditions must be removed"
 - Context: WARNING_NOTE in fearGreedSection.ts. Removed Partial; removed ?? '' fallback.
-- Violation: as cast missing (a)+(b) safety comment (B4)
-- Rule: MISTAKES.md TypeScript #7 "as casts must explain (a) why and (b) why runtime-safe"
-- Context: overallPrompt.ts overload disambiguation casts. Added two-line comment block.
 - Violation: test boundary literals not derived from source constants (S1)
 - Rule: MISTAKES.md Tests #4 "Boundary constants must be imported from source"
 - Context: composition.test.ts detectWarning literals. Imported FEAR_GREED_WARNING_THRESHOLDS.
@@ -484,16 +481,7 @@
 - Context: submitAnalysis.test.ts and submitOverallAnalysis.test.ts. Tightened to === 7 with comment.
 
 ## [PR #78 round 3 | feat/per-stock-fear-greed-index | 2026-05-07]
-- Violation: as casts missing (a)+(b) safety comment (B1)
-- Rule: MISTAKES.md TypeScript #7 "as casts must explain (a) why and (b) why runtime-safe"
-- Context: overallPrompt.ts technical/fundamental/news (5 casts) — round 2 only added comments to timeframe/fearGreed.
 - Violation: magic number 5 hardcoded twice (B2)
 - Rule: MISTAKES.md Coding Paradigm #13 "Magic numbers must be extracted to named constants"
 - Context: factors.ts volSamples and pocBars guards used literal 5. Extracted to MIN_ROLLING_GUARD.
-- Violation: 8 branches uncovered in computeFactorsAtT (B3)
-- Rule: MISTAKES.md Tests #15 "Domain functions require 100% branch coverage"
-- Context: factors.test.ts had 5 cases; added 8 more for std=0, !vp, vp.poc=0, ma200=0, high=low, !bsv, volSamples<5, pocBars<5.
-- Violation: empty bars guard not tested (B4)
-- Rule: MISTAKES.md Tests #15
-- Context: walkForward.test.ts computeFearGreedIndex missed bars.length===0 case. Added.
 
