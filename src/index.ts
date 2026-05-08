@@ -245,6 +245,7 @@ export {
     isAllowed,
     isInfoDepthAllowed,
     isModelAllowed,
+    isPremiumModel,
     isTier,
     isTimeframeAllowed,
 } from './domain/tier';

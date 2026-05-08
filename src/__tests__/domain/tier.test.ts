@@ -9,6 +9,7 @@ import {
     isAllowed,
     isInfoDepthAllowed,
     isModelAllowed,
+    isPremiumModel,
     isTier,
     isTimeframeAllowed,
 } from '@/domain/tier';
@@ -282,6 +283,24 @@ describe('tier', () => {
             expect(isTier('member')).toBe(true);
             expect(isTier('pro')).toBe(true);
             expect(isTier('enterprise')).toBe(false);
+        });
+    });
+
+    describe('isPremiumModel', () => {
+        it('returns false for free-tier models', () => {
+            expect(isPremiumModel('gemini-2.5-flash')).toBe(false);
+            expect(isPremiumModel('gemini-2.5-flash-lite')).toBe(false);
+            expect(isPremiumModel('claude-haiku-4-5')).toBe(false);
+            expect(isPremiumModel('gpt-5-mini')).toBe(false);
+        });
+
+        it('returns true for member-only models', () => {
+            expect(isPremiumModel('gemini-2.5-pro')).toBe(true);
+            expect(isPremiumModel('claude-sonnet-4-6')).toBe(true);
+        });
+
+        it('returns true for pro-only models', () => {
+            expect(isPremiumModel('claude-opus-4-7')).toBe(true);
         });
     });
 });

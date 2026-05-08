@@ -270,3 +270,18 @@ export function isModelAllowed(
 export function isTier(value: string): value is Tier {
     return TIER_VALUE_STRINGS.includes(value);
 }
+
+/**
+ * Return whether a model is considered premium (not in the free-tier list).
+ *
+ * @param model - The AI model identifier to check.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` if the model is NOT in `config.models.free`, `false` otherwise.
+ */
+export function isPremiumModel(
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    const freeModels = config.models.free as readonly string[];
+    return !freeModels.includes(model);
+}
