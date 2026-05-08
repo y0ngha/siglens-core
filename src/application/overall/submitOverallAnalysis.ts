@@ -28,6 +28,8 @@ import type {
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+// Matches USER_API_KEY_REQUIRED_MESSAGE in submitAnalysis.ts, submitNewsAnalysis.ts,
+// submitFundamentalAnalysis.ts, submitOverallAnalysis.ts — update all four if the message changes.
 const USER_API_KEY_REQUIRED_MESSAGE =
     '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.';
 

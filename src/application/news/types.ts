@@ -64,8 +64,8 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      */
     now?: Date;
     /**
-     * BYOK API key. non-pro 티어가 프리미엄 모델 사용 시 필수.
-     * 제공 시 worker로 X-AI-API-KEY 헤더로 전달됨.
+     * BYOK API key. Must be provided when a non-pro tier requests a premium model.
+     * When provided, forwarded to the worker as the X-AI-API-KEY header.
      */
     userApiKey?: string;
 }

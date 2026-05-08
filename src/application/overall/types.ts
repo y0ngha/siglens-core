@@ -226,8 +226,9 @@ export interface SubmitOverallAnalysisOptions
      */
     now?: Date;
     /**
-     * BYOK API key (overall scope). 최상위에서 한 번 전달되며, dependency resolver가
-     * 각 axis 옵션으로 전파한다 (이미 axis 옵션에 명시되어 있으면 axis 값 우선).
+     * BYOK API key (top-level scope). Provided once at the overall level;
+     * the dependency resolver propagates it to each axis option
+     * (axis-level values take precedence if already set).
      */
     userApiKey?: string;
 }

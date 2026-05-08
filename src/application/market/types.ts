@@ -32,7 +32,10 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     tierConfig?: TierConfig;
     /** LLM model identifier used to isolate cached results per model and for worker routing. */
     modelId?: ModelId;
-    /** User-supplied AI API key forwarded as `X-AI-API-KEY` to the worker. Must be provided when the selected model requires a user-supplied API key; omit for platform-managed models. */
+    /**
+     * BYOK API key. Must be provided when a non-pro tier requests a premium model.
+     * When provided, forwarded to the worker as the X-AI-API-KEY header.
+     */
     userApiKey?: string;
 }
 
@@ -58,18 +61,19 @@ export interface TierGateErrorResult {
 
 /** Result variant when a user BYOK API key is required for the requested model+tier combo. */
 export interface UserApiKeyRequiredError {
+    status: 'key_error';
     code: 'user_api_key_required';
-    message: string;
+    error: string;
     /** The model that triggered the BYOK requirement. */
     modelId: ModelId;
     /** The tier that triggered the BYOK requirement. */
     tier: Tier;
 }
 
-/** Analysis error result: usage limit exceeded or tier timeframe denied. */
+/** Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required. */
 export type SubmitAnalysisErrorResult =
     | { status: 'error'; error: AnalysisLimitError }
-    | { status: 'error'; error: UserApiKeyRequiredError }
+    | UserApiKeyRequiredError
     | TierGateErrorResult;
 
 /** Submit analysis outcome including application-level gate errors. */

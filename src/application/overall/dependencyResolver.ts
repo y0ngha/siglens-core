@@ -135,9 +135,12 @@ export async function resolveOverallDependencies(
     } = technicalOptions;
 
     // ── Extract top-level propagation fields (available when called from submitOverallAnalysis) ──
-    // `tier` and `userApiKey` live on SubmitOverallAnalysisOptions (a superset of
-    // OverallDependencyInputs). Access them via a cast that matches the established
-    // pattern for the legacy `newsOptions` field above.
+    // `tier` and `userApiKey` exist on SubmitOverallAnalysisOptions, which extends
+    // OverallDependencyInputs. TS cannot widen the parameter type automatically.
+    // Safe: resolveOverallDependencies is only ever called from submitOverallAnalysis,
+    // which passes SubmitOverallAnalysisOptions — the superset type that includes
+    // these fields. Direct callers from tests may construct OverallDependencyInputs
+    // without these fields; the optional access pattern handles that case.
     const topLevelTier = (inputs as { tier?: Tier }).tier;
     const topLevelUserApiKey = (inputs as { userApiKey?: string }).userApiKey;
 
@@ -202,11 +205,20 @@ export async function resolveOverallDependencies(
     ]);
 
     // ── Check for axis errors — surface immediately, do not coerce to pending ──
+    // `key_error` from the technical axis (market BYOK gate) is also surfaced as
+    // a dependency error so the overall caller can propagate it to the user.
     if (technicalResult.status === 'error') {
         return {
             kind: 'error',
             axis: 'technical',
             error: technicalResult.error,
+        };
+    }
+    if (technicalResult.status === 'key_error') {
+        return {
+            kind: 'error',
+            axis: 'technical',
+            error: technicalResult,
         };
     }
     if (fundamentalResult.status === 'error') {

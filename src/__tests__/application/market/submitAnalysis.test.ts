@@ -840,9 +840,9 @@ describe('submitAnalysis 함수는', () => {
                 }
             );
 
-            expect(result.status).toBe('error');
-            if (result.status === 'error') {
-                expect(result.error.code).toBe('user_api_key_required');
+            expect(result.status).toBe('key_error');
+            if (result.status === 'key_error') {
+                expect(result.code).toBe('user_api_key_required');
             }
             expect(mockFetch).not.toHaveBeenCalled();
         });
@@ -862,12 +862,10 @@ describe('submitAnalysis 함수는', () => {
             );
 
             expect(result).toMatchObject({
-                status: 'error',
-                error: {
-                    code: 'user_api_key_required',
-                    modelId: 'gemini-2.5-pro',
-                    tier: 'member',
-                },
+                status: 'key_error',
+                code: 'user_api_key_required',
+                modelId: 'gemini-2.5-pro',
+                tier: 'member',
             });
         });
 
