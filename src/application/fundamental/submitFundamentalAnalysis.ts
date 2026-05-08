@@ -178,13 +178,14 @@ export async function submitFundamentalAnalysis(
     const premium = isPremiumModel(modelId, tierConfig);
 
     if (tier !== 'pro' && premium && options.userApiKey === undefined) {
-        const apiKeyRequiredError: SubmitFundamentalAnalysisApiKeyRequiredError = {
-            status: 'error',
-            code: 'user_api_key_required',
-            error: USER_API_KEY_REQUIRED_MESSAGE,
-            modelId,
-            tier,
-        };
+        const apiKeyRequiredError: SubmitFundamentalAnalysisApiKeyRequiredError =
+            {
+                status: 'error',
+                code: 'user_api_key_required',
+                error: USER_API_KEY_REQUIRED_MESSAGE,
+                modelId,
+                tier,
+            };
         return apiKeyRequiredError;
     }
 

@@ -529,7 +529,10 @@ describe('submitFundamentalAnalysis 함수는', () => {
             });
 
             expect(result.status).toBe('error');
-            if (result.status === 'error' && result.code === 'user_api_key_required') {
+            if (
+                result.status === 'error' &&
+                result.code === 'user_api_key_required'
+            ) {
                 expect(result.modelId).toBe('gemini-2.5-pro');
                 expect(result.tier).toBe('member');
             } else {

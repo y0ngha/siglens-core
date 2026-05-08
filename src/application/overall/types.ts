@@ -119,7 +119,12 @@ export interface OverallDependencyInputs {
     news?:
         | Pick<
               SubmitNewsAnalysisOptions,
-              'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
+              | 'tier'
+              | 'tierConfig'
+              | 'usage'
+              | 'now'
+              | 'waitUntil'
+              | 'userApiKey'
           >
         | ReadonlyArray<EnrichedNewsItem>;
     /**
