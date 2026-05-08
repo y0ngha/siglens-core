@@ -18,7 +18,10 @@ import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
-import { setJobMeta } from '@/infrastructure/jobs/queue';
+import {
+    claimOrJoinInFlightJob,
+    setJobMeta,
+} from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
@@ -222,8 +225,19 @@ export async function submitFundamentalAnalysis(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, skills);
-    const jobId = crypto.randomUUID();
+    const newJobId = crypto.randomUUID();
+    // Dedup: when another submitter is already in flight for the same cache
+    // key, reuse their jobId rather than spawning a duplicate worker call.
+    const claim = await claimOrJoinInFlightJob(cacheKey, newJobId);
 
+    if (claim.status === 'joined') {
+        // Subscribed to an existing job — refcount is already incremented, no
+        // new worker dispatch and no usage record (the original submit owns
+        // both responsibilities).
+        return { status: 'submitted', jobId: claim.jobId };
+    }
+
+    const { jobId } = claim;
     await setJobMeta(jobId, {
         symbol,
         modelId,
@@ -247,6 +261,9 @@ export async function submitFundamentalAnalysis(
     });
     fireAndForget(dispatch, options);
 
+    // Usage is recorded only on the claiming submitter — joined subscribers
+    // returned early above and intentionally skip this so a single overall
+    // request still counts as exactly one analysis.
     await recordAnalysisUsageSafely(usage, modelId, occurredAt);
 
     return { status: 'submitted', jobId };

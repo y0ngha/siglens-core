@@ -7,6 +7,10 @@ import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 import { buildBriefingCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
+import {
+    claimOrJoinInFlightJob,
+    setJobMeta,
+} from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 
@@ -68,7 +72,21 @@ export async function submitBriefing(
     const { workerUrl, workerSecret } = readWorkerConfig();
 
     const prompt = buildMarketBriefingPrompt(data.indices, data.sectors);
-    const jobId = crypto.randomUUID();
+    const newJobId = crypto.randomUUID();
+    // Dedup: when another submitter is already in flight for the same cache
+    // key, reuse their jobId rather than spawning a duplicate worker call.
+    const claim = await claimOrJoinInFlightJob(cacheKey, newJobId);
+
+    if (claim.status === 'joined') {
+        return { status: 'submitted', jobId: claim.jobId };
+    }
+
+    const { jobId } = claim;
+    // Persist `cacheKey` so that terminal-status cleanup and the last-cancel
+    // path can release the in-flight slot. Without this the slot would only
+    // expire via TTL and intermediate failures would force same-hour retries
+    // to attach to a dead job — the regression flagged in PR #82 review B-2.
+    await setJobMeta(jobId, { cacheKey });
 
     // fire-and-forget: serverless 환경에선 options.waitUntil로 응답 후 promise 종료 보장.
     const dispatch = fetch(`${workerUrl}/briefing`, {

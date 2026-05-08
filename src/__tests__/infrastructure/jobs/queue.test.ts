@@ -5,7 +5,11 @@ import type { JobMeta } from '@/infrastructure/jobs/types';
 
 const mockGet = vi.fn();
 const mockSet = vi.fn();
+const mockSetNx = vi.fn();
 const mockDel = vi.fn();
+const mockIncr = vi.fn();
+const mockDecr = vi.fn();
+const mockExpire = vi.fn();
 
 vi.mock('@/infrastructure/jobs/redis', () => ({
     createJobRedis: vi.fn(),
@@ -14,12 +18,15 @@ vi.mock('@/infrastructure/jobs/redis', () => ({
 import { createJobRedis } from '@/infrastructure/jobs/redis';
 import {
     cancelJob,
+    claimOrJoinInFlightJob,
     cleanupJob,
+    clearInFlightJob,
     getJobError,
     getJobMeta,
     getJobResult,
     getJobStatus,
     isJobCancelled,
+    releaseInFlightJob,
     setJobError,
     setJobMeta,
     setJobResult,
@@ -32,7 +39,11 @@ const mockCreateJobRedis = createJobRedis as Mock;
 const fakeRedis = {
     get: mockGet,
     set: mockSet,
+    setNx: mockSetNx,
     del: mockDel,
+    incr: mockIncr,
+    decr: mockDecr,
+    expire: mockExpire,
 };
 
 describe('job queue — redis null (env vars missing)', () => {
@@ -40,7 +51,11 @@ describe('job queue — redis null (env vars missing)', () => {
         mockCreateJobRedis.mockReturnValue(null);
         mockGet.mockClear();
         mockSet.mockClear();
+        mockSetNx.mockClear();
         mockDel.mockClear();
+        mockIncr.mockClear();
+        mockDecr.mockClear();
+        mockExpire.mockClear();
     });
 
     it('setJobMeta returns without calling redis', async () => {
@@ -96,6 +111,25 @@ describe('job queue — redis null (env vars missing)', () => {
         await cleanupJob('job1');
         expect(mockDel).not.toHaveBeenCalled();
     });
+
+    it('claimOrJoinInFlightJob falls back to claimed with newJobId', async () => {
+        const claim = await claimOrJoinInFlightJob('cache-key', 'new-job');
+        expect(claim).toEqual({ status: 'claimed', jobId: 'new-job' });
+        expect(mockSetNx).not.toHaveBeenCalled();
+        expect(mockIncr).not.toHaveBeenCalled();
+    });
+
+    it('releaseInFlightJob returns true so legacy callers still cancel', async () => {
+        const isLast = await releaseInFlightJob('job1');
+        expect(isLast).toBe(true);
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
+    it('clearInFlightJob returns without calling redis', async () => {
+        await clearInFlightJob('job1', 'cache-key');
+        expect(mockDel).not.toHaveBeenCalled();
+        expect(mockGet).not.toHaveBeenCalled();
+    });
 });
 
 describe('job queue — with redis', () => {
@@ -103,7 +137,11 @@ describe('job queue — with redis', () => {
         mockCreateJobRedis.mockReturnValue(fakeRedis);
         mockGet.mockClear();
         mockSet.mockClear();
+        mockSetNx.mockClear();
         mockDel.mockClear();
+        mockIncr.mockClear();
+        mockDecr.mockClear();
+        mockExpire.mockClear();
     });
 
     it('setJobMeta calls redis.set with correct key and TTL', async () => {
@@ -175,15 +213,16 @@ describe('job queue — with redis', () => {
         expect(await isJobCancelled('job1')).toBe(false);
     });
 
-    it('cleanupJob calls redis.del with all job keys', async () => {
-        mockDel.mockResolvedValue(5);
+    it('cleanupJob calls redis.del with all job keys including refcount', async () => {
+        mockDel.mockResolvedValue(6);
         await cleanupJob('job1');
         expect(mockDel).toHaveBeenCalledWith(
             'job:job1:status',
             'job:job1:result',
             'job:job1:error',
             'job:job1:meta',
-            'job:job1:cancelled'
+            'job:job1:cancelled',
+            'job:job1:refcount'
         );
     });
 
@@ -213,5 +252,139 @@ describe('job queue — with redis', () => {
             'Something went wrong',
             { ex: SECONDS_PER_HOUR }
         );
+    });
+
+    describe('claimOrJoinInFlightJob', () => {
+        it('claims a fresh slot when no in-flight job exists', async () => {
+            mockSetNx.mockResolvedValueOnce('OK');
+            mockIncr.mockResolvedValueOnce(1);
+            mockExpire.mockResolvedValueOnce(1);
+
+            const claim = await claimOrJoinInFlightJob('cache-key', 'new-job');
+
+            expect(claim).toEqual({ status: 'claimed', jobId: 'new-job' });
+            expect(mockSetNx).toHaveBeenCalledWith(
+                'job:inflight:cache-key',
+                'new-job',
+                { ex: SECONDS_PER_HOUR }
+            );
+            expect(mockIncr).toHaveBeenCalledWith('job:new-job:refcount');
+            expect(mockExpire).toHaveBeenCalledWith(
+                'job:new-job:refcount',
+                SECONDS_PER_HOUR
+            );
+        });
+
+        it('joins an existing in-flight slot when contention is detected', async () => {
+            mockSetNx.mockResolvedValueOnce(null);
+            mockGet.mockResolvedValueOnce('existing-job');
+            mockIncr.mockResolvedValueOnce(2);
+            mockExpire.mockResolvedValueOnce(1);
+
+            const claim = await claimOrJoinInFlightJob('cache-key', 'new-job');
+
+            expect(claim).toEqual({
+                status: 'joined',
+                jobId: 'existing-job',
+            });
+            expect(mockGet).toHaveBeenCalledWith('job:inflight:cache-key');
+            expect(mockIncr).toHaveBeenCalledWith('job:existing-job:refcount');
+            expect(mockExpire).toHaveBeenCalledWith(
+                'job:existing-job:refcount',
+                SECONDS_PER_HOUR
+            );
+        });
+
+        it('retries with a fresh claim when the slot disappears between SET NX and GET', async () => {
+            // First iteration: SET NX returns null (slot taken), GET returns null (slot gone).
+            // Second iteration: SET NX succeeds (slot re-claimed after race).
+            mockSetNx.mockResolvedValueOnce(null).mockResolvedValueOnce('OK');
+            mockGet.mockResolvedValueOnce(null);
+            mockIncr.mockResolvedValueOnce(1);
+            mockExpire.mockResolvedValueOnce(1);
+
+            const claim = await claimOrJoinInFlightJob('cache-key', 'new-job');
+
+            expect(claim).toEqual({ status: 'claimed', jobId: 'new-job' });
+            expect(mockSetNx).toHaveBeenCalledTimes(2);
+        });
+
+        it('initializes refcount on the fall-through claim after retries are exhausted', async () => {
+            // Every attempt: SET NX returns null and GET returns null too →
+            // loop runs CLAIM_OR_JOIN_MAX_ATTEMPTS times then falls through.
+            mockSetNx.mockResolvedValue(null);
+            mockGet.mockResolvedValue(null);
+            mockIncr.mockResolvedValueOnce(1);
+            mockExpire.mockResolvedValueOnce(1);
+
+            const claim = await claimOrJoinInFlightJob('cache-key', 'new-job');
+
+            expect(claim).toEqual({ status: 'claimed', jobId: 'new-job' });
+            // Refcount must still be incremented on the fall-through path so
+            // that a later cancel from a joiner cannot push it negative and
+            // prematurely terminate the job.
+            expect(mockIncr).toHaveBeenCalledWith('job:new-job:refcount');
+            expect(mockExpire).toHaveBeenCalledWith(
+                'job:new-job:refcount',
+                SECONDS_PER_HOUR
+            );
+        });
+    });
+
+    describe('releaseInFlightJob', () => {
+        it('returns true when the caller is the last subscriber', async () => {
+            mockDecr.mockResolvedValueOnce(0);
+            const isLast = await releaseInFlightJob('job1');
+            expect(isLast).toBe(true);
+            expect(mockDecr).toHaveBeenCalledWith('job:job1:refcount');
+        });
+
+        it('returns false when other subscribers remain', async () => {
+            mockDecr.mockResolvedValueOnce(2);
+            const isLast = await releaseInFlightJob('job1');
+            expect(isLast).toBe(false);
+        });
+
+        it('returns true when refcount goes negative (over-release)', async () => {
+            mockDecr.mockResolvedValueOnce(-1);
+            const isLast = await releaseInFlightJob('job1');
+            expect(isLast).toBe(true);
+        });
+    });
+
+    describe('clearInFlightJob', () => {
+        it('deletes refcount and inflight key when current still matches jobId', async () => {
+            mockGet.mockResolvedValueOnce('job1');
+            mockDel.mockResolvedValue(1);
+
+            await clearInFlightJob('job1', 'cache-key');
+
+            expect(mockDel).toHaveBeenNthCalledWith(1, 'job:job1:refcount');
+            expect(mockGet).toHaveBeenCalledWith('job:inflight:cache-key');
+            expect(mockDel).toHaveBeenNthCalledWith(
+                2,
+                'job:inflight:cache-key'
+            );
+        });
+
+        it('skips inflight delete when slot was reclaimed by a different jobId', async () => {
+            mockGet.mockResolvedValueOnce('different-job');
+            mockDel.mockResolvedValue(1);
+
+            await clearInFlightJob('job1', 'cache-key');
+
+            expect(mockDel).toHaveBeenCalledTimes(1);
+            expect(mockDel).toHaveBeenCalledWith('job:job1:refcount');
+        });
+
+        it('skips inflight delete when cacheKey is undefined', async () => {
+            mockDel.mockResolvedValue(1);
+
+            await clearInFlightJob('job1', undefined);
+
+            expect(mockGet).not.toHaveBeenCalled();
+            expect(mockDel).toHaveBeenCalledTimes(1);
+            expect(mockDel).toHaveBeenCalledWith('job:job1:refcount');
+        });
     });
 });

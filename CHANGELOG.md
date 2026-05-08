@@ -1,5 +1,17 @@
 # Changelog
 
+# [0.9.0](https://github.com/y0ngha/siglens-core/compare/v0.8.0...v0.9.0) (2026-05-08)
+
+
+### Features
+
+* job dedup via `claimOrJoinInFlightJob` (Redis SETNX on `job:inflight:{cacheKey}`) and subscriber refcount cancel via `releaseInFlightJob` so concurrent submitters share a single worker job and only the last cancel propagates to `/cancel`. Wired into all four analysis submit paths (technical / fundamental / news / overall) and `submitBriefing`.
+
+
+### BREAKING CHANGES
+
+* `JobMeta.symbol` is now optional (`symbol?: string`) so briefing jobs — which are not symbol-bound — can register `cacheKey` for inflight-slot cleanup. Consumers reading `meta.symbol` as a non-null `string` must add a guard or fallback.
+
 # [0.8.0](https://github.com/y0ngha/siglens-core/compare/v0.7.11...v0.8.0) (2026-05-07)
 
 
