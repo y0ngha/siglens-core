@@ -205,8 +205,8 @@ export async function resolveOverallDependencies(
     ]);
 
     // ── Check for axis errors — surface immediately, do not coerce to pending ──
-    // `key_error` from the technical axis (market BYOK gate) is also surfaced as
-    // a dependency error so the overall caller can propagate it to the user.
+    // `key_error` from any axis (market/fundamental/news BYOK gate) is surfaced
+    // as a dependency error so the overall caller can propagate it to the user.
     if (technicalResult.status === 'error') {
         return {
             kind: 'error',
@@ -228,8 +228,18 @@ export async function resolveOverallDependencies(
             error: fundamentalResult.error,
         };
     }
+    if (fundamentalResult.status === 'key_error') {
+        return {
+            kind: 'error',
+            axis: 'fundamental',
+            error: fundamentalResult,
+        };
+    }
     if (newsResult.status === 'error') {
         return { kind: 'error', axis: 'news', error: newsResult.error };
+    }
+    if (newsResult.status === 'key_error') {
+        return { kind: 'error', axis: 'news', error: newsResult };
     }
 
     // ── Determine pending job IDs for each axis ──

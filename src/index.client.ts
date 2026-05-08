@@ -79,8 +79,10 @@ export {
     getAllowedTimeframes,
     getTierLimit,
     isAllowed,
+    isFreeModel,
     isInfoDepthAllowed,
     isModelAllowed,
+    isPremiumModel,
     isTier,
     isTimeframeAllowed,
 } from './domain/tier';

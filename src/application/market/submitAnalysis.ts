@@ -218,17 +218,15 @@ export async function submitAnalysis(
             ? isPremiumModel(options.modelId, tierConfig)
             : false;
 
-    if (
-        tier !== 'pro' &&
-        premium &&
-        options.modelId !== undefined &&
-        options.userApiKey === undefined
-    ) {
+    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
         return {
             status: 'key_error',
             code: 'user_api_key_required',
             error: USER_API_KEY_REQUIRED_MESSAGE,
-            modelId: options.modelId,
+            // Safe: premium === true implies options.modelId !== undefined (premium
+            // falls back to false when options.modelId is undefined per the
+            // construction above).
+            modelId: options.modelId as NonNullable<typeof options.modelId>,
             tier,
         };
     }

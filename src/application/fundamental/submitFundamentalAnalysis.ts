@@ -182,7 +182,7 @@ export async function submitFundamentalAnalysis(
     if (tier !== 'pro' && premium && options.userApiKey === undefined) {
         const apiKeyRequiredError: SubmitFundamentalAnalysisApiKeyRequiredError =
             {
-                status: 'error',
+                status: 'key_error',
                 code: 'user_api_key_required',
                 error: USER_API_KEY_REQUIRED_MESSAGE,
                 modelId,

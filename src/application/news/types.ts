@@ -98,8 +98,9 @@ export interface SubmitNewsAnalysisLimitError {
 
 /** Result variant when a user BYOK API key is required for the requested model+tier combo. */
 export interface SubmitNewsAnalysisApiKeyRequiredError {
-    status: 'error';
+    status: 'key_error';
     code: 'user_api_key_required';
+    /** User-facing message explaining the BYOK requirement. */
     error: string;
     /** The model that triggered the BYOK requirement. */
     modelId: ModelId;

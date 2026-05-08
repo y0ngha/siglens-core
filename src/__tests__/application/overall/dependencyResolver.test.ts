@@ -206,6 +206,87 @@ describe('resolveOverallDependencies 함수는', () => {
     });
 
     describe('축 에러 처리', () => {
+        it('technical key_error 이면 kind: error 를 반환하고 axis: technical 을 포함한다', async () => {
+            const keyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
+            };
+            mockSubmitAnalysis.mockResolvedValue(keyError);
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('technical');
+                expect(state.error).toEqual(keyError);
+            }
+        });
+
+        it('fundamental key_error 이면 kind: error 를 반환하고 axis: fundamental 을 포함한다', async () => {
+            const keyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
+            };
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue(keyError);
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('fundamental');
+                expect(state.error).toEqual(keyError);
+            }
+        });
+
+        it('news key_error 이면 kind: error 를 반환하고 axis: news 를 포함한다', async () => {
+            const keyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
+            };
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue(keyError);
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('news');
+                expect(state.error).toEqual(keyError);
+            }
+        });
+
         it('technical 에러이면 kind: error 를 반환하고 axis: technical 을 포함한다', async () => {
             const technicalError = {
                 code: 'timeframe_not_allowed',
