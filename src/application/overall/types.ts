@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type { SubmitAnalysisOptions } from '@/application/market/types';
 import type { SubmitFundamentalAnalysisOptions } from '@/application/fundamental/types';
 import type { SubmitNewsAnalysisOptions } from '@/application/news/types';
@@ -174,14 +175,26 @@ export interface DependencyStatePending {
 }
 
 /**
- * One of the dependency axes returned `status: 'error'` from its submit function.
+ * One of the dependency axes returned `status: 'error'` or `status: 'key_error'`
+ * from its submit function.
  *
  * `axis` identifies which axis failed; `error` carries the error payload from
- * the respective submit result (string message or structured `AnalysisLimitError`).
+ * the respective submit result — a string message, a structured limit error,
+ * or a `UserApiKeyRequiredError` object when the axis BYOK gate fired.
  */
 export interface DependencyStateError {
     kind: 'error';
     axis: OverallAxis;
+    /**
+     * Error payload from the failing axis submit result.
+     *
+     * Possible shapes:
+     * - `string` — generic error message
+     * - `AnalysisLimitError` — usage limit exceeded
+     * - `UserApiKeyRequiredError` — BYOK required (from `'key_error'` status);
+     *   `submitOverallAnalysis` re-surfaces this as a top-level
+     *   `SubmitOverallAnalysisApiKeyRequiredError` for consumer convenience.
+     */
     error: unknown;
 }
 
@@ -290,18 +303,7 @@ export interface SubmitOverallAnalysisLimitError {
 }
 
 /** Result variant when BYOK API key is required for the overall job's own AI call. */
-export interface SubmitOverallAnalysisApiKeyRequiredError {
-    /** Discriminant: 'key_error' identifies BYOK-required outcomes. */
-    status: 'key_error';
-    /** Machine-readable code for narrowing within the 'key_error' status. */
-    code: 'user_api_key_required';
-    /** User-facing message explaining the BYOK requirement. */
-    error: string;
-    /** The model that triggered the BYOK requirement. */
-    modelId: ModelId;
-    /** The tier that triggered the BYOK requirement. */
-    tier: Tier;
-}
+export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.

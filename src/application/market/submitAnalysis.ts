@@ -220,7 +220,7 @@ export async function submitAnalysis(
             code: 'user_api_key_required',
             error: USER_API_KEY_REQUIRED_MESSAGE,
             // Safe: the outer `options.modelId !== undefined` guard narrows the type.
-            modelId: options.modelId!,
+            modelId: options.modelId,
             tier,
         };
     }

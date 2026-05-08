@@ -91,14 +91,31 @@ export async function submitOverallAnalysis(
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
-    // ── 0. Overall-scoped usage limit check ──
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+
+    // ── 0. BYOK gate for overall job's own AI call ──
+    // Sync, cheap check — fires first so we avoid an async DB call when the
+    // request is blocked at the key level. Consistent with the other 3 submit
+    // functions (market, fundamental, news) which also run BYOK before usage.
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
+        return {
+            status: 'key_error',
+            code: 'user_api_key_required',
+            error: USER_API_KEY_REQUIRED_MESSAGE,
+            modelId,
+            tier,
+        };
+    }
+
+    // ── 0a. Overall-scoped usage limit check ──
     // Owned at this layer (not per axis) so one overall request counts as
     // exactly one analysis. The dependency resolver drops `usage` from each
     // axis's forwarded options (see dropAxisUsage below) to prevent
     // triple-counting.
-    const tier = options.tier ?? DEFAULT_TIER;
-    const tierConfig = options.tierConfig ?? TIER_CONFIG;
-
     if (options.tier !== undefined && usage !== undefined) {
         const allowed = await checkAnalysisUsageAllowed(
             usage,
@@ -113,22 +130,6 @@ export async function submitOverallAnalysis(
                 error: buildUsageLimitError('analysisPerDay', tier),
             };
         }
-    }
-
-    // ── 0a. BYOK gate for overall job's own AI call ──
-    // Fires BEFORE the dependency resolver so axes are not dispatched when the
-    // overall-level gate blocks the request.
-    if (
-        requiresByokKey(tier, modelId, tierConfig) &&
-        options.userApiKey === undefined
-    ) {
-        return {
-            status: 'key_error',
-            code: 'user_api_key_required',
-            error: USER_API_KEY_REQUIRED_MESSAGE,
-            modelId,
-            tier,
-        };
     }
 
     // ── 1. Resolve all three dependency axes in parallel ──
@@ -153,10 +154,14 @@ export async function submitOverallAnalysis(
             // and we only re-surface when status matches; otherwise we fall through to the generic error.
             (inner as { status: unknown }).status === 'key_error'
         ) {
-            // The axis-level result already has the SubmitXxxAnalysisApiKeyRequiredError shape:
-            // { status: 'key_error', code, error, modelId, tier }
-            // Forward as-is — the top-level `SubmitOverallAnalysisApiKeyRequiredError`
-            // has the same structure.
+            // (a) TS cannot narrow 'unknown' to a specific union variant from the
+            //     `'status' in inner && inner.status === 'key_error'` check alone — the
+            //     `inner` type is `{ status: unknown } & object`, not the structured
+            //     UserApiKeyRequiredError shape.
+            // (b) Structural match is guaranteed at runtime: DependencyStateError.error
+            //     always carries an axis submit result, and when its status is 'key_error'
+            //     it has the shared UserApiKeyRequiredError shape (alias of all
+            //     SubmitXxxAnalysisApiKeyRequiredError types after B2 extraction).
             return inner as SubmitOverallAnalysisApiKeyRequiredError;
         }
         // One axis failed — return immediately without cache lookup or job submission.
