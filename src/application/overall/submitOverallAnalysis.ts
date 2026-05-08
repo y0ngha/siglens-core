@@ -49,9 +49,7 @@ const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  * assignment below turns it into a compile error rather than a silent runtime
  * fallback.
  */
-function unwrapAxisError(
-    err: { error: unknown } | { code: unknown }
-): unknown {
+function unwrapAxisError(err: { error: unknown } | { code: unknown }): unknown {
     if ('error' in err) return err.error;
     if ('code' in err) return String(err.code);
     // Unreachable for the current union — adding a variant without `error` or
