@@ -274,6 +274,13 @@ export function isTier(value: string): value is Tier {
 /**
  * Return whether a model is considered premium (not in the free-tier list).
  *
+ * Unlike {@link isModelAllowed}, this function intentionally **ignores**
+ * `config.featureFlags.enableTierRestrictions`. It is a classifier of the
+ * model's intrinsic class (free vs premium), not an access decision — so
+ * it must return the same result regardless of restriction mode. Callers
+ * use this to decide whether BYOK is required, which is independent of
+ * whether tier restrictions are toggled on.
+ *
  * @param model - The AI model identifier to check.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
  * @returns `true` if the model is NOT in `config.models.free`, `false` otherwise.
@@ -282,6 +289,10 @@ export function isPremiumModel(
     model: ModelId,
     config: TierConfig = TIER_CONFIG
 ): boolean {
+    // `config.models.free` is typed as `readonly TierModel[]` (string-literal union).
+    // Widening to `readonly string[]` lets `.includes(model: ModelId)` accept a non-literal
+    // argument; same pattern as `isKnownModelId` in submitAnalysisAction. Read-only view —
+    // we never mutate through this binding.
     const freeModels = config.models.free as readonly string[];
     return !freeModels.includes(model);
 }

@@ -296,11 +296,25 @@ describe('tier', () => {
 
         it('returns true for member-only models', () => {
             expect(isPremiumModel('gemini-2.5-pro')).toBe(true);
+            expect(isPremiumModel('gemini-3-flash-preview')).toBe(true);
             expect(isPremiumModel('claude-sonnet-4-6')).toBe(true);
+            expect(isPremiumModel('gpt-5.4')).toBe(true);
         });
 
         it('returns true for pro-only models', () => {
+            expect(isPremiumModel('gemini-3.1-pro-preview')).toBe(true);
             expect(isPremiumModel('claude-opus-4-7')).toBe(true);
+            expect(isPremiumModel('gpt-5.5')).toBe(true);
+        });
+
+        it('ignores enableTierRestrictions flag', () => {
+            // Build a config that flips the restriction flag on. Result must be identical.
+            const restricted: TierConfig = {
+                ...TIER_CONFIG,
+                featureFlags: { enableTierRestrictions: true },
+            };
+            expect(isPremiumModel('gemini-2.5-flash', restricted)).toBe(false);
+            expect(isPremiumModel('gemini-2.5-pro', restricted)).toBe(true);
         });
     });
 });
