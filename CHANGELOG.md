@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/y0ngha/siglens-core/compare/v0.9.1...v0.9.2) (2026-05-08)
+
+
+### Reverts
+
+* Revert "Merge pull request #82 from y0ngha/feat/81/job-dedup-and-cancel-refcount" ([04be8ee](https://github.com/y0ngha/siglens-core/commit/04be8ee435a1b487516fa5616d7cc198cb7518b1)), closes [#82](https://github.com/y0ngha/siglens-core/issues/82)
+
 ## [0.9.1](https://github.com/y0ngha/siglens-core/compare/v0.8.0...v0.9.1) (2026-05-08)
 
 
