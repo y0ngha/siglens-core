@@ -212,10 +212,7 @@ export async function resolveOverallDependencies(
     ) {
         return { kind: 'error', axis: 'fundamental', error: fundamentalResult };
     }
-    if (
-        newsResult.status === 'error' ||
-        newsResult.status === 'key_error'
-    ) {
+    if (newsResult.status === 'error' || newsResult.status === 'key_error') {
         return { kind: 'error', axis: 'news', error: newsResult };
     }
 
