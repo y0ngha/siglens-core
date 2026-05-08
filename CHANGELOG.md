@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.9.3](https://github.com/y0ngha/siglens-core/compare/v0.9.2...v0.9.3) (2026-05-08)
+
+
+### Bug Fixes
+
+* 분석 데이터 polling 진행시 symbol 체크 추가 ([b02e1b2](https://github.com/y0ngha/siglens-core/commit/b02e1b27a69e76d3ecf98ce63b1dbbb06f771407))
+* address PR [#84](https://github.com/y0ngha/siglens-core/issues/84) review findings (B1-B4, S1-S2) + modelSpecs test ([e45cd75](https://github.com/y0ngha/siglens-core/commit/e45cd758bf9f60bdb1355de6698713b7a4b64c5a))
+* **domain:** document isPremiumModel intent + expand tests + update PUBLIC_API ([07471b7](https://github.com/y0ngha/siglens-core/commit/07471b797c932d44fba1087cc73f386b2def7b52))
+* **market:** extract message constant + enrich error type + decouple tests from TIER_CONFIG ([c009262](https://github.com/y0ngha/siglens-core/commit/c0092626e983dd06c00f9cdde84f1207ca1608dd))
+* round 2 review (B1 status unification, B2 client export, B3 axis key_error, S2 dead code) ([608405f](https://github.com/y0ngha/siglens-core/commit/608405f2d31237612ef4f08df6edcf0a9b671b82))
+* round 3 review (B1 message constant, B2 axis re-surface, S1-S3 cleanup) ([507e992](https://github.com/y0ngha/siglens-core/commit/507e99214a1db559a5abfad5b036a8dff49037c8))
+* round 4 review (B1 [@internal](https://github.com/internal), B2 requiresByokKey helper, B3+S1+S2) ([ceb1f4d](https://github.com/y0ngha/siglens-core/commit/ceb1f4d9333150aa82ac109ff3380828e436f039))
+* round 5 review (B1 gate order, B2 ApiKeyRequiredError extraction, S1-S3) ([1810d02](https://github.com/y0ngha/siglens-core/commit/1810d02564b971b8629f27e1e29cee0d27bf560e))
+* round 6 review (B1 BYOK error factory, B2 typed union for axis errors, S1) ([16bd811](https://github.com/y0ngha/siglens-core/commit/16bd8119f47d6fb71594920bb5af294e2bc85e98))
+* round 7 review (B1-B3 JSDoc updates, S1-S3 test + fallback) ([b87a37d](https://github.com/y0ngha/siglens-core/commit/b87a37dd4cea57ebe75bc7bf0b2ed41df6030b7d))
+* round 8 review (B1 helper extraction, S1 test dedup, S2 task ID comments) ([43c33b6](https://github.com/y0ngha/siglens-core/commit/43c33b664c56b4a54e0eba844726af100271acfd))
+
+
+### Features
+
+* **domain:** add isFreeModel as positive complement of isPremiumModel ([3cbcaab](https://github.com/y0ngha/siglens-core/commit/3cbcaab4add5f635409d9fa78938fd933aa52c4c))
+* **domain:** add isPremiumModel pure function ([1bac9ac](https://github.com/y0ngha/siglens-core/commit/1bac9ac87988f44bd41a55db3ad71508726af2ed))
+* **fundamental:** userApiKey + BYOK gate + tier forwarding ([d3e1a91](https://github.com/y0ngha/siglens-core/commit/d3e1a91143b4c5b6f8ddc8aedda297295f7e7b7d))
+* **market:** BYOK gate + tier forwarding to worker ([00813a8](https://github.com/y0ngha/siglens-core/commit/00813a8fd2c40090354b8874d4ecd72b9b561511))
+* **news:** userApiKey + BYOK gate + tier forwarding ([bedd4e4](https://github.com/y0ngha/siglens-core/commit/bedd4e46a77b517f7bb0e711d38b8524b58cae1a))
+* **overall:** top-level userApiKey + axis propagation + BYOK gate + tier forwarding ([287b208](https://github.com/y0ngha/siglens-core/commit/287b208c19c3cad5c92ed024829ff53cc9e08ba7))
+
 ## [0.9.2](https://github.com/y0ngha/siglens-core/compare/v0.9.1...v0.9.2) (2026-05-08)
 
 
