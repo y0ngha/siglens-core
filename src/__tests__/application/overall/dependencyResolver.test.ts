@@ -206,18 +206,15 @@ describe('resolveOverallDependencies 함수는', () => {
     });
 
     describe('축 에러 처리', () => {
-        it('technical 에러이면 kind: error 를 반환하고 axis: technical 을 포함한다', async () => {
-            const technicalError = {
-                code: 'timeframe_not_allowed',
-                message: 'Not allowed',
-                tier: 'free',
-                timeframe: '1Day',
-                allowedTimeframes: [],
+        it('technical key_error 이면 kind: error 를 반환하고 axis: technical 을 포함한다', async () => {
+            const keyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
             };
-            mockSubmitAnalysis.mockResolvedValue({
-                status: 'error',
-                error: technicalError,
-            });
+            mockSubmitAnalysis.mockResolvedValue(keyError);
             mockSubmitFundamentalAnalysis.mockResolvedValue({
                 status: 'cached',
                 result: cachedFundamental,
@@ -232,7 +229,92 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(state.kind).toBe('error');
             if (state.kind === 'error') {
                 expect(state.axis).toBe('technical');
-                expect(state.error).toEqual(technicalError);
+                expect(state.error).toEqual(keyError);
+            }
+        });
+
+        it('fundamental key_error 이면 kind: error 를 반환하고 axis: fundamental 을 포함한다', async () => {
+            const keyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
+            };
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue(keyError);
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('fundamental');
+                expect(state.error).toEqual(keyError);
+            }
+        });
+
+        it('news key_error 이면 kind: error 를 반환하고 axis: news 를 포함한다', async () => {
+            const keyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
+            };
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue(keyError);
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('news');
+                expect(state.error).toEqual(keyError);
+            }
+        });
+
+        it('technical 에러이면 kind: error 를 반환하고 axis: technical 을 포함한다', async () => {
+            const technicalError = {
+                code: 'timeframe_not_allowed',
+                message: 'Not allowed',
+                tier: 'free',
+                timeframe: '1Day',
+                allowedTimeframes: [],
+            };
+            const technicalResult = {
+                status: 'error' as const,
+                error: technicalError,
+            };
+            mockSubmitAnalysis.mockResolvedValue(technicalResult);
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(makeInputs());
+
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('technical');
+                expect(state.error).toEqual(technicalResult);
             }
         });
 
@@ -638,6 +720,151 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(mockSubmitAnalysis).not.toHaveBeenCalled();
             expect(mockSubmitFundamentalAnalysis).not.toHaveBeenCalled();
             expect(mockSubmitNewsAnalysis).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('top-level userApiKey / tier 전파는', () => {
+        beforeEach(() => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+        });
+
+        it('top-level userApiKey를 axis-level이 없을 때 세 축에 전파한다', async () => {
+            const inputs: OverallDependencyInputs = {
+                ...makeInputs(),
+                userApiKey: 'top-key',
+            };
+
+            await resolveOverallDependencies(inputs);
+
+            // technical axis
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
+            expect(technicalOpts).toMatchObject({ userApiKey: 'top-key' });
+
+            // fundamental axis
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).toMatchObject({ userApiKey: 'top-key' });
+
+            // news axis
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).toMatchObject({ userApiKey: 'top-key' });
+        });
+
+        it('axis-level userApiKey가 top-level을 덮어쓴다', async () => {
+            const inputs: OverallDependencyInputs = {
+                ...makeInputs({
+                    technical: { userApiKey: 'axis-key' },
+                    fundamental: { userApiKey: 'axis-fund-key' },
+                }),
+                userApiKey: 'top-key',
+            };
+
+            await resolveOverallDependencies(inputs);
+
+            // technical: axis-key wins
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
+            expect(technicalOpts).toMatchObject({ userApiKey: 'axis-key' });
+
+            // fundamental: axis-fund-key wins
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).toMatchObject({
+                userApiKey: 'axis-fund-key',
+            });
+
+            // news: no axis-level → falls back to top-key
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).toMatchObject({ userApiKey: 'top-key' });
+        });
+
+        it('top-level tier를 fundamental / news 축에 전파한다', async () => {
+            const inputs: OverallDependencyInputs = {
+                ...makeInputs(),
+                tier: 'pro',
+            };
+
+            await resolveOverallDependencies(inputs);
+
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).toMatchObject({ tier: 'pro' });
+
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).toMatchObject({ tier: 'pro' });
+        });
+
+        it('top-level tier 미지정 시 DEFAULT_TIER(free)를 fundamental / news에 전달한다', async () => {
+            await resolveOverallDependencies(makeInputs());
+
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).toMatchObject({ tier: 'free' });
+
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).toMatchObject({ tier: 'free' });
+        });
+
+        it('axis-level tier가 top-level tier를 덮어쓴다', async () => {
+            const inputs: OverallDependencyInputs = {
+                ...makeInputs({
+                    fundamental: { tier: 'member' as const },
+                }),
+                tier: 'pro',
+            };
+
+            await resolveOverallDependencies(inputs);
+
+            // fundamental: axis-level member wins over top-level pro
+            const fundamentalOpts =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalOpts).toMatchObject({ tier: 'member' });
+
+            // news: no axis-level → top-level pro propagates
+            const newsOpts = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsOpts).toMatchObject({ tier: 'pro' });
+        });
+
+        it('top-level tier가 technical tierContext로 전파된다 (tierContext 미지정 시)', async () => {
+            const inputs: OverallDependencyInputs = {
+                ...makeInputs({ technical: {} }),
+                tier: 'member',
+            };
+
+            await resolveOverallDependencies(inputs);
+
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
+            expect(technicalOpts).toMatchObject({
+                tierContext: { userId: null, tier: 'member' },
+            });
+        });
+
+        it('technical에 tierContext가 지정되면 top-level tier를 무시한다', async () => {
+            const inputs: OverallDependencyInputs = {
+                ...makeInputs({
+                    technical: {
+                        tierContext: { userId: 'user-1', tier: 'pro' as const },
+                    },
+                }),
+                tier: 'free',
+            };
+
+            await resolveOverallDependencies(inputs);
+
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
+            expect(technicalOpts).toMatchObject({
+                tierContext: { userId: 'user-1', tier: 'pro' },
+            });
         });
     });
 });

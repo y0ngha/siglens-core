@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
@@ -11,6 +12,8 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
+
+export type { UserApiKeyRequiredError };
 
 /**
  * Usage tracking and daily limit options for analysis submissions.
@@ -32,7 +35,10 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     tierConfig?: TierConfig;
     /** LLM model identifier used to isolate cached results per model and for worker routing. */
     modelId?: ModelId;
-    /** User-supplied AI API key forwarded as `X-AI-API-KEY` to the worker. Must be provided when the selected model requires a user-supplied API key; omit for platform-managed models. */
+    /**
+     * BYOK API key. Must be provided when a non-pro tier requests a premium model.
+     * When provided, forwarded to the worker as the X-AI-API-KEY header.
+     */
     userApiKey?: string;
 }
 
@@ -56,9 +62,10 @@ export interface TierGateErrorResult {
     error: TierTimeframeAccessError;
 }
 
-/** Analysis error result: usage limit exceeded or tier timeframe denied. */
+/** Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required. */
 export type SubmitAnalysisErrorResult =
     | { status: 'error'; error: AnalysisLimitError }
+    | UserApiKeyRequiredError
     | TierGateErrorResult;
 
 /** Submit analysis outcome including application-level gate errors. */

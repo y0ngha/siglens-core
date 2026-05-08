@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     buildUsageLimitError,
     checkAnalysisUsageAllowed,
@@ -13,7 +14,7 @@ import type {
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
-import { TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -169,9 +170,18 @@ export async function submitFundamentalAnalysis(
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
+    // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
+        return buildUserApiKeyRequiredError(tier, modelId);
+    }
+
     if (options.tier !== undefined && usage !== undefined) {
-        const tier = options.tier;
-        const tierConfig = options.tierConfig ?? TIER_CONFIG;
         const allowed = await checkAnalysisUsageAllowed(
             usage,
             tier,
@@ -231,13 +241,19 @@ export async function submitFundamentalAnalysis(
         ...(skillsDegraded && { skillsDegraded }),
     });
 
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
+            ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId }),
+        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error(

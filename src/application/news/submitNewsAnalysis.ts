@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import {
     buildUsageLimitError,
@@ -13,7 +14,7 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildNewsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -111,10 +112,19 @@ export async function submitNewsAnalysis(
         return noNewsError;
     }
 
+    // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
+        return buildUserApiKeyRequiredError(tier, modelId);
+    }
+
     // ── 2. Usage limit check (only when both tier and usage are provided) ──
     if (options.tier !== undefined && usage !== undefined) {
-        const tier = options.tier;
-        const tierConfig = options.tierConfig ?? TIER_CONFIG;
         const allowed = await checkAnalysisUsageAllowed(
             usage,
             tier,
@@ -178,13 +188,19 @@ export async function submitNewsAnalysis(
         ...(skillsDegraded && { skillsDegraded }),
     });
 
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
+            ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId }),
+        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitNewsAnalysis] Worker request failed:', error);

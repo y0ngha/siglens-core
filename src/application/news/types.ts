@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
@@ -6,9 +7,9 @@ import type {
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
+    ModelId,
     NewsAnalysisResponse,
     NewsCardAnalysis,
-    ModelId,
     NewsItem,
     Tier,
     TierConfig,
@@ -45,8 +46,12 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
     /**
-     * Resolved subscription tier. Required only when `usage` is also provided;
-     * omit before Phase 4 (siglens passes neither).
+     * Resolved subscription tier.
+     *
+     * Required in two cases:
+     * 1. When `usage` is also provided — enforces the daily analysis limit.
+     * 2. When a premium model is requested — determines BYOK key requirement.
+     *    Defaults to {@link DEFAULT_TIER} (`'free'`) when omitted.
      */
     tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
@@ -63,6 +68,11 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * time. Useful in tests that need a fixed clock.
      */
     now?: Date;
+    /**
+     * BYOK API key. Must be provided when a non-pro tier requests a premium model.
+     * When provided, forwarded to the worker as the X-AI-API-KEY header.
+     */
+    userApiKey?: string;
 }
 
 /** The caller receives a cached analysis — no new job was created. */
@@ -91,12 +101,16 @@ export interface SubmitNewsAnalysisLimitError {
     error: AnalysisLimitError;
 }
 
+/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+export type SubmitNewsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
+
 /** Union of all possible outcomes from {@link submitNewsAnalysis}. */
 export type SubmitNewsAnalysisResult =
     | SubmitNewsAnalysisCached
     | SubmitNewsAnalysisSubmitted
     | SubmitNewsAnalysisNoNewsError
-    | SubmitNewsAnalysisLimitError;
+    | SubmitNewsAnalysisLimitError
+    | SubmitNewsAnalysisApiKeyRequiredError;
 
 // ─────────────────────────────────────────
 // Poll News Analysis

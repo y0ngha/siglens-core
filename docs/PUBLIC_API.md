@@ -222,12 +222,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `normalizeNewsCardAnalysis` | `domain/analysis/normalizeNews.ts` |
 | `normalizeOverallAnalysisResponse` | `domain/analysis/normalizeOverall.ts` |
 
-**티어 게이트 (Tier gating) (11)**
+**티어 게이트 (Tier gating) (13)**
 | Symbol | Source |
 |---|---|
 | `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
 | `isAllowed` / `getTierLimit` / `getAllowedTimeframes` / `getAllowedModels` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
+| `isPremiumModel` / `isFreeModel` / `requiresByokKey` | `domain/tier.ts` |
 | `isTier` | `domain/tier.ts` |
 | `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
 
@@ -347,11 +348,11 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
 
 새로 추가된 use-case option/result 타입:
-- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `PollFundamentalAnalysisResult`.
-- 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `PollNewsAnalysisResult`.
-- 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `PollOverallAnalysisResult`.
+- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `PollFundamentalAnalysisResult`.
+- 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `SubmitNewsAnalysisApiKeyRequiredError`, `PollNewsAnalysisResult`.
+- 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `SubmitOverallAnalysisApiKeyRequiredError`, `PollOverallAnalysisResult`.
 
-**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `TierTimeframeAccessError`), `BackgroundTaskOptions`, 채팅 application 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 

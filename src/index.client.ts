@@ -79,10 +79,13 @@ export {
     getAllowedTimeframes,
     getTierLimit,
     isAllowed,
+    isFreeModel,
     isInfoDepthAllowed,
     isModelAllowed,
+    isPremiumModel,
     isTier,
     isTimeframeAllowed,
+    requiresByokKey,
 } from './domain/tier';
 
 // Response normalization
@@ -365,7 +368,10 @@ export type {
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
 } from './application/chat/types';
-export type { SubmitAnalysisGatedResult } from './application/market/types';
+export type {
+    SubmitAnalysisGatedResult,
+    UserApiKeyRequiredError,
+} from './application/market/types';
 export type {
     AnalysisLimitError,
     AnalysisLimitErrorCode,

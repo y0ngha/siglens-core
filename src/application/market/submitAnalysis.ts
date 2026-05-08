@@ -1,5 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import type {
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
@@ -19,6 +20,7 @@ import {
     TIER_CONFIG,
     getAllowedTimeframes,
     isTimeframeAllowed,
+    requiresByokKey,
 } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -202,6 +204,21 @@ export async function submitAnalysis(
         };
     }
 
+    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
+    // `options.modelId` is a TierModel; the default 'analysis-worker' is a
+    // platform routing token, not a user-selectable model, so it is never premium.
+    // requiresByokKey is only called when options.modelId is set — DEFAULT_ANALYSIS_MODEL_ID
+    // is not a TierModel and not in any config.models.* list, so requiresByokKey
+    // would erroneously return true for it.
+    if (
+        options.modelId !== undefined &&
+        requiresByokKey(tier, options.modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
+        // Safe: the outer `options.modelId !== undefined` guard narrows the type.
+        return buildUserApiKeyRequiredError(tier, options.modelId);
+    }
+
     const usage = options.usage;
     const usageOccurredAt = usage?.occurredAt ?? new Date();
 
@@ -220,7 +237,6 @@ export async function submitAnalysis(
         }
     }
 
-    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe, effectiveModelId);
 
@@ -313,7 +329,7 @@ export async function submitAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: effectiveModelId }),
+        body: JSON.stringify({ jobId, prompt, model: effectiveModelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[Submit] Worker request failed:', error);

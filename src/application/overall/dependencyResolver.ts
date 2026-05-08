@@ -1,6 +1,7 @@
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
+import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     DependencyState,
     OverallDependencyInputs,
@@ -132,6 +133,12 @@ export async function resolveOverallDependencies(
         ...technicalRest
     } = technicalOptions;
 
+    // ── Extract top-level propagation fields ──
+    // `tier` and `userApiKey` live directly on `OverallDependencyInputs` so
+    // the resolver can propagate them to each axis without casting.
+    const topLevelTier = inputs.tier;
+    const topLevelUserApiKey = inputs.userApiKey;
+
     // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
     // Triple-counting prevention: if the caller forwards `usage` here, three
     // axis submits would each check + record one analysis. Overall owns the
@@ -159,12 +166,22 @@ export async function resolveOverallDependencies(
             {
                 ...technicalAxisOptions,
                 modelId: technicalAxisOptions.modelId ?? modelId,
+                userApiKey:
+                    technicalAxisOptions.userApiKey ?? topLevelUserApiKey,
+                tierContext:
+                    technicalAxisOptions.tierContext ??
+                    (topLevelTier !== undefined
+                        ? { userId: null, tier: topLevelTier }
+                        : undefined),
             }
         ),
         submitFundamentalAnalysis({
             symbol,
             modelId,
             dataProvider: fundamentalProvider,
+            // Top-level fallbacks: axis-level values win because the spread comes last.
+            tier: topLevelTier ?? DEFAULT_TIER,
+            userApiKey: topLevelUserApiKey,
             ...fundamentalAxisOptions,
         }),
         submitNewsAnalysis({
@@ -173,27 +190,30 @@ export async function resolveOverallDependencies(
             modelId,
             news: resolvedNewsItems,
             upcomingCalendar,
+            // Top-level fallbacks: axis-level values win because the spread comes last.
+            tier: topLevelTier ?? DEFAULT_TIER,
+            userApiKey: topLevelUserApiKey,
             ...newsAxisOptions,
         }),
     ]);
 
     // ── Check for axis errors — surface immediately, do not coerce to pending ──
-    if (technicalResult.status === 'error') {
-        return {
-            kind: 'error',
-            axis: 'technical',
-            error: technicalResult.error,
-        };
+    // Always store the full submit result so consumers can narrow on
+    // `error.status` without runtime `typeof` / `'status' in` guards.
+    if (
+        technicalResult.status === 'error' ||
+        technicalResult.status === 'key_error'
+    ) {
+        return { kind: 'error', axis: 'technical', error: technicalResult };
     }
-    if (fundamentalResult.status === 'error') {
-        return {
-            kind: 'error',
-            axis: 'fundamental',
-            error: fundamentalResult.error,
-        };
+    if (
+        fundamentalResult.status === 'error' ||
+        fundamentalResult.status === 'key_error'
+    ) {
+        return { kind: 'error', axis: 'fundamental', error: fundamentalResult };
     }
-    if (newsResult.status === 'error') {
-        return { kind: 'error', axis: 'news', error: newsResult.error };
+    if (newsResult.status === 'error' || newsResult.status === 'key_error') {
+        return { kind: 'error', axis: 'news', error: newsResult };
     }
 
     // ── Determine pending job IDs for each axis ──

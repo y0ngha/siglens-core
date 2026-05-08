@@ -1,8 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type {
+    SubmitOverallAnalysisApiKeyRequiredError,
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
 } from '@/application/overall/types';
@@ -15,7 +17,7 @@ import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOve
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import { TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -28,6 +30,25 @@ import type {
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+
+/**
+ * Unwrap an axis-error result into its user-facing payload.
+ *
+ * Every non-BYOK variant in `DependencyStateError['error']` carries either an
+ * `error` field (string or structured limit error) or a `code` field (e.g.
+ * `SubmitFundamentalAnalysisFetchError` with `code: 'fetch_failed'`). If the
+ * union grows to include a variant lacking both fields, the exhaustiveness
+ * assignment below turns it into a compile error rather than a silent runtime
+ * fallback.
+ */
+function unwrapAxisError(err: { error: unknown } | { code: unknown }): unknown {
+    if ('error' in err) return err.error;
+    if ('code' in err) return String(err.code);
+    // Unreachable for the current union — adding a variant without `error` or
+    // `code` will cause a type error on the line below.
+    const _exhaustive: never = err;
+    return _exhaustive;
+}
 
 /**
  * Strip volatile, write-time-only fields from a cached technical
@@ -89,14 +110,26 @@ export async function submitOverallAnalysis(
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
-    // ── 0. Overall-scoped usage limit check ──
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+
+    // ── 0. BYOK gate for overall job's own AI call ──
+    // Sync, cheap check — fires first so we avoid an async DB call when the
+    // request is blocked at the key level. Consistent with the other 3 submit
+    // functions (market, fundamental, news) which also run BYOK before usage.
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
+        return buildUserApiKeyRequiredError(tier, modelId);
+    }
+
+    // ── 0a. Overall-scoped usage limit check ──
     // Owned at this layer (not per axis) so one overall request counts as
     // exactly one analysis. The dependency resolver drops `usage` from each
     // axis's forwarded options (see dropAxisUsage below) to prevent
     // triple-counting.
     if (options.tier !== undefined && usage !== undefined) {
-        const tier = options.tier;
-        const tierConfig = options.tierConfig ?? TIER_CONFIG;
         const allowed = await checkAnalysisUsageAllowed(
             usage,
             tier,
@@ -120,8 +153,26 @@ export async function submitOverallAnalysis(
     });
 
     if (deps.kind === 'error') {
-        // One axis failed — return immediately without cache lookup or job submission.
-        return { status: 'error', axis: deps.axis, error: deps.error };
+        // If an axis returned a BYOK error, re-surface it at the overall level
+        // so consumers get a uniform `key_error` shape regardless of which axis
+        // (or top-level model) triggered the BYOK requirement.
+        // `deps.error` is now a typed union — narrow directly on the discriminant.
+        if (deps.error.status === 'key_error') {
+            // (a) TS cannot fully narrow through the nested SubmitAnalysisErrorResult union
+            // after the status === 'key_error' check — the discriminant lives one level
+            // inside the union-of-unions, which TS cannot resolve to a single leaf type.
+            // (b) Runtime safety: all BYOK error variants (SubmitAnalysis/Fundamental/News
+            // ApiKeyRequiredError) are type aliases for UserApiKeyRequiredError — identical
+            // shape at runtime.
+            return deps.error as SubmitOverallAnalysisApiKeyRequiredError;
+        }
+        // For non-BYOK errors (status === 'error' on each axis), unwrap the inner
+        // `.error` field for backward-compatible SubmitOverallAnalysisError shape.
+        return {
+            status: 'error',
+            axis: deps.axis,
+            error: unwrapAxisError(deps.error),
+        };
     }
 
     if (deps.kind === 'pending') {
@@ -217,13 +268,19 @@ export async function submitOverallAnalysis(
         cacheKey,
     });
 
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
+            ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId }),
+        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitOverallAnalysis] Worker request failed:', error);

@@ -270,3 +270,73 @@ export function isModelAllowed(
 export function isTier(value: string): value is Tier {
     return TIER_VALUE_STRINGS.includes(value);
 }
+
+/**
+ * Return whether a model is considered premium (not in the free-tier list).
+ *
+ * Unlike {@link isModelAllowed}, this function intentionally **ignores**
+ * `config.featureFlags.enableTierRestrictions`. It is a classifier of the
+ * model's intrinsic class (free vs premium), not an access decision — so
+ * it must return the same result regardless of restriction mode. Callers
+ * use this to decide whether BYOK is required, which is independent of
+ * whether tier restrictions are toggled on.
+ *
+ * @param model - The AI model identifier to check.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` if the model is NOT in `config.models.free`, `false` otherwise.
+ */
+export function isPremiumModel(
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    // `config.models.free` is typed as `readonly TierModel[]` (string-literal union).
+    // Widening to `readonly string[]` lets `.includes(model: ModelId)` accept a non-literal
+    // argument; same pattern as `isKnownModelId` in submitAnalysisAction. Read-only view —
+    // we never mutate through this binding.
+    const freeModels = config.models.free as readonly string[];
+    return !freeModels.includes(model);
+}
+
+/**
+ * Return whether a model is in the free-tier list.
+ *
+ * Inverse of {@link isPremiumModel}. Like that function, this is a classifier
+ * of the model's intrinsic class — it intentionally **ignores**
+ * `config.featureFlags.enableTierRestrictions`. Both functions are mutually
+ * exclusive: every model is either free or premium.
+ *
+ * @param model - The AI model identifier to check.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` if the model is in `config.models.free`, `false` otherwise.
+ */
+export function isFreeModel(
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    return !isPremiumModel(model, config);
+}
+
+/**
+ * Return whether a request requires a BYOK API key.
+ *
+ * BYOK is required when a non-pro tier user requests a premium model.
+ * Pro tier and free models bypass BYOK (server pays).
+ *
+ * Like {@link isPremiumModel}, this function intentionally **ignores**
+ * `config.featureFlags.enableTierRestrictions` — BYOK classification is
+ * independent of whether tier restrictions are enabled.
+ *
+ * Pure function — no I/O, no side effects.
+ *
+ * @param tier - The user's subscription tier.
+ * @param model - The AI model identifier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` if the user must provide their own BYOK key for this combo.
+ */
+export function requiresByokKey(
+    tier: Tier,
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    return tier !== 'pro' && isPremiumModel(model, config);
+}

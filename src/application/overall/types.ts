@@ -1,7 +1,21 @@
 import type { BackgroundTaskOptions } from '@/application/types';
-import type { SubmitAnalysisOptions } from '@/application/market/types';
-import type { SubmitFundamentalAnalysisOptions } from '@/application/fundamental/types';
-import type { SubmitNewsAnalysisOptions } from '@/application/news/types';
+import type { UserApiKeyRequiredError } from '@/application/byok/types';
+import type {
+    SubmitAnalysisOptions,
+    SubmitAnalysisErrorResult,
+} from '@/application/market/types';
+import type {
+    SubmitFundamentalAnalysisOptions,
+    SubmitFundamentalAnalysisLimitError,
+    SubmitFundamentalAnalysisFetchError,
+    SubmitFundamentalAnalysisApiKeyRequiredError,
+} from '@/application/fundamental/types';
+import type {
+    SubmitNewsAnalysisOptions,
+    SubmitNewsAnalysisNoNewsError,
+    SubmitNewsAnalysisLimitError,
+    SubmitNewsAnalysisApiKeyRequiredError,
+} from '@/application/news/types';
 import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
@@ -46,6 +60,18 @@ export interface OverallDependencyInputs {
     modelId: ModelId;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
+    /**
+     * Resolved subscription tier. Optional for backward compatibility with
+     * direct test callers; submitOverallAnalysis defaults to DEFAULT_TIER
+     * when omitted.
+     */
+    tier?: Tier;
+    /**
+     * BYOK API key (top-level scope). Provided once at the overall level;
+     * the dependency resolver propagates it to each axis option
+     * (axis-level values take precedence if already set).
+     */
+    userApiKey?: string;
     /**
      * Enriched news items (already card-analyzed by flash-lite).
      *
@@ -99,7 +125,7 @@ export interface OverallDependencyInputs {
      */
     fundamental?: Pick<
         SubmitFundamentalAnalysisOptions,
-        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
     >;
     /**
      * Options forwarded verbatim to `submitNewsAnalysis`.
@@ -119,7 +145,12 @@ export interface OverallDependencyInputs {
     news?:
         | Pick<
               SubmitNewsAnalysisOptions,
-              'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+              | 'tier'
+              | 'tierConfig'
+              | 'usage'
+              | 'now'
+              | 'waitUntil'
+              | 'userApiKey'
           >
         | ReadonlyArray<EnrichedNewsItem>;
     /**
@@ -129,7 +160,7 @@ export interface OverallDependencyInputs {
      */
     newsOptions?: Pick<
         SubmitNewsAnalysisOptions,
-        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
     >;
 }
 
@@ -157,15 +188,31 @@ export interface DependencyStatePending {
 }
 
 /**
- * One of the dependency axes returned `status: 'error'` from its submit function.
+ * One of the dependency axes returned `status: 'error'` or `status: 'key_error'`
+ * from its submit function.
  *
- * `axis` identifies which axis failed; `error` carries the error payload from
- * the respective submit result (string message or structured `AnalysisLimitError`).
+ * `axis` identifies which axis failed; `error` carries the full submit result
+ * object from the failing axis so consumers can narrow on `error.status` without
+ * runtime `typeof` / `'status' in` guards.
  */
 export interface DependencyStateError {
     kind: 'error';
     axis: OverallAxis;
-    error: unknown;
+    /**
+     * Full submit result object from the failing axis.
+     *
+     * Carries the original status discriminant (`'error'` or `'key_error'`),
+     * so consumers (notably `submitOverallAnalysis`) can re-surface BYOK
+     * errors with full type narrowing.
+     */
+    error:
+        | SubmitAnalysisErrorResult
+        | SubmitFundamentalAnalysisLimitError
+        | SubmitFundamentalAnalysisFetchError
+        | SubmitFundamentalAnalysisApiKeyRequiredError
+        | SubmitNewsAnalysisNoNewsError
+        | SubmitNewsAnalysisLimitError
+        | SubmitNewsAnalysisApiKeyRequiredError;
 }
 
 /**
@@ -200,11 +247,6 @@ export type DependencyState =
  */
 export interface SubmitOverallAnalysisOptions
     extends OverallDependencyInputs, BackgroundTaskOptions {
-    /**
-     * Resolved subscription tier. Required only when `usage` is also provided;
-     * omit before Phase 4 (siglens passes neither).
-     */
-    tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
     tierConfig?: TierConfig;
     /**
@@ -277,6 +319,9 @@ export interface SubmitOverallAnalysisLimitError {
     error: AnalysisLimitError;
 }
 
+/** Result variant when BYOK API key is required for the overall job's own AI call. */
+export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
+
 /**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.
  *
@@ -284,13 +329,15 @@ export interface SubmitOverallAnalysisLimitError {
  * - `pending_dependencies` — one or more axis jobs are still running; retry after polling each.
  * - `submitted` — overall analysis job submitted; poll via {@link pollOverallAnalysis}.
  * - `error` — one of the dependency axes failed; see `axis` and `error` for details.
+ * - `key_error` — BYOK API key required for the overall job's own AI call.
  */
 export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisCached
     | SubmitOverallAnalysisPendingDependencies
     | SubmitOverallAnalysisSubmitted
     | SubmitOverallAnalysisError
-    | SubmitOverallAnalysisLimitError;
+    | SubmitOverallAnalysisLimitError
+    | SubmitOverallAnalysisApiKeyRequiredError;
 
 // ─────────────────────────────────────────
 // Poll

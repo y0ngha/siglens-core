@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
@@ -38,8 +39,12 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      */
     dataProvider: FundamentalDataProvider;
     /**
-     * Resolved subscription tier. Required only when `usage` is also provided;
-     * omit before Phase 4 (siglens passes neither).
+     * Resolved subscription tier.
+     *
+     * Required in two cases:
+     * 1. When `usage` is also provided — enforces the daily analysis limit.
+     * 2. When a premium model is requested — determines BYOK key requirement.
+     *    Defaults to {@link DEFAULT_TIER} (`'free'`) when omitted.
      */
     tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
@@ -56,6 +61,11 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * time. Useful in tests that need a fixed clock.
      */
     now?: Date;
+    /**
+     * BYOK API key. Must be provided when a non-pro tier requests a premium model.
+     * When provided, forwarded to the worker as the X-AI-API-KEY header.
+     */
+    userApiKey?: string;
 }
 
 /** The caller receives a cached analysis — no new job was created. */
@@ -84,12 +94,17 @@ export interface SubmitFundamentalAnalysisFetchError {
     error?: string;
 }
 
+/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+export type SubmitFundamentalAnalysisApiKeyRequiredError =
+    UserApiKeyRequiredError;
+
 /** Union of all possible outcomes from {@link submitFundamentalAnalysis}. */
 export type SubmitFundamentalAnalysisResult =
     | SubmitFundamentalAnalysisCached
     | SubmitFundamentalAnalysisSubmitted
     | SubmitFundamentalAnalysisLimitError
-    | SubmitFundamentalAnalysisFetchError;
+    | SubmitFundamentalAnalysisFetchError
+    | SubmitFundamentalAnalysisApiKeyRequiredError;
 
 // ─────────────────────────────────────────
 // Poll

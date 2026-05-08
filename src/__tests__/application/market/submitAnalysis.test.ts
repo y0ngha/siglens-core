@@ -29,6 +29,7 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -805,6 +806,152 @@ describe('submitAnalysis 함수는', () => {
                 expect.any(String),
                 expect.objectContaining({ atr: undefined })
             );
+        });
+    });
+
+    describe('submitAnalysis BYOK gate + tier forwarding', () => {
+        const testTierConfig = TEST_TIER_CONFIG;
+
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('returns user_api_key_required when non-pro tier requests premium model without BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    tierContext: { tier: 'member', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                }
+            );
+
+            expect(result.status).toBe('key_error');
+            if (result.status === 'key_error') {
+                expect(result.code).toBe('user_api_key_required');
+            }
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('error includes modelId and tier diagnostic fields', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    tierContext: { tier: 'member', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                }
+            );
+
+            expect(result).toMatchObject({
+                status: 'key_error',
+                code: 'user_api_key_required',
+                modelId: 'gemini-2.5-pro',
+                tier: 'member',
+            });
+        });
+
+        it('proceeds when non-pro tier requests premium model with BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    tierContext: { tier: 'member', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                    userApiKey: 'usr-key',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        'X-AI-API-KEY': 'usr-key',
+                    }),
+                })
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('member');
+        });
+
+        it('proceeds when pro tier requests premium model without BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    tierContext: { tier: 'pro', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            const fetchCall = mockFetch.mock.calls[0][1] as {
+                headers: Record<string, string>;
+                body: string;
+            };
+            expect(fetchCall.headers['X-AI-API-KEY']).toBeUndefined();
+            const body = JSON.parse(fetchCall.body) as Record<string, unknown>;
+            expect(body.tier).toBe('pro');
+        });
+
+        it('proceeds when any tier requests free model without BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    tierContext: { tier: 'free', userId: null },
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('free');
+        });
+
+        it('forwards tier "free" when no tierContext provided', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('free');
         });
     });
 

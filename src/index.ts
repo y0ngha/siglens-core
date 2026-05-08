@@ -244,9 +244,12 @@ export {
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
+    isFreeModel,
     isModelAllowed,
+    isPremiumModel,
     isTier,
     isTimeframeAllowed,
+    requiresByokKey,
 } from './domain/tier';
 
 // Dashboard helpers
@@ -491,6 +494,7 @@ export type {
 export type {
     FundamentalAnalysisUsageOptions,
     PollFundamentalAnalysisResult,
+    SubmitFundamentalAnalysisApiKeyRequiredError,
     SubmitFundamentalAnalysisCached,
     SubmitFundamentalAnalysisFetchError,
     SubmitFundamentalAnalysisLimitError,
@@ -505,11 +509,13 @@ export type {
     SubmitAnalysisErrorResult,
     TierGateErrorResult,
     TierTimeframeAccessError,
+    UserApiKeyRequiredError,
 } from './application/market/types';
 export type {
     NewsAnalysisUsageOptions,
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
+    SubmitNewsAnalysisApiKeyRequiredError,
     SubmitNewsAnalysisCached,
     SubmitNewsAnalysisLimitError,
     SubmitNewsAnalysisNoNewsError,
@@ -531,6 +537,7 @@ export type {
     SubmitOverallAnalysisSubmitted,
     SubmitOverallAnalysisError,
     SubmitOverallAnalysisLimitError,
+    SubmitOverallAnalysisApiKeyRequiredError,
     DependencyState,
     DependencyStateCached,
     DependencyStatePending,
