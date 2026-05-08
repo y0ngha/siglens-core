@@ -91,7 +91,8 @@ export interface SubmitFundamentalAnalysisFetchError {
 }
 
 /** Result variant when a user BYOK API key is required for the requested model+tier combo. */
-export type SubmitFundamentalAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
+export type SubmitFundamentalAnalysisApiKeyRequiredError =
+    UserApiKeyRequiredError;
 
 /** Union of all possible outcomes from {@link submitFundamentalAnalysis}. */
 export type SubmitFundamentalAnalysisResult =
