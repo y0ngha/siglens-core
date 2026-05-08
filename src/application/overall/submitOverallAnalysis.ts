@@ -139,10 +139,12 @@ export async function submitOverallAnalysis(
         // (or top-level model) triggered the BYOK requirement.
         // `deps.error` is now a typed union — narrow directly on the discriminant.
         if (deps.error.status === 'key_error') {
-            // Structural match is guaranteed: all `key_error` variants in the union
-            // share the UserApiKeyRequiredError shape (same fields, different type aliases).
-            // The `as` cast is safe because every BYOK error variant across all axes
-            // is structurally identical to SubmitOverallAnalysisApiKeyRequiredError.
+            // (a) TS cannot fully narrow through the nested SubmitAnalysisErrorResult union
+            // after the status === 'key_error' check — the discriminant lives one level
+            // inside the union-of-unions, which TS cannot resolve to a single leaf type.
+            // (b) Runtime safety: all BYOK error variants (SubmitAnalysis/Fundamental/News
+            // ApiKeyRequiredError) are type aliases for UserApiKeyRequiredError — identical
+            // shape at runtime.
             return deps.error as SubmitOverallAnalysisApiKeyRequiredError;
         }
         // For non-BYOK errors (status === 'error' on each axis), unwrap the inner
@@ -151,7 +153,11 @@ export async function submitOverallAnalysis(
             status: 'error',
             axis: deps.axis,
             error:
-                'error' in deps.error ? deps.error.error : 'Unknown axis error',
+                'error' in deps.error
+                    ? deps.error.error
+                    : ('code' in deps.error
+                        ? String(deps.error.code)
+                        : 'Unknown axis error'),
         };
     }
 

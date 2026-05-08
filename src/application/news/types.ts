@@ -46,8 +46,12 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
     /**
-     * Resolved subscription tier. Required only when `usage` is also provided;
-     * omit before Phase 4 (siglens passes neither).
+     * Resolved subscription tier.
+     *
+     * Required in two cases:
+     * 1. When `usage` is also provided — enforces the daily analysis limit.
+     * 2. When a premium model is requested — determines BYOK key requirement.
+     *    Defaults to {@link DEFAULT_TIER} (`'free'`) when omitted.
      */
     tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */

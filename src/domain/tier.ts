@@ -322,6 +322,10 @@ export function isFreeModel(
  * BYOK is required when a non-pro tier user requests a premium model.
  * Pro tier and free models bypass BYOK (server pays).
  *
+ * Like {@link isPremiumModel}, this function intentionally **ignores**
+ * `config.featureFlags.enableTierRestrictions` — BYOK classification is
+ * independent of whether tier restrictions are enabled.
+ *
  * Pure function — no I/O, no side effects.
  *
  * @param tier - The user's subscription tier.
