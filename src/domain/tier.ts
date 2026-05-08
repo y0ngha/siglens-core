@@ -315,3 +315,24 @@ export function isFreeModel(
 ): boolean {
     return !isPremiumModel(model, config);
 }
+
+/**
+ * Return whether a request requires a BYOK API key.
+ *
+ * BYOK is required when a non-pro tier user requests a premium model.
+ * Pro tier and free models bypass BYOK (server pays).
+ *
+ * Pure function — no I/O, no side effects.
+ *
+ * @param tier - The user's subscription tier.
+ * @param model - The AI model identifier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` if the user must provide their own BYOK key for this combo.
+ */
+export function requiresByokKey(
+    tier: Tier,
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    return tier !== 'pro' && isPremiumModel(model, config);
+}

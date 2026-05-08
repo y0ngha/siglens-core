@@ -19,8 +19,8 @@ import {
     DEFAULT_TIER,
     TIER_CONFIG,
     getAllowedTimeframes,
-    isPremiumModel,
     isTimeframeAllowed,
+    requiresByokKey,
 } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -207,23 +207,20 @@ export async function submitAnalysis(
     const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
     // `options.modelId` is a TierModel; the default 'analysis-worker' is a
     // platform routing token, not a user-selectable model, so it is never premium.
-    // We deliberately do NOT use effectiveModelId here — DEFAULT_ANALYSIS_MODEL_ID
-    // is not a TierModel and not in any config.models.* list, so isPremiumModel
+    // requiresByokKey is only called when options.modelId is set — DEFAULT_ANALYSIS_MODEL_ID
+    // is not a TierModel and not in any config.models.* list, so requiresByokKey
     // would erroneously return true for it.
-    const premium =
-        options.modelId !== undefined
-            ? isPremiumModel(options.modelId, tierConfig)
-            : false;
-
-    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+    if (
+        options.modelId !== undefined &&
+        requiresByokKey(tier, options.modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
         return {
             status: 'key_error',
             code: 'user_api_key_required',
             error: USER_API_KEY_REQUIRED_MESSAGE,
-            // Safe: premium === true implies options.modelId !== undefined (premium
-            // falls back to false when options.modelId is undefined per the
-            // construction above).
-            modelId: options.modelId as NonNullable<typeof options.modelId>,
+            // Safe: the outer `options.modelId !== undefined` guard narrows the type.
+            modelId: options.modelId!,
             tier,
         };
     }

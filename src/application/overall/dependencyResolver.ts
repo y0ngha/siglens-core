@@ -166,8 +166,6 @@ export async function resolveOverallDependencies(
             {
                 ...technicalAxisOptions,
                 modelId: technicalAxisOptions.modelId ?? modelId,
-                // Propagate top-level userApiKey when axis-level is not set.
-                // tierContext propagation: use axis-level if set, else fall back to top-level tier.
                 userApiKey:
                     technicalAxisOptions.userApiKey ?? topLevelUserApiKey,
                 tierContext:

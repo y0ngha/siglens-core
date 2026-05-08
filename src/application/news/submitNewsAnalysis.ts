@@ -15,7 +15,7 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { DEFAULT_TIER, isPremiumModel, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildNewsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -116,9 +116,8 @@ export async function submitNewsAnalysis(
     // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
-    const premium = isPremiumModel(modelId, tierConfig);
 
-    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+    if (requiresByokKey(tier, modelId, tierConfig) && options.userApiKey === undefined) {
         const apiKeyRequiredError: SubmitNewsAnalysisApiKeyRequiredError = {
             status: 'key_error',
             code: 'user_api_key_required',

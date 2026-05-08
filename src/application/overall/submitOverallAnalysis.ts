@@ -17,7 +17,7 @@ import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOve
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import { DEFAULT_TIER, isPremiumModel, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -118,8 +118,7 @@ export async function submitOverallAnalysis(
     // ── 0a. BYOK gate for overall job's own AI call ──
     // Fires BEFORE the dependency resolver so axes are not dispatched when the
     // overall-level gate blocks the request.
-    const premium = isPremiumModel(modelId, tierConfig);
-    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+    if (requiresByokKey(tier, modelId, tierConfig) && options.userApiKey === undefined) {
         return {
             status: 'key_error',
             code: 'user_api_key_required',
@@ -145,6 +144,10 @@ export async function submitOverallAnalysis(
             typeof inner === 'object' &&
             inner !== null &&
             'status' in inner &&
+            // After `'status' in inner`, TS narrows `inner` to `object & { status: unknown }`.
+            // Comparing `inner.status` to the literal 'key_error' is safe:
+            // `deps.error` is always an axis submit result (one of the BYOK error union variants),
+            // and we only re-surface when status matches; otherwise we fall through to the generic error.
             (inner as { status: unknown }).status === 'key_error'
         ) {
             // The axis-level result already has the SubmitXxxAnalysisApiKeyRequiredError shape:

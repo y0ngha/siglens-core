@@ -13,6 +13,7 @@ import {
     isPremiumModel,
     isTier,
     isTimeframeAllowed,
+    requiresByokKey,
 } from '@/domain/tier';
 import type { ModelId, TierConfig } from '@/domain/types';
 
@@ -359,6 +360,30 @@ describe('tier', () => {
             };
             expect(isFreeModel('gemini-2.5-flash', restricted)).toBe(true);
             expect(isFreeModel('gemini-2.5-pro', restricted)).toBe(false);
+        });
+    });
+
+    describe('requiresByokKey', () => {
+        it('returns false for pro tier on premium models', () => {
+            expect(requiresByokKey('pro', 'gemini-2.5-pro')).toBe(false);
+        });
+
+        it('returns false for non-pro tier on free models', () => {
+            expect(requiresByokKey('member', 'gemini-2.5-flash')).toBe(false);
+            expect(requiresByokKey('free', 'gemini-2.5-flash')).toBe(false);
+        });
+
+        it('returns true for non-pro tier on premium models', () => {
+            expect(requiresByokKey('member', 'gemini-2.5-pro')).toBe(true);
+            expect(requiresByokKey('free', 'gemini-2.5-pro')).toBe(true);
+        });
+
+        it('respects custom config', () => {
+            const restricted: TierConfig = {
+                ...TIER_CONFIG,
+                featureFlags: { enableTierRestrictions: true },
+            };
+            expect(requiresByokKey('member', 'gemini-2.5-pro', restricted)).toBe(true);
         });
     });
 });

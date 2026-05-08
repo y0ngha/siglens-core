@@ -249,6 +249,7 @@ export {
     isPremiumModel,
     isTier,
     isTimeframeAllowed,
+    requiresByokKey,
 } from './domain/tier';
 
 // Dashboard helpers

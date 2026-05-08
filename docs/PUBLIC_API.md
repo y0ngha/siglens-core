@@ -228,7 +228,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
 | `isAllowed` / `getTierLimit` / `getAllowedTimeframes` / `getAllowedModels` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
-| `isPremiumModel` / `isFreeModel` | `domain/tier.ts` |
+| `isPremiumModel` / `isFreeModel` / `requiresByokKey` | `domain/tier.ts` |
 | `isTier` | `domain/tier.ts` |
 | `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
 
