@@ -1,5 +1,5 @@
 import { fireAndForget } from '@/application/background';
-import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import {
     buildUsageLimitError,
@@ -7,7 +7,6 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import type {
-    SubmitNewsAnalysisApiKeyRequiredError,
     SubmitNewsAnalysisLimitError,
     SubmitNewsAnalysisNoNewsError,
     SubmitNewsAnalysisOptions,
@@ -121,14 +120,7 @@ export async function submitNewsAnalysis(
         requiresByokKey(tier, modelId, tierConfig) &&
         options.userApiKey === undefined
     ) {
-        const apiKeyRequiredError: SubmitNewsAnalysisApiKeyRequiredError = {
-            status: 'key_error',
-            code: 'user_api_key_required',
-            error: USER_API_KEY_REQUIRED_MESSAGE,
-            modelId,
-            tier,
-        };
-        return apiKeyRequiredError;
+        return buildUserApiKeyRequiredError(tier, modelId);
     }
 
     // ── 2. Usage limit check (only when both tier and usage are provided) ──

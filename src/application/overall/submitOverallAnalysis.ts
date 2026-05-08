@@ -1,6 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
-import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type {
@@ -102,13 +102,7 @@ export async function submitOverallAnalysis(
         requiresByokKey(tier, modelId, tierConfig) &&
         options.userApiKey === undefined
     ) {
-        return {
-            status: 'key_error',
-            code: 'user_api_key_required',
-            error: USER_API_KEY_REQUIRED_MESSAGE,
-            modelId,
-            tier,
-        };
+        return buildUserApiKeyRequiredError(tier, modelId);
     }
 
     // ── 0a. Overall-scoped usage limit check ──
@@ -143,29 +137,22 @@ export async function submitOverallAnalysis(
         // If an axis returned a BYOK error, re-surface it at the overall level
         // so consumers get a uniform `key_error` shape regardless of which axis
         // (or top-level model) triggered the BYOK requirement.
-        const inner = deps.error;
-        if (
-            typeof inner === 'object' &&
-            inner !== null &&
-            'status' in inner &&
-            // After `'status' in inner`, TS narrows `inner` to `object & { status: unknown }`.
-            // Comparing `inner.status` to the literal 'key_error' is safe:
-            // `deps.error` is always an axis submit result (one of the BYOK error union variants),
-            // and we only re-surface when status matches; otherwise we fall through to the generic error.
-            (inner as { status: unknown }).status === 'key_error'
-        ) {
-            // (a) TS cannot narrow 'unknown' to a specific union variant from the
-            //     `'status' in inner && inner.status === 'key_error'` check alone — the
-            //     `inner` type is `{ status: unknown } & object`, not the structured
-            //     UserApiKeyRequiredError shape.
-            // (b) Structural match is guaranteed at runtime: DependencyStateError.error
-            //     always carries an axis submit result, and when its status is 'key_error'
-            //     it has the shared UserApiKeyRequiredError shape (alias of all
-            //     SubmitXxxAnalysisApiKeyRequiredError types after B2 extraction).
-            return inner as SubmitOverallAnalysisApiKeyRequiredError;
+        // `deps.error` is now a typed union — narrow directly on the discriminant.
+        if (deps.error.status === 'key_error') {
+            // Structural match is guaranteed: all `key_error` variants in the union
+            // share the UserApiKeyRequiredError shape (same fields, different type aliases).
+            // The `as` cast is safe because every BYOK error variant across all axes
+            // is structurally identical to SubmitOverallAnalysisApiKeyRequiredError.
+            return deps.error as SubmitOverallAnalysisApiKeyRequiredError;
         }
-        // One axis failed — return immediately without cache lookup or job submission.
-        return { status: 'error', axis: deps.axis, error: deps.error };
+        // For non-BYOK errors (status === 'error' on each axis), unwrap the inner
+        // `.error` field for backward-compatible SubmitOverallAnalysisError shape.
+        return {
+            status: 'error',
+            axis: deps.axis,
+            error:
+                'error' in deps.error ? deps.error.error : 'Unknown axis error',
+        };
     }
 
     if (deps.kind === 'pending') {

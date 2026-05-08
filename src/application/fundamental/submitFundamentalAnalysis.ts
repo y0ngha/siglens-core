@@ -1,5 +1,5 @@
 import { fireAndForget } from '@/application/background';
-import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     buildUsageLimitError,
     checkAnalysisUsageAllowed,
@@ -10,7 +10,6 @@ import type {
     SubmitFundamentalAnalysisResult,
     SubmitFundamentalAnalysisLimitError,
     SubmitFundamentalAnalysisFetchError,
-    SubmitFundamentalAnalysisApiKeyRequiredError,
 } from '@/application/fundamental/types';
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
@@ -179,15 +178,7 @@ export async function submitFundamentalAnalysis(
         requiresByokKey(tier, modelId, tierConfig) &&
         options.userApiKey === undefined
     ) {
-        const apiKeyRequiredError: SubmitFundamentalAnalysisApiKeyRequiredError =
-            {
-                status: 'key_error',
-                code: 'user_api_key_required',
-                error: USER_API_KEY_REQUIRED_MESSAGE,
-                modelId,
-                tier,
-            };
-        return apiKeyRequiredError;
+        return buildUserApiKeyRequiredError(tier, modelId);
     }
 
     if (options.tier !== undefined && usage !== undefined) {

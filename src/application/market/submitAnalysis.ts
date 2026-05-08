@@ -1,6 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
-import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import type {
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
@@ -215,14 +215,8 @@ export async function submitAnalysis(
         requiresByokKey(tier, options.modelId, tierConfig) &&
         options.userApiKey === undefined
     ) {
-        return {
-            status: 'key_error',
-            code: 'user_api_key_required',
-            error: USER_API_KEY_REQUIRED_MESSAGE,
-            // Safe: the outer `options.modelId !== undefined` guard narrows the type.
-            modelId: options.modelId,
-            tier,
-        };
+        // Safe: the outer `options.modelId !== undefined` guard narrows the type.
+        return buildUserApiKeyRequiredError(tier, options.modelId);
     }
 
     const usage = options.usage;

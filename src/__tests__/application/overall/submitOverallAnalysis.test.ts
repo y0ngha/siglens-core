@@ -198,10 +198,13 @@ describe('submitOverallAnalysis 함수는', () => {
 
     describe('의존성 축이 error 일 때', () => {
         it('error 를 반환하고 axis 와 error 를 포함한다', async () => {
+            const innerError = { code: 'timeframe_not_allowed' };
             mockResolveOverallDependencies.mockResolvedValue({
                 kind: 'error',
                 axis: 'technical',
-                error: { code: 'timeframe_not_allowed' },
+                // B2: resolver now stores the full result object; submitOverallAnalysis
+                // unwraps `.error` for the backward-compatible SubmitOverallAnalysisError shape.
+                error: { status: 'error', error: innerError },
             });
 
             const result = await submitOverallAnalysis(makeOptions());
@@ -209,7 +212,7 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(result.status).toBe('error');
             if (result.status === 'error' && 'axis' in result) {
                 expect(result.axis).toBe('technical');
-                expect(result.error).toEqual({ code: 'timeframe_not_allowed' });
+                expect(result.error).toEqual(innerError);
             }
             expect(mockCacheGet).not.toHaveBeenCalled();
             expect(mockSetJobMeta).not.toHaveBeenCalled();
@@ -633,7 +636,8 @@ describe('submitOverallAnalysis 함수는', () => {
             mockResolveOverallDependencies.mockResolvedValue({
                 kind: 'error',
                 axis: 'technical',
-                error: { code: 'timeframe_not_allowed' },
+                // B2: resolver stores the full result object
+                error: { status: 'error', error: { code: 'timeframe_not_allowed' } },
             });
             const recordUsage = vi.fn().mockResolvedValue(undefined);
 

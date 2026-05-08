@@ -295,10 +295,8 @@ describe('resolveOverallDependencies 함수는', () => {
                 timeframe: '1Day',
                 allowedTimeframes: [],
             };
-            mockSubmitAnalysis.mockResolvedValue({
-                status: 'error',
-                error: technicalError,
-            });
+            const technicalResult = { status: 'error' as const, error: technicalError };
+            mockSubmitAnalysis.mockResolvedValue(technicalResult);
             mockSubmitFundamentalAnalysis.mockResolvedValue({
                 status: 'cached',
                 result: cachedFundamental,
@@ -313,7 +311,8 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(state.kind).toBe('error');
             if (state.kind === 'error') {
                 expect(state.axis).toBe('technical');
-                expect(state.error).toEqual(technicalError);
+                // B2: resolver stores the full result object (not just the inner error)
+                expect(state.error).toEqual(technicalResult);
             }
         });
 

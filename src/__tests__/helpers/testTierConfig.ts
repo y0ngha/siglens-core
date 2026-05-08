@@ -2,6 +2,8 @@ import { TIER_CONFIG } from '@/domain/tier';
 import type { TierConfig } from '@/domain/types';
 
 /**
+ * @internal
+ *
  * Test fixture for BYOK + tier-forwarding tests across all 4 analysis modules.
  * Decouples tests from production TIER_CONFIG model lists so model
  * additions/removals don't break BYOK assertion semantics.
