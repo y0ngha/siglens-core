@@ -39,6 +39,27 @@ const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  * is a transient loader-health flag that is sometimes attached to the
  * cached body. Neither belongs in the hashing surface.
  */
+/**
+ * Unwrap an axis-error result into its user-facing payload.
+ *
+ * Every non-BYOK variant in `DependencyStateError['error']` carries either an
+ * `error` field (string or structured limit error) or a `code` field (e.g.
+ * `SubmitFundamentalAnalysisFetchError` with `code: 'fetch_failed'`). If the
+ * union grows to include a variant lacking both fields, the exhaustiveness
+ * assignment below turns it into a compile error rather than a silent runtime
+ * fallback.
+ */
+function unwrapAxisError(
+    err: { error: unknown } | { code: unknown }
+): unknown {
+    if ('error' in err) return err.error;
+    if ('code' in err) return String(err.code);
+    // Unreachable for the current union — adding a variant without `error` or
+    // `code` will cause a type error on the line below.
+    const _exhaustive: never = err;
+    return _exhaustive;
+}
+
 function stripVolatileTechnicalFields(
     technical: AnalysisResponse
 ): Omit<AnalysisResponse, 'analyzedAt'> {
@@ -152,12 +173,7 @@ export async function submitOverallAnalysis(
         return {
             status: 'error',
             axis: deps.axis,
-            error:
-                'error' in deps.error
-                    ? deps.error.error
-                    : 'code' in deps.error
-                      ? String(deps.error.code)
-                      : 'Unknown axis error',
+            error: unwrapAxisError(deps.error),
         };
     }
 

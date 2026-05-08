@@ -314,7 +314,6 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(state.kind).toBe('error');
             if (state.kind === 'error') {
                 expect(state.axis).toBe('technical');
-                // B2: resolver stores the full result object (not just the inner error)
                 expect(state.error).toEqual(technicalResult);
             }
         });

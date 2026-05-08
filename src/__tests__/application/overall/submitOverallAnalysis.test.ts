@@ -202,7 +202,7 @@ describe('submitOverallAnalysis 함수는', () => {
             mockResolveOverallDependencies.mockResolvedValue({
                 kind: 'error',
                 axis: 'technical',
-                // B2: resolver now stores the full result object; submitOverallAnalysis
+                // resolver stores the full result object; submitOverallAnalysis
                 // unwraps `.error` for the backward-compatible SubmitOverallAnalysisError shape.
                 error: { status: 'error', error: innerError },
             });
@@ -636,7 +636,6 @@ describe('submitOverallAnalysis 함수는', () => {
             mockResolveOverallDependencies.mockResolvedValue({
                 kind: 'error',
                 axis: 'technical',
-                // B2: resolver stores the full result object
                 error: {
                     status: 'error',
                     error: { code: 'timeframe_not_allowed' },

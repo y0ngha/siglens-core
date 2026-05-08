@@ -14,13 +14,10 @@ describe('buildUserApiKeyRequiredError', () => {
         });
     });
 
-    it('preserves the modelId argument', () => {
-        const result = buildUserApiKeyRequiredError('free', 'claude-opus-4-7');
-        expect(result.modelId).toBe('claude-opus-4-7');
-    });
-
-    it('preserves the tier argument', () => {
-        const result = buildUserApiKeyRequiredError('free', 'gemini-2.5-pro');
-        expect(result.tier).toBe('free');
+    it('returns the same error message regardless of inputs', () => {
+        const a = buildUserApiKeyRequiredError('member', 'gemini-2.5-pro');
+        const b = buildUserApiKeyRequiredError('free', 'claude-opus-4-7');
+        expect(a.error).toBe(b.error);
+        expect(a.error).toBe(USER_API_KEY_REQUIRED_MESSAGE);
     });
 });
