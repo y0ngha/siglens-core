@@ -37,6 +37,8 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+const USER_API_KEY_REQUIRED_MESSAGE =
+    '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.';
 const TIMEFRAMES: readonly Timeframe[] = [
     '5Min',
     '15Min',
@@ -206,18 +208,27 @@ export async function submitAnalysis(
     const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
     // `options.modelId` is a TierModel; the default 'analysis-worker' is a
     // platform routing token, not a user-selectable model, so it is never premium.
+    // We deliberately do NOT use effectiveModelId here — DEFAULT_ANALYSIS_MODEL_ID
+    // is not a TierModel and not in any config.models.* list, so isPremiumModel
+    // would erroneously return true for it.
     const premium =
         options.modelId !== undefined
             ? isPremiumModel(options.modelId, tierConfig)
             : false;
 
-    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+    if (
+        tier !== 'pro' &&
+        premium &&
+        options.modelId !== undefined &&
+        options.userApiKey === undefined
+    ) {
         return {
             status: 'error',
             error: {
                 code: 'user_api_key_required',
-                message:
-                    '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.',
+                message: USER_API_KEY_REQUIRED_MESSAGE,
+                modelId: options.modelId,
+                tier,
             },
         };
     }

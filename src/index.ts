@@ -506,6 +506,7 @@ export type {
     SubmitAnalysisErrorResult,
     TierGateErrorResult,
     TierTimeframeAccessError,
+    UserApiKeyRequiredError,
 } from './application/market/types';
 export type {
     NewsAnalysisUsageOptions,

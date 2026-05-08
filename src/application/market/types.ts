@@ -60,6 +60,10 @@ export interface TierGateErrorResult {
 export interface UserApiKeyRequiredError {
     code: 'user_api_key_required';
     message: string;
+    /** The model that triggered the BYOK requirement. */
+    modelId: ModelId;
+    /** The tier that triggered the BYOK requirement. */
+    tier: Tier;
 }
 
 /** Analysis error result: usage limit exceeded or tier timeframe denied. */

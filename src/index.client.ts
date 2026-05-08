@@ -365,7 +365,10 @@ export type {
     RequestChatCompletionDependencies,
     RequestChatCompletionResult,
 } from './application/chat/types';
-export type { SubmitAnalysisGatedResult } from './application/market/types';
+export type {
+    SubmitAnalysisGatedResult,
+    UserApiKeyRequiredError,
+} from './application/market/types';
 export type {
     AnalysisLimitError,
     AnalysisLimitErrorCode,

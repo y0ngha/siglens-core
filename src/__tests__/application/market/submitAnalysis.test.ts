@@ -7,7 +7,7 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
-import { getAllowedTimeframes } from '@/domain/tier';
+import { getAllowedTimeframes, TIER_CONFIG } from '@/domain/tier';
 import type { UsageRepository } from '@/infrastructure/db';
 
 vi.mock('@/infrastructure/cache/redis');
@@ -809,6 +809,19 @@ describe('submitAnalysis 함수는', () => {
     });
 
     describe('submitAnalysis BYOK gate + tier forwarding', () => {
+        // Explicit tier config decoupled from production TIER_CONFIG.
+        // Tests classify models themselves so changes to TIER_CONFIG don't
+        // silently pass with wrong semantics.
+        const testTierConfig: TierConfig = {
+            ...TIER_CONFIG,
+            models: {
+                free: ['gemini-2.5-flash'],
+                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+            },
+            featureFlags: { enableTierRestrictions: false },
+        };
+
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);
         });
@@ -821,20 +834,41 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: testTierConfig,
                     tierContext: { tier: 'member', userId: null },
                     modelId: 'gemini-2.5-pro',
                 }
             );
 
-            expect(result).toEqual({
+            expect(result.status).toBe('error');
+            if (result.status === 'error') {
+                expect(result.error.code).toBe('user_api_key_required');
+            }
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('error includes modelId and tier diagnostic fields', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierConfig: testTierConfig,
+                    tierContext: { tier: 'member', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                }
+            );
+
+            expect(result).toMatchObject({
                 status: 'error',
                 error: {
                     code: 'user_api_key_required',
-                    message:
-                        '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.',
+                    modelId: 'gemini-2.5-pro',
+                    tier: 'member',
                 },
             });
-            expect(mockFetch).not.toHaveBeenCalled();
         });
 
         it('proceeds when non-pro tier requests premium model with BYOK', async () => {
@@ -845,6 +879,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: testTierConfig,
                     tierContext: { tier: 'member', userId: null },
                     modelId: 'gemini-2.5-pro',
                     userApiKey: 'usr-key',
@@ -874,6 +909,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: testTierConfig,
                     tierContext: { tier: 'pro', userId: null },
                     modelId: 'gemini-2.5-pro',
                 }
@@ -897,6 +933,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: testTierConfig,
                     tierContext: { tier: 'free', userId: null },
                     modelId: 'gemini-2.5-flash',
                 }
@@ -917,6 +954,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    tierConfig: testTierConfig,
                     modelId: 'gemini-2.5-flash',
                 }
             );
