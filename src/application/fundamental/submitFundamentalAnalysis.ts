@@ -175,7 +175,10 @@ export async function submitFundamentalAnalysis(
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
-    if (requiresByokKey(tier, modelId, tierConfig) && options.userApiKey === undefined) {
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
         const apiKeyRequiredError: SubmitFundamentalAnalysisApiKeyRequiredError =
             {
                 status: 'key_error',

@@ -117,7 +117,10 @@ export async function submitNewsAnalysis(
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
-    if (requiresByokKey(tier, modelId, tierConfig) && options.userApiKey === undefined) {
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
         const apiKeyRequiredError: SubmitNewsAnalysisApiKeyRequiredError = {
             status: 'key_error',
             code: 'user_api_key_required',

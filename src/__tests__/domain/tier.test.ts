@@ -383,7 +383,9 @@ describe('tier', () => {
                 ...TIER_CONFIG,
                 featureFlags: { enableTierRestrictions: true },
             };
-            expect(requiresByokKey('member', 'gemini-2.5-pro', restricted)).toBe(true);
+            expect(
+                requiresByokKey('member', 'gemini-2.5-pro', restricted)
+            ).toBe(true);
         });
     });
 });

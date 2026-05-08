@@ -118,7 +118,10 @@ export async function submitOverallAnalysis(
     // ── 0a. BYOK gate for overall job's own AI call ──
     // Fires BEFORE the dependency resolver so axes are not dispatched when the
     // overall-level gate blocks the request.
-    if (requiresByokKey(tier, modelId, tierConfig) && options.userApiKey === undefined) {
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
         return {
             status: 'key_error',
             code: 'user_api_key_required',
