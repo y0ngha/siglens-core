@@ -808,6 +808,127 @@ describe('submitAnalysis 함수는', () => {
         });
     });
 
+    describe('submitAnalysis BYOK gate + tier forwarding', () => {
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('returns user_api_key_required when non-pro tier requests premium model without BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { tier: 'member', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                }
+            );
+
+            expect(result).toEqual({
+                status: 'error',
+                error: {
+                    code: 'user_api_key_required',
+                    message:
+                        '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.',
+                },
+            });
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('proceeds when non-pro tier requests premium model with BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { tier: 'member', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                    userApiKey: 'usr-key',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        'X-AI-API-KEY': 'usr-key',
+                    }),
+                })
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('member');
+        });
+
+        it('proceeds when pro tier requests premium model without BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { tier: 'pro', userId: null },
+                    modelId: 'gemini-2.5-pro',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            const fetchCall = mockFetch.mock.calls[0][1] as {
+                headers: Record<string, string>;
+                body: string;
+            };
+            expect(fetchCall.headers['X-AI-API-KEY']).toBeUndefined();
+            const body = JSON.parse(fetchCall.body) as Record<string, unknown>;
+            expect(body.tier).toBe('pro');
+        });
+
+        it('proceeds when any tier requests free model without BYOK', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    tierContext: { tier: 'free', userId: null },
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('free');
+        });
+
+        it('forwards tier "free" when no tierContext provided', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    modelId: 'gemini-2.5-flash',
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('free');
+        });
+    });
+
     describe('FearGreed snapshot 주입 시', () => {
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);

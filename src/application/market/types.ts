@@ -56,9 +56,16 @@ export interface TierGateErrorResult {
     error: TierTimeframeAccessError;
 }
 
+/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+export interface UserApiKeyRequiredError {
+    code: 'user_api_key_required';
+    message: string;
+}
+
 /** Analysis error result: usage limit exceeded or tier timeframe denied. */
 export type SubmitAnalysisErrorResult =
     | { status: 'error'; error: AnalysisLimitError }
+    | { status: 'error'; error: UserApiKeyRequiredError }
     | TierGateErrorResult;
 
 /** Submit analysis outcome including application-level gate errors. */

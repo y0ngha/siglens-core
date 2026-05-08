@@ -18,6 +18,7 @@ import {
     DEFAULT_TIER,
     TIER_CONFIG,
     getAllowedTimeframes,
+    isPremiumModel,
     isTimeframeAllowed,
 } from '@/domain/tier';
 import type {
@@ -202,6 +203,25 @@ export async function submitAnalysis(
         };
     }
 
+    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
+    // `options.modelId` is a TierModel; the default 'analysis-worker' is a
+    // platform routing token, not a user-selectable model, so it is never premium.
+    const premium =
+        options.modelId !== undefined
+            ? isPremiumModel(options.modelId, tierConfig)
+            : false;
+
+    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+        return {
+            status: 'error',
+            error: {
+                code: 'user_api_key_required',
+                message:
+                    '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.',
+            },
+        };
+    }
+
     const usage = options.usage;
     const usageOccurredAt = usage?.occurredAt ?? new Date();
 
@@ -220,7 +240,6 @@ export async function submitAnalysis(
         }
     }
 
-    const effectiveModelId = options.modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(symbol, timeframe, effectiveModelId);
 
@@ -313,7 +332,7 @@ export async function submitAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: effectiveModelId }),
+        body: JSON.stringify({ jobId, prompt, model: effectiveModelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[Submit] Worker request failed:', error);
