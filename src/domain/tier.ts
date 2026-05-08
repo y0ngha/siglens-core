@@ -296,3 +296,22 @@ export function isPremiumModel(
     const freeModels = config.models.free as readonly string[];
     return !freeModels.includes(model);
 }
+
+/**
+ * Return whether a model is in the free-tier list.
+ *
+ * Inverse of {@link isPremiumModel}. Like that function, this is a classifier
+ * of the model's intrinsic class — it intentionally **ignores**
+ * `config.featureFlags.enableTierRestrictions`. Both functions are mutually
+ * exclusive: every model is either free or premium.
+ *
+ * @param model - The AI model identifier to check.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` if the model is in `config.models.free`, `false` otherwise.
+ */
+export function isFreeModel(
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    return !isPremiumModel(model, config);
+}

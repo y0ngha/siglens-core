@@ -244,6 +244,7 @@ export {
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
+    isFreeModel,
     isModelAllowed,
     isPremiumModel,
     isTier,

@@ -7,6 +7,7 @@ import {
     getAllowedTimeframes,
     getTierLimit,
     isAllowed,
+    isFreeModel,
     isInfoDepthAllowed,
     isModelAllowed,
     isPremiumModel,
@@ -315,6 +316,49 @@ describe('tier', () => {
             };
             expect(isPremiumModel('gemini-2.5-flash', restricted)).toBe(false);
             expect(isPremiumModel('gemini-2.5-pro', restricted)).toBe(true);
+        });
+    });
+
+    describe('isFreeModel', () => {
+        it('returns true for free-tier models', () => {
+            expect(isFreeModel('gemini-2.5-flash')).toBe(true);
+            expect(isFreeModel('gemini-2.5-flash-lite')).toBe(true);
+            expect(isFreeModel('claude-haiku-4-5')).toBe(true);
+            expect(isFreeModel('gpt-5-mini')).toBe(true);
+        });
+
+        it('returns false for member-only models', () => {
+            expect(isFreeModel('gemini-2.5-pro')).toBe(false);
+            expect(isFreeModel('gemini-3-flash-preview')).toBe(false);
+            expect(isFreeModel('claude-sonnet-4-6')).toBe(false);
+            expect(isFreeModel('gpt-5.4')).toBe(false);
+        });
+
+        it('returns false for pro-only models', () => {
+            expect(isFreeModel('gemini-3.1-pro-preview')).toBe(false);
+            expect(isFreeModel('claude-opus-4-7')).toBe(false);
+            expect(isFreeModel('gpt-5.5')).toBe(false);
+        });
+
+        it('is the inverse of isPremiumModel', () => {
+            // Property-style check across all configured models
+            const allModels = [
+                ...TIER_CONFIG.models.free,
+                ...TIER_CONFIG.models.member,
+                ...TIER_CONFIG.models.pro,
+            ];
+            for (const m of allModels) {
+                expect(isFreeModel(m)).toBe(!isPremiumModel(m));
+            }
+        });
+
+        it('ignores enableTierRestrictions flag', () => {
+            const restricted: TierConfig = {
+                ...TIER_CONFIG,
+                featureFlags: { enableTierRestrictions: true },
+            };
+            expect(isFreeModel('gemini-2.5-flash', restricted)).toBe(true);
+            expect(isFreeModel('gemini-2.5-pro', restricted)).toBe(false);
         });
     });
 });
