@@ -348,7 +348,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
 
 새로 추가된 use-case option/result 타입:
-- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `PollFundamentalAnalysisResult`.
+- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `PollFundamentalAnalysisResult`.
 - 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `SubmitNewsAnalysisApiKeyRequiredError`, `PollNewsAnalysisResult`.
 - 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `PollOverallAnalysisResult`.
 

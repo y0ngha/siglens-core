@@ -492,6 +492,7 @@ export type {
 export type {
     FundamentalAnalysisUsageOptions,
     PollFundamentalAnalysisResult,
+    SubmitFundamentalAnalysisApiKeyRequiredError,
     SubmitFundamentalAnalysisCached,
     SubmitFundamentalAnalysisFetchError,
     SubmitFundamentalAnalysisLimitError,

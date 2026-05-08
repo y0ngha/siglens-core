@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { TierConfig } from '@/domain/types';
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
+import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -497,6 +498,120 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(recordUsage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('submitFundamentalAnalysis BYOK gate + tier forwarding', () => {
+        // Explicit tier config decoupled from production TIER_CONFIG.
+        // Tests classify models themselves so changes to TIER_CONFIG don't
+        // silently pass with wrong semantics.
+        const testTierConfig: TierConfig = {
+            ...TIER_CONFIG,
+            models: {
+                free: ['gemini-2.5-flash'],
+                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+            },
+            featureFlags: { enableTierRestrictions: false },
+        };
+
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('returns user_api_key_required when non-pro premium without BYOK', async () => {
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-pro',
+                dataProvider: mockDataProvider,
+                tier: 'member',
+                tierConfig: testTierConfig,
+            });
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error' && result.code === 'user_api_key_required') {
+                expect(result.modelId).toBe('gemini-2.5-pro');
+                expect(result.tier).toBe('member');
+            } else {
+                expect(result).toMatchObject({ code: 'user_api_key_required' });
+            }
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('proceeds when non-pro premium with BYOK (tier in body, header set)', async () => {
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-pro',
+                dataProvider: mockDataProvider,
+                tier: 'member',
+                tierConfig: testTierConfig,
+                userApiKey: 'usr-key',
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        'X-AI-API-KEY': 'usr-key',
+                    }),
+                })
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('member');
+        });
+
+        it('proceeds when pro premium without BYOK (tier in body, no header)', async () => {
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-pro',
+                dataProvider: mockDataProvider,
+                tier: 'pro',
+                tierConfig: testTierConfig,
+            });
+
+            expect(result.status).toBe('submitted');
+            const fetchCall = mockFetch.mock.calls[0][1] as {
+                headers: Record<string, string>;
+                body: string;
+            };
+            expect(fetchCall.headers['X-AI-API-KEY']).toBeUndefined();
+            const body = JSON.parse(fetchCall.body) as Record<string, unknown>;
+            expect(body.tier).toBe('pro');
+        });
+
+        it('proceeds for free model regardless of tier', async () => {
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tier: 'free',
+                tierConfig: testTierConfig,
+            });
+
+            expect(result.status).toBe('submitted');
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('free');
+        });
+
+        it('treats missing tier as DEFAULT_TIER', async () => {
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tierConfig: testTierConfig,
+                // no tier provided
+            });
+
+            expect(result.status).toBe('submitted');
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe(DEFAULT_TIER);
         });
     });
 });
