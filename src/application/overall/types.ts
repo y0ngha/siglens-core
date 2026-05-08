@@ -1,6 +1,9 @@
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
-import type { SubmitAnalysisOptions, SubmitAnalysisErrorResult } from '@/application/market/types';
+import type {
+    SubmitAnalysisOptions,
+    SubmitAnalysisErrorResult,
+} from '@/application/market/types';
 import type {
     SubmitFundamentalAnalysisOptions,
     SubmitFundamentalAnalysisLimitError,

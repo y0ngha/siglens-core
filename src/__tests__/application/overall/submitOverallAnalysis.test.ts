@@ -637,7 +637,10 @@ describe('submitOverallAnalysis 함수는', () => {
                 kind: 'error',
                 axis: 'technical',
                 // B2: resolver stores the full result object
-                error: { status: 'error', error: { code: 'timeframe_not_allowed' } },
+                error: {
+                    status: 'error',
+                    error: { code: 'timeframe_not_allowed' },
+                },
             });
             const recordUsage = vi.fn().mockResolvedValue(undefined);
 

@@ -295,7 +295,10 @@ describe('resolveOverallDependencies 함수는', () => {
                 timeframe: '1Day',
                 allowedTimeframes: [],
             };
-            const technicalResult = { status: 'error' as const, error: technicalError };
+            const technicalResult = {
+                status: 'error' as const,
+                error: technicalError,
+            };
             mockSubmitAnalysis.mockResolvedValue(technicalResult);
             mockSubmitFundamentalAnalysis.mockResolvedValue({
                 status: 'cached',
