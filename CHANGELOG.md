@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.1](https://github.com/y0ngha/siglens-core/compare/v0.8.0...v0.9.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* PR [#82](https://github.com/y0ngha/siglens-core/issues/82) 리뷰 코멘트 반영 (B-1 ~ B-5, S-1 ~ S-5) ([b4d1aa5](https://github.com/y0ngha/siglens-core/commit/b4d1aa592685397b7e4844424cd0bb9a7be6019a))
+* PR [#82](https://github.com/y0ngha/siglens-core/issues/82) 추가 리뷰 반영 (B-1 docs/API.md 동기화, S-1 submitBriefing dedup) ([5230d19](https://github.com/y0ngha/siglens-core/commit/5230d19a9c67e861eadaa1a580f3501766b54371))
+* PR [#82](https://github.com/y0ngha/siglens-core/issues/82) 추가 리뷰 반영 (B-1 InFlightClaim → types.ts, B-2 briefing inflight 누수, S-1/S-2/S-3) ([88a860b](https://github.com/y0ngha/siglens-core/commit/88a860bb71723f855b167a4f4582bffd53c245dc))
+* PR [#82](https://github.com/y0ngha/siglens-core/issues/82) 추가 리뷰 반영 (B-1 semver bump, B-2 cacheKey JSDoc, B-3/B-4 분기 테스트, S-1 cleanup 주석) ([a442a28](https://github.com/y0ngha/siglens-core/commit/a442a285af6d13efc99b874c3ac2941aa57d5f65))
+* PR [#82](https://github.com/y0ngha/siglens-core/issues/82) 추가 리뷰 반영 (B-1 setNx null 분기 테스트, S-1 const 추출, S-2 process.env 복원) ([1675547](https://github.com/y0ngha/siglens-core/commit/1675547ccf85150d1e22c61add0b8f78996ef218))
+* PR [#82](https://github.com/y0ngha/siglens-core/issues/82) retry 소진 후 fall-through claim에서 refcount 초기화 누락 수정 ([e533598](https://github.com/y0ngha/siglens-core/commit/e5335983d3a5a3dd9833d4de0ef4afe92572b6ca))
+* restore [@internal](https://github.com/internal), extract fetchProviderData(), add overallConclusionKo guard ([82de1bb](https://github.com/y0ngha/siglens-core/commit/82de1bb821a307e00ab096c6ba65593294c14f4f)), closes [#12](https://github.com/y0ngha/siglens-core/issues/12)
+* skillsDegraded type narrowing and error message clarity ([eb66e4c](https://github.com/y0ngha/siglens-core/commit/eb66e4c7617d9a6ee8c495b28a011bb716d63a3a))
+
+
+### Features
+
+* Job 중복 제거 및 Cancel 구독자 카운팅 (refcount) ([4b3f51d](https://github.com/y0ngha/siglens-core/commit/4b3f51df53fca7023d055633ea9c9dc3af22546f))
+
 # [0.9.0](https://github.com/y0ngha/siglens-core/compare/v0.8.0...v0.9.0) (2026-05-08)
 
 
