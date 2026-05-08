@@ -4,22 +4,14 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/jobs/queue');
 
 import { cleanupInBackground, fireAndForget } from '@/application/background';
-import {
-    cleanupJob,
-    clearInFlightJob,
-    getJobMeta,
-} from '@/infrastructure/jobs/queue';
+import { cleanupJob } from '@/infrastructure/jobs/queue';
 
 const mockCleanupJob = cleanupJob as Mock;
-const mockClearInFlightJob = clearInFlightJob as Mock;
-const mockGetJobMeta = getJobMeta as Mock;
 
 describe('background helpers', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
-        mockClearInFlightJob.mockResolvedValue(undefined);
-        mockGetJobMeta.mockResolvedValue(null);
     });
 
     it('fireAndForget은 waitUntil이 있으면 promise를 등록한다', () => {
@@ -36,91 +28,7 @@ describe('background helpers', () => {
 
         cleanupInBackground('job-1', '[Test]', { waitUntil });
 
+        expect(mockCleanupJob).toHaveBeenCalledWith('job-1');
         expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
-    });
-
-    it('cleanupInBackground는 meta의 cacheKey로 in-flight slot을 해제한다', async () => {
-        let registered: Promise<unknown> | undefined;
-        const waitUntil = vi.fn((promise: Promise<unknown>) => {
-            registered = promise;
-        });
-        mockGetJobMeta.mockResolvedValue({
-            symbol: 'AAPL',
-            cacheKey: 'cache-key',
-        });
-
-        cleanupInBackground('job-1', '[Test]', { waitUntil });
-        await registered;
-
-        expect(mockGetJobMeta).toHaveBeenCalledWith('job-1');
-        expect(mockClearInFlightJob).toHaveBeenCalledWith('job-1', 'cache-key');
-        expect(mockCleanupJob).toHaveBeenCalledWith('job-1');
-    });
-
-    it('cleanupInBackground는 meta read 실패 시에도 cleanupJob을 호출한다', async () => {
-        let registered: Promise<unknown> | undefined;
-        const waitUntil = vi.fn((promise: Promise<unknown>) => {
-            registered = promise;
-        });
-        mockGetJobMeta.mockRejectedValue(new Error('redis down'));
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-        cleanupInBackground('job-1', '[Test]', { waitUntil });
-        await registered;
-
-        expect(warnSpy).toHaveBeenCalledWith(
-            '[Test] cleanup meta read failed:',
-            expect.any(Error)
-        );
-        expect(mockClearInFlightJob).toHaveBeenCalledWith('job-1', undefined);
-        expect(mockCleanupJob).toHaveBeenCalledWith('job-1');
-
-        warnSpy.mockRestore();
-    });
-
-    it('cleanupInBackground는 meta가 null로 resolve되면 경고 없이 정리만 진행한다', async () => {
-        let registered: Promise<unknown> | undefined;
-        const waitUntil = vi.fn((promise: Promise<unknown>) => {
-            registered = promise;
-        });
-        // meta가 TTL 만료 등으로 사라진 상태(에러는 아님). 경고 로그가 발생하지
-        // 않아야 reject 분기와 동작이 구분된다.
-        mockGetJobMeta.mockResolvedValue(null);
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-        cleanupInBackground('job-1', '[Test]', { waitUntil });
-        await registered;
-
-        expect(warnSpy).not.toHaveBeenCalled();
-        expect(mockClearInFlightJob).toHaveBeenCalledWith('job-1', undefined);
-        expect(mockCleanupJob).toHaveBeenCalledWith('job-1');
-
-        warnSpy.mockRestore();
-    });
-
-    it('cleanupInBackground는 clearInFlightJob 실패 시에도 cleanupJob을 호출한다', async () => {
-        let registered: Promise<unknown> | undefined;
-        const waitUntil = vi.fn((promise: Promise<unknown>) => {
-            registered = promise;
-        });
-        mockGetJobMeta.mockResolvedValue({
-            symbol: 'AAPL',
-            cacheKey: 'cache-key',
-        });
-        // clearInFlightJob이 reject되더라도 cleanupJob은 계속 호출되어야 한다 —
-        // 한 단계 실패가 잡 라이프사이클 키 정리 자체를 막으면 키가 TTL까지 남는다.
-        mockClearInFlightJob.mockRejectedValueOnce(new Error('redis down'));
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-        cleanupInBackground('job-1', '[Test]', { waitUntil });
-        await registered;
-
-        expect(warnSpy).toHaveBeenCalledWith(
-            '[Test] clearInFlightJob failed:',
-            expect.any(Error)
-        );
-        expect(mockCleanupJob).toHaveBeenCalledWith('job-1');
-
-        warnSpy.mockRestore();
     });
 });

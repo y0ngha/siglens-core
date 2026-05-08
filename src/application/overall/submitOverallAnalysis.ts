@@ -18,10 +18,7 @@ import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    claimOrJoinInFlightJob,
-    setJobMeta,
-} from '@/infrastructure/jobs/queue';
+import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import type {
     AnalysisResponse,
@@ -211,19 +208,8 @@ export async function submitOverallAnalysis(
         timeframe,
         fearGreed ?? undefined
     );
-    const newJobId = crypto.randomUUID();
-    // Dedup: when another submitter is already in flight for the same cache
-    // key, reuse their jobId rather than spawning a duplicate worker call.
-    const claim = await claimOrJoinInFlightJob(cacheKey, newJobId);
+    const jobId = crypto.randomUUID();
 
-    if (claim.status === 'joined') {
-        // Subscribed to an existing job — refcount is already incremented, no
-        // new worker dispatch and no usage record (the original submit owns
-        // both responsibilities).
-        return { status: 'submitted', jobId: claim.jobId };
-    }
-
-    const { jobId } = claim;
     await setJobMeta(jobId, {
         symbol,
         timeframe,
@@ -244,9 +230,6 @@ export async function submitOverallAnalysis(
     });
     fireAndForget(dispatch, options);
 
-    // Usage is recorded only on the claiming submitter — joined subscribers
-    // returned early above and intentionally skip this so a single overall
-    // request still counts as exactly one analysis.
     await recordAnalysisUsageSafely(usage, modelId, occurredAt);
 
     return { status: 'submitted', jobId };
