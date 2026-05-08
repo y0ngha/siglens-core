@@ -32,14 +32,6 @@ import type {
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
- * Strip volatile, write-time-only fields from a cached technical
- * `AnalysisResponse` so the overall input hash stays stable across polls.
- *
- * `analyzedAt` is rewritten on every `pollAnalysis` call; `skillsDegraded`
- * is a transient loader-health flag that is sometimes attached to the
- * cached body. Neither belongs in the hashing surface.
- */
-/**
  * Unwrap an axis-error result into its user-facing payload.
  *
  * Every non-BYOK variant in `DependencyStateError['error']` carries either an
@@ -58,6 +50,14 @@ function unwrapAxisError(err: { error: unknown } | { code: unknown }): unknown {
     return _exhaustive;
 }
 
+/**
+ * Strip volatile, write-time-only fields from a cached technical
+ * `AnalysisResponse` so the overall input hash stays stable across polls.
+ *
+ * `analyzedAt` is rewritten on every `pollAnalysis` call; `skillsDegraded`
+ * is a transient loader-health flag that is sometimes attached to the
+ * cached body. Neither belongs in the hashing surface.
+ */
 function stripVolatileTechnicalFields(
     technical: AnalysisResponse
 ): Omit<AnalysisResponse, 'analyzedAt'> {

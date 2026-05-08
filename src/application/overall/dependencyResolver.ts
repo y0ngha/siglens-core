@@ -200,26 +200,22 @@ export async function resolveOverallDependencies(
     // ── Check for axis errors — surface immediately, do not coerce to pending ──
     // Always store the full submit result so consumers can narrow on
     // `error.status` without runtime `typeof` / `'status' in` guards.
-    if (technicalResult.status === 'error') {
+    if (
+        technicalResult.status === 'error' ||
+        technicalResult.status === 'key_error'
+    ) {
         return { kind: 'error', axis: 'technical', error: technicalResult };
     }
-    if (technicalResult.status === 'key_error') {
-        return { kind: 'error', axis: 'technical', error: technicalResult };
-    }
-    if (fundamentalResult.status === 'error') {
+    if (
+        fundamentalResult.status === 'error' ||
+        fundamentalResult.status === 'key_error'
+    ) {
         return { kind: 'error', axis: 'fundamental', error: fundamentalResult };
     }
-    if (fundamentalResult.status === 'key_error') {
-        return {
-            kind: 'error',
-            axis: 'fundamental',
-            error: fundamentalResult,
-        };
-    }
-    if (newsResult.status === 'error') {
-        return { kind: 'error', axis: 'news', error: newsResult };
-    }
-    if (newsResult.status === 'key_error') {
+    if (
+        newsResult.status === 'error' ||
+        newsResult.status === 'key_error'
+    ) {
         return { kind: 'error', axis: 'news', error: newsResult };
     }
 
