@@ -155,9 +155,9 @@ export async function submitOverallAnalysis(
             error:
                 'error' in deps.error
                     ? deps.error.error
-                    : ('code' in deps.error
-                        ? String(deps.error.code)
-                        : 'Unknown axis error'),
+                    : 'code' in deps.error
+                      ? String(deps.error.code)
+                      : 'Unknown axis error',
         };
     }
 
