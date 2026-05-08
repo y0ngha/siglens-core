@@ -1,16 +1,16 @@
 import { cleanupInBackground, fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
+import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import {
     enrichAnalysisWithConfidence,
     isFallbackAnalysis,
 } from '@/domain/analysis/confidence';
-import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import type { PollAnalysisResult, Skill } from '@/domain/types';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildAnalysisCacheKey,
     computeEffectiveTtl,
 } from '@/infrastructure/cache/config';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     getJobError,
     getJobMeta,
@@ -123,7 +123,7 @@ export async function pollAnalysis(
     const analyzedAt = now.toISOString();
     const result = { ...reconciled, analyzedAt };
 
-    if (meta && meta.timeframe !== undefined) {
+    if (meta && meta.symbol !== undefined && meta.timeframe !== undefined) {
         if (isFallbackAnalysis(reconciled)) {
             console.warn(
                 '[Poll] Worker returned empty analysis; skipping cache write',
