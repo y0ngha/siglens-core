@@ -1,10 +1,12 @@
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
+import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     DependencyState,
     OverallDependencyInputs,
 } from '@/application/overall/types';
+import type { Tier } from '@/domain/types';
 
 /**
  * @internal Object branch of {@link OverallDependencyInputs.news} (per-axis
@@ -132,6 +134,13 @@ export async function resolveOverallDependencies(
         ...technicalRest
     } = technicalOptions;
 
+    // ── Extract top-level propagation fields (available when called from submitOverallAnalysis) ──
+    // `tier` and `userApiKey` live on SubmitOverallAnalysisOptions (a superset of
+    // OverallDependencyInputs). Access them via a cast that matches the established
+    // pattern for the legacy `newsOptions` field above.
+    const topLevelTier = (inputs as { tier?: Tier }).tier;
+    const topLevelUserApiKey = (inputs as { userApiKey?: string }).userApiKey;
+
     // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
     // Triple-counting prevention: if the caller forwards `usage` here, three
     // axis submits would each check + record one analysis. Overall owns the
@@ -159,12 +168,24 @@ export async function resolveOverallDependencies(
             {
                 ...technicalAxisOptions,
                 modelId: technicalAxisOptions.modelId ?? modelId,
+                // Propagate top-level userApiKey when axis-level is not set.
+                // tierContext propagation: use axis-level if set, else fall back to top-level tier.
+                userApiKey:
+                    technicalAxisOptions.userApiKey ?? topLevelUserApiKey,
+                tierContext:
+                    technicalAxisOptions.tierContext ??
+                    (topLevelTier !== undefined
+                        ? { userId: null, tier: topLevelTier }
+                        : undefined),
             }
         ),
         submitFundamentalAnalysis({
             symbol,
             modelId,
             dataProvider: fundamentalProvider,
+            // Top-level fallbacks: axis-level values win because the spread comes last.
+            tier: topLevelTier ?? DEFAULT_TIER,
+            userApiKey: topLevelUserApiKey,
             ...fundamentalAxisOptions,
         }),
         submitNewsAnalysis({
@@ -173,6 +194,9 @@ export async function resolveOverallDependencies(
             modelId,
             news: resolvedNewsItems,
             upcomingCalendar,
+            // Top-level fallbacks: axis-level values win because the spread comes last.
+            tier: topLevelTier ?? DEFAULT_TIER,
+            userApiKey: topLevelUserApiKey,
             ...newsAxisOptions,
         }),
     ]);

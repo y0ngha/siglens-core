@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
+import { TIER_CONFIG } from '@/domain/tier';
 
 // ── Mock dependencies before importing the module under test ──
 vi.mock('@/application/overall/dependencyResolver');
@@ -28,9 +29,9 @@ import type {
     FearGreedSnapshot,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
+    TierConfig,
 } from '@/domain/types';
 import type { SubmitOverallAnalysisOptions } from '@/application/overall/types';
-import type { TierConfig } from '@/domain/types';
 import {
     makeEnrichedNewsItem,
     makeCalendarItem,
@@ -727,6 +728,201 @@ describe('submitOverallAnalysis 함수는', () => {
                 'AAPL',
                 '1Day',
                 'AAPL.US'
+            );
+        });
+    });
+
+    describe('submitOverallAnalysis BYOK gate + tier forwarding', () => {
+        /** TierConfig where gemini-2.5-pro is premium (not in free list). */
+        const testTierConfig: TierConfig = {
+            ...TIER_CONFIG,
+            models: {
+                free: ['gemini-2.5-flash'],
+                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+            },
+            featureFlags: { enableTierRestrictions: false },
+        };
+
+        it('returns key_error when non-pro tier + premium model + no userApiKey', async () => {
+            const result = await submitOverallAnalysis(
+                makeOptions({
+                    tier: 'member',
+                    tierConfig: testTierConfig,
+                    modelId: 'gemini-2.5-pro',
+                })
+            );
+
+            expect(result.status).toBe('key_error');
+            if (result.status === 'key_error') {
+                expect(result.code).toBe('user_api_key_required');
+                expect(result.modelId).toBe('gemini-2.5-pro');
+                expect(result.tier).toBe('member');
+                expect(typeof result.error).toBe('string');
+                expect(result.error.length).toBeGreaterThan(0);
+            }
+            // BYOK gate fires before dependency resolver
+            expect(mockResolveOverallDependencies).not.toHaveBeenCalled();
+        });
+
+        it('proceeds when pro tier + premium model + no userApiKey', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({
+                    tier: 'pro',
+                    tierConfig: testTierConfig,
+                    modelId: 'gemini-2.5-pro',
+                })
+            );
+
+            // Gate does not fire for pro tier
+            expect(result.status).toBe('submitted');
+            expect(mockResolveOverallDependencies).toHaveBeenCalled();
+        });
+
+        it('proceeds when non-pro tier + premium model + userApiKey provided', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({
+                    tier: 'member',
+                    tierConfig: testTierConfig,
+                    modelId: 'gemini-2.5-pro',
+                    userApiKey: 'my-byok-key',
+                })
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockResolveOverallDependencies).toHaveBeenCalled();
+        });
+
+        it('forwards tier in worker POST body', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(
+                makeOptions({
+                    tier: 'pro',
+                    tierConfig: testTierConfig,
+                    modelId: 'gemini-2.5-flash',
+                })
+            );
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    body: expect.stringContaining('"tier":"pro"'),
+                })
+            );
+        });
+
+        it('treats missing tier as DEFAULT_TIER (free) in worker POST body', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            // No tier supplied → defaults to DEFAULT_TIER ('free')
+            await submitOverallAnalysis(makeOptions());
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    body: expect.stringContaining('"tier":"free"'),
+                })
+            );
+        });
+
+        it('forwards top-level userApiKey as X-AI-API-KEY header in worker POST', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(
+                makeOptions({
+                    userApiKey: 'top-key',
+                    // free model is not premium — gate won't block
+                    modelId: 'gemini-2.5-flash',
+                })
+            );
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        'X-AI-API-KEY': 'top-key',
+                    }),
+                })
+            );
+        });
+
+        it('omits X-AI-API-KEY header when userApiKey is not provided', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(makeOptions());
+
+            const fetchCall = mockFetch.mock.calls[0];
+            expect(fetchCall).toBeDefined();
+            const headers = fetchCall?.[1]?.headers as Record<string, string>;
+            expect(headers?.['X-AI-API-KEY']).toBeUndefined();
+        });
+
+        it('passes top-level userApiKey and tier to resolveOverallDependencies inputs', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(
+                makeOptions({
+                    tier: 'pro',
+                    userApiKey: 'propagated-key',
+                    modelId: 'gemini-2.5-flash',
+                })
+            );
+
+            // The first arg to resolveOverallDependencies is the full options object,
+            // which includes top-level userApiKey and tier for propagation to axes.
+            expect(mockResolveOverallDependencies).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userApiKey: 'propagated-key',
+                    tier: 'pro',
+                }),
+                expect.any(Object)
             );
         });
     });

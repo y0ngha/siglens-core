@@ -99,7 +99,7 @@ export interface OverallDependencyInputs {
      */
     fundamental?: Pick<
         SubmitFundamentalAnalysisOptions,
-        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
     >;
     /**
      * Options forwarded verbatim to `submitNewsAnalysis`.
@@ -119,7 +119,7 @@ export interface OverallDependencyInputs {
     news?:
         | Pick<
               SubmitNewsAnalysisOptions,
-              'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+              'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
           >
         | ReadonlyArray<EnrichedNewsItem>;
     /**
@@ -129,7 +129,7 @@ export interface OverallDependencyInputs {
      */
     newsOptions?: Pick<
         SubmitNewsAnalysisOptions,
-        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil'
+        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
     >;
 }
 
@@ -220,6 +220,11 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
+    /**
+     * BYOK API key (overall scope). 최상위에서 한 번 전달되며, dependency resolver가
+     * 각 axis 옵션으로 전파한다 (이미 axis 옵션에 명시되어 있으면 axis 값 우선).
+     */
+    userApiKey?: string;
 }
 
 /** The caller receives a cached overall analysis — no new job was created. */
@@ -277,6 +282,17 @@ export interface SubmitOverallAnalysisLimitError {
     error: AnalysisLimitError;
 }
 
+/** Result variant when BYOK API key is required for the overall job's own AI call. */
+export interface SubmitOverallAnalysisApiKeyRequiredError {
+    status: 'key_error';
+    code: 'user_api_key_required';
+    error: string;
+    /** The model that triggered the BYOK requirement. */
+    modelId: ModelId;
+    /** The tier that triggered the BYOK requirement. */
+    tier: Tier;
+}
+
 /**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.
  *
@@ -284,13 +300,15 @@ export interface SubmitOverallAnalysisLimitError {
  * - `pending_dependencies` — one or more axis jobs are still running; retry after polling each.
  * - `submitted` — overall analysis job submitted; poll via {@link pollOverallAnalysis}.
  * - `error` — one of the dependency axes failed; see `axis` and `error` for details.
+ * - `key_error` — BYOK API key required for the overall job's own AI call.
  */
 export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisCached
     | SubmitOverallAnalysisPendingDependencies
     | SubmitOverallAnalysisSubmitted
     | SubmitOverallAnalysisError
-    | SubmitOverallAnalysisLimitError;
+    | SubmitOverallAnalysisLimitError
+    | SubmitOverallAnalysisApiKeyRequiredError;
 
 // ─────────────────────────────────────────
 // Poll

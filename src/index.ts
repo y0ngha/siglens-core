@@ -535,6 +535,7 @@ export type {
     SubmitOverallAnalysisSubmitted,
     SubmitOverallAnalysisError,
     SubmitOverallAnalysisLimitError,
+    SubmitOverallAnalysisApiKeyRequiredError,
     DependencyState,
     DependencyStateCached,
     DependencyStatePending,

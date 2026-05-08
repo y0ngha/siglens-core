@@ -15,7 +15,7 @@ import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOve
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import { TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, isPremiumModel, TIER_CONFIG } from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -28,6 +28,8 @@ import type {
 
 /** Maximum time to wait for the worker to accept the overall analysis job. */
 const SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+const USER_API_KEY_REQUIRED_MESSAGE =
+    '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.';
 
 /**
  * Strip volatile, write-time-only fields from a cached technical
@@ -94,9 +96,10 @@ export async function submitOverallAnalysis(
     // exactly one analysis. The dependency resolver drops `usage` from each
     // axis's forwarded options (see dropAxisUsage below) to prevent
     // triple-counting.
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+
     if (options.tier !== undefined && usage !== undefined) {
-        const tier = options.tier;
-        const tierConfig = options.tierConfig ?? TIER_CONFIG;
         const allowed = await checkAnalysisUsageAllowed(
             usage,
             tier,
@@ -110,6 +113,20 @@ export async function submitOverallAnalysis(
                 error: buildUsageLimitError('analysisPerDay', tier),
             };
         }
+    }
+
+    // ── 0a. BYOK gate for overall job's own AI call ──
+    // Fires BEFORE the dependency resolver so axes are not dispatched when the
+    // overall-level gate blocks the request.
+    const premium = isPremiumModel(modelId, tierConfig);
+    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+        return {
+            status: 'key_error',
+            code: 'user_api_key_required',
+            error: USER_API_KEY_REQUIRED_MESSAGE,
+            modelId,
+            tier,
+        };
     }
 
     // ── 1. Resolve all three dependency axes in parallel ──
@@ -217,13 +234,19 @@ export async function submitOverallAnalysis(
         cacheKey,
     });
 
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
+            ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId }),
+        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitOverallAnalysis] Worker request failed:', error);
