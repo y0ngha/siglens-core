@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import { TIER_CONFIG } from '@/domain/tier';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 // ── Mock dependencies before importing the module under test ──
 vi.mock('@/application/overall/dependencyResolver');
@@ -210,6 +210,33 @@ describe('submitOverallAnalysis 함수는', () => {
             if (result.status === 'error' && 'axis' in result) {
                 expect(result.axis).toBe('technical');
                 expect(result.error).toEqual({ code: 'timeframe_not_allowed' });
+            }
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
+        });
+
+        it('axis 에서 key_error 가 반환되면 top-level key_error 로 re-surface 한다', async () => {
+            const axisKeyError = {
+                status: 'key_error' as const,
+                code: 'user_api_key_required' as const,
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro' as const,
+                tier: 'member' as const,
+            };
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'error',
+                axis: 'fundamental',
+                error: axisKeyError,
+            });
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('key_error');
+            if (result.status === 'key_error') {
+                expect(result.code).toBe('user_api_key_required');
+                expect(result.modelId).toBe('gemini-2.5-pro');
+                expect(result.tier).toBe('member');
             }
             expect(mockCacheGet).not.toHaveBeenCalled();
             expect(mockSetJobMeta).not.toHaveBeenCalled();
@@ -734,15 +761,7 @@ describe('submitOverallAnalysis 함수는', () => {
 
     describe('submitOverallAnalysis BYOK gate + tier forwarding', () => {
         /** TierConfig where gemini-2.5-pro is premium (not in free list). */
-        const testTierConfig: TierConfig = {
-            ...TIER_CONFIG,
-            models: {
-                free: ['gemini-2.5-flash'],
-                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-            },
-            featureFlags: { enableTierRestrictions: false },
-        };
+        const testTierConfig = TEST_TIER_CONFIG;
 
         it('returns key_error when non-pro tier + premium model + no userApiKey', async () => {
             const result = await submitOverallAnalysis(

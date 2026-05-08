@@ -6,7 +6,6 @@ import type {
     DependencyState,
     OverallDependencyInputs,
 } from '@/application/overall/types';
-import type { Tier } from '@/domain/types';
 
 /**
  * @internal Object branch of {@link OverallDependencyInputs.news} (per-axis
@@ -134,15 +133,11 @@ export async function resolveOverallDependencies(
         ...technicalRest
     } = technicalOptions;
 
-    // ── Extract top-level propagation fields (available when called from submitOverallAnalysis) ──
-    // `tier` and `userApiKey` exist on SubmitOverallAnalysisOptions, which extends
-    // OverallDependencyInputs. TS cannot widen the parameter type automatically.
-    // Safe: resolveOverallDependencies is only ever called from submitOverallAnalysis,
-    // which passes SubmitOverallAnalysisOptions — the superset type that includes
-    // these fields. Direct callers from tests may construct OverallDependencyInputs
-    // without these fields; the optional access pattern handles that case.
-    const topLevelTier = (inputs as { tier?: Tier }).tier;
-    const topLevelUserApiKey = (inputs as { userApiKey?: string }).userApiKey;
+    // ── Extract top-level propagation fields ──
+    // `tier` and `userApiKey` live directly on `OverallDependencyInputs` so
+    // the resolver can propagate them to each axis without casting.
+    const topLevelTier = inputs.tier;
+    const topLevelUserApiKey = inputs.userApiKey;
 
     // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
     // Triple-counting prevention: if the caller forwards `usage` here, three

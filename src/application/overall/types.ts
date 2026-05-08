@@ -47,6 +47,18 @@ export interface OverallDependencyInputs {
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
     /**
+     * Resolved subscription tier. Optional for backward compatibility with
+     * direct test callers; submitOverallAnalysis defaults to DEFAULT_TIER
+     * when omitted.
+     */
+    tier?: Tier;
+    /**
+     * BYOK API key (top-level scope). Provided once at the overall level;
+     * the dependency resolver propagates it to each axis option
+     * (axis-level values take precedence if already set).
+     */
+    userApiKey?: string;
+    /**
      * Enriched news items (already card-analyzed by flash-lite).
      *
      * Renamed from `news` to disambiguate from the per-axis options field
@@ -205,11 +217,6 @@ export type DependencyState =
  */
 export interface SubmitOverallAnalysisOptions
     extends OverallDependencyInputs, BackgroundTaskOptions {
-    /**
-     * Resolved subscription tier. Required only when `usage` is also provided;
-     * omit before Phase 4 (siglens passes neither).
-     */
-    tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
     tierConfig?: TierConfig;
     /**
@@ -225,12 +232,6 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
-    /**
-     * BYOK API key (top-level scope). Provided once at the overall level;
-     * the dependency resolver propagates it to each axis option
-     * (axis-level values take precedence if already set).
-     */
-    userApiKey?: string;
 }
 
 /** The caller receives a cached overall analysis — no new job was created. */
@@ -290,7 +291,9 @@ export interface SubmitOverallAnalysisLimitError {
 
 /** Result variant when BYOK API key is required for the overall job's own AI call. */
 export interface SubmitOverallAnalysisApiKeyRequiredError {
+    /** Discriminant: 'key_error' identifies BYOK-required outcomes. */
     status: 'key_error';
+    /** Machine-readable code for narrowing within the 'key_error' status. */
     code: 'user_api_key_required';
     /** User-facing message explaining the BYOK requirement. */
     error: string;

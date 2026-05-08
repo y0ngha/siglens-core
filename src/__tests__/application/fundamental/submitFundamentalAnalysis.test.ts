@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { TierConfig } from '@/domain/types';
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
-import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER } from '@/domain/tier';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -502,18 +503,7 @@ describe('submitFundamentalAnalysis 함수는', () => {
     });
 
     describe('submitFundamentalAnalysis BYOK gate + tier forwarding', () => {
-        // Explicit tier config decoupled from production TIER_CONFIG.
-        // Tests classify models themselves so changes to TIER_CONFIG don't
-        // silently pass with wrong semantics.
-        const testTierConfig: TierConfig = {
-            ...TIER_CONFIG,
-            models: {
-                free: ['gemini-2.5-flash'],
-                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-            },
-            featureFlags: { enableTierRestrictions: false },
-        };
+        const testTierConfig = TEST_TIER_CONFIG;
 
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);

@@ -1,5 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
 import type {
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
@@ -37,10 +38,6 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
-// Matches USER_API_KEY_REQUIRED_MESSAGE in submitAnalysis.ts, submitNewsAnalysis.ts,
-// submitFundamentalAnalysis.ts, submitOverallAnalysis.ts — update all four if the message changes.
-const USER_API_KEY_REQUIRED_MESSAGE =
-    '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.';
 const TIMEFRAMES: readonly Timeframe[] = [
     '5Min',
     '15Min',

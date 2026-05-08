@@ -739,12 +739,10 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('top-level userApiKey를 axis-level이 없을 때 세 축에 전파한다', async () => {
-            // inputs is OverallDependencyInputs; top-level tier/userApiKey are
-            // added via cast to simulate what submitOverallAnalysis passes at runtime.
-            const inputs = {
+            const inputs: OverallDependencyInputs = {
                 ...makeInputs(),
                 userApiKey: 'top-key',
-            } as OverallDependencyInputs & { userApiKey?: string };
+            };
 
             await resolveOverallDependencies(inputs);
 
@@ -763,13 +761,13 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('axis-level userApiKey가 top-level을 덮어쓴다', async () => {
-            const inputs = {
+            const inputs: OverallDependencyInputs = {
                 ...makeInputs({
                     technical: { userApiKey: 'axis-key' },
                     fundamental: { userApiKey: 'axis-fund-key' },
                 }),
                 userApiKey: 'top-key',
-            } as OverallDependencyInputs & { userApiKey?: string };
+            };
 
             await resolveOverallDependencies(inputs);
 
@@ -790,10 +788,10 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('top-level tier를 fundamental / news 축에 전파한다', async () => {
-            const inputs = {
+            const inputs: OverallDependencyInputs = {
                 ...makeInputs(),
                 tier: 'pro',
-            } as OverallDependencyInputs & { tier?: string };
+            };
 
             await resolveOverallDependencies(inputs);
 
@@ -817,12 +815,12 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('axis-level tier가 top-level tier를 덮어쓴다', async () => {
-            const inputs = {
+            const inputs: OverallDependencyInputs = {
                 ...makeInputs({
                     fundamental: { tier: 'member' as const },
                 }),
                 tier: 'pro',
-            } as OverallDependencyInputs & { tier?: string };
+            };
 
             await resolveOverallDependencies(inputs);
 
@@ -837,10 +835,10 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('top-level tier가 technical tierContext로 전파된다 (tierContext 미지정 시)', async () => {
-            const inputs = {
+            const inputs: OverallDependencyInputs = {
                 ...makeInputs({ technical: {} }),
                 tier: 'member',
-            } as OverallDependencyInputs & { tier?: string };
+            };
 
             await resolveOverallDependencies(inputs);
 
@@ -851,14 +849,14 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('technical에 tierContext가 지정되면 top-level tier를 무시한다', async () => {
-            const inputs = {
+            const inputs: OverallDependencyInputs = {
                 ...makeInputs({
                     technical: {
                         tierContext: { userId: 'user-1', tier: 'pro' as const },
                     },
                 }),
                 tier: 'free',
-            } as OverallDependencyInputs & { tier?: string };
+            };
 
             await resolveOverallDependencies(inputs);
 

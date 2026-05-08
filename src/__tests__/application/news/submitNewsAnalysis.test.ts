@@ -11,12 +11,13 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     EnrichedNewsItem,
     EarningsCalendarItem,
     TierConfig,
 } from '@/domain/types';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -475,18 +476,7 @@ describe('submitNewsAnalysis 함수는', () => {
     });
 
     describe('submitNewsAnalysis BYOK gate + tier forwarding', () => {
-        // Explicit tier config decoupled from production TIER_CONFIG.
-        // Tests classify models themselves so changes to TIER_CONFIG don't
-        // silently pass with wrong semantics.
-        const testTierConfig: TierConfig = {
-            ...TIER_CONFIG,
-            models: {
-                free: ['gemini-2.5-flash'],
-                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-            },
-            featureFlags: { enableTierRestrictions: false },
-        };
+        const testTierConfig = TEST_TIER_CONFIG;
 
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);

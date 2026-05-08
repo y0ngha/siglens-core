@@ -7,7 +7,7 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
-import { getAllowedTimeframes, TIER_CONFIG } from '@/domain/tier';
+import { getAllowedTimeframes } from '@/domain/tier';
 import type { UsageRepository } from '@/infrastructure/db';
 
 vi.mock('@/infrastructure/cache/redis');
@@ -29,6 +29,7 @@ import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -809,18 +810,7 @@ describe('submitAnalysis 함수는', () => {
     });
 
     describe('submitAnalysis BYOK gate + tier forwarding', () => {
-        // Explicit tier config decoupled from production TIER_CONFIG.
-        // Tests classify models themselves so changes to TIER_CONFIG don't
-        // silently pass with wrong semantics.
-        const testTierConfig: TierConfig = {
-            ...TIER_CONFIG,
-            models: {
-                free: ['gemini-2.5-flash'],
-                member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-                pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-            },
-            featureFlags: { enableTierRestrictions: false },
-        };
+        const testTierConfig = TEST_TIER_CONFIG;
 
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);
