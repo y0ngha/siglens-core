@@ -63,6 +63,11 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * time. Useful in tests that need a fixed clock.
      */
     now?: Date;
+    /**
+     * BYOK API key. non-pro 티어가 프리미엄 모델 사용 시 필수.
+     * 제공 시 worker로 X-AI-API-KEY 헤더로 전달됨.
+     */
+    userApiKey?: string;
 }
 
 /** The caller receives a cached analysis — no new job was created. */
@@ -91,12 +96,24 @@ export interface SubmitNewsAnalysisLimitError {
     error: AnalysisLimitError;
 }
 
+/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+export interface SubmitNewsAnalysisApiKeyRequiredError {
+    status: 'error';
+    code: 'user_api_key_required';
+    error: string;
+    /** The model that triggered the BYOK requirement. */
+    modelId: ModelId;
+    /** The tier that triggered the BYOK requirement. */
+    tier: Tier;
+}
+
 /** Union of all possible outcomes from {@link submitNewsAnalysis}. */
 export type SubmitNewsAnalysisResult =
     | SubmitNewsAnalysisCached
     | SubmitNewsAnalysisSubmitted
     | SubmitNewsAnalysisNoNewsError
-    | SubmitNewsAnalysisLimitError;
+    | SubmitNewsAnalysisLimitError
+    | SubmitNewsAnalysisApiKeyRequiredError;
 
 // ─────────────────────────────────────────
 // Poll News Analysis

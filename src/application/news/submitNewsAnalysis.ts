@@ -6,6 +6,7 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import type {
+    SubmitNewsAnalysisApiKeyRequiredError,
     SubmitNewsAnalysisLimitError,
     SubmitNewsAnalysisNoNewsError,
     SubmitNewsAnalysisOptions,
@@ -13,7 +14,7 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, isPremiumModel, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildNewsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -24,6 +25,8 @@ import type { NewsAnalysisResponse, Skill } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the news analysis job. */
 const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+const USER_API_KEY_REQUIRED_MESSAGE =
+    '선택한 모델은 BYOK API 키가 필요합니다. 키를 등록하거나 등급을 업그레이드해 주세요.';
 
 /**
  * Derive a short deterministic hash of the news set, calendar, and active skills.
@@ -111,10 +114,24 @@ export async function submitNewsAnalysis(
         return noNewsError;
     }
 
+    // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+    const premium = isPremiumModel(modelId, tierConfig);
+
+    if (tier !== 'pro' && premium && options.userApiKey === undefined) {
+        const apiKeyRequiredError: SubmitNewsAnalysisApiKeyRequiredError = {
+            status: 'error',
+            code: 'user_api_key_required',
+            error: USER_API_KEY_REQUIRED_MESSAGE,
+            modelId,
+            tier,
+        };
+        return apiKeyRequiredError;
+    }
+
     // ── 2. Usage limit check (only when both tier and usage are provided) ──
     if (options.tier !== undefined && usage !== undefined) {
-        const tier = options.tier;
-        const tierConfig = options.tierConfig ?? TIER_CONFIG;
         const allowed = await checkAnalysisUsageAllowed(
             usage,
             tier,
@@ -178,13 +195,19 @@ export async function submitNewsAnalysis(
         ...(skillsDegraded && { skillsDegraded }),
     });
 
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
     const dispatch = fetch(`${workerUrl}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
+            ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId }),
+        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitNewsAnalysis] Worker request failed:', error);

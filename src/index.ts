@@ -512,6 +512,7 @@ export type {
     NewsAnalysisUsageOptions,
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
+    SubmitNewsAnalysisApiKeyRequiredError,
     SubmitNewsAnalysisCached,
     SubmitNewsAnalysisLimitError,
     SubmitNewsAnalysisNoNewsError,
