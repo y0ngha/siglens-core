@@ -24,10 +24,7 @@ vi.mock('@/domain/indicators/fearGreed', () => ({
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    claimOrJoinInFlightJob,
-    setJobMeta,
-} from '@/infrastructure/jobs/queue';
+import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -35,7 +32,6 @@ import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
-const mockClaimOrJoinInFlightJob = claimOrJoinInFlightJob as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
 const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
@@ -148,15 +144,6 @@ describe('submitAnalysis 함수는', () => {
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockLoadSkills.mockResolvedValue([]);
         mockSetJobMeta.mockResolvedValue(undefined);
-        // Default: claim a fresh slot using the caller-provided jobId.
-        // Tests that exercise dedup override with mockResolvedValueOnce to
-        // return { status: 'joined', jobId: <existing> }.
-        mockClaimOrJoinInFlightJob.mockImplementation(
-            async (_cacheKey: string, newJobId: string) => ({
-                status: 'claimed' as const,
-                jobId: newJobId,
-            })
-        );
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
         // Default fearGreed compute → null (matches real behavior on the
@@ -914,33 +901,6 @@ describe('submitAnalysis 함수는', () => {
             expect(args[6]).toBeUndefined();
 
             consoleSpy.mockRestore();
-        });
-    });
-
-    describe('dedup으로 기존 in-flight job에 join되면', () => {
-        it('worker로 dispatch하지 않고 기존 jobId를 반환한다', async () => {
-            // No cache hit; fall through to claim/join.
-            mockCacheGet.mockResolvedValueOnce(null);
-            mockClaimOrJoinInFlightJob.mockImplementationOnce(async () => ({
-                status: 'joined',
-                jobId: 'existing-shared-job',
-            }));
-
-            const result = await submitAnalysis(
-                mockSymbol,
-                mockCompanyName,
-                mockTimeframe
-            );
-
-            expect(result).toEqual({
-                status: 'submitted',
-                jobId: 'existing-shared-job',
-            });
-            // setJobMeta, worker fetch, and usage recording are skipped on
-            // the joined path — only the original claimer owns those.
-            expect(mockSetJobMeta).not.toHaveBeenCalled();
-            expect(mockFetch).not.toHaveBeenCalled();
-            expect(mockRecordUsage).not.toHaveBeenCalled();
         });
     });
 });

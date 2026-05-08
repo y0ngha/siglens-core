@@ -17,10 +17,7 @@ vi.mock('@/domain/indicators/fearGreed', () => ({
 import { submitOverallAnalysis } from '@/application/overall/submitOverallAnalysis';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    claimOrJoinInFlightJob,
-    setJobMeta,
-} from '@/infrastructure/jobs/queue';
+import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
@@ -43,7 +40,6 @@ import {
 const mockResolveOverallDependencies = resolveOverallDependencies as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
-const mockClaimOrJoinInFlightJob = claimOrJoinInFlightJob as Mock;
 const mockFireAndForget = fireAndForget as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockBuildOverallAnalysisPrompt = buildOverallAnalysisPrompt as Mock;
@@ -181,12 +177,6 @@ describe('submitOverallAnalysis 함수는', () => {
 
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockSetJobMeta.mockResolvedValue(undefined);
-        mockClaimOrJoinInFlightJob.mockImplementation(
-            async (_cacheKey: string, newJobId: string) => ({
-                status: 'claimed' as const,
-                jobId: newJobId,
-            })
-        );
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFireAndForget.mockImplementation(() => undefined);
         mockCacheGet.mockResolvedValue(null);
@@ -738,48 +728,6 @@ describe('submitOverallAnalysis 함수는', () => {
                 '1Day',
                 'AAPL.US'
             );
-        });
-    });
-
-    describe('dedup으로 기존 in-flight job에 join되면', () => {
-        it('worker로 dispatch하지 않고 기존 jobId를 반환하며 usage도 기록하지 않는다', async () => {
-            mockResolveOverallDependencies.mockResolvedValue({
-                kind: 'cached',
-                technical: cachedTechnical,
-                fundamental: cachedFundamental,
-                news: cachedNews,
-            });
-            mockCacheGet.mockResolvedValue(null);
-            mockClaimOrJoinInFlightJob.mockImplementationOnce(async () => ({
-                status: 'joined',
-                jobId: 'existing-overall-job',
-            }));
-            const recordUsage = vi.fn().mockResolvedValue(undefined);
-
-            const result = await submitOverallAnalysis(
-                makeOptions({
-                    usage: {
-                        usageRepository: {
-                            recordUsage,
-                            getUsageToday: vi.fn().mockResolvedValue({
-                                analysis: 0,
-                                chatbot: 0,
-                            }),
-                        },
-                        clientIp: '203.0.113.10',
-                    },
-                })
-            );
-
-            expect(result).toEqual({
-                status: 'submitted',
-                jobId: 'existing-overall-job',
-            });
-            // setJobMeta, worker fetch, and usage recording are all skipped on
-            // the joined path — only the original claimer owns those.
-            expect(mockSetJobMeta).not.toHaveBeenCalled();
-            expect(mockFireAndForget).not.toHaveBeenCalled();
-            expect(recordUsage).not.toHaveBeenCalled();
         });
     });
 });

@@ -10,9 +10,7 @@ import {
     getJobStatus,
     getJobError,
     getJobResult,
-    getJobMeta,
     cleanupJob,
-    clearInFlightJob,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
@@ -20,9 +18,7 @@ import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefi
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
 const mockGetJobResult = getJobResult as Mock;
-const mockGetJobMeta = getJobMeta as Mock;
 const mockCleanupJob = cleanupJob as Mock;
-const mockClearInFlightJob = clearInFlightJob as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockNormalizeMarketBriefing = normalizeMarketBriefing as Mock;
 
@@ -45,8 +41,6 @@ describe('pollBriefing 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
-        mockClearInFlightJob.mockResolvedValue(undefined);
-        mockGetJobMeta.mockResolvedValue(null);
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheSet.mockResolvedValue(undefined);
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
@@ -81,10 +75,7 @@ describe('pollBriefing 함수는', () => {
             if (result.status === 'error') {
                 expect(result.error).toBe('Worker crash');
             }
-            // cleanupInBackground는 fire-and-forget이라 microtask로 실행된다.
-            await vi.waitFor(() => {
-                expect(mockCleanupJob).toHaveBeenCalledWith('job-err');
-            });
+            expect(mockCleanupJob).toHaveBeenCalledWith('job-err');
         });
 
         it('에러 메시지가 null이면 Unknown error를 반환한다', async () => {
@@ -135,9 +126,7 @@ describe('pollBriefing 함수는', () => {
             if (result.status === 'error') {
                 expect(result.error).toBe('Result not found');
             }
-            await vi.waitFor(() => {
-                expect(mockCleanupJob).toHaveBeenCalled();
-            });
+            expect(mockCleanupJob).toHaveBeenCalled();
         });
 
         it('summary가 없는 briefing이면 Invalid briefing result 에러를 반환한다', async () => {
@@ -178,9 +167,7 @@ describe('pollBriefing 함수는', () => {
 
             await pollBriefing('job-cleanup');
 
-            await vi.waitFor(() => {
-                expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
-            });
+            expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
         });
     });
 

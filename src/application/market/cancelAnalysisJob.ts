@@ -1,39 +1,21 @@
 import { fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { MS_PER_SECOND } from '@/domain/constants/time';
-import {
-    cancelJob,
-    clearInFlightJob,
-    getJobMeta,
-    releaseInFlightJob,
-} from '@/infrastructure/jobs/queue';
+import { cancelJob } from '@/infrastructure/jobs/queue';
 import { tryReadWorkerConfig } from '@/infrastructure/market/config';
 
 const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
 
 /**
- * Cancel an in-flight analysis job, with subscriber refcount semantics.
+ * Cancel an in-flight analysis job.
  *
- * The dedup mechanism means multiple submitters may share a single `jobId`.
- * Each submitter holds one subscription; each cancel releases exactly one
- * subscription via {@link releaseInFlightJob}. Only the LAST cancel — the
- * one that takes the refcount to zero — propagates to the actual worker
- * job. Otherwise one client closing a tab would terminate analyses other
- * clients still want.
- *
- * When the cancel is the last subscriber's, sends two best-effort signals:
+ * Sends two best-effort cancellation signals:
  * 1. Marks the job as cancelled in Redis (sets the `cancelledKey`) so the
  *    worker can observe it via `isJobCancelled` and self-abort. This does
  *    NOT call `setJobStatus`, so the job's status stays whatever the worker
  *    last wrote (typically `processing`).
  * 2. If a worker URL is configured, dispatches a background POST to `/cancel`
  *    to abort the in-progress AI call on the worker side (5-second timeout).
- *
- * When other subscribers remain, `releaseInFlightJob` returns `false` and
- * this function returns immediately without touching the worker — the
- * remaining subscribers' analysis proceeds unaffected. When Upstash is not
- * configured, refcount is unavailable and every cancel propagates (legacy
- * behavior).
  *
  * Both signals are best-effort: rejections are logged via `console.warn` and
  * swallowed, so this never throws even if Redis is down or the worker
@@ -53,10 +35,10 @@ const CANCEL_ANALYSIS_JOB_TIMEOUT_MS = 5 * MS_PER_SECOND;
  * @param jobId - The `jobId` returned by {@link submitAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
  *   so the worker `/cancel` request can continue after the response.
- * @returns A `Promise<void>` that resolves once the cancellation has settled
- *   (or been suppressed because other subscribers remain). The promise
- *   resolves even if the signal failed (errors are logged, not thrown), so
- *   a successful resolution does not imply the worker has actually stopped.
+ * @returns A `Promise<void>` that resolves once the Redis cancellation
+ *   signal has settled. The promise resolves even if the signal failed
+ *   (errors are logged, not thrown), so a successful resolution does not
+ *   imply the worker has actually stopped.
  *
  * @see submitAnalysis
  * @see pollAnalysis
@@ -65,43 +47,6 @@ export async function cancelAnalysisJob(
     jobId: string,
     options?: BackgroundTaskOptions
 ): Promise<void> {
-    const isLastSubscriber = await releaseInFlightJob(jobId).catch(reason => {
-        console.warn(
-            '[cancelAnalysisJob] Failed to release subscriber refcount:',
-            jobId,
-            reason
-        );
-        // Refcount lookup failures fall through to a propagated cancel — losing
-        // dedup is preferable to leaking a worker job that nobody can stop.
-        return true;
-    });
-
-    if (!isLastSubscriber) {
-        // Other subscribers are still polling this job — don't terminate it.
-        return;
-    }
-
-    // Free the in-flight slot immediately so a fresh submitter for the same
-    // cacheKey starts a new job rather than joining this cancelled one.
-    // Without this, a re-submit between cancel and TTL expiration would
-    // attach to the worker job that's already shutting down — a regression
-    // versus pre-dedup behavior where every submit produced a new job.
-    const meta = await getJobMeta(jobId).catch(reason => {
-        console.warn(
-            '[cancelAnalysisJob] Failed to read job meta during cleanup:',
-            jobId,
-            reason
-        );
-        return null;
-    });
-    await clearInFlightJob(jobId, meta?.cacheKey).catch(reason =>
-        console.warn(
-            '[cancelAnalysisJob] Failed to clear in-flight slot:',
-            jobId,
-            reason
-        )
-    );
-
     const workerConfig = tryReadWorkerConfig();
 
     if (workerConfig !== null) {

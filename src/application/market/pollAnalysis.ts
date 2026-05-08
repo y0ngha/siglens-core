@@ -123,7 +123,7 @@ export async function pollAnalysis(
     const analyzedAt = now.toISOString();
     const result = { ...reconciled, analyzedAt };
 
-    if (meta && meta.symbol !== undefined && meta.timeframe !== undefined) {
+    if (meta && meta.timeframe !== undefined) {
         if (isFallbackAnalysis(reconciled)) {
             console.warn(
                 '[Poll] Worker returned empty analysis; skipping cache write',

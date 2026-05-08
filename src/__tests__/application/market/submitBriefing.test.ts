@@ -2,23 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/cache/redis');
-vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
 import { submitBriefing } from '@/application/market/submitBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    claimOrJoinInFlightJob,
-    setJobMeta,
-} from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import type { MarketSummaryData, MarketBriefingResponse } from '@/domain/types';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
-const mockClaimOrJoinInFlightJob = claimOrJoinInFlightJob as Mock;
-const mockSetJobMeta = setJobMeta as Mock;
 const mockNormalizeMarketBriefing = normalizeMarketBriefing as Mock;
 const mockBuildMarketBriefingPrompt = buildMarketBriefingPrompt as Mock;
 
@@ -62,14 +55,6 @@ describe('submitBriefing 함수는', () => {
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
-        // Default: 새 슬롯을 claim한 것으로 가정. dedup 분기는 per-test에서 override.
-        mockClaimOrJoinInFlightJob.mockImplementation(
-            async (_cacheKey: string, newJobId: string) => ({
-                status: 'claimed' as const,
-                jobId: newJobId,
-            })
-        );
-        mockSetJobMeta.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockBuildMarketBriefingPrompt.mockReturnValue('mock prompt');
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
@@ -126,17 +111,6 @@ describe('submitBriefing 함수는', () => {
             }
         });
 
-        it('claim한 새 jobId에 cacheKey만 담은 setJobMeta를 호출한다', async () => {
-            // 에러 경로에서 cleanupInBackground이 inflight 슬롯을 정확히 해제할 수
-            // 있도록 cacheKey만 저장한다. briefing은 symbol에 묶이지 않는다.
-            await submitBriefing(mockData);
-
-            expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
-            const [jobIdArg, metaArg] = mockSetJobMeta.mock.calls[0];
-            expect(typeof jobIdArg).toBe('string');
-            expect(metaArg).toEqual({ cacheKey: expect.any(String) });
-        });
-
         it('waitUntil이 제공되면 Worker 요청 promise를 등록한다', async () => {
             const waitUntil = vi.fn();
 
@@ -172,27 +146,6 @@ describe('submitBriefing 함수는', () => {
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('dedup으로 기존 in-flight job에 join되면', () => {
-        it('worker로 dispatch하지 않고 기존 jobId를 반환한다', async () => {
-            mockClaimOrJoinInFlightJob.mockImplementationOnce(async () => ({
-                status: 'joined',
-                jobId: 'existing-briefing-job',
-            }));
-
-            const result = await submitBriefing(mockData);
-
-            expect(result).toEqual({
-                status: 'submitted',
-                jobId: 'existing-briefing-job',
-            });
-            // 같은 시간대(briefing cacheKey)에 동시 submit이 들어와도 worker
-            // 호출은 한 번만 발생해야 한다 — 나머지는 기존 jobId만 polling.
-            expect(mockFetch).not.toHaveBeenCalled();
-            // setJobMeta는 claim한 submitter만 책임진다 — joined 경로는 스킵.
-            expect(mockSetJobMeta).not.toHaveBeenCalled();
         });
     });
 });

@@ -120,27 +120,14 @@ infrastructure/chat/
 | `job:{jobId}:status` | `JobStatus` | 잡 상태 (`processing` \| `done` \| `error`) |
 | `job:{jobId}:result` | `unknown` | AI 분석 결과 (JSON) |
 | `job:{jobId}:error` | `string` | 실패 원인 메시지 |
-| `job:{jobId}:meta` | `JobMeta` | 잡 메타데이터 (symbol, timeframe, cacheKey 등) |
+| `job:{jobId}:meta` | `JobMeta` | 잡 메타데이터 (symbol, timeframe 등) |
 | `job:{jobId}:cancelled` | `"1"` | 취소 플래그 (존재 여부로 판단) |
-| `job:inflight:{cacheKey}` | `string` | in-flight 슬롯 — 동일 cacheKey 동시 요청 dedup용 canonical jobId. 첫 submitter가 `SET NX`로 claim하고 나머지는 join한다. |
-| `job:{jobId}:refcount` | `number` | 구독자 수 — submit마다 `INCR`, cancel마다 `DECR`. 0에 도달한 cancel만 worker `/cancel`로 신호를 보낸다. |
 
 ### Job 라이프사이클 함수
 
-`infrastructure/jobs/queue.ts`는 14개의 순수 라이프사이클 함수를 제공한다:
+`infrastructure/jobs/queue.ts`는 11개의 순수 라이프사이클 함수를 제공한다:
 `setJobMeta`, `getJobStatus`, `getJobResult`, `getJobError`, `getJobMeta`,
-`setJobStatus`, `setJobResult`, `setJobError`, `cancelJob`, `isJobCancelled`, `cleanupJob`,
-`claimOrJoinInFlightJob`, `releaseInFlightJob`, `clearInFlightJob`.
-
-마지막 3개는 dedup/refcount용 `@internal` 헬퍼다:
-
-- `claimOrJoinInFlightJob(cacheKey, newJobId)` — `SET inflight:{cacheKey} NX EX`로 슬롯 claim.
-  성공 시 `{ status: 'claimed', jobId: newJobId }`, 실패 시 기존 jobId에 `INCR`로 join하여
-  `{ status: 'joined', jobId: existingJobId }`.
-- `releaseInFlightJob(jobId)` — `DECR refcount:{jobId}`. 새 값이 ≤0이면 `true` (caller가 마지막
-  구독자) 반환 → cancel을 worker로 전파해도 안전.
-- `clearInFlightJob(jobId, cacheKey?)` — refcount 키와 (cacheKey가 일치하는 경우) inflight 슬롯을
-  compare-and-delete로 정리. `cleanupInBackground`와 마지막 cancel 경로에서 호출된다.
+`setJobStatus`, `setJobResult`, `setJobError`, `cancelJob`, `isJobCancelled`, `cleanupJob`
 
 ### 구현 위치
 

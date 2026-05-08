@@ -31,7 +31,6 @@ import {
     getJobResult,
     getJobMeta,
     cleanupJob,
-    clearInFlightJob,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FileSkillsLoader } from '@/infrastructure/skills/loader';
@@ -43,7 +42,6 @@ const mockGetJobError = getJobError as Mock;
 const mockGetJobResult = getJobResult as Mock;
 const mockGetJobMeta = getJobMeta as Mock;
 const mockCleanupJob = cleanupJob as Mock;
-const mockClearInFlightJob = clearInFlightJob as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockEnrichAnalysisWithConfidence = enrichAnalysisWithConfidence as Mock;
 const mockPostProcessAnalysisWithReconcile =
@@ -82,8 +80,6 @@ describe('pollAnalysis 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
-        mockClearInFlightJob.mockResolvedValue(undefined);
-        mockGetJobMeta.mockResolvedValue(null);
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheSet.mockResolvedValue(undefined);
         (FileSkillsLoader as Mock).mockImplementation(() => ({
@@ -123,10 +119,7 @@ describe('pollAnalysis 함수는', () => {
             if (result.status === 'error') {
                 expect(result.error).toBe('Worker crash');
             }
-            // cleanupInBackground는 fire-and-forget이라 microtask로 실행된다.
-            await vi.waitFor(() => {
-                expect(mockCleanupJob).toHaveBeenCalledWith('job-err');
-            });
+            expect(mockCleanupJob).toHaveBeenCalledWith('job-err');
         });
 
         it('에러 메시지가 null이면 Unknown error를 반환한다', async () => {
@@ -175,9 +168,7 @@ describe('pollAnalysis 함수는', () => {
             if (result.status === 'error') {
                 expect(result.error).toBe('Result not found');
             }
-            await vi.waitFor(() => {
-                expect(mockCleanupJob).toHaveBeenCalled();
-            });
+            expect(mockCleanupJob).toHaveBeenCalled();
         });
 
         it('meta가 있으면 모델 ID 포함 캐시 키로 저장한다', async () => {
@@ -287,9 +278,7 @@ describe('pollAnalysis 함수는', () => {
 
             await pollAnalysis('job-cleanup');
 
-            await vi.waitFor(() => {
-                expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
-            });
+            expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
         });
 
         it('analyzedAt은 ISO 형식의 현재 시각이다', async () => {
@@ -398,7 +387,7 @@ describe('pollAnalysis 함수는', () => {
         });
     });
 
-    describe('meta.symbol 또는 meta.timeframe이 undefined일 때', () => {
+    describe('meta.timeframe undefined 분기', () => {
         beforeEach(() => {
             mockGetJobStatus.mockResolvedValue('done');
         });
@@ -432,21 +421,6 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-with-timeframe');
 
             expect(mockCacheSet).toHaveBeenCalled();
-        });
-
-        it('meta.symbol이 undefined이면 캐시 저장을 건너뛴다', async () => {
-            // briefing처럼 symbol에 묶이지 않은 job이 어쩌다 pollAnalysis 경로를
-            // 타게 되더라도 캐시 키를 만들 수 없으므로 저장은 건너뛰어야 한다.
-            mockGetJobResult.mockResolvedValueOnce(rawResult);
-            mockGetJobMeta.mockResolvedValueOnce({
-                timeframe: '1Day',
-                cacheKey: 'some-key',
-            });
-
-            const result = await pollAnalysis('job-no-symbol');
-
-            expect(result.status).toBe('done');
-            expect(mockCacheSet).not.toHaveBeenCalled();
         });
     });
 });
