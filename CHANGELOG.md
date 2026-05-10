@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/y0ngha/siglens-core/compare/v0.9.3...v0.9.4) (2026-05-10)
+
+
+### Features
+
+* modelSpecs Downgrade ([e524269](https://github.com/y0ngha/siglens-core/commit/e5242691272ff741709fb877767f8ddf06db1461))
+
 ## [0.9.3](https://github.com/y0ngha/siglens-core/compare/v0.9.2...v0.9.3) (2026-05-08)
 
 
