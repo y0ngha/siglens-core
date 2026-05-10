@@ -46,14 +46,14 @@ export const MODEL_SPECS = {
         provider: 'gemini',
         apiModelId: 'gemini-2.5-flash',
         maxOutputTokens: 65_536,
-        thinkingBudget: 24_576,
+        thinkingBudget: 12_288,
         temperature: DEFAULT_TEMPERATURE,
     },
     'gemini-2.5-flash-lite': {
         provider: 'gemini',
         apiModelId: 'gemini-2.5-flash-lite',
         maxOutputTokens: 65_536,
-        thinkingBudget: 24_576,
+        thinkingBudget: 12_288,
         temperature: DEFAULT_TEMPERATURE,
     },
     'gemini-2.5-pro': {
@@ -80,7 +80,7 @@ export const MODEL_SPECS = {
     'gpt-5-mini': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5-mini',
-        maxOutputTokens: 128_000,
+        maxOutputTokens: 65_536,
         effort: 'medium',
     },
     'gpt-5.4': {

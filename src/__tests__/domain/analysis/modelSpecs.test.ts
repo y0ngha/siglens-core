@@ -12,16 +12,16 @@ import {
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
 import {
+    isClaudeReasoningModelSpec,
+    isClaudeSamplingModelSpec,
+    isReasoningModelSpec,
+    isSamplingModelSpec,
     type ActiveModelId,
     type ChatGPTModelSpec,
     type ClaudeReasoningModelSpec,
     type ClaudeSamplingModelSpec,
     type GeminiModelSpec,
     type ModelSpec,
-    isClaudeReasoningModelSpec,
-    isClaudeSamplingModelSpec,
-    isReasoningModelSpec,
-    isSamplingModelSpec,
 } from '@/domain/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
@@ -72,9 +72,13 @@ describe('MODEL_SPECS', () => {
         }
     });
 
-    it('uses 128_000 max output tokens for every GPT model', () => {
+    it('uses 65_536 max output tokens for every GPT mini model', () => {
+        expect(MODEL_SPECS['gpt-5-mini'].maxOutputTokens).toBe(65_536);
+    });
+
+    it('uses 128_000 max output tokens for every GPT model without GPT mini', () => {
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
-            if (spec.provider === 'chatgpt') {
+            if (spec.provider === 'chatgpt' && model !== 'gpt-5-mini') {
                 expect(spec.maxOutputTokens, model).toBe(128_000);
             }
         }
@@ -99,9 +103,9 @@ describe('MODEL_SPECS', () => {
     });
 
     it('keeps gemini-2.5-flash and gemini-2.5-flash-lite at the documented 24_576 thinking budget', () => {
-        expect(MODEL_SPECS['gemini-2.5-flash'].thinkingBudget).toBe(24_576);
+        expect(MODEL_SPECS['gemini-2.5-flash'].thinkingBudget).toBe(12_288);
         expect(MODEL_SPECS['gemini-2.5-flash-lite'].thinkingBudget).toBe(
-            24_576
+            12_288
         );
     });
 
