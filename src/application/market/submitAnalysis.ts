@@ -257,6 +257,10 @@ export async function submitAnalysis(
         }
     }
 
+    if (options.skipEnqueueIfMiss) {
+        return { status: 'miss_no_trigger' };
+    }
+
     const { workerUrl, workerSecret } = readWorkerConfig();
 
     const { bars, indicators } = await fetchBarsWithIndicators(
