@@ -262,6 +262,13 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
+    /**
+     * When `true`, skip enqueueing a new analysis job on cache miss and return
+     * `{ status: 'miss_no_trigger' }` instead. Cache hits are unaffected and
+     * still returned. Intended for consumer-side gating of bot/crawler traffic
+     * that should not trigger worker compute.
+     */
+    skipEnqueueIfMiss?: boolean;
 }
 
 /** The caller receives a cached overall analysis — no new job was created. */
@@ -323,11 +330,21 @@ export interface SubmitOverallAnalysisLimitError {
 export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
+ * Result indicating the overall analysis cache missed but no job was enqueued
+ * because the caller opted out via `skipEnqueueIfMiss`. The consumer is
+ * expected to render a fallback in this case.
+ */
+export interface SubmitOverallAnalysisMissNoTrigger {
+    status: 'miss_no_trigger';
+}
+
+/**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.
  *
  * - `cached` — a fresh analysis exists in the cache; result is embedded.
  * - `pending_dependencies` — one or more axis jobs are still running; retry after polling each.
  * - `submitted` — overall analysis job submitted; poll via {@link pollOverallAnalysis}.
+ * - `miss_no_trigger` — cache miss but enqueue skipped via `skipEnqueueIfMiss`.
  * - `error` — one of the dependency axes failed; see `axis` and `error` for details.
  * - `key_error` — BYOK API key required for the overall job's own AI call.
  */
@@ -335,6 +352,7 @@ export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisCached
     | SubmitOverallAnalysisPendingDependencies
     | SubmitOverallAnalysisSubmitted
+    | SubmitOverallAnalysisMissNoTrigger
     | SubmitOverallAnalysisError
     | SubmitOverallAnalysisLimitError
     | SubmitOverallAnalysisApiKeyRequiredError;

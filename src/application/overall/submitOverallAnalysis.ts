@@ -228,6 +228,10 @@ export async function submitOverallAnalysis(
         }
     }
 
+    if (options.skipEnqueueIfMiss) {
+        return { status: 'miss_no_trigger' };
+    }
+
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
 
