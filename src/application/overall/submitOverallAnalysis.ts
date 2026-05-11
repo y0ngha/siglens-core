@@ -87,10 +87,13 @@ function stripVolatileTechnicalFields(
  *   `pendingJobs` entry by its `jobId`, then retry this function once all
  *   three have resolved. No cache lookup or job submission is performed until
  *   all dependencies are available.
- * - `miss_no_trigger`: the cache missed but no job was enqueued because
- *   `options.skipEnqueueIfMiss` was set. The resolver propagates this flag
- *   to all three sub-axis submits, so no axis is enqueued either. The
- *   consumer should render a fallback (typically used for bot/crawler gating).
+ * - `miss_no_trigger`: no job was enqueued because `options.skipEnqueueIfMiss`
+ *   was set. Triggered in two cases: (1) any sub-axis cache missed — the
+ *   resolver short-circuits via `kind: 'miss_no_trigger'` without ever
+ *   checking the overall cache; (2) all three sub-axes resolved from cache
+ *   but the overall cache itself missed. The resolver propagates the flag to
+ *   every sub-axis submit so no axis is enqueued either. The consumer should
+ *   render a fallback (typically used for bot/crawler gating).
  *
  * @param options - Dependency inputs (symbol, timeframe, model, providers,
  *   news, calendar) and optional background-task hooks.

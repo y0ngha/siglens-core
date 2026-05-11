@@ -345,9 +345,18 @@ export interface SubmitOverallAnalysisLimitError {
 export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
- * Result indicating the overall analysis cache missed but no job was enqueued
- * because the caller opted out via `skipEnqueueIfMiss`. The consumer is
- * expected to render a fallback in this case.
+ * Result indicating no overall analysis job was enqueued because the caller
+ * opted out via `skipEnqueueIfMiss`. Returned in two cases:
+ *
+ * 1. At least one sub-axis cache missed — the dependency resolver
+ *    short-circuits to `kind: 'miss_no_trigger'` and the overall cache is
+ *    never even checked.
+ * 2. All three sub-axes resolved from cache, but the overall cache itself
+ *    missed — `submitOverallAnalysis` short-circuits after the overall
+ *    cache lookup.
+ *
+ * The consumer is expected to render a fallback in either case (typically
+ * used for bot/crawler gating).
  */
 export interface SubmitOverallAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
