@@ -82,6 +82,8 @@ describe('stripLlmJsonFence', () => {
     });
 
     it('펜스도 brace 도 없으면 trim 한 raw 문자열을 반환한다', () => {
-        expect(stripLlmJsonFence('  not json at all  ')).toBe('not json at all');
+        expect(stripLlmJsonFence('  not json at all  ')).toBe(
+            'not json at all'
+        );
     });
 });
