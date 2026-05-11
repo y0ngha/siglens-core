@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.1](https://github.com/y0ngha/siglens-core/compare/v0.9.5...v0.10.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* address round-2 review (JSDoc, client export, PUBLIC_API, test rename) ([1d3ca8b](https://github.com/y0ngha/siglens-core/commit/1d3ca8b08951de1637501f8936dd759629e1140d))
+* Propagate skipEnqueueIfMiss to overall sub-axis submits and address review feedback ([214cc4a](https://github.com/y0ngha/siglens-core/commit/214cc4a127d8f9ec1b4fb815fee17ea959de0b71)), closes [hi#priority](https://github.com/hi/issues/priority)
+
+
+### Features
+
+* Add skipEnqueueIfMiss option to submitAnalysis ([7eadd45](https://github.com/y0ngha/siglens-core/commit/7eadd452b54f8f40b2dd0b579bc07de4e9c39447))
+* Add skipEnqueueIfMiss option to submitFundamentalAnalysis ([2d04638](https://github.com/y0ngha/siglens-core/commit/2d0463896306932b10a2b3459e254e5fcf1dc900))
+* Add skipEnqueueIfMiss option to submitNewsAnalysis ([7f05a9a](https://github.com/y0ngha/siglens-core/commit/7f05a9a09cffc455913599eaf7c3783664718da1))
+* Add skipEnqueueIfMiss option to submitOverallAnalysis ([3f4f841](https://github.com/y0ngha/siglens-core/commit/3f4f841a5422ee734c0dc0c517d4966df3482e49))
+
 ## [0.10.0](https://github.com/y0ngha/siglens-core/compare/v0.9.5...v0.10.0) (2026-05-11)
 
 
