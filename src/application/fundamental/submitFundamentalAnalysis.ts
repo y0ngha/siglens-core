@@ -222,6 +222,10 @@ export async function submitFundamentalAnalysis(
         }
     }
 
+    if (options.skipEnqueueIfMiss) {
+        return { status: 'miss_no_trigger' };
+    }
+
     const providerData = await fetchProviderData(
         dataProvider,
         symbol,
