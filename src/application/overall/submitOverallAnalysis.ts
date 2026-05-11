@@ -76,7 +76,7 @@ function stripVolatileTechnicalFields(
 /**
  * Submit an overall (3-axis: technical + fundamental + news) analysis job.
  *
- * Resolves to one of three outcomes:
+ * Resolves to one of four outcomes:
  * - `cached`: a recent overall analysis is reused (keyed by `symbol` +
  *   `timeframe` + `modelId` + an input hash of the three dependency results).
  * - `submitted`: all dependencies were resolved from cache, the prompt was
@@ -87,6 +87,10 @@ function stripVolatileTechnicalFields(
  *   `pendingJobs` entry by its `jobId`, then retry this function once all
  *   three have resolved. No cache lookup or job submission is performed until
  *   all dependencies are available.
+ * - `miss_no_trigger`: the cache missed but no job was enqueued because
+ *   `options.skipEnqueueIfMiss` was set. The resolver propagates this flag
+ *   to all three sub-axis submits, so no axis is enqueued either. The
+ *   consumer should render a fallback (typically used for bot/crawler gating).
  *
  * @param options - Dependency inputs (symbol, timeframe, model, providers,
  *   news, calendar) and optional background-task hooks.
@@ -96,6 +100,7 @@ function stripVolatileTechnicalFields(
  * ```ts
  * const res = await submitOverallAnalysis({ symbol: 'AAPL', timeframe: '1Day', modelId: '...', ... });
  * if (res.status === 'cached') return res.result;
+ * if (res.status === 'miss_no_trigger') return null; // bot/crawler fallback
  * if (res.status === 'pending_dependencies') return { retry: res.pendingJobs };
  * const polled = await pollOverallAnalysis(res.jobId);
  * ```
@@ -185,6 +190,13 @@ export async function submitOverallAnalysis(
                 news: deps.pendingJobs.news,
             },
         };
+    }
+
+    if (deps.kind === 'miss_no_trigger') {
+        // Bot/crawler path: at least one axis missed cache and the resolver was
+        // told to skip enqueueing. The overall job cannot be built (and we must
+        // not enqueue anything ourselves), so surface miss_no_trigger directly.
+        return { status: 'miss_no_trigger' };
     }
 
     // ── 2. All three cached — hash combined inputs and check overall cache ──

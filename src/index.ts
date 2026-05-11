@@ -502,6 +502,7 @@ export type {
     SubmitFundamentalAnalysisCached,
     SubmitFundamentalAnalysisFetchError,
     SubmitFundamentalAnalysisLimitError,
+    SubmitFundamentalAnalysisMissNoTrigger,
     SubmitFundamentalAnalysisOptions,
     SubmitFundamentalAnalysisResult,
     SubmitFundamentalAnalysisSubmitted,
@@ -509,6 +510,7 @@ export type {
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
+    SubmitAnalysisMissNoTrigger,
     SubmitAnalysisOptions,
     SubmitAnalysisErrorResult,
     TierGateErrorResult,
@@ -522,6 +524,7 @@ export type {
     SubmitNewsAnalysisApiKeyRequiredError,
     SubmitNewsAnalysisCached,
     SubmitNewsAnalysisLimitError,
+    SubmitNewsAnalysisMissNoTrigger,
     SubmitNewsAnalysisNoNewsError,
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
@@ -542,10 +545,12 @@ export type {
     SubmitOverallAnalysisError,
     SubmitOverallAnalysisLimitError,
     SubmitOverallAnalysisApiKeyRequiredError,
+    SubmitOverallAnalysisMissNoTrigger,
     DependencyState,
     DependencyStateCached,
     DependencyStatePending,
     DependencyStateError,
+    DependencyStateMissNoTrigger,
     OverallDependencyInputs,
 } from './application/overall/types';
 

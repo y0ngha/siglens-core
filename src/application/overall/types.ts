@@ -73,6 +73,15 @@ export interface OverallDependencyInputs {
      */
     userApiKey?: string;
     /**
+     * When `true`, the resolver forwards `skipEnqueueIfMiss: true` to every
+     * axis submit call so cache misses on any axis return `'miss_no_trigger'`
+     * instead of triggering a worker job. The overall submit also returns
+     * `'miss_no_trigger'` directly without ever calling the resolver in that
+     * case — see {@link submitOverallAnalysis}. Intended for consumer-side
+     * gating of bot/crawler traffic.
+     */
+    skipEnqueueIfMiss?: boolean;
+    /**
      * Enriched news items (already card-analyzed by flash-lite).
      *
      * Renamed from `news` to disambiguate from the per-axis options field
@@ -216,16 +225,28 @@ export interface DependencyStateError {
 }
 
 /**
+ * Resolver state indicating at least one axis missed cache and the resolver
+ * was told (via `skipEnqueueIfMiss`) not to trigger a job. The overall caller
+ * should surface a fallback without enqueueing anything itself.
+ */
+export interface DependencyStateMissNoTrigger {
+    kind: 'miss_no_trigger';
+}
+
+/**
  * Result returned by {@link resolveOverallDependencies}.
  *
  * - `cached` — all three axes resolved from cache; the results are embedded.
  * - `pending` — one or more axes submitted new jobs; caller should poll.
  * - `error` — one axis returned an error (tier gate, usage limit, or fetch failure).
+ * - `miss_no_trigger` — at least one axis missed cache and the resolver was
+ *   asked to skip enqueueing (bot/crawler gating).
  */
 export type DependencyState =
     | DependencyStateCached
     | DependencyStatePending
-    | DependencyStateError;
+    | DependencyStateError
+    | DependencyStateMissNoTrigger;
 
 // ─────────────────────────────────────────
 // Submit
@@ -262,13 +283,6 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
-    /**
-     * When `true`, skip enqueueing a new analysis job on cache miss and return
-     * `{ status: 'miss_no_trigger' }` instead. Cache hits are unaffected and
-     * still returned. Intended for consumer-side gating of bot/crawler traffic
-     * that should not trigger worker compute.
-     */
-    skipEnqueueIfMiss?: boolean;
 }
 
 /** The caller receives a cached overall analysis — no new job was created. */

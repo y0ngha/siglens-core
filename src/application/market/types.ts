@@ -80,7 +80,7 @@ export type SubmitAnalysisErrorResult =
  * the caller opted out via `skipEnqueueIfMiss`. The consumer is expected to
  * render a fallback in this case.
  */
-export interface MissNoTriggerResult {
+export interface SubmitAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
 
@@ -88,5 +88,5 @@ export interface MissNoTriggerResult {
 export type SubmitAnalysisGatedResult =
     | { status: 'cached'; result: AnalysisResponse }
     | { status: 'submitted'; jobId: string }
-    | MissNoTriggerResult
+    | SubmitAnalysisMissNoTrigger
     | SubmitAnalysisErrorResult;

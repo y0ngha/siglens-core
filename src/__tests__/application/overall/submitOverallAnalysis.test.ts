@@ -997,5 +997,23 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(result.status).toBe('submitted');
             expect(mockFetch).toHaveBeenCalled();
         });
+
+        it('resolver가 miss_no_trigger를 반환하면 워커 트리거 없이 miss_no_trigger를 반환한다', async () => {
+            // resolver-level short-circuit (any sub-axis missed cache while
+            // skipEnqueueIfMiss was propagated) — overall must not enqueue,
+            // not even reach the overall cache check.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'miss_no_trigger',
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ skipEnqueueIfMiss: true })
+            );
+
+            expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
     });
 });

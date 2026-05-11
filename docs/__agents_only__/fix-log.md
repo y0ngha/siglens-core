@@ -464,3 +464,8 @@
 - Context: Side effect of S-2 — pollAnalysis.test.ts had `vi.mock('@/domain/analysis/confidence')` which auto-mocked the newly-moved isFallbackAnalysis (returned undefined → cache write was no longer skipped). Converted to a partial mock that keeps isFallbackAnalysis / EMPTY_ANALYSIS_FALLBACK_SUMMARY as their real implementations and only stubs enrichAnalysisWithConfidence.
 
 
+
+## [PR #85 | feat/skip-enqueue-if-miss | 2026-05-11]
+- Violation: skipEnqueueIfMiss option not propagated from top-level to sub-axis submits inside submitOverallAnalysis
+- Rule: bot-gating intent — skipEnqueueIfMiss must prevent worker enqueue at every layer it triggers
+- Context: Gemini high-priority — resolveOverallDependencies was called BEFORE the existing guard at line 231, and the resolver forwarded options to submitAnalysis / submitFundamentalAnalysis / submitNewsAnalysis WITHOUT the flag. A bot request would have triggered three sub-axis workers before reaching the overall-level guard. Fixed by (1) moving skipEnqueueIfMiss onto OverallDependencyInputs so the resolver sees it, (2) forcing skipEnqueueIfMiss into all three sub-axis option objects in the resolver, and (3) adding a new DependencyStateMissNoTrigger short-circuit so submitOverallAnalysis returns miss_no_trigger directly when any axis returns miss_no_trigger. Added 5 new resolver tests + 1 new submit test (74 → 80 in the overall suite) to lock in propagation behavior.
