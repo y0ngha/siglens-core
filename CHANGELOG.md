@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/y0ngha/siglens-core/compare/v0.9.4...v0.9.5) (2026-05-11)
+
+
+### Bug Fixes
+
+* LLM 응답에서 JSON 깨질 때 오류나는 현상 수정 ([f804134](https://github.com/y0ngha/siglens-core/commit/f804134b06ffcebdd407d8d743ad3c326850711f))
+
 ## [0.9.4](https://github.com/y0ngha/siglens-core/compare/v0.9.3...v0.9.4) (2026-05-10)
 
 
