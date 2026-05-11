@@ -1447,6 +1447,7 @@ __metadata:
     dotenv-cli: "npm:^11.0.0"
     eslint: "npm:^9.18.0"
     husky: "npm:^9.1.7"
+    jsonrepair: "npm:^3.14.0"
     prettier: "npm:^3.4.0"
     release-it: "npm:^19.2.4"
     tsc-alias: "npm:^1.8.10"
@@ -3141,6 +3142,15 @@ __metadata:
   version: 3.5.8
   resolution: "json-with-bigint@npm:3.5.8"
   checksum: 10c0/a0c4e37626d74a9a493539f9f9a94855933fa15ea2f028859a787229a42c5f11803db6f94f1ce7b1d89756c1e80a7c1f11006bac266ec7ce819b75701765ca0a
+  languageName: node
+  linkType: hard
+
+"jsonrepair@npm:^3.14.0":
+  version: 3.14.0
+  resolution: "jsonrepair@npm:3.14.0"
+  bin:
+    jsonrepair: bin/cli.js
+  checksum: 10c0/8c2f6691c37f9c811abe08e1cb525221652eb789b1804e4fd439b332faed97cda81ddeb06284cb500823dbbc98fdbebb3b3f58da17048f0608c1feb68ce2af94
   languageName: node
   linkType: hard
 

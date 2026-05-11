@@ -276,6 +276,10 @@ export {
 } from './infrastructure/cache/config';
 export { createCacheProvider } from './infrastructure/cache/redis';
 
+// LLM response JSON parsing with `jsonrepair` salvage — used by worker
+// codebases that parse raw LLM JSON before storing job results.
+export { extractJsonWithRepair } from './infrastructure/ai/extractJsonWithRepair';
+
 // Market data providers
 export { createMarketDataProvider } from './infrastructure/market/factory';
 

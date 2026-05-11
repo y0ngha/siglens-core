@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
+import {
+    extractJsonFromLlmResponse,
+    stripLlmJsonFence,
+} from '@/domain/analysis/promptFormat';
 
 // ─────────────────────────────────────────
 // IC-5: extractJsonFromLlmResponse — flexible fence stripping
@@ -64,5 +67,21 @@ describe('extractJsonFromLlmResponse', () => {
         expect(() =>
             extractJsonFromLlmResponse('```json\n{invalid}\n```')
         ).toThrow(SyntaxError);
+    });
+});
+
+// stripLlmJsonFence is exported so infrastructure-layer salvage wrappers can
+// reuse the exact stripping behaviour — assert the contract directly.
+describe('stripLlmJsonFence', () => {
+    it('```json 펜스 안 내용을 trim 해서 반환한다', () => {
+        expect(stripLlmJsonFence('```json\n{"a":1}\n```')).toBe('{"a":1}');
+    });
+
+    it('펜스 없이 brace 가 있으면 첫 { … 마지막 } 슬라이스를 반환한다', () => {
+        expect(stripLlmJsonFence('prefix {"a":1} suffix')).toBe('{"a":1}');
+    });
+
+    it('펜스도 brace 도 없으면 trim 한 raw 문자열을 반환한다', () => {
+        expect(stripLlmJsonFence('  not json at all  ')).toBe('not json at all');
     });
 });

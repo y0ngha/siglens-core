@@ -63,5 +63,8 @@
             "browser": "./dist/index.client.js",
             "default": "./dist/index.js"
         }
+    },
+    "dependencies": {
+        "jsonrepair": "^3.14.0"
     }
 }

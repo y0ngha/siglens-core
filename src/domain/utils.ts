@@ -21,6 +21,16 @@ export function stripMarkdownCodeBlock(text: string): string {
     return match ? match[1].trim() : text.trim();
 }
 
+/**
+ * Parse an LLM response string as JSON with markdown-fence stripping.
+ *
+ * Pure-domain helper — no salvage. Consumers needing tolerance for
+ * truncated / unquoted-key / trailing-comma payloads should use the
+ * infrastructure-layer `extractJsonWithRepair` wrapper.
+ *
+ * @param text   - Raw response from the LLM.
+ * @param source - Caller label for the error message (e.g. `'koreanTranslator'`).
+ */
 export function parseJsonResponse(text: string, source: string): unknown {
     try {
         return JSON.parse(stripMarkdownCodeBlock(text));

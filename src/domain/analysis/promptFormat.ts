@@ -35,10 +35,14 @@ export function formatNullableNumber(
  * 2. Otherwise, slice the first `{`…last `}` brace pair.
  * 3. Fall back to the trimmed raw string.
  *
+ * Exported so infrastructure-layer salvage wrappers (which need to feed the
+ * stripped candidate into a repair library) can reuse the exact same
+ * stripping behaviour rather than diverging.
+ *
  * @param raw - Raw string from the LLM response.
  * @returns Extracted JSON string (not yet parsed).
  */
-function stripFence(raw: string): string {
+export function stripLlmJsonFence(raw: string): string {
     const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (fenceMatch) return fenceMatch[1].trim();
 
@@ -60,11 +64,16 @@ function stripFence(raw: string): string {
  * extracts the first JSON block before parsing so normalizers can accept both
  * raw JSON and fenced/prose-wrapped JSON strings.
  *
+ * Pure-domain implementation — no salvage. Consumers needing tolerance for
+ * truncated / unquoted-key / trailing-comma payloads should use the
+ * infrastructure-layer `extractJsonWithRepair` wrapper, which retries via
+ * `jsonrepair` on failure.
+ *
  * @internal
  * @param raw - Raw string from the LLM response. May be fenced, prose-wrapped, or plain JSON.
  * @returns Parsed JSON value as `unknown` — callers must validate the shape.
  * @throws {SyntaxError} When the string (after fence removal) is not valid JSON.
  */
 export function extractJsonFromLlmResponse(raw: string): unknown {
-    return JSON.parse(stripFence(raw));
+    return JSON.parse(stripLlmJsonFence(raw));
 }
