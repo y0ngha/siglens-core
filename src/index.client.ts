@@ -370,6 +370,7 @@ export type {
 } from './application/chat/types';
 export type {
     SubmitAnalysisGatedResult,
+    SubmitAnalysisMissNoTrigger,
     UserApiKeyRequiredError,
 } from './application/market/types';
 export type {

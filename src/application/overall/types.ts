@@ -75,10 +75,11 @@ export interface OverallDependencyInputs {
     /**
      * When `true`, the resolver forwards `skipEnqueueIfMiss: true` to every
      * axis submit call so cache misses on any axis return `'miss_no_trigger'`
-     * instead of triggering a worker job. The overall submit also returns
-     * `'miss_no_trigger'` directly without ever calling the resolver in that
-     * case — see {@link submitOverallAnalysis}. Intended for consumer-side
-     * gating of bot/crawler traffic.
+     * instead of triggering a worker job. When all sub-axes resolve from
+     * cache but the overall cache itself misses, `submitOverallAnalysis`
+     * also returns `'miss_no_trigger'` directly instead of enqueueing the
+     * overall worker job — see {@link submitOverallAnalysis}. Intended for
+     * consumer-side gating of bot/crawler traffic.
      */
     skipEnqueueIfMiss?: boolean;
     /**

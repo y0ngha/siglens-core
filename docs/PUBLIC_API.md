@@ -348,9 +348,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
 
 새로 추가된 use-case option/result 타입:
-- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `PollFundamentalAnalysisResult`.
-- 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `SubmitNewsAnalysisApiKeyRequiredError`, `PollNewsAnalysisResult`.
-- 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `SubmitOverallAnalysisApiKeyRequiredError`, `PollOverallAnalysisResult`.
+- 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `SubmitFundamentalAnalysisMissNoTrigger`, `PollFundamentalAnalysisResult`.
+- 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `SubmitNewsAnalysisApiKeyRequiredError`, `SubmitNewsAnalysisMissNoTrigger`, `PollNewsAnalysisResult`.
+- 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `SubmitOverallAnalysisApiKeyRequiredError`, `SubmitOverallAnalysisMissNoTrigger`, `DependencyStateMissNoTrigger`, `PollOverallAnalysisResult`.
+- 기술적: `SubmitAnalysisMissNoTrigger` — 0.10.0에서 추가된 봇/크롤러 게이팅용 결과 variant.
 
 **인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
 

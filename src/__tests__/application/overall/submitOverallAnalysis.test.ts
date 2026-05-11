@@ -966,7 +966,9 @@ describe('submitOverallAnalysis 함수는', () => {
             });
         });
 
-        it('캐시 미스이면 워커를 트리거하지 않고 miss_no_trigger를 반환한다', async () => {
+        it('sub-axis는 모두 캐시 히트지만 overall 캐시는 미스인 경우 워커를 트리거하지 않고 miss_no_trigger를 반환한다', async () => {
+            // resolver는 mockResolvedValue로 'cached' 분기로 들어가도록 셋업됨 (beforeEach 참고).
+            // 즉 sub-axis 미스 short-circuit 경로가 아니라 overall-cache 미스 분기를 검증한다.
             mockCacheGet.mockResolvedValue(null);
 
             const result = await submitOverallAnalysis(
@@ -974,6 +976,7 @@ describe('submitOverallAnalysis 함수는', () => {
             );
 
             expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(mockCacheGet).toHaveBeenCalledTimes(1);
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
         });
