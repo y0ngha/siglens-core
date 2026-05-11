@@ -867,4 +867,120 @@ describe('resolveOverallDependencies 함수는', () => {
             });
         });
     });
+
+    describe('skipEnqueueIfMiss propagation은', () => {
+        it('top-level skipEnqueueIfMiss=true를 세 축 모두에 전파한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({ skipEnqueueIfMiss: true })
+            );
+
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
+            expect(technicalOpts).toMatchObject({ skipEnqueueIfMiss: true });
+
+            const fundamentalArgs =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalArgs).toMatchObject({ skipEnqueueIfMiss: true });
+
+            const newsArgs = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsArgs).toMatchObject({ skipEnqueueIfMiss: true });
+        });
+
+        it('skipEnqueueIfMiss 미설정 시 axis로 undefined가 전파된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(makeInputs());
+
+            const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
+            expect(technicalOpts?.skipEnqueueIfMiss).toBeUndefined();
+
+            const fundamentalArgs =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
+            expect(fundamentalArgs?.skipEnqueueIfMiss).toBeUndefined();
+
+            const newsArgs = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
+            expect(newsArgs?.skipEnqueueIfMiss).toBeUndefined();
+        });
+
+        it('어느 축이라도 miss_no_trigger를 반환하면 kind: miss_no_trigger를 반환한다 (technical)', async () => {
+            mockSubmitAnalysis.mockResolvedValue({ status: 'miss_no_trigger' });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(
+                makeInputs({ skipEnqueueIfMiss: true })
+            );
+
+            expect(state).toEqual({ kind: 'miss_no_trigger' });
+        });
+
+        it('fundamental만 miss_no_trigger여도 kind: miss_no_trigger를 반환한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'miss_no_trigger',
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            const state = await resolveOverallDependencies(
+                makeInputs({ skipEnqueueIfMiss: true })
+            );
+
+            expect(state).toEqual({ kind: 'miss_no_trigger' });
+        });
+
+        it('news만 miss_no_trigger여도 kind: miss_no_trigger를 반환한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'miss_no_trigger',
+            });
+
+            const state = await resolveOverallDependencies(
+                makeInputs({ skipEnqueueIfMiss: true })
+            );
+
+            expect(state).toEqual({ kind: 'miss_no_trigger' });
+        });
+    });
 });

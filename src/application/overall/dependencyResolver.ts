@@ -134,10 +134,12 @@ export async function resolveOverallDependencies(
     } = technicalOptions;
 
     // ── Extract top-level propagation fields ──
-    // `tier` and `userApiKey` live directly on `OverallDependencyInputs` so
-    // the resolver can propagate them to each axis without casting.
+    // `tier`, `userApiKey`, and `skipEnqueueIfMiss` live directly on
+    // `OverallDependencyInputs` so the resolver can propagate them to each
+    // axis without casting.
     const topLevelTier = inputs.tier;
     const topLevelUserApiKey = inputs.userApiKey;
+    const topLevelSkipEnqueueIfMiss = inputs.skipEnqueueIfMiss;
 
     // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
     // Triple-counting prevention: if the caller forwards `usage` here, three
@@ -156,6 +158,9 @@ export async function resolveOverallDependencies(
             : resolvedNewsOptions;
 
     // ── Kick off all three axes in parallel ──
+    // `skipEnqueueIfMiss` is forced from the top level for every axis when
+    // set: bot/crawler gating must apply uniformly to all sub-axis enqueues,
+    // not just the overall job, otherwise sub-axis workers would still fire.
     const [technicalResult, fundamentalResult, newsResult] = await Promise.all([
         submitAnalysis(
             symbol,
@@ -173,6 +178,7 @@ export async function resolveOverallDependencies(
                     (topLevelTier !== undefined
                         ? { userId: null, tier: topLevelTier }
                         : undefined),
+                skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
             }
         ),
         submitFundamentalAnalysis({
@@ -183,6 +189,7 @@ export async function resolveOverallDependencies(
             tier: topLevelTier ?? DEFAULT_TIER,
             userApiKey: topLevelUserApiKey,
             ...fundamentalAxisOptions,
+            skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
         }),
         submitNewsAnalysis({
             symbol,
@@ -194,6 +201,7 @@ export async function resolveOverallDependencies(
             tier: topLevelTier ?? DEFAULT_TIER,
             userApiKey: topLevelUserApiKey,
             ...newsAxisOptions,
+            skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
         }),
     ]);
 
@@ -214,6 +222,19 @@ export async function resolveOverallDependencies(
     }
     if (newsResult.status === 'error' || newsResult.status === 'key_error') {
         return { kind: 'error', axis: 'news', error: newsResult };
+    }
+
+    // ── Any axis cache-missed with skipEnqueueIfMiss → short-circuit ──
+    // When bot/crawler gating is on, no axis should have enqueued — any axis
+    // returning `miss_no_trigger` means the overall result is unbuildable
+    // for this request, so surface that state to the caller without going
+    // through the pending/cached paths.
+    if (
+        technicalResult.status === 'miss_no_trigger' ||
+        fundamentalResult.status === 'miss_no_trigger' ||
+        newsResult.status === 'miss_no_trigger'
+    ) {
+        return { kind: 'miss_no_trigger' };
     }
 
     // ── Determine pending job IDs for each axis ──

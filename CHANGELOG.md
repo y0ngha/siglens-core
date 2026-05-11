@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/y0ngha/siglens-core/compare/v0.9.5...v0.10.0) (2026-05-11)
+
+
+### Features
+
+* add `skipEnqueueIfMiss` option to `submitAnalysis`, `submitFundamentalAnalysis`, `submitNewsAnalysis`, and `submitOverallAnalysis`. When set, a cache miss returns `{ status: 'miss_no_trigger' }` instead of enqueueing a worker job. Cache hits are unaffected. Intended for consumer-side bot/crawler gating where read-only access should not trigger AI analysis.
+
 ## [0.9.5](https://github.com/y0ngha/siglens-core/compare/v0.9.4...v0.9.5) (2026-05-11)
 
 

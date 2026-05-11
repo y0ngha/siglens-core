@@ -73,6 +73,16 @@ export interface OverallDependencyInputs {
      */
     userApiKey?: string;
     /**
+     * When `true`, the resolver forwards `skipEnqueueIfMiss: true` to every
+     * axis submit call so cache misses on any axis return `'miss_no_trigger'`
+     * instead of triggering a worker job. When all sub-axes resolve from
+     * cache but the overall cache itself misses, `submitOverallAnalysis`
+     * also returns `'miss_no_trigger'` directly instead of enqueueing the
+     * overall worker job — see {@link submitOverallAnalysis}. Intended for
+     * consumer-side gating of bot/crawler traffic.
+     */
+    skipEnqueueIfMiss?: boolean;
+    /**
      * Enriched news items (already card-analyzed by flash-lite).
      *
      * Renamed from `news` to disambiguate from the per-axis options field
@@ -216,16 +226,28 @@ export interface DependencyStateError {
 }
 
 /**
+ * Resolver state indicating at least one axis missed cache and the resolver
+ * was told (via `skipEnqueueIfMiss`) not to trigger a job. The overall caller
+ * should surface a fallback without enqueueing anything itself.
+ */
+export interface DependencyStateMissNoTrigger {
+    kind: 'miss_no_trigger';
+}
+
+/**
  * Result returned by {@link resolveOverallDependencies}.
  *
  * - `cached` — all three axes resolved from cache; the results are embedded.
  * - `pending` — one or more axes submitted new jobs; caller should poll.
  * - `error` — one axis returned an error (tier gate, usage limit, or fetch failure).
+ * - `miss_no_trigger` — at least one axis missed cache and the resolver was
+ *   asked to skip enqueueing (bot/crawler gating).
  */
 export type DependencyState =
     | DependencyStateCached
     | DependencyStatePending
-    | DependencyStateError;
+    | DependencyStateError
+    | DependencyStateMissNoTrigger;
 
 // ─────────────────────────────────────────
 // Submit
@@ -323,11 +345,30 @@ export interface SubmitOverallAnalysisLimitError {
 export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
+ * Result indicating no overall analysis job was enqueued because the caller
+ * opted out via `skipEnqueueIfMiss`. Returned in two cases:
+ *
+ * 1. At least one sub-axis cache missed — the dependency resolver
+ *    short-circuits to `kind: 'miss_no_trigger'` and the overall cache is
+ *    never even checked.
+ * 2. All three sub-axes resolved from cache, but the overall cache itself
+ *    missed — `submitOverallAnalysis` short-circuits after the overall
+ *    cache lookup.
+ *
+ * The consumer is expected to render a fallback in either case (typically
+ * used for bot/crawler gating).
+ */
+export interface SubmitOverallAnalysisMissNoTrigger {
+    status: 'miss_no_trigger';
+}
+
+/**
  * Union of all possible outcomes from {@link submitOverallAnalysis}.
  *
  * - `cached` — a fresh analysis exists in the cache; result is embedded.
  * - `pending_dependencies` — one or more axis jobs are still running; retry after polling each.
  * - `submitted` — overall analysis job submitted; poll via {@link pollOverallAnalysis}.
+ * - `miss_no_trigger` — cache miss but enqueue skipped via `skipEnqueueIfMiss`.
  * - `error` — one of the dependency axes failed; see `axis` and `error` for details.
  * - `key_error` — BYOK API key required for the overall job's own AI call.
  */
@@ -335,6 +376,7 @@ export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisCached
     | SubmitOverallAnalysisPendingDependencies
     | SubmitOverallAnalysisSubmitted
+    | SubmitOverallAnalysisMissNoTrigger
     | SubmitOverallAnalysisError
     | SubmitOverallAnalysisLimitError
     | SubmitOverallAnalysisApiKeyRequiredError;

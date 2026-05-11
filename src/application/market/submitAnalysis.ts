@@ -110,13 +110,16 @@ function resolveSubmitAnalysisArgs(
 /**
  * Submit an analysis job for a given symbol/timeframe.
  *
- * Resolves to one of three outcomes:
+ * Resolves to one of four outcomes:
  * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`, keyed
  *   by `symbol` + `timeframe` + `modelId`).
  * - `submitted`: the bars + indicators were fetched, the prompt was built, a
  *   `jobId` was registered with the job queue, and a fire-and-forget HTTP
  *   POST was sent to the configured worker. Poll the result with
  *   {@link pollAnalysis}.
+ * - `miss_no_trigger`: the cache missed but no job was enqueued because
+ *   `options.skipEnqueueIfMiss` was set. The consumer should render a
+ *   fallback in this case (typically used for bot/crawler gating).
  * - `error`: application tier gates blocked access to the requested timeframe,
  *   or the daily analysis usage limit was exceeded.
  *
@@ -148,6 +151,7 @@ function resolveSubmitAnalysisArgs(
  * // or include a company display name for the prompt:
  * const named = await submitAnalysis('AAPL', 'Apple Inc.', '1Day');
  * if (submission.status === 'cached') return submission.result;
+ * if (submission.status === 'miss_no_trigger') return null; // bot/crawler fallback
  * if (submission.status === 'error') return submission.error;
  * const polled = await pollAnalysis(submission.jobId);
  * ```
@@ -255,6 +259,10 @@ export async function submitAnalysis(
         } catch (error) {
             console.error('[Submit] Cache read failed:', error);
         }
+    }
+
+    if (options.skipEnqueueIfMiss) {
+        return { status: 'miss_no_trigger' };
     }
 
     const { workerUrl, workerSecret } = readWorkerConfig();

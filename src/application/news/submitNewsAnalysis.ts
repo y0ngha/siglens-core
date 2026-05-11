@@ -62,12 +62,15 @@ function hashNewsInput(
 /**
  * Submit a news analysis job for the given symbol.
  *
- * Resolves to one of three outcomes:
+ * Resolves to one of four outcomes:
  * - `cached`: a recent analysis is reused (keyed by `symbol` + `modelId` +
  *   an input hash of the sorted news IDs and earnings dates).
  * - `submitted`: the prompt was built, a `jobId` was registered, and a
  *   fire-and-forget HTTP POST was sent to the configured worker. Poll the
  *   result with {@link pollNewsAnalysis}.
+ * - `miss_no_trigger`: the cache missed but no job was enqueued because
+ *   `options.skipEnqueueIfMiss` was set; no worker request is made. The
+ *   consumer should render a fallback (typically used for bot/crawler gating).
  * - `error`: either no news was provided (`no_news`), the daily analysis
  *   limit was exceeded (`usage_limit_exceeded`), or another gate blocked
  *   the submission.
@@ -82,6 +85,7 @@ function hashNewsInput(
  * ```ts
  * const res = await submitNewsAnalysis({ symbol: 'AAPL', modelId: 'gemini-2.5-flash', news, upcomingCalendar });
  * if (res.status === 'cached') return res.result;
+ * if (res.status === 'miss_no_trigger') return null; // bot/crawler fallback
  * if (res.status === 'error')  return res.error;
  * const polled = await pollNewsAnalysis(res.jobId);
  * ```
@@ -168,6 +172,10 @@ export async function submitNewsAnalysis(
         } catch (error) {
             console.error('[submitNewsAnalysis] Cache read failed:', error);
         }
+    }
+
+    if (options.skipEnqueueIfMiss) {
+        return { status: 'miss_no_trigger' };
     }
 
     // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──

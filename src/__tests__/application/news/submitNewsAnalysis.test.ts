@@ -581,4 +581,57 @@ describe('submitNewsAnalysis 함수는', () => {
             expect(body.tier).toBe(DEFAULT_TIER);
         });
     });
+
+    describe('skipEnqueueIfMiss 옵션이 true일 때', () => {
+        beforeEach(() => {
+            // 이 파일의 다른 테스트들이 mockResolvedValueOnce 큐를 남기는
+            // 경우가 있어 격리 차원에서 reset (vi.clearAllMocks는 큐를 지우지 않음).
+            mockCacheGet.mockReset();
+        });
+
+        it('캐시 미스이면 워커를 트리거하지 않고 miss_no_trigger를 반환한다', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                skipEnqueueIfMiss: true,
+            });
+
+            expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('캐시 히트면 평소처럼 cached 결과를 반환한다', async () => {
+            mockCacheGet.mockResolvedValue(mockCachedResult);
+
+            const result = await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                skipEnqueueIfMiss: true,
+            });
+
+            expect(result.status).toBe('cached');
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('옵션이 생략되면 기존대로 캐시 미스 시 submitted를 반환한다', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalled();
+        });
+    });
 });

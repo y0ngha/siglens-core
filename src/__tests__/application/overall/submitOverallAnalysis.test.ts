@@ -951,4 +951,72 @@ describe('submitOverallAnalysis 함수는', () => {
             );
         });
     });
+
+    describe('skipEnqueueIfMiss 옵션이 true일 때', () => {
+        beforeEach(() => {
+            // 이 파일의 다른 테스트들이 mockResolvedValueOnce 큐를 남기는
+            // 경우가 있어 격리 차원에서 reset (vi.clearAllMocks는 큐를 지우지 않음).
+            mockCacheGet.mockReset();
+            mockResolveOverallDependencies.mockReset();
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+        });
+
+        it('sub-axis는 모두 캐시 히트지만 overall 캐시는 미스인 경우 워커를 트리거하지 않고 miss_no_trigger를 반환한다', async () => {
+            // resolver는 mockResolvedValue로 'cached' 분기로 들어가도록 셋업됨 (beforeEach 참고).
+            // 즉 sub-axis 미스 short-circuit 경로가 아니라 overall-cache 미스 분기를 검증한다.
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ skipEnqueueIfMiss: true })
+            );
+
+            expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(mockCacheGet).toHaveBeenCalledTimes(1);
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('캐시 히트면 평소처럼 cached 결과를 반환한다', async () => {
+            mockCacheGet.mockResolvedValue(cachedOverallResult);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ skipEnqueueIfMiss: true })
+            );
+
+            expect(result.status).toBe('cached');
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('옵션이 생략되면 기존대로 캐시 미스 시 submitted를 반환한다', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalled();
+        });
+
+        it('resolver가 miss_no_trigger를 반환하면 워커 트리거 없이 miss_no_trigger를 반환한다', async () => {
+            // resolver-level short-circuit (any sub-axis missed cache while
+            // skipEnqueueIfMiss was propagated) — overall must not enqueue,
+            // not even reach the overall cache check.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'miss_no_trigger',
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ skipEnqueueIfMiss: true })
+            );
+
+            expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+    });
 });

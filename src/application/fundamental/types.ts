@@ -66,6 +66,13 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * When provided, forwarded to the worker as the X-AI-API-KEY header.
      */
     userApiKey?: string;
+    /**
+     * When `true`, skip enqueueing a new analysis job on cache miss and return
+     * `{ status: 'miss_no_trigger' }` instead. Cache hits are unaffected and
+     * still returned. Intended for consumer-side gating of bot/crawler traffic
+     * that should not trigger worker compute.
+     */
+    skipEnqueueIfMiss?: boolean;
 }
 
 /** The caller receives a cached analysis — no new job was created. */
@@ -98,10 +105,20 @@ export interface SubmitFundamentalAnalysisFetchError {
 export type SubmitFundamentalAnalysisApiKeyRequiredError =
     UserApiKeyRequiredError;
 
+/**
+ * Result indicating the analysis cache missed but no job was enqueued because
+ * the caller opted out via `skipEnqueueIfMiss`. The consumer is expected to
+ * render a fallback in this case.
+ */
+export interface SubmitFundamentalAnalysisMissNoTrigger {
+    status: 'miss_no_trigger';
+}
+
 /** Union of all possible outcomes from {@link submitFundamentalAnalysis}. */
 export type SubmitFundamentalAnalysisResult =
     | SubmitFundamentalAnalysisCached
     | SubmitFundamentalAnalysisSubmitted
+    | SubmitFundamentalAnalysisMissNoTrigger
     | SubmitFundamentalAnalysisLimitError
     | SubmitFundamentalAnalysisFetchError
     | SubmitFundamentalAnalysisApiKeyRequiredError;

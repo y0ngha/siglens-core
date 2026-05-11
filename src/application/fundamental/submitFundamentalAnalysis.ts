@@ -135,7 +135,7 @@ async function fetchProviderData(
 /**
  * Submit a fundamental analysis job for the given symbol.
  *
- * Resolves to one of three outcomes:
+ * Resolves to one of four outcomes:
  * - `cached`: a recent analysis is reused (keyed by `symbol` + `modelId`).
  *   The Redis check happens before any FMP data fetch, so cache hits avoid
  *   all 13 parallel provider calls.
@@ -143,6 +143,10 @@ async function fetchProviderData(
  *   loading), the prompt was built, a `jobId` was registered, and a
  *   fire-and-forget HTTP POST was sent to the configured worker. Poll the
  *   result with {@link pollFundamentalAnalysis}.
+ * - `miss_no_trigger`: the cache missed but no job was enqueued because
+ *   `options.skipEnqueueIfMiss` was set. Provider data is not fetched and
+ *   no worker request is made. The consumer should render a fallback
+ *   (typically used for bot/crawler gating).
  * - `error`: the daily analysis limit was exceeded (when `tier` + `usage` are
  *   both provided), or the data provider threw during the parallel fetch.
  *
@@ -156,6 +160,7 @@ async function fetchProviderData(
  * ```ts
  * const res = await submitFundamentalAnalysis({ symbol: 'AAPL', modelId: 'gemini-2.5-flash', dataProvider });
  * if (res.status === 'cached') return res.result;
+ * if (res.status === 'miss_no_trigger') return null; // bot/crawler fallback
  * if (res.status === 'error')  return res.error;
  * const polled = await pollFundamentalAnalysis(res.jobId);
  * ```
@@ -220,6 +225,10 @@ export async function submitFundamentalAnalysis(
                 error
             );
         }
+    }
+
+    if (options.skipEnqueueIfMiss) {
+        return { status: 'miss_no_trigger' };
     }
 
     const providerData = await fetchProviderData(
