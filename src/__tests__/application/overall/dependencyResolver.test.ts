@@ -890,8 +890,8 @@ describe('resolveOverallDependencies 함수는', () => {
             const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
             expect(technicalOpts).toMatchObject({ skipEnqueueIfMiss: true });
 
-            const fundamentalArgs = mockSubmitFundamentalAnalysis.mock
-                .calls[0]?.[0];
+            const fundamentalArgs =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
             expect(fundamentalArgs).toMatchObject({ skipEnqueueIfMiss: true });
 
             const newsArgs = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
@@ -917,8 +917,8 @@ describe('resolveOverallDependencies 함수는', () => {
             const technicalOpts = mockSubmitAnalysis.mock.calls[0]?.[5];
             expect(technicalOpts?.skipEnqueueIfMiss).toBeUndefined();
 
-            const fundamentalArgs = mockSubmitFundamentalAnalysis.mock
-                .calls[0]?.[0];
+            const fundamentalArgs =
+                mockSubmitFundamentalAnalysis.mock.calls[0]?.[0];
             expect(fundamentalArgs?.skipEnqueueIfMiss).toBeUndefined();
 
             const newsArgs = mockSubmitNewsAnalysis.mock.calls[0]?.[0];
