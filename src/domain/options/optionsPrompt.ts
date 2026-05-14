@@ -23,7 +23,9 @@ export function buildOptionsAnalysisPrompt(
             ? snapshot.chains
             : snapshot.chains.filter(c => c.expirationDate === expirationDate);
 
-    const summaries = targetChains.map(summarizeChainForLlm);
+    const summaries = targetChains.map(c =>
+        summarizeChainForLlm(c, snapshot.underlyingPrice)
+    );
 
     return [
         `당신은 옵션 시장 분석가입니다. ${companyName} (${snapshot.symbol})의 옵션 시장 데이터를 한국어로 해석해주세요.`,
