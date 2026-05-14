@@ -35,6 +35,7 @@ export interface OptionsSnapshot {
 /** Per-expiration computed metrics. */
 export interface OptionsExpirationMetrics {
     expirationDate: string;
+    /** Strike at which total options-writer payoff is minimized (USD). */
     maxPain: number;
     /** sum(put OI) / sum(call OI). */
     putCallRatio: number;
@@ -75,7 +76,20 @@ export interface OptionsAnalysisResponse {
     analyzedAt: string;
 }
 
+/**
+ * Tone tag attached to per-expiration commentary in AI analysis output.
+ *
+ * Four values (one more than `Trend`/`FundamentalSentiment`/`NewsSentiment`):
+ * - `bullish` — options market positioned for upside (heavy call OI, low P/C)
+ * - `bearish` — options market positioned for downside (heavy put OI, high P/C)
+ * - `cautious` — defensive positioning (elevated put protection without
+ *   outright bearish skew). Intentionally distinct from `neutral` because
+ *   options markets can show hedging activity that is not directional.
+ * - `neutral` — no clear directional positioning
+ */
 export type OptionsTone = 'bullish' | 'bearish' | 'neutral' | 'cautious';
+
+/** Structured signal kind emitted alongside AI commentary. */
 export type OptionsSignalKind = 'bullish' | 'bearish' | 'neutral' | 'volatility';
 
 /** @internal Raw response shape before normalization. */
