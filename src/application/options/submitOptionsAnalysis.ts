@@ -117,7 +117,7 @@ export async function submitOptionsAnalysis(
 
     if (usableChains.length === 0) {
         const noChainsError: SubmitOptionsAnalysisNoChainsError = {
-            status: 'error',
+            status: 'no_chains_error',
             code: 'no_options_chains',
             error: 'snapshot has no usable options chains',
         };
@@ -130,7 +130,7 @@ export async function submitOptionsAnalysis(
         );
         if (!hasTarget) {
             const noChainsError: SubmitOptionsAnalysisNoChainsError = {
-                status: 'error',
+                status: 'no_chains_error',
                 code: 'no_options_chains',
                 error: `expiration ${expirationDate} not present in snapshot`,
             };
@@ -159,7 +159,7 @@ export async function submitOptionsAnalysis(
         );
         if (!allowed) {
             const limitError: SubmitOptionsAnalysisLimitError = {
-                status: 'error',
+                status: 'limit_error',
                 code: 'usage_limit_exceeded',
                 error: buildUsageLimitError('analysisPerDay', tier),
             };

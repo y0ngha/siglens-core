@@ -395,8 +395,8 @@ describe('submitOptionsAnalysis 함수는', () => {
                 },
             });
 
-            expect(result.status).toBe('error');
-            if (result.status === 'error') {
+            expect(result.status).toBe('limit_error');
+            if (result.status === 'limit_error') {
                 expect(result.code).toBe('usage_limit_exceeded');
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
@@ -430,8 +430,8 @@ describe('submitOptionsAnalysis 함수는', () => {
                 snapshot: emptySnapshot,
             });
 
-            expect(result.status).toBe('error');
-            if (result.status === 'error') {
+            expect(result.status).toBe('no_chains_error');
+            if (result.status === 'no_chains_error') {
                 expect(result.code).toBe('no_options_chains');
                 expect(result.error).toBe(
                     'snapshot has no usable options chains'
@@ -507,8 +507,8 @@ describe('submitOptionsAnalysis 함수는', () => {
                 snapshot: corruptSnapshot,
             });
 
-            expect(result.status).toBe('error');
-            if (result.status === 'error') {
+            expect(result.status).toBe('no_chains_error');
+            if (result.status === 'no_chains_error') {
                 expect(result.code).toBe('no_options_chains');
             }
         });
@@ -524,8 +524,8 @@ describe('submitOptionsAnalysis 함수는', () => {
                 snapshot: makeSnapshot(),
             });
 
-            expect(result.status).toBe('error');
-            if (result.status === 'error') {
+            expect(result.status).toBe('no_chains_error');
+            if (result.status === 'no_chains_error') {
                 expect(result.code).toBe('no_options_chains');
                 expect(result.error).toContain('2026-09-19');
             }

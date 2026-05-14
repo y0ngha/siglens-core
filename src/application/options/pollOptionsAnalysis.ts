@@ -55,7 +55,7 @@ import {
  */
 export async function pollOptionsAnalysis(
     jobId: string,
-    options?: BackgroundTaskOptions
+    options?: BackgroundTaskOptions & { now?: Date }
 ): Promise<PollOptionsAnalysisResult> {
     const status = await getJobStatus(jobId);
 
@@ -75,7 +75,7 @@ export async function pollOptionsAnalysis(
         getJobMeta(jobId),
     ]);
 
-    if (!rawResult) {
+    if (rawResult === null) {
         console.error('[PollOptions] Result not found', {
             jobId,
             hasMeta: meta !== null,
@@ -90,7 +90,7 @@ export async function pollOptionsAnalysis(
     // normalizeOptionsAnalysisResponse never throws — every field has a fallback.
     const result: OptionsAnalysisResponse = normalizeOptionsAnalysisResponse(
         rawResult,
-        new Date()
+        options?.now ?? new Date()
     );
 
     if (

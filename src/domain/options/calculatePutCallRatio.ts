@@ -1,7 +1,9 @@
 import type { OptionsChain } from './types';
 
 /**
- * Compute the put/call ratio = sum(put OI) / sum(call OI).
+ * @internal Compute the put/call ratio = sum(put OI) / sum(call OI).
+ *
+ * Implementation detail consumed by {@link summarizeChainForLlm}.
  *
  * @param chain - Options chain for a single expiration.
  * @returns The put/call OI ratio. `+Infinity` when call OI is 0 with non-

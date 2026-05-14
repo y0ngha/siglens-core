@@ -1,11 +1,13 @@
 import type { OptionsChain } from './types';
 
 /**
- * Compute the max pain strike — the strike at which the total writer
- * (option seller) payoff is minimized. For each candidate strike S, the
- * total payoff is:
+ * @internal Compute the max pain strike — the strike at which the total
+ * writer (option seller) payoff is minimized. For each candidate strike S,
+ * the total payoff is:
  *   - sum over call strikes K: max(S - K, 0) * callOI(K)
  *   - sum over put strikes K:  max(K - S, 0) * putOI(K)
+ *
+ * Implementation detail consumed by {@link summarizeChainForLlm}.
  *
  * @param chain - The options chain for a single expiration.
  * @returns The max pain strike, or NaN if the chain has no contracts.

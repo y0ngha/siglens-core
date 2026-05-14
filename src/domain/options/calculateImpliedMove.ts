@@ -1,9 +1,10 @@
 const TRADING_DAYS_BASIS = 365;
 
 /**
- * Compute the implied move for an expiration as ±% of underlying.
+ * @internal Compute the implied move for an expiration as ±% of underlying.
  *
- * Formula: atmIv * sqrt(daysToExpiration / 365) * 100
+ * Formula: atmIv * sqrt(daysToExpiration / 365) * 100. Implementation
+ * detail consumed by {@link summarizeChainForLlm}.
  *
  * @param atmIv - ATM implied volatility as a fraction (0.25 = 25%). null when unavailable.
  * @param daysToExpiration - Calendar days until expiration. Must be > 0.

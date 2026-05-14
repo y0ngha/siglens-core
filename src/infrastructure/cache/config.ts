@@ -157,13 +157,7 @@ export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
 export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
-/**
- * TTL for options analysis cache results in seconds. Re-exported on
- * {@link siglens-core}'s public API so consumers can match cache-write
- * windows to their own background-task lifetimes.
- *
- * Default: 24 hours.
- */
+/** @internal TTL for options analysis cache results. Default: 24 hours. */
 export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
 /**

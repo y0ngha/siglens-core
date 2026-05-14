@@ -12,7 +12,7 @@ const INVALID_RATIO_THRESHOLD = 0.05; // 5%
 const MIN_INVALID_TO_REJECT = 2;
 
 /**
- * Drop malformed contracts (negative OI/volume, duplicate strikes). Returns
+ * @internal Drop malformed contracts (negative OI/volume, duplicate strikes). Returns
  * null when the chain is unreliable — that is, when invalid contracts
  * (negative OI/volume) on either side exceed both the absolute floor
  * (MIN_INVALID_TO_REJECT) and the 5% ratio threshold. Duplicate-strike

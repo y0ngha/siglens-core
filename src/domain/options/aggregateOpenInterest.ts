@@ -1,8 +1,9 @@
 import type { OptionsChain, StrikeOpenInterest } from './types';
 
 /**
- * Aggregate call/put open interest per strike, sorted ascending by strike.
- * Missing sides are filled with 0.
+ * @internal Aggregate call/put open interest per strike, sorted ascending
+ * by strike. Missing sides are filled with 0. Implementation detail
+ * consumed by {@link summarizeChainForLlm}.
  *
  * @param chain - Options chain for a single expiration.
  * @returns Strike-grouped OI totals; readonly so downstream consumers must

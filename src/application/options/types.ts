@@ -78,16 +78,28 @@ export interface SubmitOptionsAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
 
-/** Result variant when the daily analysis limit is exceeded. */
+/**
+ * Result variant when the daily analysis limit is exceeded.
+ *
+ * The `status` is `'limit_error'` (not `'error'`) so callers can
+ * exhaustively narrow the union via `switch (result.status)` without
+ * needing to inspect the `code` field.
+ */
 export interface SubmitOptionsAnalysisLimitError {
-    status: 'error';
+    status: 'limit_error';
     code: 'usage_limit_exceeded';
     error: AnalysisLimitError;
 }
 
-/** Result variant when the underlying snapshot has no chains to analyze. */
+/**
+ * Result variant when the underlying snapshot has no chains to analyze.
+ *
+ * The `status` is `'no_chains_error'` (not `'error'`) so callers can
+ * exhaustively narrow the union via `switch (result.status)` without
+ * needing to inspect the `code` field.
+ */
 export interface SubmitOptionsAnalysisNoChainsError {
-    status: 'error';
+    status: 'no_chains_error';
     code: 'no_options_chains';
     error: string;
 }

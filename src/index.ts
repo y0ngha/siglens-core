@@ -783,13 +783,24 @@ export type {
     SlotMapping,
 } from './domain/options/expirationSlots';
 
-// Options analysis — calculation utilities
-export { calculateMaxPain } from './domain/options/calculateMaxPain';
-export { calculatePutCallRatio } from './domain/options/calculatePutCallRatio';
-export { calculateImpliedMove } from './domain/options/calculateImpliedMove';
+// Options analysis — aggregate entry point + the two consumer-facing
+// utilities that have no good substitute on the aggregate:
+//
+//   - summarizeChainForLlm: the canonical metrics entry point. Reads
+//     summarize().maxPain / .putCallRatio / .impliedMovePercent /
+//     .atmImpliedVolatility instead of importing the underlying calculators.
+//   - aggregateOpenInterest: strike-by-strike OI map used by visualization
+//     (the summary only carries the top-3 strikes; charts need the full
+//     distribution).
+//   - sanitizeOptionsChain: chain-level data-quality gate called by
+//     OptionsDataProvider implementations (which live in consumer apps).
+//
+// The individual `calculate*` helpers stay internal — consumers should read
+// the derived fields from OptionsExpirationMetrics rather than re-running
+// the math.
+export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
-export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 
 // Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
 export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
@@ -813,5 +824,3 @@ export type {
     PollOptionsAnalysisResult,
 } from './application/options';
 
-// Options analysis — cache TTL constant (consumer needs for cache.set TTL)
-export { OPTIONS_CACHE_TTL_SECONDS } from './infrastructure/cache/config';
