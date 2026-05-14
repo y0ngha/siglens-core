@@ -49,7 +49,52 @@ export function mapExpirationsToSlots(
     });
 }
 
+/**
+ * Days between two calendar dates anchored to America/New_York (market TZ).
+ *
+ * Compares the day-of-month/month/year of `from` and `isoDate` *as observed
+ * in ET*, ignoring the time-of-day component. This avoids DST drift — hard-
+ * coding `-04:00` (EDT) was wrong during EST months (Nov–Mar), where the
+ * boundary between two calendar days shifts by an hour.
+ *
+ * Implementation: `Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York' })`
+ * resolves the correct offset for each Date instance based on its calendar
+ * position. We extract Y/M/D parts and convert both endpoints to a UTC noon
+ * Date for subtraction (noon avoids DST transition windows).
+ */
 function daysBetween(from: Date, isoDate: string): number {
-    const to = new Date(`${isoDate}T00:00:00-04:00`);
-    return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
+    const fromParts = etCalendarParts(from);
+    const toParts = etCalendarParts(new Date(`${isoDate}T12:00:00Z`));
+    const fromUtc = Date.UTC(
+        fromParts.year,
+        fromParts.month - 1,
+        fromParts.day,
+        12
+    );
+    const toUtc = Date.UTC(toParts.year, toParts.month - 1, toParts.day, 12);
+    return Math.round((toUtc - fromUtc) / MS_PER_DAY);
+}
+
+const ET_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+});
+
+function etCalendarParts(d: Date): {
+    year: number;
+    month: number;
+    day: number;
+} {
+    let year = 0;
+    let month = 0;
+    let day = 0;
+    for (const part of ET_DATE_FORMATTER.formatToParts(d)) {
+        if (part.type === 'year') year = Number.parseInt(part.value, 10);
+        else if (part.type === 'month')
+            month = Number.parseInt(part.value, 10);
+        else if (part.type === 'day') day = Number.parseInt(part.value, 10);
+    }
+    return { year, month, day };
 }
