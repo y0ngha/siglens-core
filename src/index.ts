@@ -796,3 +796,24 @@ export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 // Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
 export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
 export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
+
+// Options analysis — application use-cases (submit + poll, cache key builder)
+export {
+    submitOptionsAnalysis,
+    pollOptionsAnalysis,
+    buildOptionsCacheKey,
+} from './application/options';
+export type {
+    SubmitOptionsAnalysisOptions,
+    SubmitOptionsAnalysisResult,
+    SubmitOptionsAnalysisCached,
+    SubmitOptionsAnalysisSubmitted,
+    SubmitOptionsAnalysisMissNoTrigger,
+    SubmitOptionsAnalysisLimitError,
+    SubmitOptionsAnalysisNoChainsError,
+    SubmitOptionsAnalysisApiKeyRequiredError,
+    PollOptionsAnalysisResult,
+} from './application/options';
+
+// Options analysis — cache TTL constant (consumer needs for cache.set TTL)
+export { OPTIONS_CACHE_TTL_SECONDS } from './infrastructure/cache/config';
