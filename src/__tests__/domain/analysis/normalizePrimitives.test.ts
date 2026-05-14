@@ -3,6 +3,7 @@ import {
     asArray,
     asBoolean,
     asEnum,
+    asIsoDate,
     asNumber,
     asObject,
     asOptionalEnum,
@@ -144,5 +145,35 @@ describe('compact', () => {
 
     it('빈 배열은 빈 배열을 반환한다', () => {
         expect(compact([])).toEqual([]);
+    });
+});
+
+describe('asIsoDate', () => {
+    it('returns ISO date when input is valid YYYY-MM-DD', () => {
+        expect(asIsoDate('2026-05-14')).toBe('2026-05-14');
+    });
+
+    it('returns ISO date when input is valid ISO datetime', () => {
+        expect(asIsoDate('2026-05-14T12:00:00Z')).toBe('2026-05-14T12:00:00Z');
+        expect(asIsoDate('2026-05-14T12:00:00.123Z')).toBe(
+            '2026-05-14T12:00:00.123Z'
+        );
+        expect(asIsoDate('2026-05-14T12:00:00+09:00')).toBe(
+            '2026-05-14T12:00:00+09:00'
+        );
+    });
+
+    it('returns null for malformed date strings', () => {
+        expect(asIsoDate('not-a-date')).toBeNull();
+        expect(asIsoDate('2026-13-99')).toBeNull();
+        expect(asIsoDate('2026/05/14')).toBeNull();
+    });
+
+    it('returns null for non-string inputs', () => {
+        expect(asIsoDate(null)).toBeNull();
+        expect(asIsoDate(undefined)).toBeNull();
+        expect(asIsoDate(123)).toBeNull();
+        expect(asIsoDate({})).toBeNull();
+        expect(asIsoDate([])).toBeNull();
     });
 });
