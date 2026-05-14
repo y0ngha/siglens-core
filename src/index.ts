@@ -754,3 +754,45 @@ export type {
     VolumeProfileRow,
     WaitUntil,
 } from './domain/types';
+
+// Options analysis — domain types
+export type {
+    OptionsContract,
+    OptionsChain,
+    OptionsSnapshot,
+    OptionsExpirationMetrics,
+    OptionsSymbolMetrics,
+    OptionsAnalysisResponse,
+    OptionsTone,
+    OptionsSignalKind,
+} from './domain/options/types';
+
+// Options analysis — provider interface (implementation injected by consumer)
+export type { OptionsDataProvider } from './infrastructure/options/types';
+
+// Options analysis — expiration slot mapping
+export {
+    EXPIRATION_SLOTS,
+    mapExpirationsToSlots,
+} from './domain/options/expirationSlots';
+export type {
+    ExpirationSlot,
+    SlotMapping,
+} from './domain/options/expirationSlots';
+
+// Options analysis — calculation utilities
+export { calculateMaxPain } from './domain/options/calculateMaxPain';
+export { calculatePutCallRatio } from './domain/options/calculatePutCallRatio';
+export { calculateImpliedMove } from './domain/options/calculateImpliedMove';
+export {
+    aggregateOpenInterest,
+} from './domain/options/aggregateOpenInterest';
+export type {
+    StrikeOpenInterest,
+} from './domain/options/aggregateOpenInterest';
+export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
+export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
+
+// Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
+export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
+export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
