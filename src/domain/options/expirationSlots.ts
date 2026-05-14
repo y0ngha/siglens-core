@@ -1,11 +1,23 @@
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { MS_PER_DAY } from '@/domain/constants/time';
 
+/**
+ * One canonical chip slot in the options expiration picker UI. The set is
+ * fixed across the codebase — adding a slot here changes which chips the
+ * frontend renders.
+ */
 export interface ExpirationSlot {
+    /** Stable identifier used as a React key and a routing-friendly token. */
     key: '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
+    /** Korean label shown to users (e.g., "1개월"). */
     label: string;
+    /** Minimum days from today the chosen expiration must be at least. */
     targetDays: number;
 }
 
+/**
+ * Canonical chip slots in render order. Frontends pick the closest matching
+ * provider expiration per slot.
+ */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
     { key: '1W', label: '1주', targetDays: 7 },
     { key: '2W', label: '2주', targetDays: 14 },
@@ -15,8 +27,11 @@ export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
     { key: '6M', label: '6개월', targetDays: 180 },
 ];
 
+/** A chip slot paired with the actual provider expiration that fills it. */
 export interface SlotMapping {
+    /** The canonical slot this mapping satisfies. */
     slot: ExpirationSlot;
+    /** Provider expiration date in ISO `'YYYY-MM-DD'` form. */
     expirationDate: string;
 }
 

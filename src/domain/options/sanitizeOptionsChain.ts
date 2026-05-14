@@ -19,6 +19,10 @@ const MIN_INVALID_TO_REJECT = 2;
  * deduplication is always applied regardless of the chain's verdict, and
  * duplicates do NOT count toward the reject ratio (dedup is a normalization
  * concern, not a data-quality signal).
+ *
+ * @param chain - Raw provider chain that may include malformed rows.
+ * @returns Sanitized chain when the data is trustworthy, or `null` when
+ *   the chain should be rejected entirely.
  */
 export function sanitizeOptionsChain(chain: OptionsChain): OptionsChain | null {
     const totalCalls = chain.calls.length;
@@ -54,7 +58,6 @@ function filterValid(
     return contracts.filter(c => {
         if (c.openInterest < 0) return false;
         if (c.volume < 0) return false;
-        if (c.strike === null || c.strike === undefined) return false;
         if (seen.has(c.strike)) return false;
         seen.add(c.strike);
         return true;

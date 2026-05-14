@@ -65,17 +65,26 @@ function normalizeSignalItem(item: unknown) {
 
 /**
  * Normalize a raw LLM options analysis response into a fully-typed
- * OptionsAnalysisResponse. Never throws — every field has a fallback.
+ * OptionsAnalysisResponse. Never throws — every field has a fallback so
+ * downstream rendering is safe even when the model returns garbage.
  *
- * Used in two places per the spec (siglens-core SOP):
- *   1. pollOptionsAnalysis — normalize raw worker output before caching
- *   2. submitOptionsAnalysis — re-normalize cached payloads (schema drift guard)
+ * Domain purity: `now` is taken as a required argument so this function
+ * stays a pure transformation.
+ *
+ * @param raw - Worker JSON / cached payload / arbitrary unknown.
+ * @param now - Reference clock used as `analyzedAt` fallback when the
+ *   payload omits the field or carries a non-ISO string.
+ * @returns Fully-typed normalized response with every field populated.
  */
 export function normalizeOptionsAnalysisResponse(
     raw: unknown,
-    now: Date = new Date()
+    now: Date
 ): OptionsAnalysisResponse {
     const parsed = parseLlmPayload(raw);
+    // `asObject` filters to plain objects (returns null for arrays/primitives).
+    // `?? {}` ensures non-null so subsequent property access never throws.
+    // The cast to `RawOptionsAnalysisResponse` is safe because every Raw
+    // field is `unknown?` — any object shape is structurally assignable.
     const o = (asObject(parsed) ?? {}) as RawOptionsAnalysisResponse;
 
     return {

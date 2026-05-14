@@ -138,7 +138,7 @@ export async function submitOptionsAnalysis(
         }
     }
 
-    // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
+    // ── 2. BYOK gate (tier + premium model + no userApiKey) ──
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
@@ -149,7 +149,7 @@ export async function submitOptionsAnalysis(
         return buildUserApiKeyRequiredError(tier, modelId);
     }
 
-    // ── 2. Usage limit check (only when both tier and usage are provided) ──
+    // ── 3. Usage limit check (only when both tier and usage are provided) ──
     if (options.tier !== undefined && usage !== undefined) {
         const allowed = await checkAnalysisUsageAllowed(
             usage,
@@ -167,7 +167,7 @@ export async function submitOptionsAnalysis(
         }
     }
 
-    // ── 3. Hash snapshot → build cache key → check cache ──
+    // ── 4. Hash snapshot → build cache key → check cache ──
     const inputHash = hashOptionsInput(snapshot, expirationDate);
     const cacheKey = buildOptionsCacheKey(
         symbol,
@@ -200,7 +200,7 @@ export async function submitOptionsAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──
+    // ── 5. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
     const prompt = buildOptionsAnalysisPrompt({
         expirationDate,

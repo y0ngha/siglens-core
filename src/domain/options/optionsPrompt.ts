@@ -12,6 +12,11 @@ interface BuildOptionsAnalysisPromptOptions {
  * Build the LLM prompt for options analysis. The prompt requests a JSON
  * response matching RawOptionsAnalysisResponse (kept tolerant — normalize
  * will fill in any missing fields).
+ *
+ * @param options - Target expiration, company display name, and the
+ *   pre-fetched options snapshot.
+ * @returns A multi-section Korean-language prompt string ready to send to
+ *   the LLM. Deterministic for a given input (no clocks, no random IDs).
  */
 export function buildOptionsAnalysisPrompt(
     options: BuildOptionsAnalysisPromptOptions

@@ -116,7 +116,7 @@ describe('pollOptionsAnalysis 함수는', () => {
             mockGetJobMeta.mockResolvedValue(mockMeta);
         });
 
-        it('결과가 없으면 error를 반환한다', async () => {
+        it('결과가 없으면 error를 반환하고 cleanup을 호출한다', async () => {
             mockGetJobResult.mockResolvedValueOnce(null);
 
             const result = await pollOptionsAnalysis('job-no-result');
@@ -125,6 +125,11 @@ describe('pollOptionsAnalysis 함수는', () => {
             if (result.status === 'error') {
                 expect(result.error).toBe('Result not found');
             }
+            expect(mockCleanupInBackground).toHaveBeenCalledWith(
+                'job-no-result',
+                '[PollOptions]',
+                undefined
+            );
         });
 
         it('유효한 결과이면 normalize하고 done 상태를 반환한다', async () => {
@@ -223,8 +228,9 @@ describe('pollOptionsAnalysis 함수는', () => {
     describe('idempotent re-normalize', () => {
         it('normalize를 두 번 통과해도 동일한 결과를 반환한다', () => {
             const rawParsed = JSON.parse(rawOptionsJson) as unknown;
-            const first = normalizeOptionsAnalysisResponse(rawParsed);
-            const second = normalizeOptionsAnalysisResponse(first);
+            const now = new Date('2026-05-14T12:00:00Z');
+            const first = normalizeOptionsAnalysisResponse(rawParsed, now);
+            const second = normalizeOptionsAnalysisResponse(first, now);
 
             expect(second.summary).toBe(first.summary);
             expect(second.perExpiration).toEqual(first.perExpiration);

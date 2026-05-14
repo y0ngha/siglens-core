@@ -88,8 +88,10 @@ export async function pollOptionsAnalysis(
     // The worker stores the raw LLM response as a JSON string or object.
     // Normalize it through the options response normalizer.
     // normalizeOptionsAnalysisResponse never throws — every field has a fallback.
-    const result: OptionsAnalysisResponse =
-        normalizeOptionsAnalysisResponse(rawResult);
+    const result: OptionsAnalysisResponse = normalizeOptionsAnalysisResponse(
+        rawResult,
+        new Date()
+    );
 
     if (
         result.summary === '' &&

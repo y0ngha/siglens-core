@@ -5,15 +5,18 @@ import { calculatePutCallRatio } from './calculatePutCallRatio';
 import type { OptionsChain, OptionsExpirationMetrics } from './types';
 
 /**
- * Reduce an OptionsChain (potentially hundreds of strikes) to the metrics
- * the AI needs. Used by `buildOptionsAnalysisPrompt` and by overall-axis
- * integration. Keeps prompt token count bounded.
+ * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
+ * of metrics suitable for LLM prompt input. The result extracts single-
+ * number aggregates (Max Pain, P/C ratio, ATM IV) plus the top-3 strikes
+ * by combined OI, keeping token count bounded regardless of chain depth.
  *
  * @param chain - The expiration's chain.
  * @param underlyingPrice - When the caller knows the spot price (typically
  *   from the parent snapshot), pass it so `pickAtmIv` anchors on the actual
  *   ATM strike. Without it, the helper falls back to the median strike,
  *   which is a rougher proxy and can be misleading on skewed chains.
+ * @returns Single-expiration metrics including Max Pain, P/C ratio, ATM IV,
+ *   the top 3 OI strikes, and implied move %.
  */
 export function summarizeChainForLlm(
     chain: OptionsChain,
@@ -21,8 +24,8 @@ export function summarizeChainForLlm(
 ): OptionsExpirationMetrics {
     const atmIv = pickAtmIv(chain, underlyingPrice);
     const oiByStrike = aggregateOpenInterest(chain);
-    const top = [...oiByStrike]
-        .sort(
+    const top = oiByStrike
+        .toSorted(
             (a, b) =>
                 b.callOpenInterest +
                 b.putOpenInterest -
@@ -56,7 +59,7 @@ function pickAtmIv(
     ) {
         anchor = underlyingPrice;
     } else {
-        const strikes = all.map(c => c.strike).sort((a, b) => a - b);
+        const strikes = all.map(c => c.strike).toSorted((a, b) => a - b);
         anchor = strikes[Math.floor(strikes.length / 2)];
     }
 

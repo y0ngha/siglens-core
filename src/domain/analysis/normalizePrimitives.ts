@@ -43,8 +43,8 @@ const ISO_DATE_RE =
     /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
 
 /**
- * Validate an ISO 8601 date or datetime string. Returns the input string
- * when valid (canonical form unchanged) or null otherwise.
+ * @internal Validate an ISO 8601 date or datetime string. Returns the input
+ * string when valid (canonical form unchanged) or null otherwise.
  */
 export function asIsoDate(v: unknown): string | null {
     if (typeof v !== 'string') return null;
