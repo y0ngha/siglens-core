@@ -39,9 +39,7 @@ const rawOptionsJson = JSON.stringify({
             tone: 'bullish',
         },
     ],
-    signals: [
-        { kind: 'bullish', message: 'Put/Call 비율이 낮아 강세 신호.' },
-    ],
+    signals: [{ kind: 'bullish', message: 'Put/Call 비율이 낮아 강세 신호.' }],
     analyzedAt: '2026-05-14T10:00:00.000Z',
 });
 

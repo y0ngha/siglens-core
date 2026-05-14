@@ -57,7 +57,7 @@ function makeSnapshot(overrides?: Partial<OptionsSnapshot>): OptionsSnapshot {
                         ask: 3.4,
                         volume: 80,
                         openInterest: 300,
-                        impliedVolatility: 0.30,
+                        impliedVolatility: 0.3,
                         inTheMoney: false,
                     },
                 ],
@@ -182,7 +182,9 @@ describe('submitOptionsAnalysis 함수는', () => {
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
-                expect(result.result.summary).toBe('캐시된 옵션 분석 요약입니다.');
+                expect(result.result.summary).toBe(
+                    '캐시된 옵션 분석 요약입니다.'
+                );
                 expect(result.result.perExpiration).toHaveLength(1);
                 expect(result.result.signals).toHaveLength(1);
                 // analyzedAt is preserved from cached payload
@@ -193,7 +195,10 @@ describe('submitOptionsAnalysis 함수는', () => {
         });
 
         it('캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
-            const poisonedCache = { summary: '오래된 형태', someOldField: true };
+            const poisonedCache = {
+                summary: '오래된 형태',
+                someOldField: true,
+            };
             mockCacheGet.mockResolvedValueOnce(poisonedCache);
 
             const result = await submitOptionsAnalysis({
@@ -286,7 +291,9 @@ describe('submitOptionsAnalysis 함수는', () => {
             // options analysis does NOT propagate skillsDegraded
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
-                expect.not.objectContaining({ skillsDegraded: expect.anything() })
+                expect.not.objectContaining({
+                    skillsDegraded: expect.anything(),
+                })
             );
         });
     });
@@ -426,7 +433,9 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(result.status).toBe('error');
             if (result.status === 'error') {
                 expect(result.code).toBe('no_options_chains');
-                expect(result.error).toBe('snapshot has no usable options chains');
+                expect(result.error).toBe(
+                    'snapshot has no usable options chains'
+                );
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();

@@ -784,12 +784,8 @@ export type {
 export { calculateMaxPain } from './domain/options/calculateMaxPain';
 export { calculatePutCallRatio } from './domain/options/calculatePutCallRatio';
 export { calculateImpliedMove } from './domain/options/calculateImpliedMove';
-export {
-    aggregateOpenInterest,
-} from './domain/options/aggregateOpenInterest';
-export type {
-    StrikeOpenInterest,
-} from './domain/options/aggregateOpenInterest';
+export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
+export type { StrikeOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
 export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 

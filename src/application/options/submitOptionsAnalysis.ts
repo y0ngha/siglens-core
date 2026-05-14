@@ -125,7 +125,9 @@ export async function submitOptionsAnalysis(
     }
 
     if (expirationDate !== 'all') {
-        const hasTarget = usableChains.some(c => c.expirationDate === expirationDate);
+        const hasTarget = usableChains.some(
+            c => c.expirationDate === expirationDate
+        );
         if (!hasTarget) {
             const noChainsError: SubmitOptionsAnalysisNoChainsError = {
                 status: 'error',
@@ -167,7 +169,12 @@ export async function submitOptionsAnalysis(
 
     // ── 3. Hash snapshot → build cache key → check cache ──
     const inputHash = hashOptionsInput(snapshot, expirationDate);
-    const cacheKey = buildOptionsCacheKey(symbol, expirationDate, modelId, inputHash);
+    const cacheKey = buildOptionsCacheKey(
+        symbol,
+        expirationDate,
+        modelId,
+        inputHash
+    );
     const cache = createCacheProvider();
 
     if (cache !== null) {
@@ -179,10 +186,8 @@ export async function submitOptionsAnalysis(
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
             if (cached !== null) {
-                const result: OptionsAnalysisResponse = normalizeOptionsAnalysisResponse(
-                    cached,
-                    occurredAt
-                );
+                const result: OptionsAnalysisResponse =
+                    normalizeOptionsAnalysisResponse(cached, occurredAt);
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result };
             }

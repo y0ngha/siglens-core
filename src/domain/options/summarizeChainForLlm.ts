@@ -15,9 +15,11 @@ export function summarizeChainForLlm(
     const atmIv = pickAtmIv(chain);
     const oiByStrike = aggregateOpenInterest(chain);
     const top = [...oiByStrike]
-        .sort((a, b) =>
-            (b.callOpenInterest + b.putOpenInterest) -
-            (a.callOpenInterest + a.putOpenInterest)
+        .sort(
+            (a, b) =>
+                b.callOpenInterest +
+                b.putOpenInterest -
+                (a.callOpenInterest + a.putOpenInterest)
         )
         .slice(0, 3);
 

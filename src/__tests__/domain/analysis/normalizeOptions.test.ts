@@ -8,7 +8,11 @@ describe('normalizeOptionsAnalysisResponse', () => {
         const raw = {
             summary: '시장은 상승 편향',
             perExpiration: [
-                { expirationDate: '2026-05-22', commentary: '단기 OI 두텁다', tone: 'bullish' },
+                {
+                    expirationDate: '2026-05-22',
+                    commentary: '단기 OI 두텁다',
+                    tone: 'bullish',
+                },
             ],
             signals: [{ kind: 'bullish', message: '콜 OI 급증' }],
             analyzedAt: '2026-05-14T11:55:00Z',
@@ -27,7 +31,10 @@ describe('normalizeOptionsAnalysisResponse', () => {
     });
 
     it('returns empty perExpiration when not an array', () => {
-        const result = normalizeOptionsAnalysisResponse({ perExpiration: 'invalid' }, now);
+        const result = normalizeOptionsAnalysisResponse(
+            { perExpiration: 'invalid' },
+            now
+        );
         expect(result.perExpiration).toEqual([]);
     });
 
@@ -35,7 +42,11 @@ describe('normalizeOptionsAnalysisResponse', () => {
         const raw = {
             perExpiration: [
                 { commentary: 'good', tone: 'bullish' }, // no expirationDate
-                { expirationDate: '2026-05-22', commentary: 'ok', tone: 'neutral' },
+                {
+                    expirationDate: '2026-05-22',
+                    commentary: 'ok',
+                    tone: 'neutral',
+                },
             ],
         };
         const result = normalizeOptionsAnalysisResponse(raw, now);
@@ -53,7 +64,11 @@ describe('normalizeOptionsAnalysisResponse', () => {
     it('coerces invalid tone to neutral', () => {
         const raw = {
             perExpiration: [
-                { expirationDate: '2026-05-22', commentary: 'x', tone: 'super-bullish' },
+                {
+                    expirationDate: '2026-05-22',
+                    commentary: 'x',
+                    tone: 'super-bullish',
+                },
             ],
         };
         const result = normalizeOptionsAnalysisResponse(raw, now);
@@ -86,8 +101,12 @@ describe('normalizeOptionsAnalysisResponse', () => {
 
     it('handles null and non-object inputs safely', () => {
         expect(() => normalizeOptionsAnalysisResponse(null, now)).not.toThrow();
-        expect(() => normalizeOptionsAnalysisResponse(undefined, now)).not.toThrow();
-        expect(() => normalizeOptionsAnalysisResponse('string', now)).not.toThrow();
+        expect(() =>
+            normalizeOptionsAnalysisResponse(undefined, now)
+        ).not.toThrow();
+        expect(() =>
+            normalizeOptionsAnalysisResponse('string', now)
+        ).not.toThrow();
         expect(() => normalizeOptionsAnalysisResponse(123, now)).not.toThrow();
     });
 

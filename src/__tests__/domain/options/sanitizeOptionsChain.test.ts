@@ -2,10 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeOptionsChain } from '@/domain/options/sanitizeOptionsChain';
 import type { OptionsChain, OptionsContract } from '@/domain/options/types';
 
-const makeContract = (strike: number, oi: number, volume = 0): OptionsContract => ({
+const makeContract = (
+    strike: number,
+    oi: number,
+    volume = 0
+): OptionsContract => ({
     contractSymbol: `X${strike}`,
-    strike, lastPrice: null, bid: null, ask: null,
-    volume, openInterest: oi, impliedVolatility: null, inTheMoney: false,
+    strike,
+    lastPrice: null,
+    bid: null,
+    ask: null,
+    volume,
+    openInterest: oi,
+    impliedVolatility: null,
+    inTheMoney: false,
 });
 
 describe('sanitizeOptionsChain', () => {

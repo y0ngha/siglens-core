@@ -4,8 +4,14 @@ import type { OptionsChain, OptionsContract } from '@/domain/options/types';
 
 const makeContract = (strike: number, oi: number): OptionsContract => ({
     contractSymbol: `X${strike}`,
-    strike, lastPrice: null, bid: null, ask: null,
-    volume: 0, openInterest: oi, impliedVolatility: null, inTheMoney: false,
+    strike,
+    lastPrice: null,
+    bid: null,
+    ask: null,
+    volume: 0,
+    openInterest: oi,
+    impliedVolatility: null,
+    inTheMoney: false,
 });
 
 describe('aggregateOpenInterest', () => {

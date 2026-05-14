@@ -88,9 +88,14 @@ export async function pollOptionsAnalysis(
     // The worker stores the raw LLM response as a JSON string or object.
     // Normalize it through the options response normalizer.
     // normalizeOptionsAnalysisResponse never throws — every field has a fallback.
-    const result: OptionsAnalysisResponse = normalizeOptionsAnalysisResponse(rawResult);
+    const result: OptionsAnalysisResponse =
+        normalizeOptionsAnalysisResponse(rawResult);
 
-    if (result.summary === '' && result.perExpiration.length === 0 && result.signals.length === 0) {
+    if (
+        result.summary === '' &&
+        result.perExpiration.length === 0 &&
+        result.signals.length === 0
+    ) {
         console.warn('[PollOptions] Empty options analysis', { jobId });
     }
 
@@ -102,7 +107,10 @@ export async function pollOptionsAnalysis(
                 cache
                     .set(meta.cacheKey, result, OPTIONS_CACHE_TTL_SECONDS)
                     .catch(error =>
-                        console.error('[PollOptions] Cache write failed:', error)
+                        console.error(
+                            '[PollOptions] Cache write failed:',
+                            error
+                        )
                     ),
                 options
             );

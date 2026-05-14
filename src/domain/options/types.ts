@@ -90,7 +90,11 @@ export interface OptionsAnalysisResponse {
 export type OptionsTone = 'bullish' | 'bearish' | 'neutral' | 'cautious';
 
 /** Structured signal kind emitted alongside AI commentary. */
-export type OptionsSignalKind = 'bullish' | 'bearish' | 'neutral' | 'volatility';
+export type OptionsSignalKind =
+    | 'bullish'
+    | 'bearish'
+    | 'neutral'
+    | 'volatility';
 
 /** @internal Raw response shape before normalization. */
 export interface RawOptionsAnalysisResponse {
