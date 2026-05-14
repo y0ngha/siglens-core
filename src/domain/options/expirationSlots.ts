@@ -92,8 +92,7 @@ function etCalendarParts(d: Date): {
     let day = 0;
     for (const part of ET_DATE_FORMATTER.formatToParts(d)) {
         if (part.type === 'year') year = Number.parseInt(part.value, 10);
-        else if (part.type === 'month')
-            month = Number.parseInt(part.value, 10);
+        else if (part.type === 'month') month = Number.parseInt(part.value, 10);
         else if (part.type === 'day') day = Number.parseInt(part.value, 10);
     }
     return { year, month, day };
