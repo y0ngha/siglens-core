@@ -1925,3 +1925,16 @@ export type CurrentAnalysisContext =
     | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
     | { kind: 'news'; payload: NewsAnalysisResponse }
     | { kind: 'overall'; payload: OverallAnalysisResponse };
+
+// --- Options Analysis Types ---
+export type {
+    OptionsContract,
+    OptionsChain,
+    OptionsSnapshot,
+    OptionsExpirationMetrics,
+    OptionsSymbolMetrics,
+    OptionsAnalysisResponse,
+    OptionsTone,
+    OptionsSignalKind,
+    RawOptionsAnalysisResponse,
+} from './options/types';
