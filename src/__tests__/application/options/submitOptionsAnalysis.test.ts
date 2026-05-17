@@ -224,6 +224,41 @@ describe('submitOptionsAnalysis 함수는', () => {
             mockCacheGet.mockResolvedValueOnce(null);
         });
 
+        it('캐시 읽기 중 에러가 발생해도 submitted로 진행한다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockRejectedValueOnce(new Error('Redis down'));
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+            });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+            }
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
+
+        it('cache 프로바이더가 null이면 캐시 체크를 건너뛰고 submitted로 진행한다', async () => {
+            mockCreateCacheProvider.mockReturnValueOnce(null);
+            // 이 경로에서는 mockCacheGet이 호출되지 않는다.
+            mockCacheGet.mockReset();
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
+
         it('submitted 상태와 jobId를 반환하고 워커에 POST를 보낸다', async () => {
             const result = await submitOptionsAnalysis({
                 symbol: 'AAPL',

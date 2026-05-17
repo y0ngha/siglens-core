@@ -56,4 +56,44 @@ describe('sanitizeOptionsChain', () => {
         };
         expect(sanitizeOptionsChain(chain)).toBeNull();
     });
+
+    it('does NOT reject chain at exactly 5% invalid ratio', () => {
+        // 2 invalid / 40 total = 0.05 = 5%. The reject rule is `> 0.05`,
+        // so exactly 5% must survive. invalidCount=2 also matches
+        // MIN_INVALID_TO_REJECT but the ratio gate stays open.
+        const validCalls = Array.from({ length: 38 }, (_, i) =>
+            makeContract(100 + i, 100)
+        );
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [
+                ...validCalls,
+                makeContract(200, -1),
+                makeContract(201, -2),
+            ],
+            puts: [],
+        };
+        const result = sanitizeOptionsChain(chain);
+        expect(result).not.toBeNull();
+        expect(result?.calls).toHaveLength(38);
+    });
+
+    it('does NOT reject chain when only 1 contract is invalid (below MIN_INVALID_TO_REJECT)', () => {
+        // 1 < MIN_INVALID_TO_REJECT (=2), so the absolute floor blocks rejection
+        // even though 1/3 ≈ 33% > 5%.
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [
+                makeContract(190, 100),
+                makeContract(195, 200),
+                makeContract(200, -1), // 1 invalid
+            ],
+            puts: [],
+        };
+        const result = sanitizeOptionsChain(chain);
+        expect(result).not.toBeNull();
+        expect(result?.calls).toHaveLength(2);
+    });
 });

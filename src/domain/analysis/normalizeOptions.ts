@@ -2,8 +2,8 @@ import type {
     OptionsAnalysisResponse,
     OptionsTone,
     OptionsSignalKind,
-    RawOptionsAnalysisResponse,
 } from '@/domain/types';
+import type { RawOptionsAnalysisResponse } from '@/domain/options/types';
 import {
     asArray,
     asEnum,

@@ -1939,5 +1939,6 @@ export type {
     OptionsAnalysisResponse,
     OptionsTone,
     OptionsSignalKind,
-    RawOptionsAnalysisResponse,
+    ExpirationSlot,
+    SlotMapping,
 } from './options/types';

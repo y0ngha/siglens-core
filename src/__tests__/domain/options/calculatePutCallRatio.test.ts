@@ -44,4 +44,14 @@ describe('calculatePutCallRatio', () => {
         };
         expect(calculatePutCallRatio(chain)).toBe(0);
     });
+
+    it('returns 0 when put OI is 0 but call OI > 0', () => {
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [makeContract(195, 100)],
+            puts: [makeContract(195, 0)],
+        };
+        expect(calculatePutCallRatio(chain)).toBe(0);
+    });
 });

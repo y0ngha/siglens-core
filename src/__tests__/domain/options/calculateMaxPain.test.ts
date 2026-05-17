@@ -79,18 +79,36 @@ describe('calculateMaxPain', () => {
     };
 
     it('returns the strike with minimum total writer loss', () => {
+        // Pain table for baseChain (calls 190:100, 195:200, 200:50;
+        // puts 190:50, 195:100, 200:100):
+        //  candidate=190: call 0 + put (195-190)*100+(200-190)*100=1500 → 1500
+        //  candidate=195: call (195-190)*100=500 + put (200-195)*100=500 → 1000
+        //  candidate=200: call (200-190)*100+(200-195)*200=2000 + put 0 → 2000
+        // Minimum is 195.
         const result = calculateMaxPain(baseChain);
-        expect([190, 195, 200]).toContain(result);
+        expect(result).toBe(195);
     });
 
-    it('handles chain with only calls', () => {
+    it('only-calls chain — min total writer loss at the lowest strike', () => {
+        // No puts → pain at strike X = sum(max(X-K, 0) * OI) for all call rows.
+        // calls (190:100, 195:200, 200:50):
+        //  X=190 → 0
+        //  X=195 → (195-190)*100 = 500
+        //  X=200 → (200-190)*100 + (200-195)*200 = 2000
+        // Minimum at 190.
         const result = calculateMaxPain({ ...baseChain, puts: [] });
-        expect(typeof result).toBe('number');
+        expect(result).toBe(190);
     });
 
-    it('handles chain with only puts', () => {
+    it('only-puts chain — min total writer loss at the highest strike', () => {
+        // No calls → pain at strike X = sum(max(K-X, 0) * OI) for all put rows.
+        // puts (190:50, 195:100, 200:100):
+        //  X=190 → (195-190)*100 + (200-190)*100 = 1500
+        //  X=195 → (200-195)*100 = 500
+        //  X=200 → 0
+        // Minimum at 200.
         const result = calculateMaxPain({ ...baseChain, calls: [] });
-        expect(typeof result).toBe('number');
+        expect(result).toBe(200);
     });
 
     it('returns NaN for empty chain', () => {

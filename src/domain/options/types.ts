@@ -157,3 +157,25 @@ export interface RawOptionsAnalysisResponse {
     signals?: unknown;
     analyzedAt?: unknown;
 }
+
+/**
+ * One canonical chip slot in the options expiration picker UI. The set is
+ * fixed across the codebase — adding a slot here changes which chips the
+ * frontend renders.
+ */
+export interface ExpirationSlot {
+    /** Stable identifier used as a routing-friendly token. */
+    key: '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
+    /** Korean label shown to users (e.g., "1개월"). */
+    label: string;
+    /** Minimum days from today the chosen expiration must be at least. */
+    targetDays: number;
+}
+
+/** A chip slot paired with the actual provider expiration that fills it. */
+export interface SlotMapping {
+    /** The canonical slot this mapping satisfies. */
+    slot: ExpirationSlot;
+    /** Provider expiration date in ISO `'YYYY-MM-DD'` form. */
+    expirationDate: string;
+}

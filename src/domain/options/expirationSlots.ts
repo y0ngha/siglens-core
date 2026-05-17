@@ -1,18 +1,5 @@
 import { MS_PER_DAY } from '@/domain/constants/time';
-
-/**
- * One canonical chip slot in the options expiration picker UI. The set is
- * fixed across the codebase — adding a slot here changes which chips the
- * frontend renders.
- */
-export interface ExpirationSlot {
-    /** Stable identifier used as a React key and a routing-friendly token. */
-    key: '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
-    /** Korean label shown to users (e.g., "1개월"). */
-    label: string;
-    /** Minimum days from today the chosen expiration must be at least. */
-    targetDays: number;
-}
+import type { ExpirationSlot, SlotMapping } from './types';
 
 /**
  * Canonical chip slots in render order. Frontends pick the closest matching
@@ -26,14 +13,6 @@ export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
     { key: '3M', label: '3개월', targetDays: 90 },
     { key: '6M', label: '6개월', targetDays: 180 },
 ];
-
-/** A chip slot paired with the actual provider expiration that fills it. */
-export interface SlotMapping {
-    /** The canonical slot this mapping satisfies. */
-    slot: ExpirationSlot;
-    /** Provider expiration date in ISO `'YYYY-MM-DD'` form. */
-    expirationDate: string;
-}
 
 /**
  * Map provider expirations to slots. For each slot, pick the closest
@@ -53,15 +32,25 @@ export function mapExpirationsToSlots(
         .filter(e => e.days >= 0)
         .toSorted((a, b) => a.days - b.days);
 
-    const used = new Set<string>();
-    return EXPIRATION_SLOTS.map(slot => {
-        const match = dated.find(
-            e => e.days >= slot.targetDays && !used.has(e.date)
-        );
-        if (!match) return null;
-        used.add(match.date);
-        return { slot, expirationDate: match.date };
-    });
+    // Slot count is bounded (EXPIRATION_SLOTS.length === 6) and each
+    // already-used date never re-enters consideration, so an immutable
+    // reduce with `[...used, match.date]` keeps the same once-per-slot
+    // semantics without any in-place mutation of a shared Set.
+    return EXPIRATION_SLOTS.reduce<
+        readonly [ReadonlyArray<SlotMapping | null>, ReadonlyArray<string>]
+    >(
+        ([mappings, used], slot) => {
+            const match = dated.find(
+                e => e.days >= slot.targetDays && !used.includes(e.date)
+            );
+            if (!match) return [[...mappings, null], used];
+            return [
+                [...mappings, { slot, expirationDate: match.date }],
+                [...used, match.date],
+            ];
+        },
+        [[], []]
+    )[0];
 }
 
 /**
@@ -102,13 +91,10 @@ function etCalendarParts(d: Date): {
     month: number;
     day: number;
 } {
-    let year = 0;
-    let month = 0;
-    let day = 0;
-    for (const part of ET_DATE_FORMATTER.formatToParts(d)) {
-        if (part.type === 'year') year = Number.parseInt(part.value, 10);
-        else if (part.type === 'month') month = Number.parseInt(part.value, 10);
-        else if (part.type === 'day') day = Number.parseInt(part.value, 10);
-    }
-    return { year, month, day };
+    const parts = ET_DATE_FORMATTER.formatToParts(d);
+    const part = (type: 'year' | 'month' | 'day'): number => {
+        const found = parts.find(p => p.type === type);
+        return found ? Number.parseInt(found.value, 10) : 0;
+    };
+    return { year: part('year'), month: part('month'), day: part('day') };
 }

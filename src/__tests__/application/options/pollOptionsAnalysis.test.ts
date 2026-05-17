@@ -11,7 +11,6 @@ import {
     getJobError,
     getJobResult,
     getJobMeta,
-    cleanupJob,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { fireAndForget, cleanupInBackground } from '@/application/background';
@@ -21,7 +20,6 @@ const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
 const mockGetJobResult = getJobResult as Mock;
 const mockGetJobMeta = getJobMeta as Mock;
-const mockCleanupJob = cleanupJob as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockFireAndForget = fireAndForget as Mock;
 const mockCleanupInBackground = cleanupInBackground as Mock;
@@ -54,7 +52,6 @@ describe('pollOptionsAnalysis 함수는', () => {
         vi.clearAllMocks();
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheSet.mockResolvedValue(undefined);
-        mockCleanupJob.mockResolvedValue(undefined);
         mockFireAndForget.mockImplementation(() => undefined);
         mockCleanupInBackground.mockImplementation(() => undefined);
     });

@@ -755,7 +755,7 @@ export type {
     WaitUntil,
 } from './domain/types';
 
-// Options analysis — domain types
+// Options analysis — domain types (including expiration slot types)
 export type {
     OptionsContract,
     OptionsChain,
@@ -768,19 +768,17 @@ export type {
     OptionsAnalysisResponse,
     OptionsTone,
     OptionsSignalKind,
+    ExpirationSlot,
+    SlotMapping,
 } from './domain/options/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
 export type { OptionsDataProvider } from './infrastructure/options/types';
 
-// Options analysis — expiration slot mapping
+// Options analysis — expiration slot mapping (values only; types above)
 export {
     EXPIRATION_SLOTS,
     mapExpirationsToSlots,
-} from './domain/options/expirationSlots';
-export type {
-    ExpirationSlot,
-    SlotMapping,
 } from './domain/options/expirationSlots';
 
 // Options analysis — aggregate entry point + the two consumer-facing

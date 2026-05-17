@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     EXPIRATION_SLOTS,
     mapExpirationsToSlots,
-    type SlotMapping,
 } from '@/domain/options/expirationSlots';
+import type { SlotMapping } from '@/domain/options/types';
 
 const isMapping = (x: SlotMapping | null): x is SlotMapping => x !== null;
 
