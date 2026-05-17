@@ -159,13 +159,20 @@ export interface RawOptionsAnalysisResponse {
 }
 
 /**
+ * Stable identifier for each canonical expiration chip slot. Six fixed
+ * tokens used both as React-tree keys (in consumer apps) and routing-
+ * friendly URL fragments.
+ */
+export type ExpirationSlotKey = '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
+
+/**
  * One canonical chip slot in the options expiration picker UI. The set is
  * fixed across the codebase — adding a slot here changes which chips the
  * frontend renders.
  */
 export interface ExpirationSlot {
     /** Stable identifier used as a routing-friendly token. */
-    key: '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
+    key: ExpirationSlotKey;
     /** Korean label shown to users (e.g., "1개월"). */
     label: string;
     /** Minimum days from today the chosen expiration must be at least. */

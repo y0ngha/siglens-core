@@ -769,6 +769,7 @@ export type {
     OptionsTone,
     OptionsSignalKind,
     ExpirationSlot,
+    ExpirationSlotKey,
     SlotMapping,
 } from './domain/options/types';
 

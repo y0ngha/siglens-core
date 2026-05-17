@@ -115,4 +115,30 @@ describe('normalizeOptionsAnalysisResponse', () => {
         const result = normalizeOptionsAnalysisResponse(raw, now);
         expect(result.summary).toBe('테스트');
     });
+
+    it('is idempotent — passing already-normalized result through again is a no-op', () => {
+        const raw = {
+            summary: '콜 옵션 OI가 높아 강세 포지셔닝이 확인됩니다.',
+            perExpiration: [
+                {
+                    expirationDate: '2026-06-20',
+                    commentary: '이 만기에서 콜 비중이 높습니다.',
+                    tone: 'bullish',
+                },
+            ],
+            signals: [
+                { kind: 'bullish', message: 'Put/Call 비율이 낮아 강세 신호.' },
+            ],
+            analyzedAt: '2026-05-14T10:00:00.000Z',
+        };
+        const first = normalizeOptionsAnalysisResponse(raw, now);
+        const second = normalizeOptionsAnalysisResponse(first, now);
+
+        expect(second.summary).toBe(first.summary);
+        expect(second.perExpiration).toEqual(first.perExpiration);
+        expect(second.signals).toEqual(first.signals);
+        // analyzedAt is a valid ISO on the first pass, so it must be
+        // preserved verbatim on the second.
+        expect(second.analyzedAt).toBe(first.analyzedAt);
+    });
 });

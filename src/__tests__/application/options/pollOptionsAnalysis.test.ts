@@ -14,7 +14,6 @@ import {
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { fireAndForget, cleanupInBackground } from '@/application/background';
-import { normalizeOptionsAnalysisResponse } from '@/domain/analysis/normalizeOptions';
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
@@ -225,21 +224,4 @@ describe('pollOptionsAnalysis 함수는', () => {
         });
     });
 
-    // ── 6. Idempotent re-normalize ─────────────────────────────────────────────
-
-    describe('idempotent re-normalize', () => {
-        it('normalize를 두 번 통과해도 동일한 결과를 반환한다', () => {
-            const rawParsed = JSON.parse(rawOptionsJson) as unknown;
-            const now = new Date('2026-05-14T12:00:00Z');
-            const first = normalizeOptionsAnalysisResponse(rawParsed, now);
-            const second = normalizeOptionsAnalysisResponse(first, now);
-
-            expect(second.summary).toBe(first.summary);
-            expect(second.perExpiration).toEqual(first.perExpiration);
-            expect(second.signals).toEqual(first.signals);
-            // analyzedAt may differ if first.analyzedAt is already valid ISO — it
-            // should be preserved on the second pass.
-            expect(second.analyzedAt).toBe(first.analyzedAt);
-        });
-    });
 });

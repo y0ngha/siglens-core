@@ -64,7 +64,8 @@ function hashOptionsInput(
 /**
  * Submit an options analysis job for the given symbol and expiration.
  *
- * Resolves to one of four outcomes:
+ * Resolves to one of six outcomes (the {@link SubmitOptionsAnalysisResult}
+ * discriminated union):
  * - `cached`: a recent analysis is reused (keyed by `symbol` + `expirationDate`
  *   + `modelId` + an input hash derived from the snapshot).
  * - `submitted`: the prompt was built, a `jobId` was registered, and a
@@ -73,16 +74,20 @@ function hashOptionsInput(
  * - `miss_no_trigger`: the cache missed but no job was enqueued because
  *   `options.skipEnqueueIfMiss` was set; no worker request is made. The
  *   consumer should render a fallback (typically used for bot/crawler gating).
- * - `error`: either no usable chains were found (`no_options_chains`), the
- *   daily analysis limit was exceeded (`usage_limit_exceeded`), or another
- *   gate blocked the submission.
+ * - `no_chains_error`: the snapshot contained no usable chains (every chain
+ *   was filtered by {@link sanitizeOptionsChain}, or the requested
+ *   `expirationDate` is absent).
+ * - `limit_error`: the per-tier daily analysis limit was exceeded
+ *   (`usage_limit_exceeded`).
+ * - `key_error`: BYOK is required for the requested tier × premium model
+ *   combination but `userApiKey` was not provided.
  *
  * Tier and usage checks are skipped entirely when `options.usage` or
  * `options.tier` is not provided — this is the intended pre-Phase 4 behavior.
  *
  * @param options - Symbol, expiration, model, snapshot, and optional
  *   tier/usage/timing config.
- * @returns The submission outcome.
+ * @returns The submission outcome — see {@link SubmitOptionsAnalysisResult}.
  *
  * @example
  * ```ts

@@ -1940,5 +1940,6 @@ export type {
     OptionsTone,
     OptionsSignalKind,
     ExpirationSlot,
+    ExpirationSlotKey,
     SlotMapping,
 } from './options/types';

@@ -85,11 +85,17 @@ const ET_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
 });
 
-function etCalendarParts(d: Date): {
+/**
+ * Numeric calendar parts (Y/M/D) of a given instant *as observed in
+ * America/New_York*. Used only by `daysBetween`.
+ */
+interface EtCalendarParts {
     year: number;
     month: number;
     day: number;
-} {
+}
+
+function etCalendarParts(d: Date): EtCalendarParts {
     const parts = ET_DATE_FORMATTER.formatToParts(d);
     const part = (type: 'year' | 'month' | 'day'): number => {
         const found = parts.find(p => p.type === type);
