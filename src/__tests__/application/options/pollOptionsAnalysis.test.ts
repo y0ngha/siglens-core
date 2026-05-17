@@ -223,5 +223,4 @@ describe('pollOptionsAnalysis 함수는', () => {
             warnSpy.mockRestore();
         });
     });
-
 });
