@@ -55,4 +55,15 @@ describe('mapExpirationsToSlots', () => {
         const filled = result.filter(isMapping);
         expect(filled).toHaveLength(1);
     });
+
+    it('past expirations (days < 0) are filtered out before slot matching', () => {
+        // now = 2026-05-14; 2026-05-01 is in the past, 2026-05-22 is +8d.
+        // Only the future expiration should populate the 1W slot.
+        const expirations = ['2026-05-01', '2026-05-22'];
+        const result = mapExpirationsToSlots(expirations, now);
+        const filled = result.filter(isMapping);
+        expect(filled).toHaveLength(1);
+        expect(filled[0]?.slot.key).toBe('1W');
+        expect(filled[0]?.expirationDate).toBe('2026-05-22');
+    });
 });

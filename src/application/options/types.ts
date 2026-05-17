@@ -37,9 +37,10 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
      */
     snapshot: OptionsSnapshot;
     /**
-     * Resolved subscription tier. Required when `usage` is also provided
-     * (enforces the daily analysis limit) or when a premium model is requested
-     * (BYOK requirement). Defaults to {@link DEFAULT_TIER} (`'free'`) when omitted.
+     * Resolved subscription tier. Must be provided when `usage` is also
+     * given (enforces the daily analysis limit) or when a premium model is
+     * requested (BYOK requirement). Defaults to {@link DEFAULT_TIER}
+     * (`'free'`) when omitted.
      */
     tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
@@ -52,7 +53,7 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     usage?: AnalysisUsageOptions;
     /** Reference timestamp for limit checks. Defaults to `new Date()`. */
     now?: Date;
-    /** BYOK API key. Required when a non-pro tier requests a premium model. */
+    /** BYOK API key. Must be provided when a non-pro tier requests a premium model. */
     userApiKey?: string;
     /**
      * When `true`, skip enqueueing on cache miss and return `miss_no_trigger`.

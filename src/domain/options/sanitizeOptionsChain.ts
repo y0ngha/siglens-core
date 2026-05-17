@@ -62,8 +62,7 @@ function filterValid(
 ): ReadonlyArray<OptionsContract> {
     const seen = new Set<number>();
     return contracts.filter(c => {
-        if (c.openInterest < 0) return false;
-        if (c.volume < 0) return false;
+        if (isInvalidContract(c)) return false;
         if (seen.has(c.strike)) return false;
         seen.add(c.strike);
         return true;

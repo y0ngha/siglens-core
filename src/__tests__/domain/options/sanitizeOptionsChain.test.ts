@@ -31,6 +31,22 @@ describe('sanitizeOptionsChain', () => {
         expect(result?.calls[0].strike).toBe(195);
     });
 
+    it('drops contracts with negative volume even when OI is non-negative', () => {
+        // openInterest≥0 but volume<0 → still invalid (separate filter branch).
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [
+                makeContract(195, 100, 0),
+                makeContract(200, 100, -1), // bad volume
+            ],
+            puts: [],
+        };
+        const result = sanitizeOptionsChain(chain);
+        expect(result?.calls).toHaveLength(1);
+        expect(result?.calls[0].strike).toBe(195);
+    });
+
     it('drops duplicate strikes (keeps first)', () => {
         const chain: OptionsChain = {
             expirationDate: '2026-05-22',

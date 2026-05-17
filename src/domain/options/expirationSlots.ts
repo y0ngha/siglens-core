@@ -32,25 +32,24 @@ export function mapExpirationsToSlots(
         .filter(e => e.days >= 0)
         .toSorted((a, b) => a.days - b.days);
 
-    // Slot count is bounded (EXPIRATION_SLOTS.length === 6) and each
-    // already-used date never re-enters consideration, so an immutable
-    // reduce with `[...used, match.date]` keeps the same once-per-slot
-    // semantics without any in-place mutation of a shared Set.
-    return EXPIRATION_SLOTS.reduce<
-        readonly [ReadonlyArray<SlotMapping | null>, ReadonlyArray<string>]
-    >(
-        ([mappings, used], slot) => {
-            const match = dated.find(
-                e => e.days >= slot.targetDays && !used.includes(e.date)
-            );
-            if (!match) return [[...mappings, null], used];
-            return [
-                [...mappings, { slot, expirationDate: match.date }],
-                [...used, match.date],
-            ];
-        },
-        [[], []]
-    )[0];
+    // Function-local mutable accumulators. The `mappings` array and `used`
+    // Set are scoped to this single call — no external observer sees them
+    // mid-build, so this is not a shared-mutation concern. Set lookup is
+    // O(1) per `find` predicate evaluation (vs O(N) for Array.includes).
+    const mappings: Array<SlotMapping | null> = [];
+    const used = new Set<string>();
+    for (const slot of EXPIRATION_SLOTS) {
+        const match = dated.find(
+            e => e.days >= slot.targetDays && !used.has(e.date)
+        );
+        if (!match) {
+            mappings.push(null);
+        } else {
+            mappings.push({ slot, expirationDate: match.date });
+            used.add(match.date);
+        }
+    }
+    return mappings;
 }
 
 /**

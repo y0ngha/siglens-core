@@ -211,11 +211,21 @@ export async function submitOptionsAnalysis(
     });
     const jobId = crypto.randomUUID();
 
-    await setJobMeta(jobId, {
-        symbol,
-        modelId,
-        cacheKey,
-    });
+    // Mirror the fail-open posture of the cache.get block above — if the
+    // job-meta store is unavailable the worker poll path can still resolve
+    // via the worker's own status, so a failure here should not abort the
+    // submit. The downside is that the cache-on-done write in
+    // pollOptionsAnalysis loses its key reference, which falls back to a
+    // miss on the next request — acceptable.
+    try {
+        await setJobMeta(jobId, {
+            symbol,
+            modelId,
+            cacheKey,
+        });
+    } catch (error) {
+        console.error('[submitOptionsAnalysis] setJobMeta failed:', error);
+    }
 
     const userApiKeyHeader: Record<string, string> =
         options.userApiKey !== undefined

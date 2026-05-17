@@ -13,6 +13,17 @@ import { CACHE_KEY_SCHEMA_VERSION } from '@/infrastructure/cache/config';
  * @param snapshotInputHash - Hash of the snapshot inputs — a fresher
  *   snapshot produces a different hash and therefore a new cache entry.
  * @returns Composite Redis key suitable for `cache.get` / `cache.set`.
+ *
+ * @example
+ * ```ts
+ * const key = buildOptionsCacheKey(
+ *     'AAPL',
+ *     '2026-06-20',
+ *     'gemini-2.5-flash',
+ *     hashAnalysisInput(JSON.stringify(snapshotDigest))
+ * );
+ * const cached = await cache.get<OptionsAnalysisResponse>(key);
+ * ```
  */
 export function buildOptionsCacheKey(
     symbol: string,
