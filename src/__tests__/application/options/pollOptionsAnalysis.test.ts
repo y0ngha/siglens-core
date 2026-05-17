@@ -146,6 +146,11 @@ describe('pollOptionsAnalysis 함수는', () => {
                 expect(result.result.perExpiration[0].tone).toBe('bullish');
                 expect(result.result.signals).toHaveLength(1);
             }
+            expect(mockCleanupInBackground).toHaveBeenCalledWith(
+                'job-done',
+                '[PollOptions]',
+                undefined
+            );
         });
 
         it('meta.cacheKey가 있으면 fireAndForget으로 캐시에 저장한다', async () => {

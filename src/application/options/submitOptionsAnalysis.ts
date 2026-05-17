@@ -89,7 +89,9 @@ function hashOptionsInput(
  * const res = await submitOptionsAnalysis({ symbol: 'AAPL', expirationDate: '2026-06-20', modelId: 'gemini-2.5-flash', snapshot });
  * if (res.status === 'cached') return res.result;
  * if (res.status === 'miss_no_trigger') return null; // bot/crawler fallback
- * if (res.status === 'error') return res.error;
+ * if (res.status === 'no_chains_error' || res.status === 'limit_error' || res.status === 'key_error') {
+ *     return res.error;
+ * }
  * const polled = await pollOptionsAnalysis(res.jobId);
  * ```
  *

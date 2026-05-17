@@ -51,7 +51,7 @@ export function mapExpirationsToSlots(
     const dated = expirations
         .map(d => ({ date: d, days: daysBetween(now, d) }))
         .filter(e => e.days >= 0)
-        .sort((a, b) => a.days - b.days);
+        .toSorted((a, b) => a.days - b.days);
 
     const used = new Set<string>();
     return EXPIRATION_SLOTS.map(slot => {

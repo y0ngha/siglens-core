@@ -2,17 +2,28 @@ import type { OptionsSnapshot } from '@/domain/options/types';
 
 /**
  * Provider contract for fetching options market data. Implementations live
- * in consumer projects (siglens injects YahooOptionsAdapter). Phase 1
- * keeps a single implementation; Tradier fallback is reserved for a
- * future Phase.
+ * in consumer projects and are injected at the application boundary; core
+ * does not bind to a specific data feed.
  *
- * A per-expiration chain fetcher is intentionally omitted — consumers
- * currently filter the full snapshot client-side via `pickActiveChain`.
- * Add `fetchChain` here in the PR that introduces a caller.
+ * The interface intentionally exposes only a full-snapshot fetcher plus a
+ * lightweight existence check. Per-expiration fetching is not part of the
+ * surface — consumers filter the snapshot client-side instead.
  */
 export interface OptionsDataProvider {
-    /** Full snapshot (all expirations) for a symbol. null when no options market. */
+    /**
+     * Fetch the full options snapshot (all expirations) for a symbol.
+     *
+     * @param symbol - Underlying ticker (uppercase, e.g. `'AAPL'`).
+     * @returns Full snapshot when an options market exists, or `null` when
+     *   the symbol has no listed options.
+     */
     fetchSnapshot(symbol: string): Promise<OptionsSnapshot | null>;
-    /** Fast existence check — does NOT fetch chain data. */
+    /**
+     * Lightweight existence check — does NOT fetch chain data.
+     *
+     * @param symbol - Underlying ticker (uppercase, e.g. `'AAPL'`).
+     * @returns `true` when the symbol has any listed options expiration,
+     *   `false` otherwise.
+     */
     hasOptionsMarket(symbol: string): Promise<boolean>;
 }

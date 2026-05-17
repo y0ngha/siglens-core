@@ -2,7 +2,11 @@ import { aggregateOpenInterest } from './aggregateOpenInterest';
 import { calculateImpliedMove } from './calculateImpliedMove';
 import { calculateMaxPain } from './calculateMaxPain';
 import { calculatePutCallRatio } from './calculatePutCallRatio';
-import type { OptionsChain, OptionsExpirationMetrics } from './types';
+import type {
+    OptionsChain,
+    OptionsContract,
+    OptionsExpirationMetrics,
+} from './types';
 
 /**
  * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
@@ -52,16 +56,10 @@ function pickAtmIv(
     // ATM proxy: contract with smallest |strike - anchor|. Prefer the real
     // underlying spot when provided; otherwise fall back to the median
     // strike (good enough for balanced chains).
-    let anchor: number;
-    if (
-        typeof underlyingPrice === 'number' &&
-        Number.isFinite(underlyingPrice)
-    ) {
-        anchor = underlyingPrice;
-    } else {
-        const strikes = all.map(c => c.strike).toSorted((a, b) => a - b);
-        anchor = strikes[Math.floor(strikes.length / 2)];
-    }
+    const anchor =
+        typeof underlyingPrice === 'number' && Number.isFinite(underlyingPrice)
+            ? underlyingPrice
+            : medianStrike(all);
 
     let best: { distance: number; iv: number } | null = null;
     for (const c of all) {
@@ -72,4 +70,9 @@ function pickAtmIv(
         }
     }
     return best?.iv ?? null;
+}
+
+function medianStrike(contracts: ReadonlyArray<OptionsContract>): number {
+    const strikes = contracts.map(c => c.strike).toSorted((a, b) => a - b);
+    return strikes[Math.floor(strikes.length / 2)];
 }

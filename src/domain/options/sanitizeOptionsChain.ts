@@ -12,13 +12,19 @@ const INVALID_RATIO_THRESHOLD = 0.05; // 5%
 const MIN_INVALID_TO_REJECT = 2;
 
 /**
- * @internal Drop malformed contracts (negative OI/volume, duplicate strikes). Returns
- * null when the chain is unreliable — that is, when invalid contracts
- * (negative OI/volume) on either side exceed both the absolute floor
- * (MIN_INVALID_TO_REJECT) and the 5% ratio threshold. Duplicate-strike
- * deduplication is always applied regardless of the chain's verdict, and
- * duplicates do NOT count toward the reject ratio (dedup is a normalization
- * concern, not a data-quality signal).
+ * Sanitize a raw options chain — drop malformed contracts and reject the
+ * chain entirely when the bad-data ratio is too high.
+ *
+ * The reject rule fires only when *both* conditions are met on at least one
+ * side (calls or puts):
+ * 1. invalid contract count ≥ `MIN_INVALID_TO_REJECT` (absolute floor that
+ *    prevents micro-cap chains with a single bad row from being discarded);
+ * 2. invalid / total > 5% (the ratio threshold).
+ *
+ * Invalid contracts are those with negative open-interest or negative
+ * volume. Duplicate-strike deduplication is always applied regardless of
+ * the chain's verdict, and duplicates do NOT count toward the reject ratio
+ * (dedup is a normalization concern, not a data-quality signal).
  *
  * @param chain - Raw provider chain that may include malformed rows.
  * @returns Sanitized chain when the data is trustworthy, or `null` when
