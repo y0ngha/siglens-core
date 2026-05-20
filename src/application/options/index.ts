@@ -11,4 +11,7 @@ export type {
     SubmitOptionsAnalysisNoChainsError,
     SubmitOptionsAnalysisApiKeyRequiredError,
     PollOptionsAnalysisResult,
+    PollOptionsAnalysisProcessing,
+    PollOptionsAnalysisDone,
+    PollOptionsAnalysisError,
 } from './types';

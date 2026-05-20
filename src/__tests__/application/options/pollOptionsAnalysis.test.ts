@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/cache/redis');
@@ -74,6 +74,18 @@ describe('pollOptionsAnalysis 함수는', () => {
     // ── 2. Error from worker ───────────────────────────────────────────────────
 
     describe('status가 error일 때', () => {
+        let errorSpy: ReturnType<typeof vi.spyOn>;
+        beforeEach(() => {
+            // Production code logs to console.error on both worker-failure
+            // and missing-result paths; silence to keep test output clean.
+            errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+        });
+        afterEach(() => {
+            errorSpy.mockRestore();
+        });
+
         it('getJobError를 호출하고 error 상태를 반환한다', async () => {
             mockGetJobStatus.mockResolvedValueOnce('error');
             mockGetJobError.mockResolvedValueOnce('LLM timeout');
@@ -107,9 +119,17 @@ describe('pollOptionsAnalysis 함수는', () => {
     // ── 3. Done + success ──────────────────────────────────────────────────────
 
     describe('status가 done일 때', () => {
+        let errorSpy: ReturnType<typeof vi.spyOn>;
         beforeEach(() => {
             mockGetJobStatus.mockResolvedValue('done');
             mockGetJobMeta.mockResolvedValue(mockMeta);
+            // Production code logs to console.error when result is missing.
+            errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+        });
+        afterEach(() => {
+            errorSpy.mockRestore();
         });
 
         it('결과가 없으면 error를 반환하고 cleanup을 호출한다', async () => {

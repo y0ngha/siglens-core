@@ -1938,7 +1938,6 @@ export type {
     OptionsSnapshot,
     StrikeOpenInterest,
     OptionsExpirationMetrics,
-    OptionsSymbolMetrics,
     OptionsPerExpirationCommentary,
     OptionsSignal,
     OptionsAnalysisResponse,

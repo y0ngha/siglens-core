@@ -55,11 +55,13 @@ function pickAtmIv(
     if (all.length === 0) return null;
     // ATM proxy: contract with smallest |strike - anchor|. Prefer the real
     // underlying spot when provided; otherwise fall back to the median
-    // strike (good enough for balanced chains).
+    // strike (good enough for balanced chains). `medianStrike` returns
+    // `undefined` only when its input array is empty; we've already returned
+    // for that case above, so the result is guaranteed defined here.
     const anchor =
         typeof underlyingPrice === 'number' && Number.isFinite(underlyingPrice)
             ? underlyingPrice
-            : medianStrike(all);
+            : (medianStrike(all) as number);
 
     const best = all.reduce<{ distance: number; iv: number } | null>(
         (acc, c) => {
@@ -74,7 +76,10 @@ function pickAtmIv(
     return best?.iv ?? null;
 }
 
-function medianStrike(contracts: ReadonlyArray<OptionsContract>): number {
+function medianStrike(
+    contracts: ReadonlyArray<OptionsContract>
+): number | undefined {
+    if (contracts.length === 0) return undefined;
     const strikes = contracts.map(c => c.strike).toSorted((a, b) => a - b);
     return strikes[Math.floor(strikes.length / 2)];
 }

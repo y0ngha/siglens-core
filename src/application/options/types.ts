@@ -123,8 +123,25 @@ export type SubmitOptionsAnalysisResult =
 // Poll Options Analysis
 // ─────────────────────────────────────────
 
+/** Worker has not finished yet — caller should retry. */
+export interface PollOptionsAnalysisProcessing {
+    status: 'processing';
+}
+
+/** Worker finished successfully — `result` is the normalized analysis. */
+export interface PollOptionsAnalysisDone {
+    status: 'done';
+    result: OptionsAnalysisResponse;
+}
+
+/** Worker reported a failure, result missing, or normalization failed. */
+export interface PollOptionsAnalysisError {
+    status: 'error';
+    error: string;
+}
+
 /** Outcome of `pollOptionsAnalysis`: still processing, finished, or errored. */
 export type PollOptionsAnalysisResult =
-    | { status: 'processing' }
-    | { status: 'done'; result: OptionsAnalysisResponse }
-    | { status: 'error'; error: string };
+    | PollOptionsAnalysisProcessing
+    | PollOptionsAnalysisDone
+    | PollOptionsAnalysisError;

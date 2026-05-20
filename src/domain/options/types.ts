@@ -94,8 +94,10 @@ export interface OptionsExpirationMetrics {
 }
 
 /**
- * Symbol-level aggregated metrics — the cross-expiration view consumed by
- * dashboards.
+ * @internal Symbol-level aggregated metrics — the cross-expiration view
+ * intended for future dashboards. Not currently returned or consumed by any
+ * exported function; kept here so the cross-expiration shape is captured in
+ * one place. Promote to a public export when a consumer materializes.
  */
 export interface OptionsSymbolMetrics {
     /** Underlying ticker. */

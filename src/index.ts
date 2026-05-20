@@ -765,7 +765,6 @@ export type {
     OptionsSnapshot,
     StrikeOpenInterest,
     OptionsExpirationMetrics,
-    OptionsSymbolMetrics,
     OptionsPerExpirationCommentary,
     OptionsSignal,
     OptionsAnalysisResponse,
@@ -828,4 +827,7 @@ export type {
     SubmitOptionsAnalysisNoChainsError,
     SubmitOptionsAnalysisApiKeyRequiredError,
     PollOptionsAnalysisResult,
+    PollOptionsAnalysisProcessing,
+    PollOptionsAnalysisDone,
+    PollOptionsAnalysisError,
 } from './application/options';
