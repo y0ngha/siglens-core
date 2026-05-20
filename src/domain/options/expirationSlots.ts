@@ -100,9 +100,20 @@ interface EtCalendarParts {
 
 function etCalendarParts(d: Date): EtCalendarParts {
     const parts = ET_DATE_FORMATTER.formatToParts(d);
-    const part = (type: 'year' | 'month' | 'day'): number => {
-        const found = parts.find(p => p.type === type);
-        return found ? Number.parseInt(found.value, 10) : 0;
+    return {
+        year: extractDatePart(parts, 'year'),
+        month: extractDatePart(parts, 'month'),
+        day: extractDatePart(parts, 'day'),
     };
-    return { year: part('year'), month: part('month'), day: part('day') };
+}
+
+function extractDatePart(
+    parts: Intl.DateTimeFormatPart[],
+    type: 'year' | 'month' | 'day'
+): number {
+    // Intl.DateTimeFormat configured with { year, month, day } always emits
+    // these three parts for any valid Date, so `.find()` is guaranteed to
+    // return a defined entry.
+    const found = parts.find(p => p.type === type)!;
+    return Number.parseInt(found.value, 10);
 }

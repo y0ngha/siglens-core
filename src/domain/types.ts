@@ -1927,6 +1927,10 @@ export type CurrentAnalysisContext =
     | { kind: 'overall'; payload: OverallAnalysisResponse };
 
 // --- Options Analysis Types ---
+// 15+ options domain types live in ./options/types and are re-exported here so
+// consumers can keep using the canonical `@/domain/types` import path.
+// ARCHITECTURE.md's type-placement rule allows this subdirectory pattern for
+// cohesive feature areas (in lieu of inflating this barrel further).
 export type {
     BuildOptionsAnalysisPromptOptions,
     OptionsContract,

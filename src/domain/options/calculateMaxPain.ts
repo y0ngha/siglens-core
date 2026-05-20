@@ -25,26 +25,25 @@ export function calculateMaxPain(chain: OptionsChain): number | null {
 
     if (strikes.length === 0) return null;
 
-    let minPain = Number.POSITIVE_INFINITY;
-    let minPainStrike = strikes[0];
+    const computePain = (candidate: number): number =>
+        chain.calls.reduce(
+            (s, c) =>
+                candidate > c.strike
+                    ? s + (candidate - c.strike) * c.openInterest
+                    : s,
+            0
+        ) +
+        chain.puts.reduce(
+            (s, p) =>
+                candidate < p.strike
+                    ? s + (p.strike - candidate) * p.openInterest
+                    : s,
+            0
+        );
 
-    for (const candidate of strikes) {
-        let pain = 0;
-        for (const c of chain.calls) {
-            if (candidate > c.strike) {
-                pain += (candidate - c.strike) * c.openInterest;
-            }
-        }
-        for (const p of chain.puts) {
-            if (candidate < p.strike) {
-                pain += (p.strike - candidate) * p.openInterest;
-            }
-        }
-        if (pain < minPain) {
-            minPain = pain;
-            minPainStrike = candidate;
-        }
-    }
+    const { strike: minPainStrike } = strikes
+        .map(s => ({ strike: s, pain: computePain(s) }))
+        .reduce((best, cur) => (cur.pain < best.pain ? cur : best));
 
     return minPainStrike;
 }

@@ -61,14 +61,16 @@ function pickAtmIv(
             ? underlyingPrice
             : medianStrike(all);
 
-    let best: { distance: number; iv: number } | null = null;
-    for (const c of all) {
-        if (c.impliedVolatility === null) continue;
-        const distance = Math.abs(c.strike - anchor);
-        if (best === null || distance < best.distance) {
-            best = { distance, iv: c.impliedVolatility };
-        }
-    }
+    const best = all.reduce<{ distance: number; iv: number } | null>(
+        (acc, c) => {
+            if (c.impliedVolatility === null) return acc;
+            const distance = Math.abs(c.strike - anchor);
+            return acc === null || distance < acc.distance
+                ? { distance, iv: c.impliedVolatility }
+                : acc;
+        },
+        null
+    );
     return best?.iv ?? null;
 }
 
