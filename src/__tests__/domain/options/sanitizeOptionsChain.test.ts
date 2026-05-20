@@ -112,4 +112,21 @@ describe('sanitizeOptionsChain', () => {
         expect(result).not.toBeNull();
         expect(result?.calls).toHaveLength(2);
     });
+
+    it('rejects entire chain when >5% of puts are invalid (puts-side branch)', () => {
+        // Mirrors the calls-side rejection rule on the puts branch — covers
+        // the `shouldReject(invalidPuts, totalPuts)` guard. 2/3 > 5% and
+        // invalidCount (2) ≥ MIN_INVALID_TO_REJECT.
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [makeContract(190, 100)],
+            puts: [
+                makeContract(195, 100),
+                makeContract(200, -1), // invalid
+                makeContract(205, -2), // invalid (2/3 > 5%)
+            ],
+        };
+        expect(sanitizeOptionsChain(chain)).toBeNull();
+    });
 });

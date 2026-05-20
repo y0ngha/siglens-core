@@ -29,7 +29,7 @@ describe('aggregateOpenInterest', () => {
         ]);
     });
 
-    it('fills 0 for missing side', () => {
+    it('fills 0 for missing puts side', () => {
         const chain: OptionsChain = {
             expirationDate: '2026-05-22',
             daysToExpiration: 8,
@@ -39,6 +39,21 @@ describe('aggregateOpenInterest', () => {
         const result = aggregateOpenInterest(chain);
         expect(result).toEqual([
             { strike: 200, callOpenInterest: 100, putOpenInterest: 0 },
+        ]);
+    });
+
+    it('fills 0 for missing calls side (puts-only strike)', () => {
+        // Covers the puts loop branch where `prev` is undefined for a strike
+        // that has no calls — `prev?.callOpenInterest ?? 0` evaluates to 0.
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [],
+            puts: [makeContract(200, 150)],
+        };
+        const result = aggregateOpenInterest(chain);
+        expect(result).toEqual([
+            { strike: 200, callOpenInterest: 0, putOpenInterest: 150 },
         ]);
     });
 

@@ -68,6 +68,26 @@ describe('summarizeChainForLlm', () => {
         );
     });
 
+    it('falls back to median strike when underlyingPrice is NaN', () => {
+        // Covers the `Number.isFinite(underlyingPrice)` guard: NaN passes the
+        // typeof check but fails isFinite, so pickAtmIv must fall back to the
+        // median strike rather than anchoring on NaN.
+        const c: OptionsChain = {
+            expirationDate: '2026-06-20',
+            daysToExpiration: 30,
+            calls: [
+                contract(100, 0.5, 50, 0, 'call'),
+                contract(150, 0.3, 50, 0, 'call'),
+                contract(200, 0.5, 50, 0, 'call'),
+            ],
+            puts: [],
+        };
+        expect(summarizeChainForLlm(c, NaN).atmImpliedVolatility).toBeCloseTo(
+            0.3,
+            5
+        );
+    });
+
     it('returns null ATM IV for an empty chain', () => {
         const c: OptionsChain = {
             expirationDate: '2026-06-20',

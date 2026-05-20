@@ -33,19 +33,26 @@ export function mapExpirationsToSlots(
         .toSorted((a, b) => a.days - b.days);
 
     // `used` is a function-local Set — no external observer sees it mid-
-    // build, so the `used.add` side effect inside `.map` is contained to
-    // this call. The alternative (rebuilding an immutable Set per slot)
-    // would be O(N²) for no readability gain. Set lookup is O(1) per
-    // `find` predicate evaluation (vs O(N) for Array.includes).
+    // build. Using a for-of with pre-allocated result keeps the mutation
+    // and the array build co-located instead of mixing a `.map` callback
+    // with `used.add` side effects. The alternative (rebuilding an
+    // immutable Set per slot) would be O(N²) for no readability gain. Set
+    // lookup is O(1) per `find` predicate evaluation (vs O(N) for
+    // Array.includes).
     const used = new Set<string>();
-    return EXPIRATION_SLOTS.map(slot => {
+    const result: (SlotMapping | null)[] = [];
+    for (const slot of EXPIRATION_SLOTS) {
         const match = dated.find(
             e => e.days >= slot.targetDays && !used.has(e.date)
         );
-        if (!match) return null;
+        if (!match) {
+            result.push(null);
+            continue;
+        }
         used.add(match.date);
-        return { slot, expirationDate: match.date };
-    });
+        result.push({ slot, expirationDate: match.date });
+    }
+    return result;
 }
 
 /**
