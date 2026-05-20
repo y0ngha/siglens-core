@@ -1928,6 +1928,7 @@ export type CurrentAnalysisContext =
 
 // --- Options Analysis Types ---
 export type {
+    BuildOptionsAnalysisPromptOptions,
     OptionsContract,
     OptionsChain,
     OptionsSnapshot,

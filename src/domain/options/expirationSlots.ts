@@ -32,24 +32,20 @@ export function mapExpirationsToSlots(
         .filter(e => e.days >= 0)
         .toSorted((a, b) => a.days - b.days);
 
-    // Function-local mutable accumulators. The `mappings` array and `used`
-    // Set are scoped to this single call — no external observer sees them
-    // mid-build, so this is not a shared-mutation concern. Set lookup is
-    // O(1) per `find` predicate evaluation (vs O(N) for Array.includes).
-    const mappings: Array<SlotMapping | null> = [];
+    // `used` is a function-local Set — no external observer sees it mid-
+    // build, so the `used.add` side effect inside `.map` is contained to
+    // this call. The alternative (rebuilding an immutable Set per slot)
+    // would be O(N²) for no readability gain. Set lookup is O(1) per
+    // `find` predicate evaluation (vs O(N) for Array.includes).
     const used = new Set<string>();
-    for (const slot of EXPIRATION_SLOTS) {
+    return EXPIRATION_SLOTS.map(slot => {
         const match = dated.find(
             e => e.days >= slot.targetDays && !used.has(e.date)
         );
-        if (!match) {
-            mappings.push(null);
-        } else {
-            mappings.push({ slot, expirationDate: match.date });
-            used.add(match.date);
-        }
-    }
-    return mappings;
+        if (!match) return null;
+        used.add(match.date);
+        return { slot, expirationDate: match.date };
+    });
 }
 
 /**

@@ -70,10 +70,21 @@ export interface StrikeOpenInterest {
 export interface OptionsExpirationMetrics {
     /** Expiration date in ISO `'YYYY-MM-DD'` form. */
     expirationDate: string;
-    /** Strike at which total options-writer payoff is minimized (USD). */
-    maxPain: number;
-    /** `sum(put OI) / sum(call OI)`. */
-    putCallRatio: number;
+    /**
+     * Strike at which total options-writer payoff is minimized (USD).
+     * `null` when the chain has no contracts on either side (no strikes to
+     * evaluate). Never `NaN` — callers can safely `JSON.stringify` this field
+     * without producing the misleading literal `null` from a `NaN` value.
+     */
+    maxPain: number | null;
+    /**
+     * `sum(put OI) / sum(call OI)`. `null` when call OI is 0 (ratio is
+     * mathematically undefined) or when both sides have zero OI (nothing to
+     * report). Never `+Infinity` — callers can safely `JSON.stringify` this
+     * field without producing the misleading literal `null` from an
+     * `Infinity` value.
+     */
+    putCallRatio: number | null;
     /** ATM IV as fraction (e.g., 0.28). null if unavailable. */
     atmImpliedVolatility: number | null;
     /** Top 3 strikes by combined OI, sorted descending. */
@@ -84,13 +95,11 @@ export interface OptionsExpirationMetrics {
 
 /**
  * Symbol-level aggregated metrics — the cross-expiration view consumed by
- * dashboards. `ivRank` is reserved for the historical-IV phase.
+ * dashboards.
  */
 export interface OptionsSymbolMetrics {
     /** Underlying ticker. */
     symbol: string;
-    /** 0–100 percentile rank of ATM IV over the trailing window. Phase 1 returns null. */
-    ivRank: number | null;
     /** Per-expiration metrics, ordered the same as the source snapshot. */
     perExpiration: ReadonlyArray<OptionsExpirationMetrics>;
     /** Source snapshot timestamp (ISO datetime). */
@@ -185,4 +194,17 @@ export interface SlotMapping {
     slot: ExpirationSlot;
     /** Provider expiration date in ISO `'YYYY-MM-DD'` form. */
     expirationDate: string;
+}
+
+/**
+ * Input options for `buildOptionsAnalysisPrompt`.
+ *
+ * Exported as part of the Tier 4 public API so consumers can type-annotate
+ * inputs and adapt to schema changes without inference chains.
+ */
+export interface BuildOptionsAnalysisPromptOptions {
+    /** Specific expiration ('YYYY-MM-DD') or 'all' for aggregated analysis. */
+    expirationDate: string | 'all';
+    companyName: string;
+    snapshot: OptionsSnapshot;
 }

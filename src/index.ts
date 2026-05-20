@@ -776,14 +776,18 @@ export type {
 // Options analysis — provider interface (implementation injected by consumer)
 export type { OptionsDataProvider } from './infrastructure/options/types';
 
-// Options analysis — expiration slot mapping (values only; types above)
-export {
-    EXPIRATION_SLOTS,
-    mapExpirationsToSlots,
-} from './domain/options/expirationSlots';
+// Options analysis — Tier 4 constant (canonical chip slot table consumed by
+// frontends for rendering and routing).
+export { EXPIRATION_SLOTS } from './domain/options/expirationSlots';
 
-// Options analysis — aggregate entry point + the two consumer-facing
-// utilities that have no good substitute on the aggregate:
+// Options analysis — Tier 4 prompt-input type (allows consumers to type-
+// annotate inputs to `buildOptionsAnalysisPrompt`).
+export type { BuildOptionsAnalysisPromptOptions } from './domain/options/types';
+
+// --- Tier 2 — Options domain functions ---
+//
+// Aggregate entry point + the consumer-facing utilities that have no good
+// substitute on the aggregate:
 //
 //   - summarizeChainForLlm: the canonical metrics entry point. Reads
 //     summarize().maxPain / .putCallRatio / .impliedMovePercent /
@@ -793,6 +797,8 @@ export {
 //     distribution).
 //   - sanitizeOptionsChain: chain-level data-quality gate called by
 //     OptionsDataProvider implementations (which live in consumer apps).
+//   - mapExpirationsToSlots: pairs provider expirations to the EXPIRATION_SLOTS
+//     chip table.
 //
 // The individual `calculate*` helpers stay internal — consumers should read
 // the derived fields from OptionsExpirationMetrics rather than re-running
@@ -800,11 +806,11 @@ export {
 export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
+export { mapExpirationsToSlots } from './domain/options/expirationSlots';
 
 // Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
 export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
 export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
-export type { BuildOptionsAnalysisPromptOptions } from './domain/options/optionsPrompt';
 
 // Options analysis — application use-cases (submit + poll, cache key builder)
 export {

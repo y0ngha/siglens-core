@@ -10,9 +10,12 @@ import type { OptionsChain } from './types';
  * Implementation detail consumed by {@link summarizeChainForLlm}.
  *
  * @param chain - The options chain for a single expiration.
- * @returns The max pain strike, or NaN if the chain has no contracts.
+ * @returns The max pain strike, or `null` when the chain has no contracts on
+ *   either side. `null` (rather than `NaN`) keeps `JSON.stringify` honest
+ *   when the metric flows into LLM prompts — `JSON.stringify(NaN)` produces
+ *   the literal `"null"`, which the model would misread as a valid value.
  */
-export function calculateMaxPain(chain: OptionsChain): number {
+export function calculateMaxPain(chain: OptionsChain): number | null {
     const strikes = Array.from(
         new Set([
             ...chain.calls.map(c => c.strike),
@@ -20,7 +23,7 @@ export function calculateMaxPain(chain: OptionsChain): number {
         ])
     ).toSorted((a, b) => a - b);
 
-    if (strikes.length === 0) return Number.NaN;
+    if (strikes.length === 0) return null;
 
     let minPain = Number.POSITIVE_INFINITY;
     let minPainStrike = strikes[0];

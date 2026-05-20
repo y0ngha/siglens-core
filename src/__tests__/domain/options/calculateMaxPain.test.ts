@@ -111,13 +111,26 @@ describe('calculateMaxPain', () => {
         expect(result).toBe(200);
     });
 
-    it('returns NaN for empty chain', () => {
+    it('returns null for empty chain', () => {
         const result = calculateMaxPain({
             expirationDate: '2026-05-22',
             daysToExpiration: 8,
             calls: [],
             puts: [],
         });
-        expect(Number.isNaN(result)).toBe(true);
+        expect(result).toBeNull();
+    });
+
+    it('JSON.stringify of null result yields "null" literal (not number)', () => {
+        // Regression guard: NaN also stringifies to "null", but explicit
+        // null keeps semantics honest. Tests that consumers can safely
+        // round-trip the metric through JSON.
+        const result = calculateMaxPain({
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [],
+            puts: [],
+        });
+        expect(JSON.stringify(result)).toBe('null');
     });
 });

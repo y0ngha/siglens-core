@@ -1,18 +1,5 @@
-import type { OptionsSnapshot } from './types';
+import type { BuildOptionsAnalysisPromptOptions } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
-
-/**
- * Input options for {@link buildOptionsAnalysisPrompt}.
- *
- * Exported as part of the Tier 4 public API so consumers can type-annotate
- * inputs and adapt to schema changes without inference chains.
- */
-export interface BuildOptionsAnalysisPromptOptions {
-    /** Specific expiration ('YYYY-MM-DD') or 'all' for aggregated analysis. */
-    expirationDate: string | 'all';
-    companyName: string;
-    snapshot: OptionsSnapshot;
-}
 
 /**
  * Build the LLM prompt for options analysis. The prompt requests a JSON
