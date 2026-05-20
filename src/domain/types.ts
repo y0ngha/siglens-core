@@ -1947,4 +1947,5 @@ export type {
     ExpirationSlot,
     ExpirationSlotKey,
     SlotMapping,
+    OptionsExpirationFilter,
 } from './options/types';

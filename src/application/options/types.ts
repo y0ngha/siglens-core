@@ -7,6 +7,7 @@ import type {
 import type {
     ModelId,
     OptionsAnalysisResponse,
+    OptionsExpirationFilter,
     OptionsSnapshot,
     Tier,
     TierConfig,
@@ -23,11 +24,12 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     /** Company display name for the prompt. Defaults to `symbol` when omitted. */
     companyName?: string;
     /**
-     * Target expiration. `"YYYY-MM-DD"` selects a single expiration; `"all"`
-     * aggregates every expiration in the snapshot (per-chain summaries only,
-     * never the full chain, to keep prompt tokens bounded).
+     * Target expiration — see {@link OptionsExpirationFilter}. `'YYYY-MM-DD'`
+     * selects a single expiration; `'all'` aggregates every expiration in the
+     * snapshot (per-chain summaries only, never the full chain, to keep
+     * prompt tokens bounded).
      */
-    expirationDate: string | 'all';
+    expirationDate: OptionsExpirationFilter;
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;
     /**

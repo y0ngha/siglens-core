@@ -215,7 +215,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
 
-**옵션 분석 헬퍼 (5 + 2 상수)**
+**옵션 분석 헬퍼 (4 + 1 상수)**
 | Symbol | Source |
 |---|---|
 | `summarizeChainForLlm` | `domain/options/summarizeChainForLlm.ts` |

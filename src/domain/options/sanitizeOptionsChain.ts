@@ -60,6 +60,10 @@ function shouldReject(invalidCount: number, totalCount: number): boolean {
 function filterValid(
     contracts: ReadonlyArray<OptionsContract>
 ): ReadonlyArray<OptionsContract> {
+    // `valid` is a function-local accumulator. A purely declarative
+    // `reduce(...spread, ...)` here would be O(N²) since each step rebuilds
+    // the result array. `valid.push` keeps the iteration O(N) and the
+    // mutation never escapes this function.
     const seen = new Set<number>();
     const valid: OptionsContract[] = [];
     for (const c of contracts) {

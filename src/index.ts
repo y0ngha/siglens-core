@@ -774,6 +774,7 @@ export type {
     ExpirationSlot,
     ExpirationSlotKey,
     SlotMapping,
+    OptionsExpirationFilter,
 } from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)

@@ -381,6 +381,23 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(body.tier).toBe('free');
         });
 
+        it('setJobMeta가 실패해도 submitted를 반환한다 (fail-open)', async () => {
+            mockSetJobMeta.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+            });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+            }
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
+
         it('setJobMeta에 symbol, modelId, cacheKey를 전달한다', async () => {
             const result = await submitOptionsAnalysis({
                 symbol: 'AAPL',

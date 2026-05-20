@@ -21,7 +21,11 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { sanitizeOptionsChain } from '@/domain/options/sanitizeOptionsChain';
-import type { OptionsAnalysisResponse, OptionsSnapshot } from '@/domain/types';
+import type {
+    OptionsAnalysisResponse,
+    OptionsExpirationFilter,
+    OptionsSnapshot,
+} from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the options analysis job. */
 const SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -42,7 +46,7 @@ const SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  */
 function hashOptionsInput(
     snapshot: OptionsSnapshot,
-    expirationDate: string | 'all'
+    expirationDate: OptionsExpirationFilter
 ): string {
     return hashAnalysisInput(
         JSON.stringify({

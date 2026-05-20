@@ -32,15 +32,16 @@ import {
  * never throws — every field has a fallback. A `console.warn` is emitted when
  * heuristic empty-field checks fire (summary blank, no expirations, no signals).
  *
- * Cancel-after-poll: a successful {@link cancelOptionsAnalysisJob} call does
- * NOT immediately flip the job status. This function will keep returning
- * `processing` until the worker observes the cancel signal on its next
- * `isJobCancelled` check and self-transitions. Bound your retry loop with
- * a caller-side timeout to avoid polling indefinitely against a dead worker.
+ * Options analysis intentionally does not expose a `cancel` use-case. The
+ * submit/poll lifecycle is bounded by the worker timeout, and the front-end
+ * pageHide flow cleans the Redis job state on its own; adding a cancel
+ * surface would be YAGNI for the current consumers.
  *
  * @param jobId - The `jobId` returned by {@link submitOptionsAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
  *   so Redis cleanup and cache writes can continue after the response.
+ * @param now - Reference timestamp injected into the normalizer's
+ *   `analyzedAt` fallback. Defaults to `new Date()`.
  * @returns The current poll outcome — see {@link PollOptionsAnalysisResult}.
  *
  * @example
@@ -55,7 +56,8 @@ import {
  */
 export async function pollOptionsAnalysis(
     jobId: string,
-    options?: BackgroundTaskOptions & { now?: Date }
+    options?: BackgroundTaskOptions,
+    now?: Date
 ): Promise<PollOptionsAnalysisResult> {
     const status = await getJobStatus(jobId);
 
@@ -90,7 +92,7 @@ export async function pollOptionsAnalysis(
     // normalizeOptionsAnalysisResponse never throws — every field has a fallback.
     const result: OptionsAnalysisResponse = normalizeOptionsAnalysisResponse(
         rawResult,
-        options?.now ?? new Date()
+        now ?? new Date()
     );
 
     if (

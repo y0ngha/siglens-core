@@ -203,10 +203,22 @@ export interface SlotMapping {
  * inputs and adapt to schema changes without inference chains.
  */
 export interface BuildOptionsAnalysisPromptOptions {
-    /** Specific expiration ('YYYY-MM-DD') or 'all' for aggregated analysis. */
-    expirationDate: string | 'all';
+    /** Target expiration filter — see {@link OptionsExpirationFilter}. */
+    expirationDate: OptionsExpirationFilter;
     /** Company display name injected into the prompt header. */
     companyName: string;
     /** Pre-fetched options snapshot passed in by the caller. */
     snapshot: OptionsSnapshot;
 }
+
+/**
+ * Expiration filter accepted by options analysis use-cases. `'YYYY-MM-DD'`
+ * selects a single expiration; `'all'` aggregates every expiration in the
+ * snapshot.
+ *
+ * Note: TypeScript treats `string | 'all'` as identical to `string`, so the
+ * `'all'` literal is documentary rather than enforced. The named alias keeps
+ * the intent visible at the call sites and serves as the single source of
+ * truth across submit/poll/prompt-builder signatures.
+ */
+export type OptionsExpirationFilter = string | 'all';

@@ -41,6 +41,10 @@ export function calculateMaxPain(chain: OptionsChain): number | null {
             0
         );
 
+    // `reduce` without an initial value is safe here — `strikes.length === 0`
+    // is rejected by the guard above, so the array is guaranteed non-empty.
+    // Do NOT add `, { pain: Infinity, strike: 0 }` as a "safety" seed — that
+    // would silently produce strike `0` if the guard ever regressed.
     const { strike: minPainStrike } = strikes
         .map(s => ({ strike: s, pain: computePain(s) }))
         .reduce((best, cur) => (cur.pain < best.pain ? cur : best));
