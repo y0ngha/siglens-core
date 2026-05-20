@@ -61,10 +61,11 @@ function filterValid(
     contracts: ReadonlyArray<OptionsContract>
 ): ReadonlyArray<OptionsContract> {
     const seen = new Set<number>();
-    return contracts.filter(c => {
-        if (isInvalidContract(c)) return false;
-        if (seen.has(c.strike)) return false;
+    const valid: OptionsContract[] = [];
+    for (const c of contracts) {
+        if (isInvalidContract(c) || seen.has(c.strike)) continue;
         seen.add(c.strike);
-        return true;
-    });
+        valid.push(c);
+    }
+    return valid;
 }

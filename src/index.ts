@@ -804,6 +804,7 @@ export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
 // Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
 export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
 export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
+export type { BuildOptionsAnalysisPromptOptions } from './domain/options/optionsPrompt';
 
 // Options analysis — application use-cases (submit + poll, cache key builder)
 export {

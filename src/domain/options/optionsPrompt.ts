@@ -1,7 +1,13 @@
 import type { OptionsSnapshot } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
 
-interface BuildOptionsAnalysisPromptOptions {
+/**
+ * Input options for {@link buildOptionsAnalysisPrompt}.
+ *
+ * Exported as part of the Tier 4 public API so consumers can type-annotate
+ * inputs and adapt to schema changes without inference chains.
+ */
+export interface BuildOptionsAnalysisPromptOptions {
     /** Specific expiration ('YYYY-MM-DD') or 'all' for aggregated analysis. */
     expirationDate: string | 'all';
     companyName: string;
