@@ -205,6 +205,8 @@ export interface SlotMapping {
 export interface BuildOptionsAnalysisPromptOptions {
     /** Specific expiration ('YYYY-MM-DD') or 'all' for aggregated analysis. */
     expirationDate: string | 'all';
+    /** Company display name injected into the prompt header. */
     companyName: string;
+    /** Pre-fetched options snapshot passed in by the caller. */
     snapshot: OptionsSnapshot;
 }

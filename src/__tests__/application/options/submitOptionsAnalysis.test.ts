@@ -145,6 +145,38 @@ const mockCachedResult = {
     analyzedAt: '2026-05-14T10:00:00Z',
 };
 
+/**
+ * Shared tier config for usage-limit tests — free tier capped at 1 analysis/day,
+ * member/pro unlimited. Used by both the cache-hit bypass test and the
+ * exhausted-quota error test to exercise the same gating logic.
+ */
+const RESTRICTED_TIER_CONFIG: TierConfig = {
+    limits: {
+        analysisPerDay: {
+            free: 1,
+            member: Infinity,
+            pro: Infinity,
+        },
+        chatbotPerDay: {
+            free: Infinity,
+            member: Infinity,
+            pro: Infinity,
+        },
+    },
+    timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
+    infoDepth: {
+        free: ['summary'],
+        member: ['summary'],
+        pro: ['summary'],
+    },
+    models: {
+        free: ['gemini-2.5-flash'],
+        member: ['gemini-2.5-flash'],
+        pro: ['gemini-2.5-flash'],
+    },
+    featureFlags: { enableTierRestrictions: true },
+};
+
 describe('submitOptionsAnalysis 함수는', () => {
     const originalEnv = process.env;
 
@@ -214,40 +246,13 @@ describe('submitOptionsAnalysis 함수는', () => {
         it('캐시 히트이면 사용량 한도 초과여도 cached 결과를 반환한다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockCachedResult);
 
-            const restrictedTierConfig: TierConfig = {
-                limits: {
-                    analysisPerDay: {
-                        free: 1,
-                        member: Infinity,
-                        pro: Infinity,
-                    },
-                    chatbotPerDay: {
-                        free: Infinity,
-                        member: Infinity,
-                        pro: Infinity,
-                    },
-                },
-                timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
-                infoDepth: {
-                    free: ['summary'],
-                    member: ['summary'],
-                    pro: ['summary'],
-                },
-                models: {
-                    free: ['gemini-2.5-flash'],
-                    member: ['gemini-2.5-flash'],
-                    pro: ['gemini-2.5-flash'],
-                },
-                featureFlags: { enableTierRestrictions: true },
-            };
-
             const result = await submitOptionsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-flash',
                 expirationDate: '2026-06-20',
                 snapshot: makeSnapshot(),
                 tier: 'free',
-                tierConfig: restrictedTierConfig,
+                tierConfig: RESTRICTED_TIER_CONFIG,
                 usage: {
                     usageRepository: {
                         recordUsage: vi.fn(),
@@ -456,40 +461,13 @@ describe('submitOptionsAnalysis 함수는', () => {
         it('tier와 usage가 제공되고 한도 초과 시 usage_limit_exceeded 에러를 반환한다', async () => {
             mockCacheGet.mockResolvedValueOnce(null);
 
-            const restrictedTierConfig: TierConfig = {
-                limits: {
-                    analysisPerDay: {
-                        free: 1,
-                        member: Infinity,
-                        pro: Infinity,
-                    },
-                    chatbotPerDay: {
-                        free: Infinity,
-                        member: Infinity,
-                        pro: Infinity,
-                    },
-                },
-                timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
-                infoDepth: {
-                    free: ['summary'],
-                    member: ['summary'],
-                    pro: ['summary'],
-                },
-                models: {
-                    free: ['gemini-2.5-flash'],
-                    member: ['gemini-2.5-flash'],
-                    pro: ['gemini-2.5-flash'],
-                },
-                featureFlags: { enableTierRestrictions: true },
-            };
-
             const result = await submitOptionsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-flash',
                 expirationDate: '2026-06-20',
                 snapshot: makeSnapshot(),
                 tier: 'free',
-                tierConfig: restrictedTierConfig,
+                tierConfig: RESTRICTED_TIER_CONFIG,
                 usage: {
                     usageRepository: {
                         recordUsage: vi.fn(),

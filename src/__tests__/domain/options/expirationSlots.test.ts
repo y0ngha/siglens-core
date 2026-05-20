@@ -66,4 +66,10 @@ describe('mapExpirationsToSlots', () => {
         expect(filled[0]?.slot.key).toBe('1W');
         expect(filled[0]?.expirationDate).toBe('2026-05-22');
     });
+
+    it('returns all-null when expirations is empty', () => {
+        const result = mapExpirationsToSlots([], now);
+        expect(result).toHaveLength(6);
+        expect(result.every(r => r === null)).toBe(true);
+    });
 });

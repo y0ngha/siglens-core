@@ -755,8 +755,11 @@ export type {
     WaitUntil,
 } from './domain/types';
 
-// Options analysis — domain types (including expiration slot types)
+// Options analysis — domain types (including expiration slot types and the
+// `buildOptionsAnalysisPrompt` input shape). Routed through the
+// `./domain/types` barrel so every domain type follows the same import path.
 export type {
+    BuildOptionsAnalysisPromptOptions,
     OptionsContract,
     OptionsChain,
     OptionsSnapshot,
@@ -771,7 +774,7 @@ export type {
     ExpirationSlot,
     ExpirationSlotKey,
     SlotMapping,
-} from './domain/options/types';
+} from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
 export type { OptionsDataProvider } from './infrastructure/options/types';
@@ -779,10 +782,6 @@ export type { OptionsDataProvider } from './infrastructure/options/types';
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).
 export { EXPIRATION_SLOTS } from './domain/options/expirationSlots';
-
-// Options analysis — Tier 4 prompt-input type (allows consumers to type-
-// annotate inputs to `buildOptionsAnalysisPrompt`).
-export type { BuildOptionsAnalysisPromptOptions } from './domain/options/types';
 
 // --- Tier 2 — Options domain functions ---
 //

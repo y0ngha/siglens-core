@@ -94,9 +94,9 @@ function hashOptionsInput(
  * const res = await submitOptionsAnalysis({ symbol: 'AAPL', expirationDate: '2026-06-20', modelId: 'gemini-2.5-flash', snapshot });
  * if (res.status === 'cached') return res.result;
  * if (res.status === 'miss_no_trigger') return null; // bot/crawler fallback
- * if (res.status === 'no_chains_error' || res.status === 'limit_error' || res.status === 'key_error') {
- *     return res.error;
- * }
+ * if (res.status === 'no_chains_error') return res.error;        // string
+ * if (res.status === 'limit_error') return res.error.message;    // AnalysisLimitError.message
+ * if (res.status === 'key_error') return res.code;               // 'user_api_key_required'
  * const polled = await pollOptionsAnalysis(res.jobId);
  * ```
  *
