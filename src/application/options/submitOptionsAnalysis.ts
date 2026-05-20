@@ -145,36 +145,10 @@ export async function submitOptionsAnalysis(
         }
     }
 
-    // ── 2. BYOK gate (tier + premium model + no userApiKey) ──
-    const tier = options.tier ?? DEFAULT_TIER;
-    const tierConfig = options.tierConfig ?? TIER_CONFIG;
-
-    if (
-        requiresByokKey(tier, modelId, tierConfig) &&
-        options.userApiKey === undefined
-    ) {
-        return buildUserApiKeyRequiredError(tier, modelId);
-    }
-
-    // ── 3. Usage limit check (only when both tier and usage are provided) ──
-    if (options.tier !== undefined && usage !== undefined) {
-        const allowed = await checkAnalysisUsageAllowed(
-            usage,
-            tier,
-            occurredAt,
-            tierConfig
-        );
-        if (!allowed) {
-            const limitError: SubmitOptionsAnalysisLimitError = {
-                status: 'limit_error',
-                code: 'usage_limit_exceeded',
-                error: buildUsageLimitError('analysisPerDay', tier),
-            };
-            return limitError;
-        }
-    }
-
-    // ── 4. Hash snapshot → build cache key → check cache ──
+    // ── 2. Hash snapshot → build cache key → check cache ──
+    // Cache check runs BEFORE the BYOK gate and usage limit so that a cached
+    // result (which involves no new AI computation) is never blocked by a
+    // missing user API key or an exhausted daily quota.
     const inputHash = hashOptionsInput(snapshot, expirationDate);
     const cacheKey = buildOptionsCacheKey(
         symbol,
@@ -205,6 +179,35 @@ export async function submitOptionsAnalysis(
 
     if (options.skipEnqueueIfMiss) {
         return { status: 'miss_no_trigger' };
+    }
+
+    // ── 3. BYOK gate (tier + premium model + no userApiKey) ──
+    const tier = options.tier ?? DEFAULT_TIER;
+    const tierConfig = options.tierConfig ?? TIER_CONFIG;
+
+    if (
+        requiresByokKey(tier, modelId, tierConfig) &&
+        options.userApiKey === undefined
+    ) {
+        return buildUserApiKeyRequiredError(tier, modelId);
+    }
+
+    // ── 4. Usage limit check (only when both tier and usage are provided) ──
+    if (options.tier !== undefined && usage !== undefined) {
+        const allowed = await checkAnalysisUsageAllowed(
+            usage,
+            tier,
+            occurredAt,
+            tierConfig
+        );
+        if (!allowed) {
+            const limitError: SubmitOptionsAnalysisLimitError = {
+                status: 'limit_error',
+                code: 'usage_limit_exceeded',
+                error: buildUsageLimitError('analysisPerDay', tier),
+            };
+            return limitError;
+        }
     }
 
     // ── 5. Build prompt, enqueue job, fire-and-forget worker POST ──

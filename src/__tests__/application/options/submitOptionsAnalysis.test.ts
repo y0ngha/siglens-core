@@ -194,6 +194,76 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(mockFireAndForget).not.toHaveBeenCalled();
         });
 
+        it('캐시 히트이면 BYOK 없이도 cached 결과를 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockCachedResult);
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-pro', // premium model
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+                tier: 'member',
+                tierConfig: TEST_TIER_CONFIG,
+                // userApiKey 미제공 — 캐시 히트이므로 BYOK 게이트를 통과하면 안 된다
+            });
+
+            expect(result.status).toBe('cached');
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('캐시 히트이면 사용량 한도 초과여도 cached 결과를 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockCachedResult);
+
+            const restrictedTierConfig: TierConfig = {
+                limits: {
+                    analysisPerDay: {
+                        free: 1,
+                        member: Infinity,
+                        pro: Infinity,
+                    },
+                    chatbotPerDay: {
+                        free: Infinity,
+                        member: Infinity,
+                        pro: Infinity,
+                    },
+                },
+                timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
+                infoDepth: {
+                    free: ['summary'],
+                    member: ['summary'],
+                    pro: ['summary'],
+                },
+                models: {
+                    free: ['gemini-2.5-flash'],
+                    member: ['gemini-2.5-flash'],
+                    pro: ['gemini-2.5-flash'],
+                },
+                featureFlags: { enableTierRestrictions: true },
+            };
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+                tier: 'free',
+                tierConfig: restrictedTierConfig,
+                usage: {
+                    usageRepository: {
+                        recordUsage: vi.fn(),
+                        // 한도 초과 상태이지만 캐시 히트로 우회되어야 한다
+                        getUsageToday: vi
+                            .fn()
+                            .mockResolvedValue({ analysis: 1, chatbot: 0 }),
+                    },
+                    clientIp: '203.0.113.10',
+                },
+            });
+
+            expect(result.status).toBe('cached');
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
         it('캐시에 부분 형태가 들어 있어도 정규화된 cached 결과를 반환한다', async () => {
             const poisonedCache = {
                 summary: '오래된 형태',
@@ -384,6 +454,8 @@ describe('submitOptionsAnalysis 함수는', () => {
     // ── 4. Usage limit exceeded ──
     describe('사용량 제한이 적용될 때', () => {
         it('tier와 usage가 제공되고 한도 초과 시 usage_limit_exceeded 에러를 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+
             const restrictedTierConfig: TierConfig = {
                 limits: {
                     analysisPerDay: {
