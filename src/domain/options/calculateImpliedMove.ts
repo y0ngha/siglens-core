@@ -24,7 +24,5 @@ export function calculateImpliedMove(
 ): number | null {
     if (atmIv === null) return null;
     if (daysToExpiration <= 0) return null;
-    return (
-        atmIv * Math.sqrt(daysToExpiration / CALENDAR_DAYS_PER_YEAR) * 100
-    );
+    return atmIv * Math.sqrt(daysToExpiration / CALENDAR_DAYS_PER_YEAR) * 100;
 }

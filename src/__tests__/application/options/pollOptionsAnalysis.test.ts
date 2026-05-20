@@ -78,9 +78,7 @@ describe('pollOptionsAnalysis 함수는', () => {
         beforeEach(() => {
             // Production code logs to console.error on both worker-failure
             // and missing-result paths; silence to keep test output clean.
-            errorSpy = vi
-                .spyOn(console, 'error')
-                .mockImplementation(() => {});
+            errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         });
         afterEach(() => {
             errorSpy.mockRestore();
@@ -124,9 +122,7 @@ describe('pollOptionsAnalysis 함수는', () => {
             mockGetJobStatus.mockResolvedValue('done');
             mockGetJobMeta.mockResolvedValue(mockMeta);
             // Production code logs to console.error when result is missing.
-            errorSpy = vi
-                .spyOn(console, 'error')
-                .mockImplementation(() => {});
+            errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         });
         afterEach(() => {
             errorSpy.mockRestore();
