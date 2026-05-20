@@ -55,9 +55,16 @@ function pickAtmIv(
     if (all.length === 0) return null;
     // ATM proxy: contract with smallest |strike - anchor|. Prefer the real
     // underlying spot when provided; otherwise fall back to the median
-    // strike (good enough for balanced chains). `medianStrike` returns
-    // `undefined` only when its input array is empty; we've already returned
-    // for that case above, so the result is guaranteed defined here.
+    // strike (good enough for balanced chains).
+    //
+    // `as number` cast rationale:
+    //   - TS limitation: TypeScript cannot relate the `all.length === 0`
+    //     early-return guard above to `medianStrike`'s `number | undefined`
+    //     signature across the function boundary, so it still widens the
+    //     branch to include `undefined`.
+    //   - Runtime invariant: `medianStrike` returns `undefined` only when
+    //     its input array is empty; the early-return above ensures `all` is
+    //     non-empty here, so the result is guaranteed defined.
     const anchor =
         typeof underlyingPrice === 'number' && Number.isFinite(underlyingPrice)
             ? underlyingPrice

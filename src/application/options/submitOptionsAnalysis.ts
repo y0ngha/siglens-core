@@ -30,6 +30,8 @@ import type {
 /** Maximum time to wait for the worker to accept the options analysis job. */
 const SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
+const LOG_PREFIX = '[submitOptionsAnalysis]';
+
 /**
  * Derive a short deterministic hash of the options snapshot and expiration
  * date selection.
@@ -177,7 +179,7 @@ export async function submitOptionsAnalysis(
                 return { status: 'cached', result };
             }
         } catch (error) {
-            console.error('[submitOptionsAnalysis] Cache read failed:', error);
+            console.error(`${LOG_PREFIX} Cache read failed:`, error);
         }
     }
 
@@ -236,7 +238,7 @@ export async function submitOptionsAnalysis(
             cacheKey,
         });
     } catch (error) {
-        console.error('[submitOptionsAnalysis] setJobMeta failed:', error);
+        console.error(`${LOG_PREFIX} setJobMeta failed:`, error);
     }
 
     const userApiKeyHeader: Record<string, string> =
@@ -254,7 +256,7 @@ export async function submitOptionsAnalysis(
         body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
         signal: AbortSignal.timeout(SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
-        console.error('[submitOptionsAnalysis] Worker request failed:', error);
+        console.error(`${LOG_PREFIX} Worker request failed:`, error);
     });
     fireAndForget(dispatch, options);
 

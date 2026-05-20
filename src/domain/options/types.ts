@@ -94,21 +94,6 @@ export interface OptionsExpirationMetrics {
 }
 
 /**
- * @internal Symbol-level aggregated metrics — the cross-expiration view
- * intended for future dashboards. Not currently returned or consumed by any
- * exported function; kept here so the cross-expiration shape is captured in
- * one place. Promote to a public export when a consumer materializes.
- */
-export interface OptionsSymbolMetrics {
-    /** Underlying ticker. */
-    symbol: string;
-    /** Per-expiration metrics, ordered the same as the source snapshot. */
-    perExpiration: ReadonlyArray<OptionsExpirationMetrics>;
-    /** Source snapshot timestamp (ISO datetime). */
-    capturedAt: string;
-}
-
-/**
  * Per-expiration AI commentary entry — the human-readable narrative for one
  * expiration produced by the analysis model.
  */
@@ -218,9 +203,10 @@ export interface BuildOptionsAnalysisPromptOptions {
  * selects a single expiration; `'all'` aggregates every expiration in the
  * snapshot.
  *
- * Note: TypeScript treats `string | 'all'` as identical to `string`, so the
- * `'all'` literal is documentary rather than enforced. The named alias keeps
- * the intent visible at the call sites and serves as the single source of
- * truth across submit/poll/prompt-builder signatures.
+ * Uses the `(string & {}) | 'all'` pattern instead of `string | 'all'`:
+ * `string & {}` is structurally identical to `string` at runtime, but it
+ * survives TypeScript's literal-widening pass, so IDEs surface `'all'` as an
+ * autocomplete suggestion while still accepting any `string`. See
+ * MISTAKES.md TypeScript section for context.
  */
-export type OptionsExpirationFilter = string | 'all';
+export type OptionsExpirationFilter = (string & {}) | 'all';

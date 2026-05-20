@@ -12,6 +12,8 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
+const LOG_PREFIX = '[PollOptions]';
+
 /**
  * Poll the result of an options analysis job submitted via
  * {@link submitOptionsAnalysis}.
@@ -67,7 +69,7 @@ export async function pollOptionsAnalysis(
 
     if (status === 'error') {
         const error = await getJobError(jobId);
-        cleanupInBackground(jobId, '[PollOptions]', options);
+        cleanupInBackground(jobId, LOG_PREFIX, options);
         return { status: 'error', error: error ?? 'Unknown error' };
     }
 
@@ -78,12 +80,12 @@ export async function pollOptionsAnalysis(
     ]);
 
     if (rawResult === null) {
-        console.error('[PollOptions] Result not found', {
+        console.error(`${LOG_PREFIX} Result not found`, {
             jobId,
             hasMeta: meta !== null,
             symbol: meta?.symbol,
         });
-        cleanupInBackground(jobId, '[PollOptions]', options);
+        cleanupInBackground(jobId, LOG_PREFIX, options);
         return { status: 'error', error: 'Result not found' };
     }
 
@@ -100,7 +102,7 @@ export async function pollOptionsAnalysis(
         result.perExpiration.length === 0 &&
         result.signals.length === 0
     ) {
-        console.warn('[PollOptions] Empty options analysis', { jobId });
+        console.warn(`${LOG_PREFIX} Empty options analysis`, { jobId });
     }
 
     // Cache the normalized result if a pre-computed cache key is available.
@@ -112,7 +114,7 @@ export async function pollOptionsAnalysis(
                     .set(meta.cacheKey, result, OPTIONS_CACHE_TTL_SECONDS)
                     .catch(error =>
                         console.error(
-                            '[PollOptions] Cache write failed:',
+                            `${LOG_PREFIX} Cache write failed:`,
                             error
                         )
                     ),
@@ -121,7 +123,7 @@ export async function pollOptionsAnalysis(
         }
     }
 
-    cleanupInBackground(jobId, '[PollOptions]', options);
+    cleanupInBackground(jobId, LOG_PREFIX, options);
 
     return { status: 'done', result };
 }
