@@ -173,14 +173,7 @@ export interface RawOptionsAnalysisResponse {
  * `1W` to surface end-of-week expirations on weekly tickers (e.g. PLTR
  * Fridays) that otherwise wouldn't satisfy the 1W ≥ 7-day match condition.
  */
-export type ExpirationSlotKey =
-    | '0D'
-    | '1W'
-    | '2W'
-    | '1M'
-    | '2M'
-    | '3M'
-    | '6M';
+export type ExpirationSlotKey = '0D' | '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
 
 /**
  * One canonical chip slot in the options expiration picker UI. The set is
