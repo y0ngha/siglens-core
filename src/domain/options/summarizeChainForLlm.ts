@@ -66,7 +66,7 @@ function pickAtmIv(
     // underlying spot when provided; otherwise fall back to the median
     // strike (good enough for balanced chains).
     //
-    // `as number` cast rationale:
+    // `!` non-null assertion rationale:
     //   - TS limitation: TypeScript cannot relate the `all.length === 0`
     //     early-return guard above to `medianStrike`'s `number | undefined`
     //     signature across the function boundary, so it still widens the
@@ -77,7 +77,7 @@ function pickAtmIv(
     const anchor =
         typeof underlyingPrice === 'number' && Number.isFinite(underlyingPrice)
             ? underlyingPrice
-            : (medianStrike(all) as number);
+            : medianStrike(all)!;
 
     const best = all.reduce<{ distance: number; iv: number } | null>(
         (acc, c) => {

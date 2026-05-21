@@ -31,19 +31,19 @@ const MIN_INVALID_TO_REJECT = 2;
  *   the chain should be rejected entirely.
  */
 export function sanitizeOptionsChain(chain: OptionsChain): OptionsChain | null {
-    const totalCalls = chain.calls.length;
-    const totalPuts = chain.puts.length;
+    const { valid: validCalls, invalidCount: invalidCalls } =
+        partitionContracts(chain.calls);
+    const { valid: validPuts, invalidCount: invalidPuts } = partitionContracts(
+        chain.puts
+    );
 
-    const invalidCalls = chain.calls.filter(isInvalidContract).length;
-    const invalidPuts = chain.puts.filter(isInvalidContract).length;
-
-    if (shouldReject(invalidCalls, totalCalls)) return null;
-    if (shouldReject(invalidPuts, totalPuts)) return null;
+    if (shouldReject(invalidCalls, chain.calls.length)) return null;
+    if (shouldReject(invalidPuts, chain.puts.length)) return null;
 
     return {
         ...chain,
-        calls: filterValid(chain.calls),
-        puts: filterValid(chain.puts),
+        calls: validCalls,
+        puts: validPuts,
     };
 }
 
@@ -57,19 +57,36 @@ function shouldReject(invalidCount: number, totalCount: number): boolean {
     return invalidCount / totalCount > INVALID_RATIO_THRESHOLD;
 }
 
-function filterValid(
-    contracts: ReadonlyArray<OptionsContract>
-): ReadonlyArray<OptionsContract> {
-    // `valid` is a function-local accumulator. A purely declarative
-    // `reduce(...spread, ...)` here would be O(N²) since each step rebuilds
-    // the result array. `valid.push` keeps the iteration O(N) and the
-    // mutation never escapes this function.
+/**
+ * Single-pass partition: collects dedup'd valid contracts and the invalid
+ * count in one iteration so `isInvalidContract` is evaluated exactly once
+ * per contract (vs. the prior two-pass `filter().length` + `filterValid`
+ * shape, which evaluated the predicate twice).
+ *
+ * `valid` is a function-local accumulator. A purely declarative
+ * `reduce(...spread, ...)` here would be O(N²) since each step rebuilds
+ * the result array. `valid.push` keeps the iteration O(N) and the
+ * mutation never escapes this function.
+ *
+ * Duplicate strikes are skipped silently (they do NOT count toward
+ * `invalidCount`); dedup is a normalization concern, not a data-quality
+ * signal — see the file-top JSDoc.
+ */
+function partitionContracts(contracts: ReadonlyArray<OptionsContract>): {
+    valid: OptionsContract[];
+    invalidCount: number;
+} {
     const seen = new Set<number>();
     const valid: OptionsContract[] = [];
+    let invalidCount = 0;
     for (const c of contracts) {
-        if (isInvalidContract(c) || seen.has(c.strike)) continue;
+        if (isInvalidContract(c)) {
+            invalidCount++;
+            continue;
+        }
+        if (seen.has(c.strike)) continue;
         seen.add(c.strike);
         valid.push(c);
     }
-    return valid;
+    return { valid, invalidCount };
 }
