@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #87 Round 2 | fix/options-analyzed-at-hardcoded | 2026-05-22]
+- B1: `src/domain/analysis/normalizeOptions.ts` — `normalizeOptionsAnalysisResponse`는 `src/index.ts:811` / `src/index.client.ts:101`로 export되는 공개 API인데 JSDoc 본문 7줄과 `@param now`가 한국어로 작성됨. 동일 의미를 보존하면서 영어로 재작성(LLM이 프롬프트 예시 문자열을 그대로 echo하는 사례, 1-day cache TTL이 캐시-히트 시각 drift를 24시간 이내로 제한한다는 점 포함).
+  - Rule: CONVENTIONS.md JSDoc Rules — Public-facing JSDoc is written in English (npm 공개 패키지가 비한국어 사용자에게도 노출되기 때문).
+- Context: 한국어 코멘트는 fallback 문자열 / 프롬프트 본문 같은 사용자 노출 런타임 데이터에만 허용되며, 공개 API의 JSDoc은 영어로 유지해야 한다. 캐시 히트 시 시각 의미가 "최근 본 시각"이라는 설계 의도와 TTL 제약을 영어로 동등하게 옮겼다.
+
 ## [PR #86 Round 20 audit | options/analysis | 2026-05-21]
 - Violation: `infrastructure/options/types.ts` imported `OptionsSnapshot` from `@/domain/options/types` instead of canonical `@/domain/types`
 - Rule: canonical-barrel rule documented in `domain/CLAUDE.md` for this PR — consumers must use `@/domain/types`
