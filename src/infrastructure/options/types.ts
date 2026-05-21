@@ -1,4 +1,4 @@
-import type { OptionsSnapshot } from '@/domain/options/types';
+import type { OptionsSnapshot } from '@/domain/types';
 
 /**
  * Provider contract for fetching options market data. Implementations live

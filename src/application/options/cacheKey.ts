@@ -1,4 +1,4 @@
-import type { OptionsExpirationFilter } from '@/domain/options/types';
+import type { OptionsExpirationFilter } from '@/domain/types';
 import { CACHE_KEY_SCHEMA_VERSION } from '@/infrastructure/cache/config';
 
 /**

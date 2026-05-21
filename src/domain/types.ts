@@ -1931,9 +1931,7 @@ export type CurrentAnalysisContext =
 // so consumers can keep using the canonical `@/domain/types` import path.
 // Defining them inline would push this barrel well past 2,200 lines; the
 // subdirectory split keeps the options feature cohesive without changing the
-// import contract for callers. (ARCHITECTURE.md does not explicitly forbid
-// the pattern; if the convention needs codifying, do it in a follow-up doc
-// PR rather than here.)
+// import contract for callers.
 export type {
     BuildOptionsAnalysisPromptOptions,
     OptionsContract,

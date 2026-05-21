@@ -1,5 +1,7 @@
 import type {
     OptionsAnalysisResponse,
+    OptionsPerExpirationCommentary,
+    OptionsSignal,
     OptionsTone,
     OptionsSignalKind,
 } from '@/domain/types';
@@ -40,7 +42,9 @@ function parseLlmPayload(raw: unknown): unknown {
     }
 }
 
-function normalizePerExpirationItem(item: unknown) {
+function normalizePerExpirationItem(
+    item: unknown
+): OptionsPerExpirationCommentary | null {
     const o = asObject(item);
     if (!o) return null;
     const expirationDate = asIsoDate(o.expirationDate);
@@ -52,7 +56,7 @@ function normalizePerExpirationItem(item: unknown) {
     };
 }
 
-function normalizeSignalItem(item: unknown) {
+function normalizeSignalItem(item: unknown): OptionsSignal | null {
     const o = asObject(item);
     if (!o) return null;
     const message = asString(o.message);
