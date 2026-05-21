@@ -7,12 +7,19 @@
 const CALENDAR_DAYS_PER_YEAR = 365;
 
 /**
+ * Fraction → percent multiplier. `atmIv` and `sqrt(...)` are unitless
+ * fractions; the contract on the return value is "± percent units" (e.g.
+ * `4.2` means ±4.2%), so the final factor flips the result into that scale.
+ */
+const FRACTION_TO_PERCENT = 100;
+
+/**
  * @internal Compute the implied move for an expiration as ±% of underlying.
  *
- * Formula: atmIv * sqrt(daysToExpiration / CALENDAR_DAYS_PER_YEAR) * 100.
- * Both `atmIv` and `daysToExpiration` are calendar-time quantities, so the
- * denominator stays on a 365-day basis. Implementation detail consumed by
- * {@link summarizeChainForLlm}.
+ * Formula: atmIv * sqrt(daysToExpiration / CALENDAR_DAYS_PER_YEAR) *
+ * FRACTION_TO_PERCENT. Both `atmIv` and `daysToExpiration` are calendar-time
+ * quantities, so the denominator stays on a 365-day basis. Implementation
+ * detail consumed by {@link summarizeChainForLlm}.
  *
  * @param atmIv - ATM implied volatility as a fraction (0.25 = 25%). null when unavailable.
  * @param daysToExpiration - Calendar days until expiration. Must be > 0.
@@ -24,5 +31,9 @@ export function calculateImpliedMove(
 ): number | null {
     if (atmIv === null) return null;
     if (daysToExpiration <= 0) return null;
-    return atmIv * Math.sqrt(daysToExpiration / CALENDAR_DAYS_PER_YEAR) * 100;
+    return (
+        atmIv *
+        Math.sqrt(daysToExpiration / CALENDAR_DAYS_PER_YEAR) *
+        FRACTION_TO_PERCENT
+    );
 }

@@ -1,3 +1,4 @@
+import type { OptionsExpirationFilter } from '@/domain/options/types';
 import { CACHE_KEY_SCHEMA_VERSION } from '@/infrastructure/cache/config';
 
 /**
@@ -7,8 +8,10 @@ import { CACHE_KEY_SCHEMA_VERSION } from '@/infrastructure/cache/config';
  * `infrastructure/cache/config.ts`).
  *
  * @param symbol - Underlying ticker (uppercase).
- * @param expirationDate - ISO `'YYYY-MM-DD'` or the `'all'` sentinel for
- *   aggregate analysis across every available expiration.
+ * @param expirationDate - {@link OptionsExpirationFilter} — `'YYYY-MM-DD'` or
+ *   the `'all'` sentinel for aggregate analysis across every available
+ *   expiration. Typed as the named alias (not bare `string`) so the contract
+ *   matches the use-case-layer signatures that produce this value.
  * @param modelId - LLM model identifier scoping the cache.
  * @param snapshotInputHash - Hash of the snapshot inputs — a fresher
  *   snapshot produces a different hash and therefore a new cache entry.
@@ -27,7 +30,7 @@ import { CACHE_KEY_SCHEMA_VERSION } from '@/infrastructure/cache/config';
  */
 export function buildOptionsCacheKey(
     symbol: string,
-    expirationDate: string,
+    expirationDate: OptionsExpirationFilter,
     modelId: string,
     snapshotInputHash: string
 ): string {

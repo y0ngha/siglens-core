@@ -9,6 +9,15 @@ import type {
 } from './types';
 
 /**
+ * Number of top strikes (by combined call+put OI) to surface in the LLM
+ * summary. Three is enough for the analyst to anchor a narrative around
+ * the two or three highest-attention strikes without bloating the prompt
+ * with marginal levels. Matches the JSDoc contract on
+ * {@link OptionsExpirationMetrics.topOpenInterestStrikes}.
+ */
+const TOP_OI_STRIKES_COUNT = 3;
+
+/**
  * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
  * of metrics suitable for LLM prompt input. The result extracts single-
  * number aggregates (Max Pain, P/C ratio, ATM IV) plus the top-3 strikes
@@ -35,7 +44,7 @@ export function summarizeChainForLlm(
                 b.putOpenInterest -
                 (a.callOpenInterest + a.putOpenInterest)
         )
-        .slice(0, 3);
+        .slice(0, TOP_OI_STRIKES_COUNT);
 
     return {
         expirationDate: chain.expirationDate,

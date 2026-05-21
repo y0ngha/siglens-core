@@ -295,8 +295,16 @@ describe('submitOptionsAnalysis 함수는', () => {
 
     // ── 2. Cache miss + enqueues ──
     describe('캐시 미스일 때', () => {
+        // Production code logs to console.error on cache-read failure and
+        // setJobMeta failure (fail-open paths). Silence these spy
+        // implementations so the error-path tests below do not flood stderr.
+        let errorSpy: ReturnType<typeof vi.spyOn>;
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);
+            errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        });
+        afterEach(() => {
+            errorSpy.mockRestore();
         });
 
         it('캐시 읽기 중 에러가 발생해도 submitted로 진행한다', async () => {
@@ -383,6 +391,26 @@ describe('submitOptionsAnalysis 함수는', () => {
 
         it('setJobMeta가 실패해도 submitted를 반환한다 (fail-open)', async () => {
             mockSetJobMeta.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+            });
+
+            expect(result.status).toBe('submitted');
+            if (result.status === 'submitted') {
+                expect(typeof result.jobId).toBe('string');
+            }
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
+
+        it('워커 dispatch가 reject되어도 submitted를 반환한다 (fail-open)', async () => {
+            // Covers the `fetch(...).catch(error => console.error(...))`
+            // branch on line ~258 — worker dispatch is fire-and-forget so a
+            // rejected fetch must not surface to the caller.
+            mockFetch.mockRejectedValueOnce(new Error('network unreachable'));
 
             const result = await submitOptionsAnalysis({
                 symbol: 'AAPL',
