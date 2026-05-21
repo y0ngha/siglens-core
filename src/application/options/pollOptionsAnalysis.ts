@@ -20,8 +20,10 @@ const LOG_PREFIX = '[PollOptions]';
  *
  * Returns one of three outcomes:
  * - `processing`: the worker has not finished yet. Caller should retry.
- * - `error`: the worker reported a failure, the result was missing, or the
- *   payload could not be normalized.
+ * - `error`: the worker reported a failure status, or the job result was
+ *   missing from the store ("Result not found"). Normalization failures
+ *   never produce `error` — every malformed payload falls back to a valid
+ *   {@link OptionsAnalysisResponse} via {@link normalizeOptionsAnalysisResponse}.
  * - `done`: the result is ready. The raw worker response is normalized via
  *   {@link normalizeOptionsAnalysisResponse} and cached under the pre-computed
  *   `cacheKey` from job metadata before being returned.

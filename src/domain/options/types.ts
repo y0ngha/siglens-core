@@ -13,9 +13,17 @@ export interface OptionsContract {
     bid: number | null;
     /** Lowest current ask, or `null` when no ask is posted. */
     ask: number | null;
-    /** Trade volume during the current session. */
+    /**
+     * Trade volume during the current session. Non-nullable by contract —
+     * provider adapters (Yahoo, etc.) must coerce missing/null feed values to
+     * `0` before constructing this object. The non-null type keeps callers
+     * (max-pain, OI aggregation) free of null-handling boilerplate.
+     */
     volume: number;
-    /** Total contracts currently outstanding (not closed). */
+    /**
+     * Total contracts currently outstanding (not closed). Same non-nullable
+     * contract as `volume` — adapters coerce null to `0`.
+     */
     openInterest: number;
     /** Implied volatility as a 0–1 fraction (e.g., `0.25` = 25% IV). null if unavailable. */
     impliedVolatility: number | null;
