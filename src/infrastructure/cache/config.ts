@@ -157,6 +157,8 @@ export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
 export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
+/** @internal TTL for options analysis cache results. Default: 24 hours. */
+export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.

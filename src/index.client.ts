@@ -98,6 +98,37 @@ export {
     normalizeNewsCardAnalysis,
 } from './domain/analysis/normalizeNews';
 export { normalizeOverallAnalysisResponse } from './domain/analysis/normalizeOverall';
+export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
+
+// Options analysis — domain helpers (server-only submit/poll use-cases are
+// intentionally omitted; only pure domain functions belong on the browser
+// entry).
+export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
+export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
+export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
+export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
+export {
+    EXPIRATION_SLOTS,
+    mapExpirationsToSlots,
+} from './domain/options/expirationSlots';
+export type { OptionsDataProvider } from './infrastructure/options/types';
+export type {
+    BuildOptionsAnalysisPromptOptions,
+    OptionsContract,
+    OptionsChain,
+    OptionsSnapshot,
+    StrikeOpenInterest,
+    OptionsExpirationMetrics,
+    OptionsPerExpirationCommentary,
+    OptionsSignal,
+    OptionsAnalysisResponse,
+    OptionsTone,
+    OptionsSignalKind,
+    ExpirationSlot,
+    ExpirationSlotKey,
+    SlotMapping,
+    OptionsExpirationFilter,
+} from './domain/types';
 
 // Model spec helpers
 export {

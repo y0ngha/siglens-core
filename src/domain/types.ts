@@ -1925,3 +1925,27 @@ export type CurrentAnalysisContext =
     | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
     | { kind: 'news'; payload: NewsAnalysisResponse }
     | { kind: 'overall'; payload: OverallAnalysisResponse };
+
+// --- Options Analysis Types ---
+// 15+ options domain types live in ./options/types and are re-exported here
+// so consumers can keep using the canonical `@/domain/types` import path.
+// Defining them inline would push this barrel well past 2,200 lines; the
+// subdirectory split keeps the options feature cohesive without changing the
+// import contract for callers.
+export type {
+    BuildOptionsAnalysisPromptOptions,
+    OptionsContract,
+    OptionsChain,
+    OptionsSnapshot,
+    StrikeOpenInterest,
+    OptionsExpirationMetrics,
+    OptionsPerExpirationCommentary,
+    OptionsSignal,
+    OptionsAnalysisResponse,
+    OptionsTone,
+    OptionsSignalKind,
+    ExpirationSlot,
+    ExpirationSlotKey,
+    SlotMapping,
+    OptionsExpirationFilter,
+} from './options/types';

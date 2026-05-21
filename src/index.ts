@@ -754,3 +754,80 @@ export type {
     VolumeProfileRow,
     WaitUntil,
 } from './domain/types';
+
+// Options analysis — domain types (including expiration slot types and the
+// `buildOptionsAnalysisPrompt` input shape). Routed through the
+// `./domain/types` barrel so every domain type follows the same import path.
+export type {
+    BuildOptionsAnalysisPromptOptions,
+    OptionsContract,
+    OptionsChain,
+    OptionsSnapshot,
+    StrikeOpenInterest,
+    OptionsExpirationMetrics,
+    OptionsPerExpirationCommentary,
+    OptionsSignal,
+    OptionsAnalysisResponse,
+    OptionsTone,
+    OptionsSignalKind,
+    ExpirationSlot,
+    ExpirationSlotKey,
+    SlotMapping,
+    OptionsExpirationFilter,
+} from './domain/types';
+
+// Options analysis — provider interface (implementation injected by consumer)
+export type { OptionsDataProvider } from './infrastructure/options/types';
+
+// Options analysis — Tier 4 constant (canonical chip slot table consumed by
+// frontends for rendering and routing).
+export { EXPIRATION_SLOTS } from './domain/options/expirationSlots';
+
+// --- Tier 2 — Options domain functions ---
+//
+// Aggregate entry point + the consumer-facing utilities that have no good
+// substitute on the aggregate:
+//
+//   - summarizeChainForLlm: the canonical metrics entry point. Reads
+//     summarize().maxPain / .putCallRatio / .impliedMovePercent /
+//     .atmImpliedVolatility instead of importing the underlying calculators.
+//   - aggregateOpenInterest: strike-by-strike OI map used by visualization
+//     (the summary only carries the top-3 strikes; charts need the full
+//     distribution).
+//   - sanitizeOptionsChain: chain-level data-quality gate called by
+//     OptionsDataProvider implementations (which live in consumer apps).
+//   - mapExpirationsToSlots: pairs provider expirations to the EXPIRATION_SLOTS
+//     chip table.
+//
+// The individual `calculate*` helpers stay internal — consumers should read
+// the derived fields from OptionsExpirationMetrics rather than re-running
+// the math.
+export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
+export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
+export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
+export { mapExpirationsToSlots } from './domain/options/expirationSlots';
+
+// Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
+export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
+export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
+
+// Options analysis — application use-cases (submit + poll, cache key builder)
+export {
+    submitOptionsAnalysis,
+    pollOptionsAnalysis,
+    buildOptionsCacheKey,
+} from './application/options';
+export type {
+    SubmitOptionsAnalysisOptions,
+    SubmitOptionsAnalysisResult,
+    SubmitOptionsAnalysisCached,
+    SubmitOptionsAnalysisSubmitted,
+    SubmitOptionsAnalysisMissNoTrigger,
+    SubmitOptionsAnalysisLimitError,
+    SubmitOptionsAnalysisNoChainsError,
+    SubmitOptionsAnalysisApiKeyRequiredError,
+    PollOptionsAnalysisResult,
+    PollOptionsAnalysisProcessing,
+    PollOptionsAnalysisDone,
+    PollOptionsAnalysisError,
+} from './application/options';

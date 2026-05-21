@@ -183,6 +183,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `submitOverallAnalysis` | `application/overall/submitOverallAnalysis.ts` |
 | `pollOverallAnalysis` | `application/overall/pollOverallAnalysis.ts` |
 | `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
+| `submitOptionsAnalysis` | `application/options/submitOptionsAnalysis.ts` |
+| `pollOptionsAnalysis` | `application/options/pollOptionsAnalysis.ts` |
+| `buildOptionsCacheKey` | `application/options/cacheKey.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -199,7 +202,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeFearGreedIndex(bars, buySellVolume, options?)` — per-stock Fear & Greed snapshot. Returns `FearGreedSnapshot \| null`. | `domain/indicators/fearGreed/walkForward.ts` |
 | `computeFearGreedHistory(bars, buySellVolume, options?)` — walk-forward 1-year score history. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/fearGreed/walkForward.ts` |
 
-**프롬프트 빌더 (7 + 1 상수)**
+**프롬프트 빌더 (8 + 1 상수)**
 | Symbol | Source |
 |---|---|
 | `buildAnalysisPrompt` | `domain/analysis/prompt.ts` |
@@ -208,8 +211,20 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildNewsAnalysisPrompt` | `domain/analysis/newsPrompt.ts` |
 | `buildNewsCardAnalysisPrompt` | `domain/analysis/newsCardPrompt.ts` |
 | `buildOverallAnalysisPrompt` | `domain/analysis/overallPrompt.ts` |
+| `buildOptionsAnalysisPrompt` | `domain/options/optionsPrompt.ts` |
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
+
+**옵션 분석 헬퍼 (4 + 1 상수)**
+| Symbol | Source |
+|---|---|
+| `summarizeChainForLlm` | `domain/options/summarizeChainForLlm.ts` |
+| `aggregateOpenInterest` | `domain/options/aggregateOpenInterest.ts` |
+| `sanitizeOptionsChain` | `domain/options/sanitizeOptionsChain.ts` |
+| `mapExpirationsToSlots` | `domain/options/expirationSlots.ts` |
+| `EXPIRATION_SLOTS` | `domain/options/expirationSlots.ts` |
+
+> **@internal (not exported)**: `calculateMaxPain`, `calculatePutCallRatio`, `calculateImpliedMove` — single-purpose calculators consumed only by `summarizeChainForLlm`. Consumers should call `summarizeChainForLlm` (or read derived fields on `OptionsExpirationMetrics`) instead of recomputing.
 
 **응답 정규화 (6)**
 | Symbol | Source |
@@ -221,6 +236,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `normalizeNewsAnalysisResponse` | `domain/analysis/normalizeNews.ts` |
 | `normalizeNewsCardAnalysis` | `domain/analysis/normalizeNews.ts` |
 | `normalizeOverallAnalysisResponse` | `domain/analysis/normalizeOverall.ts` |
+| `normalizeOptionsAnalysisResponse` | `domain/analysis/normalizeOptions.ts` |
 
 **티어 게이트 (Tier gating) (13)**
 | Symbol | Source |
@@ -346,12 +362,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - `FundamentalDataProvider` — `infrastructure/fundamental/types.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
 - `NewsProvider` — `infrastructure/news/types.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
 - `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
+- `OptionsDataProvider` — `infrastructure/options/types.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
 
 새로 추가된 use-case option/result 타입:
 - 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `SubmitFundamentalAnalysisMissNoTrigger`, `PollFundamentalAnalysisResult`.
 - 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `SubmitNewsAnalysisApiKeyRequiredError`, `SubmitNewsAnalysisMissNoTrigger`, `PollNewsAnalysisResult`.
 - 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `SubmitOverallAnalysisApiKeyRequiredError`, `SubmitOverallAnalysisMissNoTrigger`, `DependencyStateMissNoTrigger`, `PollOverallAnalysisResult`.
 - 기술적: `SubmitAnalysisMissNoTrigger` — 0.10.0에서 추가된 봇/크롤러 게이팅용 결과 variant.
+- 옵션: `SubmitOptionsAnalysisOptions`, `SubmitOptionsAnalysisResult`, `SubmitOptionsAnalysisCached`, `SubmitOptionsAnalysisSubmitted`, `SubmitOptionsAnalysisMissNoTrigger`, `SubmitOptionsAnalysisLimitError`, `SubmitOptionsAnalysisNoChainsError`, `SubmitOptionsAnalysisApiKeyRequiredError`, `PollOptionsAnalysisResult`, `PollOptionsAnalysisProcessing`, `PollOptionsAnalysisDone`, `PollOptionsAnalysisError`. 도메인 타입(`OptionsContract`, `OptionsChain`, `OptionsSnapshot`, `StrikeOpenInterest`, `OptionsExpirationMetrics`, `OptionsPerExpirationCommentary`, `OptionsSignal`, `OptionsAnalysisResponse`, `OptionsTone`, `OptionsSignalKind`, `OptionsExpirationFilter`)과 슬롯 매핑(`ExpirationSlot`, `ExpirationSlotKey`, `SlotMapping`), 프롬프트 옵션(`BuildOptionsAnalysisPromptOptions`) 포함.
 
 **인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
 
@@ -488,3 +506,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-02 | Phase 0~6 완료. 인증/OAuth/이메일/문의/BYOK/Tier CRUD/한국어 티커/Drizzle·Neon DB/Gemini SDK 어댑터가 모두 siglens로 이전됨. core는 분석 도메인 + 분석 직결 infrastructure + Skills + 추상 repository 인터페이스만 보유. |
 | 2026-05-02 | Task 1.17~1.18: 펀더멘털/뉴스/종합 분석 use-case 12종 + 프롬프트 빌더 4종 + 정규화 함수 5종 + 캐시 키/TTL 7종 + Provider 인터페이스 2종 + 도메인 타입 30여종 public export 추가. `buildChatPrompt`에 `currentAnalysisContext` 파라미터 추가 (`CurrentAnalysisContext` tagged union). |
 | 2026-05-07 | Tier 2/4 추가 — `computeFearGreedIndex`, `computeFearGreedHistory` (per-stock Fear & Greed Index) 및 관련 도메인 타입 10종(`FearGreedLabel`, `FearGreedConfidence`, `FearGreedWarning`, `FearGreedFactorKey`, `FearGreedGroupName`, `FearGreedFactor`, `FearGreedGroup`, `FearGreedSnapshot`, `FearGreedHistoryPoint`, `ComputeFearGreedOptions`)을 Tier 2/4 인벤토리에 등록. |
+| 2026-05-15 | Options analysis 도메인 추가 — Tier 1 use-cases (`submitOptionsAnalysis`, `pollOptionsAnalysis`, `buildOptionsCacheKey`), Tier 2 헬퍼/프롬프트 (`summarizeChainForLlm`, `aggregateOpenInterest`, `sanitizeOptionsChain`, `mapExpirationsToSlots`, `buildOptionsAnalysisPrompt`, `normalizeOptionsAnalysisResponse`, `EXPIRATION_SLOTS`), Tier 3 Provider 인터페이스 (`OptionsDataProvider`), Tier 4 타입(도메인 11종 + 슬롯 2종 + use-case option/result 9종)을 인벤토리에 등록. `calculateMaxPain` / `calculatePutCallRatio` / `calculateImpliedMove`는 `@internal`. |

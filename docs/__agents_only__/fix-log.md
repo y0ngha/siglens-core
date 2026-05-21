@@ -1,5 +1,18 @@
 # Fix Log
 
+## [PR #86 Round 20 audit | options/analysis | 2026-05-21]
+- Violation: `infrastructure/options/types.ts` imported `OptionsSnapshot` from `@/domain/options/types` instead of canonical `@/domain/types`
+- Rule: canonical-barrel rule documented in `domain/CLAUDE.md` for this PR — consumers must use `@/domain/types`
+- Context: R20 B1. Switched to `@/domain/types` so the same import contract applies across every consumer; tests keep their direct subdirectory imports.
+
+- Violation: `domain/types.ts` re-export block referenced a follow-up doc PR ("if the convention needs codifying, do it in a follow-up doc PR rather than here")
+- Rule: CONVENTIONS — JSDoc/comments must describe timeless intent, not a specific PR or future task
+- Context: R20 S1. Trimmed the trailing parenthetical so the comment only documents the subdirectory-split rationale.
+
+- Violation: `normalizePerExpirationItem` / `normalizeSignalItem` returned complex `{ … } | null` unions inferred by TS without explicit annotations
+- Rule: readability — when a non-exported helper's return type is a complex union, annotate it explicitly so the contract is grep-able
+- Context: R20 S2. Reused the existing `OptionsPerExpirationCommentary` / `OptionsSignal` domain types as the explicit return annotations; no behavior change.
+
 ## [PR #78 | feat/per-stock-fear-greed-index | 2026-05-07]
 
 - Violation: AI-facing prompt section in Korean despite repo convention requiring English (gemini #1)
