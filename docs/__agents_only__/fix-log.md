@@ -1,5 +1,13 @@
 # Fix Log
 
+## [PR #87 Round 3 | fix/options-analyzed-at-hardcoded | 2026-05-22]
+- B1: `src/domain/options/types.ts:133` — `OptionsAnalysisResponse.analyzedAt` 필드 JSDoc이 여전히 "ISO datetime when the model produced this analysis"로 표기되어 있어 새 동작(서버 now로 항상 덮어쓰기, LLM 값 폐기)과 어긋남. 동작에 맞춰 "ISO datetime of the most recent normalization, taken from the server's reference clock. Any LLM-supplied timestamp is intentionally discarded — see `normalizeOptionsAnalysisResponse` for the rationale."로 재작성.
+  - Rule: MISTAKES.md Documentation Sync #3 — 구현 변경 시 관련 JSDoc 즉시 동기화.
+- B2: `src/application/options/pollOptionsAnalysis.ts:47-48` — `@param now` JSDoc이 "fallback"이라는 기존 동작 용어를 그대로 유지. 새 동작에서는 fallback이 아니라 항상 사용되므로 "used directly as the normalized result's `analyzedAt` (not as a fallback for an LLM-supplied value — the LLM value is always discarded)"로 정정.
+  - Rule: MISTAKES.md Documentation Sync #3.
+- B3: `src/application/options/types.ts:57-59` — `SubmitOptionsAnalysisOptions.now` JSDoc도 동일하게 "cache-hit normalizer's `analyzedAt` fallback" 표현을 사용. "normalizer's `analyzedAt` (always used directly — the LLM-supplied value is discarded)"로 정정.
+  - Rule: MISTAKES.md Documentation Sync #3.
+
 ## [PR #87 Round 2 | fix/options-analyzed-at-hardcoded | 2026-05-22]
 - B1: `src/domain/analysis/normalizeOptions.ts` — `normalizeOptionsAnalysisResponse`는 `src/index.ts:811` / `src/index.client.ts:101`로 export되는 공개 API인데 JSDoc 본문 7줄과 `@param now`가 한국어로 작성됨. 동일 의미를 보존하면서 영어로 재작성(LLM이 프롬프트 예시 문자열을 그대로 echo하는 사례, 1-day cache TTL이 캐시-히트 시각 drift를 24시간 이내로 제한한다는 점 포함).
   - Rule: CONVENTIONS.md JSDoc Rules — Public-facing JSDoc is written in English (npm 공개 패키지가 비한국어 사용자에게도 노출되기 때문).

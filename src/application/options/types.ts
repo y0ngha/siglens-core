@@ -55,8 +55,9 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     usage?: AnalysisUsageOptions;
     /**
      * Reference timestamp for time-dependent operations: limit checks,
-     * usage recording, and the cache-hit normalizer's `analyzedAt`
-     * fallback. Defaults to `new Date()`.
+     * usage recording, and the normalizer's `analyzedAt` (always used
+     * directly — the LLM-supplied value is discarded). Defaults to
+     * `new Date()`.
      */
     now?: Date;
     /** BYOK API key. Must be provided when a non-pro tier requests a premium model. */

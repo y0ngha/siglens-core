@@ -130,7 +130,11 @@ export interface OptionsAnalysisResponse {
     perExpiration: ReadonlyArray<OptionsPerExpirationCommentary>;
     /** Structured trading signals derived from the analysis. */
     signals: ReadonlyArray<OptionsSignal>;
-    /** ISO datetime when the model produced this analysis. */
+    /**
+     * ISO datetime of the most recent normalization, taken from the server's
+     * reference clock. Any LLM-supplied timestamp is intentionally discarded
+     * — see {@link normalizeOptionsAnalysisResponse} for the rationale.
+     */
     analyzedAt: string;
 }
 
