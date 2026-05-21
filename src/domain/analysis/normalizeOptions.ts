@@ -75,9 +75,16 @@ function normalizeSignalItem(item: unknown): OptionsSignal | null {
  * Domain purity: `now` is taken as a required argument so this function
  * stays a pure transformation.
  *
+ * `analyzedAt`은 LLM이 응답에 넣은 값이 아닌 항상 `now.toISOString()`을 사용한다.
+ * 분석을 수행한 권위 있는 시각은 서버 쪽이며, LLM은 프롬프트 예시 문자열
+ * (예: "2023-10-27T10:30:00")을 그대로 반환해 잘못된 과거 날짜를 노출한
+ * 사례가 있어 raw 입력의 `analyzedAt` 필드를 신뢰하지 않는다. 캐시 히트
+ * 경로(`submitOptionsAnalysis`)도 이 함수를 통과하므로 캐시 결과의 표시
+ * 시각은 "최근 본 시각" 의미가 된다 — TTL이 1일이라 분석 시점과의
+ * 어긋남은 24시간 이내로 제한된다.
+ *
  * @param raw - Worker JSON / cached payload / arbitrary unknown.
- * @param now - Reference clock used as `analyzedAt` fallback when the
- *   payload omits the field or carries a non-ISO string.
+ * @param now - Reference clock; `analyzedAt`에 항상 사용된다.
  * @returns Fully-typed normalized response with every field populated.
  */
 export function normalizeOptionsAnalysisResponse(
@@ -97,6 +104,6 @@ export function normalizeOptionsAnalysisResponse(
             asArray(o.perExpiration).map(normalizePerExpirationItem)
         ),
         signals: compact(asArray(o.signals).map(normalizeSignalItem)),
-        analyzedAt: asIsoDate(o.analyzedAt) ?? now.toISOString(),
+        analyzedAt: now.toISOString(),
     };
 }
