@@ -95,20 +95,21 @@ describe('normalizeOptionsAnalysisResponse', () => {
         expect(result.signals[0].kind).toBe('neutral');
     });
 
-    it('always uses now.toISOString() for analyzedAt, ignoring LLM-supplied value', () => {
-        // LLM이 프롬프트 예시 문자열("2023-10-27T10:30:00")을 그대로 응답에
-        // 넣는 사례가 있어, 서버 `now`만 신뢰한다.
-        const cases: Array<unknown> = [
-            {},
-            { analyzedAt: 'invalid-date' },
-            { analyzedAt: '2023-10-27T10:30:00' },
-            { analyzedAt: '2099-01-01T00:00:00Z' },
-        ];
-        for (const raw of cases) {
+    // LLM이 프롬프트 예시 문자열("2023-10-27T10:30:00")을 그대로 응답에
+    // 넣는 사례가 있어, 서버 `now`만 신뢰한다. 각 입력을 it.each로 펼쳐
+    // 실패 시 어떤 입력이 문제였는지 테스트 리포트에서 즉시 식별할 수 있게 한다.
+    it.each([
+        ['analyzedAt 없는 빈 객체', {}],
+        ['유효하지 않은 날짜 문자열', { analyzedAt: 'invalid-date' }],
+        ['LLM 프롬프트 예시 echo 문자열', { analyzedAt: '2023-10-27T10:30:00' }],
+        ['미래 날짜', { analyzedAt: '2099-01-01T00:00:00Z' }],
+    ] as const)(
+        'always uses now.toISOString() for analyzedAt — %s',
+        (_label, raw) => {
             const result = normalizeOptionsAnalysisResponse(raw, now);
             expect(result.analyzedAt).toBe(now.toISOString());
         }
-    });
+    );
 
     it('handles null and non-object inputs safely', () => {
         // String input that's not valid JSON exercises the parseLlmPayload

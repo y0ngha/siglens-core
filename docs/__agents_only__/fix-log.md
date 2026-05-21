@@ -1,5 +1,9 @@
 # Fix Log
 
+## [PR #87 Round 4 | fix/options-analyzed-at-hardcoded | 2026-05-22]
+- S1: `src/__tests__/domain/analysis/normalizeOptions.test.ts` — `analyzedAt` 무시 검증 테스트 안에서 `for-of` 루프로 4개 케이스를 돌리고 있어, 실패 시 어느 입력이 문제였는지 리포트에서 식별 불가. Vitest `it.each([...])`로 전환해 각 케이스가 독립 항목으로 표시되도록 분리. 라벨도 한국어로 명시("analyzedAt 없는 빈 객체" / "유효하지 않은 날짜 문자열" / "LLM 프롬프트 예시 echo 문자열" / "미래 날짜").
+  - Rule: 가독성 — 데이터 주도 테스트는 각 입력이 독립적인 it() 항목으로 보고되어야 한다.
+
 ## [PR #87 Round 3 | fix/options-analyzed-at-hardcoded | 2026-05-22]
 - B1: `src/domain/options/types.ts:133` — `OptionsAnalysisResponse.analyzedAt` 필드 JSDoc이 여전히 "ISO datetime when the model produced this analysis"로 표기되어 있어 새 동작(서버 now로 항상 덮어쓰기, LLM 값 폐기)과 어긋남. 동작에 맞춰 "ISO datetime of the most recent normalization, taken from the server's reference clock. Any LLM-supplied timestamp is intentionally discarded — see `normalizeOptionsAnalysisResponse` for the rationale."로 재작성.
   - Rule: MISTAKES.md Documentation Sync #3 — 구현 변경 시 관련 JSDoc 즉시 동기화.
