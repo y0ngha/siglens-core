@@ -1,5 +1,45 @@
 # Changelog
 
+# [0.11.0](https://github.com/y0ngha/siglens-core/compare/v0.10.1...v0.11.0) (2026-05-21)
+
+
+### Bug Fixes
+
+* **options:** apply round 13 review — JSDoc + test cleanup + barrel routing ([edde0f7](https://github.com/y0ngha/siglens-core/commit/edde0f760a01dbbaec210ddf7c4b6b2ac82a50ba))
+* **options:** apply round 14 review — branch coverage + expirationSlots for-of ([fd92033](https://github.com/y0ngha/siglens-core/commit/fd92033168a165bd85e57c301d657b08818578a4))
+* **options:** apply round 16 review — extract filter type + remove cancel ref + tests ([71116ac](https://github.com/y0ngha/siglens-core/commit/71116ac0cd63d62feb592cf36b486005e820bf60))
+* **options:** apply round 17 review — rename calendar-day basis + name poll variants ([89afb61](https://github.com/y0ngha/siglens-core/commit/89afb61e0342eddf6525de91ce2b826d0471ae50))
+* **options:** apply round 18 review — extract LOG_PREFIX + tighten types ([7d3ca94](https://github.com/y0ngha/siglens-core/commit/7d3ca94fb146574760e5fee4dd8ef6b6fd67a902))
+* **options:** apply round 20 review — add browser exports + doc subdir pattern ([0be3ea3](https://github.com/y0ngha/siglens-core/commit/0be3ea347c8718851a9de2621c6218749a88616e))
+* **options:** apply round 20 review — canonical imports + comment cleanup + explicit normalize return types ([480bb25](https://github.com/y0ngha/siglens-core/commit/480bb255659227e7e260deae5ec110b9f1a2eb0e))
+* **options:** forward underlyingPrice to summarizeChainForLlm from prompt builder ([9784c77](https://github.com/y0ngha/siglens-core/commit/9784c77d4e3e31798261186fdc5d0a2d4bc547c2))
+* **options:** reorder cache check before BYOK gate and usage limit ([e139c22](https://github.com/y0ngha/siglens-core/commit/e139c22d72fc0b1978906b489ad96271af8f9961)), closes [#86](https://github.com/y0ngha/siglens-core/issues/86)
+* **options:** resolve PR [#86](https://github.com/y0ngha/siglens-core/issues/86) review round 5 — 5 Blocker + 5 Suggestion ([fd68357](https://github.com/y0ngha/siglens-core/commit/fd68357fedfd1f199fa0e2909766e187fcd97b37))
+* **options:** resolve PR [#86](https://github.com/y0ngha/siglens-core/issues/86) review round 6 — 2 Blocker + 10 Suggestion ([4475449](https://github.com/y0ngha/siglens-core/commit/44754494fc9a2b37f7ad43b9bfdf834a579a5121))
+* **options:** resolve PR [#86](https://github.com/y0ngha/siglens-core/issues/86) review round 7 — 6 Blocker + 2 Suggestion ([615e8ce](https://github.com/y0ngha/siglens-core/commit/615e8ce14f8ba694e8b2f683c9579771e7d6e266))
+* **options:** resolve PR [#86](https://github.com/y0ngha/siglens-core/issues/86) review round 8 — 1 Blocker + 4 Suggestion ([7b4b6db](https://github.com/y0ngha/siglens-core/commit/7b4b6db4a25a0e9c869271d65e7a7ae9a439a9d1))
+* **options:** resolve PR [#86](https://github.com/y0ngha/siglens-core/issues/86) round-3 review — 13 Blocker + 5 Suggestion ([67c6dab](https://github.com/y0ngha/siglens-core/commit/67c6dab8a1e1d184f6b5e0f57171a8cb786cc09e))
+* **options:** resolve PR [#86](https://github.com/y0ngha/siglens-core/issues/86) round-4 review — 2 Blocker + 5 Suggestion ([eda74bb](https://github.com/y0ngha/siglens-core/commit/eda74bbd49cc1652619f4f7350d6ff44bc280009))
+* **options:** tighten numeric return types + relocate prompt-options type ([40ad290](https://github.com/y0ngha/siglens-core/commit/40ad29028c4f35710ee3037c26750812f23de7ff))
+* **options:** tighten sanitize filter + export prompt options type ([d3bdf62](https://github.com/y0ngha/siglens-core/commit/d3bdf620aa1cebe497ab611728547a2556a3b6b1))
+* **options:** TZ-safe ET day diff + spot-anchored ATM IV (PR [#86](https://github.com/y0ngha/siglens-core/issues/86) feedback) ([31532ef](https://github.com/y0ngha/siglens-core/commit/31532efcf80fb5dd0b32218498eb10a1e227ecf9))
+
+
+### Features
+
+* add asIsoDate primitive normalization helper ([27e29d8](https://github.com/y0ngha/siglens-core/commit/27e29d81be5ffd8686bd67f89121128984ef4d2c))
+* **options:** add buildOptionsAnalysisPrompt + summarizeChainForLlm ([0d59658](https://github.com/y0ngha/siglens-core/commit/0d596580c4675f0fd94a6170043bfb5c8dbab8f6))
+* **options:** add cache TTL constant and cache key builder ([9b407e8](https://github.com/y0ngha/siglens-core/commit/9b407e86b132642c651931dbe33c63085bf806e1))
+* **options:** add core calculation functions (max pain, P/C, implied move, OI agg, sanitize) ([fbf63a5](https://github.com/y0ngha/siglens-core/commit/fbf63a58b5e297a334e1be57bb00c08560ecd68f))
+* **options:** add core domain types for options analysis ([dca3d09](https://github.com/y0ngha/siglens-core/commit/dca3d0913aead0e586086f64fa17d37b1ef79baa))
+* **options:** add expiration slot mapping (1W/2W/1M/2M/3M/6M) ([feefe3f](https://github.com/y0ngha/siglens-core/commit/feefe3fc691b15e535967bbaf20ea54b12b16d24))
+* **options:** add normalizeOptionsAnalysisResponse with nested field guards ([27235b4](https://github.com/y0ngha/siglens-core/commit/27235b41e50657d50995909b22cd23eb7f5bad3d))
+* **options:** add pollOptionsAnalysis with write-side normalization + cache persistence ([8a8da5a](https://github.com/y0ngha/siglens-core/commit/8a8da5ab3ee2d59f50e6f978f72f3496cf870eb4))
+* **options:** add submit/poll types (matches news/fundamental patterns) ([70f8b11](https://github.com/y0ngha/siglens-core/commit/70f8b11ecdf07d7d122505d6fcf7d1f334a71b47))
+* **options:** add submitOptionsAnalysis use-case (matches news/fundamental cache+enqueue pattern) ([907a7b4](https://github.com/y0ngha/siglens-core/commit/907a7b470739a3d6b5c118716390a7c1143d45a5))
+* **options:** export options application use-cases through public API ([fbef646](https://github.com/y0ngha/siglens-core/commit/fbef646e2f68e53cb82924e5ba66ea6fa046fd3f))
+* **options:** expose options public API (types + provider interface + calc utils + normalize + prompt) ([6782ce9](https://github.com/y0ngha/siglens-core/commit/6782ce9a425676d001b157739a1b3bd94fcd9170))
+
 ## [0.10.1](https://github.com/y0ngha/siglens-core/compare/v0.9.5...v0.10.1) (2026-05-11)
 
 
