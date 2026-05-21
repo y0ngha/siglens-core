@@ -15,13 +15,14 @@ describe('normalizeOptionsAnalysisResponse', () => {
                 },
             ],
             signals: [{ kind: 'bullish', message: '콜 OI 급증' }],
+            // LLM이 보낸 analyzedAt은 의도적으로 무시되고 서버 `now`가 사용된다.
             analyzedAt: '2026-05-14T11:55:00Z',
         };
         const result = normalizeOptionsAnalysisResponse(raw, now);
         expect(result.summary).toBe('시장은 상승 편향');
         expect(result.perExpiration).toHaveLength(1);
         expect(result.signals).toHaveLength(1);
-        expect(result.analyzedAt).toBe('2026-05-14T11:55:00Z');
+        expect(result.analyzedAt).toBe(now.toISOString());
     });
 
     it('falls back to FALLBACK_SUMMARY when summary missing', () => {
@@ -94,10 +95,24 @@ describe('normalizeOptionsAnalysisResponse', () => {
         expect(result.signals[0].kind).toBe('neutral');
     });
 
-    it('uses now.toISOString() when analyzedAt missing or invalid', () => {
-        const result = normalizeOptionsAnalysisResponse({}, now);
-        expect(result.analyzedAt).toBe(now.toISOString());
-    });
+    // LLM이 프롬프트 예시 문자열("2023-10-27T10:30:00")을 그대로 응답에
+    // 넣는 사례가 있어, 서버 `now`만 신뢰한다. 각 입력을 it.each로 펼쳐
+    // 실패 시 어떤 입력이 문제였는지 테스트 리포트에서 즉시 식별할 수 있게 한다.
+    it.each([
+        ['analyzedAt 없는 빈 객체', {}],
+        ['유효하지 않은 날짜 문자열', { analyzedAt: 'invalid-date' }],
+        [
+            'LLM 프롬프트 예시 echo 문자열',
+            { analyzedAt: '2023-10-27T10:30:00' },
+        ],
+        ['미래 날짜', { analyzedAt: '2099-01-01T00:00:00Z' }],
+    ] as const)(
+        'always uses now.toISOString() for analyzedAt — %s',
+        (_label, raw) => {
+            const result = normalizeOptionsAnalysisResponse(raw, now);
+            expect(result.analyzedAt).toBe(now.toISOString());
+        }
+    );
 
     it('handles null and non-object inputs safely', () => {
         // String input that's not valid JSON exercises the parseLlmPayload
@@ -123,7 +138,7 @@ describe('normalizeOptionsAnalysisResponse', () => {
         expect(result.summary).toBe('테스트');
     });
 
-    it('is idempotent — passing already-normalized result through again is a no-op', () => {
+    it('is idempotent for content fields when passed through again', () => {
         const raw = {
             summary: '콜 옵션 OI가 높아 강세 포지셔닝이 확인됩니다.',
             perExpiration: [
@@ -144,8 +159,9 @@ describe('normalizeOptionsAnalysisResponse', () => {
         expect(second.summary).toBe(first.summary);
         expect(second.perExpiration).toEqual(first.perExpiration);
         expect(second.signals).toEqual(first.signals);
-        // analyzedAt is a valid ISO on the first pass, so it must be
-        // preserved verbatim on the second.
+        // analyzedAt은 매 호출마다 `now`로 새로 찍는다 — `now`가 같으면
+        // 동일 값으로 수렴해 멱등성이 유지된다.
         expect(second.analyzedAt).toBe(first.analyzedAt);
+        expect(first.analyzedAt).toBe(now.toISOString());
     });
 });

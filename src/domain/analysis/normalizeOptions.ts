@@ -75,9 +75,17 @@ function normalizeSignalItem(item: unknown): OptionsSignal | null {
  * Domain purity: `now` is taken as a required argument so this function
  * stays a pure transformation.
  *
+ * `analyzedAt` is always set to `now.toISOString()` — any value supplied
+ * in `raw` is intentionally ignored. The server is the authoritative
+ * source for analysis time, and the LLM has been observed echoing the
+ * prompt example string (e.g. `"2023-10-27T10:30:00"`) verbatim,
+ * surfacing stale past dates in the UI. Cache-hit paths also flow
+ * through this function (see `submitOptionsAnalysis`), so the displayed
+ * time effectively means "most recently observed"; with the 1-day cache
+ * TTL the drift from the original analysis time is bounded to 24 hours.
+ *
  * @param raw - Worker JSON / cached payload / arbitrary unknown.
- * @param now - Reference clock used as `analyzedAt` fallback when the
- *   payload omits the field or carries a non-ISO string.
+ * @param now - Reference clock; always used as `analyzedAt`.
  * @returns Fully-typed normalized response with every field populated.
  */
 export function normalizeOptionsAnalysisResponse(
@@ -97,6 +105,6 @@ export function normalizeOptionsAnalysisResponse(
             asArray(o.perExpiration).map(normalizePerExpirationItem)
         ),
         signals: compact(asArray(o.signals).map(normalizeSignalItem)),
-        analyzedAt: asIsoDate(o.analyzedAt) ?? now.toISOString(),
+        analyzedAt: now.toISOString(),
     };
 }

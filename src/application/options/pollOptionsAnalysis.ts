@@ -44,8 +44,9 @@ const LOG_PREFIX = '[PollOptions]';
  * @param jobId - The `jobId` returned by {@link submitOptionsAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
  *   so Redis cleanup and cache writes can continue after the response.
- * @param now - Reference timestamp injected into the normalizer's
- *   `analyzedAt` fallback. Defaults to `new Date()`.
+ * @param now - Reference timestamp used directly as the normalized result's
+ *   `analyzedAt` (not as a fallback for an LLM-supplied value — the LLM
+ *   value is always discarded). Defaults to `new Date()`.
  * @returns The current poll outcome — see {@link PollOptionsAnalysisResult}.
  *
  * @example
