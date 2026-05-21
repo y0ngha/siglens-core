@@ -53,6 +53,21 @@ const key = process.env.API_KEY;
 // ✅ Define MACDResult in domain/types.ts, import it in macd.ts
 ```
 
+**Subdirectory `types.ts` exception** — when a feature area introduces 10+ cohesive types
+(currently `domain/options/types.ts`), defining them in a feature-local `types.ts` is
+permitted **provided** `domain/types.ts` re-exports the full set, so all consumers still
+use the canonical `@/domain/types` import path. The exception exists because inlining a
+large feature's types would push `domain/types.ts` past 2,200 lines and dilute its
+discoverability. Implementation files in that feature folder must still NOT define their
+own types — they import from the feature-local `types.ts`.
+
+```typescript
+// ✅ domain/options/types.ts defines OptionsContract, OptionsChain, ...
+// ✅ domain/types.ts re-exports the full set
+// ✅ Consumers: import type { OptionsChain } from '@/domain/types'
+// ❌ Define OptionsContract inside domain/options/sanitizeOptionsChain.ts
+```
+
 **No hardcoded literals:** extract to constants files.
 ```typescript
 // ❌ period = 14

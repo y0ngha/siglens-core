@@ -100,14 +100,21 @@ describe('normalizeOptionsAnalysisResponse', () => {
     });
 
     it('handles null and non-object inputs safely', () => {
-        expect(() => normalizeOptionsAnalysisResponse(null, now)).not.toThrow();
-        expect(() =>
-            normalizeOptionsAnalysisResponse(undefined, now)
-        ).not.toThrow();
-        expect(() =>
-            normalizeOptionsAnalysisResponse('string', now)
-        ).not.toThrow();
-        expect(() => normalizeOptionsAnalysisResponse(123, now)).not.toThrow();
+        // String input that's not valid JSON exercises the parseLlmPayload
+        // catch branch (JSON.parse throws → fallback to FALLBACK_SUMMARY).
+        const fromString = normalizeOptionsAnalysisResponse('string', now);
+        expect(fromString.summary).toContain('가져올 수 없');
+        expect(fromString.perExpiration).toEqual([]);
+        expect(fromString.signals).toEqual([]);
+
+        // Non-object primitives go through a different fallback path (no
+        // parse attempt) but must still resolve to FALLBACK_SUMMARY shape.
+        for (const input of [null, undefined, 123]) {
+            const result = normalizeOptionsAnalysisResponse(input, now);
+            expect(result.summary).toContain('가져올 수 없');
+            expect(result.perExpiration).toEqual([]);
+            expect(result.signals).toEqual([]);
+        }
     });
 
     it('parses LLM markdown-fenced JSON string', () => {
