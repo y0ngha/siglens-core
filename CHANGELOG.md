@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/y0ngha/siglens-core/compare/v0.11.0...v0.11.1) (2026-05-21)
+
+
+### Bug Fixes
+
+* 옵션 분석 응답의 hardcoded 날짜 수정 ([8ebb030](https://github.com/y0ngha/siglens-core/commit/8ebb030e2527675024fb935f4d42b09779b78be9))
+
 # [0.11.0](https://github.com/y0ngha/siglens-core/compare/v0.10.1...v0.11.0) (2026-05-21)
 
 
