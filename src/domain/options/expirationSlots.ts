@@ -6,6 +6,13 @@ import type { ExpirationSlot, SlotMapping } from './types';
  * provider expiration per slot.
  */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
+    // 이번 주 만기 위클리 옵션(0~6일) 슬롯. 미국 옵션은 매주 금요일 만기이므로
+    // ET 기준 어느 요일에 호출해도 이 범위에 "이번 주 금요일 만기"가 들어온다.
+    // label은 의도적으로 '오늘'이 아닌 '이번 주' — 사용자가 호출하는 시점(예:
+    // ET 월요일)에는 days=4 위클리가 매핑되는데 '오늘'로 표시하면 어색하다.
+    // maxDays가 없으면 8일짜리 다음 주 위클리까지 빨아들여 1W가 비는 케이스가
+    // 생기므로 6일 상한을 둔다.
+    { key: '0D', label: '이번 주', targetDays: 0, maxDays: 6 },
     { key: '1W', label: '1주', targetDays: 7 },
     { key: '2W', label: '2주', targetDays: 14 },
     { key: '1M', label: '1개월', targetDays: 30 },
@@ -43,7 +50,10 @@ export function mapExpirationsToSlots(
     const result: (SlotMapping | null)[] = [];
     for (const slot of EXPIRATION_SLOTS) {
         const match = dated.find(
-            e => e.days >= slot.targetDays && !used.has(e.date)
+            e =>
+                e.days >= slot.targetDays &&
+                (slot.maxDays === undefined || e.days <= slot.maxDays) &&
+                !used.has(e.date)
         );
         if (!match) {
             result.push(null);
