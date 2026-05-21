@@ -4,10 +4,7 @@ import {
     ZERO_DTE_MAX_DAYS,
     mapExpirationsToSlots,
 } from '@/domain/options/expirationSlots';
-import type {
-    ExpirationSlotKey,
-    SlotMapping,
-} from '@/domain/options/types';
+import type { ExpirationSlotKey, SlotMapping } from '@/domain/options/types';
 
 const isMapping = (x: SlotMapping | null): x is SlotMapping => x !== null;
 
@@ -73,21 +70,24 @@ describe('mapExpirationsToSlots', () => {
         expect(byKey['1W']).toBe('2026-05-21');
     });
 
-    it(`maps the inclusive ${ZERO_DTE_MAX_DAYS}-day boundary to the 0D slot, ` +
-        `forcing 7-day expirations into 1W`, () => {
-        // 2026-05-14 기준: 6일 후 = 2026-05-20 (포함적 maxDays 상한 = 0D),
-        // 8일 후 = 2026-05-22 (maxDays 초과 = 1W). ZERO_DTE_MAX_DAYS 값을
-        // 직접 검증해 상수 변경 시 경계가 무너지면 즉시 회귀가 잡힌다.
-        const expirations = ['2026-05-20', '2026-05-22'];
-        const result = mapExpirationsToSlots(expirations, now);
-        const byKey = Object.fromEntries(
-            result
-                .filter(isMapping)
-                .map(m => [m.slot.key, m.expirationDate] as const)
-        ) as Partial<Record<ExpirationSlotKey, string>>;
-        expect(byKey['0D']).toBe('2026-05-20');
-        expect(byKey['1W']).toBe('2026-05-22');
-    });
+    it(
+        `maps the inclusive ${ZERO_DTE_MAX_DAYS}-day boundary to the 0D slot, ` +
+            `forcing 7-day expirations into 1W`,
+        () => {
+            // 2026-05-14 기준: 6일 후 = 2026-05-20 (포함적 maxDays 상한 = 0D),
+            // 8일 후 = 2026-05-22 (maxDays 초과 = 1W). ZERO_DTE_MAX_DAYS 값을
+            // 직접 검증해 상수 변경 시 경계가 무너지면 즉시 회귀가 잡힌다.
+            const expirations = ['2026-05-20', '2026-05-22'];
+            const result = mapExpirationsToSlots(expirations, now);
+            const byKey = Object.fromEntries(
+                result
+                    .filter(isMapping)
+                    .map(m => [m.slot.key, m.expirationDate] as const)
+            ) as Partial<Record<ExpirationSlotKey, string>>;
+            expect(byKey['0D']).toBe('2026-05-20');
+            expect(byKey['1W']).toBe('2026-05-22');
+        }
+    );
 
     it('omits slots with no satisfying expiration', () => {
         const expirations = ['2026-05-22']; // only 1W
