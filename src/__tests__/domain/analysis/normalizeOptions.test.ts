@@ -101,7 +101,10 @@ describe('normalizeOptionsAnalysisResponse', () => {
     it.each([
         ['analyzedAt 없는 빈 객체', {}],
         ['유효하지 않은 날짜 문자열', { analyzedAt: 'invalid-date' }],
-        ['LLM 프롬프트 예시 echo 문자열', { analyzedAt: '2023-10-27T10:30:00' }],
+        [
+            'LLM 프롬프트 예시 echo 문자열',
+            { analyzedAt: '2023-10-27T10:30:00' },
+        ],
         ['미래 날짜', { analyzedAt: '2099-01-01T00:00:00Z' }],
     ] as const)(
         'always uses now.toISOString() for analyzedAt — %s',
