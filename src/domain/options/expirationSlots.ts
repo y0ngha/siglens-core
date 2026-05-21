@@ -2,17 +2,23 @@ import { MS_PER_DAY } from '@/domain/constants/time';
 import type { ExpirationSlot, SlotMapping } from './types';
 
 /**
+ * Inclusive upper bound on days-to-expiration for the `0D` (same-week)
+ * slot. 6일 = 1주(7일) 직전까지로, 미국 위클리 옵션이 매주 금요일에
+ * 만기되므로 ET 어느 요일에 호출해도 "이번 주 금요일 만기" 1건이 이
+ * 범위에 들어온다. 7일 이상은 1W 슬롯이 가져가도록 경계를 둔다.
+ */
+export const ZERO_DTE_MAX_DAYS = 6;
+
+/**
  * Canonical chip slots in render order. Frontends pick the closest matching
  * provider expiration per slot.
+ *
+ * `0D` slot은 "이번 주 만기"를 의미한다. label이 '오늘'이 아닌 '이번 주'인
+ * 이유: ET 월요일에 호출하면 days=4 위클리가 이 슬롯에 매핑되는데 '오늘'로
+ * 표기하면 어색하다.
  */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
-    // 이번 주 만기 위클리 옵션(0~6일) 슬롯. 미국 옵션은 매주 금요일 만기이므로
-    // ET 기준 어느 요일에 호출해도 이 범위에 "이번 주 금요일 만기"가 들어온다.
-    // label은 의도적으로 '오늘'이 아닌 '이번 주' — 사용자가 호출하는 시점(예:
-    // ET 월요일)에는 days=4 위클리가 매핑되는데 '오늘'로 표시하면 어색하다.
-    // maxDays가 없으면 8일짜리 다음 주 위클리까지 빨아들여 1W가 비는 케이스가
-    // 생기므로 6일 상한을 둔다.
-    { key: '0D', label: '이번 주', targetDays: 0, maxDays: 6 },
+    { key: '0D', label: '이번 주', targetDays: 0, maxDays: ZERO_DTE_MAX_DAYS },
     { key: '1W', label: '1주', targetDays: 7 },
     { key: '2W', label: '2주', targetDays: 14 },
     { key: '1M', label: '1개월', targetDays: 30 },

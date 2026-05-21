@@ -1,5 +1,19 @@
 # Fix Log
 
+## [PR #88 Round 2 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
+- B1: `src/domain/options/expirationSlots.ts` — 0D 슬롯의 `maxDays: 6`이 매직 넘버. `ZERO_DTE_MAX_DAYS = 6` 모듈 상수로 추출하고 JSDoc으로 의도(1주 직전 경계) 명시. 슬롯 정의는 이 상수를 참조하도록 변경.
+  - Rule: MISTAKES.md 코딩 패러다임 #13 — 매직 넘버는 named module-level 상수로 추출.
+- B2: `docs/PUBLIC_API.md` — Tier 4 `ExpirationSlot.maxDays?` 신규 필드와 `ExpirationSlotKey`의 `'0D'` 멤버 추가, `hashOptionsInput`의 내부 cache-key 입력 단순화 변경을 개정 이력(2026-05-22)에 추가. 0.x semver에서 minor bump 대상임을 명시하고 exhaustive switch 사용 consumer 영향 안내.
+  - Rule: MISTAKES.md Documentation Sync #7 — src/index.ts 변경 시 동일 commit에 PUBLIC_API.md 갱신.
+- S1: `src/__tests__/domain/options/expirationSlots.test.ts` — `Object.fromEntries(pairs)` 반환 타입이 `{ [k: string]: string }`이라 `byKey['0D']`의 `undefined` 가능성이 표현 안 됨. `as Partial<Record<ExpirationSlotKey, string>>` 단언 추가, `ExpirationSlotKey` 타입 import도 함께.
+  - Rule: MISTAKES.md TypeScript #1 — `Object.fromEntries` 반환 타입 단언.
+- S2: `src/__tests__/application/options/submitOptionsAnalysis.test.ts` — 새 hash 시맨틱(structural identity만 hash, fast-moving 필드 제외)에 대한 회귀 방지 테스트가 없었음. "underlyingPrice/capturedAt/OI 변경에도 동일 cacheKey로 cache.get이 호출된다"는 케이스를 캐시 히트 describe 블록에 추가.
+  - Rule: MISTAKES.md Tests #15 — 변경된 핵심 시맨틱은 전용 테스트로 명시 보호.
+- S3: `src/__tests__/domain/options/expirationSlots.test.ts` — `maxDays` 포함적 상한(6일) 경계 직접 검증 테스트 추가(`day 6 → 0D, day 8 → 1W`). `ZERO_DTE_MAX_DAYS` 상수 import해서 값 변경 시 회귀 자동 감지.
+  - Rule: 가독성 — 경계값 명시 테스트로 상수 변경 시 의도치 않은 경계 이동 방지.
+- Inline high 1 partial: `src/application/options/submitOptionsAnalysis.ts` — reviewer가 hash에 (a) OI 합계 다시 포함 / (b) modelId 포함 / (c) 만기별 chain 필터링 셋을 제안. (a)는 PR의 핵심 의도(cache hit률 회복)와 직접 충돌하므로 reject, (b)는 `buildOptionsCacheKey`가 이미 modelId를 별도 segment로 포함하므로 중복이라 reject, (c)는 합리적이라 적용 — `expirationDate !== 'all'`인 경우 해당 chain만 filter 후 hash, JSDoc도 단일 만기 분석의 cache scope 의도를 추가.
+  - Rule: PR_FIX_FLOW §1-6 Reject #5(reviewer가 PR 의도를 놓침) + 부분 적용.
+
 ## [PR #87 Round 4 | fix/options-analyzed-at-hardcoded | 2026-05-22]
 - S1: `src/__tests__/domain/analysis/normalizeOptions.test.ts` — `analyzedAt` 무시 검증 테스트 안에서 `for-of` 루프로 4개 케이스를 돌리고 있어, 실패 시 어느 입력이 문제였는지 리포트에서 식별 불가. Vitest `it.each([...])`로 전환해 각 케이스가 독립 항목으로 표시되도록 분리. 라벨도 한국어로 명시("analyzedAt 없는 빈 객체" / "유효하지 않은 날짜 문자열" / "LLM 프롬프트 예시 echo 문자열" / "미래 날짜").
   - Rule: 가독성 — 데이터 주도 테스트는 각 입력이 독립적인 it() 항목으로 보고되어야 한다.

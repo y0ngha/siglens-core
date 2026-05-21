@@ -46,6 +46,15 @@ const LOG_PREFIX = '[submitOptionsAnalysis]';
  * added or delisted), which is the actual invalidation signal worth firing
  * a fresh LLM call for.
  *
+ * When `expirationDate` is a concrete ISO date (not `'all'`), only the
+ * matching chain participates in the hash. Other expirations' structural
+ * changes are irrelevant to the single-expiration analysis and should not
+ * invalidate its cache. `'all'` analyses fold every chain in.
+ *
+ * `modelId` is intentionally **not** part of the hash input — the cache
+ * key (`buildOptionsCacheKey`) already includes it as a separate segment,
+ * so adding it here would double-count the same disambiguation axis.
+ *
  * @param snapshot       - Options snapshot fetched from the provider.
  * @param expirationDate - Target expiration or `'all'`.
  * @returns 16-character lowercase hex string.
@@ -54,11 +63,16 @@ function hashOptionsInput(
     snapshot: OptionsSnapshot,
     expirationDate: OptionsExpirationFilter
 ): string {
+    const targetChains =
+        expirationDate === 'all'
+            ? snapshot.chains
+            : snapshot.chains.filter(c => c.expirationDate === expirationDate);
+
     return hashAnalysisInput(
         JSON.stringify({
             symbol: snapshot.symbol,
             expirationDate,
-            chains: snapshot.chains.map(c => ({
+            chains: targetChains.map(c => ({
                 expirationDate: c.expirationDate,
                 callsLen: c.calls.length,
                 putsLen: c.puts.length,
