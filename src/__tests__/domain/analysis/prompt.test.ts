@@ -275,6 +275,27 @@ describe('prompt', () => {
             );
             expect(result).toContain('Volume:');
         });
+
+        it('labels the current market block as "Analysis Snapshot" with "Snapshot Price"', () => {
+            const bars = [
+                makeBar(0, TEST_PREV_CLOSE),
+                makeBar(1, TEST_NEXT_CLOSE),
+            ];
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            expect(prompt).toContain('## Analysis Snapshot');
+            expect(prompt).toContain(
+                '- Snapshot Price (price captured at analysis time; not a live quote):'
+            );
+            expect(prompt).not.toContain('## Current Market Status');
+            expect(prompt).not.toContain('- Current Price:');
+        });
     });
 
     describe('인디케이터 수치 섹션', () => {

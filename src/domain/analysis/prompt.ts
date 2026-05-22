@@ -193,8 +193,8 @@ const lastOf = <T>(arr: T[]): T | null =>
 const formatMarketSection = (bars: Bar[]): string => {
     if (bars.length === 0) {
         return [
-            '## Current Market Status',
-            '- Current Price: N/A',
+            '## Analysis Snapshot',
+            '- Snapshot Price (price captured at analysis time; not a live quote): N/A',
             '- Price Change %: N/A',
             '- Volume: N/A',
         ].join('\n');
@@ -208,8 +208,8 @@ const formatMarketSection = (bars: Bar[]): string => {
             : 'N/A';
 
     return [
-        '## Current Market Status',
-        `- Current Price: ${fmt(last.close)}`,
+        '## Analysis Snapshot',
+        `- Snapshot Price (price captured at analysis time; not a live quote): ${fmt(last.close)}`,
         `- Price Change %: ${changeRate}`,
         `- Volume: ${formatVolume(last.volume)}`,
     ].join('\n');
