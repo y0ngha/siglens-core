@@ -196,5 +196,24 @@ describe('pollOverallAnalysis 함수는', () => {
             );
             warnSpy.mockRestore();
         });
+
+        it('echoes meta.optionsOiStale onto response.optionsOiStale', async () => {
+            // The stale-OI flag is captured at submit time and stashed in the
+            // job meta so the normalizer can attach it to the worker response
+            // without round-tripping through the LLM payload. Verify the
+            // end-to-end echo: meta.optionsOiStale=true → result.optionsOiStale=true.
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                optionsOiStale: true,
+            });
+            mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+            const result = await pollOverallAnalysis('job-stale');
+
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.optionsOiStale).toBe(true);
+            }
+        });
     });
 });

@@ -431,18 +431,20 @@ describe('buildOverallAnalysisPrompt', () => {
             expect(prompt).not.toContain('미국 옵션 정규 거래 시간 외에 수집된');
         });
 
-        it('treats the 3-axis (no companyName) legacy overload as a graceful options skip', () => {
+        it('treats an omitted options arg as a graceful options skip (4-axis call without options)', () => {
             const prompt = buildOverallAnalysisPrompt(
                 TEST_SYMBOL,
+                TEST_COMPANY_NAME,
                 MOCK_TECHNICAL,
                 MOCK_FUNDAMENTAL,
                 MOCK_NEWS,
                 '1Day' as Timeframe
+                // options + optionsOiStale omitted → fallback to null/false.
             );
 
-            // The legacy overload omits the options arg entirely. The impl
-            // falls back to `options=null`, so we expect the same "no options
-            // data" hint as the explicit-null branch.
+            // When the options arg is omitted, the impl falls back to
+            // `options=null`, producing the same "no options data" hint as
+            // the explicit-null branch.
             expect(prompt).toContain(
                 '옵션 시장 데이터는 분석에 포함되지 않았습니다'
             );

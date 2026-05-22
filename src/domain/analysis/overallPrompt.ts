@@ -268,19 +268,11 @@ function formatOptions(
  *                         section so the LLM tempers positioning claims.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
-// Legacy 3-axis overload retained for callers that haven't migrated yet —
-// `companyName` defaults to `symbol`, options-axis section is omitted.
-export function buildOverallAnalysisPrompt(
-    symbol: string,
-    technical: AnalysisResponse,
-    fundamental: FundamentalAnalysisResponse,
-    news: NewsAnalysisResponse,
-    timeframe: Timeframe,
-    fearGreed?: FearGreedSnapshot
-): string;
-// 4-axis overload (current canonical). Options axis is appended at the end of
-// the positional list with `optionsOiStale` so existing call sites passing
-// only the first 7 args remain compatible.
+// 4-axis canonical signature. The legacy 3-axis overload (without
+// companyName) was removed — submitOverallAnalysis and dependencyResolver
+// both call the 4-axis form, and every test (overallPrompt.test.ts +
+// submitOverallAnalysis.test.ts) was already migrated. No remaining
+// caller depended on the old shape.
 export function buildOverallAnalysisPrompt(
     symbol: string,
     companyName: string,
@@ -291,56 +283,9 @@ export function buildOverallAnalysisPrompt(
     fearGreed?: FearGreedSnapshot,
     options?: OptionsAnalysisResponse | null,
     optionsOiStale?: boolean
-): string;
-export function buildOverallAnalysisPrompt(
-    symbol: string,
-    companyNameOrTechnical: string | AnalysisResponse,
-    technicalOrFundamental: AnalysisResponse | FundamentalAnalysisResponse,
-    fundamentalOrNews: FundamentalAnalysisResponse | NewsAnalysisResponse,
-    newsOrTimeframe: NewsAnalysisResponse | Timeframe,
-    maybeTimeframeOrFearGreed?: Timeframe | FearGreedSnapshot,
-    maybeFearGreed?: FearGreedSnapshot,
-    maybeOptions?: OptionsAnalysisResponse | null,
-    maybeOptionsOiStale?: boolean
 ): string {
-    const hasCompanyName = typeof companyNameOrTechnical === 'string';
-    const companyName = hasCompanyName ? companyNameOrTechnical : symbol;
-    // (a) TS cannot narrow AnalysisResponse|FundamentalAnalysisResponse union from `hasCompanyName` boolean.
-    // (b) Safe: with-companyName overload places technical at arg 3 (technicalOrFundamental); without-companyName overload places technical at arg 2 (companyNameOrTechnical, already narrowed away from string here).
-    const technical = hasCompanyName
-        ? (technicalOrFundamental as AnalysisResponse)
-        : companyNameOrTechnical;
-    // (a) TS cannot narrow AnalysisResponse|FundamentalAnalysisResponse|NewsAnalysisResponse union from `hasCompanyName` boolean.
-    // (b) Safe: with-companyName overload places fundamental at arg 4 (fundamentalOrNews); without-companyName overload places fundamental at arg 3 (technicalOrFundamental).
-    const fundamental = hasCompanyName
-        ? (fundamentalOrNews as FundamentalAnalysisResponse)
-        : (technicalOrFundamental as FundamentalAnalysisResponse);
-    // (a) TS cannot narrow FundamentalAnalysisResponse|NewsAnalysisResponse|Timeframe union from `hasCompanyName` boolean.
-    // (b) Safe: with-companyName overload places news at arg 5 (newsOrTimeframe); without-companyName overload places news at arg 4 (fundamentalOrNews).
-    const news = hasCompanyName
-        ? (newsOrTimeframe as NewsAnalysisResponse)
-        : (fundamentalOrNews as NewsAnalysisResponse);
-    // (a) TS cannot narrow Timeframe|FearGreedSnapshot|undefined to Timeframe from a property check on `hasCompanyName`.
-    // (b) Safe: with-companyName overload guarantees arg 6 (maybeTimeframeOrFearGreed) is Timeframe;
-    //     without-companyName overload guarantees arg 5 (newsOrTimeframe) is Timeframe.
-    const timeframe = hasCompanyName
-        ? (maybeTimeframeOrFearGreed as Timeframe)
-        : (newsOrTimeframe as Timeframe);
-    // (a) TS cannot narrow Timeframe|FearGreedSnapshot|undefined to FearGreedSnapshot|undefined from `hasCompanyName`.
-    // (b) Safe: without-companyName overload signature places FearGreedSnapshot|undefined at arg 6
-    //     (i.e. maybeTimeframeOrFearGreed); with-companyName overload places it at arg 7 (maybeFearGreed).
-    const fearGreed: FearGreedSnapshot | undefined = hasCompanyName
-        ? maybeFearGreed
-        : (maybeTimeframeOrFearGreed as FearGreedSnapshot | undefined);
-    // The options axis is only addressable via the 4-axis overload (with
-    // companyName). The legacy 3-axis overload omits it, which is rendered
-    // as a graceful skip (same hint shown when caller passes `null`).
-    const options: OptionsAnalysisResponse | null = hasCompanyName
-        ? (maybeOptions ?? null)
-        : null;
-    const optionsOiStale: boolean = hasCompanyName
-        ? (maybeOptionsOiStale ?? false)
-        : false;
+    const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
+    const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
     const { label, context } = TIMEFRAME_CONFIG[timeframe];
 
     const fearGreedBlock =
@@ -370,7 +315,7 @@ ${formatFundamental(fundamental)}
 ${formatNews(news)}
 
 ## Axis 4 — Options Analysis
-${formatOptions(options, optionsOiStale)}
+${formatOptions(resolvedOptions, resolvedOptionsOiStale)}
 
 ## Output Schema
 {

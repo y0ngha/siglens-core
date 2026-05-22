@@ -1103,9 +1103,11 @@ describe('submitOverallAnalysis 함수는', () => {
     });
 
     describe('options axis integration', () => {
+        // `tone` lives on OptionsPerExpirationCommentary, not on the
+        // top-level OptionsAnalysisResponse. Keep the fixture limited to the
+        // real shape.
         const cachedOptionsResponse = {
             summary: '옵션 시장 요약',
-            tone: 'neutral' as const,
             perExpiration: [],
             signals: [],
             analyzedAt: '2099-01-01T00:00:00Z',

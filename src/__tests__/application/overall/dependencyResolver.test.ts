@@ -1124,9 +1124,11 @@ describe('resolveOverallDependencies 함수는', () => {
         });
 
         it('returns cached options payload when submitOptionsAnalysis hits cache', async () => {
+            // `tone` lives on OptionsPerExpirationCommentary, not on the
+            // top-level OptionsAnalysisResponse. Don't replant it here as a
+            // top-level field.
             const cachedOptions = {
                 summary: 'Options summary',
-                tone: 'neutral',
                 perExpiration: [],
                 signals: [],
                 analyzedAt: '2099-01-01T00:00:00Z',
