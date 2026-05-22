@@ -2,7 +2,7 @@ import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
-import { pickNearestExpiration } from '@/application/overall/pickNearestExpiration';
+import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     DependencyState,

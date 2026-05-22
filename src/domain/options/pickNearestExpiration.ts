@@ -4,13 +4,16 @@ const PREFERRED_MIN_DAYS = 3;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Pick the nearest expiration that's ≥ `now + 3 days` to avoid 0DTE/near-expiry
- * noise (gamma blow-ups, single-event distortions). If every available
- * expiration is within 3 days, fall back to the earliest one ≥ `now`. Returns
- * null when no future expiration exists (NoChains-like edge).
+ * @internal Pick the nearest expiration that's ≥ `now + 3 days` to avoid
+ * 0DTE/near-expiry noise (gamma blow-ups, single-event distortions). If every
+ * available expiration is within 3 days, fall back to the earliest one ≥
+ * `now`. Returns null when no future expiration exists (NoChains-like edge).
  *
  * `snapshot.chains` is documented as ascending-sorted by `expirationDate`, so
  * we scan once and return the first hit per branch.
+ *
+ * Used only by the overall dependency resolver; not re-exported from the
+ * package public surface.
  */
 export function pickNearestExpiration(
     snapshot: OptionsSnapshot,
