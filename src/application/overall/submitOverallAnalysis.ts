@@ -240,7 +240,14 @@ export async function submitOverallAnalysis(
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
             if (cached !== null) {
-                const result = normalizeOverallAnalysisResponse(cached);
+                // Forward the current request's `optionsOiStale` (not the
+                // cached body's stale flag, which is undefined since the
+                // normalizer omits the field when false): the staleness
+                // is a function of the *current* request's snapshot time,
+                // not when the analysis was originally generated.
+                const result = normalizeOverallAnalysisResponse(cached, {
+                    optionsOiStale: options.optionsOiStale,
+                });
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result };
             }

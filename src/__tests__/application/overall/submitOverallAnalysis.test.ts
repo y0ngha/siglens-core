@@ -133,7 +133,9 @@ const cachedOverallResult = {
     integratedConclusionKo: '3축 결론',
     scenarios: [],
     riskFactorsKo: [],
-    optionsOiStale: false,
+    // `optionsOiStale` is omitted (not set to false) — the normalizer drops
+    // the field when not stale rather than emitting `false`, matching the
+    // optional-field contract on `OverallAnalysisResponse`.
 };
 
 const mockCacheGet = vi.fn();
