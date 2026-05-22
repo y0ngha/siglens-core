@@ -1,3 +1,5 @@
+import type { OptionsAnalysisResponse } from './options/types';
+
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 
@@ -1924,7 +1926,8 @@ export type CurrentAnalysisContext =
     | { kind: 'technical'; payload: AnalysisResponse }
     | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
     | { kind: 'news'; payload: NewsAnalysisResponse }
-    | { kind: 'overall'; payload: OverallAnalysisResponse };
+    | { kind: 'overall'; payload: OverallAnalysisResponse }
+    | { kind: 'options'; payload: OptionsAnalysisResponse };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here
@@ -1938,6 +1941,8 @@ export type {
     OptionsChain,
     OptionsSnapshot,
     StrikeOpenInterest,
+    StrikeVolumeAggregate,
+    TopOiQuote,
     OptionsExpirationMetrics,
     OptionsPerExpirationCommentary,
     OptionsSignal,

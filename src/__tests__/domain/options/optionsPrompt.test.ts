@@ -53,4 +53,14 @@ describe('buildOptionsAnalysisPrompt', () => {
         expect(prompt).toContain('AAPL');
         expect(prompt).toContain('$198');
     });
+
+    it('includes interpretation guidance for topVolumeStrikes and topOiBidAskSummary', () => {
+        const prompt = buildOptionsAnalysisPrompt({
+            expirationDate: 'all',
+            companyName: 'Apple Inc.',
+            snapshot,
+        });
+        expect(prompt).toContain('topVolumeStrikes');
+        expect(prompt).toContain('topOiBidAskSummary');
+    });
 });

@@ -1,21 +1,26 @@
 import { aggregateOpenInterest } from './aggregateOpenInterest';
+import { aggregateVolume } from './aggregateVolume';
 import { calculateImpliedMove } from './calculateImpliedMove';
 import { calculateMaxPain } from './calculateMaxPain';
 import { calculatePutCallRatio } from './calculatePutCallRatio';
 import type {
+    MidAndSpread,
     OptionsChain,
     OptionsContract,
     OptionsExpirationMetrics,
+    TopOiQuote,
 } from './types';
 
 /**
- * Number of top strikes (by combined call+put OI) to surface in the LLM
- * summary. Three is enough for the analyst to anchor a narrative around
- * the two or three highest-attention strikes without bloating the prompt
- * with marginal levels. Matches the JSDoc contract on
+ * Number of top strikes (by combined call+put OI or volume) to surface in
+ * the LLM summary. Three is enough for the analyst to anchor a narrative
+ * around the two or three highest-attention strikes without bloating the
+ * prompt with marginal levels. Matches the JSDoc contract on
  * {@link OptionsExpirationMetrics.topOpenInterestStrikes}.
+ *
+ * OI top과 Volume top 모두 동수 유지 — 프롬프트 내 두 섹션 균형.
  */
-const TOP_OI_STRIKES_COUNT = 3;
+const TOP_STRIKES_COUNT = 3;
 
 /**
  * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
@@ -29,7 +34,8 @@ const TOP_OI_STRIKES_COUNT = 3;
  *   ATM strike. Without it, the helper falls back to the median strike,
  *   which is a rougher proxy and can be misleading on skewed chains.
  * @returns Single-expiration metrics including Max Pain, P/C ratio, ATM IV,
- *   the top 3 OI strikes, and implied move %.
+ *   the top 3 OI strikes, top 3 volume strikes, top-OI bid/ask quotes, and
+ *   implied move %.
  */
 export function summarizeChainForLlm(
     chain: OptionsChain,
@@ -44,7 +50,18 @@ export function summarizeChainForLlm(
                 b.putOpenInterest -
                 (a.callOpenInterest + a.putOpenInterest)
         )
-        .slice(0, TOP_OI_STRIKES_COUNT);
+        .slice(0, TOP_STRIKES_COUNT);
+
+    const volumeByStrike = aggregateVolume(chain);
+    const topVolume = volumeByStrike
+        .toSorted(
+            (a, b) => b.callVolume + b.putVolume - (a.callVolume + a.putVolume)
+        )
+        .slice(0, TOP_STRIKES_COUNT);
+
+    const topOiBidAskSummary = top.map(({ strike }) =>
+        buildTopOiQuote(strike, chain)
+    );
 
     return {
         expirationDate: chain.expirationDate,
@@ -53,7 +70,43 @@ export function summarizeChainForLlm(
         atmImpliedVolatility: atmIv,
         topOpenInterestStrikes: top,
         impliedMovePercent: calculateImpliedMove(atmIv, chain.daysToExpiration),
+        topVolumeStrikes: topVolume,
+        topOiBidAskSummary,
     };
+}
+
+/** Build a bid/ask quote snapshot for one strike from the first matching call and put. */
+function buildTopOiQuote(strike: number, chain: OptionsChain): TopOiQuote {
+    const callContract = chain.calls.find(c => c.strike === strike);
+    const putContract = chain.puts.find(p => p.strike === strike);
+    const callQuote = computeMidAndSpread(callContract);
+    const putQuote = computeMidAndSpread(putContract);
+    return {
+        strike,
+        callMidPrice: callQuote.mid,
+        callSpread: callQuote.spread,
+        putMidPrice: putQuote.mid,
+        putSpread: putQuote.spread,
+    };
+}
+
+/**
+ * Derive mid price and spread from a contract's bid/ask. Returns `null`
+ * for both fields when:
+ * - the contract is missing,
+ * - either bid or ask is `null` (one-sided market),
+ * - the resulting spread is negative (crossed/locked quote — treated as
+ *   bad data rather than a real market state).
+ */
+function computeMidAndSpread(
+    contract: OptionsContract | undefined
+): MidAndSpread {
+    if (!contract) return { mid: null, spread: null };
+    const { bid, ask } = contract;
+    if (bid === null || ask === null) return { mid: null, spread: null };
+    const spread = ask - bid;
+    if (spread < 0) return { mid: null, spread: null };
+    return { mid: (bid + ask) / 2, spread };
 }
 
 function pickAtmIv(

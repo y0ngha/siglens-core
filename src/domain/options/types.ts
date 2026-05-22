@@ -74,6 +74,36 @@ export interface StrikeOpenInterest {
     putOpenInterest: number;
 }
 
+/** Per-strike aggregated trading volume (today's session). */
+export interface StrikeVolumeAggregate {
+    /** Strike price in the underlying's currency. */
+    strike: number;
+    /** Sum of call-side trading volume at this strike (today's session). */
+    callVolume: number;
+    /** Sum of put-side trading volume at this strike (today's session). */
+    putVolume: number;
+}
+
+/** @internal Return type of computeMidAndSpread — not part of the public API. */
+export interface MidAndSpread {
+    mid: number | null;
+    spread: number | null;
+}
+
+/** Bid/ask quote snapshot for one of the top OI strikes — surfaces liquidity at the levels the market is anchored to. */
+export interface TopOiQuote {
+    /** Strike price in the underlying's currency. */
+    strike: number;
+    /** Mid-price `(bid + ask) / 2` of the call side, or `null` when bid/ask is missing or crossed (`ask < bid`). */
+    callMidPrice: number | null;
+    /** Bid-ask spread `ask - bid` of the call side, or `null` when bid/ask is missing or crossed. */
+    callSpread: number | null;
+    /** Mid-price `(bid + ask) / 2` of the put side, or `null` when bid/ask is missing or crossed. */
+    putMidPrice: number | null;
+    /** Bid-ask spread `ask - bid` of the put side, or `null` when bid/ask is missing or crossed. */
+    putSpread: number | null;
+}
+
 /** Per-expiration computed metrics derived from a single {@link OptionsChain}. */
 export interface OptionsExpirationMetrics {
     /** Expiration date in ISO `'YYYY-MM-DD'` form. */
@@ -99,6 +129,10 @@ export interface OptionsExpirationMetrics {
     topOpenInterestStrikes: ReadonlyArray<StrikeOpenInterest>;
     /** Implied move in ±% units (4.2 means ±4.2%). null if unavailable. */
     impliedMovePercent: number | null;
+    /** Top 3 strikes by combined (call + put) volume — today's most-traded levels. */
+    topVolumeStrikes: ReadonlyArray<StrikeVolumeAggregate>;
+    /** Bid/ask snapshot for each strike in `topOpenInterestStrikes` — liquidity around the heaviest OI levels. */
+    topOiBidAskSummary: ReadonlyArray<TopOiQuote>;
 }
 
 /**

@@ -59,6 +59,8 @@ export function buildOptionsAnalysisPrompt(
         '- P/C Ratio: 풋/콜 OI 비율. 1보다 크면 풋 우세 (방어적), 작으면 콜 우세 (공격적)',
         '- ATM IV: 시장이 예상하는 변동성',
         '- topOpenInterestStrikes: 돈이 가장 많이 쌓인 strike 3개',
+        '- topVolumeStrikes: 오늘 거래가 활발한 strike 3개 — OI(누적 베팅)와 함께 보면 시장이 새로 움직이는 가격대를 알 수 있다',
+        '- topOiBidAskSummary: top OI strike의 호가 (mid · spread) — 스프레드가 좁으면 그 가격대 유동성이 좋다는 신호',
         '- 친근하지만 정확한 한국어 톤. 종목 명은 영어 그대로 (예: AAPL).',
     ].join('\n');
 }
