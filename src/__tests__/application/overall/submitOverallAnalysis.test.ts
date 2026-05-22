@@ -129,9 +129,11 @@ const cachedOverallResult = {
     technicalBulletsKo: [],
     fundamentalBulletsKo: [],
     newsBulletsKo: [],
-    threeAxisConclusionKo: '3축 결론',
+    optionsBulletsKo: [],
+    integratedConclusionKo: '3축 결론',
     scenarios: [],
     riskFactorsKo: [],
+    optionsOiStale: false,
 };
 
 const mockCacheGet = vi.fn();
@@ -385,7 +387,8 @@ describe('submitOverallAnalysis 함수는', () => {
                     technicalBulletsKo: [],
                     fundamentalBulletsKo: [],
                     newsBulletsKo: [],
-                    threeAxisConclusionKo: '',
+                    optionsBulletsKo: [],
+                    integratedConclusionKo: '',
                     scenarios: [],
                     riskFactorsKo: [],
                 });

@@ -100,7 +100,7 @@ describe('buildOverallAnalysisPrompt', () => {
         expect(prompt).toContain('intraday');
         // Schema fields
         expect(prompt).toContain('headlineKo');
-        expect(prompt).toContain('threeAxisConclusionKo');
+        expect(prompt).toContain('integratedConclusionKo');
         expect(prompt).toContain('scenarios');
         expect(prompt).toContain('riskFactorsKo');
         expect(prompt).toContain('## Data Boundary');

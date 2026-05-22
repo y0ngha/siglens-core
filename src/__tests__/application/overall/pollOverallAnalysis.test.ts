@@ -34,7 +34,8 @@ const rawOverallJson = JSON.stringify({
     technicalBulletsKo: ['상승 추세 유지'],
     fundamentalBulletsKo: ['밸류에이션 적정'],
     newsBulletsKo: ['긍정적 뉴스 흐름'],
-    threeAxisConclusionKo: '세 축 모두 긍정적',
+    optionsBulletsKo: [],
+    integratedConclusionKo: '세 축 모두 긍정적',
     scenarios: [
         {
             name: 'bullish',

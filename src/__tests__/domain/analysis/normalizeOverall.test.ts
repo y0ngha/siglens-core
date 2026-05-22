@@ -44,7 +44,7 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 '어닝 서프라이즈 연속',
                 'CEO 신뢰도 상승',
             ]);
-            expect(result.threeAxisConclusionKo).toBe(
+            expect(result.integratedConclusionKo).toBe(
                 '세 가지 축 모두 긍정적 신호를 보내고 있습니다.'
             );
             expect(result.scenarios).toHaveLength(2);
@@ -85,7 +85,7 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 technicalBulletsKo: [],
                 fundamentalBulletsKo: [],
                 newsBulletsKo: [],
-                threeAxisConclusionKo: '',
+                integratedConclusionKo: '',
                 scenarios: [],
                 riskFactorsKo: [],
             });
