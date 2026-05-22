@@ -244,7 +244,13 @@ export interface DependencyStateCached {
     technical: AnalysisResponse;
     fundamental: FundamentalAnalysisResponse;
     news: NewsAnalysisResponse;
-    options: OptionsAnalysisResponse | null;
+    /**
+     * Options axis result. `null` indicates a graceful skip (NoChains symbol
+     * or absent snapshot). Optional so existing consumers that constructed
+     * `DependencyStateCached` without options before this PR (e.g. test mocks
+     * from prior versions) still type-check; the resolver always sets it.
+     */
+    options?: OptionsAnalysisResponse | null;
 }
 
 /**

@@ -175,12 +175,8 @@ describe('submitFundamentalAnalysis 함수는', () => {
         });
 
         it('bypasses cache when force=true', async () => {
-            // Pre-populate the cache so a no-force run would resolve to cached;
-            // force=true must skip the read entirely and proceed to submit.
-            // Use mockResolvedValue (not Once) so this fixture cannot leak
-            // into the next test — the queue is reset by mockReset before
-            // each test in this suite's beforeEach hook only resets call
-            // history, not pending resolutions.
+            // mockReset because vitest's clearAllMocks resets call history but
+            // not pending resolutions — re-queuing here cannot leak forward.
             mockCacheGet.mockReset();
             mockCacheGet.mockResolvedValue(mockCachedResult);
 
