@@ -1,6 +1,7 @@
 import type { OptionsSnapshot } from '@/domain/types';
 
 /**
+ * @port
  * Provider contract for fetching options market data. Implementations live
  * in consumer projects and are injected at the application boundary; core
  * does not bind to a specific data feed.

@@ -32,7 +32,7 @@ import type {
     TierConfig,
     Timeframe,
 } from '@/domain/types';
-import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
+import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
 /** Axis identifier for the three-axis overall analysis pipeline. */
 export type OverallAxis = 'technical' | 'fundamental' | 'news';

@@ -360,10 +360,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
     - `ComputeFearGreedOptions`
 
 새로 추가된 Provider 인터페이스:
-- `FundamentalDataProvider` — `infrastructure/fundamental/types.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
-- `NewsProvider` — `infrastructure/news/types.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
-- `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
-- `OptionsDataProvider` — `infrastructure/options/types.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
+- `FundamentalDataProvider` — `domain/ports/fundamentalDataProvider.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
+- `NewsProvider` — `domain/ports/newsProvider.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
+- `NewsTimeRange` — `domain/ports/newsProvider.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
+- `OptionsDataProvider` — `domain/ports/optionsDataProvider.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
 
 새로 추가된 use-case option/result 타입:
 - 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `SubmitFundamentalAnalysisMissNoTrigger`, `PollFundamentalAnalysisResult`.

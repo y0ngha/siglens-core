@@ -467,7 +467,7 @@ export type {
     GeminiRole,
 } from './infrastructure/ai/types';
 export type { CacheProvider } from './domain/ports/cache';
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     CreateUsageLogInput,
     RecordUsageInput,
@@ -480,14 +480,14 @@ export type {
     UserTierRepository,
 } from './infrastructure/db';
 export type { FmpConfig } from './infrastructure/fmp/types';
-export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
+export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
     AcquireReanalyzeCooldownResult,
     GetBarsOptions,
     MarketDataProvider,
 } from './infrastructure/market/types';
-export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
+export type { NewsProvider, NewsTimeRange } from './domain/ports/newsProvider';
 export type { SkillsProvider } from './domain/ports/skillsProvider';
 
 // Application types
@@ -782,7 +782,7 @@ export type {
 } from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).

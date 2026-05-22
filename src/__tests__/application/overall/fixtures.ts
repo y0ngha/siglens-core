@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { EarningsCalendarItem, EnrichedNewsItem } from '@/domain/types';
-import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
+import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
 /** Minimal {@link EnrichedNewsItem} fixture for use in overall analysis tests. */
 export function makeEnrichedNewsItem(id: string): EnrichedNewsItem {

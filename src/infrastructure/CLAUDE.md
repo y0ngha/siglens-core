@@ -20,7 +20,6 @@ Each sub-directory corresponds to exactly **one** external system:
 | `hash/` | Deterministic input hashing helpers used in cache keys |
 | `jobs/` | Redis-based job queue (enqueue / dequeue / status / meta) |
 | `market/` | Market data provider abstraction (Alpaca / FMP adapters) |
-| `news/` | News provider interface (articles, earnings calendar, reports) |
 | `skills/` | Filesystem Skills loader (`skills/*.md` → `Skill[]`) |
 | `upstash/` | Upstash Redis client factory + config |
 | `usage/` | Daily-salt IP hashing helper for cross-DB usage tracking |

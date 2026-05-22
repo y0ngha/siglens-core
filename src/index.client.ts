@@ -111,7 +111,7 @@ export {
     EXPIRATION_SLOTS,
     mapExpirationsToSlots,
 } from './domain/options/expirationSlots';
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 export type {
     BuildOptionsAnalysisPromptOptions,
     OptionsContract,
@@ -393,7 +393,7 @@ export type {
     GeminiPart,
     CallAiProviderOptions,
 } from './infrastructure/ai/types';
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     ChatActionResult,
     ChatErrorCode,

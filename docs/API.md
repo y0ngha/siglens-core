@@ -104,9 +104,11 @@ AI provider 호출 이후 `server_busy` 또는 `server_error`로 매핑되는 �
 ### 구현 위치
 
 ```
+domain/ports/
+└── chatTokenStore.ts  ← ChatTokenStore 포트 (@port)
+
 infrastructure/chat/
-├── types.ts       ← ChatTokenStore 인터페이스
-└── tokenStore.ts  ← Upstash 기반 구현체 + IP 해시 helper
+└── tokenStore.ts      ← Upstash 기반 구현체 (@adapter implements ChatTokenStore) + IP 해시 helper
 ```
 
 ---
@@ -134,10 +136,15 @@ infrastructure/chat/
 
 ### 구현 위치
 
+`JobStateStore` 포트 인터페이스(및 인자 타입 `JobStateSetOpts`)는 `domain/ports/jobStateStore.ts`에 정의되어 있고 (`@internal`), Upstash 기반 어댑터는 `infrastructure/jobs/redis.ts`에 있다.
+
 ```
+domain/ports/
+└── jobStateStore.ts  ← JobStateStore (@internal), JobStateSetOpts (@internal)
+
 infrastructure/jobs/
-├── types.ts     ← JobStatus, JobMeta, JobRedisClient 인터페이스
-├── redis.ts     ← Upstash 기반 JobRedisClient 구현체
+├── types.ts     ← JobStatus, JobMeta (DTO)
+├── redis.ts     ← Upstash 기반 JobStateStore 어댑터 (createJobStateStore)
 └── queue.ts     ← job 라이프사이클 함수
 ```
 

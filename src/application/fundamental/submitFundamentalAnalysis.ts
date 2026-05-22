@@ -18,7 +18,7 @@ import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
+import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
