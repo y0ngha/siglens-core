@@ -1,13 +1,3 @@
-/**
- * NewsProvider infrastructure types.
- *
- * Defines the time-range alias and the fetcher interface used by the
- * application layer to retrieve news articles, earnings calendars, and
- * earnings reports. Consumer (siglens) implements this against FMP
- * `/stable/news/stock`, `/stable/earnings-calendar`, `/stable/earnings`.
- *
- * Core depends only on this interface — never on the concrete HTTP client.
- */
 import type {
     EarningsCalendarItem,
     EarningsReport,
@@ -24,12 +14,18 @@ import type {
 export type NewsTimeRange = '24h' | '7d' | '30d';
 
 /**
- * News + earnings calendar fetcher abstraction. Consumer (siglens) implements
- * via FMP `/stable/news/stock`, `/stable/earnings-calendar`, `/stable/earnings`.
+ * @port
+ * News + earnings calendar fetcher abstraction the domain depends on for
+ * retrieving articles, earnings schedules, and earnings reports.
  *
- * `fetchEarningsCalendarAll` returns the full calendar without a symbol filter
- * because FMP does not support per-symbol calendar queries on the stable tier.
- * Consumer must DB-cache this data via a daily Cron job (Phase 2 Task 2.5) and
+ * Adapters live in `infrastructure/news/` and surface the underlying
+ * client's errors to the caller — graceful degradation (e.g. treating a
+ * fetch failure as an empty result) is the responsibility of the
+ * application-layer caller, not the adapter.
+ *
+ * `fetchEarningsCalendarAll` returns the full calendar without a symbol
+ * filter because FMP does not support per-symbol calendar queries on the
+ * stable tier. Consumers must DB-cache this data via a daily Cron job and
  * filter by symbol at the repository layer.
  *
  * @see NewsTimeRange

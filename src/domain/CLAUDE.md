@@ -26,6 +26,7 @@ under "Currently migrated" actually exist today):**
 ```
 domain/ports/
   cache.ts             → CacheProvider           ✅ migrated
+  newsProvider.ts      → NewsProvider, NewsTimeRange ✅ migrated
   marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ⏳ planned
   skillsProvider.ts    → SkillsProvider                         ⏳ planned
   ...
