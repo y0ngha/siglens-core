@@ -5,7 +5,8 @@ export interface JobStateSetOpts {
 }
 
 /**
- * @port @internal
+ * @port
+ * @internal
  * Minimal key-value surface the job-queue layer depends on for tracking
  * analysis-job lifecycle state (status, result, error, meta, cancelled flag).
  *
