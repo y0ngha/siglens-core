@@ -1433,7 +1433,7 @@ export type UsageActionType = 'analysis' | 'chatbot' | 'premium_model';
  *
  * Only the action types that participate in the daily rate-limit aggregation
  * are surfaced here. `premium_model` is intentionally omitted because those
- * events are tracked separately through {@link UsageLogRepository} for billing
+ * events are tracked separately through `UsageLogRepository` for billing
  * purposes and do not contribute to the per-IP daily quota.
  */
 export interface UsageCounts {

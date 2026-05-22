@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22] (Round 4)
+- Violation: `{@link UsageLogRepository}` JSDoc tag in `src/domain/types.ts` (base layer) referencing a symbol declared in `src/domain/ports/usageLogRepository.ts` (upper layer that imports from `domain/types.ts`).
+- Rule: ARCHITECTURE.md — layer dependency direction `domain/types.ts → (no upward imports/refs)`; documentation references should follow the same direction as code imports to avoid implying a reverse coupling.
+- Context: `UsageCounts` JSDoc explained why `premium_model` was omitted by linking to `UsageLogRepository`, but `domain/types.ts` is the base file that ports depend on, not vice versa. Replaced `{@link UsageLogRepository}` with the backtick-only form `` `UsageLogRepository` `` so the prose still documents the relationship without producing a reverse-direction doc link.
+
 ## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22]
 - Violation: Circular import between sibling port files (`domain/ports/usageRepository.ts` imports `UsageLogRecord` from `usageLogRepository.ts`, while `usageLogRepository.ts` imports `UsageActionType` back from `usageRepository.ts` — A → B → A).
 - Rule: ARCHITECTURE.md — "모듈 간 순환 import 금지 (A → B → A) → 공유 상수/타입은 제3 파일로 분리하여 순환 해소".
