@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.11.4](https://github.com/y0ngha/siglens-core/compare/v0.11.3...v0.11.4) (2026-05-22)
+
+
+### Bug Fixes
+
+* **ai-port:** address PR [#92](https://github.com/y0ngha/siglens-core/issues/92) round 2 review — restore deprecated Gemini type aliases ([d29fd5e](https://github.com/y0ngha/siglens-core/commit/d29fd5e872ccfb7b6878fb62c297576856b9be47)), closes [#3](https://github.com/y0ngha/siglens-core/issues/3)
+* **ai-port:** address PR [#92](https://github.com/y0ngha/siglens-core/issues/92) round 3 review — replace inline dynamic type imports + accurate GeminiPart deprecation note ([030a69c](https://github.com/y0ngha/siglens-core/commit/030a69c9c2d7bbd8fc53bed99dfe21d08a1f6d7d))
+* **ai-port:** address PR [#92](https://github.com/y0ngha/siglens-core/issues/92) round 4 review — restore alphabetical import order in chat/types.ts and relocate [@port](https://github.com/port) tag to CallAiProvider JSDoc ([8cc8294](https://github.com/y0ngha/siglens-core/commit/8cc8294e92a812589119940f7a92d1c6fb2143c5))
+* **ports:** address PR [#98](https://github.com/y0ngha/siglens-core/issues/98) review — break circular import, sync architecture docs ([ecce88c](https://github.com/y0ngha/siglens-core/commit/ecce88c2153d1ea43e615a8b8a088491083a8026))
+
 ## [0.11.3](https://github.com/y0ngha/siglens-core/compare/v0.11.2...v0.11.3) (2026-05-22)
 
 
