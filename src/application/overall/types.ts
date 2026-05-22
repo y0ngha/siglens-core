@@ -207,11 +207,16 @@ export interface OverallDependencyInputs {
 
     /**
      * Top-level force flag. When true, the resolver forwards `force: true` to
-     * every axis submit call (computed as `topLevel.force ?? axis.force ?? false`).
-     * Used by the re-analyze button in the app, which performs a 4-axis full
-     * refresh. Per-axis `force` (e.g. `technical.force`) remains supported
-     * for backward compatibility; the OR-style precedence means either layer
-     * setting `true` triggers a force refresh on that axis.
+     * every axis submit call. Effective per-axis force is computed as
+     * `topLevel.force ?? axis.force ?? false`, but only the `technical` axis
+     * has a per-axis `force` field in its Pick (preserved for backward
+     * compatibility). For `fundamental`/`news`/`options` the formula collapses
+     * to `topLevel.force ?? false`. Used by the re-analyze button in the app,
+     * which performs a 4-axis full refresh.
+     *
+     * Note on `??` semantics: this is undefined-fallthrough, not OR. An
+     * explicit `topLevel.force = false` will NOT defer to a per-axis
+     * `force = true` — `false` is a real value, not a missing one.
      */
     force?: boolean;
 }
