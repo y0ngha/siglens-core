@@ -1,5 +1,22 @@
 # Fix Log
 
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22]
+- Violation: Circular import between sibling port files (`domain/ports/usageRepository.ts` imports `UsageLogRecord` from `usageLogRepository.ts`, while `usageLogRepository.ts` imports `UsageActionType` back from `usageRepository.ts` — A → B → A).
+- Rule: ARCHITECTURE.md — "모듈 간 순환 import 금지 (A → B → A) → 공유 상수/타입은 제3 파일로 분리하여 순환 해소".
+- Context: When splitting a single types file into per-port files, the shared value types stayed inside one of the ports instead of moving up to `domain/types.ts`. Lifted both `UsageActionType` and `UsageLogRecord` to `domain/types.ts` so each port has a single-direction import to the shared module.
+
+- Violation: `docs/ARCHITECTURE.md` not updated when `infrastructure/db/` was deleted and `domain/ports/` was introduced. Three stale db/ references + missing ports/ folder description.
+- Rule: MISTAKES.md Documentation Sync — code refactor and folder-structure docs must be updated in the same PR (extends §2/§3 from infra-only to architecture-level moves).
+- Context: PR introduced `domain/ports/{cache,usageRepository,usageLogRepository,userTierRepository}.ts` and deleted `infrastructure/db/`, but the folder-structure tree, dependency-rule paragraph, and infrastructure module list in ARCHITECTURE.md still referenced db/ and never mentioned ports/.
+
+- Violation: Custom JSDoc tag `@internal-sync` used on a public Tier 4 union without being defined anywhere in project docs.
+- Rule: CONVENTIONS.md JSDoc Rules — public symbols must use documented tags so IDE/TypeDoc render correctly. Custom unrecognized tags become noise for npm consumers.
+- Context: `UsageActionType` carried a hand-rolled `@internal-sync` block explaining cross-repo sync requirements with siglens. Replaced with the standard `@remarks` block, which TypeDoc and IDEs render natively. Same content, standard tag.
+
+- Violation: Same logical field has different declared types across record (`string`) and input (`ModelId`) shapes in the same module.
+- Rule: TypeScript predictability — paired input/output types for the same field should share the same declared type, unless the narrower form is enforced at the producer boundary.
+- Context: `UsageLogRecord.modelUsed: string` but `CreateUsageLogInput.modelUsed: ModelId`. The DB layer ultimately stores it as text, and `modelId` in core is documented as a cache-key disambiguator rather than the runtime model selector. Aligned `CreateUsageLogInput.modelUsed` to `string` and removed the now-unused `ModelId` import.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).

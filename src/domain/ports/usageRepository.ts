@@ -1,17 +1,4 @@
-import type { UsageLogRecord } from '@/domain/ports/usageLogRepository';
-
-/**
- * Action type recorded in usage logs.
- *
- * Defined as a hand-written union so the core library can describe the usage
- * accounting contract without depending on any database schema definition.
- *
- * @internal-sync If a siglens consumer adds new action types to its
- *   `USAGE_ACTION_TYPE_VALUES` (or equivalent schema enum), this union must be
- *   extended in a corresponding core PR so callers see the new variant in
- *   `RecordUsageInput` / `CreateUsageLogInput`.
- */
-export type UsageActionType = 'analysis' | 'chatbot' | 'premium_model';
+import type { UsageActionType, UsageLogRecord } from '@/domain/types';
 
 /**
  * Input for recording one analysis or chatbot usage event.

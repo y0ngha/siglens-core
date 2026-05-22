@@ -471,15 +471,14 @@ export type {
 } from './domain/ports/userTierRepository';
 export type {
     CreateUsageLogInput,
-    UsageLogRecord,
     UsageLogRepository,
 } from './domain/ports/usageLogRepository';
 export type {
     RecordUsageInput,
-    UsageActionType,
     UsageCounts,
     UsageRepository,
 } from './domain/ports/usageRepository';
+export type { UsageActionType, UsageLogRecord } from './domain/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';

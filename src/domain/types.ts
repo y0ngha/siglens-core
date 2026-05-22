@@ -1412,6 +1412,42 @@ export interface UserTierContext {
     tier: Tier;
 }
 
+// ─── Usage Tracking ───────────────────────────────────────────────────────────
+
+/**
+ * Action type recorded in usage logs.
+ *
+ * Defined as a hand-written union so the core library can describe the usage
+ * accounting contract without depending on any database schema definition.
+ *
+ * @remarks
+ * If a siglens consumer adds new action types to its
+ * `USAGE_ACTION_TYPE_VALUES` (or equivalent schema enum), this union must be
+ * extended in a corresponding core PR so callers see the new variant in
+ * `RecordUsageInput` / `CreateUsageLogInput`.
+ */
+export type UsageActionType = 'analysis' | 'chatbot' | 'premium_model';
+
+/**
+ * Persisted usage log record returned after insertion.
+ */
+export interface UsageLogRecord {
+    /** Unique usage log identifier. */
+    id: string;
+    /** User UUID when authenticated, otherwise null. */
+    userId: string | null;
+    /** SHA-256 hash of IP plus UTC daily salt. */
+    ipHash: string;
+    /** Usage action that was recorded. */
+    actionType: UsageActionType;
+    /** AI model or backend path used by the request. */
+    modelUsed: string;
+    /** UTC date bucket used for daily resets. */
+    date: string;
+    /** Timestamp when the row was created. */
+    createdAt: Date;
+}
+
 // ─── Backtesting ──────────────────────────────────────────────────────────────
 
 /** Internal: backtest signal outcome. */
