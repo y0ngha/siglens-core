@@ -3597,6 +3597,31 @@ describe('prompt', () => {
             expect(result).toContain('is in premium zone');
         });
 
+        it('labels SMC price-zone line as "Snapshot price" (not "Current price")', () => {
+            const smc: SMCResult = {
+                ...EMPTY_SMC_RESULT,
+                premiumZone: { high: 170.0, low: 160.0, type: 'premium' },
+                equilibriumZone: {
+                    high: 160.0,
+                    low: 150.0,
+                    type: 'equilibrium',
+                },
+                discountZone: { high: 150.0, low: 140.0, type: 'discount' },
+            };
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({ smc }),
+                [],
+                '1Day'
+            );
+            expect(prompt).toMatch(
+                /Snapshot price \([\d.]+\) is in (premium|discount|equilibrium|neutral) zone/
+            );
+            expect(prompt).not.toMatch(/Current price \(/);
+        });
+
         it('should show swing points with bars ago', () => {
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,

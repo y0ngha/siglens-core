@@ -534,7 +534,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     const currentPriceLine =
         currentPrice !== null
             ? [
-                  `- Current price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
+                  `- Snapshot price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
               ]
             : [];
     const marketZonesSection =
