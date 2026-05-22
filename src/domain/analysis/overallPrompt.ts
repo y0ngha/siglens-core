@@ -211,31 +211,39 @@ function formatOptions(
         ].join('\n');
     }
 
-    const lines: string[] = [`- Summary (KO): ${options.summary}`];
+    const perExpirationLines =
+        options.perExpiration.length > 0
+            ? [
+                  '- Per-Expiration:',
+                  ...options.perExpiration.map(
+                      entry =>
+                          `  • ${entry.expirationDate} [${entry.tone}]: ${entry.commentary}`
+                  ),
+              ]
+            : [];
 
-    if (options.perExpiration.length > 0) {
-        lines.push('- Per-Expiration:');
-        for (const entry of options.perExpiration) {
-            lines.push(
-                `  • ${entry.expirationDate} [${entry.tone}]: ${entry.commentary}`
-            );
-        }
-    }
+    const signalLines =
+        options.signals.length > 0
+            ? [
+                  '- Signals:',
+                  ...options.signals.map(
+                      signal => `  • [${signal.kind}] ${signal.message}`
+                  ),
+              ]
+            : [];
 
-    if (options.signals.length > 0) {
-        lines.push('- Signals:');
-        for (const signal of options.signals) {
-            lines.push(`  • [${signal.kind}] ${signal.message}`);
-        }
-    }
+    const staleLines = optionsOiStale
+        ? [
+              '- 주의: 미국 옵션 정규 거래 시간 외에 수집된 스냅샷으로, Open Interest가 직전 세션 기준일 수 있습니다.',
+          ]
+        : [];
 
-    if (optionsOiStale) {
-        lines.push(
-            '- 주의: 미국 옵션 정규 거래 시간 외에 수집된 스냅샷으로, Open Interest가 직전 세션 기준일 수 있습니다.'
-        );
-    }
-
-    return lines.join('\n');
+    return [
+        `- Summary (KO): ${options.summary}`,
+        ...perExpirationLines,
+        ...signalLines,
+        ...staleLines,
+    ].join('\n');
 }
 
 /**
