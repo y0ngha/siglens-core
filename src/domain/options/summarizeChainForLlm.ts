@@ -11,16 +11,15 @@ import type {
 } from './types';
 
 /**
- * Number of top strikes (by combined call+put OI) to surface in the LLM
- * summary. Three is enough for the analyst to anchor a narrative around
- * the two or three highest-attention strikes without bloating the prompt
- * with marginal levels. Matches the JSDoc contract on
+ * Number of top strikes (by combined call+put OI or volume) to surface in
+ * the LLM summary. Three is enough for the analyst to anchor a narrative
+ * around the two or three highest-attention strikes without bloating the
+ * prompt with marginal levels. Matches the JSDoc contract on
  * {@link OptionsExpirationMetrics.topOpenInterestStrikes}.
+ *
+ * OI top과 Volume top 모두 동수 유지 — 프롬프트 내 두 섹션 균형.
  */
-const TOP_OI_STRIKES_COUNT = 3;
-
-// OI top-3과 동수 — 프롬프트 내 OI·볼륨 섹션 균형 유지.
-const TOP_VOLUME_STRIKES_COUNT = 3;
+const TOP_STRIKES_COUNT = 3;
 
 /**
  * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
@@ -49,14 +48,14 @@ export function summarizeChainForLlm(
                 b.putOpenInterest -
                 (a.callOpenInterest + a.putOpenInterest)
         )
-        .slice(0, TOP_OI_STRIKES_COUNT);
+        .slice(0, TOP_STRIKES_COUNT);
 
     const volumeByStrike = aggregateVolume(chain);
     const topVolume = volumeByStrike
         .toSorted(
             (a, b) => b.callVolume + b.putVolume - (a.callVolume + a.putVolume)
         )
-        .slice(0, TOP_VOLUME_STRIKES_COUNT);
+        .slice(0, TOP_STRIKES_COUNT);
 
     const topOiBidAskSummary = top.map(({ strike }) =>
         buildTopOiQuote(strike, chain)

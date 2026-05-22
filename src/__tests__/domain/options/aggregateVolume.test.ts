@@ -57,6 +57,19 @@ describe('aggregateVolume', () => {
         ]);
     });
 
+    it('calls에 동일 strike가 두 번 등장하면 callVolume을 합산한다', () => {
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [makeContract(200, 100), makeContract(200, 50)],
+            puts: [],
+        };
+        const result = aggregateVolume(chain);
+        expect(result).toEqual([
+            { strike: 200, callVolume: 150, putVolume: 0 },
+        ]);
+    });
+
     it('returns empty array for empty chain', () => {
         const result = aggregateVolume({
             expirationDate: '2026-05-22',

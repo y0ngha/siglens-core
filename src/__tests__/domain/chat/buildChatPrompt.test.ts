@@ -505,6 +505,29 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         );
     });
 
+    it('options context: perExpiration과 signals가 빈 배열이면 해당 섹션을 포함하지 않는다', () => {
+        const context: CurrentAnalysisContext = {
+            kind: 'options',
+            payload: { ...OPTIONS_PAYLOAD, perExpiration: [], signals: [] },
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        // Options-context 섹션을 슬라이스해서 검사 — `Indicator Signals:` 같은
+        // 기존 분석 섹션의 문자열과 충돌하지 않도록 함.
+        const optionsSection = result.systemPrompt.slice(
+            result.systemPrompt.indexOf('## Current analysis context')
+        );
+        expect(optionsSection).not.toContain('Per-expiration:');
+        expect(optionsSection).not.toContain('Signals:');
+        expect(optionsSection).toContain('Kind: options');
+    });
+
     it('options 컨텍스트가 제공되면 옵션 분석 섹션을 포함한다', () => {
         const context: CurrentAnalysisContext = {
             kind: 'options',

@@ -4,8 +4,6 @@ import type { OptionsChain, StrikeVolumeAggregate } from './types';
  * @internal Aggregate call/put trade volume per strike for a single
  * expiration.
  *
- * Implementation detail consumed by {@link summarizeChainForLlm}.
- *
  * Returns one entry per unique strike with the call and put volume summed
  * independently; sides that have no contract at a given strike contribute
  * `0`. The result is sorted ascending by strike so consumers can render or
