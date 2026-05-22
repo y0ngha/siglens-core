@@ -28,10 +28,10 @@
         "format:check": "prettier --check .",
         "doc": "typedoc",
         "doc:watch": "typedoc --watch",
-        "release": "dotenv -e .env.local -- release-it",
-        "release:patch": "dotenv -e .env.local -- release-it patch",
-        "release:minor": "dotenv -e .env.local -- release-it minor",
-        "release:major": "dotenv -e .env.local -- release-it major"
+        "release": "yarn test && yarn lint && dotenv -e .env.local -- release-it",
+        "release:patch": "yarn test && yarn lint && dotenv -e .env.local -- release-it patch",
+        "release:minor": "yarn test && yarn lint && dotenv -e .env.local -- release-it minor",
+        "release:major": "yarn test && yarn lint && dotenv -e .env.local -- release-it major"
     },
     "peerDependencies": {
         "@upstash/redis": "^1.37.0"
