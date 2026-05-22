@@ -1,4 +1,8 @@
-import type { UsageActionType, UsageLogRecord } from '@/domain/types';
+import type {
+    UsageActionType,
+    UsageCounts,
+    UsageLogRecord,
+} from '@/domain/types';
 
 /**
  * Input for recording one analysis or chatbot usage event.
@@ -14,21 +18,6 @@ export interface RecordUsageInput {
     modelUsed: string;
     /** Event timestamp; defaults to the current time in the infrastructure layer. */
     occurredAt?: Date;
-}
-
-/**
- * Daily usage counts grouped by action type.
- *
- * Only the action types that participate in the daily rate-limit aggregation
- * are surfaced here. `premium_model` is intentionally omitted because those
- * events are tracked separately through {@link UsageLogRepository} for billing
- * purposes and do not contribute to the per-IP daily quota.
- */
-export interface UsageCounts {
-    /** Number of analysis requests recorded for the UTC day. */
-    analysis: number;
-    /** Number of chatbot requests recorded for the UTC day. */
-    chatbot: number;
 }
 
 /**

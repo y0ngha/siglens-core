@@ -1429,6 +1429,21 @@ export interface UserTierContext {
 export type UsageActionType = 'analysis' | 'chatbot' | 'premium_model';
 
 /**
+ * Daily usage counts grouped by action type.
+ *
+ * Only the action types that participate in the daily rate-limit aggregation
+ * are surfaced here. `premium_model` is intentionally omitted because those
+ * events are tracked separately through {@link UsageLogRepository} for billing
+ * purposes and do not contribute to the per-IP daily quota.
+ */
+export interface UsageCounts {
+    /** Number of analysis requests recorded for the UTC day. */
+    analysis: number;
+    /** Number of chatbot requests recorded for the UTC day. */
+    chatbot: number;
+}
+
+/**
  * Persisted usage log record returned after insertion.
  */
 export interface UsageLogRecord {

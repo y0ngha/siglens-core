@@ -202,11 +202,11 @@ no external imports, pure functions only.
 도메인 계층이 외부 인프라에 결합되지 않도록 보장한다.
 
 - `cache.ts` — `CacheProvider` 인터페이스 (TTL 기반 key-value 캐시 계약).
-- `usageRepository.ts` — `UsageRepository` 인터페이스, `RecordUsageInput`, `UsageCounts`.
+- `usageRepository.ts` — `UsageRepository` 인터페이스, `RecordUsageInput`.
 - `usageLogRepository.ts` — `UsageLogRepository` 인터페이스, `CreateUsageLogInput`.
 - `userTierRepository.ts` — `UserTierRepository` 인터페이스, `UserTier` alias.
 
-공유되는 도메인 값 타입(`UsageActionType`, `UsageLogRecord` 등)은 `domain/types.ts`에서
+공유되는 도메인 값 타입(`UsageActionType`, `UsageCounts`, `UsageLogRecord` 등)은 `domain/types.ts`에서
 정의되어 port 파일들 간 순환 import를 방지한다.
 
 ### infrastructure/

@@ -475,10 +475,13 @@ export type {
 } from './domain/ports/usageLogRepository';
 export type {
     RecordUsageInput,
-    UsageCounts,
     UsageRepository,
 } from './domain/ports/usageRepository';
-export type { UsageActionType, UsageLogRecord } from './domain/types';
+export type {
+    UsageActionType,
+    UsageCounts,
+    UsageLogRecord,
+} from './domain/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
