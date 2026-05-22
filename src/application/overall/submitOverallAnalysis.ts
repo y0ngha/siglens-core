@@ -25,6 +25,7 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
+    OptionsAnalysisResponse,
     OverallAnalysisResponse,
 } from '@/domain/types';
 
@@ -70,6 +71,32 @@ function stripVolatileTechnicalFields(
         skillsDegraded: _skillsDegraded,
         ...rest
     } = technical as AnalysisResponse & { skillsDegraded?: boolean };
+    return rest;
+}
+
+/**
+ * Strip volatile, write-time-only fields from a cached options
+ * `OptionsAnalysisResponse` so the overall input hash stays stable across
+ * polls.
+ *
+ * `analyzedAt` is unconditionally rewritten to the server clock on every
+ * `submitOptionsAnalysis` cache-hit (see
+ * {@link normalizeOptionsAnalysisResponse}). If the field stayed inside the
+ * overall input hash, the overall cache key would shift on every poll even
+ * when the options analysis body was unchanged — defeating the overall
+ * cache TTL.
+ *
+ * Passes `null` through unchanged so the "no options" overall variant keeps
+ * a distinct cache identity from the "options present" variant. `undefined`
+ * is treated the same as `null` for forward-compat with `DependencyState`
+ * shapes that pre-date the options axis (e.g. mocked resolver results in
+ * older tests that never set the field).
+ */
+function stripVolatileOptionsFields(
+    options: OptionsAnalysisResponse | null | undefined
+): Omit<OptionsAnalysisResponse, 'analyzedAt'> | null {
+    if (options === null || options === undefined) return null;
+    const { analyzedAt: _analyzedAt, ...rest } = options;
     return rest;
 }
 
@@ -210,17 +237,21 @@ export async function submitOverallAnalysis(
     //   and would otherwise invalidate the overall cache on every poll.
     // - `skillsDegraded` is a transient flag attached to the cached technical
     //   result; it reflects loader health at write time, not analysis content.
+    // - The options axis also re-stamps `analyzedAt` on every cache-hit (the
+    //   normalizer always uses the server clock — see normalizeOptions); the
+    //   same per-poll churn would otherwise leak into the overall hash.
     // - The options axis is `null` when gracefully skipped (no snapshot or
     //   no_chains_error) — its `null`-vs-payload distinction must be in the
     //   hash so the overall cache splits between "no options" and "options
     //   present" variants of the same symbol.
     const stableTechnical = stripVolatileTechnicalFields(deps.technical);
+    const stableOptions = stripVolatileOptionsFields(deps.options);
     const inputHash = hashAnalysisInput(
         JSON.stringify({
             t: stableTechnical,
             f: deps.fundamental,
             n: deps.news,
-            o: deps.options,
+            o: stableOptions,
         })
     );
     const cacheKey = buildOverallCacheKey(

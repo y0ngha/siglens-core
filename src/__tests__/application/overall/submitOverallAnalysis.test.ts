@@ -487,6 +487,80 @@ describe('submitOverallAnalysis 함수는', () => {
 
             expect(firstCacheKey).not.toBe(secondCacheKey);
         });
+
+        it('options.analyzedAt 만 다르면 동일한 캐시 키로 조회된다', async () => {
+            // The options-axis cache-hit path unconditionally re-stamps
+            // `analyzedAt` to the server clock on every submit, so polling
+            // the same overall analysis would otherwise shift the overall
+            // cache key every time. stripVolatileOptionsFields must drop
+            // the field from the hash input to keep the overall TTL alive.
+            const baseOptions = {
+                summary: 'Options summary',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2026-05-22T10:00:00Z',
+            };
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: baseOptions,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: { ...baseOptions, analyzedAt: '2026-05-22T11:00:00Z' },
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).toBe(secondCacheKey);
+        });
+
+        it('options 본문(summary)이 달라지면 캐시 키가 달라진다', async () => {
+            // Inverse of the analyzedAt-stability test — only non-volatile
+            // options fields participate in the hash, so a meaningful body
+            // change must still bust the overall cache.
+            const baseOptions = {
+                summary: 'Options summary A',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2026-05-22T10:00:00Z',
+            };
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: baseOptions,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: { ...baseOptions, summary: 'Options summary B' },
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).not.toBe(secondCacheKey);
+        });
     });
 
     describe('overall-scoped usage 추적이', () => {
