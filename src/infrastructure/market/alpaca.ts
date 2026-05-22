@@ -1,11 +1,11 @@
 import { MS_PER_SECOND } from '@/domain/constants/time';
-import type { Bar, MarketQuote } from '@/domain/types';
-import { readAlpacaConfig } from '@/infrastructure/market/config';
-import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 import type {
     GetBarsOptions,
     MarketDataProvider,
-} from '@/infrastructure/market/types';
+} from '@/domain/ports/marketDataProvider';
+import type { Bar, MarketQuote } from '@/domain/types';
+import { readAlpacaConfig } from '@/infrastructure/market/config';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 
 const BASE_URL = 'https://data.alpaca.markets/v2';
 
@@ -33,6 +33,14 @@ function toAlpacaBar(raw: AlpacaBar): Bar {
     };
 }
 
+/**
+ * @adapter implements {@link MarketDataProvider}
+ *
+ * Alpaca Markets adapter for {@link MarketDataProvider}. Fetches OHLCV bars
+ * from the Alpaca v2 IEX feed. Does not support quote retrieval —
+ * {@link AlpacaProvider.getQuote} returns `null` so that callers can fall
+ * back to a provider that does.
+ */
 export class AlpacaProvider implements MarketDataProvider {
     private readonly apiKey: string;
     private readonly secretKey: string;

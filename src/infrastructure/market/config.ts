@@ -1,8 +1,5 @@
-import type {
-    AlpacaConfig,
-    MarketDataProviderType,
-    WorkerConfig,
-} from '@/infrastructure/market/types';
+import type { MarketDataProviderType } from '@/domain/ports/marketDataProvider';
+import type { AlpacaConfig, WorkerConfig } from '@/infrastructure/market/types';
 
 export function readAlpacaConfig(): AlpacaConfig {
     const apiKey = process.env.ALPACA_API_KEY;

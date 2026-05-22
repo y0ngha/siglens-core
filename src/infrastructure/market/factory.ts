@@ -1,10 +1,10 @@
-import { AlpacaProvider } from '@/infrastructure/market/alpaca';
-import { readMarketProviderType } from '@/infrastructure/market/config';
-import { FmpProvider } from '@/infrastructure/market/fmp';
 import type {
     MarketDataProvider,
     MarketDataProviderType,
-} from '@/infrastructure/market/types';
+} from '@/domain/ports/marketDataProvider';
+import { AlpacaProvider } from '@/infrastructure/market/alpaca';
+import { readMarketProviderType } from '@/infrastructure/market/config';
+import { FmpProvider } from '@/infrastructure/market/fmp';
 
 const MARKET_PROVIDER_MAP: Record<
     MarketDataProviderType,
@@ -15,6 +15,8 @@ const MARKET_PROVIDER_MAP: Record<
 };
 
 /**
+ * @adapter implements {@link MarketDataProvider}
+ *
  * Construct the configured {@link MarketDataProvider} (Alpaca or FMP).
  *
  * Reads `MARKET_PROVIDER` from env and

@@ -480,10 +480,11 @@ export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
-    AcquireReanalyzeCooldownResult,
     GetBarsOptions,
     MarketDataProvider,
-} from './infrastructure/market/types';
+    MarketDataProviderType,
+} from './domain/ports/marketDataProvider';
+export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
 export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
 export type { SkillsProvider } from './infrastructure/skills/types';
 

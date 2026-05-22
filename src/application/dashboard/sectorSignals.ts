@@ -7,6 +7,7 @@ import {
     computeStockSignalResult,
     lookbackIsoFromNow,
 } from '@/domain/dashboard';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type {
     Bar,
     DashboardTimeframe,
@@ -22,7 +23,6 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { createMarketDataProvider } from '@/infrastructure/market/factory';
-import type { MarketDataProvider } from '@/infrastructure/market/types';
 
 // FMP/Alpaca 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;

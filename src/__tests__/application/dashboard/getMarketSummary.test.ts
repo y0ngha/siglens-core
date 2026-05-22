@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type { MarketQuote } from '@/domain/types';
-import type { MarketDataProvider } from '@/infrastructure/market/types';
 
 const getQuoteMock = vi.fn<(s: string) => Promise<MarketQuote | null>>();
 const getBarsMock = vi.fn();
