@@ -32,12 +32,24 @@ const mockSubmitNewsAnalysis = submitNewsAnalysis as Mock;
 const mockSubmitOptionsAnalysis = submitOptionsAnalysis as Mock;
 
 // ─── Options snapshot helpers ──────────────────────────────────────────────
+/**
+ * `daysToExpiration` is required on `OptionsChain` — populate it from the
+ * expiration date string relative to a fixed reference clock so the helper
+ * works with concrete dates (e.g. `'2099-01-08'`) without depending on the
+ * real wall-clock at test-run time.
+ */
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const REFERENCE_NOW_MS = Date.parse('2099-01-01T00:00:00Z');
+
 function makeOptionsChain(date: string): OptionsChain {
     return {
         expirationDate: date,
+        daysToExpiration: Math.floor(
+            (Date.parse(`${date}T00:00:00Z`) - REFERENCE_NOW_MS) / MS_PER_DAY
+        ),
         calls: [],
         puts: [],
-    } as OptionsChain;
+    };
 }
 
 /** Snapshot with one chain ~7 days out — passes pickNearestExpiration's ≥3d floor. */
