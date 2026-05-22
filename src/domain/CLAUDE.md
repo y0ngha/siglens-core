@@ -27,6 +27,7 @@ under "Currently migrated" actually exist today):**
 domain/ports/
   cache.ts             → CacheProvider           ✅ migrated
   chatTokenStore.ts    → ChatTokenStore           ✅ migrated
+  fundamentalDataProvider.ts → FundamentalDataProvider ✅ migrated
   jobStateStore.ts     → JobStateStore (@internal), JobStateSetOpts ✅ migrated
   newsProvider.ts      → NewsProvider, NewsTimeRange ✅ migrated
   optionsDataProvider.ts → OptionsDataProvider     ✅ migrated

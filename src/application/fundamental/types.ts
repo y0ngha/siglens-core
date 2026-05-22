@@ -10,7 +10,7 @@ import type {
     Tier,
     TierConfig,
 } from '@/domain/types';
-import type { FundamentalDataProvider } from '@/infrastructure/fundamental/types';
+import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
 // ─────────────────────────────────────────
 // Submit

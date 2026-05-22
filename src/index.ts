@@ -477,7 +477,7 @@ export type {
     UserTierRepository,
 } from './infrastructure/db';
 export type { FmpConfig } from './infrastructure/fmp/types';
-export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
+export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
     AcquireReanalyzeCooldownResult,
