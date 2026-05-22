@@ -28,7 +28,6 @@ application ← MAY import from domain/
 ```typescript
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 ```
 
 **Prohibited:**
@@ -48,12 +47,13 @@ A function belongs in `application/` when it must coordinate **two or more** inf
 modules, or when it sequences a domain call followed by an infrastructure call.
 
 ```typescript
-// ✅ application: sequences infra (load skills) → domain (build prompt) → infra (AI call) → infra (cache)
+// ✅ application: cache lookup (infra) → domain prompt → infra enqueue → infra cache write
 export async function submitAnalysis(params: SubmitAnalysisParams): Promise<string> {
     const cache = createCacheProvider();           // adapter factory → CacheProvider | null
-    const skills = await new FileSkillsLoader().loadSkills();
-    const prompt = buildAnalysisPrompt(params.symbol, params.bars, params.indicators, skills);
-    // … enqueue, cache, etc.
+    const cached = await cache?.get<AnalysisResponse>(buildAnalysisCacheKey(params));
+    if (cached) return cached.jobId;
+    const prompt = buildAnalysisPrompt(params.symbol, params.bars, params.indicators);
+    // … enqueue, write cache, etc.
 }
 ```
 
@@ -62,11 +62,16 @@ in that infrastructure module instead. Do not promote it to `application/` prema
 
 ## Adapter Composition
 
-Use-cases call **infrastructure adapter factories** directly (`createCacheProvider()`,
-`new FileSkillsLoader()`, etc.). Factories return values typed as the corresponding
-**domain port** (`CacheProvider`, `SkillsProvider`, …), so the contract between
-application and infrastructure is enforced by the compiler — application code is
-written against the port, never against an adapter's concrete shape.
+Use-cases call **infrastructure adapter factories** directly (e.g. `createCacheProvider()`).
+Factories return values typed as the corresponding **domain port** (`CacheProvider`,
+`MarketDataProvider`, …), so the contract between application and infrastructure is
+enforced by the compiler — application code is written against the port, never
+against an adapter's concrete shape.
+
+For modules that have not yet been migrated to a domain port, the adapter is still
+constructed directly (`new FileSkillsLoader()`, etc.). Treat those as temporary —
+they should be replaced with a `create<Port>Provider()` factory when the module's
+port migration lands.
 
 Do **not** push every dependency through a `deps: { … }` parameter. Library
 consumers call use-cases with domain inputs only (`submitAnalysis(params)`) and
@@ -117,7 +122,7 @@ import type { CacheProvider } from '@/domain/ports/cache';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 
 vi.mock('@/infrastructure/cache/redis');
-const mockCreateCacheProvider = createCacheProvider as Mock;
+const mockCreateCacheProvider = vi.mocked(createCacheProvider);
 
 const stubCache: CacheProvider = {
     get: vi.fn().mockResolvedValue(null),

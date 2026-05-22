@@ -73,10 +73,13 @@ AI 분석 결과는 심볼·타임프레임별 TTL로 캐싱한다.
 ### 구현 위치
 
 ```
+domain/ports/
+└── cache.ts     ← CacheProvider 인터페이스 (port)
+
 infrastructure/cache/
-├── types.ts     ← CacheProvider 인터페이스
+├── types.ts     ← 어댑터 내부 타입 (CachedBriefingData 등)
 ├── config.ts    ← 캐시 키 / TTL 상수
-└── redis.ts     ← Upstash 구현체
+└── redis.ts     ← Upstash 어댑터 (@adapter implements CacheProvider)
 ```
 
 `CacheProvider`를 in-memory stub으로 대체하면 단위 테스트에서 외부 호출 없이 검증할 수 있다.

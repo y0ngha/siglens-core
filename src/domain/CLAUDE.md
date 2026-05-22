@@ -20,14 +20,20 @@ is a pure interface — no behavior, no implementation, no SDK references. Adapt
 `infrastructure/<module>/` import the port and implement it (`implements` for classes,
 explicit return-type annotation for factory functions).
 
-**File layout:**
+**Target file layout (ports are migrated module-by-module — only files listed
+under "Currently migrated" actually exist today):**
+
 ```
 domain/ports/
-  cache.ts             → CacheProvider
-  marketDataProvider.ts → MarketDataProvider, GetBarsOptions
-  skillsProvider.ts    → SkillsProvider
+  cache.ts             → CacheProvider           ✅ migrated
+  marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ⏳ planned
+  skillsProvider.ts    → SkillsProvider                         ⏳ planned
   ...
 ```
+
+Until a module is migrated, its port interface still lives in
+`infrastructure/<module>/types.ts`. Do not import from a `domain/ports/<x>` path
+that is not yet listed under "✅ migrated".
 
 **Authoring rules:**
 - One conceptual contract per file. Co-locate option / argument types used by that
