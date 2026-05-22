@@ -1,15 +1,17 @@
 import { Redis } from '@upstash/redis';
-import type { CacheProvider } from '@/infrastructure/cache/types';
+import type { CacheProvider } from '@/domain/ports/cache';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 /**
+ * @adapter implements {@link CacheProvider}
+ *
  * Construct a {@link CacheProvider} backed by Upstash Redis.
  *
  * Reads connection settings from env. Returns
  * `null` when the required vars are not present so callers can degrade
  * gracefully (cache miss on every operation) instead of crashing.
  *
- * When `UPSTASH_REDIS_REST_TOKEN_READONLY` is provided, reads use the
+ * When `UPSTASH_REDIS_REST_READONLY_TOKEN` is provided, reads use the
  * read-only token while writes go through the writer token — useful when
  * deploying with split credentials.
  *

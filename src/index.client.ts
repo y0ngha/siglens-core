@@ -376,8 +376,8 @@ export {
     WILLIAMS_R_DEFAULT_PERIOD,
 } from './domain/indicators/constants';
 
-// Infrastructure interfaces are type-only and safe for browser consumers.
-export type { CacheProvider } from './infrastructure/cache/types';
+// Domain ports + infrastructure type-only interfaces are safe for browser consumers.
+export type { CacheProvider } from './domain/ports/cache';
 export type { SkillsProvider } from './infrastructure/skills/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
