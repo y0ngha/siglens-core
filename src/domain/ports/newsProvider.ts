@@ -18,15 +18,9 @@ export type NewsTimeRange = '24h' | '7d' | '30d';
  * News + earnings calendar fetcher abstraction the domain depends on for
  * retrieving articles, earnings schedules, and earnings reports.
  *
- * Adapters live in `infrastructure/news/` and surface the underlying
- * client's errors to the caller — graceful degradation (e.g. treating a
- * fetch failure as an empty result) is the responsibility of the
- * application-layer caller, not the adapter.
- *
- * `fetchEarningsCalendarAll` returns the full calendar without a symbol
- * filter because FMP does not support per-symbol calendar queries on the
- * stable tier. Consumers must DB-cache this data via a daily Cron job and
- * filter by symbol at the repository layer.
+ * Adapters surface the underlying client's errors to the caller — graceful
+ * degradation (e.g. treating a fetch failure as an empty result) is the
+ * responsibility of the application-layer caller, not the adapter.
  *
  * @see NewsTimeRange
  * @see NewsItem
