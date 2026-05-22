@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Redis } from '@upstash/redis';
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 export const CHAT_TOKEN_LIMIT = 5;
@@ -15,6 +15,23 @@ export function hashClientIp(clientIp: string): string {
     return createHash('sha256').update(clientIp).digest('hex');
 }
 
+/**
+ * @adapter implements {@link ChatTokenStore}
+ *
+ * Construct a {@link ChatTokenStore} backed by Upstash Redis.
+ *
+ * Reads connection settings from env via `readUpstashConfig`. When Upstash
+ * env is missing the adapter is still returned, but every operation degrades
+ * gracefully: `tryConsumeToken` reports the caller as within-limit,
+ * `refundConsumedToken` is a no-op, and `getRemainingTokens` returns the
+ * full daily allowance. Runtime Redis errors are caught and degraded the
+ * same way so a Redis outage does not block chat traffic.
+ *
+ * @returns A configured chat token store. Never `null` — graceful degradation
+ *   happens per-operation rather than at construction.
+ *
+ * @see ChatTokenStore
+ */
 export function createChatTokenStore(): ChatTokenStore {
     const config = readUpstashConfig();
     const redis =

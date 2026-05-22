@@ -104,9 +104,11 @@ AI provider 호출 이후 `server_busy` 또는 `server_error`로 매핑되는 �
 ### 구현 위치
 
 ```
+domain/ports/
+└── chatTokenStore.ts  ← ChatTokenStore 포트 (@port)
+
 infrastructure/chat/
-├── types.ts       ← ChatTokenStore 인터페이스
-└── tokenStore.ts  ← Upstash 기반 구현체 + IP 해시 helper
+└── tokenStore.ts      ← Upstash 기반 구현체 (@adapter implements ChatTokenStore) + IP 해시 helper
 ```
 
 ---

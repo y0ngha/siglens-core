@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #93 Round 1 | worktree-agent-a20856e6094365c94 | 2026-05-22]
+- Violation: `domain/ports/chatTokenStore.ts` JSDoc references infrastructure path (`infrastructure/chat/`) and concrete adapter function name (`hashClientIp`) — gemini-code-assist inline comment
+- Rule: domain layer must remain isolated from infrastructure; port JSDoc should describe policy (e.g. "identifiers are hashed") rather than naming concrete adapter modules/functions
+- Context: Migration PR moved `ChatTokenStore` into `domain/ports/`, but the JSDoc still pointed adapters consumers at a specific infrastructure subdirectory and helper name. Rewrote the port description to refer to "implementations" / "the adapter" abstractly so the port contract stays direction-agnostic.
+
 ## [PR #96 Round 2 follow-up | worktree-refactor+ports-jobs-slice | 2026-05-22]
 - S1: `src/domain/ports/jobStateStore.ts` — `JobStateStore` 인터페이스 메서드(get/set/deleteMany)에 per-method JSDoc 한 줄 설명 누락. 기존 공개 포트(`CacheProvider`)는 각 메서드에 한 줄 설명을 갖추고 있어 IDE hover 시 의도 파악이 즉시 가능. `@internal` 포트라도 어댑터 개발자 / 내부 리뷰어의 가독성을 위해 동일 패턴을 적용. 특히 `deleteMany`는 단일 키 `delete`와 달리 다중 키 + 삭제 개수 반환이라는 차이를 명시.
   - Rule: Domain ports authoring 패턴 일관성 — 기존 포트(`CacheProvider`)와 동일하게 각 메서드 한 줄 JSDoc 추가.
