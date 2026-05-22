@@ -485,7 +485,7 @@ export type {
     MarketDataProvider,
 } from './infrastructure/market/types';
 export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
-export type { SkillsProvider } from './infrastructure/skills/types';
+export type { SkillsProvider } from './domain/ports/skillsProvider';
 
 // Application types
 export type {
