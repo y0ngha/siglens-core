@@ -327,3 +327,11 @@
 - Rule: MISTAKES.md Documentation/JSDoc — deprecation notes must accurately describe the migration path; misleading guidance is worse than no guidance
 - Context: Suggestion S1 (round 3) — `GeminiPart` deprecation note "Use `ConversationTurn['text']` instead" would mislead consumers into replacing `{ text: string }` with `string`. Rewrote the JSDoc on both `src/index.ts` and `src/index.client.ts` to explain that `parts: GeminiPart[]` was flattened into `text: string` on `ConversationTurn` and that the type has no direct equivalent.
 
+- Violation: alphabetical import order broken — `@/domain/ports/aiProvider` placed AFTER `@/domain/types` even though `'ports'` < `'types'`
+- Rule: CONVENTIONS.md import ordering — within the same path-alias group, imports must be alphabetically sorted by full module path
+- Context: Suggestion S1 (round 4) — `src/application/chat/types.ts` had the same out-of-order pattern that was fixed in `requestChatCompletion.ts` during round 2 but was missed here. Moved `import type { CallAiProvider } from '@/domain/ports/aiProvider'` to precede the `@/domain/types` block. Lesson: when applying an ordering fix in one file, sweep the entire module/feature for the same pattern instead of relying on the reviewer to flag siblings one round at a time.
+
+- Violation: `@port` tag placed on file-level module JSDoc instead of the actual port interface/type JSDoc
+- Rule: domain/CLAUDE.md "Authoring rules" — "Tag the interface JSDoc with `@port` so adapters and reviewers can identify it"; the tag must annotate the port contract, not the module header
+- Context: Suggestion S2 (round 4) — `src/domain/ports/aiProvider.ts` had `@port` on the file-leading block comment, but the port contract is `CallAiProvider` at the bottom of the file. Tools / readers scanning for `@port` on type declarations (matching the `CacheProvider` example) would miss it. Moved the tag onto the `CallAiProvider` type JSDoc and kept the module-level prose as a plain header.
+

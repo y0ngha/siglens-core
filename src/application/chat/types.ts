@@ -1,4 +1,5 @@
 import type { ChatbotLimitError } from '@/application/usage/types';
+import type { CallAiProvider } from '@/domain/ports/aiProvider';
 import type {
     AnalysisResponse,
     ChatMessage,
@@ -8,7 +9,6 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
-import type { CallAiProvider } from '@/domain/ports/aiProvider';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 

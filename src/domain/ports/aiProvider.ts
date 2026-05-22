@@ -1,5 +1,4 @@
 /**
- * @port
  * Provider-neutral AI chat-completion contract the domain depends on for
  * generating analysis text, briefings, and chat replies.
  *
@@ -50,6 +49,7 @@ export interface CallAiProviderOptions {
 }
 
 /**
+ * @port
  * Callable port shape for the AI provider. Adapters implement this signature
  * directly (no class wrapper) and the application layer accepts the function
  * as a dependency.
