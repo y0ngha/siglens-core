@@ -5,6 +5,7 @@ import type {
     FearGreedSnapshot,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
+    OptionsAnalysisResponse,
     Timeframe,
 } from '@/domain/types';
 
@@ -314,6 +315,136 @@ describe('buildOverallAnalysisPrompt', () => {
             );
             expect(prompt).toContain(
                 'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
+            );
+        });
+    });
+
+    describe('options axis integration', () => {
+        const MOCK_OPTIONS: OptionsAnalysisResponse = {
+            summary: '풋콜 비율은 균형 상태이며 단기 변동성 프리미엄이 평이합니다.',
+            perExpiration: [
+                {
+                    expirationDate: '2026-06-20',
+                    tone: 'neutral',
+                    commentary: '주요 외가격 콜 옵션에 거래량 집중.',
+                },
+            ],
+            signals: [
+                {
+                    kind: 'volatility',
+                    message: 'IV가 30일 평균 대비 12% 낮음.',
+                },
+            ],
+            analyzedAt: '2026-05-22T13:30:00Z',
+        };
+
+        it('renders optionsBulletsKo + integratedConclusionKo schema fields', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                MOCK_OPTIONS
+            );
+
+            expect(prompt).toContain('optionsBulletsKo');
+            expect(prompt).toContain('integratedConclusionKo');
+            // Old field name must be gone.
+            expect(prompt).not.toContain('threeAxisConclusionKo');
+            // 4-axis label appears in narrative and rules.
+            expect(prompt).toContain('four-axis');
+        });
+
+        it('embeds options summary + per-expiration + signals when payload is provided', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                MOCK_OPTIONS
+            );
+
+            expect(prompt).toContain('풋콜 비율은 균형 상태이며');
+            expect(prompt).toContain('2026-06-20');
+            expect(prompt).toContain('주요 외가격 콜 옵션에 거래량 집중');
+            expect(prompt).toContain('IV가 30일 평균 대비 12% 낮음');
+            expect(prompt).toContain('Axis 4 — Options Analysis');
+        });
+
+        it('renders the 옵션 미상장 hint when options is null', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                null
+            );
+
+            expect(prompt).toContain('옵션 시장 데이터는 분석에 포함되지 않았습니다');
+            expect(prompt).toContain('optionsBulletsKo는 빈 배열로 유지하세요');
+            // No analytical content from a non-null options payload should leak in.
+            expect(prompt).not.toContain('풋콜 비율은 균형 상태이며');
+        });
+
+        it('appends the stale-OI caveat when optionsOiStale=true', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                MOCK_OPTIONS,
+                true
+            );
+
+            expect(prompt).toContain(
+                '미국 옵션 정규 거래 시간 외에 수집된 스냅샷'
+            );
+            expect(prompt).toContain(
+                'Open Interest가 직전 세션 기준일 수 있습니다'
+            );
+        });
+
+        it('omits the stale-OI caveat when optionsOiStale is false or undefined', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                MOCK_OPTIONS
+            );
+
+            expect(prompt).not.toContain('미국 옵션 정규 거래 시간 외에 수집된');
+        });
+
+        it('treats the 3-axis (no companyName) legacy overload as a graceful options skip', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe
+            );
+
+            // The legacy overload omits the options arg entirely. The impl
+            // falls back to `options=null`, so we expect the same "no options
+            // data" hint as the explicit-null branch.
+            expect(prompt).toContain(
+                '옵션 시장 데이터는 분석에 포함되지 않았습니다'
             );
         });
     });

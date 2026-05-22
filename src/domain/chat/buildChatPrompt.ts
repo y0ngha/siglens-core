@@ -133,10 +133,12 @@ function formatNewsContext(payload: NewsAnalysisResponse): string {
 }
 
 /**
- * Format an overall (3-axis) analysis context section for the system prompt.
+ * Format an overall (4-axis) analysis context section for the system prompt.
  *
  * Surfaces the two most informative fields: the headline summary and the
- * three-axis conclusion (both in Korean, as produced by the LLM).
+ * integrated conclusion (both in Korean, as produced by the LLM). The label
+ * is intentionally still `Integrated Conclusion` rather than `4-axis` so the
+ * chat prompt reads naturally even when the options axis was skipped.
  *
  * @param payload - The {@link OverallAnalysisResponse} to format.
  * @returns A markdown section string.
@@ -144,8 +146,7 @@ function formatNewsContext(payload: NewsAnalysisResponse): string {
 function formatOverallContext(payload: OverallAnalysisResponse): string {
     return [
         `Headline: ${payload.headlineKo}`,
-        // @ts-expect-error options axis WIP — threeAxisConclusionKo → integratedConclusionKo in Phase 4-Core
-        `Three-axis Conclusion: ${payload.threeAxisConclusionKo}`,
+        `Integrated Conclusion: ${payload.integratedConclusionKo}`,
     ].join('\n');
 }
 
