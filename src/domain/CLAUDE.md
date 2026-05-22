@@ -26,6 +26,7 @@ under "Currently migrated" actually exist today):**
 ```
 domain/ports/
   cache.ts             → CacheProvider           ✅ migrated
+  jobRedisClient.ts    → JobRedisClient (@internal), RedisSetOpts ✅ migrated
   marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ⏳ planned
   skillsProvider.ts    → SkillsProvider                         ⏳ planned
   ...

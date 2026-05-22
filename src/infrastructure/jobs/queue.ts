@@ -1,10 +1,9 @@
-import { createJobRedis } from '@/infrastructure/jobs/redis';
 import type {
-    JobMeta,
     JobRedisClient,
-    JobStatus,
     RedisSetOpts,
-} from '@/infrastructure/jobs/types';
+} from '@/domain/ports/jobRedisClient';
+import { createJobRedis } from '@/infrastructure/jobs/redis';
+import type { JobMeta, JobStatus } from '@/infrastructure/jobs/types';
 import { SECONDS_PER_HOUR } from '@/domain/constants/time';
 
 const JOB_TTL_SECONDS = SECONDS_PER_HOUR;
