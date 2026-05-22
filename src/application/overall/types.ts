@@ -183,8 +183,12 @@ export interface OverallDependencyInputs {
     /**
      * Pre-fetched options snapshot. Caller fetches via OptionsDataProvider
      * (or app-side adapter). Omit (or set undefined) to skip the options axis
-     * gracefully — the resolver returns kind: 'options_skipped' and the
-     * prompt builder receives a null options context.
+     * gracefully — the resolver routes through an internal `no_chains_error`
+     * branch and the resulting `DependencyStateCached.options` is set to
+     * `null`, so the prompt builder receives a null options context (the
+     * "옵션 미상장" hint). `DependencyState` itself has no dedicated
+     * `'options_skipped'` variant; the skip is encoded as `kind: 'cached'`
+     * with `options: null`.
      */
     optionsSnapshot?: OptionsSnapshot;
 

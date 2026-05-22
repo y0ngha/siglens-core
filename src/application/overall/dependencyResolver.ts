@@ -324,13 +324,10 @@ export async function resolveOverallDependencies(
 
     // ── Resolve the options-axis payload for the cached branch ──
     // `cached` → embed the analysis; `no_chains_error` → null (graceful skip).
-    // Any other status (`submitted`) is handled by the pending branch.
+    // Other statuses (`submitted`) are handled by the pending branch below, so
+    // the payload is only consumed when status ∈ {cached, no_chains_error}.
     const optionsPayload: OptionsAnalysisResponse | null =
-        optionsResult.status === 'cached'
-            ? optionsResult.result
-            : optionsResult.status === 'no_chains_error'
-              ? null
-              : null;
+        optionsResult.status === 'cached' ? optionsResult.result : null;
 
     // ── All four axes terminal (cached or no_chains for options) → cached state ──
     // The options axis is "resolved" when it's either cached or no_chains_error;
