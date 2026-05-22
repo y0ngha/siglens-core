@@ -156,7 +156,10 @@ export async function submitNewsAnalysis(
     const cacheKey = buildNewsCacheKey(symbol, modelId, inputHash);
     const cache = createCacheProvider();
 
-    if (cache !== null) {
+    // `force` bypasses the cache read entirely so a fresh job is always
+    // enqueued. Skip-on-force mirrors submitAnalysis's positional `force`
+    // contract — the four axes now share one re-analyze lever.
+    if (!options.force && cache !== null) {
         try {
             const cached = await cache.get<NewsAnalysisResponse>(cacheKey);
             // Lightweight structural validation — schema drift from a prior

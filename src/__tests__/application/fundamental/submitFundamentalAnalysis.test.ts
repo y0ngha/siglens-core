@@ -174,6 +174,31 @@ describe('submitFundamentalAnalysis 함수는', () => {
             expect(recordUsage).toHaveBeenCalledTimes(1);
         });
 
+        it('bypasses cache when force=true', async () => {
+            // Pre-populate the cache so a no-force run would resolve to cached;
+            // force=true must skip the read entirely and proceed to submit.
+            // Use mockResolvedValue (not Once) so this fixture cannot leak
+            // into the next test — the queue is reset by mockReset before
+            // each test in this suite's beforeEach hook only resets call
+            // history, not pending resolutions.
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValue(mockCachedResult);
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                force: true,
+            });
+
+            expect(result.status).toBe('submitted');
+            // Cache read must not have been attempted at all.
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            // Provider was contacted and the job was enqueued.
+            expect(mockDataProvider.getProfile).toHaveBeenCalled();
+            expect(mockSetJobMeta).toHaveBeenCalled();
+        });
+
         it('캐시 결과의 overallConclusionKo가 비어 있으면 캐시 미스로 처리하고 provider를 호출한다', async () => {
             const emptyConclusion = {
                 overallConclusionKo: '',

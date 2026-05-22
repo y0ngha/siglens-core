@@ -292,6 +292,31 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(mockSetJobMeta).not.toHaveBeenCalled();
         });
 
+        it('bypasses cache when force=true', async () => {
+            // Pre-populate the cache so a no-force run would resolve to cached;
+            // force=true must skip the read entirely and proceed to submit.
+            // Use mockReset + mockResolvedValue (not Once) so the queued
+            // resolution cannot leak forward — vitest's clearAllMocks resets
+            // call history but not pending resolutions on a mock.
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValue(mockCachedResult);
+
+            const result = await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+                force: true,
+            });
+
+            expect(result.status).toBe('submitted');
+            // Cache read must not have been attempted at all.
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            // The job was enqueued via the normal submit path.
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
+
         it('underlyingPrice / capturedAt / OI 합계가 변경되어도 동일 캐시 키로 조회된다', async () => {
             // hashOptionsInput은 구조적 식별자만 hash하므로, provider 폴링마다
             // 흔들리는 fast-moving 필드(가격·시간·OI)는 cache miss를 일으키지

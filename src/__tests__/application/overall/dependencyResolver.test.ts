@@ -1171,7 +1171,7 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(optionsOpts).not.toHaveProperty('usage');
         });
 
-        it('forwards top-level force to all 4 axes', async () => {
+        it('forwards top-level force to all 4 axes (resolver-level contract)', async () => {
             mockSubmitOptionsAnalysis.mockResolvedValueOnce({
                 status: 'no_chains_error',
                 code: 'no_options_chains',
@@ -1185,6 +1185,10 @@ describe('resolveOverallDependencies 함수는', () => {
             expect(technicalArgs?.[3]).toBe(true);
 
             // The other three axes receive `force` inside the options object.
+            // Each submit fn's cache-bypass behaviour (skip read on force=true)
+            // is covered by its own unit tests — this assertion is the
+            // resolver-level contract that the flag is actually plumbed
+            // through, not silently dropped.
             expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
                 expect.objectContaining({ force: true })
             );
@@ -1193,6 +1197,33 @@ describe('resolveOverallDependencies 함수는', () => {
             );
             expect(mockSubmitOptionsAnalysis).toHaveBeenCalledWith(
                 expect.objectContaining({ force: true })
+            );
+        });
+
+        it('omits force from all 4 axes when top-level force is not set', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No usable chains',
+            });
+            await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            // Technical: 4th positional arg defaults to false (per the existing
+            // `technical.force / fmpSymbol 미지정 시 기본 false` test above).
+            const technicalArgs = mockSubmitAnalysis.mock.calls[0];
+            expect(technicalArgs?.[3]).toBe(false);
+
+            // The other three axes get force=false explicitly (not omitted) — the
+            // resolver always sets it so consumers see a consistent surface.
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: false })
+            );
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: false })
+            );
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: false })
             );
         });
     });

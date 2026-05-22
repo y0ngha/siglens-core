@@ -9,10 +9,7 @@ import type {
     OverallDependencyInputs,
 } from '@/application/overall/types';
 import type { OptionsAnalysisResponse } from '@/domain/types';
-import type {
-    SubmitOptionsAnalysisResult,
-    SubmitOptionsAnalysisOptions,
-} from '@/application/options/types';
+import type { SubmitOptionsAnalysisResult } from '@/application/options/types';
 
 /**
  * @internal Object branch of {@link OverallDependencyInputs.news} (per-axis
@@ -189,10 +186,9 @@ export async function resolveOverallDependencies(
             : null;
 
     // ── Options-axis submit (gracefully short-circuited when no snapshot) ──
-    // Forwarded `force` is the top-level flag only — submitOptionsAnalysis
-    // does not currently consume `force` at runtime, but we propagate it so
-    // the resolver contract stays uniform across all four axes and a future
-    // submit-level cache-bust hook can pick it up without API churn.
+    // The four axes all consume `force` through their option types now, so
+    // we can drop the explicit `as SubmitOptionsAnalysisOptions & { force }`
+    // cast and rely on the structural type check.
     const optionsSubmit: Promise<SubmitOptionsAnalysisResult> =
         optionsSnapshot !== undefined && optionsExpirationDate !== null
             ? submitOptionsAnalysis({
@@ -206,7 +202,7 @@ export async function resolveOverallDependencies(
                   ...optionsAxisOptionsResolved,
                   skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                   force: effectiveAxisForce,
-              } as SubmitOptionsAnalysisOptions & { force: boolean })
+              })
             : Promise.resolve({
                   status: 'no_chains_error' as const,
                   code: 'no_options_chains' as const,
@@ -251,8 +247,6 @@ export async function resolveOverallDependencies(
                 ...fundamentalAxisOptions,
                 skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                 force: effectiveAxisForce,
-            } as Parameters<typeof submitFundamentalAnalysis>[0] & {
-                force: boolean;
             }),
             submitNewsAnalysis({
                 symbol,
@@ -266,8 +260,6 @@ export async function resolveOverallDependencies(
                 ...newsAxisOptions,
                 skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                 force: effectiveAxisForce,
-            } as Parameters<typeof submitNewsAnalysis>[0] & {
-                force: boolean;
             }),
             optionsSubmit,
         ]);
