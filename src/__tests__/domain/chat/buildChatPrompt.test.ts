@@ -360,7 +360,8 @@ const OVERALL_PAYLOAD: OverallAnalysisResponse = {
     technicalBulletsKo: [],
     fundamentalBulletsKo: [],
     newsBulletsKo: [],
-    threeAxisConclusionKo: '기술·펀더·뉴스 모두 긍정적입니다.',
+    optionsBulletsKo: [],
+    integratedConclusionKo: '기술·펀더·뉴스 모두 긍정적입니다.',
     scenarios: [],
     riskFactorsKo: [],
 };
