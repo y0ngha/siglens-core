@@ -41,13 +41,14 @@ domain         ← 외부 import 없음
                  technicalindicators 라이브러리도 금지
                  (계산 로직을 직접 구현)
                  Date.now(), fetch, console.*, process.env 전부 금지
+                 추상 Repository / 외부 의존성 port 인터페이스 노출 담당 (ports/)
+                 — 실제 어댑터(DB, 캐시 등)는 consumer 또는 infrastructure 소유
 
 infrastructure ← domain import 가능
                  application import 금지 (ESLint 강제)
                  외부 API (AI 프로바이더 등) 호출 담당
                  Skills 파일 I/O 담당
                  Upstash Redis 캐시 관리 담당 (cache/)
-                 추상 Repository 인터페이스 노출 담당 (db/) — 실제 DB 어댑터는 consumer 소유
                  인터페이스(types.ts)를 반드시 먼저 정의
 
 application    ← domain, infrastructure import 가능
@@ -127,14 +128,13 @@ const key = process.env.API_KEY; // 금지
     │   ├── chat
     │   ├── constants
     │   ├── indicators
-    │   ├── ports          # Port interfaces (CacheProvider, CallAiProvider, …)
+    │   ├── ports          # Port interfaces (CacheProvider, CallAiProvider, repositories, …)
     │   ├── signals
     │   └── utils
     ├── infrastructure
     │   ├── ai            # LLM response JSON salvage helper (no SDK adapter); port lives in domain/ports/aiProvider.ts
     │   ├── cache
     │   ├── chat
-    │   ├── db            # Abstract repository interfaces only (no Drizzle/Neon)
     │   ├── email         # EmailDispatcher type contract only
     │   ├── fmp           # Config reader for FMP env vars
     │   ├── jobs
@@ -195,15 +195,28 @@ Tier 정의, 함수별 분류, 새 함수 추가 시 결정 워크플로우, sem
 Pure-function signal detectors. Follows the same rules as `domain/indicators/`:
 no external imports, pure functions only.
 
+### domain/ports/
+
+추상 port 인터페이스 모음. 도메인이 의존하는 외부 시스템(캐시, DB 등)의 계약만 선언하며,
+실제 어댑터 구현은 consumer 또는 `infrastructure/`가 소유한다. 의존성 역전(DIP)을 통해
+도메인 계층이 외부 인프라에 결합되지 않도록 보장한다.
+
+- `cache.ts` — `CacheProvider` 인터페이스 (TTL 기반 key-value 캐시 계약).
+- `usageRepository.ts` — `UsageRepository` 인터페이스, `RecordUsageInput`.
+- `usageLogRepository.ts` — `UsageLogRepository` 인터페이스, `CreateUsageLogInput`.
+- `userTierRepository.ts` — `UserTierRepository` 인터페이스, `UserTier` alias.
+
+공유되는 도메인 값 타입(`UsageActionType`, `UsageCounts`, `UsageLogRecord` 등)은 `domain/types.ts`에서
+정의되어 port 파일들 간 순환 import를 방지한다.
+
 ### infrastructure/
 
 외부 시스템과의 경계를 담당한다. 각 서브디렉토리는 **하나의 외부 시스템**에만 대응하며,
 `types.ts`에 정의된 인터페이스를 구현한다.
 
 - `ai/` — LLM 응답 JSON salvage 헬퍼(`extractJsonWithRepair`)만 보유. AI 프로바이더 호출 시그니처(`CallAiProvider`)는 `domain/ports/aiProvider.ts`(port)로 이전됨. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
-- `cache/` — Upstash Redis 래퍼 (TTL 기반 캐시)
+- `cache/` — Upstash Redis 래퍼 (`CacheProvider` port 구현, TTL 기반 캐시).
 - `chat/` — Upstash Redis 기반 채팅 토큰 저장소
-- `db/` — 추상 Repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`) + 사용량/티어 union 타입. 실제 DB 어댑터(Drizzle/Neon)는 consumer 소유.
 - `email/` — `EmailDispatcher` 타입 계약만 보유. 발송 어댑터(Resend 등)는 consumer 소유.
 - `fmp/` — FMP 환경변수 reader (값을 채우는 책임은 consumer).
 - `jobs/` — Redis 기반 Job 큐 (enqueue / dequeue / status 관리)

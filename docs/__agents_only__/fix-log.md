@@ -1,5 +1,32 @@
 # Fix Log
 
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22] (Round 4)
+- Violation: `{@link UsageLogRepository}` JSDoc tag in `src/domain/types.ts` (base layer) referencing a symbol declared in `src/domain/ports/usageLogRepository.ts` (upper layer that imports from `domain/types.ts`).
+- Rule: ARCHITECTURE.md — layer dependency direction `domain/types.ts → (no upward imports/refs)`; documentation references should follow the same direction as code imports to avoid implying a reverse coupling.
+- Context: `UsageCounts` JSDoc explained why `premium_model` was omitted by linking to `UsageLogRepository`, but `domain/types.ts` is the base file that ports depend on, not vice versa. Replaced `{@link UsageLogRepository}` with the backtick-only form `` `UsageLogRepository` `` so the prose still documents the relationship without producing a reverse-direction doc link.
+
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22]
+- Violation: Circular import between sibling port files (`domain/ports/usageRepository.ts` imports `UsageLogRecord` from `usageLogRepository.ts`, while `usageLogRepository.ts` imports `UsageActionType` back from `usageRepository.ts` — A → B → A).
+- Rule: ARCHITECTURE.md — "모듈 간 순환 import 금지 (A → B → A) → 공유 상수/타입은 제3 파일로 분리하여 순환 해소".
+- Context: When splitting a single types file into per-port files, the shared value types stayed inside one of the ports instead of moving up to `domain/types.ts`. Lifted both `UsageActionType` and `UsageLogRecord` to `domain/types.ts` so each port has a single-direction import to the shared module.
+
+- Violation: `docs/ARCHITECTURE.md` not updated when `infrastructure/db/` was deleted and `domain/ports/` was introduced. Three stale db/ references + missing ports/ folder description.
+- Rule: MISTAKES.md Documentation Sync — code refactor and folder-structure docs must be updated in the same PR (extends §2/§3 from infra-only to architecture-level moves).
+- Context: PR introduced `domain/ports/{cache,usageRepository,usageLogRepository,userTierRepository}.ts` and deleted `infrastructure/db/`, but the folder-structure tree, dependency-rule paragraph, and infrastructure module list in ARCHITECTURE.md still referenced db/ and never mentioned ports/.
+
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22] (Round 2)
+- Violation: `src/domain/CLAUDE.md` port-layout block listed `UsageLogRecord` and `UsageActionType` under `usageLogRepository.ts` / `usageRepository.ts`, but those symbols actually live in `domain/types.ts` (the ports only import them).
+- Rule: MISTAKES.md Documentation Sync §3 — code refactor / type relocation and the symbol-mapping doc must be updated in the same PR (and ports.ts authoring rule: "DTOs the port returns or receives stay in `domain/types.ts`").
+- Context: Round 1 lifted both DTO types out of the per-port files into `domain/types.ts` to break a circular import, but the CLAUDE.md mapping table still credited the port files as the definition site, so future agents searching for the symbols would open the wrong file.
+
+- Violation: Custom JSDoc tag `@internal-sync` used on a public Tier 4 union without being defined anywhere in project docs.
+- Rule: CONVENTIONS.md JSDoc Rules — public symbols must use documented tags so IDE/TypeDoc render correctly. Custom unrecognized tags become noise for npm consumers.
+- Context: `UsageActionType` carried a hand-rolled `@internal-sync` block explaining cross-repo sync requirements with siglens. Replaced with the standard `@remarks` block, which TypeDoc and IDEs render natively. Same content, standard tag.
+
+- Violation: Same logical field has different declared types across record (`string`) and input (`ModelId`) shapes in the same module.
+- Rule: TypeScript predictability — paired input/output types for the same field should share the same declared type, unless the narrower form is enforced at the producer boundary.
+- Context: `UsageLogRecord.modelUsed: string` but `CreateUsageLogInput.modelUsed: ModelId`. The DB layer ultimately stores it as text, and `modelId` in core is documented as a cache-key disambiguator rather than the runtime model selector. Aligned `CreateUsageLogInput.modelUsed` to `string` and removed the now-unused `ModelId` import.
+
 ## [PR #97 Round 2 | worktree-agent-af677455522108f87 | 2026-05-22]
 - Violation: `domain/ports/marketDataProvider.ts`에 infrastructure-specific identifier union `MarketDataProviderType = 'alpaca' | 'fmp'`를 배치 + 포트 JSDoc이 `infrastructure/market/` 경로와 `MARKET_PROVIDER` env 변수를 직접 언급 + `GetBarsOptions.symbol` 설명이 "FMP-style"이라는 구현체 이름을 노출.
 - Rule: `src/domain/CLAUDE.md` Ports authoring rules ("One conceptual contract per file. Co-locate option/argument types used by that contract") + domain layer purity ("No SDK references, no implementation"). 포트 파일에는 인터페이스가 인자/반환 타입으로 사용하는 옵션만 두고, 어댑터 선택 식별자(provider 이름 union)는 infrastructure 설정 concern이다.
@@ -357,6 +384,11 @@
 - Violation: skipEnqueueIfMiss option not propagated from top-level to sub-axis submits inside submitOverallAnalysis
 - Rule: bot-gating intent — skipEnqueueIfMiss must prevent worker enqueue at every layer it triggers
 - Context: Gemini high-priority — resolveOverallDependencies was called BEFORE the existing guard at line 231, and the resolver forwarded options to submitAnalysis / submitFundamentalAnalysis / submitNewsAnalysis WITHOUT the flag. A bot request would have triggered three sub-axis workers before reaching the overall-level guard. Fixed by (1) moving skipEnqueueIfMiss onto OverallDependencyInputs so the resolver sees it, (2) forcing skipEnqueueIfMiss into all three sub-axis option objects in the resolver, and (3) adding a new DependencyStateMissNoTrigger short-circuit so submitOverallAnalysis returns miss_no_trigger directly when any axis returns miss_no_trigger. Added 5 new resolver tests + 1 new submit test (74 → 80 in the overall suite) to lock in propagation behavior.
+
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22]
+- Violation: Port return DTO (`UsageCounts`) co-located in `domain/ports/usageRepository.ts` instead of `domain/types.ts`
+- Rule: `domain/CLAUDE.md` Authoring Rules — "DTOs the port returns or receives stay in `domain/types.ts`. Ports reference them via import."
+- Context: Round 3 Blocker B1 — `UsageCounts` is `UsageRepository.getUsageToday`'s return DTO, mirroring `UsageLogRecord` (already moved). Co-location is reserved for option/argument types (`RecordUsageInput`, `CreateUsageLogInput`). Moved interface to `domain/types.ts` Usage Tracking section, updated imports in `usageRepository.ts` + `application/usage/limits.ts`, and synced symbol tables in `domain/CLAUDE.md`, `docs/ARCHITECTURE.md`, and `src/index.ts` re-exports.
 
 ## [PR #92 | refactor/ports-ai-module | 2026-05-22]
 - Violation: `@deprecated` JSDoc migration hint points to a non-equivalent type (`ConversationTurn['text']` is `string`, but the deprecated alias `GeminiPart` is an object `{ text: string }`)

@@ -10,7 +10,8 @@ import type {
     UserTierContext,
 } from '@/domain/types';
 import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
-import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
+import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 
 /** Error code produced by chat infrastructure or application policy. */
 export type ChatErrorCode =

@@ -325,7 +325,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | Symbol | Source |
 |---|---|
 | `hashUsageIp` | `infrastructure/usage/hash.ts` |
-| (참고) `UsageRepository` / `UsageLogRepository` / `UserTierRepository` 인터페이스는 `infrastructure/db/types.ts`에 정의되어 분석 use-case가 DI로 소비. Drizzle/Neon 의존성은 Phase 6에서 모두 siglens로 이전됨. |
+| (참고) `UsageRepository` / `UsageLogRepository` / `UserTierRepository` 인터페이스는 각각 `domain/ports/usageRepository.ts`, `domain/ports/usageLogRepository.ts`, `domain/ports/userTierRepository.ts`에 정의된 도메인 port로, 분석 use-case가 DI로 소비. 공유 도메인 타입(`UsageActionType`, `UsageLogRecord`)은 `domain/types.ts`에서 정의되어 port 간 순환 import를 방지. Drizzle/Neon 어댑터는 siglens consumer가 소유. |
 
 **Job queue (worker용) (11)**
 | Symbol | Source |

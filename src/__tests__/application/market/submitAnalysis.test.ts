@@ -8,7 +8,7 @@ import type {
 } from '@/domain/types';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
-import type { UsageRepository } from '@/infrastructure/db';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');

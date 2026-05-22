@@ -500,16 +500,22 @@ export type GeminiContent = ConversationTurn;
 export type { CacheProvider } from './domain/ports/cache';
 export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
+    UserTier,
+    UserTierRepository,
+} from './domain/ports/userTierRepository';
+export type {
     CreateUsageLogInput,
+    UsageLogRepository,
+} from './domain/ports/usageLogRepository';
+export type {
     RecordUsageInput,
+    UsageRepository,
+} from './domain/ports/usageRepository';
+export type {
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
-    UsageLogRepository,
-    UsageRepository,
-    UserTier,
-    UserTierRepository,
-} from './infrastructure/db';
+} from './domain/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';

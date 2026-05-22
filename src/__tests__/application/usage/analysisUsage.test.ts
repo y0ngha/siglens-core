@@ -6,7 +6,7 @@ import {
 } from '@/application/usage/analysisUsage';
 import type { AnalysisUsageOptions } from '@/application/usage/types';
 import type { TierConfig } from '@/domain/types';
-import type { UsageRepository } from '@/infrastructure/db';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 
 const restrictedConfig: TierConfig = {

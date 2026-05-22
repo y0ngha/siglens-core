@@ -1,5 +1,5 @@
 import type { Tier, TierConfig } from '@/domain/types';
-import type { UsageRepository } from '@/infrastructure/db';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 
 /**
  * Usage tracking and daily limit options shared by every analysis use-case

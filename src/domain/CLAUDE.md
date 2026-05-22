@@ -34,6 +34,9 @@ domain/ports/
   newsProvider.ts      → NewsProvider, NewsTimeRange ✅ migrated
   optionsDataProvider.ts → OptionsDataProvider     ✅ migrated
   skillsProvider.ts    → SkillsProvider                         ✅ migrated
+  usageLogRepository.ts → UsageLogRepository, CreateUsageLogInput ✅ migrated
+  usageRepository.ts   → UsageRepository, RecordUsageInput ✅ migrated
+  userTierRepository.ts → UserTierRepository      ✅ migrated
   ...
 ```
 
