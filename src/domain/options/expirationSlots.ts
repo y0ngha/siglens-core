@@ -13,10 +13,10 @@ export const ZERO_DTE_MAX_DAYS = 6;
  * Canonical chip slots in render order. Frontends pick the closest matching
  * provider expiration per slot.
  *
- * The `0D` slot represents same-week expirations (≤ `ZERO_DTE_MAX_DAYS`
- * days out). The label is "이번 주" ("this week") rather than "today"
- * because a Monday call may match a Friday weekly that is 4 days away —
- * labelling it "today" would be misleading.
+ * The `0D` slot represents same-week expirations (≤ 6 days out). The label
+ * is "이번 주" ("this week") rather than "today" because a Monday call may
+ * match a Friday weekly that is 4 days away — labelling it "today" would
+ * be misleading.
  */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
     { key: '0D', label: '이번 주', targetDays: 0, maxDays: ZERO_DTE_MAX_DAYS },

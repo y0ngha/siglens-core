@@ -1,5 +1,9 @@
 # Fix Log
 
+## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
+- S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
+  - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).
+
 ## [PR #88 Round 3 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - B1: `src/domain/options/expirationSlots.ts:10` — `ZERO_DTE_MAX_DAYS`는 `export`되지만 `src/index.ts`에 재-export되지 않는 module-internal symbol. `/** @internal ... */` JSDoc 태그 추가하고 역할 설명 한 줄 포함.
   - Rule: MISTAKES.md §9.5 — 재-export되지 않는 exported 심볼은 `@internal` 태그 필수. §9.6 — bare `@internal`보다 역할 설명 권장.
@@ -17,8 +21,6 @@
   - Rule: MISTAKES.md Documentation Sync #7 — src/index.ts 변경 시 동일 commit에 PUBLIC_API.md 갱신.
 - S1: `src/__tests__/domain/options/expirationSlots.test.ts` — `Object.fromEntries(pairs)` 반환 타입이 `{ [k: string]: string }`이라 `byKey['0D']`의 `undefined` 가능성이 표현 안 됨. `as Partial<Record<ExpirationSlotKey, string>>` 단언 추가, `ExpirationSlotKey` 타입 import도 함께.
   - Rule: MISTAKES.md TypeScript #1 — `Object.fromEntries` 반환 타입 단언.
-- S2: `src/__tests__/application/options/submitOptionsAnalysis.test.ts` — 새 hash 시맨틱(structural identity만 hash, fast-moving 필드 제외)에 대한 회귀 방지 테스트가 없었음. "underlyingPrice/capturedAt/OI 변경에도 동일 cacheKey로 cache.get이 호출된다"는 케이스를 캐시 히트 describe 블록에 추가.
-  - Rule: MISTAKES.md Tests #15 — 변경된 핵심 시맨틱은 전용 테스트로 명시 보호.
 - S3: `src/__tests__/domain/options/expirationSlots.test.ts` — `maxDays` 포함적 상한(6일) 경계 직접 검증 테스트 추가(`day 6 → 0D, day 8 → 1W`). `ZERO_DTE_MAX_DAYS` 상수 import해서 값 변경 시 회귀 자동 감지.
   - Rule: 가독성 — 경계값 명시 테스트로 상수 변경 시 의도치 않은 경계 이동 방지.
 - Inline high 1 partial: `src/application/options/submitOptionsAnalysis.ts` — reviewer가 hash에 (a) OI 합계 다시 포함 / (b) modelId 포함 / (c) 만기별 chain 필터링 셋을 제안. (a)는 PR의 핵심 의도(cache hit률 회복)와 직접 충돌하므로 reject, (b)는 `buildOptionsCacheKey`가 이미 modelId를 별도 segment로 포함하므로 중복이라 reject, (c)는 합리적이라 적용 — `expirationDate !== 'all'`인 경우 해당 chain만 filter 후 hash, JSDoc도 단일 만기 분석의 cache scope 의도를 추가.

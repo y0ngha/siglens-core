@@ -170,9 +170,9 @@ export interface RawOptionsAnalysisResponse {
  * Stable identifier for each canonical expiration chip slot. Seven fixed
  * tokens used both as React-tree keys (in consumer apps) and routing-
  * friendly URL fragments. `0D` (same-week expiration, accepting
- * expirations up to `ZERO_DTE_MAX_DAYS` days out) sits before `1W` to
- * surface end-of-week expirations on weekly tickers (e.g. PLTR Fridays)
- * that otherwise wouldn't satisfy the 1W ≥ 7-day match condition.
+ * expirations up to 6 days out) sits before `1W` to surface end-of-week
+ * expirations on weekly tickers (e.g. PLTR Fridays) that otherwise
+ * wouldn't satisfy the 1W ≥ 7-day match condition.
  */
 export type ExpirationSlotKey = '0D' | '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
 
