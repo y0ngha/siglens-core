@@ -321,7 +321,8 @@ describe('buildOverallAnalysisPrompt', () => {
 
     describe('options axis integration', () => {
         const MOCK_OPTIONS: OptionsAnalysisResponse = {
-            summary: '풋콜 비율은 균형 상태이며 단기 변동성 프리미엄이 평이합니다.',
+            summary:
+                '풋콜 비율은 균형 상태이며 단기 변동성 프리미엄이 평이합니다.',
             perExpiration: [
                 {
                     expirationDate: '2026-06-20',
@@ -389,7 +390,9 @@ describe('buildOverallAnalysisPrompt', () => {
                 null
             );
 
-            expect(prompt).toContain('옵션 시장 데이터는 분석에 포함되지 않았습니다');
+            expect(prompt).toContain(
+                '옵션 시장 데이터는 분석에 포함되지 않았습니다'
+            );
             expect(prompt).toContain('optionsBulletsKo는 빈 배열로 유지하세요');
             // No analytical content from a non-null options payload should leak in.
             expect(prompt).not.toContain('풋콜 비율은 균형 상태이며');
@@ -428,7 +431,9 @@ describe('buildOverallAnalysisPrompt', () => {
                 MOCK_OPTIONS
             );
 
-            expect(prompt).not.toContain('미국 옵션 정규 거래 시간 외에 수집된');
+            expect(prompt).not.toContain(
+                '미국 옵션 정규 거래 시간 외에 수집된'
+            );
         });
 
         it('treats an omitted options arg as a graceful options skip (4-axis call without options)', () => {

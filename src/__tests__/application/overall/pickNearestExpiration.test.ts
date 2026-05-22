@@ -35,7 +35,12 @@ describe('pickNearestExpiration', () => {
     const now = NOW;
 
     it('picks earliest expiration ≥ now + 3 days', () => {
-        const snap = makeSnapshot(['2026-05-23', '2026-05-24', '2026-05-26', '2026-06-02']);
+        const snap = makeSnapshot([
+            '2026-05-23',
+            '2026-05-24',
+            '2026-05-26',
+            '2026-06-02',
+        ]);
         expect(pickNearestExpiration(snap, now)).toBe('2026-05-26');
     });
 

@@ -1172,9 +1172,7 @@ describe('submitOverallAnalysis 함수는', () => {
                 options: cachedOptionsResponse,
             });
             mockCacheGet.mockResolvedValueOnce(null);
-            await submitOverallAnalysis(
-                makeOptions({ optionsOiStale: true })
-            );
+            await submitOverallAnalysis(makeOptions({ optionsOiStale: true }));
 
             const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
             expect(args[8]).toBe(true);
