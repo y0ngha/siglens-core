@@ -193,8 +193,8 @@ const lastOf = <T>(arr: T[]): T | null =>
 const formatMarketSection = (bars: Bar[]): string => {
     if (bars.length === 0) {
         return [
-            '## Current Market Status',
-            '- Current Price: N/A',
+            '## Analysis Snapshot',
+            '- Snapshot Price (price captured at analysis time; not a live quote): N/A',
             '- Price Change %: N/A',
             '- Volume: N/A',
         ].join('\n');
@@ -208,8 +208,8 @@ const formatMarketSection = (bars: Bar[]): string => {
             : 'N/A';
 
     return [
-        '## Current Market Status',
-        `- Current Price: ${fmt(last.close)}`,
+        '## Analysis Snapshot',
+        `- Snapshot Price (price captured at analysis time; not a live quote): ${fmt(last.close)}`,
         `- Price Change %: ${changeRate}`,
         `- Volume: ${formatVolume(last.volume)}`,
     ].join('\n');
@@ -534,7 +534,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     const currentPriceLine =
         currentPrice !== null
             ? [
-                  `- Current price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
+                  `- Snapshot Price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
               ]
             : [];
     const marketZonesSection =
@@ -756,6 +756,11 @@ const ANALYSIS_GUIDELINES = [
     '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
     '- Weight signals by the number of confirming indicators and the strength of each signal.',
     '- Mention the conflict explicitly in the summary so the user understands the mixed picture.',
+    '',
+    '### Price Reference Naming',
+    '- The "Snapshot Price" labels in ## Analysis Snapshot and ## Smart Money Concepts (SMC) represent the bar close at the moment this analysis was captured, not a live market quote.',
+    '- In all Korean output fields (summary, actionRecommendation, strategyResults, etc.), refer to this value consistently as "분석 시점 가격" or "분석 당시 종가".',
+    '- NEVER call it "현재 가격" or "실시간 가격" — those phrases imply a live market quote, which this analysis does not have.',
     '',
     '### Readable Text Formatting Rules',
     '- All long-form Korean prose fields must be easy to render in a UI without becoming one dense line.',
@@ -981,7 +986,7 @@ function byName(a: Skill, b: Skill): number {
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
  * Composes a fully-rendered English prompt that the worker LLM consumes to
- * produce an `AnalysisResponse`. Sections include current market status,
+ * produce an `AnalysisResponse`. Sections include analysis snapshot,
  * long-term context, recent bars with detected candle patterns, buy / sell
  * volume split, every indicator value with timeframe-aware trend labels,
  * SMC structure, and per-skill writing rules.

@@ -218,7 +218,9 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('Current Price: N/A');
+            expect(result).toContain(
+                'Snapshot Price (price captured at analysis time; not a live quote): N/A'
+            );
             expect(result).toContain('Price Change %: N/A');
             expect(result).toContain('Volume: N/A');
         });
@@ -274,6 +276,27 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain('Volume:');
+        });
+
+        it('labels the current market block as "Analysis Snapshot" with "Snapshot Price"', () => {
+            const bars = [
+                makeBar(0, TEST_PREV_CLOSE),
+                makeBar(1, TEST_NEXT_CLOSE),
+            ];
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            expect(prompt).toContain('## Analysis Snapshot');
+            expect(prompt).toContain(
+                '- Snapshot Price (price captured at analysis time; not a live quote):'
+            );
+            expect(prompt).not.toContain('## Current Market Status');
+            expect(prompt).not.toContain('- Current Price:');
         });
     });
 
@@ -1540,6 +1563,24 @@ describe('prompt', () => {
             const guidelineIndex = result.indexOf('Analysis Guidelines');
             const requestIndex = result.indexOf('Analysis Request');
             expect(guidelineIndex).toBeLessThan(requestIndex);
+        });
+
+        it('instructs the LLM to use "분석 시점 가격" instead of "현재 가격" in Korean output', () => {
+            const bars = [
+                makeBar(0, TEST_PREV_CLOSE),
+                makeBar(1, TEST_NEXT_CLOSE),
+            ];
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            expect(prompt).toContain('### Price Reference Naming');
+            expect(prompt).toContain('분석 시점 가격');
+            expect(prompt).toContain('NEVER call it "현재 가격"');
         });
     });
 
@@ -3571,9 +3612,34 @@ describe('prompt', () => {
             expect(result).toContain('Equilibrium Zone: 150.00 ~ 160.00');
             expect(result).toContain('Discount Zone: 140.00 ~ 150.00');
             expect(result).toMatch(
-                /Current price \(.+\) is in (premium|discount|equilibrium|neutral) zone/
+                /Snapshot Price \(.+\) is in (premium|discount|equilibrium|neutral) zone/
             );
             expect(result).toContain('is in premium zone');
+        });
+
+        it('labels SMC price-zone line as "Snapshot Price" (not "Current price")', () => {
+            const smc: SMCResult = {
+                ...EMPTY_SMC_RESULT,
+                premiumZone: { high: 170.0, low: 160.0, type: 'premium' },
+                equilibriumZone: {
+                    high: 160.0,
+                    low: 150.0,
+                    type: 'equilibrium',
+                },
+                discountZone: { high: 150.0, low: 140.0, type: 'discount' },
+            };
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({ smc }),
+                [],
+                '1Day'
+            );
+            expect(prompt).toMatch(
+                /Snapshot Price \([\d.]+\) is in (premium|discount|equilibrium|neutral) zone/
+            );
+            expect(prompt).not.toMatch(/Current price \(/);
         });
 
         it('should show swing points with bars ago', () => {
@@ -3632,7 +3698,10 @@ describe('prompt', () => {
                 makeIndicators({ smc })
             );
             const indicatorIdx = result.indexOf('## Indicator Values');
-            const smcIdx = result.indexOf('## Smart Money Concepts (SMC)');
+            // lastIndexOf: ANALYSIS_GUIDELINES의 'Price Reference Naming' 항목이
+            // '## Smart Money Concepts (SMC)' 문자열을 참조하므로, 실제 SMC 섹션
+            // 시작점을 찾으려면 마지막 등장 위치를 사용한다.
+            const smcIdx = result.lastIndexOf('## Smart Money Concepts (SMC)');
             expect(indicatorIdx).toBeGreaterThan(-1);
             expect(smcIdx).toBeGreaterThan(indicatorIdx);
         });
