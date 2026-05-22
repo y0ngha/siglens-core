@@ -12,7 +12,7 @@ import type {
     ModelId,
     TierConfig,
 } from '@/domain/types';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 import { constants } from 'node:http2';
 import type { Mock } from 'vitest';

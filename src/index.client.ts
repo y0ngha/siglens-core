@@ -393,7 +393,7 @@ export type {
     GeminiPart,
     CallAiProviderOptions,
 } from './infrastructure/ai/types';
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     ChatActionResult,
     ChatErrorCode,

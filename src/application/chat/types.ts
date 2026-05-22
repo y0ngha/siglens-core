@@ -9,7 +9,7 @@ import type {
     UserTierContext,
 } from '@/domain/types';
 import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 
 /** Error code produced by chat infrastructure or application policy. */
