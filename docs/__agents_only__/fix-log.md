@@ -1,5 +1,11 @@
 # Fix Log
 
+## [PR #92 Round 2 | refactor/ports-ai-module | 2026-05-22]
+- B1: `src/index.ts` + `src/index.client.ts` — Round 1에서 Tier 4 공개 타입 `GeminiRole` / `GeminiPart` / `GeminiContent`를 deprecated alias 없이 완전히 삭제. 외부 소비자가 `import type { GeminiContent } from '@y0ngha/siglens-core'` 사용 시 TS2305 컴파일 오류 발생. 두 entrypoint에 deprecated alias 3개 추가 (`GeminiRole = ConversationRole`, `GeminiPart = { text: string }`, `GeminiContent = ConversationTurn`)로 backward compatibility 유지. 각 alias에 `@deprecated` JSDoc + 대체 타입 안내.
+  - Rule: MISTAKES.md §Public API #3 — Tier 4 public type 삭제 시 deprecated alias 필수 (consumers passing 기존 import는 컴파일 유지되어야 함).
+- S1: `src/application/chat/requestChatCompletion.ts` — `@/domain/ports/aiProvider` import가 `@/domain/types` import 뒤에 있어 알파벳 순서 위반(`ports` < `types`). domain group 내 일관성을 위해 `@/domain/ports/aiProvider`를 `@/domain/types` 앞으로 이동.
+  - Rule: import 정렬 일관성 — 동일 alias prefix 그룹 내에서 서브경로 알파벳 정렬.
+
 ## [PR #92 | refactor/ports-ai-module | 2026-05-22]
 - B1: `src/domain/ports/aiProvider.ts` — port declared "Provider-neutral AI chat-completion contract" in the JSDoc header but body exposed Gemini SDK schema types (`GeminiRole`, `GeminiPart`, `GeminiContent`) and `AiContents = string | GeminiContent[]`. domain/CLAUDE.md ports rule: "Each port is a pure interface — no behavior, no implementation, no SDK references." Replaced with provider-neutral `ConversationRole` / `ConversationTurn`; `AiContents = string | ConversationTurn[]`. Updated `application/chat/requestChatCompletion.ts` `toAiContents` to translate `ChatMessage.role` (`'user' | 'model'`) → `ConversationRole` (`'user' | 'assistant'`). Updated test fixtures and removed Gemini-specific exports from `src/index.ts` and `src/index.client.ts`. Adapters (consumer-owned) must now translate `ConversationTurn[]` → upstream SDK shape (e.g. Gemini `contents`).
   - Rule: domain/CLAUDE.md §Ports — port interfaces must be SDK-neutral; provider-specific schema belongs in the adapter (consumer code or infrastructure/<module>/).

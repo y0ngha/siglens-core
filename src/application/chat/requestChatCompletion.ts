@@ -7,6 +7,7 @@ import type {
 } from '@/application/chat/types';
 import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
+import type { AiContents, ConversationRole } from '@/domain/ports/aiProvider';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import type {
     ChatMessage,
@@ -15,7 +16,6 @@ import type {
     Tier,
     TierConfig,
 } from '@/domain/types';
-import type { AiContents, ConversationRole } from '@/domain/ports/aiProvider';
 import {
     createChatTokenStore,
     hashClientIp,

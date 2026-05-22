@@ -393,6 +393,25 @@ export type {
     ConversationRole,
     ConversationTurn,
 } from './domain/ports/aiProvider';
+
+// Deprecated Gemini-shaped aliases — retained so existing consumer imports
+// continue to compile after the provider-neutral rename. Will be removed in
+// a future major version. New code should use the ConversationRole /
+// ConversationTurn names exported above.
+
+/** @deprecated Use `ConversationRole` instead. Will be removed in a future major version. */
+export type GeminiRole = import('./domain/ports/aiProvider').ConversationRole;
+
+/** @deprecated Use `ConversationTurn['text']` instead. Will be removed in a future major version. */
+export type GeminiPart = { text: string };
+
+/**
+ * @deprecated Use `ConversationTurn` instead.
+ * Note: `ConversationTurn` uses `text: string` directly instead of
+ * `parts: GeminiPart[]`. Will be removed in a future major version.
+ */
+export type GeminiContent =
+    import('./domain/ports/aiProvider').ConversationTurn;
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
     ChatActionResult,
