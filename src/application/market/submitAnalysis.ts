@@ -35,7 +35,7 @@ import {
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+import { createSkillsProvider } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const TIMEFRAMES: readonly Timeframe[] = [
@@ -273,7 +273,7 @@ export async function submitAnalysis(
         fmpSymbol
     );
 
-    const skillsLoader = new FileSkillsLoader();
+    const skillsLoader = createSkillsProvider();
     const [skills, skillsDegraded] = await skillsLoader
         .loadSkills()
         .then(s => [s, false] as const)

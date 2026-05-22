@@ -104,9 +104,11 @@ AI provider 호출 이후 `server_busy` 또는 `server_error`로 매핑되는 �
 ### 구현 위치
 
 ```
+domain/ports/
+└── chatTokenStore.ts  ← ChatTokenStore 포트 (@port)
+
 infrastructure/chat/
-├── types.ts       ← ChatTokenStore 인터페이스
-└── tokenStore.ts  ← Upstash 기반 구현체 + IP 해시 helper
+└── tokenStore.ts      ← Upstash 기반 구현체 (@adapter implements ChatTokenStore) + IP 해시 helper
 ```
 
 ---
@@ -134,10 +136,15 @@ infrastructure/chat/
 
 ### 구현 위치
 
+`JobStateStore` 포트 인터페이스(및 인자 타입 `JobStateSetOpts`)는 `domain/ports/jobStateStore.ts`에 정의되어 있고 (`@internal`), Upstash 기반 어댑터는 `infrastructure/jobs/redis.ts`에 있다.
+
 ```
+domain/ports/
+└── jobStateStore.ts  ← JobStateStore (@internal), JobStateSetOpts (@internal)
+
 infrastructure/jobs/
-├── types.ts     ← JobStatus, JobMeta, JobRedisClient 인터페이스
-├── redis.ts     ← Upstash 기반 JobRedisClient 구현체
+├── types.ts     ← JobStatus, JobMeta (DTO)
+├── redis.ts     ← Upstash 기반 JobStateStore 어댑터 (createJobStateStore)
 └── queue.ts     ← job 라이프사이클 함수
 ```
 
@@ -180,10 +187,10 @@ Body (JSON):
 주입한 `MarketDataProvider` 구현체에서 이뤄진다.
 
 ```typescript
-// infrastructure/market/types.ts
+// domain/ports/marketDataProvider.ts
 export interface MarketDataProvider {
-    fetchBars(symbol: string, timeframe: Timeframe): Promise<Bar[]>;
-    fetchLatestBar(symbol: string): Promise<Bar | null>;
+    getBars(options: GetBarsOptions): Promise<Bar[]>;
+    getQuote(symbol: string): Promise<MarketQuote | null>;
 }
 ```
 
@@ -194,11 +201,12 @@ export interface MarketDataProvider {
 외부 네트워크 서비스는 아니지만 I/O를 수반하므로 동일 규칙이 적용된다.
 
 - 위치: 프로젝트 루트의 `/skills/**/*.md`
-- 담당: `infrastructure/skills/loader.ts` (`FileSkillsLoader`)
+- 담당: `infrastructure/skills/loader.ts` (`createSkillsProvider`, `FileSkillsLoader`)
 - 파일 포맷과 frontmatter 스펙은 `docs/DOMAIN.md`의 Skills 섹션을 참조한다.
 
-domain은 filesystem을 직접 읽지 않는다. consumer가 `FileSkillsLoader.loadSkills()`를
-호출한 결과(`Skill[]`)를 domain 함수에 주입한다.
+domain은 filesystem을 직접 읽지 않는다. consumer가 `createSkillsProvider()`로 얻은
+`SkillsProvider`의 `loadSkills()`를 호출한 결과(`Skill[]`)를 domain 함수에 주입한다.
+`FileSkillsLoader`는 동일 어댑터의 클래스 형태로 계속 노출되며, 팩토리 호출이 표준 경로다.
 
 ---
 

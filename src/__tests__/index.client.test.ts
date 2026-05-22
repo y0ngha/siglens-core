@@ -101,6 +101,7 @@ describe('browser public API exports', () => {
 
     it('does not export server-only runtime entrypoints', () => {
         expect('FileSkillsLoader' in clientApi).toBe(false);
+        expect('createSkillsProvider' in clientApi).toBe(false);
         expect('submitAnalysis' in clientApi).toBe(false);
         expect('requestChatCompletion' in clientApi).toBe(false);
         expect('createCacheProvider' in clientApi).toBe(false);

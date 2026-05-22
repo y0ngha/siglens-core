@@ -27,6 +27,56 @@
 - Rule: TypeScript predictability — paired input/output types for the same field should share the same declared type, unless the narrower form is enforced at the producer boundary.
 - Context: `UsageLogRecord.modelUsed: string` but `CreateUsageLogInput.modelUsed: ModelId`. The DB layer ultimately stores it as text, and `modelId` in core is documented as a cache-key disambiguator rather than the runtime model selector. Aligned `CreateUsageLogInput.modelUsed` to `string` and removed the now-unused `ModelId` import.
 
+## [PR #97 Round 2 | worktree-agent-af677455522108f87 | 2026-05-22]
+- Violation: `domain/ports/marketDataProvider.ts`에 infrastructure-specific identifier union `MarketDataProviderType = 'alpaca' | 'fmp'`를 배치 + 포트 JSDoc이 `infrastructure/market/` 경로와 `MARKET_PROVIDER` env 변수를 직접 언급 + `GetBarsOptions.symbol` 설명이 "FMP-style"이라는 구현체 이름을 노출.
+- Rule: `src/domain/CLAUDE.md` Ports authoring rules ("One conceptual contract per file. Co-locate option/argument types used by that contract") + domain layer purity ("No SDK references, no implementation"). 포트 파일에는 인터페이스가 인자/반환 타입으로 사용하는 옵션만 두고, 어댑터 선택 식별자(provider 이름 union)는 infrastructure 설정 concern이다.
+- Context: PR #97 round 1 리뷰에서 claude / gemini-code-assist 양쪽이 동일 leak 지적. `MarketDataProviderType`을 `infrastructure/market/types.ts`로 이동하고 `config.ts`/`factory.ts`/`src/index.ts`/`src/index.client.ts` import 경로를 함께 갱신. 포트 JSDoc은 provider-agnostic 표현으로 재작성, `src/domain/CLAUDE.md`의 migrated-port 목록도 동기화.
+
+## [PR #92 Round 2 | refactor/ports-ai-module | 2026-05-22]
+- B1: `src/index.ts` + `src/index.client.ts` — Round 1에서 Tier 4 공개 타입 `GeminiRole` / `GeminiPart` / `GeminiContent`를 deprecated alias 없이 완전히 삭제. 외부 소비자가 `import type { GeminiContent } from '@y0ngha/siglens-core'` 사용 시 TS2305 컴파일 오류 발생. 두 entrypoint에 deprecated alias 3개 추가 (`GeminiRole = ConversationRole`, `GeminiPart = { text: string }`, `GeminiContent = ConversationTurn`)로 backward compatibility 유지. 각 alias에 `@deprecated` JSDoc + 대체 타입 안내.
+  - Rule: MISTAKES.md §Public API #3 — Tier 4 public type 삭제 시 deprecated alias 필수 (consumers passing 기존 import는 컴파일 유지되어야 함).
+- S1: `src/application/chat/requestChatCompletion.ts` — `@/domain/ports/aiProvider` import가 `@/domain/types` import 뒤에 있어 알파벳 순서 위반(`ports` < `types`). domain group 내 일관성을 위해 `@/domain/ports/aiProvider`를 `@/domain/types` 앞으로 이동.
+  - Rule: import 정렬 일관성 — 동일 alias prefix 그룹 내에서 서브경로 알파벳 정렬.
+
+## [PR #92 | refactor/ports-ai-module | 2026-05-22]
+- B1: `src/domain/ports/aiProvider.ts` — port declared "Provider-neutral AI chat-completion contract" in the JSDoc header but body exposed Gemini SDK schema types (`GeminiRole`, `GeminiPart`, `GeminiContent`) and `AiContents = string | GeminiContent[]`. domain/CLAUDE.md ports rule: "Each port is a pure interface — no behavior, no implementation, no SDK references." Replaced with provider-neutral `ConversationRole` / `ConversationTurn`; `AiContents = string | ConversationTurn[]`. Updated `application/chat/requestChatCompletion.ts` `toAiContents` to translate `ChatMessage.role` (`'user' | 'model'`) → `ConversationRole` (`'user' | 'assistant'`). Updated test fixtures and removed Gemini-specific exports from `src/index.ts` and `src/index.client.ts`. Adapters (consumer-owned) must now translate `ConversationTurn[]` → upstream SDK shape (e.g. Gemini `contents`).
+  - Rule: domain/CLAUDE.md §Ports — port interfaces must be SDK-neutral; provider-specific schema belongs in the adapter (consumer code or infrastructure/<module>/).
+- B3: `docs/ARCHITECTURE.md` folder tree omitted `domain/ports/` (added in PR #91, expanded by this PR); inline comment on `infrastructure/ai/` still said "AI provider type contracts (no SDK adapter)" though the type contracts moved to `domain/ports/aiProvider.ts` and only `extractJsonWithRepair` remains. Body description of `ai/` likewise stale. `src/infrastructure/CLAUDE.md` responsibility table row for `ai/` likewise stale. All three updated to reference the new port location.
+  - Rule: Documentation Sync — ARCHITECTURE.md folder tree / module descriptions and infrastructure/CLAUDE.md responsibility table must be updated in the same PR that moves code across layers.
+- S2: `src/domain/ports/aiProvider.ts` — `systemInstruction` JSDoc referenced Gemini-specific `config.systemInstruction` path. Provider-neutral ports must describe semantic purpose, not upstream API paths. Replaced with "Optional system-level instruction prepended before the conversation."
+  - Rule: domain/CLAUDE.md §Ports — port JSDoc must describe the contract abstractly, not refer to provider-internal API paths.
+
+## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
+- Violation: `create<Port>Provider()` factory introduced in infrastructure but neither exported from `src/index.ts` nor adopted by application call-sites in the same PR
+- Rule: MISTAKES.md Public API §9.5 — exported module symbols not re-exported in `src/index.ts` must carry `/** @internal */`; and Adapter Composition convention (`src/application/CLAUDE.md`) requires use-cases to call `create<Port>Provider()` factories instead of `new Adapter()` once the port migration lands
+- Context: `createSkillsProvider()` was added to `infrastructure/skills/loader.ts` to mirror `createCacheProvider` (Tier 3) but `src/index.ts` Tier 3 block was not updated, `docs/PUBLIC_API.md` Skills inventory was stale (`FileSkillsLoader` only), and `submitAnalysis.ts:276` / `pollAnalysis.ts:99` still constructed `new FileSkillsLoader()`. A port-migration PR must land the factory export, the PUBLIC_API.md inventory update, and the application call-site migration as a single unit.
+- Violation: Tier 4 public interface method missing `@returns` JSDoc
+- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 4 interface methods require `@param`/`@returns` JSDoc; single-line description is insufficient
+- Context: `SkillsProvider.loadSkills()` in `src/domain/ports/skillsProvider.ts` carried only `/** Load every available skill. */`; expanded to include `@returns` tag describing the resolved value.
+
+## [PR #95 Round 2 | refactor/architecture/news-ports-migration | 2026-05-22]
+- S1: `docs/ARCHITECTURE.md` 폴더 구조 트리에서 `domain/ports/` 디렉토리가 누락된 상태. `cache.ts`가 이미 존재할 때부터 stale했고, 이번 PR에서 `newsProvider.ts`가 추가되며 격차가 더 벌어짐. `indicators` 다음 alphabetical 위치에 `ports` 항목 추가.
+  - Rule: MISTAKES.md Documentation Sync — 새 디렉토리/심볼 추가 시 ARCHITECTURE.md 폴더 트리 동기화.
+  - Context: review-agent Suggestion (non-required). 현재 PR이 `domain/ports/`에 새 파일을 추가하므로 같은 PR에서 트리 동기화하는 것이 자연스러움.
+
+## [PR #93 Round 1 | worktree-agent-a20856e6094365c94 | 2026-05-22]
+- Violation: `domain/ports/chatTokenStore.ts` JSDoc references infrastructure path (`infrastructure/chat/`) and concrete adapter function name (`hashClientIp`) — gemini-code-assist inline comment
+- Rule: domain layer must remain isolated from infrastructure; port JSDoc should describe policy (e.g. "identifiers are hashed") rather than naming concrete adapter modules/functions
+- Context: Migration PR moved `ChatTokenStore` into `domain/ports/`, but the JSDoc still pointed adapters consumers at a specific infrastructure subdirectory and helper name. Rewrote the port description to refer to "implementations" / "the adapter" abstractly so the port contract stays direction-agnostic.
+
+## [PR #96 Round 2 follow-up | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- S1: `src/domain/ports/jobStateStore.ts` — `JobStateStore` 인터페이스 메서드(get/set/deleteMany)에 per-method JSDoc 한 줄 설명 누락. 기존 공개 포트(`CacheProvider`)는 각 메서드에 한 줄 설명을 갖추고 있어 IDE hover 시 의도 파악이 즉시 가능. `@internal` 포트라도 어댑터 개발자 / 내부 리뷰어의 가독성을 위해 동일 패턴을 적용. 특히 `deleteMany`는 단일 키 `delete`와 달리 다중 키 + 삭제 개수 반환이라는 차이를 명시.
+  - Rule: Domain ports authoring 패턴 일관성 — 기존 포트(`CacheProvider`)와 동일하게 각 메서드 한 줄 JSDoc 추가.
+
+## [PR #96 Round 2 | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- B1: `src/domain/ports/jobRedisClient.ts` (renamed → `jobStateStore.ts`) — 도메인 포트 이름 `JobRedisClient`가 인프라 기술명("Redis")을 노출하고 `domain/CLAUDE.md` Ports authoring rules가 권장하는 접미사(`Provider`/`Repository`/`Dispatcher`/`Store`)를 따르지 않음. 또한 `RedisSetOpts.ex` 필드와 `del(...)` 메서드 이름은 Redis CLI 약어를 그대로 도메인에 노출. 포트를 `JobStateStore`(메서드 `deleteMany`, 옵션 필드 `ttlSeconds`)로 전면 개명하고 어댑터(`infrastructure/jobs/redis.ts`)에서 Upstash 시그니처(`{ ex }`, `del(...)`)로 번역하도록 변경. 어댑터 팩토리도 `createJobRedis` → `createJobStateStore`로 변경.
+  - Rule: `src/domain/CLAUDE.md` Ports > Authoring rules — 도메인 포트 이름은 구현 기술에 무관해야 하며 허용된 접미사(`Provider`/`Repository`/`Dispatcher`/`Store`)를 사용해야 한다.
+- B2: `src/domain/ports/jobStateStore.ts` — `set` 메서드 반환 타입이 `Promise<unknown>`이라 호출부 계약이 모호. 모든 호출부가 반환값을 무시하고 `CacheProvider.set`도 `Promise<void>`이므로 `Promise<void>`로 변경. 어댑터에서 Upstash의 `"OK"` 응답을 흡수.
+  - Rule: FF.md Predictability — 사용되지 않는 반환값은 `void`로 선언해 호출부 계약을 명확히.
+- B3: `docs/API.md` (line 139 영역) — Job 모듈 "구현 위치" 다이어그램이 여전히 `JobRedisClient` 인터페이스가 `infrastructure/jobs/types.ts`에 있다고 표시. 포트 마이그레이션 후 새 이름(`JobStateStore`, `JobStateSetOpts`)과 위치(`domain/ports/jobStateStore.ts`)로 갱신.
+  - Rule: MISTAKES.md Documentation Sync — 외부 서비스 사용처/포트 위치 변경 시 같은 PR 내에서 `docs/API.md` 갱신.
+- Reject: `src/infrastructure/jobs/queue.ts:6` (gemini) — `JobStatus`/`JobMeta`를 `domain/types.ts`로 이동 제안. 이 PR은 포트 인터페이스 마이그레이션이 스코프이며, DTO 분류는 별도 brainstorming + PR이 필요한 결정. queue.ts에 답글로 거부 사유 게시.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).
@@ -340,3 +390,25 @@
 - Rule: `domain/CLAUDE.md` Authoring Rules — "DTOs the port returns or receives stay in `domain/types.ts`. Ports reference them via import."
 - Context: Round 3 Blocker B1 — `UsageCounts` is `UsageRepository.getUsageToday`'s return DTO, mirroring `UsageLogRecord` (already moved). Co-location is reserved for option/argument types (`RecordUsageInput`, `CreateUsageLogInput`). Moved interface to `domain/types.ts` Usage Tracking section, updated imports in `usageRepository.ts` + `application/usage/limits.ts`, and synced symbol tables in `domain/CLAUDE.md`, `docs/ARCHITECTURE.md`, and `src/index.ts` re-exports.
 
+## [PR #92 | refactor/ports-ai-module | 2026-05-22]
+- Violation: `@deprecated` JSDoc migration hint points to a non-equivalent type (`ConversationTurn['text']` is `string`, but the deprecated alias `GeminiPart` is an object `{ text: string }`)
+- Rule: MISTAKES.md Documentation/JSDoc — deprecation notes must accurately describe the migration path; misleading guidance is worse than no guidance
+- Context: Suggestion S1 (round 3) — `GeminiPart` deprecation note "Use `ConversationTurn['text']` instead" would mislead consumers into replacing `{ text: string }` with `string`. Rewrote the JSDoc on both `src/index.ts` and `src/index.client.ts` to explain that `parts: GeminiPart[]` was flattened into `text: string` on `ConversationTurn` and that the type has no direct equivalent.
+
+- Violation: alphabetical import order broken — `@/domain/ports/aiProvider` placed AFTER `@/domain/types` even though `'ports'` < `'types'`
+- Rule: CONVENTIONS.md import ordering — within the same path-alias group, imports must be alphabetically sorted by full module path
+- Context: Suggestion S1 (round 4) — `src/application/chat/types.ts` had the same out-of-order pattern that was fixed in `requestChatCompletion.ts` during round 2 but was missed here. Moved `import type { CallAiProvider } from '@/domain/ports/aiProvider'` to precede the `@/domain/types` block. Lesson: when applying an ordering fix in one file, sweep the entire module/feature for the same pattern instead of relying on the reviewer to flag siblings one round at a time.
+
+- Violation: `@port` tag placed on file-level module JSDoc instead of the actual port interface/type JSDoc
+- Rule: domain/CLAUDE.md "Authoring rules" — "Tag the interface JSDoc with `@port` so adapters and reviewers can identify it"; the tag must annotate the port contract, not the module header
+- Context: Suggestion S2 (round 4) — `src/domain/ports/aiProvider.ts` had `@port` on the file-leading block comment, but the port contract is `CallAiProvider` at the bottom of the file. Tools / readers scanning for `@port` on type declarations (matching the `CacheProvider` example) would miss it. Moved the tag onto the `CallAiProvider` type JSDoc and kept the module-level prose as a plain header.
+
+## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
+- Violation: `@adapter implements {@link Port}` JSDoc tag applied to a factory function (createSkillsProvider) rather than the implementing class
+- Rule: Documentation accuracy — `@adapter` marks the class implementing a port; factories create adapters but are not themselves adapters
+- Context: Round 2 S1 — createSkillsProvider() JSDoc had `@adapter implements {@link SkillsProvider}` copied from FileSkillsLoader's JSDoc; removed the tag from the factory while keeping it on the class. When introducing a `create<Port>Provider()` factory next to an `@adapter` class, only annotate the class with `@adapter`.
+
+## [PR #96 | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- Violation: Multiple JSDoc tags packed on a single line (`@port @internal`) — standard JSDoc/TypeDoc parsers consume `@internal` as `@port`'s description text instead of treating it as an independent tag
+- Rule: JSDoc tag declaration — each block tag must be on its own line so parsers (TypeDoc included) recognize them as independent tags
+- Context: Round 3 suggestion on src/domain/ports/jobStateStore.ts JobStateStore interface — split `@port @internal` into two separate lines so TypeDoc honors the `@internal` exclusion when generating docs

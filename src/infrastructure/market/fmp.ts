@@ -1,12 +1,12 @@
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_SECOND } from '@/domain/constants/time';
-import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
-import { readFmpConfig } from '@/infrastructure/fmp/config';
-import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 import type {
     GetBarsOptions,
     MarketDataProvider,
-} from '@/infrastructure/market/types';
+} from '@/domain/ports/marketDataProvider';
+import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
+import { readFmpConfig } from '@/infrastructure/fmp/config';
+import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 
 const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
 
@@ -147,6 +147,15 @@ function toFmpDailyBar(raw: FmpDailyBar): Bar {
     };
 }
 
+/**
+ * @internal
+ * @adapter implements {@link MarketDataProvider}
+ *
+ * Financial Modeling Prep adapter for {@link MarketDataProvider}. Handles
+ * both intraday (`/historical-chart`) and daily (`/historical-price-eod`)
+ * endpoints, converting FMP's ET-based timestamps to UTC seconds with DST
+ * awareness. Quote fetches degrade to `null` on transport failure.
+ */
 export class FmpProvider implements MarketDataProvider {
     private readonly apiKey: string;
 

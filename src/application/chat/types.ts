@@ -1,4 +1,5 @@
 import type { ChatbotLimitError } from '@/application/usage/types';
+import type { CallAiProvider } from '@/domain/ports/aiProvider';
 import type {
     AnalysisResponse,
     ChatMessage,
@@ -8,8 +9,7 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
-import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
 
@@ -80,7 +80,7 @@ export interface RequestChatCompletionDependencies {
      * generated text. The core library no longer ships a default adapter —
      * callers wire up their own provider client and inject it here.
      */
-    callAiProvider: (options: CallAiProviderOptions) => Promise<string>;
+    callAiProvider: CallAiProvider;
     tierConfig?: TierConfig;
 }
 

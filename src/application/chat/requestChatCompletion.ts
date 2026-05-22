@@ -7,19 +7,20 @@ import type {
 } from '@/application/chat/types';
 import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
+import type { AiContents, ConversationRole } from '@/domain/ports/aiProvider';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
 import type {
+    ChatMessage,
     ChatPromptPayload,
     ModelId,
     Tier,
     TierConfig,
 } from '@/domain/types';
-import type { AiContents } from '@/infrastructure/ai/types';
 import {
     createChatTokenStore,
     hashClientIp,
 } from '@/infrastructure/chat/tokenStore';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { type UsageRepository } from '@/domain/ports/usageRepository';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { constants } from 'node:http2';
@@ -101,10 +102,14 @@ function toUsageDate(date: Date): string {
     return date.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
+function toConversationRole(role: ChatMessage['role']): ConversationRole {
+    return role === 'model' ? 'assistant' : 'user';
+}
+
 function toAiContents(payload: ChatPromptPayload): AiContents {
     return payload.messages.map(message => ({
-        role: message.role,
-        parts: [{ text: message.content }],
+        role: toConversationRole(message.role),
+        text: message.content,
     }));
 }
 

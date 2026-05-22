@@ -309,9 +309,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 |---|---|
 | `createMarketDataProvider` | `infrastructure/market/factory.ts` |
 
-**Skills (1)**
+**Skills (2)**
 | Symbol | Source |
 |---|---|
+| `createSkillsProvider` | `infrastructure/skills/loader.ts` |
 | `FileSkillsLoader` | `infrastructure/skills/loader.ts` |
 
 **Config readers (2)**
@@ -359,10 +360,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
     - `ComputeFearGreedOptions`
 
 새로 추가된 Provider 인터페이스:
-- `FundamentalDataProvider` — `infrastructure/fundamental/types.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
-- `NewsProvider` — `infrastructure/news/types.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
-- `NewsTimeRange` — `infrastructure/news/types.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
-- `OptionsDataProvider` — `infrastructure/options/types.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
+- `FundamentalDataProvider` — `domain/ports/fundamentalDataProvider.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
+- `NewsProvider` — `domain/ports/newsProvider.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
+- `NewsTimeRange` — `domain/ports/newsProvider.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
+- `OptionsDataProvider` — `domain/ports/optionsDataProvider.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
 
 새로 추가된 use-case option/result 타입:
 - 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `SubmitFundamentalAnalysisMissNoTrigger`, `PollFundamentalAnalysisResult`.
@@ -371,7 +372,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - 기술적: `SubmitAnalysisMissNoTrigger` — 0.10.0에서 추가된 봇/크롤러 게이팅용 결과 variant.
 - 옵션: `SubmitOptionsAnalysisOptions`, `SubmitOptionsAnalysisResult`, `SubmitOptionsAnalysisCached`, `SubmitOptionsAnalysisSubmitted`, `SubmitOptionsAnalysisMissNoTrigger`, `SubmitOptionsAnalysisLimitError`, `SubmitOptionsAnalysisNoChainsError`, `SubmitOptionsAnalysisApiKeyRequiredError`, `PollOptionsAnalysisResult`, `PollOptionsAnalysisProcessing`, `PollOptionsAnalysisDone`, `PollOptionsAnalysisError`. 도메인 타입(`OptionsContract`, `OptionsChain`, `OptionsSnapshot`, `StrikeOpenInterest`, `StrikeVolumeAggregate`, `TopOiQuote`, `OptionsExpirationMetrics`, `OptionsPerExpirationCommentary`, `OptionsSignal`, `OptionsAnalysisResponse`, `OptionsTone`, `OptionsSignalKind`, `OptionsExpirationFilter`)과 슬롯 매핑(`ExpirationSlot`, `ExpirationSlotKey`, `SlotMapping`), 프롬프트 옵션(`BuildOptionsAnalysisPromptOptions`) 포함.
 
-**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 타입, tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn` — 모두 `domain/ports/aiProvider.ts`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
@@ -509,3 +510,5 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-15 | Options analysis 도메인 추가 — Tier 1 use-cases (`submitOptionsAnalysis`, `pollOptionsAnalysis`, `buildOptionsCacheKey`), Tier 2 헬퍼/프롬프트 (`summarizeChainForLlm`, `aggregateOpenInterest`, `sanitizeOptionsChain`, `mapExpirationsToSlots`, `buildOptionsAnalysisPrompt`, `normalizeOptionsAnalysisResponse`, `EXPIRATION_SLOTS`), Tier 3 Provider 인터페이스 (`OptionsDataProvider`), Tier 4 타입(도메인 11종 + 슬롯 2종 + use-case option/result 9종)을 인벤토리에 등록. `calculateMaxPain` / `calculatePutCallRatio` / `calculateImpliedMove`는 `@internal`. |
 | 2026-05-22 | Tier 4 `ExpirationSlot` 인터페이스에 선택적 `maxDays?: number` 필드 추가. Tier 4 `ExpirationSlotKey` 유니온이 `'0D' \| '1W' \| '2W' \| '1M' \| '2M' \| '3M' \| '6M'`로 확장(이번 주 만기 위클리 옵션용 0DTE 슬롯). 0.x semver에서 minor bump 대상이며, `ExpirationSlotKey`에 exhaustive switch를 쓰는 소비자는 `'0D'` 케이스를 추가해야 한다. `ZERO_DTE_MAX_DAYS`(`= 6`)는 `domain/options/expirationSlots.ts` 모듈 내부 상수로만 노출(공개 export 아님). `hashOptionsInput`이 캐시 키 입력에서 `underlyingPrice`/`capturedAt`/per-strike OI 합계를 제거해 구조적 식별자(symbol + expirationDate + 만기별 chain length)만 hash — 24h TTL 내 cache hit률 회복. 공개 시그니처 변경은 없다(내부 cache-key 동작만 변경). |
 | 2026-05-22 | Tier 4 `StrikeVolumeAggregate`, `TopOiQuote` 신규 타입을 인벤토리에 등록. `OptionsExpirationMetrics`에 `topVolumeStrikes: ReadonlyArray<StrikeVolumeAggregate>`와 `topOiBidAskSummary: ReadonlyArray<TopOiQuote>` 두 필드 추가(additive — 기존 필드 변경 없음, 0.x semver minor bump). 신규 `aggregateVolume` 헬퍼는 내부 모듈로만 노출되며 `summarizeChainForLlm`이 사용. `buildOptionsAnalysisPrompt`의 `== 해석 가이드 ==` 섹션에 두 줄 추가(`topVolumeStrikes`, `topOiBidAskSummary` 해설). Tier 4 `CurrentAnalysisContext` 유니온이 `\| { kind: 'options'; payload: OptionsAnalysisResponse }` variant를 추가해 확장 — 0.x semver minor bump이지만, `CurrentAnalysisContext.kind`에 exhaustive switch를 쓰는 소비자는 `'options'` 케이스를 추가해야 컴파일된다. `buildChatPrompt`의 `formatCurrentAnalysisContext` switch에 `'options'` 분기 추가(symbol-level summary + per-expiration commentary + signals + analyzedAt을 plain `Key: Value` 라인으로 합류). |
+| 2026-05-22 | AI provider 포트가 `infrastructure/ai/types.ts` → `domain/ports/aiProvider.ts`로 이전. Tier 4 신규 export(`CallAiProvider` 함수 타입 별칭 — adapters가 직접 구현하는 canonical signature, `ConversationRole`, `ConversationTurn`). 기존 `CallAiProviderOptions`, `AiContents` export는 새 경로(`domain/ports/aiProvider.ts`)에서 재노출되며 호환됨. `AiContents`가 provider-neutral 형태로 재정의됨(`string \| ConversationTurn[]`) — Gemini SDK 스키마 타입(`GeminiRole`, `GeminiPart`, `GeminiContent`)은 도메인에서 제거되어 더 이상 export되지 않는다. `RequestChatCompletionDependencies.callAiProvider` 필드 타입이 인라인 시그니처에서 `CallAiProvider` 별칭 사용으로 전환(MISTAKES.md TypeScript #5 준수). consumer adapters는 `ConversationTurn[]`을 받아 자신의 upstream SDK 스키마(예: Gemini `contents`)로 변환해야 한다. 0.x semver minor bump(BREAKING for adapters — 기존 어댑터가 `GeminiContent[]`를 직접 받았다면 `ConversationTurn[]` → Gemini 스키마 매핑 로직을 추가해야 한다). |
+| 2026-05-22 | Market 모듈 domain/ports 마이그레이션 (PR #97). Tier 4 `MarketDataProvider`와 `GetBarsOptions`의 source가 `infrastructure/market/types.ts` → `domain/ports/marketDataProvider.ts`로 이동(port/adapter 분리). `src/index.ts`/`src/index.client.ts`의 `export type` 경로만 갱신되며 공개 시그니처/필드 변경은 없다. `MarketDataProviderType = 'alpaca' \| 'fmp'`는 `MARKET_DATA_PROVIDER` env var로 제어되는 내부 디스패치 식별자이므로 공개 export 하지 않고 `@internal`로 유지(MISTAKES.md §Public API #6.5 — consumer가 import할 필요가 없는 internal 심볼). `createMarketDataProvider`의 반환 타입은 그대로 `MarketDataProvider`. |

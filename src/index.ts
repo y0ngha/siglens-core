@@ -3,6 +3,14 @@
 // =============================================================================
 // Use-case functions called directly from Server Actions / API handlers / workers.
 
+// Top-level type imports used by deprecated aliases below.
+// Required because re-exports do not add names to the local module scope
+// (MISTAKES.md TypeScript #9.5 — no inline dynamic type imports).
+import type {
+    ConversationRole,
+    ConversationTurn,
+} from './domain/ports/aiProvider';
+
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';
@@ -292,7 +300,10 @@ export {
 } from './infrastructure/chat/tokenStore';
 
 // Skills loader
-export { FileSkillsLoader } from './infrastructure/skills/loader';
+export {
+    createSkillsProvider,
+    FileSkillsLoader,
+} from './infrastructure/skills/loader';
 
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
@@ -458,13 +469,36 @@ export type {
 } from './application/usage';
 export type {
     AiContents,
+    CallAiProvider,
     CallAiProviderOptions,
-    GeminiContent,
-    GeminiPart,
-    GeminiRole,
-} from './infrastructure/ai/types';
+    ConversationRole,
+    ConversationTurn,
+} from './domain/ports/aiProvider';
+
+// Deprecated Gemini-shaped aliases — retained so existing consumer imports
+// continue to compile after the provider-neutral rename. Will be removed in
+// a future major version. New code should use the ConversationRole /
+// ConversationTurn names exported above.
+
+/** @deprecated Use `ConversationRole` instead. Will be removed in a future major version. */
+export type GeminiRole = ConversationRole;
+
+/**
+ * @deprecated The `parts: GeminiPart[]` structure has been replaced by the flat
+ * `text: string` field on `ConversationTurn`. This type has no direct equivalent —
+ * use `ConversationTurn` for the full turn shape.
+ * Will be removed in a future major version.
+ */
+export type GeminiPart = { text: string };
+
+/**
+ * @deprecated Use `ConversationTurn` instead.
+ * Note: `ConversationTurn` uses `text: string` directly instead of
+ * `parts: GeminiPart[]`. Will be removed in a future major version.
+ */
+export type GeminiContent = ConversationTurn;
 export type { CacheProvider } from './domain/ports/cache';
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     UserTier,
     UserTierRepository,
@@ -483,15 +517,15 @@ export type {
     UsageLogRecord,
 } from './domain/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
-export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
+export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
-    AcquireReanalyzeCooldownResult,
     GetBarsOptions,
     MarketDataProvider,
-} from './infrastructure/market/types';
-export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
-export type { SkillsProvider } from './infrastructure/skills/types';
+} from './domain/ports/marketDataProvider';
+export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
+export type { NewsProvider, NewsTimeRange } from './domain/ports/newsProvider';
+export type { SkillsProvider } from './domain/ports/skillsProvider';
 
 // Application types
 export type {
@@ -785,7 +819,7 @@ export type {
 } from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).

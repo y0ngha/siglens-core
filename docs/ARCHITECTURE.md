@@ -128,11 +128,11 @@ const key = process.env.API_KEY; // 금지
     │   ├── chat
     │   ├── constants
     │   ├── indicators
-    │   ├── ports         # Abstract port interfaces (CacheProvider, repositories)
+    │   ├── ports          # Port interfaces (CacheProvider, CallAiProvider, repositories, …)
     │   ├── signals
     │   └── utils
     ├── infrastructure
-    │   ├── ai            # AI provider type contracts (no SDK adapter)
+    │   ├── ai            # LLM response JSON salvage helper (no SDK adapter); port lives in domain/ports/aiProvider.ts
     │   ├── cache
     │   ├── chat
     │   ├── email         # EmailDispatcher type contract only
@@ -214,7 +214,7 @@ no external imports, pure functions only.
 외부 시스템과의 경계를 담당한다. 각 서브디렉토리는 **하나의 외부 시스템**에만 대응하며,
 `types.ts`에 정의된 인터페이스를 구현한다.
 
-- `ai/` — AI 프로바이더 호출 시그니처(`callAiProvider`) 타입 계약. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
+- `ai/` — LLM 응답 JSON salvage 헬퍼(`extractJsonWithRepair`)만 보유. AI 프로바이더 호출 시그니처(`CallAiProvider`)는 `domain/ports/aiProvider.ts`(port)로 이전됨. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
 - `cache/` — Upstash Redis 래퍼 (`CacheProvider` port 구현, TTL 기반 캐시).
 - `chat/` — Upstash Redis 기반 채팅 토큰 저장소
 - `email/` — `EmailDispatcher` 타입 계약만 보유. 발송 어댑터(Resend 등)는 consumer 소유.
