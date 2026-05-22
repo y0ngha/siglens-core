@@ -118,6 +118,8 @@ export type {
     OptionsChain,
     OptionsSnapshot,
     StrikeOpenInterest,
+    StrikeVolumeAggregate,
+    TopOiQuote,
     OptionsExpirationMetrics,
     OptionsPerExpirationCommentary,
     OptionsSignal,
