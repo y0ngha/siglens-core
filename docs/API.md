@@ -136,10 +136,15 @@ infrastructure/chat/
 
 ### 구현 위치
 
+`JobStateStore` 포트 인터페이스(및 인자 타입 `JobStateSetOpts`)는 `domain/ports/jobStateStore.ts`에 정의되어 있고 (`@internal`), Upstash 기반 어댑터는 `infrastructure/jobs/redis.ts`에 있다.
+
 ```
+domain/ports/
+└── jobStateStore.ts  ← JobStateStore (@internal), JobStateSetOpts (@internal)
+
 infrastructure/jobs/
-├── types.ts     ← JobStatus, JobMeta, JobRedisClient 인터페이스
-├── redis.ts     ← Upstash 기반 JobRedisClient 구현체
+├── types.ts     ← JobStatus, JobMeta (DTO)
+├── redis.ts     ← Upstash 기반 JobStateStore 어댑터 (createJobStateStore)
 └── queue.ts     ← job 라이프사이클 함수
 ```
 
