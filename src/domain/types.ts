@@ -1020,7 +1020,8 @@ export interface RawOverallAnalysisResponse {
     technicalBulletsKo?: unknown;
     fundamentalBulletsKo?: unknown;
     newsBulletsKo?: unknown;
-    threeAxisConclusionKo?: unknown;
+    optionsBulletsKo?: unknown;
+    integratedConclusionKo?: unknown;
     scenarios?: unknown;
     riskFactorsKo?: unknown;
 }
@@ -1950,7 +1951,7 @@ export interface OverallScenario {
     priceRangeKo: string;
 }
 
-/** LLM-generated 3-axis (technical + fundamental + news) overall analysis result. */
+/** LLM-generated 4-axis (technical + fundamental + news + options) overall analysis result. */
 export interface OverallAnalysisResponse {
     /** One-line definition followed by a current-state paragraph (Korean output). */
     headlineKo: string;
@@ -1960,12 +1961,16 @@ export interface OverallAnalysisResponse {
     fundamentalBulletsKo: string[];
     /** News analysis summary bullet points (Korean output). */
     newsBulletsKo: string[];
-    /** 3-axis synthesis conclusion block, one or two paragraphs (Korean output). */
-    threeAxisConclusionKo: string;
+    /** Options analysis summary bullet points (Korean output). */
+    optionsBulletsKo: string[];
+    /** 4-axis synthesis conclusion block, one or two paragraphs (Korean output). */
+    integratedConclusionKo: string;
     /** Scenario analysis (bullish / neutral / bearish). */
     scenarios: OverallScenario[];
     /** Risk factor bullet points (Korean output). */
     riskFactorsKo: string[];
+    /** OI snapshot staleness marker echoed from caller input. */
+    optionsOiStale?: boolean;
 }
 
 /**

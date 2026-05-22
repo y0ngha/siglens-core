@@ -206,7 +206,7 @@ export async function submitFundamentalAnalysis(
     const cacheKey = buildFundamentalCacheKey(symbol, modelId);
     const cache = createCacheProvider();
 
-    if (cache !== null) {
+    if (!options.force && cache !== null) {
         try {
             const cached =
                 await cache.get<FundamentalAnalysisResponse>(cacheKey);

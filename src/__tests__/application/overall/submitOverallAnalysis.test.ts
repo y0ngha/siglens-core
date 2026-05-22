@@ -129,9 +129,13 @@ const cachedOverallResult = {
     technicalBulletsKo: [],
     fundamentalBulletsKo: [],
     newsBulletsKo: [],
-    threeAxisConclusionKo: '3축 결론',
+    optionsBulletsKo: [],
+    integratedConclusionKo: '3축 결론',
     scenarios: [],
     riskFactorsKo: [],
+    // `optionsOiStale` is omitted (not set to false) — the normalizer drops
+    // the field when not stale rather than emitting `false`, matching the
+    // optional-field contract on `OverallAnalysisResponse`.
 };
 
 const mockCacheGet = vi.fn();
@@ -385,7 +389,8 @@ describe('submitOverallAnalysis 함수는', () => {
                     technicalBulletsKo: [],
                     fundamentalBulletsKo: [],
                     newsBulletsKo: [],
-                    threeAxisConclusionKo: '',
+                    optionsBulletsKo: [],
+                    integratedConclusionKo: '',
                     scenarios: [],
                     riskFactorsKo: [],
                 });
@@ -475,6 +480,80 @@ describe('submitOverallAnalysis 함수는', () => {
                 technical: { ...cachedTechnical, summary: 'B' },
                 fundamental: cachedFundamental,
                 news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).not.toBe(secondCacheKey);
+        });
+
+        it('options.analyzedAt 만 다르면 동일한 캐시 키로 조회된다', async () => {
+            // The options-axis cache-hit path unconditionally re-stamps
+            // `analyzedAt` to the server clock on every submit, so polling
+            // the same overall analysis would otherwise shift the overall
+            // cache key every time. stripVolatileOptionsFields must drop
+            // the field from the hash input to keep the overall TTL alive.
+            const baseOptions = {
+                summary: 'Options summary',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2026-05-22T10:00:00Z',
+            };
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: baseOptions,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: { ...baseOptions, analyzedAt: '2026-05-22T11:00:00Z' },
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).toBe(secondCacheKey);
+        });
+
+        it('options 본문(summary)이 달라지면 캐시 키가 달라진다', async () => {
+            // Inverse of the analyzedAt-stability test — only non-volatile
+            // options fields participate in the hash, so a meaningful body
+            // change must still bust the overall cache.
+            const baseOptions = {
+                summary: 'Options summary A',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2026-05-22T10:00:00Z',
+            };
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: baseOptions,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: { ...baseOptions, summary: 'Options summary B' },
             });
             mockCacheGet.mockResolvedValueOnce(null);
             await submitOverallAnalysis(makeOptions());
@@ -722,7 +801,10 @@ describe('submitOverallAnalysis 함수는', () => {
             // switches to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
-            expect(args.length).toBe(7);
+            // Phase 4-Core extended the signature to 9 positional args:
+            // (..., fearGreed, options, optionsOiStale). The first 7 retain
+            // their meaning; args 8/9 are the new options axis hooks.
+            expect(args.length).toBe(9);
         });
 
         it('일봉 fetch가 throw해도 overall 분석은 fearGreed=undefined로 계속 진행된다', async () => {
@@ -1017,6 +1099,143 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(mockCacheGet).not.toHaveBeenCalled();
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('options axis integration', () => {
+        // `tone` lives on OptionsPerExpirationCommentary, not on the
+        // top-level OptionsAnalysisResponse. Keep the fixture limited to the
+        // real shape.
+        const cachedOptionsResponse = {
+            summary: '옵션 시장 요약',
+            perExpiration: [],
+            signals: [],
+            analyzedAt: '2099-01-01T00:00:00Z',
+        };
+
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+            mockResolveOverallDependencies.mockReset();
+        });
+
+        it('includes options payload in input hash so cached overall keys differ when options changes', async () => {
+            // First call: options = null
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            // Second call: same axes but options is now non-null
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).not.toBe(secondCacheKey);
+        });
+
+        it('passes options payload to buildOverallAnalysisPrompt (8th arg)', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            // 8th positional arg = options payload.
+            expect(args[7]).toEqual(cachedOptionsResponse);
+        });
+
+        it('passes optionsOiStale to buildOverallAnalysisPrompt (9th arg) and setJobMeta', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions({ optionsOiStale: true }));
+
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            expect(args[8]).toBe(true);
+
+            // setJobMeta receives optionsOiStale so pollOverallAnalysis can
+            // echo it back when normalizing.
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ optionsOiStale: true })
+            );
+        });
+
+        it('defaults optionsOiStale to false when omitted', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            expect(args[8]).toBe(false);
+        });
+
+        it('surfaces options axis error like other axis errors', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'error',
+                axis: 'options',
+                error: {
+                    status: 'limit_error',
+                    code: 'usage_limit_exceeded',
+                    error: { code: 'usage_limit_exceeded', message: 'limit' },
+                },
+            });
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error' && 'axis' in result) {
+                expect(result.axis).toBe('options');
+            }
+        });
+
+        it('forwards pending options jobId in pendingJobs', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'pending',
+                pendingJobs: {
+                    technical: undefined,
+                    fundamental: undefined,
+                    news: undefined,
+                    options: 'opt-job-abc',
+                },
+            });
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('pending_dependencies');
+            if (result.status === 'pending_dependencies') {
+                expect(result.pendingJobs.options).toBe('opt-job-abc');
+            }
         });
     });
 });

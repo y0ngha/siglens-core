@@ -276,6 +276,28 @@ describe('submitNewsAnalysis 함수는', () => {
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
         });
+
+        it('bypasses cache when force=true', async () => {
+            // mockReset because vitest's clearAllMocks resets call history but
+            // not pending resolutions — re-queuing here cannot leak forward.
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValue(mockCachedResult);
+
+            const result = await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                force: true,
+            });
+
+            expect(result.status).toBe('submitted');
+            // Cache read must not have been attempted at all.
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            // The job was enqueued via the normal submit path.
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalled();
+        });
     });
 
     describe('사용량 제한이 적용될 때', () => {

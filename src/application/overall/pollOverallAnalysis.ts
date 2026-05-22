@@ -93,9 +93,14 @@ export async function pollOverallAnalysis(
     }
 
     // Normalize the raw LLM response through the overall response normalizer.
+    // The `optionsOiStale` flag was captured at submit time and stored in the
+    // job meta — forwarding it here lets the normalizer attach it to the
+    // response without the worker having to round-trip the value.
     let result: OverallAnalysisResponse;
     try {
-        result = normalizeOverallAnalysisResponse(rawResult);
+        result = normalizeOverallAnalysisResponse(rawResult, {
+            optionsOiStale: meta?.optionsOiStale,
+        });
     } catch (error) {
         console.error('[PollOverall] Normalization failed:', error);
         cleanupInBackground(jobId, '[PollOverall]', options);

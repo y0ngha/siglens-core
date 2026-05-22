@@ -1,11 +1,15 @@
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
+import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
+import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     DependencyState,
     OverallDependencyInputs,
 } from '@/application/overall/types';
+import type { OptionsAnalysisResponse } from '@/domain/types';
+import type { SubmitOptionsAnalysisResult } from '@/application/options/types';
 
 /**
  * @internal Object branch of {@link OverallDependencyInputs.news} (per-axis
@@ -87,6 +91,9 @@ export async function resolveOverallDependencies(
         technical: technicalOptions,
         fundamental: fundamentalOptions,
         news: newsField,
+        optionsSnapshot,
+        options: optionsAxisOptions,
+        force: topLevelForce,
     } = inputs;
     const dropAxisUsage = options.dropAxisUsage ?? false;
     // ── Backward-compat disambiguation for the renamed news fields ──
@@ -127,11 +134,18 @@ export async function resolveOverallDependencies(
     }
 
     // ── Extract technical positional overrides (force, fmpSymbol) ──
+    // `technicalForce` is the per-axis flag; the resolver OR's it with the
+    // top-level `force` so either layer can trigger a refresh on the
+    // technical axis. The other three axes (fundamental, news, options)
+    // only have the top-level lever since they don't expose a per-axis
+    // force option.
     const {
         force: technicalForce = false,
         fmpSymbol: technicalFmpSymbol,
         ...technicalRest
     } = technicalOptions;
+    const effectiveTechnicalForce = topLevelForce ?? technicalForce;
+    const effectiveAxisForce = topLevelForce ?? false;
 
     // ── Extract top-level propagation fields ──
     // `tier`, `userApiKey`, and `skipEnqueueIfMiss` live directly on
@@ -156,54 +170,99 @@ export async function resolveOverallDependencies(
         dropAxisUsage && resolvedNewsOptions !== undefined
             ? omitUsage(resolvedNewsOptions)
             : resolvedNewsOptions;
+    const optionsAxisOptionsResolved =
+        dropAxisUsage && optionsAxisOptions !== undefined
+            ? omitUsage(optionsAxisOptions)
+            : optionsAxisOptions;
 
-    // ── Kick off all three axes in parallel ──
+    // ── Options-axis preflight: pick the nearest expiration ──
+    // `pickNearestExpiration` returns null when the snapshot has no usable
+    // future chains; we treat that as a graceful skip (same shape as
+    // submitOptionsAnalysis's `no_chains_error`) so the prompt builder can
+    // proceed with `options: null`.
+    const optionsExpirationDate =
+        optionsSnapshot !== undefined
+            ? pickNearestExpiration(optionsSnapshot, new Date())
+            : null;
+
+    // ── Options-axis submit (gracefully short-circuited when no snapshot) ──
+    // The four axes all consume `force` through their option types now, so
+    // we can drop the explicit `as SubmitOptionsAnalysisOptions & { force }`
+    // cast and rely on the structural type check.
+    const optionsSubmit: Promise<SubmitOptionsAnalysisResult> =
+        optionsSnapshot !== undefined && optionsExpirationDate !== null
+            ? submitOptionsAnalysis({
+                  symbol,
+                  companyName,
+                  modelId,
+                  snapshot: optionsSnapshot,
+                  expirationDate: optionsExpirationDate,
+                  tier: topLevelTier ?? DEFAULT_TIER,
+                  userApiKey: topLevelUserApiKey,
+                  ...optionsAxisOptionsResolved,
+                  skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
+                  force: effectiveAxisForce,
+              })
+            : Promise.resolve({
+                  status: 'no_chains_error' as const,
+                  code: 'no_options_chains' as const,
+                  error:
+                      optionsSnapshot === undefined
+                          ? 'No options snapshot provided'
+                          : 'No usable future expiration in snapshot',
+              });
+
+    // ── Kick off all four axes in parallel ──
     // `skipEnqueueIfMiss` is forced from the top level for every axis when
     // set: bot/crawler gating must apply uniformly to all sub-axis enqueues,
     // not just the overall job, otherwise sub-axis workers would still fire.
-    const [technicalResult, fundamentalResult, newsResult] = await Promise.all([
-        submitAnalysis(
-            symbol,
-            companyName,
-            timeframe,
-            technicalForce,
-            technicalFmpSymbol,
-            {
-                ...technicalAxisOptions,
-                modelId: technicalAxisOptions.modelId ?? modelId,
-                userApiKey:
-                    technicalAxisOptions.userApiKey ?? topLevelUserApiKey,
-                tierContext:
-                    technicalAxisOptions.tierContext ??
-                    (topLevelTier !== undefined
-                        ? { userId: null, tier: topLevelTier }
-                        : undefined),
+    const [technicalResult, fundamentalResult, newsResult, optionsResult] =
+        await Promise.all([
+            submitAnalysis(
+                symbol,
+                companyName,
+                timeframe,
+                effectiveTechnicalForce,
+                technicalFmpSymbol,
+                {
+                    ...technicalAxisOptions,
+                    modelId: technicalAxisOptions.modelId ?? modelId,
+                    userApiKey:
+                        technicalAxisOptions.userApiKey ?? topLevelUserApiKey,
+                    tierContext:
+                        technicalAxisOptions.tierContext ??
+                        (topLevelTier !== undefined
+                            ? { userId: null, tier: topLevelTier }
+                            : undefined),
+                    skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
+                }
+            ),
+            submitFundamentalAnalysis({
+                symbol,
+                modelId,
+                dataProvider: fundamentalProvider,
+                // Top-level fallbacks: axis-level values win because the spread comes last.
+                tier: topLevelTier ?? DEFAULT_TIER,
+                userApiKey: topLevelUserApiKey,
+                ...fundamentalAxisOptions,
                 skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
-            }
-        ),
-        submitFundamentalAnalysis({
-            symbol,
-            modelId,
-            dataProvider: fundamentalProvider,
-            // Top-level fallbacks: axis-level values win because the spread comes last.
-            tier: topLevelTier ?? DEFAULT_TIER,
-            userApiKey: topLevelUserApiKey,
-            ...fundamentalAxisOptions,
-            skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
-        }),
-        submitNewsAnalysis({
-            symbol,
-            companyName,
-            modelId,
-            news: resolvedNewsItems,
-            upcomingCalendar,
-            // Top-level fallbacks: axis-level values win because the spread comes last.
-            tier: topLevelTier ?? DEFAULT_TIER,
-            userApiKey: topLevelUserApiKey,
-            ...newsAxisOptions,
-            skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
-        }),
-    ]);
+                force: effectiveAxisForce,
+            }),
+            submitNewsAnalysis({
+                symbol,
+                companyName,
+                modelId,
+                news: resolvedNewsItems,
+                upcomingCalendar,
+                // Top-level fallbacks: axis-level values win because the spread comes last.
+                tier: topLevelTier ?? DEFAULT_TIER,
+                userApiKey: topLevelUserApiKey,
+                ...newsAxisOptions,
+                skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
+                force: effectiveAxisForce,
+            }),
+            optionsSubmit,
+        ]);
 
     // ── Check for axis errors — surface immediately, do not coerce to pending ──
     // Always store the full submit result so consumers can narrow on
@@ -223,6 +282,17 @@ export async function resolveOverallDependencies(
     if (newsResult.status === 'error' || newsResult.status === 'key_error') {
         return { kind: 'error', axis: 'news', error: newsResult };
     }
+    // Options axis surfaces `limit_error` and `key_error` as resolver errors.
+    // `no_chains_error` is intentionally NOT an error — it's a graceful skip
+    // (no options listed for this symbol or no usable chain at the picked
+    // expiration), handled below by mapping to `options: null` in the cached
+    // payload.
+    if (
+        optionsResult.status === 'limit_error' ||
+        optionsResult.status === 'key_error'
+    ) {
+        return { kind: 'error', axis: 'options', error: optionsResult };
+    }
 
     // ── Any axis cache-missed with skipEnqueueIfMiss → short-circuit ──
     // When bot/crawler gating is on, no axis should have enqueued — any axis
@@ -232,7 +302,8 @@ export async function resolveOverallDependencies(
     if (
         technicalResult.status === 'miss_no_trigger' ||
         fundamentalResult.status === 'miss_no_trigger' ||
-        newsResult.status === 'miss_no_trigger'
+        newsResult.status === 'miss_no_trigger' ||
+        optionsResult.status === 'miss_no_trigger'
     ) {
         return { kind: 'miss_no_trigger' };
     }
@@ -248,18 +319,35 @@ export async function resolveOverallDependencies(
             : undefined;
     const newsJobId =
         newsResult.status === 'submitted' ? newsResult.jobId : undefined;
+    const optionsJobId =
+        optionsResult.status === 'submitted' ? optionsResult.jobId : undefined;
 
-    // ── All three cached → return cached state ──
+    // ── Resolve the options-axis payload for the cached branch ──
+    // `cached` → embed the analysis; `no_chains_error` → null (graceful skip).
+    // Other statuses (`submitted`) are handled by the pending branch below, so
+    // the payload is only consumed when status ∈ {cached, no_chains_error}.
+    const optionsPayload: OptionsAnalysisResponse | null =
+        optionsResult.status === 'cached' ? optionsResult.result : null;
+
+    // ── All four axes terminal (cached or no_chains for options) → cached state ──
+    // The options axis is "resolved" when it's either cached or no_chains_error;
+    // both produce a non-pending payload that the prompt builder can consume.
+    const optionsResolved =
+        optionsResult.status === 'cached' ||
+        optionsResult.status === 'no_chains_error';
+
     if (
         technicalResult.status === 'cached' &&
         fundamentalResult.status === 'cached' &&
-        newsResult.status === 'cached'
+        newsResult.status === 'cached' &&
+        optionsResolved
     ) {
         return {
             kind: 'cached',
             technical: technicalResult.result,
             fundamental: fundamentalResult.result,
             news: newsResult.result,
+            options: optionsPayload,
         };
     }
 
@@ -270,6 +358,7 @@ export async function resolveOverallDependencies(
             technical: technicalJobId,
             fundamental: fundamentalJobId,
             news: newsJobId,
+            options: optionsJobId,
         },
     };
 }

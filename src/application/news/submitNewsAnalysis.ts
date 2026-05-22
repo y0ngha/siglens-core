@@ -156,7 +156,7 @@ export async function submitNewsAnalysis(
     const cacheKey = buildNewsCacheKey(symbol, modelId, inputHash);
     const cache = createCacheProvider();
 
-    if (cache !== null) {
+    if (!options.force && cache !== null) {
         try {
             const cached = await cache.get<NewsAnalysisResponse>(cacheKey);
             // Lightweight structural validation — schema drift from a prior

@@ -6,7 +6,8 @@ const validPayload = {
     technicalBulletsKo: ['RSI 상승 다이버전스', '50일 이평선 돌파'],
     fundamentalBulletsKo: ['EPS 성장 지속', '부채비율 안정'],
     newsBulletsKo: ['어닝 서프라이즈 연속', 'CEO 신뢰도 상승'],
-    threeAxisConclusionKo: '세 가지 축 모두 긍정적 신호를 보내고 있습니다.',
+    optionsBulletsKo: ['콜 옵션 매집 우위', '단기 풋콜 비율 균형'],
+    integratedConclusionKo: '네 가지 축 모두 긍정적 신호를 보내고 있습니다.',
     scenarios: [
         {
             name: 'bullish',
@@ -44,8 +45,12 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 '어닝 서프라이즈 연속',
                 'CEO 신뢰도 상승',
             ]);
-            expect(result.threeAxisConclusionKo).toBe(
-                '세 가지 축 모두 긍정적 신호를 보내고 있습니다.'
+            expect(result.optionsBulletsKo).toEqual([
+                '콜 옵션 매집 우위',
+                '단기 풋콜 비율 균형',
+            ]);
+            expect(result.integratedConclusionKo).toBe(
+                '네 가지 축 모두 긍정적 신호를 보내고 있습니다.'
             );
             expect(result.scenarios).toHaveLength(2);
             expect(result.scenarios[0]).toEqual({
@@ -85,7 +90,8 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 technicalBulletsKo: [],
                 fundamentalBulletsKo: [],
                 newsBulletsKo: [],
-                threeAxisConclusionKo: '',
+                optionsBulletsKo: [],
+                integratedConclusionKo: '',
                 scenarios: [],
                 riskFactorsKo: [],
             });
@@ -97,6 +103,7 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                     technicalBulletsKo: ['RSI 개선', null, 1, ''],
                     fundamentalBulletsKo: ['EPS 성장', {}, ''],
                     newsBulletsKo: ['실적 발표', false, ''],
+                    optionsBulletsKo: ['콜 매수 우세', null, 0, ''],
                     riskFactorsKo: ['금리 위험', [], ''],
                 })
             );
@@ -104,7 +111,36 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
             expect(result.technicalBulletsKo).toEqual(['RSI 개선']);
             expect(result.fundamentalBulletsKo).toEqual(['EPS 성장']);
             expect(result.newsBulletsKo).toEqual(['실적 발표']);
+            expect(result.optionsBulletsKo).toEqual(['콜 매수 우세']);
             expect(result.riskFactorsKo).toEqual(['금리 위험']);
+        });
+    });
+
+    describe('context.optionsOiStale가 주어졌을 때', () => {
+        it('true이면 optionsOiStale: true를 응답에 부착한다', () => {
+            const result = normalizeOverallAnalysisResponse(
+                JSON.stringify(validPayload),
+                { optionsOiStale: true }
+            );
+
+            expect(result.optionsOiStale).toBe(true);
+        });
+
+        it('false이면 optionsOiStale 필드를 생략한다', () => {
+            const result = normalizeOverallAnalysisResponse(
+                JSON.stringify(validPayload),
+                { optionsOiStale: false }
+            );
+
+            expect(result.optionsOiStale).toBeUndefined();
+        });
+
+        it('context 미제공이면 optionsOiStale 필드를 생략한다', () => {
+            const result = normalizeOverallAnalysisResponse(
+                JSON.stringify(validPayload)
+            );
+
+            expect(result.optionsOiStale).toBeUndefined();
         });
     });
 

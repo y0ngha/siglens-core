@@ -73,6 +73,12 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * that should not trigger worker compute.
      */
     skipEnqueueIfMiss?: boolean;
+    /**
+     * When true, bypass the cache and enqueue a fresh analysis. Mirrors
+     * submitAnalysis's positional force parameter so all four axes accept
+     * the same re-analyze lever.
+     */
+    force?: boolean;
 }
 
 /** The caller receives a cached analysis — no new job was created. */

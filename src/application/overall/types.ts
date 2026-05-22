@@ -27,15 +27,22 @@ import type {
     FundamentalAnalysisResponse,
     ModelId,
     NewsAnalysisResponse,
+    OptionsAnalysisResponse,
+    OptionsSnapshot,
     OverallAnalysisResponse,
     Tier,
     TierConfig,
     Timeframe,
 } from '@/domain/types';
+import type {
+    SubmitOptionsAnalysisLimitError,
+    SubmitOptionsAnalysisApiKeyRequiredError,
+    SubmitOptionsAnalysisOptions,
+} from '@/application/options/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
-/** Axis identifier for the three-axis overall analysis pipeline. */
-export type OverallAxis = 'technical' | 'fundamental' | 'news';
+/** Axis identifier for the four-axis overall analysis pipeline. */
+export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';
 
 // ─────────────────────────────────────────
 // Dependency resolver input types
@@ -56,7 +63,7 @@ export interface OverallDependencyInputs {
     companyName?: string;
     /** Bar resolution used for the technical analysis axis. */
     timeframe: Timeframe;
-    /** LLM model identifier scoped across all three axes. */
+    /** LLM model identifier scoped across all four axes. */
     modelId: ModelId;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
@@ -172,18 +179,78 @@ export interface OverallDependencyInputs {
         SubmitNewsAnalysisOptions,
         'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
     >;
+
+    /**
+     * Pre-fetched options snapshot. Caller fetches via OptionsDataProvider
+     * (or app-side adapter). Omit (or set undefined) to skip the options axis
+     * gracefully — the resolver routes through an internal `no_chains_error`
+     * branch and the resulting `DependencyStateCached.options` is set to
+     * `null`, so the prompt builder receives a null options context (the
+     * "옵션 미상장" hint). `DependencyState` itself has no dedicated
+     * `'options_skipped'` variant; the skip is encoded as `kind: 'cached'`
+     * with `options: null`.
+     */
+    optionsSnapshot?: OptionsSnapshot;
+
+    /**
+     * Per-axis options forwarded verbatim to `submitOptionsAnalysis`.
+     * Mirrors the technical/fundamental/news per-axis option fields.
+     * `expirationDate` is computed by the resolver via pickNearestExpiration —
+     * do not set it here.
+     */
+    options?: Pick<
+        SubmitOptionsAnalysisOptions,
+        'usage' | 'tier' | 'tierConfig' | 'modelId' | 'userApiKey' | 'waitUntil'
+    >;
+
+    /**
+     * OI snapshot staleness marker. Forwarded to the prompt as a hint and
+     * echoed back on `OverallAnalysisResponse.optionsOiStale` so the UI can
+     * show a stale badge. Caller-determined: set to `true` when the snapshot
+     * was captured outside U.S. options regular trading hours and the
+     * open-interest counts are stale (still reflecting the previous session).
+     */
+    optionsOiStale?: boolean;
+
+    /**
+     * Top-level force flag. When true, the resolver forwards `force: true` to
+     * every axis submit call. Effective per-axis force is computed as
+     * `topLevel.force ?? axis.force ?? false`, but only the `technical` axis
+     * has a per-axis `force` field in its Pick (preserved for backward
+     * compatibility). For `fundamental`/`news`/`options` the formula collapses
+     * to `topLevel.force ?? false`. Used by the re-analyze button in the app,
+     * which performs a 4-axis full refresh.
+     *
+     * Note on `??` semantics: this is undefined-fallthrough, not OR. An
+     * explicit `topLevel.force = false` will NOT defer to a per-axis
+     * `force = true` — `false` is a real value, not a missing one.
+     */
+    force?: boolean;
 }
 
 // ─────────────────────────────────────────
 // Dependency resolver output types
 // ─────────────────────────────────────────
 
-/** All three dependency axes resolved from cache — overall analysis can be built immediately. */
+/**
+ * All four dependency axes resolved — overall analysis can be built immediately.
+ *
+ * `options` is `null` when the axis was gracefully skipped (the caller omitted
+ * `optionsSnapshot` or `submitOptionsAnalysis` returned `no_chains_error`).
+ * Non-null payloads carry the full options analysis to feed into the prompt.
+ */
 export interface DependencyStateCached {
     kind: 'cached';
     technical: AnalysisResponse;
     fundamental: FundamentalAnalysisResponse;
     news: NewsAnalysisResponse;
+    /**
+     * Options axis result. `null` indicates a graceful skip (NoChains symbol
+     * or absent snapshot). Optional so existing consumers that constructed
+     * `DependencyStateCached` without options before this PR (e.g. test mocks
+     * from prior versions) still type-check; the resolver always sets it.
+     */
+    options?: OptionsAnalysisResponse | null;
 }
 
 /**
@@ -222,7 +289,9 @@ export interface DependencyStateError {
         | SubmitFundamentalAnalysisApiKeyRequiredError
         | SubmitNewsAnalysisNoNewsError
         | SubmitNewsAnalysisLimitError
-        | SubmitNewsAnalysisApiKeyRequiredError;
+        | SubmitNewsAnalysisApiKeyRequiredError
+        | SubmitOptionsAnalysisLimitError
+        | SubmitOptionsAnalysisApiKeyRequiredError;
 }
 
 /**
@@ -237,7 +306,7 @@ export interface DependencyStateMissNoTrigger {
 /**
  * Result returned by {@link resolveOverallDependencies}.
  *
- * - `cached` — all three axes resolved from cache; the results are embedded.
+ * - `cached` — all four axes resolved from cache; the results are embedded.
  * - `pending` — one or more axes submitted new jobs; caller should poll.
  * - `error` — one axis returned an error (tier gate, usage limit, or fetch failure).
  * - `miss_no_trigger` — at least one axis missed cache and the resolver was
@@ -258,11 +327,11 @@ export type DependencyState =
  *
  * Extends {@link OverallDependencyInputs} with background-task hooks plus an
  * overall-scoped tier/usage gate. The caller is responsible for constructing
- * all three dependency-axis options before invoking {@link submitOverallAnalysis}.
+ * all four dependency-axis options before invoking {@link submitOverallAnalysis}.
  *
  * Usage tracking is intentionally owned at this layer (not per axis): a
  * single `submitOverallAnalysis` call must count as exactly one analysis,
- * even though it dispatches three axis submits internally. The dependency
+ * even though it dispatches four axis submits internally. The dependency
  * resolver therefore drops any `usage` provided in `technical`/`fundamental`/
  * `news` axis options when called from overall — see
  * {@link resolveOverallDependencies}.
@@ -296,7 +365,7 @@ export interface SubmitOverallAnalysisCached {
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
- * `submitOverallAnalysis` once all three are resolved.
+ * `submitOverallAnalysis` once all four are resolved.
  */
 export interface SubmitOverallAnalysisPendingDependencies {
     status: 'pending_dependencies';
@@ -319,7 +388,7 @@ export interface SubmitOverallAnalysisSubmitted {
  */
 export interface SubmitOverallAnalysisError {
     status: 'error';
-    /** Axis that failed: `'technical'`, `'fundamental'`, or `'news'`. */
+    /** Axis that failed: `'technical'`, `'fundamental'`, `'news'`, or `'options'`. */
     axis: OverallAxis;
     /** Error payload from the failing axis submit result. */
     error: unknown;
@@ -351,7 +420,7 @@ export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
  * 1. At least one sub-axis cache missed — the dependency resolver
  *    short-circuits to `kind: 'miss_no_trigger'` and the overall cache is
  *    never even checked.
- * 2. All three sub-axes resolved from cache, but the overall cache itself
+ * 2. All four sub-axes resolved from cache, but the overall cache itself
  *    missed — `submitOverallAnalysis` short-circuits after the overall
  *    cache lookup.
  *

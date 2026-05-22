@@ -25,6 +25,7 @@ import { readWorkerConfig } from '@/infrastructure/market/config';
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
+    OptionsAnalysisResponse,
     OverallAnalysisResponse,
 } from '@/domain/types';
 
@@ -70,6 +71,32 @@ function stripVolatileTechnicalFields(
         skillsDegraded: _skillsDegraded,
         ...rest
     } = technical as AnalysisResponse & { skillsDegraded?: boolean };
+    return rest;
+}
+
+/**
+ * Strip volatile, write-time-only fields from a cached options
+ * `OptionsAnalysisResponse` so the overall input hash stays stable across
+ * polls.
+ *
+ * `analyzedAt` is unconditionally rewritten to the server clock on every
+ * `submitOptionsAnalysis` cache-hit (see
+ * {@link normalizeOptionsAnalysisResponse}). If the field stayed inside the
+ * overall input hash, the overall cache key would shift on every poll even
+ * when the options analysis body was unchanged — defeating the overall
+ * cache TTL.
+ *
+ * Passes `null` through unchanged so the "no options" overall variant keeps
+ * a distinct cache identity from the "options present" variant. `undefined`
+ * is treated the same as `null` for forward-compat with `DependencyState`
+ * shapes that pre-date the options axis (e.g. mocked resolver results in
+ * older tests that never set the field).
+ */
+function stripVolatileOptionsFields(
+    options: OptionsAnalysisResponse | null | undefined
+): Omit<OptionsAnalysisResponse, 'analyzedAt'> | null {
+    if (options === null || options === undefined) return null;
+    const { analyzedAt: _analyzedAt, ...rest } = options;
     return rest;
 }
 
@@ -191,6 +218,7 @@ export async function submitOverallAnalysis(
                 technical: deps.pendingJobs.technical,
                 fundamental: deps.pendingJobs.fundamental,
                 news: deps.pendingJobs.news,
+                options: deps.pendingJobs.options,
             },
         };
     }
@@ -202,19 +230,28 @@ export async function submitOverallAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    // ── 2. All three cached — hash combined inputs and check overall cache ──
+    // ── 2. All four cached — hash combined inputs and check overall cache ──
     // Strip volatile fields from each axis result before hashing so that
     // re-polling a stable analysis produces the same overall cache key.
     // - `analyzedAt` is set per poll on the technical axis (see pollAnalysis)
     //   and would otherwise invalidate the overall cache on every poll.
     // - `skillsDegraded` is a transient flag attached to the cached technical
     //   result; it reflects loader health at write time, not analysis content.
+    // - The options axis also re-stamps `analyzedAt` on every cache-hit (the
+    //   normalizer always uses the server clock — see normalizeOptions); the
+    //   same per-poll churn would otherwise leak into the overall hash.
+    // - The options axis is `null` when gracefully skipped (no snapshot or
+    //   no_chains_error) — its `null`-vs-payload distinction must be in the
+    //   hash so the overall cache splits between "no options" and "options
+    //   present" variants of the same symbol.
     const stableTechnical = stripVolatileTechnicalFields(deps.technical);
+    const stableOptions = stripVolatileOptionsFields(deps.options);
     const inputHash = hashAnalysisInput(
         JSON.stringify({
             t: stableTechnical,
             f: deps.fundamental,
             n: deps.news,
+            o: stableOptions,
         })
     );
     const cacheKey = buildOverallCacheKey(
@@ -234,7 +271,14 @@ export async function submitOverallAnalysis(
             // primary invalidation lever (see CACHE_KEY_SCHEMA_VERSION); this
             // check is a belt-and-braces fallback.
             if (cached !== null) {
-                const result = normalizeOverallAnalysisResponse(cached);
+                // Forward the current request's `optionsOiStale` (not the
+                // cached body's stale flag, which is undefined since the
+                // normalizer omits the field when false): the staleness
+                // is a function of the *current* request's snapshot time,
+                // not when the analysis was originally generated.
+                const result = normalizeOverallAnalysisResponse(cached, {
+                    optionsOiStale: options.optionsOiStale,
+                });
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result };
             }
@@ -269,6 +313,7 @@ export async function submitOverallAnalysis(
             return null;
         });
 
+    const optionsOiStale = options.optionsOiStale ?? false;
     const prompt = buildOverallAnalysisPrompt(
         symbol,
         companyName,
@@ -276,7 +321,9 @@ export async function submitOverallAnalysis(
         deps.fundamental,
         deps.news,
         timeframe,
-        fearGreed ?? undefined
+        fearGreed ?? undefined,
+        deps.options,
+        optionsOiStale
     );
     const jobId = crypto.randomUUID();
 
@@ -285,6 +332,9 @@ export async function submitOverallAnalysis(
         timeframe,
         modelId,
         cacheKey,
+        // Echo back to pollOverallAnalysis so the normalizer can attach
+        // `optionsOiStale: true` to the worker response.
+        optionsOiStale,
     });
 
     const userApiKeyHeader: Record<string, string> =

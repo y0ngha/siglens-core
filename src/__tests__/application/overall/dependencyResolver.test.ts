@@ -1,20 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 
-// ── Mock the three submit functions before importing the resolver ──
+// ── Mock the four submit functions before importing the resolver ──
 vi.mock('@/application/market/submitAnalysis');
 vi.mock('@/application/fundamental/submitFundamentalAnalysis');
 vi.mock('@/application/news/submitNewsAnalysis');
+vi.mock('@/application/options/submitOptionsAnalysis');
 
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type { OverallDependencyInputs } from '@/application/overall/types';
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
+import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
 import type {
     AnalysisResponse,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
+    OptionsSnapshot,
+    OptionsChain,
 } from '@/domain/types';
 import {
     makeEnrichedNewsItem,
@@ -25,6 +29,48 @@ import {
 const mockSubmitAnalysis = submitAnalysis as Mock;
 const mockSubmitFundamentalAnalysis = submitFundamentalAnalysis as Mock;
 const mockSubmitNewsAnalysis = submitNewsAnalysis as Mock;
+const mockSubmitOptionsAnalysis = submitOptionsAnalysis as Mock;
+
+// ─── Options snapshot helpers ──────────────────────────────────────────────
+/**
+ * `daysToExpiration` is required on `OptionsChain` — populate it from the
+ * expiration date string relative to a fixed reference clock so the helper
+ * works with concrete dates (e.g. `'2099-01-08'`) without depending on the
+ * real wall-clock at test-run time.
+ */
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const REFERENCE_NOW_MS = Date.parse('2099-01-01T00:00:00Z');
+
+function makeOptionsChain(date: string): OptionsChain {
+    return {
+        expirationDate: date,
+        daysToExpiration: Math.floor(
+            (Date.parse(`${date}T00:00:00Z`) - REFERENCE_NOW_MS) / MS_PER_DAY
+        ),
+        calls: [],
+        puts: [],
+    };
+}
+
+/** Snapshot with one chain ~7 days out — passes pickNearestExpiration's ≥3d floor. */
+function makeSnapshot(): OptionsSnapshot {
+    return {
+        symbol: 'AAPL',
+        underlyingPrice: 100,
+        chains: [makeOptionsChain('2099-01-08')],
+        capturedAt: '2099-01-01T00:00:00Z',
+    };
+}
+
+/** Snapshot with no chains — pickNearestExpiration returns null so the resolver short-circuits. */
+function makeEmptySnapshot(): OptionsSnapshot {
+    return {
+        symbol: 'AAPL',
+        underlyingPrice: 100,
+        chains: [],
+        capturedAt: '2099-01-01T00:00:00Z',
+    };
+}
 
 // ─────────────────────────────────────────
 // Fixtures
@@ -981,6 +1027,206 @@ describe('resolveOverallDependencies 함수는', () => {
             );
 
             expect(state).toEqual({ kind: 'miss_no_trigger' });
+        });
+    });
+
+    describe('options axis', () => {
+        beforeEach(() => {
+            // Reset the options mock between tests so `mockResolvedValueOnce`
+            // queues from earlier tests don't leak forward (vi.clearAllMocks
+            // resets call history but not queued resolutions).
+            mockSubmitOptionsAnalysis.mockReset();
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+        });
+
+        it('returns options: null when optionsSnapshot is undefined', async () => {
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: undefined })
+            );
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toBeNull();
+            }
+            // The options axis was never dispatched.
+            expect(mockSubmitOptionsAnalysis).not.toHaveBeenCalled();
+        });
+
+        it('returns options: null when submitOptionsAnalysis returns no_chains_error', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No options chains available',
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeEmptySnapshot() })
+            );
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toBeNull();
+            }
+        });
+
+        it('surfaces options limit_error like other axis errors', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'limit_error',
+                code: 'usage_limit_exceeded',
+                error: { code: 'usage_limit_exceeded', message: 'limit' },
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('options');
+            }
+        });
+
+        it('surfaces options key_error like other axis errors', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro',
+                tier: 'member',
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('options');
+            }
+        });
+
+        it('includes options jobId in pendingJobs when submitted', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'submitted',
+                jobId: 'opt-123',
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('pending');
+            if (state.kind === 'pending') {
+                expect(state.pendingJobs.options).toBe('opt-123');
+            }
+        });
+
+        it('returns cached options payload when submitOptionsAnalysis hits cache', async () => {
+            // `tone` lives on OptionsPerExpirationCommentary, not on the
+            // top-level OptionsAnalysisResponse. Don't replant it here as a
+            // top-level field.
+            const cachedOptions = {
+                summary: 'Options summary',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2099-01-01T00:00:00Z',
+            };
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'cached',
+                result: cachedOptions,
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toEqual(cachedOptions);
+            }
+        });
+
+        it('drops options.usage when dropAxisUsage is true', async () => {
+            const fakeUsage = {
+                usageRepository: {
+                    recordUsage: vi.fn(),
+                    getUsageToday: vi.fn(),
+                },
+                clientIp: '203.0.113.10',
+            };
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No usable chains',
+            });
+            await resolveOverallDependencies(
+                makeInputs({
+                    optionsSnapshot: makeSnapshot(),
+                    options: {
+                        usage: fakeUsage,
+                        modelId: 'claude-sonnet-4-6',
+                    },
+                }),
+                { dropAxisUsage: true }
+            );
+            const optionsOpts = mockSubmitOptionsAnalysis.mock.calls[0]?.[0];
+            expect(optionsOpts).not.toHaveProperty('usage');
+        });
+
+        it('forwards top-level force to all 4 axes (resolver-level contract)', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No usable chains',
+            });
+            await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot(), force: true })
+            );
+            // The technical axis receives `force` as the 4th positional arg.
+            const technicalArgs = mockSubmitAnalysis.mock.calls[0];
+            expect(technicalArgs?.[3]).toBe(true);
+
+            // The other three axes receive `force` inside the options object.
+            // Each submit fn's cache-bypass behaviour (skip read on force=true)
+            // is covered by its own unit tests — this assertion is the
+            // resolver-level contract that the flag is actually plumbed
+            // through, not silently dropped.
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: true })
+            );
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: true })
+            );
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: true })
+            );
+        });
+
+        it('omits force from all 4 axes when top-level force is not set', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No usable chains',
+            });
+            await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            // Technical: 4th positional arg defaults to false (per the existing
+            // `technical.force / fmpSymbol 미지정 시 기본 false` test above).
+            const technicalArgs = mockSubmitAnalysis.mock.calls[0];
+            expect(technicalArgs?.[3]).toBe(false);
+
+            // The other three axes get force=false explicitly (not omitted) — the
+            // resolver always sets it so consumers see a consistent surface.
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: false })
+            );
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: false })
+            );
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: false })
+            );
         });
     });
 });
