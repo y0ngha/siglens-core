@@ -5,13 +5,13 @@ import type { JobMeta } from '@/infrastructure/jobs/types';
 
 const mockGet = vi.fn();
 const mockSet = vi.fn();
-const mockDel = vi.fn();
+const mockDeleteMany = vi.fn();
 
 vi.mock('@/infrastructure/jobs/redis', () => ({
-    createJobRedis: vi.fn(),
+    createJobStateStore: vi.fn(),
 }));
 
-import { createJobRedis } from '@/infrastructure/jobs/redis';
+import { createJobStateStore } from '@/infrastructure/jobs/redis';
 import {
     cancelJob,
     cleanupJob,
@@ -26,24 +26,24 @@ import {
     setJobStatus,
 } from '@/infrastructure/jobs/queue';
 
-// vi.mock이 createJobRedis를 vi.fn()으로 교체하므로 Mock API(mockReturnValue 등) 접근을 위해 캐스트
-const mockCreateJobRedis = createJobRedis as Mock;
+// vi.mock이 createJobStateStore를 vi.fn()으로 교체하므로 Mock API(mockReturnValue 등) 접근을 위해 캐스트
+const mockCreateJobStateStore = createJobStateStore as Mock;
 
-const fakeRedis = {
+const fakeStore = {
     get: mockGet,
     set: mockSet,
-    del: mockDel,
+    deleteMany: mockDeleteMany,
 };
 
-describe('job queue — redis null (env vars missing)', () => {
+describe('job queue — store null (env vars missing)', () => {
     beforeEach(() => {
-        mockCreateJobRedis.mockReturnValue(null);
+        mockCreateJobStateStore.mockReturnValue(null);
         mockGet.mockClear();
         mockSet.mockClear();
-        mockDel.mockClear();
+        mockDeleteMany.mockClear();
     });
 
-    it('setJobMeta returns without calling redis', async () => {
+    it('setJobMeta returns without calling store', async () => {
         await setJobMeta('job1', {
             symbol: 'AAPL',
             timeframe: '1Hour',
@@ -52,17 +52,17 @@ describe('job queue — redis null (env vars missing)', () => {
         expect(mockSet).not.toHaveBeenCalled();
     });
 
-    it('setJobStatus returns without calling redis', async () => {
+    it('setJobStatus returns without calling store', async () => {
         await setJobStatus('job1', 'processing');
         expect(mockSet).not.toHaveBeenCalled();
     });
 
-    it('setJobResult returns without calling redis', async () => {
+    it('setJobResult returns without calling store', async () => {
         await setJobResult('job1', { score: 1 });
         expect(mockSet).not.toHaveBeenCalled();
     });
 
-    it('setJobError returns without calling redis', async () => {
+    it('setJobError returns without calling store', async () => {
         await setJobError('job1', 'Something went wrong');
         expect(mockSet).not.toHaveBeenCalled();
     });
@@ -83,7 +83,7 @@ describe('job queue — redis null (env vars missing)', () => {
         expect(await getJobMeta('job1')).toBeNull();
     });
 
-    it('cancelJob returns without calling redis', async () => {
+    it('cancelJob returns without calling store', async () => {
         await cancelJob('job1');
         expect(mockSet).not.toHaveBeenCalled();
     });
@@ -92,22 +92,22 @@ describe('job queue — redis null (env vars missing)', () => {
         expect(await isJobCancelled('job1')).toBe(false);
     });
 
-    it('cleanupJob returns without calling redis', async () => {
+    it('cleanupJob returns without calling store', async () => {
         await cleanupJob('job1');
-        expect(mockDel).not.toHaveBeenCalled();
+        expect(mockDeleteMany).not.toHaveBeenCalled();
     });
 });
 
-describe('job queue — with redis', () => {
+describe('job queue — with store', () => {
     beforeEach(() => {
-        mockCreateJobRedis.mockReturnValue(fakeRedis);
+        mockCreateJobStateStore.mockReturnValue(fakeStore);
         mockGet.mockClear();
         mockSet.mockClear();
-        mockDel.mockClear();
+        mockDeleteMany.mockClear();
     });
 
-    it('setJobMeta calls redis.set with correct key and TTL', async () => {
-        mockSet.mockResolvedValue('OK');
+    it('setJobMeta calls store.set with correct key and TTL', async () => {
+        mockSet.mockResolvedValue(undefined);
         const meta: JobMeta = {
             symbol: 'AAPL',
             timeframe: '1Hour',
@@ -115,32 +115,32 @@ describe('job queue — with redis', () => {
         };
         await setJobMeta('job1', meta);
         expect(mockSet).toHaveBeenCalledWith('job:job1:meta', meta, {
-            ex: SECONDS_PER_HOUR,
+            ttlSeconds: SECONDS_PER_HOUR,
         });
     });
 
-    it('getJobStatus calls redis.get with status key', async () => {
+    it('getJobStatus calls store.get with status key', async () => {
         mockGet.mockResolvedValue('processing');
         const result = await getJobStatus('job1');
         expect(mockGet).toHaveBeenCalledWith('job:job1:status');
         expect(result).toBe('processing');
     });
 
-    it('getJobResult calls redis.get with result key', async () => {
+    it('getJobResult calls store.get with result key', async () => {
         mockGet.mockResolvedValue({ score: 42 });
         const result = await getJobResult('job1');
         expect(mockGet).toHaveBeenCalledWith('job:job1:result');
         expect(result).toEqual({ score: 42 });
     });
 
-    it('getJobError calls redis.get with error key', async () => {
+    it('getJobError calls store.get with error key', async () => {
         mockGet.mockResolvedValue('Something went wrong');
         const result = await getJobError('job1');
         expect(mockGet).toHaveBeenCalledWith('job:job1:error');
         expect(result).toBe('Something went wrong');
     });
 
-    it('getJobMeta calls redis.get with meta key', async () => {
+    it('getJobMeta calls store.get with meta key', async () => {
         const meta: JobMeta = {
             symbol: 'TSLA',
             timeframe: '4Hour',
@@ -152,11 +152,11 @@ describe('job queue — with redis', () => {
         expect(result).toEqual(meta);
     });
 
-    it('cancelJob calls redis.set with cancelled key', async () => {
-        mockSet.mockResolvedValue('OK');
+    it('cancelJob calls store.set with cancelled key', async () => {
+        mockSet.mockResolvedValue(undefined);
         await cancelJob('job1');
         expect(mockSet).toHaveBeenCalledWith('job:job1:cancelled', '1', {
-            ex: SECONDS_PER_HOUR,
+            ttlSeconds: SECONDS_PER_HOUR,
         });
     });
 
@@ -175,10 +175,10 @@ describe('job queue — with redis', () => {
         expect(await isJobCancelled('job1')).toBe(false);
     });
 
-    it('cleanupJob calls redis.del with all job keys', async () => {
-        mockDel.mockResolvedValue(5);
+    it('cleanupJob calls store.deleteMany with all job keys', async () => {
+        mockDeleteMany.mockResolvedValue(5);
         await cleanupJob('job1');
-        expect(mockDel).toHaveBeenCalledWith(
+        expect(mockDeleteMany).toHaveBeenCalledWith(
             'job:job1:status',
             'job:job1:result',
             'job:job1:error',
@@ -187,31 +187,31 @@ describe('job queue — with redis', () => {
         );
     });
 
-    it('setJobStatus calls redis.set with status key', async () => {
-        mockSet.mockResolvedValue('OK');
+    it('setJobStatus calls store.set with status key', async () => {
+        mockSet.mockResolvedValue(undefined);
         await setJobStatus('job1', 'processing');
         expect(mockSet).toHaveBeenCalledWith('job:job1:status', 'processing', {
-            ex: SECONDS_PER_HOUR,
+            ttlSeconds: SECONDS_PER_HOUR,
         });
     });
 
-    it('setJobResult calls redis.set with result key', async () => {
-        mockSet.mockResolvedValue('OK');
+    it('setJobResult calls store.set with result key', async () => {
+        mockSet.mockResolvedValue(undefined);
         await setJobResult('job1', { score: 42 });
         expect(mockSet).toHaveBeenCalledWith(
             'job:job1:result',
             { score: 42 },
-            { ex: SECONDS_PER_HOUR }
+            { ttlSeconds: SECONDS_PER_HOUR }
         );
     });
 
-    it('setJobError calls redis.set with error key', async () => {
-        mockSet.mockResolvedValue('OK');
+    it('setJobError calls store.set with error key', async () => {
+        mockSet.mockResolvedValue(undefined);
         await setJobError('job1', 'Something went wrong');
         expect(mockSet).toHaveBeenCalledWith(
             'job:job1:error',
             'Something went wrong',
-            { ex: SECONDS_PER_HOUR }
+            { ttlSeconds: SECONDS_PER_HOUR }
         );
     });
 });

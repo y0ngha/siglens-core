@@ -464,7 +464,7 @@ export type {
     GeminiRole,
 } from './infrastructure/ai/types';
 export type { CacheProvider } from './domain/ports/cache';
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     CreateUsageLogInput,
     RecordUsageInput,
@@ -779,7 +779,7 @@ export type {
 } from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).
