@@ -148,6 +148,7 @@ function toFmpDailyBar(raw: FmpDailyBar): Bar {
 }
 
 /**
+ * @internal
  * @adapter implements {@link MarketDataProvider}
  *
  * Financial Modeling Prep adapter for {@link MarketDataProvider}. Handles

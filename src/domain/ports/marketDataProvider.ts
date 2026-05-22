@@ -2,7 +2,7 @@ import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
 
 /** Options accepted by {@link MarketDataProvider.getBars}. */
 export interface GetBarsOptions {
-    /** Provider symbol (FMP-style). */
+    /** Ticker symbol accepted by the configured provider. */
     symbol: string;
     /** Bar resolution. */
     timeframe: Timeframe;
@@ -14,23 +14,26 @@ export interface GetBarsOptions {
     from?: string;
 }
 
-/** Identifier for the configured market data provider implementation. */
-export type MarketDataProviderType = 'alpaca' | 'fmp';
-
 /**
  * @port
  * Provider-agnostic contract for fetching bars and quotes from a market
  * data source.
  *
- * Adapters live in `infrastructure/market/` and are selected at runtime via
- * the `MARKET_PROVIDER` env var. Each adapter wraps a single external API
- * (Alpaca, FMP, …) and surfaces transport errors to the caller — the
- * application layer decides whether a fetch failure should propagate,
- * retry, or degrade.
+ * Implementations (adapters) wrap a single external API and surface
+ * transport errors to the caller. The application layer decides whether a
+ * fetch failure should propagate, retry, or degrade.
  */
 export interface MarketDataProvider {
-    /** Fetch OHLCV bars for the requested symbol/timeframe. */
+    /**
+     * Fetch OHLCV bars for the requested symbol/timeframe.
+     * @param options - Symbol, timeframe, and optional time bounds.
+     * @returns Ordered array of OHLCV bars; empty when none are available.
+     */
     getBars(options: GetBarsOptions): Promise<Bar[]>;
-    /** Fetch the latest quote for `symbol`, or `null` when unavailable. */
+    /**
+     * Fetch the latest quote for the given symbol.
+     * @param symbol - Provider symbol (e.g. equity ticker).
+     * @returns The latest quote, or `null` when unavailable.
+     */
     getQuote(symbol: string): Promise<MarketQuote | null>;
 }

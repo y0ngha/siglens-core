@@ -34,6 +34,7 @@ function toAlpacaBar(raw: AlpacaBar): Bar {
 }
 
 /**
+ * @internal
  * @adapter implements {@link MarketDataProvider}
  *
  * Alpaca Markets adapter for {@link MarketDataProvider}. Fetches OHLCV bars

@@ -384,9 +384,11 @@ export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 export type {
     MarketDataProvider,
     GetBarsOptions,
-    MarketDataProviderType,
 } from './domain/ports/marketDataProvider';
-export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
+export type {
+    AcquireReanalyzeCooldownResult,
+    MarketDataProviderType,
+} from './infrastructure/market/types';
 export type {
     AiContents,
     GeminiRole,

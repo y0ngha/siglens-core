@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #97 Round 2 | worktree-agent-af677455522108f87 | 2026-05-22]
+- Violation: `domain/ports/marketDataProvider.ts`에 infrastructure-specific identifier union `MarketDataProviderType = 'alpaca' | 'fmp'`를 배치 + 포트 JSDoc이 `infrastructure/market/` 경로와 `MARKET_PROVIDER` env 변수를 직접 언급 + `GetBarsOptions.symbol` 설명이 "FMP-style"이라는 구현체 이름을 노출.
+- Rule: `src/domain/CLAUDE.md` Ports authoring rules ("One conceptual contract per file. Co-locate option/argument types used by that contract") + domain layer purity ("No SDK references, no implementation"). 포트 파일에는 인터페이스가 인자/반환 타입으로 사용하는 옵션만 두고, 어댑터 선택 식별자(provider 이름 union)는 infrastructure 설정 concern이다.
+- Context: PR #97 round 1 리뷰에서 claude / gemini-code-assist 양쪽이 동일 leak 지적. `MarketDataProviderType`을 `infrastructure/market/types.ts`로 이동하고 `config.ts`/`factory.ts`/`src/index.ts`/`src/index.client.ts` import 경로를 함께 갱신. 포트 JSDoc은 provider-agnostic 표현으로 재작성, `src/domain/CLAUDE.md`의 migrated-port 목록도 동기화.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).

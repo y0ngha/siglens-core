@@ -482,9 +482,11 @@ export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
     GetBarsOptions,
     MarketDataProvider,
-    MarketDataProviderType,
 } from './domain/ports/marketDataProvider';
-export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
+export type {
+    AcquireReanalyzeCooldownResult,
+    MarketDataProviderType,
+} from './infrastructure/market/types';
 export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
 export type { SkillsProvider } from './infrastructure/skills/types';
 

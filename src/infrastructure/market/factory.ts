@@ -1,10 +1,8 @@
-import type {
-    MarketDataProvider,
-    MarketDataProviderType,
-} from '@/domain/ports/marketDataProvider';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import { AlpacaProvider } from '@/infrastructure/market/alpaca';
 import { readMarketProviderType } from '@/infrastructure/market/config';
 import { FmpProvider } from '@/infrastructure/market/fmp';
+import type { MarketDataProviderType } from '@/infrastructure/market/types';
 
 const MARKET_PROVIDER_MAP: Record<
     MarketDataProviderType,
@@ -19,14 +17,15 @@ const MARKET_PROVIDER_MAP: Record<
  *
  * Construct the configured {@link MarketDataProvider} (Alpaca or FMP).
  *
- * Reads `MARKET_PROVIDER` from env and
- * dispatches to the corresponding implementation. Each call returns a new
- * instance — providers are lightweight and hold no shared state.
+ * Reads `MARKET_DATA_PROVIDER` from env and dispatches to the corresponding
+ * implementation. Each call returns a new instance — providers are
+ * lightweight and hold no shared state.
  *
  * @returns The configured market data provider implementation.
  *
- * @throws {Error} If `MARKET_PROVIDER` is missing or unsupported (delegated
- *   from `readMarketProviderType`).
+ * @throws {Error} If the selected adapter's required credentials are
+ *   missing (delegated from the adapter constructor — e.g. Alpaca requires
+ *   `ALPACA_API_KEY`; FMP requires `FMP_API_KEY`).
  *
  * @see fetchBarsWithIndicators
  * @see getMarketSummary

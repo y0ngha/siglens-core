@@ -14,3 +14,10 @@ export interface AlpacaConfig {
     apiKey: string;
     secretKey: string;
 }
+
+/**
+ * Identifier for the configured market data adapter implementation. Resolved
+ * by {@link readMarketProviderType} from `MARKET_DATA_PROVIDER` and consumed
+ * by {@link createMarketDataProvider} to dispatch to the matching adapter.
+ */
+export type MarketDataProviderType = 'alpaca' | 'fmp';
