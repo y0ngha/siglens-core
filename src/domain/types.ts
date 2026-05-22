@@ -1,3 +1,5 @@
+import type { OptionsAnalysisResponse } from './options/types';
+
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 
@@ -1914,12 +1916,6 @@ export interface OverallAnalysisResponse {
     /** Risk factor bullet points (Korean output). */
     riskFactorsKo: string[];
 }
-
-// Local import so `CurrentAnalysisContext` (below) can reference the options
-// payload type by name. The same type is also surfaced through the
-// `export type { OptionsAnalysisResponse, ... } from './options/types'`
-// barrel further down for downstream `@/domain/types` consumers.
-import type { OptionsAnalysisResponse } from './options/types';
 
 /**
  * Tagged union representing the analysis result currently in view by the chatbot.

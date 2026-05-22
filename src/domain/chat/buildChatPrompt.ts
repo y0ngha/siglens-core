@@ -148,18 +148,7 @@ function formatOverallContext(payload: OverallAnalysisResponse): string {
     ].join('\n');
 }
 
-/**
- * Format an options analysis context section for the system prompt.
- *
- * Surfaces the symbol-level summary, per-expiration commentary (one line
- * per expiration tagged with its tone), and the structured signal list. The
- * `analyzedAt` timestamp is appended last when present so the assistant can
- * cite freshness without it dominating the context.
- *
- * @param payload - The {@link OptionsAnalysisResponse} to format.
- * @returns A markdown section string matching the tone of the other context
- *   formatters (plain `Key: Value` lines, no `===` banners).
- */
+/** Append `analyzedAt` last so the assistant can cite freshness without it dominating the context. */
 function formatOptionsContext(payload: OptionsAnalysisResponse): string {
     const perExpirationLines = payload.perExpiration.map(
         e => `- ${e.expirationDate} (${e.tone}): ${e.commentary}`

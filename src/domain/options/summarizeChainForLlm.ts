@@ -19,11 +19,7 @@ import type {
  */
 const TOP_OI_STRIKES_COUNT = 3;
 
-/**
- * Number of top strikes (by combined call+put volume) to surface alongside
- * the OI top-3. Matches `TOP_OI_STRIKES_COUNT` so the prompt stays balanced
- * between accumulated-positioning (OI) and same-day-activity (volume).
- */
+// OI top-3과 동수 — 프롬프트 내 OI·볼륨 섹션 균형 유지.
 const TOP_VOLUME_STRIKES_COUNT = 3;
 
 /**
@@ -78,11 +74,12 @@ export function summarizeChainForLlm(
     };
 }
 
-/**
- * Build a bid/ask quote snapshot for one strike using the first matching
- * call and put contract from the chain. Side-defensive: missing contract,
- * missing bid/ask, or a negative spread all collapse to `null`.
- */
+interface MidAndSpread {
+    mid: number | null;
+    spread: number | null;
+}
+
+/** Build a bid/ask quote snapshot for one strike from the first matching call and put. */
 function buildTopOiQuote(strike: number, chain: OptionsChain): TopOiQuote {
     const callContract = chain.calls.find(c => c.strike === strike);
     const putContract = chain.puts.find(p => p.strike === strike);
@@ -105,10 +102,9 @@ function buildTopOiQuote(strike: number, chain: OptionsChain): TopOiQuote {
  * - the resulting spread is negative (crossed/locked quote — treated as
  *   bad data rather than a real market state).
  */
-function computeMidAndSpread(contract: OptionsContract | undefined): {
-    mid: number | null;
-    spread: number | null;
-} {
+function computeMidAndSpread(
+    contract: OptionsContract | undefined
+): MidAndSpread {
     if (!contract) return { mid: null, spread: null };
     const { bid, ask } = contract;
     if (bid === null || ask === null) return { mid: null, spread: null };
