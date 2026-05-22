@@ -392,8 +392,8 @@ export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 export type {
     MarketDataProvider,
     GetBarsOptions,
-    AcquireReanalyzeCooldownResult,
-} from './infrastructure/market/types';
+} from './domain/ports/marketDataProvider';
+export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
 export type {
     AiContents,
     CallAiProvider,

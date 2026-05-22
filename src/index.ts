@@ -514,10 +514,10 @@ export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';
 export type {
-    AcquireReanalyzeCooldownResult,
     GetBarsOptions,
     MarketDataProvider,
-} from './infrastructure/market/types';
+} from './domain/ports/marketDataProvider';
+export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
 export type { NewsProvider, NewsTimeRange } from './domain/ports/newsProvider';
 export type { SkillsProvider } from './domain/ports/skillsProvider';
 

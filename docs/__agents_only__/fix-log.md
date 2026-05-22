@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #97 Round 2 | worktree-agent-af677455522108f87 | 2026-05-22]
+- Violation: `domain/ports/marketDataProvider.ts`에 infrastructure-specific identifier union `MarketDataProviderType = 'alpaca' | 'fmp'`를 배치 + 포트 JSDoc이 `infrastructure/market/` 경로와 `MARKET_PROVIDER` env 변수를 직접 언급 + `GetBarsOptions.symbol` 설명이 "FMP-style"이라는 구현체 이름을 노출.
+- Rule: `src/domain/CLAUDE.md` Ports authoring rules ("One conceptual contract per file. Co-locate option/argument types used by that contract") + domain layer purity ("No SDK references, no implementation"). 포트 파일에는 인터페이스가 인자/반환 타입으로 사용하는 옵션만 두고, 어댑터 선택 식별자(provider 이름 union)는 infrastructure 설정 concern이다.
+- Context: PR #97 round 1 리뷰에서 claude / gemini-code-assist 양쪽이 동일 leak 지적. `MarketDataProviderType`을 `infrastructure/market/types.ts`로 이동하고 `config.ts`/`factory.ts`/`src/index.ts`/`src/index.client.ts` import 경로를 함께 갱신. 포트 JSDoc은 provider-agnostic 표현으로 재작성, `src/domain/CLAUDE.md`의 migrated-port 목록도 동기화.
+
 ## [PR #92 Round 2 | refactor/ports-ai-module | 2026-05-22]
 - B1: `src/index.ts` + `src/index.client.ts` — Round 1에서 Tier 4 공개 타입 `GeminiRole` / `GeminiPart` / `GeminiContent`를 deprecated alias 없이 완전히 삭제. 외부 소비자가 `import type { GeminiContent } from '@y0ngha/siglens-core'` 사용 시 TS2305 컴파일 오류 발생. 두 entrypoint에 deprecated alias 3개 추가 (`GeminiRole = ConversationRole`, `GeminiPart = { text: string }`, `GeminiContent = ConversationTurn`)로 backward compatibility 유지. 각 alias에 `@deprecated` JSDoc + 대체 타입 안내.
   - Rule: MISTAKES.md §Public API #3 — Tier 4 public type 삭제 시 deprecated alias 필수 (consumers passing 기존 import는 컴파일 유지되어야 함).

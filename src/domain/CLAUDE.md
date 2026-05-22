@@ -30,9 +30,9 @@ domain/ports/
   chatTokenStore.ts    → ChatTokenStore           ✅ migrated
   fundamentalDataProvider.ts → FundamentalDataProvider ✅ migrated
   jobStateStore.ts     → JobStateStore (@internal), JobStateSetOpts ✅ migrated
+  marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ✅ migrated
   newsProvider.ts      → NewsProvider, NewsTimeRange ✅ migrated
   optionsDataProvider.ts → OptionsDataProvider     ✅ migrated
-  marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ⏳ planned
   skillsProvider.ts    → SkillsProvider                         ✅ migrated
   ...
 ```

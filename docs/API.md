@@ -187,10 +187,10 @@ Body (JSON):
 주입한 `MarketDataProvider` 구현체에서 이뤄진다.
 
 ```typescript
-// infrastructure/market/types.ts
+// domain/ports/marketDataProvider.ts
 export interface MarketDataProvider {
-    fetchBars(symbol: string, timeframe: Timeframe): Promise<Bar[]>;
-    fetchLatestBar(symbol: string): Promise<Bar | null>;
+    getBars(options: GetBarsOptions): Promise<Bar[]>;
+    getQuote(symbol: string): Promise<MarketQuote | null>;
 }
 ```
 
