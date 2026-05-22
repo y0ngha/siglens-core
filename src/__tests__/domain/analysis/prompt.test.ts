@@ -218,7 +218,9 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('Current Price: N/A');
+            expect(result).toContain(
+                'Snapshot Price (price captured at analysis time; not a live quote): N/A'
+            );
             expect(result).toContain('Price Change %: N/A');
             expect(result).toContain('Volume: N/A');
         });
@@ -3610,7 +3612,7 @@ describe('prompt', () => {
             expect(result).toContain('Equilibrium Zone: 150.00 ~ 160.00');
             expect(result).toContain('Discount Zone: 140.00 ~ 150.00');
             expect(result).toMatch(
-                /Current price \(.+\) is in (premium|discount|equilibrium|neutral) zone/
+                /Snapshot price \(.+\) is in (premium|discount|equilibrium|neutral) zone/
             );
             expect(result).toContain('is in premium zone');
         });
