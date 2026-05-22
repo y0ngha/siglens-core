@@ -309,9 +309,10 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 |---|---|
 | `createMarketDataProvider` | `infrastructure/market/factory.ts` |
 
-**Skills (1)**
+**Skills (2)**
 | Symbol | Source |
 |---|---|
+| `createSkillsProvider` | `infrastructure/skills/loader.ts` |
 | `FileSkillsLoader` | `infrastructure/skills/loader.ts` |
 
 **Config readers (2)**

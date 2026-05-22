@@ -292,7 +292,10 @@ export {
 } from './infrastructure/chat/tokenStore';
 
 // Skills loader
-export { FileSkillsLoader } from './infrastructure/skills/loader';
+export {
+    createSkillsProvider,
+    FileSkillsLoader,
+} from './infrastructure/skills/loader';
 
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
@@ -485,7 +488,7 @@ export type {
     MarketDataProvider,
 } from './infrastructure/market/types';
 export type { NewsProvider, NewsTimeRange } from './domain/ports/newsProvider';
-export type { SkillsProvider } from './infrastructure/skills/types';
+export type { SkillsProvider } from './domain/ports/skillsProvider';
 
 // Application types
 export type {

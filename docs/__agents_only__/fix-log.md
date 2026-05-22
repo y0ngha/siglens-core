@@ -1,5 +1,13 @@
 # Fix Log
 
+## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
+- Violation: `create<Port>Provider()` factory introduced in infrastructure but neither exported from `src/index.ts` nor adopted by application call-sites in the same PR
+- Rule: MISTAKES.md Public API §9.5 — exported module symbols not re-exported in `src/index.ts` must carry `/** @internal */`; and Adapter Composition convention (`src/application/CLAUDE.md`) requires use-cases to call `create<Port>Provider()` factories instead of `new Adapter()` once the port migration lands
+- Context: `createSkillsProvider()` was added to `infrastructure/skills/loader.ts` to mirror `createCacheProvider` (Tier 3) but `src/index.ts` Tier 3 block was not updated, `docs/PUBLIC_API.md` Skills inventory was stale (`FileSkillsLoader` only), and `submitAnalysis.ts:276` / `pollAnalysis.ts:99` still constructed `new FileSkillsLoader()`. A port-migration PR must land the factory export, the PUBLIC_API.md inventory update, and the application call-site migration as a single unit.
+- Violation: Tier 4 public interface method missing `@returns` JSDoc
+- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 4 interface methods require `@param`/`@returns` JSDoc; single-line description is insufficient
+- Context: `SkillsProvider.loadSkills()` in `src/domain/ports/skillsProvider.ts` carried only `/** Load every available skill. */`; expanded to include `@returns` tag describing the resolved value.
+
 ## [PR #95 Round 2 | refactor/architecture/news-ports-migration | 2026-05-22]
 - S1: `docs/ARCHITECTURE.md` 폴더 구조 트리에서 `domain/ports/` 디렉토리가 누락된 상태. `cache.ts`가 이미 존재할 때부터 stale했고, 이번 PR에서 `newsProvider.ts`가 추가되며 격차가 더 벌어짐. `indicators` 다음 alphabetical 위치에 `ports` 항목 추가.
   - Rule: MISTAKES.md Documentation Sync — 새 디렉토리/심볼 추가 시 ARCHITECTURE.md 폴더 트리 동기화.
@@ -331,8 +339,12 @@
 - Rule: bot-gating intent — skipEnqueueIfMiss must prevent worker enqueue at every layer it triggers
 - Context: Gemini high-priority — resolveOverallDependencies was called BEFORE the existing guard at line 231, and the resolver forwarded options to submitAnalysis / submitFundamentalAnalysis / submitNewsAnalysis WITHOUT the flag. A bot request would have triggered three sub-axis workers before reaching the overall-level guard. Fixed by (1) moving skipEnqueueIfMiss onto OverallDependencyInputs so the resolver sees it, (2) forcing skipEnqueueIfMiss into all three sub-axis option objects in the resolver, and (3) adding a new DependencyStateMissNoTrigger short-circuit so submitOverallAnalysis returns miss_no_trigger directly when any axis returns miss_no_trigger. Added 5 new resolver tests + 1 new submit test (74 → 80 in the overall suite) to lock in propagation behavior.
 
+## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
+- Violation: `@adapter implements {@link Port}` JSDoc tag applied to a factory function (createSkillsProvider) rather than the implementing class
+- Rule: Documentation accuracy — `@adapter` marks the class implementing a port; factories create adapters but are not themselves adapters
+- Context: Round 2 S1 — createSkillsProvider() JSDoc had `@adapter implements {@link SkillsProvider}` copied from FileSkillsLoader's JSDoc; removed the tag from the factory while keeping it on the class. When introducing a `create<Port>Provider()` factory next to an `@adapter` class, only annotate the class with `@adapter`.
+
 ## [PR #96 | worktree-refactor+ports-jobs-slice | 2026-05-22]
 - Violation: Multiple JSDoc tags packed on a single line (`@port @internal`) — standard JSDoc/TypeDoc parsers consume `@internal` as `@port`'s description text instead of treating it as an independent tag
 - Rule: JSDoc tag declaration — each block tag must be on its own line so parsers (TypeDoc included) recognize them as independent tags
 - Context: Round 3 suggestion on src/domain/ports/jobStateStore.ts JobStateStore interface — split `@port @internal` into two separate lines so TypeDoc honors the `@internal` exclusion when generating docs
-

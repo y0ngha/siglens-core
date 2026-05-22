@@ -32,7 +32,7 @@ domain/ports/
   newsProvider.ts      → NewsProvider, NewsTimeRange ✅ migrated
   optionsDataProvider.ts → OptionsDataProvider     ✅ migrated
   marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ⏳ planned
-  skillsProvider.ts    → SkillsProvider                         ⏳ planned
+  skillsProvider.ts    → SkillsProvider                         ✅ migrated
   ...
 ```
 

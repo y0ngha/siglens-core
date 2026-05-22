@@ -8,7 +8,8 @@ import type {
     SkillDisplay,
     SkillType,
 } from '@/domain/types';
-import type { LoadSkillsCachedResult, SkillsProvider } from './types';
+import type { SkillsProvider } from '@/domain/ports/skillsProvider';
+import type { LoadSkillsCachedResult } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
 
@@ -198,10 +199,11 @@ let _cachedSkillsDegraded: boolean = false;
 /**
  * Load all skills from disk, memoizing the result for the module lifetime.
  *
- * The first call invokes {@link FileSkillsLoader#loadSkills} and stores the
- * result. Subsequent calls return the cached array without hitting the
- * filesystem again. On failure the cache is set to `[]` so the second call
- * does not retry the filesystem unnecessarily.
+ * The first call invokes {@link createSkillsProvider} and calls
+ * `loadSkills()` on the returned provider, then stores the result.
+ * Subsequent calls return the cached array without hitting the filesystem
+ * again. On failure the cache is set to `[]` so the second call does not
+ * retry the filesystem unnecessarily.
  *
  * Use {@link clearSkillsCache} in test setup/teardown to reset memoization.
  *
@@ -214,7 +216,7 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
         return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
     }
     try {
-        _cachedSkills = await new FileSkillsLoader().loadSkills();
+        _cachedSkills = await createSkillsProvider().loadSkills();
         _cachedSkillsDegraded = false;
     } catch (error) {
         console.error('[loadSkillsCached] Skills load failed:', error);
@@ -228,7 +230,7 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
  * Reset the module-level skills cache.
  *
  * @internal Test-only. Call in `beforeEach`/`afterEach` to prevent cross-test
- * cache pollution when mocking {@link FileSkillsLoader}.
+ * cache pollution when mocking {@link createSkillsProvider}.
  */
 export function clearSkillsCache(): void {
     _cachedSkills = null;
@@ -268,6 +270,8 @@ export async function countSkillFiles(): Promise<SkillCounts> {
 }
 
 /**
+ * @adapter implements {@link SkillsProvider}
+ *
  * Filesystem-backed implementation of {@link SkillsProvider}.
  *
  * Recursively walks the `skills/` directory under the current working
@@ -308,4 +312,30 @@ export class FileSkillsLoader implements SkillsProvider {
 
         return skills.filter((s): s is Skill => s !== null);
     }
+}
+
+/**
+ * Construct a {@link SkillsProvider} backed by the filesystem. Thin
+ * wrapper around {@link FileSkillsLoader} that aligns the skills module
+ * with the `create<Port>Provider()` convention used by other adapters
+ * (e.g. `createCacheProvider`).
+ *
+ * Unlike `createCacheProvider`, this factory always succeeds — there is
+ * no env configuration to read, and a missing `skills/` directory or
+ * malformed file is surfaced at `loadSkills()` call time rather than at
+ * construction.
+ *
+ * @returns A configured skills provider.
+ *
+ * @example
+ * ```ts
+ * const skillsProvider = createSkillsProvider();
+ * const skills = await skillsProvider.loadSkills();
+ * ```
+ *
+ * @see SkillsProvider
+ * @see FileSkillsLoader
+ */
+export function createSkillsProvider(): SkillsProvider {
+    return new FileSkillsLoader();
 }
