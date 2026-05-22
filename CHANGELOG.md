@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.2](https://github.com/y0ngha/siglens-core/compare/v0.11.1...v0.11.2) (2026-05-22)
+
+
+### Features
+
+* 0D expiration slot and cache-hit recovery for options analysis ([47ec177](https://github.com/y0ngha/siglens-core/commit/47ec17726c29ab268826edc6fdabd20e1119f317))
+
+
+### BREAKING CHANGES
+
+* ExpirationSlotKey now includes '0D' as head element. EXPIRATION_SLOTS array length increased from 6 to 7. Consumers iterating EXPIRATION_SLOTS must expect one additional slot.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
 ## [0.11.1](https://github.com/y0ngha/siglens-core/compare/v0.11.0...v0.11.1) (2026-05-21)
 
 
