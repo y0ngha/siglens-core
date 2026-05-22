@@ -127,6 +127,7 @@ const key = process.env.API_KEY; // 금지
     │   ├── chat
     │   ├── constants
     │   ├── indicators
+    │   ├── ports
     │   ├── signals
     │   └── utils
     ├── infrastructure

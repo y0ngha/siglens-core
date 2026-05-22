@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #95 Round 2 | refactor/architecture/news-ports-migration | 2026-05-22]
+- S1: `docs/ARCHITECTURE.md` 폴더 구조 트리에서 `domain/ports/` 디렉토리가 누락된 상태. `cache.ts`가 이미 존재할 때부터 stale했고, 이번 PR에서 `newsProvider.ts`가 추가되며 격차가 더 벌어짐. `indicators` 다음 alphabetical 위치에 `ports` 항목 추가.
+  - Rule: MISTAKES.md Documentation Sync — 새 디렉토리/심볼 추가 시 ARCHITECTURE.md 폴더 트리 동기화.
+  - Context: review-agent Suggestion (non-required). 현재 PR이 `domain/ports/`에 새 파일을 추가하므로 같은 PR에서 트리 동기화하는 것이 자연스러움.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).
