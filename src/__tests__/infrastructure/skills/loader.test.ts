@@ -395,10 +395,4 @@ describe('createSkillsProvider', () => {
 
         expect(first).not.toBe(second);
     });
-
-    it('반환된 provider는 loadSkills 메서드를 노출한다', () => {
-        const provider = createSkillsProvider();
-
-        expect(typeof provider.loadSkills).toBe('function');
-    });
 });

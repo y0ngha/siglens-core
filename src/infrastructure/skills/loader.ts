@@ -199,10 +199,11 @@ let _cachedSkillsDegraded: boolean = false;
 /**
  * Load all skills from disk, memoizing the result for the module lifetime.
  *
- * The first call invokes {@link FileSkillsLoader#loadSkills} and stores the
- * result. Subsequent calls return the cached array without hitting the
- * filesystem again. On failure the cache is set to `[]` so the second call
- * does not retry the filesystem unnecessarily.
+ * The first call invokes {@link createSkillsProvider} and calls
+ * `loadSkills()` on the returned provider, then stores the result.
+ * Subsequent calls return the cached array without hitting the filesystem
+ * again. On failure the cache is set to `[]` so the second call does not
+ * retry the filesystem unnecessarily.
  *
  * Use {@link clearSkillsCache} in test setup/teardown to reset memoization.
  *
@@ -215,7 +216,7 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
         return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
     }
     try {
-        _cachedSkills = await new FileSkillsLoader().loadSkills();
+        _cachedSkills = await createSkillsProvider().loadSkills();
         _cachedSkillsDegraded = false;
     } catch (error) {
         console.error('[loadSkillsCached] Skills load failed:', error);
@@ -314,8 +315,6 @@ export class FileSkillsLoader implements SkillsProvider {
 }
 
 /**
- * @adapter implements {@link SkillsProvider}
- *
  * Construct a {@link SkillsProvider} backed by the filesystem. Thin
  * wrapper around {@link FileSkillsLoader} that aligns the skills module
  * with the `create<Port>Provider()` convention used by other adapters
