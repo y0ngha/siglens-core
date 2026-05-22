@@ -17,7 +17,10 @@ export interface JobStateSetOpts {
  * responsibility of the job-queue helpers, not the adapter.
  */
 export interface JobStateStore {
+    /** Read a previously stored value, or `null` when absent. */
     get<T>(key: string): Promise<T | null>;
+    /** Store `value` under `key` with the given TTL (see {@link JobStateSetOpts}). */
     set<T>(key: string, value: T, opts: JobStateSetOpts): Promise<void>;
+    /** Delete all specified keys in a single round-trip; returns the number of keys removed. */
     deleteMany(...keys: string[]): Promise<number>;
 }

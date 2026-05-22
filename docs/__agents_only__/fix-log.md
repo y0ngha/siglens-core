@@ -1,5 +1,9 @@
 # Fix Log
 
+## [PR #96 Round 2 follow-up | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- S1: `src/domain/ports/jobStateStore.ts` — `JobStateStore` 인터페이스 메서드(get/set/deleteMany)에 per-method JSDoc 한 줄 설명 누락. 기존 공개 포트(`CacheProvider`)는 각 메서드에 한 줄 설명을 갖추고 있어 IDE hover 시 의도 파악이 즉시 가능. `@internal` 포트라도 어댑터 개발자 / 내부 리뷰어의 가독성을 위해 동일 패턴을 적용. 특히 `deleteMany`는 단일 키 `delete`와 달리 다중 키 + 삭제 개수 반환이라는 차이를 명시.
+  - Rule: Domain ports authoring 패턴 일관성 — 기존 포트(`CacheProvider`)와 동일하게 각 메서드 한 줄 JSDoc 추가.
+
 ## [PR #96 Round 2 | worktree-refactor+ports-jobs-slice | 2026-05-22]
 - B1: `src/domain/ports/jobRedisClient.ts` (renamed → `jobStateStore.ts`) — 도메인 포트 이름 `JobRedisClient`가 인프라 기술명("Redis")을 노출하고 `domain/CLAUDE.md` Ports authoring rules가 권장하는 접미사(`Provider`/`Repository`/`Dispatcher`/`Store`)를 따르지 않음. 또한 `RedisSetOpts.ex` 필드와 `del(...)` 메서드 이름은 Redis CLI 약어를 그대로 도메인에 노출. 포트를 `JobStateStore`(메서드 `deleteMany`, 옵션 필드 `ttlSeconds`)로 전면 개명하고 어댑터(`infrastructure/jobs/redis.ts`)에서 Upstash 시그니처(`{ ex }`, `del(...)`)로 번역하도록 변경. 어댑터 팩토리도 `createJobRedis` → `createJobStateStore`로 변경.
   - Rule: `src/domain/CLAUDE.md` Ports > Authoring rules — 도메인 포트 이름은 구현 기술에 무관해야 하며 허용된 접미사(`Provider`/`Repository`/`Dispatcher`/`Store`)를 사용해야 한다.

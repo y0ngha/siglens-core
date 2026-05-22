@@ -6,6 +6,7 @@ import type {
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 /**
+ * @internal
  * @adapter implements {@link JobStateStore}
  *
  * CacheProvider.delete가 지원하지 않는 다중 키 일괄 삭제(deleteMany)를 위한
