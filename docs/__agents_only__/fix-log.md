@@ -1,5 +1,15 @@
 # Fix Log
 
+## [PR #88 Round 3 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
+- B1: `src/domain/options/expirationSlots.ts:10` — `ZERO_DTE_MAX_DAYS`는 `export`되지만 `src/index.ts`에 재-export되지 않는 module-internal symbol. `/** @internal ... */` JSDoc 태그 추가하고 역할 설명 한 줄 포함.
+  - Rule: MISTAKES.md §9.5 — 재-export되지 않는 exported 심볼은 `@internal` 태그 필수. §9.6 — bare `@internal`보다 역할 설명 권장.
+- B2: 같은 파일 — `EXPIRATION_SLOTS` JSDoc에 추가했던 한국어 3줄(0D 슬롯 의미)을 영어로 재작성. R2에서 한국어로 잘못 추가됐던 부분. 공개 export는 영어 JSDoc 규칙(R2 PR #87의 같은 케이스 반복).
+  - Rule: CONVENTIONS.md JSDoc Rules — Public-facing JSDoc is written in English.
+- S3: 같은 파일 :60-61 — `e.days >= slot.targetDays` 범위 조건이 right-to-left. FF.md §1-F에 따라 left-to-right(`slot.targetDays <= e.days`)로 정정. 아래 `e.days <= slot.maxDays`와 시각적 일관성도 확보.
+  - Rule: FF.md §1-F — 범위 조건은 수학 표기법처럼 left-to-right로 작성.
+- S4: `src/__tests__/domain/options/expirationSlots.test.ts:74-75` — 테스트 제목 "forcing 7-day expirations into 1W"가 실제 데이터(8일짜리)와 불일치. 제목을 "forcing expirations beyond ${ZERO_DTE_MAX_DAYS} days into 1W"로 변경.
+  - Rule: MISTAKES.md Tests §9 — 테스트 제목과 실제 검증이 일치해야 한다.
+
 ## [PR #88 Round 2 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - B1: `src/domain/options/expirationSlots.ts` — 0D 슬롯의 `maxDays: 6`이 매직 넘버. `ZERO_DTE_MAX_DAYS = 6` 모듈 상수로 추출하고 JSDoc으로 의도(1주 직전 경계) 명시. 슬롯 정의는 이 상수를 참조하도록 변경.
   - Rule: MISTAKES.md 코딩 패러다임 #13 — 매직 넘버는 named module-level 상수로 추출.
@@ -18,18 +28,7 @@
 - S1: `src/__tests__/domain/analysis/normalizeOptions.test.ts` — `analyzedAt` 무시 검증 테스트 안에서 `for-of` 루프로 4개 케이스를 돌리고 있어, 실패 시 어느 입력이 문제였는지 리포트에서 식별 불가. Vitest `it.each([...])`로 전환해 각 케이스가 독립 항목으로 표시되도록 분리. 라벨도 한국어로 명시("analyzedAt 없는 빈 객체" / "유효하지 않은 날짜 문자열" / "LLM 프롬프트 예시 echo 문자열" / "미래 날짜").
   - Rule: 가독성 — 데이터 주도 테스트는 각 입력이 독립적인 it() 항목으로 보고되어야 한다.
 
-## [PR #87 Round 3 | fix/options-analyzed-at-hardcoded | 2026-05-22]
-- B1: `src/domain/options/types.ts:133` — `OptionsAnalysisResponse.analyzedAt` 필드 JSDoc이 여전히 "ISO datetime when the model produced this analysis"로 표기되어 있어 새 동작(서버 now로 항상 덮어쓰기, LLM 값 폐기)과 어긋남. 동작에 맞춰 "ISO datetime of the most recent normalization, taken from the server's reference clock. Any LLM-supplied timestamp is intentionally discarded — see `normalizeOptionsAnalysisResponse` for the rationale."로 재작성.
-  - Rule: MISTAKES.md Documentation Sync #3 — 구현 변경 시 관련 JSDoc 즉시 동기화.
-- B2: `src/application/options/pollOptionsAnalysis.ts:47-48` — `@param now` JSDoc이 "fallback"이라는 기존 동작 용어를 그대로 유지. 새 동작에서는 fallback이 아니라 항상 사용되므로 "used directly as the normalized result's `analyzedAt` (not as a fallback for an LLM-supplied value — the LLM value is always discarded)"로 정정.
-  - Rule: MISTAKES.md Documentation Sync #3.
-- B3: `src/application/options/types.ts:57-59` — `SubmitOptionsAnalysisOptions.now` JSDoc도 동일하게 "cache-hit normalizer's `analyzedAt` fallback" 표현을 사용. "normalizer's `analyzedAt` (always used directly — the LLM-supplied value is discarded)"로 정정.
-  - Rule: MISTAKES.md Documentation Sync #3.
 
-## [PR #87 Round 2 | fix/options-analyzed-at-hardcoded | 2026-05-22]
-- B1: `src/domain/analysis/normalizeOptions.ts` — `normalizeOptionsAnalysisResponse`는 `src/index.ts:811` / `src/index.client.ts:101`로 export되는 공개 API인데 JSDoc 본문 7줄과 `@param now`가 한국어로 작성됨. 동일 의미를 보존하면서 영어로 재작성(LLM이 프롬프트 예시 문자열을 그대로 echo하는 사례, 1-day cache TTL이 캐시-히트 시각 drift를 24시간 이내로 제한한다는 점 포함).
-  - Rule: CONVENTIONS.md JSDoc Rules — Public-facing JSDoc is written in English (npm 공개 패키지가 비한국어 사용자에게도 노출되기 때문).
-- Context: 한국어 코멘트는 fallback 문자열 / 프롬프트 본문 같은 사용자 노출 런타임 데이터에만 허용되며, 공개 API의 JSDoc은 영어로 유지해야 한다. 캐시 히트 시 시각 의미가 "최근 본 시각"이라는 설계 의도와 TTL 제약을 영어로 동등하게 옮겼다.
 
 ## [PR #86 Round 20 audit | options/analysis | 2026-05-21]
 - Violation: `infrastructure/options/types.ts` imported `OptionsSnapshot` from `@/domain/options/types` instead of canonical `@/domain/types`

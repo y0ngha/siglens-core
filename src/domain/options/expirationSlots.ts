@@ -2,10 +2,10 @@ import { MS_PER_DAY } from '@/domain/constants/time';
 import type { ExpirationSlot, SlotMapping } from './types';
 
 /**
- * Inclusive upper bound on days-to-expiration for the `0D` (same-week)
- * slot. 6일 = 1주(7일) 직전까지로, 미국 위클리 옵션이 매주 금요일에
- * 만기되므로 ET 어느 요일에 호출해도 "이번 주 금요일 만기" 1건이 이
- * 범위에 들어온다. 7일 이상은 1W 슬롯이 가져가도록 경계를 둔다.
+ * @internal Inclusive upper-bound on days-to-expiration for the `0D` slot;
+ * expirations beyond this boundary fall through to the `1W` slot. Set to
+ * 6 (= 1 week minus 1 day) so a single weekly Friday expiration lands in
+ * `0D` regardless of which ET weekday the lookup is performed on.
  */
 export const ZERO_DTE_MAX_DAYS = 6;
 
@@ -13,9 +13,10 @@ export const ZERO_DTE_MAX_DAYS = 6;
  * Canonical chip slots in render order. Frontends pick the closest matching
  * provider expiration per slot.
  *
- * `0D` slot은 "이번 주 만기"를 의미한다. label이 '오늘'이 아닌 '이번 주'인
- * 이유: ET 월요일에 호출하면 days=4 위클리가 이 슬롯에 매핑되는데 '오늘'로
- * 표기하면 어색하다.
+ * The `0D` slot represents same-week expirations (≤ `ZERO_DTE_MAX_DAYS`
+ * days out). The label is "이번 주" ("this week") rather than "today"
+ * because a Monday call may match a Friday weekly that is 4 days away —
+ * labelling it "today" would be misleading.
  */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
     { key: '0D', label: '이번 주', targetDays: 0, maxDays: ZERO_DTE_MAX_DAYS },
@@ -29,8 +30,10 @@ export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
 
 /**
  * Map provider expirations to slots. For each slot, pick the closest
- * expiration whose daysToExpiration is ≥ targetDays. An expiration
- * mapped to one slot is not reused for later slots.
+ * expiration whose `daysToExpiration` falls within `[targetDays, maxDays]`
+ * (or simply `>= targetDays` when `maxDays` is absent — standard slots
+ * from `1W` onward omit the upper bound). An expiration mapped to one
+ * slot is not reused for later slots.
  *
  * @param expirations - Expiration dates (ISO 'YYYY-MM-DD'), unsorted OK.
  * @param now - Reference date (typically ET-midnight today).
@@ -57,7 +60,7 @@ export function mapExpirationsToSlots(
     for (const slot of EXPIRATION_SLOTS) {
         const match = dated.find(
             e =>
-                e.days >= slot.targetDays &&
+                slot.targetDays <= e.days &&
                 (slot.maxDays === undefined || e.days <= slot.maxDays) &&
                 !used.has(e.date)
         );

@@ -72,7 +72,7 @@ describe('mapExpirationsToSlots', () => {
 
     it(
         `maps the inclusive ${ZERO_DTE_MAX_DAYS}-day boundary to the 0D slot, ` +
-            `forcing 7-day expirations into 1W`,
+            `forcing expirations beyond ${ZERO_DTE_MAX_DAYS} days into 1W`,
         () => {
             // 2026-05-14 기준: 6일 후 = 2026-05-20 (포함적 maxDays 상한 = 0D),
             // 8일 후 = 2026-05-22 (maxDays 초과 = 1W). ZERO_DTE_MAX_DAYS 값을
