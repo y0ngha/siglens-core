@@ -238,9 +238,7 @@ describe('summarizeChainForLlm', () => {
         const quoteStrikes = summary.topOiBidAskSummary.map(q => q.strike);
         expect(quoteStrikes).toEqual(oiStrikes);
 
-        const quote100 = summary.topOiBidAskSummary.find(
-            q => q.strike === 100
-        );
+        const quote100 = summary.topOiBidAskSummary.find(q => q.strike === 100);
         expect(quote100).toBeDefined();
         expect(quote100!.callMidPrice).toBeCloseTo(1.1, 5);
         expect(quote100!.callSpread).toBeCloseTo(0.2, 5);

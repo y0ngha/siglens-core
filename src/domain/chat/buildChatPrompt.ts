@@ -164,9 +164,7 @@ function formatOptionsContext(payload: OptionsAnalysisResponse): string {
     const perExpirationLines = payload.perExpiration.map(
         e => `- ${e.expirationDate} (${e.tone}): ${e.commentary}`
     );
-    const signalLines = payload.signals.map(
-        s => `- [${s.kind}] ${s.message}`
-    );
+    const signalLines = payload.signals.map(s => `- [${s.kind}] ${s.message}`);
     const analyzedAtLine = payload.analyzedAt
         ? [`Analyzed At: ${payload.analyzedAt}`]
         : [];

@@ -58,8 +58,7 @@ export function summarizeChainForLlm(
     const volumeByStrike = aggregateVolume(chain);
     const topVolume = volumeByStrike
         .toSorted(
-            (a, b) =>
-                b.callVolume + b.putVolume - (a.callVolume + a.putVolume)
+            (a, b) => b.callVolume + b.putVolume - (a.callVolume + a.putVolume)
         )
         .slice(0, TOP_VOLUME_STRIKES_COUNT);
 
@@ -106,9 +105,10 @@ function buildTopOiQuote(strike: number, chain: OptionsChain): TopOiQuote {
  * - the resulting spread is negative (crossed/locked quote — treated as
  *   bad data rather than a real market state).
  */
-function computeMidAndSpread(
-    contract: OptionsContract | undefined
-): { mid: number | null; spread: number | null } {
+function computeMidAndSpread(contract: OptionsContract | undefined): {
+    mid: number | null;
+    spread: number | null;
+} {
     if (!contract) return { mid: null, spread: null };
     const { bid, ask } = contract;
     if (bid === null || ask === null) return { mid: null, spread: null };
