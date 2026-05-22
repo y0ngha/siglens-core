@@ -34,8 +34,8 @@ import type {
 } from '@/domain/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
-/** Axis identifier for the three-axis overall analysis pipeline. */
-export type OverallAxis = 'technical' | 'fundamental' | 'news';
+/** Axis identifier for the four-axis overall analysis pipeline. */
+export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';
 
 // ─────────────────────────────────────────
 // Dependency resolver input types
@@ -172,6 +172,43 @@ export interface OverallDependencyInputs {
         SubmitNewsAnalysisOptions,
         'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
     >;
+
+    /**
+     * Pre-fetched options snapshot. Caller fetches via OptionsDataProvider
+     * (or app-side adapter). Omit (or set undefined) to skip the options axis
+     * gracefully — the resolver returns kind: 'options_skipped' and the
+     * prompt builder receives a null options context.
+     */
+    optionsSnapshot?: import('@/domain/types').OptionsSnapshot;
+
+    /**
+     * Per-axis options forwarded verbatim to `submitOptionsAnalysis`.
+     * Mirrors the technical/fundamental/news per-axis option fields.
+     * `expirationDate` is computed by the resolver via pickNearestExpiration —
+     * do not set it here.
+     */
+    options?: Pick<
+        import('@/application/options/types').SubmitOptionsAnalysisOptions,
+        'usage' | 'tier' | 'tierConfig' | 'modelId' | 'userApiKey' | 'waitUntil'
+    >;
+
+    /**
+     * OI snapshot staleness marker. Forwarded to the prompt as a hint and
+     * echoed back on `OverallAnalysisResponse.optionsOiStale` so the UI can
+     * show a stale badge. Computed by the caller (app side) using
+     * isOpenInterestSnapshotStale + isUsOptionsRegularSession.
+     */
+    optionsOiStale?: boolean;
+
+    /**
+     * Top-level force flag. When true, the resolver forwards `force: true` to
+     * every axis submit call (computed as `topLevel.force ?? axis.force ?? false`).
+     * Used by the re-analyze button in the app, which performs a 4-axis full
+     * refresh. Per-axis `force` (e.g. `technical.force`) remains supported
+     * for backward compatibility; the OR-style precedence means either layer
+     * setting `true` triggers a force refresh on that axis.
+     */
+    force?: boolean;
 }
 
 // ─────────────────────────────────────────

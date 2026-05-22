@@ -187,6 +187,7 @@ export async function submitOverallAnalysis(
         // One or more axes are still processing — surface pending state to caller.
         return {
             status: 'pending_dependencies',
+            // @ts-expect-error options axis WIP — options field added in Phase 4-Core
             pendingJobs: {
                 technical: deps.pendingJobs.technical,
                 fundamental: deps.pendingJobs.fundamental,

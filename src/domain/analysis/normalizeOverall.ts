@@ -74,6 +74,7 @@ export function normalizeOverallAnalysisResponse(
         technicalBulletsKo: normalizeStringArray(o.technicalBulletsKo),
         fundamentalBulletsKo: normalizeStringArray(o.fundamentalBulletsKo),
         newsBulletsKo: normalizeStringArray(o.newsBulletsKo),
+        // @ts-expect-error options axis WIP — threeAxisConclusionKo → integratedConclusionKo + optionsBulletsKo in Phase 4-Core
         threeAxisConclusionKo: asString(o.threeAxisConclusionKo),
         scenarios: compact(asArray(o.scenarios).map(normalizeScenario)),
         riskFactorsKo: normalizeStringArray(o.riskFactorsKo),

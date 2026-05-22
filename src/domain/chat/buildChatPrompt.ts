@@ -144,6 +144,7 @@ function formatNewsContext(payload: NewsAnalysisResponse): string {
 function formatOverallContext(payload: OverallAnalysisResponse): string {
     return [
         `Headline: ${payload.headlineKo}`,
+        // @ts-expect-error options axis WIP — threeAxisConclusionKo → integratedConclusionKo in Phase 4-Core
         `Three-axis Conclusion: ${payload.threeAxisConclusionKo}`,
     ].join('\n');
 }

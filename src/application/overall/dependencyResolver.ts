@@ -266,6 +266,7 @@ export async function resolveOverallDependencies(
     // ── At least one axis is pending → return pending state ──
     return {
         kind: 'pending',
+        // @ts-expect-error options axis WIP — options field added in Phase 4-Core
         pendingJobs: {
             technical: technicalJobId,
             fundamental: fundamentalJobId,
