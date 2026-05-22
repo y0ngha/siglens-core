@@ -1,6 +1,6 @@
 import { getTierLimit, TIER_CONFIG } from '@/domain/tier';
 import type { TierLimitedFeature } from '@/domain/types';
-import type { UsageCounts } from '@/infrastructure/db';
+import type { UsageCounts } from '@/domain/ports/usageRepository';
 import type {
     AnalysisLimitError,
     ChatbotLimitError,

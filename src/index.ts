@@ -466,16 +466,20 @@ export type {
 export type { CacheProvider } from './domain/ports/cache';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
+    UserTier,
+    UserTierRepository,
+} from './domain/ports/userTierRepository';
+export type {
     CreateUsageLogInput,
+    UsageLogRecord,
+    UsageLogRepository,
+} from './domain/ports/usageLogRepository';
+export type {
     RecordUsageInput,
     UsageActionType,
     UsageCounts,
-    UsageLogRecord,
-    UsageLogRepository,
     UsageRepository,
-    UserTier,
-    UserTierRepository,
-} from './infrastructure/db';
+} from './domain/ports/usageRepository';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './infrastructure/fundamental/types';
 export type { JobMeta, JobStatus } from './infrastructure/jobs/types';

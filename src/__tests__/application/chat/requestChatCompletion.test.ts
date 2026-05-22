@@ -13,7 +13,8 @@ import type {
     TierConfig,
 } from '@/domain/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
+import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 import { constants } from 'node:http2';
 import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

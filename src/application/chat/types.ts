@@ -10,7 +10,8 @@ import type {
 } from '@/domain/types';
 import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
-import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
+import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 
 /** Error code produced by chat infrastructure or application policy. */
 export type ChatErrorCode =

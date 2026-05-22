@@ -26,6 +26,9 @@ under "Currently migrated" actually exist today):**
 ```
 domain/ports/
   cache.ts             → CacheProvider           ✅ migrated
+  userTierRepository.ts → UserTierRepository      ✅ migrated
+  usageLogRepository.ts → UsageLogRepository, CreateUsageLogInput, UsageLogRecord ✅ migrated
+  usageRepository.ts   → UsageRepository, RecordUsageInput, UsageCounts, UsageActionType ✅ migrated
   marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ⏳ planned
   skillsProvider.ts    → SkillsProvider                         ⏳ planned
   ...
