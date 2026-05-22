@@ -1562,6 +1562,24 @@ describe('prompt', () => {
             const requestIndex = result.indexOf('Analysis Request');
             expect(guidelineIndex).toBeLessThan(requestIndex);
         });
+
+        it('instructs the LLM to use "분석 시점 가격" instead of "현재 가격" in Korean output', () => {
+            const bars = [
+                makeBar(0, TEST_PREV_CLOSE),
+                makeBar(1, TEST_NEXT_CLOSE),
+            ];
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            expect(prompt).toContain('### Price Reference Naming');
+            expect(prompt).toContain('분석 시점 가격');
+            expect(prompt).toContain('NEVER call it "현재 가격"');
+        });
     });
 
     describe('분석 요청 섹션', () => {
