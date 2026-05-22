@@ -40,4 +40,12 @@ export interface JobMeta {
      * news, and overall analysis jobs whose cache keys include an input hash.
      */
     cacheKey?: string;
+    /**
+     * Options OI snapshot staleness marker (overall analysis jobs only).
+     * Stored at submit time so `pollOverallAnalysis` can echo it back via
+     * `OverallAnalysisResponse.optionsOiStale` when normalizing the worker
+     * response. The caller (app side) decides the value using
+     * `isOpenInterestSnapshotStale + isUsOptionsRegularSession`.
+     */
+    optionsOiStale?: boolean;
 }

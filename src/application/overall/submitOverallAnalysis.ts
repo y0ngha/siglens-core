@@ -187,11 +187,11 @@ export async function submitOverallAnalysis(
         // One or more axes are still processing — surface pending state to caller.
         return {
             status: 'pending_dependencies',
-            // @ts-expect-error options axis WIP — options field added in Phase 4-Core
             pendingJobs: {
                 technical: deps.pendingJobs.technical,
                 fundamental: deps.pendingJobs.fundamental,
                 news: deps.pendingJobs.news,
+                options: deps.pendingJobs.options,
             },
         };
     }
@@ -203,19 +203,24 @@ export async function submitOverallAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    // ── 2. All three cached — hash combined inputs and check overall cache ──
+    // ── 2. All four cached — hash combined inputs and check overall cache ──
     // Strip volatile fields from each axis result before hashing so that
     // re-polling a stable analysis produces the same overall cache key.
     // - `analyzedAt` is set per poll on the technical axis (see pollAnalysis)
     //   and would otherwise invalidate the overall cache on every poll.
     // - `skillsDegraded` is a transient flag attached to the cached technical
     //   result; it reflects loader health at write time, not analysis content.
+    // - The options axis is `null` when gracefully skipped (no snapshot or
+    //   no_chains_error) — its `null`-vs-payload distinction must be in the
+    //   hash so the overall cache splits between "no options" and "options
+    //   present" variants of the same symbol.
     const stableTechnical = stripVolatileTechnicalFields(deps.technical);
     const inputHash = hashAnalysisInput(
         JSON.stringify({
             t: stableTechnical,
             f: deps.fundamental,
             n: deps.news,
+            o: deps.options,
         })
     );
     const cacheKey = buildOverallCacheKey(
@@ -270,6 +275,7 @@ export async function submitOverallAnalysis(
             return null;
         });
 
+    const optionsOiStale = options.optionsOiStale ?? false;
     const prompt = buildOverallAnalysisPrompt(
         symbol,
         companyName,
@@ -277,7 +283,9 @@ export async function submitOverallAnalysis(
         deps.fundamental,
         deps.news,
         timeframe,
-        fearGreed ?? undefined
+        fearGreed ?? undefined,
+        deps.options,
+        optionsOiStale
     );
     const jobId = crypto.randomUUID();
 
@@ -286,6 +294,9 @@ export async function submitOverallAnalysis(
         timeframe,
         modelId,
         cacheKey,
+        // Echo back to pollOverallAnalysis so the normalizer can attach
+        // `optionsOiStale: true` to the worker response.
+        optionsOiStale,
     });
 
     const userApiKeyHeader: Record<string, string> =

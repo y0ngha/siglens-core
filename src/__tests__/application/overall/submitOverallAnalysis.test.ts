@@ -725,7 +725,10 @@ describe('submitOverallAnalysis 함수는', () => {
             // switches to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
-            expect(args.length).toBe(7);
+            // Phase 4-Core extended the signature to 9 positional args:
+            // (..., fearGreed, options, optionsOiStale). The first 7 retain
+            // their meaning; args 8/9 are the new options axis hooks.
+            expect(args.length).toBe(9);
         });
 
         it('일봉 fetch가 throw해도 overall 분석은 fearGreed=undefined로 계속 진행된다', async () => {
@@ -1020,6 +1023,143 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(mockCacheGet).not.toHaveBeenCalled();
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('options axis integration', () => {
+        const cachedOptionsResponse = {
+            summary: '옵션 시장 요약',
+            tone: 'neutral' as const,
+            perExpiration: [],
+            signals: [],
+            analyzedAt: '2099-01-01T00:00:00Z',
+        };
+
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+            mockResolveOverallDependencies.mockReset();
+        });
+
+        it('includes options payload in input hash so cached overall keys differ when options changes', async () => {
+            // First call: options = null
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            // Second call: same axes but options is now non-null
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).not.toBe(secondCacheKey);
+        });
+
+        it('passes options payload to buildOverallAnalysisPrompt (8th arg)', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            // 8th positional arg = options payload.
+            expect(args[7]).toEqual(cachedOptionsResponse);
+        });
+
+        it('passes optionsOiStale to buildOverallAnalysisPrompt (9th arg) and setJobMeta', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(
+                makeOptions({ optionsOiStale: true })
+            );
+
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            expect(args[8]).toBe(true);
+
+            // setJobMeta receives optionsOiStale so pollOverallAnalysis can
+            // echo it back when normalizing.
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ optionsOiStale: true })
+            );
+        });
+
+        it('defaults optionsOiStale to false when omitted', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+                options: cachedOptionsResponse,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            expect(args[8]).toBe(false);
+        });
+
+        it('surfaces options axis error like other axis errors', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'error',
+                axis: 'options',
+                error: {
+                    status: 'limit_error',
+                    code: 'usage_limit_exceeded',
+                    error: { code: 'usage_limit_exceeded', message: 'limit' },
+                },
+            });
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error' && 'axis' in result) {
+                expect(result.axis).toBe('options');
+            }
+        });
+
+        it('forwards pending options jobId in pendingJobs', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'pending',
+                pendingJobs: {
+                    technical: undefined,
+                    fundamental: undefined,
+                    news: undefined,
+                    options: 'opt-job-abc',
+                },
+            });
+
+            const result = await submitOverallAnalysis(makeOptions());
+
+            expect(result.status).toBe('pending_dependencies');
+            if (result.status === 'pending_dependencies') {
+                expect(result.pendingJobs.options).toBe('opt-job-abc');
+            }
         });
     });
 });
