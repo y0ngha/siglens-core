@@ -230,7 +230,7 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
  * Reset the module-level skills cache.
  *
  * @internal Test-only. Call in `beforeEach`/`afterEach` to prevent cross-test
- * cache pollution when mocking {@link FileSkillsLoader}.
+ * cache pollution when mocking {@link createSkillsProvider}.
  */
 export function clearSkillsCache(): void {
     _cachedSkills = null;
