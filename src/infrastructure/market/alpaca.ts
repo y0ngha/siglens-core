@@ -39,8 +39,9 @@ function toAlpacaBar(raw: AlpacaBar): Bar {
  *
  * Alpaca Markets adapter for {@link MarketDataProvider}. Fetches OHLCV bars
  * from the Alpaca v2 IEX feed. Does not support quote retrieval —
- * {@link AlpacaProvider.getQuote} returns `null` so that callers can fall
- * back to a provider that does.
+ * {@link AlpacaProvider.getQuote} returns `null` to signal unavailability;
+ * callers (application layer) are responsible for falling back to a
+ * provider that does.
  */
 export class AlpacaProvider implements MarketDataProvider {
     private readonly apiKey: string;

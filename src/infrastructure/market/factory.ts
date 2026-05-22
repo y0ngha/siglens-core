@@ -24,8 +24,9 @@ const MARKET_PROVIDER_MAP: Record<
  * @returns The configured market data provider implementation.
  *
  * @throws {Error} If the selected adapter's required credentials are
- *   missing (delegated from the adapter constructor — e.g. Alpaca requires
- *   `ALPACA_API_KEY`; FMP requires `FMP_API_KEY`).
+ *   missing (delegated from the adapter constructor — Alpaca requires
+ *   `ALPACA_API_KEY` and `ALPACA_API_SECRET` (or `ALPACA_SECRET_KEY`);
+ *   FMP requires `FMP_API_KEY`).
  *
  * @see fetchBarsWithIndicators
  * @see getMarketSummary
