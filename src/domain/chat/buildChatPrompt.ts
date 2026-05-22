@@ -9,6 +9,7 @@ import type {
     FundamentalAnalysisResponse,
     KeyLevel,
     NewsAnalysisResponse,
+    OptionsAnalysisResponse,
     OverallAnalysisResponse,
     PriceScenario,
     Timeframe,
@@ -148,6 +149,38 @@ function formatOverallContext(payload: OverallAnalysisResponse): string {
 }
 
 /**
+ * Format an options analysis context section for the system prompt.
+ *
+ * Surfaces the symbol-level summary, per-expiration commentary (one line
+ * per expiration tagged with its tone), and the structured signal list. The
+ * `analyzedAt` timestamp is appended last when present so the assistant can
+ * cite freshness without it dominating the context.
+ *
+ * @param payload - The {@link OptionsAnalysisResponse} to format.
+ * @returns A markdown section string matching the tone of the other context
+ *   formatters (plain `Key: Value` lines, no `===` banners).
+ */
+function formatOptionsContext(payload: OptionsAnalysisResponse): string {
+    const perExpirationLines = payload.perExpiration.map(
+        e => `- ${e.expirationDate} (${e.tone}): ${e.commentary}`
+    );
+    const signalLines = payload.signals.map(
+        s => `- [${s.kind}] ${s.message}`
+    );
+    const analyzedAtLine = payload.analyzedAt
+        ? [`Analyzed At: ${payload.analyzedAt}`]
+        : [];
+    return [
+        `Summary: ${payload.summary}`,
+        ...(perExpirationLines.length > 0
+            ? ['Per-expiration:', ...perExpirationLines]
+            : []),
+        ...(signalLines.length > 0 ? ['Signals:', ...signalLines] : []),
+        ...analyzedAtLine,
+    ].join('\n');
+}
+
+/**
  * Build the `## Current analysis context` section for the system prompt
  * from a {@link CurrentAnalysisContext} tagged union.
  *
@@ -176,6 +209,9 @@ function formatCurrentAnalysisContext(
         case 'overall':
             body = formatOverallContext(context.payload);
             break;
+        case 'options':
+            body = formatOptionsContext(context.payload);
+            break;
     }
 
     return `\n\n## Current analysis context\nKind: ${context.kind}\n${body}`;
@@ -202,8 +238,8 @@ function formatCurrentAnalysisContext(
  * @param userMessage - The user's latest input.
  * @param currentAnalysisContext - Optional tagged union of the analysis result
  *   currently displayed on the user's page (technical / fundamental / news /
- *   overall). When provided, a `## Current analysis context` section is
- *   appended to the system prompt so the LLM can reference live numbers
+ *   overall / options). When provided, a `## Current analysis context` section
+ *   is appended to the system prompt so the LLM can reference live numbers
  *   without re-fetching data. Omit to keep the original behavior.
  * @returns The prompt payload — see {@link ChatPromptPayload}.
  */

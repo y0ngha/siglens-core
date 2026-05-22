@@ -5,6 +5,7 @@ import type {
     CurrentAnalysisContext,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
+    OptionsAnalysisResponse,
     OverallAnalysisResponse,
 } from '@/domain/types';
 
@@ -364,6 +365,27 @@ const OVERALL_PAYLOAD: OverallAnalysisResponse = {
     riskFactorsKo: [],
 };
 
+const OPTIONS_PAYLOAD: OptionsAnalysisResponse = {
+    summary: '단기 만기 옵션 시장은 콜 우세이며 변동성 확대 신호가 있습니다.',
+    perExpiration: [
+        {
+            expirationDate: '2026-05-30',
+            tone: 'bullish',
+            commentary: '180 콜 매수세가 두드러집니다.',
+        },
+        {
+            expirationDate: '2026-06-20',
+            tone: 'cautious',
+            commentary: '170 풋 보호 매수 흔적이 있습니다.',
+        },
+    ],
+    signals: [
+        { kind: 'bullish', message: '콜 OI가 풋 대비 1.8배' },
+        { kind: 'volatility', message: 'ATM IV가 한 주 사이 5%p 상승' },
+    ],
+    analyzedAt: '2026-05-22T10:30:00Z',
+};
+
 describe('buildChatPrompt — currentAnalysisContext', () => {
     it('currentAnalysisContext가 없으면 섹션을 포함하지 않는다', () => {
         const result = buildChatPrompt(
@@ -481,5 +503,38 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         expect(result.systemPrompt).toContain(
             '기술·펀더·뉴스 모두 긍정적입니다.'
         );
+    });
+
+    it('options 컨텍스트가 제공되면 옵션 분석 섹션을 포함한다', () => {
+        const context: CurrentAnalysisContext = {
+            kind: 'options',
+            payload: OPTIONS_PAYLOAD,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: options');
+        // Summary
+        expect(result.systemPrompt).toContain(
+            '단기 만기 옵션 시장은 콜 우세이며 변동성 확대 신호가 있습니다.'
+        );
+        // Per-expiration entries
+        expect(result.systemPrompt).toContain('2026-05-30');
+        expect(result.systemPrompt).toContain('180 콜 매수세가 두드러집니다.');
+        expect(result.systemPrompt).toContain('2026-06-20');
+        expect(result.systemPrompt).toContain(
+            '170 풋 보호 매수 흔적이 있습니다.'
+        );
+        // Signals
+        expect(result.systemPrompt).toContain('콜 OI가 풋 대비 1.8배');
+        expect(result.systemPrompt).toContain('ATM IV가 한 주 사이 5%p 상승');
+        // analyzedAt
+        expect(result.systemPrompt).toContain('2026-05-22T10:30:00Z');
     });
 });

@@ -1,4 +1,5 @@
 import { aggregateOpenInterest } from './aggregateOpenInterest';
+import { aggregateVolume } from './aggregateVolume';
 import { calculateImpliedMove } from './calculateImpliedMove';
 import { calculateMaxPain } from './calculateMaxPain';
 import { calculatePutCallRatio } from './calculatePutCallRatio';
@@ -6,6 +7,7 @@ import type {
     OptionsChain,
     OptionsContract,
     OptionsExpirationMetrics,
+    TopOiQuote,
 } from './types';
 
 /**
@@ -16,6 +18,13 @@ import type {
  * {@link OptionsExpirationMetrics.topOpenInterestStrikes}.
  */
 const TOP_OI_STRIKES_COUNT = 3;
+
+/**
+ * Number of top strikes (by combined call+put volume) to surface alongside
+ * the OI top-3. Matches `TOP_OI_STRIKES_COUNT` so the prompt stays balanced
+ * between accumulated-positioning (OI) and same-day-activity (volume).
+ */
+const TOP_VOLUME_STRIKES_COUNT = 3;
 
 /**
  * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
@@ -46,6 +55,18 @@ export function summarizeChainForLlm(
         )
         .slice(0, TOP_OI_STRIKES_COUNT);
 
+    const volumeByStrike = aggregateVolume(chain);
+    const topVolume = volumeByStrike
+        .toSorted(
+            (a, b) =>
+                b.callVolume + b.putVolume - (a.callVolume + a.putVolume)
+        )
+        .slice(0, TOP_VOLUME_STRIKES_COUNT);
+
+    const topOiBidAskSummary = top.map(({ strike }) =>
+        buildTopOiQuote(strike, chain)
+    );
+
     return {
         expirationDate: chain.expirationDate,
         maxPain: calculateMaxPain(chain),
@@ -53,7 +74,47 @@ export function summarizeChainForLlm(
         atmImpliedVolatility: atmIv,
         topOpenInterestStrikes: top,
         impliedMovePercent: calculateImpliedMove(atmIv, chain.daysToExpiration),
+        topVolumeStrikes: topVolume,
+        topOiBidAskSummary,
     };
+}
+
+/**
+ * Build a bid/ask quote snapshot for one strike using the first matching
+ * call and put contract from the chain. Side-defensive: missing contract,
+ * missing bid/ask, or a negative spread all collapse to `null`.
+ */
+function buildTopOiQuote(strike: number, chain: OptionsChain): TopOiQuote {
+    const callContract = chain.calls.find(c => c.strike === strike);
+    const putContract = chain.puts.find(p => p.strike === strike);
+    const callQuote = computeMidAndSpread(callContract);
+    const putQuote = computeMidAndSpread(putContract);
+    return {
+        strike,
+        callMidPrice: callQuote.mid,
+        callSpread: callQuote.spread,
+        putMidPrice: putQuote.mid,
+        putSpread: putQuote.spread,
+    };
+}
+
+/**
+ * Derive mid price and spread from a contract's bid/ask. Returns `null`
+ * for both fields when:
+ * - the contract is missing,
+ * - either bid or ask is `null` (one-sided market),
+ * - the resulting spread is negative (crossed/locked quote — treated as
+ *   bad data rather than a real market state).
+ */
+function computeMidAndSpread(
+    contract: OptionsContract | undefined
+): { mid: number | null; spread: number | null } {
+    if (!contract) return { mid: null, spread: null };
+    const { bid, ask } = contract;
+    if (bid === null || ask === null) return { mid: null, spread: null };
+    const spread = ask - bid;
+    if (spread < 0) return { mid: null, spread: null };
+    return { mid: (bid + ask) / 2, spread };
 }
 
 function pickAtmIv(

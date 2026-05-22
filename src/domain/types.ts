@@ -1915,6 +1915,12 @@ export interface OverallAnalysisResponse {
     riskFactorsKo: string[];
 }
 
+// Local import so `CurrentAnalysisContext` (below) can reference the options
+// payload type by name. The same type is also surfaced through the
+// `export type { OptionsAnalysisResponse, ... } from './options/types'`
+// barrel further down for downstream `@/domain/types` consumers.
+import type { OptionsAnalysisResponse } from './options/types';
+
 /**
  * Tagged union representing the analysis result currently in view by the chatbot.
  * Injected as context into the chat system prompt so the assistant can reference
@@ -1924,7 +1930,8 @@ export type CurrentAnalysisContext =
     | { kind: 'technical'; payload: AnalysisResponse }
     | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
     | { kind: 'news'; payload: NewsAnalysisResponse }
-    | { kind: 'overall'; payload: OverallAnalysisResponse };
+    | { kind: 'overall'; payload: OverallAnalysisResponse }
+    | { kind: 'options'; payload: OptionsAnalysisResponse };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here
@@ -1938,6 +1945,8 @@ export type {
     OptionsChain,
     OptionsSnapshot,
     StrikeOpenInterest,
+    StrikeVolumeAggregate,
+    TopOiQuote,
     OptionsExpirationMetrics,
     OptionsPerExpirationCommentary,
     OptionsSignal,
