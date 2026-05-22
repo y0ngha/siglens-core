@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.11.3](https://github.com/y0ngha/siglens-core/compare/v0.11.2...v0.11.3) (2026-05-22)
+
+
+### Bug Fixes
+
+* **prompt:** address PR [#90](https://github.com/y0ngha/siglens-core/issues/90) review — Snapshot Price casing, guideline consolidation, JSDoc sync ([f60b0ce](https://github.com/y0ngha/siglens-core/commit/f60b0ce441c9660a246250c97c477ee669a58b31))
+
+
+### Features
+
+* options volume/bid-ask metrics and chat context integration ([7db6e93](https://github.com/y0ngha/siglens-core/commit/7db6e93a3604ef469cefd4db8b987e7f01f6c4ce))
+* **prompt:** require Korean output to use "분석 시점 가격" instead of "현재 가격" ([0edc5f4](https://github.com/y0ngha/siglens-core/commit/0edc5f47ab4bdcbb632b67e789d8012a0fa85880))
+
+
+### BREAKING CHANGES
+
+* CurrentAnalysisContext union widened with 'options' case.
+Exhaustive-switch consumers must add handler for OptionsAnalysisResponse.
+New Tier 4 types (StrikeVolumeAggregate, TopOiQuote) are additive and do not
+affect siglens-core semver versioning (currently 0.x minor bump only).
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+
 ## [0.11.2](https://github.com/y0ngha/siglens-core/compare/v0.11.1...v0.11.2) (2026-05-22)
 
 
