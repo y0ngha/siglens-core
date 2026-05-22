@@ -463,7 +463,7 @@ export type {
     GeminiPart,
     GeminiRole,
 } from './infrastructure/ai/types';
-export type { CacheProvider } from './infrastructure/cache/types';
+export type { CacheProvider } from './domain/ports/cache';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
     CreateUsageLogInput,

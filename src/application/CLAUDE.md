@@ -27,8 +27,8 @@ application ← MAY import from domain/
 **Allowed:**
 ```typescript
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
-import { UpstashAnalysisCache } from '@/infrastructure/cache/redis';
-import { ClaudeClient } from '@/infrastructure/ai/claude';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { FileSkillsLoader } from '@/infrastructure/skills/loader';
 ```
 
 **Prohibited:**
@@ -50,15 +50,31 @@ modules, or when it sequences a domain call followed by an infrastructure call.
 ```typescript
 // ✅ application: sequences infra (load skills) → domain (build prompt) → infra (AI call) → infra (cache)
 export async function submitAnalysis(params: SubmitAnalysisParams): Promise<string> {
-    const skills = await skillsLoader.load();
+    const cache = createCacheProvider();           // adapter factory → CacheProvider | null
+    const skills = await new FileSkillsLoader().loadSkills();
     const prompt = buildAnalysisPrompt(params.symbol, params.bars, params.indicators, skills);
-    const jobId = await jobQueue.enqueue(prompt);
-    return jobId;
+    // … enqueue, cache, etc.
 }
 ```
 
 If the logic touches only a single infrastructure module with trivial glue, it may belong
 in that infrastructure module instead. Do not promote it to `application/` prematurely.
+
+## Adapter Composition
+
+Use-cases call **infrastructure adapter factories** directly (`createCacheProvider()`,
+`new FileSkillsLoader()`, etc.). Factories return values typed as the corresponding
+**domain port** (`CacheProvider`, `SkillsProvider`, …), so the contract between
+application and infrastructure is enforced by the compiler — application code is
+written against the port, never against an adapter's concrete shape.
+
+Do **not** push every dependency through a `deps: { … }` parameter. Library
+consumers call use-cases with domain inputs only (`submitAnalysis(params)`) and
+should not be burdened with adapter wiring. The library owns wiring; the consumer
+owns the call site.
+
+The exception is test seams: when a factory's return value is a singleton or otherwise
+hard to substitute at runtime, mock the factory module with `vi.mock` (see Testing).
 
 ## Coding Rules
 
@@ -87,28 +103,29 @@ try {
 }
 ```
 
-**Dependency injection over direct instantiation:** accept infrastructure clients as
-parameters or via a factory so tests can inject stubs.
-
-```typescript
-// ✅ Accept dependencies as parameters
-export async function submitAnalysis(
-    params: SubmitAnalysisParams,
-    deps: { skillsLoader: SkillsLoader; jobQueue: JobQueue },
-): Promise<string> { ... }
-```
-
 ## Testing
 
 - Coverage target: **100% branch coverage** (required).
 - Test file location: `src/__tests__/application/<sub-folder>/<file>.test.ts`
-- Inject stub infrastructure implementations via interfaces — never hit real external systems.
+- Mock the **adapter factory module**, not the port interface — use-cases call
+  factories directly, so `vi.mock` on the factory's module is the natural seam.
 - Domain functions can be called directly (they are pure) — no need to mock them.
+- Never hit real Upstash / Neon / AI endpoints in tests.
 
 ```typescript
-const stubJobQueue: JobQueue = {
-    enqueue: vi.fn().mockResolvedValue('job-123'),
-    dequeue: vi.fn().mockResolvedValue(null),
-    status: vi.fn().mockResolvedValue('pending'),
+import type { CacheProvider } from '@/domain/ports/cache';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
+
+vi.mock('@/infrastructure/cache/redis');
+const mockCreateCacheProvider = createCacheProvider as Mock;
+
+const stubCache: CacheProvider = {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
 };
+
+beforeEach(() => {
+    mockCreateCacheProvider.mockReturnValue(stubCache);
+});
 ```

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bar, MarketQuote, SectorSignalsResult } from '@/domain/types';
-import type { CacheProvider } from '@/infrastructure/cache/types';
+import type { CacheProvider } from '@/domain/ports/cache';
 import type { MarketDataProvider } from '@/infrastructure/market/types';
 
 const mockCache: {

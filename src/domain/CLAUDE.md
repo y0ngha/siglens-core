@@ -8,6 +8,58 @@ This layer owns all calculation logic: technical indicators, candle pattern dete
 chart pattern analysis, signal detection, and prompt construction.
 If it can be expressed as a pure function, it belongs here.
 
+The layer also owns the **port interfaces** (`domain/ports/`) — contracts the domain
+requires from the outside world (caches, repositories, providers, dispatchers).
+Adapters that fulfill these ports live in `infrastructure/`; the domain never imports
+them, only the port type.
+
+## Ports
+
+`domain/ports/` declares every external-system contract the library needs. Each port
+is a pure interface — no behavior, no implementation, no SDK references. Adapters in
+`infrastructure/<module>/` import the port and implement it (`implements` for classes,
+explicit return-type annotation for factory functions).
+
+**File layout:**
+```
+domain/ports/
+  cache.ts             → CacheProvider
+  marketDataProvider.ts → MarketDataProvider, GetBarsOptions
+  skillsProvider.ts    → SkillsProvider
+  ...
+```
+
+**Authoring rules:**
+- One conceptual contract per file. Co-locate option / argument types used by that
+  contract (e.g. `GetBarsOptions` next to `MarketDataProvider`) — do not push them
+  to `domain/types.ts`.
+- Tag the interface JSDoc with `@port` so adapters and reviewers can identify it.
+- Keep the existing naming convention (`Provider`, `Repository`, `Dispatcher`,
+  `Store`) — natural language over a forced `Port` suffix.
+- DTOs the port returns or receives (`Bar`, `MarketQuote`, `Skill`, …) stay in
+  `domain/types.ts`. Ports reference them via import.
+
+**Example:**
+```typescript
+// domain/ports/cache.ts
+/**
+ * @port
+ * Generic key-value cache contract the domain depends on for memoizing
+ * expensive analyses.
+ */
+export interface CacheProvider {
+    get<T>(key: string): Promise<T | null>;
+    set<T>(key: string, value: T, ttlSeconds: number): Promise<void>;
+    delete(key: string): Promise<void>;
+}
+
+// infrastructure/cache/redis.ts — adapter
+import type { CacheProvider } from '@/domain/ports/cache';
+
+/** @adapter implements {@link CacheProvider} */
+export function createCacheProvider(): CacheProvider | null { ... }
+```
+
 ## Dependency Rules
 
 ```
