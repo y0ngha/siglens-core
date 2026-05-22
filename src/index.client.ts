@@ -385,10 +385,7 @@ export type {
     MarketDataProvider,
     GetBarsOptions,
 } from './domain/ports/marketDataProvider';
-export type {
-    AcquireReanalyzeCooldownResult,
-    MarketDataProviderType,
-} from './infrastructure/market/types';
+export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
 export type {
     AiContents,
     GeminiRole,
