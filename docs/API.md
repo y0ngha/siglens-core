@@ -194,11 +194,12 @@ export interface MarketDataProvider {
 외부 네트워크 서비스는 아니지만 I/O를 수반하므로 동일 규칙이 적용된다.
 
 - 위치: 프로젝트 루트의 `/skills/**/*.md`
-- 담당: `infrastructure/skills/loader.ts` (`FileSkillsLoader`)
+- 담당: `infrastructure/skills/loader.ts` (`createSkillsProvider`, `FileSkillsLoader`)
 - 파일 포맷과 frontmatter 스펙은 `docs/DOMAIN.md`의 Skills 섹션을 참조한다.
 
-domain은 filesystem을 직접 읽지 않는다. consumer가 `FileSkillsLoader.loadSkills()`를
-호출한 결과(`Skill[]`)를 domain 함수에 주입한다.
+domain은 filesystem을 직접 읽지 않는다. consumer가 `createSkillsProvider()`로 얻은
+`SkillsProvider`의 `loadSkills()`를 호출한 결과(`Skill[]`)를 domain 함수에 주입한다.
+`FileSkillsLoader`는 동일 어댑터의 클래스 형태로 계속 노출되며, 팩토리 호출이 표준 경로다.
 
 ---
 

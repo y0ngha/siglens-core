@@ -292,7 +292,10 @@ export {
 } from './infrastructure/chat/tokenStore';
 
 // Skills loader
-export { FileSkillsLoader } from './infrastructure/skills/loader';
+export {
+    createSkillsProvider,
+    FileSkillsLoader,
+} from './infrastructure/skills/loader';
 
 // Config readers
 export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';

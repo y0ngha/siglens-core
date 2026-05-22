@@ -17,7 +17,7 @@ import {
     getJobResult,
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+import { createSkillsProvider } from '@/infrastructure/skills/loader';
 
 /**
  * Poll the result of an analysis job submitted via {@link submitAnalysis}.
@@ -96,7 +96,7 @@ export async function pollAnalysis(
         return { status: 'error', error: 'Result not found' };
     }
 
-    const skillsLoader = new FileSkillsLoader();
+    const skillsLoader = createSkillsProvider();
     // `skillsDegraded` reflects the poll-time skill-load state (the load that
     // produced the `skills` used by `enrichAnalysisWithConfidence` immediately
     // below), so the cached label always matches the data actually used.

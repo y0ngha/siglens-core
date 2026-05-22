@@ -8,6 +8,7 @@ import type { Dirent } from 'node:fs';
 import {
     FileSkillsLoader,
     countSkillFiles,
+    createSkillsProvider,
     loadSkillsCached,
     clearSkillsCache,
 } from '@/infrastructure/skills/loader';
@@ -374,5 +375,30 @@ describe('loadSkillsCached', () => {
 
         expect(loadSkillsSpy).toHaveBeenCalledTimes(2);
         loadSkillsSpy.mockRestore();
+    });
+});
+
+// ─────────────────────────────────────────
+// createSkillsProvider — factory wrapper for SkillsProvider port
+// ─────────────────────────────────────────
+
+describe('createSkillsProvider', () => {
+    it('FileSkillsLoader 인스턴스를 SkillsProvider로 반환한다', () => {
+        const provider = createSkillsProvider();
+
+        expect(provider).toBeInstanceOf(FileSkillsLoader);
+    });
+
+    it('호출마다 새로운 인스턴스를 생성한다', () => {
+        const first = createSkillsProvider();
+        const second = createSkillsProvider();
+
+        expect(first).not.toBe(second);
+    });
+
+    it('반환된 provider는 loadSkills 메서드를 노출한다', () => {
+        const provider = createSkillsProvider();
+
+        expect(typeof provider.loadSkills).toBe('function');
     });
 });

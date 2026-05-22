@@ -69,9 +69,8 @@ enforced by the compiler — application code is written against the port, never
 against an adapter's concrete shape.
 
 For modules that have not yet been migrated to a domain port, the adapter is still
-constructed directly (`new FileSkillsLoader()`, etc.). Treat those as temporary —
-they should be replaced with a `create<Port>Provider()` factory when the module's
-port migration lands.
+constructed directly. Treat those as temporary — they should be replaced with a
+`create<Port>Provider()` factory when the module's port migration lands.
 
 Do **not** push every dependency through a `deps: { … }` parameter. Library
 consumers call use-cases with domain inputs only (`submitAnalysis(params)`) and

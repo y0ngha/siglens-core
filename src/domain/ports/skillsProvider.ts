@@ -11,6 +11,10 @@ import type { Skill } from '@/domain/types';
  * of the adapter or the application-layer caller, not this contract.
  */
 export interface SkillsProvider {
-    /** Load every available skill. */
+    /**
+     * Load every available skill.
+     *
+     * @returns A promise that resolves to the full list of parsed skills.
+     */
     loadSkills(): Promise<Skill[]>;
 }

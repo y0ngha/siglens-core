@@ -1,5 +1,13 @@
 # Fix Log
 
+## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
+- Violation: `create<Port>Provider()` factory introduced in infrastructure but neither exported from `src/index.ts` nor adopted by application call-sites in the same PR
+- Rule: MISTAKES.md Public API §9.5 — exported module symbols not re-exported in `src/index.ts` must carry `/** @internal */`; and Adapter Composition convention (`src/application/CLAUDE.md`) requires use-cases to call `create<Port>Provider()` factories instead of `new Adapter()` once the port migration lands
+- Context: `createSkillsProvider()` was added to `infrastructure/skills/loader.ts` to mirror `createCacheProvider` (Tier 3) but `src/index.ts` Tier 3 block was not updated, `docs/PUBLIC_API.md` Skills inventory was stale (`FileSkillsLoader` only), and `submitAnalysis.ts:276` / `pollAnalysis.ts:99` still constructed `new FileSkillsLoader()`. A port-migration PR must land the factory export, the PUBLIC_API.md inventory update, and the application call-site migration as a single unit.
+- Violation: Tier 4 public interface method missing `@returns` JSDoc
+- Rule: MISTAKES.md Documentation Sync §4.5 — Tier 4 interface methods require `@param`/`@returns` JSDoc; single-line description is insufficient
+- Context: `SkillsProvider.loadSkills()` in `src/domain/ports/skillsProvider.ts` carried only `/** Load every available skill. */`; expanded to include `@returns` tag describing the resolved value.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).
