@@ -5,6 +5,14 @@
 // export condition. Keep it free of application/infrastructure runtime exports:
 // those modules can depend on Node APIs and server-only SDKs.
 
+// Top-level type imports used by deprecated aliases below.
+// Required because re-exports do not add names to the local module scope
+// (MISTAKES.md TypeScript #9.5 — no inline dynamic type imports).
+import type {
+    ConversationRole,
+    ConversationTurn,
+} from './domain/ports/aiProvider';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -400,9 +408,14 @@ export type {
 // ConversationTurn names exported above.
 
 /** @deprecated Use `ConversationRole` instead. Will be removed in a future major version. */
-export type GeminiRole = import('./domain/ports/aiProvider').ConversationRole;
+export type GeminiRole = ConversationRole;
 
-/** @deprecated Use `ConversationTurn['text']` instead. Will be removed in a future major version. */
+/**
+ * @deprecated The `parts: GeminiPart[]` structure has been replaced by the flat
+ * `text: string` field on `ConversationTurn`. This type has no direct equivalent —
+ * use `ConversationTurn` for the full turn shape.
+ * Will be removed in a future major version.
+ */
 export type GeminiPart = { text: string };
 
 /**
@@ -410,8 +423,7 @@ export type GeminiPart = { text: string };
  * Note: `ConversationTurn` uses `text: string` directly instead of
  * `parts: GeminiPart[]`. Will be removed in a future major version.
  */
-export type GeminiContent =
-    import('./domain/ports/aiProvider').ConversationTurn;
+export type GeminiContent = ConversationTurn;
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
     ChatActionResult,
