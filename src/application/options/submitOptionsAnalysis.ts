@@ -36,11 +36,24 @@ const LOG_PREFIX = '[submitOptionsAnalysis]';
  * Derive a short deterministic hash of the options snapshot and expiration
  * date selection.
  *
- * The hash is computed from the symbol, underlying price, capture timestamp,
- * expiration date filter, and a structural digest of each chain (call/put
- * lengths and open-interest sums). This ensures a meaningful market change
- * (new strikes added, OI shift) busts the cache without requiring the full
- * contract list to be serialized.
+ * The hash intentionally captures only the **structural identity** of the
+ * snapshot — symbol, target expiration, and per-chain `(expirationDate,
+ * callsLen, putsLen)`. Fast-moving fields (`underlyingPrice`, `capturedAt`,
+ * per-strike `openInterest` sums) are excluded because they change on every
+ * provider poll and would otherwise force a cache miss for every request
+ * — defeating the 24-hour TTL. The structural digest still busts the cache
+ * when meaningful market events happen (a new expiration listed, a strike
+ * added or delisted), which is the actual invalidation signal worth firing
+ * a fresh LLM call for.
+ *
+ * When `expirationDate` is a concrete ISO date (not `'all'`), only the
+ * matching chain participates in the hash. Other expirations' structural
+ * changes are irrelevant to the single-expiration analysis and should not
+ * invalidate its cache. `'all'` analyses fold every chain in.
+ *
+ * `modelId` is intentionally **not** part of the hash input — the cache
+ * key (`buildOptionsCacheKey`) already includes it as a separate segment,
+ * so adding it here would double-count the same disambiguation axis.
  *
  * @param snapshot       - Options snapshot fetched from the provider.
  * @param expirationDate - Target expiration or `'all'`.
@@ -50,18 +63,19 @@ function hashOptionsInput(
     snapshot: OptionsSnapshot,
     expirationDate: OptionsExpirationFilter
 ): string {
+    const targetChains =
+        expirationDate === 'all'
+            ? snapshot.chains
+            : snapshot.chains.filter(c => c.expirationDate === expirationDate);
+
     return hashAnalysisInput(
         JSON.stringify({
             symbol: snapshot.symbol,
-            underlyingPrice: snapshot.underlyingPrice,
-            capturedAt: snapshot.capturedAt,
             expirationDate,
-            chains: snapshot.chains.map(c => ({
+            chains: targetChains.map(c => ({
                 expirationDate: c.expirationDate,
                 callsLen: c.calls.length,
                 putsLen: c.puts.length,
-                callsOiSum: c.calls.reduce((s, x) => s + x.openInterest, 0),
-                putsOiSum: c.puts.reduce((s, x) => s + x.openInterest, 0),
             })),
         })
     );

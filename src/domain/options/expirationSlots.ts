@@ -2,10 +2,24 @@ import { MS_PER_DAY } from '@/domain/constants/time';
 import type { ExpirationSlot, SlotMapping } from './types';
 
 /**
+ * @internal Inclusive upper-bound on days-to-expiration for the `0D` slot;
+ * expirations beyond this boundary fall through to the `1W` slot. Set to
+ * 6 (= 1 week minus 1 day) so a single weekly Friday expiration lands in
+ * `0D` regardless of which ET weekday the lookup is performed on.
+ */
+export const ZERO_DTE_MAX_DAYS = 6;
+
+/**
  * Canonical chip slots in render order. Frontends pick the closest matching
  * provider expiration per slot.
+ *
+ * The `0D` slot represents same-week expirations (≤ 6 days out). The label
+ * is "이번 주" ("this week") rather than "today" because a Monday call may
+ * match a Friday weekly that is 4 days away — labelling it "today" would
+ * be misleading.
  */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
+    { key: '0D', label: '이번 주', targetDays: 0, maxDays: ZERO_DTE_MAX_DAYS },
     { key: '1W', label: '1주', targetDays: 7 },
     { key: '2W', label: '2주', targetDays: 14 },
     { key: '1M', label: '1개월', targetDays: 30 },
@@ -16,8 +30,10 @@ export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
 
 /**
  * Map provider expirations to slots. For each slot, pick the closest
- * expiration whose daysToExpiration is ≥ targetDays. An expiration
- * mapped to one slot is not reused for later slots.
+ * expiration whose `daysToExpiration` falls within `[targetDays, maxDays]`
+ * (or simply `>= targetDays` when `maxDays` is absent — standard slots
+ * from `1W` onward omit the upper bound). An expiration mapped to one
+ * slot is not reused for later slots.
  *
  * @param expirations - Expiration dates (ISO 'YYYY-MM-DD'), unsorted OK.
  * @param now - Reference date (typically ET-midnight today).
@@ -43,7 +59,10 @@ export function mapExpirationsToSlots(
     const result: (SlotMapping | null)[] = [];
     for (const slot of EXPIRATION_SLOTS) {
         const match = dated.find(
-            e => e.days >= slot.targetDays && !used.has(e.date)
+            e =>
+                slot.targetDays <= e.days &&
+                (slot.maxDays === undefined || e.days <= slot.maxDays) &&
+                !used.has(e.date)
         );
         if (!match) {
             result.push(null);

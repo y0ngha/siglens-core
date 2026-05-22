@@ -291,6 +291,108 @@ describe('submitOptionsAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
         });
+
+        it('underlyingPrice / capturedAt / OI 합계가 변경되어도 동일 캐시 키로 조회된다', async () => {
+            // hashOptionsInput은 구조적 식별자만 hash하므로, provider 폴링마다
+            // 흔들리는 fast-moving 필드(가격·시간·OI)는 cache miss를 일으키지
+            // 말아야 한다. 두 호출이 같은 cacheKey로 cache.get을 호출하는지
+            // 직접 검증해 24h TTL 안에서 cache hit이 유지됨을 보장한다.
+            mockCacheGet.mockResolvedValue(mockCachedResult);
+
+            const snapshotA = makeSnapshot({
+                underlyingPrice: 200,
+                capturedAt: '2026-05-14T10:00:00Z',
+            });
+            const baseChain = snapshotA.chains[0]!;
+            const snapshotB = makeSnapshot({
+                underlyingPrice: 215, // 가격 흔들림
+                capturedAt: '2026-05-14T10:05:30Z', // 폴링 직후
+                chains: [
+                    {
+                        ...baseChain,
+                        calls: baseChain.calls.map(c => ({
+                            ...c,
+                            openInterest: c.openInterest + 250, // OI 변동
+                        })),
+                        puts: baseChain.puts.map(p => ({
+                            ...p,
+                            openInterest: p.openInterest + 250,
+                        })),
+                    },
+                ],
+            });
+
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: snapshotA,
+            });
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: snapshotB,
+            });
+
+            expect(mockCacheGet).toHaveBeenCalledTimes(2);
+            const firstKey = mockCacheGet.mock.calls[0]?.[0];
+            const secondKey = mockCacheGet.mock.calls[1]?.[0];
+            expect(firstKey).toBe(secondKey);
+        });
+
+        it("expirationDate가 'all'일 때 fast-moving 필드 변경은 같은 키, 만기 구조 변경은 다른 키로 가야 한다", async () => {
+            // 'all' 분기는 모든 chain을 hash에 포함한다. 두 가지 시맨틱을 함께 검증:
+            //   (1) underlyingPrice/capturedAt/OI 같은 fast-moving 변동은 hit
+            //       유지 (구체 만기 분기와 동일한 cache-stability 시맨틱).
+            //   (2) 새 만기 추가/제거 같은 구조적 변경은 cache miss로 빠져
+            //       새 LLM 호출을 트리거 (시장 풍경이 달라졌으므로 재분석 필요).
+            mockCacheGet.mockResolvedValue(mockCachedResult);
+
+            const snapshotBaseline = makeSnapshot();
+            const snapshotFastMoving = makeSnapshot({
+                underlyingPrice: 215,
+                capturedAt: '2026-05-14T10:05:30Z',
+            });
+            const baselineChain = snapshotBaseline.chains[0]!;
+            const snapshotWithExtraChain = makeSnapshot({
+                chains: [
+                    baselineChain,
+                    {
+                        expirationDate: '2026-07-18',
+                        daysToExpiration: 65,
+                        calls: [],
+                        puts: [],
+                    },
+                ],
+            });
+
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: 'all',
+                snapshot: snapshotBaseline,
+            });
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: 'all',
+                snapshot: snapshotFastMoving,
+            });
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: 'all',
+                snapshot: snapshotWithExtraChain,
+            });
+
+            expect(mockCacheGet).toHaveBeenCalledTimes(3);
+            const keyBaseline = mockCacheGet.mock.calls[0]?.[0];
+            const keyFastMoving = mockCacheGet.mock.calls[1]?.[0];
+            const keyExtraChain = mockCacheGet.mock.calls[2]?.[0];
+            expect(keyBaseline).toBe(keyFastMoving);
+            expect(keyBaseline).not.toBe(keyExtraChain);
+        });
     });
 
     // ── 2. Cache miss + enqueues ──

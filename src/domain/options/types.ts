@@ -167,11 +167,14 @@ export interface RawOptionsAnalysisResponse {
 }
 
 /**
- * Stable identifier for each canonical expiration chip slot. Six fixed
+ * Stable identifier for each canonical expiration chip slot. Seven fixed
  * tokens used both as React-tree keys (in consumer apps) and routing-
- * friendly URL fragments.
+ * friendly URL fragments. `0D` (same-week expiration, accepting
+ * expirations up to 6 days out) sits before `1W` to surface end-of-week
+ * expirations on weekly tickers (e.g. PLTR Fridays) that otherwise
+ * wouldn't satisfy the 1W ≥ 7-day match condition.
  */
-export type ExpirationSlotKey = '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
+export type ExpirationSlotKey = '0D' | '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
 
 /**
  * One canonical chip slot in the options expiration picker UI. The set is
@@ -185,6 +188,13 @@ export interface ExpirationSlot {
     label: string;
     /** Minimum days from today the chosen expiration must be at least. */
     targetDays: number;
+    /**
+     * Optional upper bound (inclusive) on days-to-expiration. When set, the
+     * slot only accepts expirations within `[targetDays, maxDays]`. Used by
+     * `0D` so it doesn't steal a 1W-eligible expiration; standard slots
+     * (1W and onward) omit this field and behave as before.
+     */
+    maxDays?: number;
 }
 
 /** A chip slot paired with the actual provider expiration that fills it. */
