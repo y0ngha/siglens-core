@@ -1,5 +1,13 @@
 # Fix Log
 
+## [PR #92 | refactor/ports-ai-module | 2026-05-22]
+- B1: `src/domain/ports/aiProvider.ts` — port declared "Provider-neutral AI chat-completion contract" in the JSDoc header but body exposed Gemini SDK schema types (`GeminiRole`, `GeminiPart`, `GeminiContent`) and `AiContents = string | GeminiContent[]`. domain/CLAUDE.md ports rule: "Each port is a pure interface — no behavior, no implementation, no SDK references." Replaced with provider-neutral `ConversationRole` / `ConversationTurn`; `AiContents = string | ConversationTurn[]`. Updated `application/chat/requestChatCompletion.ts` `toAiContents` to translate `ChatMessage.role` (`'user' | 'model'`) → `ConversationRole` (`'user' | 'assistant'`). Updated test fixtures and removed Gemini-specific exports from `src/index.ts` and `src/index.client.ts`. Adapters (consumer-owned) must now translate `ConversationTurn[]` → upstream SDK shape (e.g. Gemini `contents`).
+  - Rule: domain/CLAUDE.md §Ports — port interfaces must be SDK-neutral; provider-specific schema belongs in the adapter (consumer code or infrastructure/<module>/).
+- B3: `docs/ARCHITECTURE.md` folder tree omitted `domain/ports/` (added in PR #91, expanded by this PR); inline comment on `infrastructure/ai/` still said "AI provider type contracts (no SDK adapter)" though the type contracts moved to `domain/ports/aiProvider.ts` and only `extractJsonWithRepair` remains. Body description of `ai/` likewise stale. `src/infrastructure/CLAUDE.md` responsibility table row for `ai/` likewise stale. All three updated to reference the new port location.
+  - Rule: Documentation Sync — ARCHITECTURE.md folder tree / module descriptions and infrastructure/CLAUDE.md responsibility table must be updated in the same PR that moves code across layers.
+- S2: `src/domain/ports/aiProvider.ts` — `systemInstruction` JSDoc referenced Gemini-specific `config.systemInstruction` path. Provider-neutral ports must describe semantic purpose, not upstream API paths. Replaced with "Optional system-level instruction prepended before the conversation."
+  - Rule: domain/CLAUDE.md §Ports — port JSDoc must describe the contract abstractly, not refer to provider-internal API paths.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).

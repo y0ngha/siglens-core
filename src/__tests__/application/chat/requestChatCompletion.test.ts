@@ -328,7 +328,7 @@ describe('requestChatCompletion', () => {
         expect(callAiProvider).not.toHaveBeenCalled();
     });
 
-    it('builds a Gemini request and returns message with remaining tokens', async () => {
+    it('builds the AI provider request and returns message with remaining tokens', async () => {
         const occurredAt = new Date('2026-04-29T00:00:00.000Z');
         const result = await requestChatCompletion(
             createParams({
@@ -362,12 +362,12 @@ describe('requestChatCompletion', () => {
                 model: GEMINI_2_5_FLASH_LITE_MODEL,
                 contents: [
                     {
-                        role: 'model',
-                        parts: [{ text: '이전 답변입니다.' }],
+                        role: 'assistant',
+                        text: '이전 답변입니다.',
                     },
                     {
                         role: 'user',
-                        parts: [{ text: 'RSI도 설명해줘' }],
+                        text: 'RSI도 설명해줘',
                     },
                 ],
                 systemInstruction: expect.stringContaining('AAPL'),

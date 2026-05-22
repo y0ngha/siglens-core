@@ -388,11 +388,10 @@ export type {
 } from './infrastructure/market/types';
 export type {
     AiContents,
-    GeminiRole,
-    GeminiContent,
-    GeminiPart,
     CallAiProvider,
     CallAiProviderOptions,
+    ConversationRole,
+    ConversationTurn,
 } from './domain/ports/aiProvider';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {

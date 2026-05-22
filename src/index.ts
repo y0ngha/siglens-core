@@ -460,9 +460,8 @@ export type {
     AiContents,
     CallAiProvider,
     CallAiProviderOptions,
-    GeminiContent,
-    GeminiPart,
-    GeminiRole,
+    ConversationRole,
+    ConversationTurn,
 } from './domain/ports/aiProvider';
 export type { CacheProvider } from './domain/ports/cache';
 export type { ChatTokenStore } from './infrastructure/chat/types';
