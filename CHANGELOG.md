@@ -1,5 +1,26 @@
 # Changelog
 
+# [0.12.0](https://github.com/y0ngha/siglens-core/compare/v0.11.4...v0.12.0) (2026-05-22)
+
+
+### Bug Fixes
+
+* **overall:** align buildChatPrompt test fixture with integratedConclusionKo rename ([3a524b3](https://github.com/y0ngha/siglens-core/commit/3a524b3ecef3e37caca5ec12983e4ac738206e5f))
+* **overall:** populate OptionsChain.daysToExpiration in test fixtures ([a8f2fd9](https://github.com/y0ngha/siglens-core/commit/a8f2fd9254dde403b5a0dac402dfc2bf76a3f1d0))
+* **overall:** strip options.analyzedAt from inputHash to prevent cache thrash ([4feeaa0](https://github.com/y0ngha/siglens-core/commit/4feeaa03e08f207d845c23357b34c4a991af048b))
+* **overall:** update test fixtures/assertions for integratedConclusionKo rename + optionsBulletsKo ([9b73ab0](https://github.com/y0ngha/siglens-core/commit/9b73ab0b7984bb20ef197c35e67bd1f06ce4015a))
+
+
+### Features
+
+* **overall:** 4-axis prompt schema + integratedConclusionKo rename + options/stale hints ([255cfed](https://github.com/y0ngha/siglens-core/commit/255cfed9d07824405baed06f91747c84eb433db8))
+* **overall:** add pickNearestExpiration helper with 0DTE avoidance ([2018e7d](https://github.com/y0ngha/siglens-core/commit/2018e7db0b8e477e74a30190104c41946d9d2176))
+* **overall:** extend OverallAxis with 'options' + response/inputs type surface ([da86a58](https://github.com/y0ngha/siglens-core/commit/da86a58d4976174739c16158c4e95a05c483342d))
+* **overall:** include options payload in input hash + pass to prompt ([6906d5e](https://github.com/y0ngha/siglens-core/commit/6906d5eaf72ec350a8152b81a0fa4d0bfa093f8b))
+* **overall:** integrate options axis into dependency resolver (skipped/pending/error paths) ([e7ae4a7](https://github.com/y0ngha/siglens-core/commit/e7ae4a7c2b64163493502ef509abbb857dbff4f9))
+* **overall:** normalize 4-axis response with integratedConclusionKo + optionsOiStale echo ([1c10937](https://github.com/y0ngha/siglens-core/commit/1c109378614d83c2218ce25093283989447f2c9b))
+* **overall:** plumb force through all 4 axes to actually bypass cache ([df011ed](https://github.com/y0ngha/siglens-core/commit/df011ed348188ca9227124433500808074b7c531))
+
 ## [0.11.4](https://github.com/y0ngha/siglens-core/compare/v0.11.3...v0.11.4) (2026-05-22)
 
 
