@@ -484,7 +484,7 @@ export type {
     GetBarsOptions,
     MarketDataProvider,
 } from './infrastructure/market/types';
-export type { NewsProvider, NewsTimeRange } from './infrastructure/news/types';
+export type { NewsProvider, NewsTimeRange } from './domain/ports/newsProvider';
 export type { SkillsProvider } from './infrastructure/skills/types';
 
 // Application types

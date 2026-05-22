@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #95 Round 2 | refactor/architecture/news-ports-migration | 2026-05-22]
+- S1: `docs/ARCHITECTURE.md` 폴더 구조 트리에서 `domain/ports/` 디렉토리가 누락된 상태. `cache.ts`가 이미 존재할 때부터 stale했고, 이번 PR에서 `newsProvider.ts`가 추가되며 격차가 더 벌어짐. `indicators` 다음 alphabetical 위치에 `ports` 항목 추가.
+  - Rule: MISTAKES.md Documentation Sync — 새 디렉토리/심볼 추가 시 ARCHITECTURE.md 폴더 트리 동기화.
+  - Context: review-agent Suggestion (non-required). 현재 PR이 `domain/ports/`에 새 파일을 추가하므로 같은 PR에서 트리 동기화하는 것이 자연스러움.
+
 ## [PR #93 Round 1 | worktree-agent-a20856e6094365c94 | 2026-05-22]
 - Violation: `domain/ports/chatTokenStore.ts` JSDoc references infrastructure path (`infrastructure/chat/`) and concrete adapter function name (`hashClientIp`) — gemini-code-assist inline comment
 - Rule: domain layer must remain isolated from infrastructure; port JSDoc should describe policy (e.g. "identifiers are hashed") rather than naming concrete adapter modules/functions
