@@ -111,7 +111,7 @@ export {
     EXPIRATION_SLOTS,
     mapExpirationsToSlots,
 } from './domain/options/expirationSlots';
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 export type {
     BuildOptionsAnalysisPromptOptions,
     OptionsContract,

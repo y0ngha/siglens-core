@@ -779,7 +779,7 @@ export type {
 } from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).
