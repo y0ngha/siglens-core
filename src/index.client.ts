@@ -119,7 +119,7 @@ export {
     EXPIRATION_SLOTS,
     mapExpirationsToSlots,
 } from './domain/options/expirationSlots';
-export type { OptionsDataProvider } from './infrastructure/options/types';
+export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 export type {
     BuildOptionsAnalysisPromptOptions,
     OptionsContract,
@@ -386,7 +386,7 @@ export {
 
 // Domain ports + infrastructure type-only interfaces are safe for browser consumers.
 export type { CacheProvider } from './domain/ports/cache';
-export type { SkillsProvider } from './infrastructure/skills/types';
+export type { SkillsProvider } from './domain/ports/skillsProvider';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 export type {
@@ -424,7 +424,7 @@ export type GeminiPart = { text: string };
  * `parts: GeminiPart[]`. Will be removed in a future major version.
  */
 export type GeminiContent = ConversationTurn;
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     ChatActionResult,
     ChatErrorCode,

@@ -20,7 +20,7 @@ import {
     createChatTokenStore,
     hashClientIp,
 } from '@/infrastructure/chat/tokenStore';
-import type { ChatTokenStore } from '@/infrastructure/chat/types';
+import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { type UsageRepository } from '@/infrastructure/db';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { constants } from 'node:http2';

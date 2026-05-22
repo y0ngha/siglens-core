@@ -25,7 +25,7 @@ import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+import { createSkillsProvider } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
@@ -139,9 +139,9 @@ describe('submitAnalysis 함수는', () => {
             WORKER_URL: 'https://worker.test',
             WORKER_SECRET: 'test-secret',
         };
-        (FileSkillsLoader as Mock).mockImplementation(() => ({
+        (createSkillsProvider as Mock).mockReturnValue({
             loadSkills: mockLoadSkills,
-        }));
+        });
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockLoadSkills.mockResolvedValue([]);
         mockSetJobMeta.mockResolvedValue(undefined);

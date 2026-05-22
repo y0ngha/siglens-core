@@ -1,14 +1,13 @@
-import { createJobRedis } from '@/infrastructure/jobs/redis';
 import type {
-    JobMeta,
-    JobRedisClient,
-    JobStatus,
-    RedisSetOpts,
-} from '@/infrastructure/jobs/types';
+    JobStateSetOpts,
+    JobStateStore,
+} from '@/domain/ports/jobStateStore';
+import { createJobStateStore } from '@/infrastructure/jobs/redis';
+import type { JobMeta, JobStatus } from '@/infrastructure/jobs/types';
 import { SECONDS_PER_HOUR } from '@/domain/constants/time';
 
 const JOB_TTL_SECONDS = SECONDS_PER_HOUR;
-const JOB_TTL_OPTS: RedisSetOpts = { ex: JOB_TTL_SECONDS };
+const JOB_TTL_OPTS: JobStateSetOpts = { ttlSeconds: JOB_TTL_SECONDS };
 
 function statusKey(jobId: string): string {
     return `job:${jobId}:status`;
@@ -31,12 +30,12 @@ function cancelledKey(jobId: string): string {
 }
 
 // Upstash는 HTTP REST 기반 — TCP 연결 없음, 함수마다 인스턴스 생성해도 성능 영향 없음.
-async function withJobRedis<T>(
-    fn: (redis: JobRedisClient) => Promise<T>,
+async function withJobStore<T>(
+    fn: (store: JobStateStore) => Promise<T>,
     fallback: T
 ): Promise<T> {
-    const redis = createJobRedis();
-    return redis !== null ? fn(redis) : Promise.resolve(fallback);
+    const store = createJobStateStore();
+    return store !== null ? fn(store) : Promise.resolve(fallback);
 }
 
 // Upstash REST client는 값을 자동으로 직렬화/역직렬화한다.
@@ -56,8 +55,8 @@ async function withJobRedis<T>(
  * @param meta - The metadata payload.
  */
 export async function setJobMeta(jobId: string, meta: JobMeta): Promise<void> {
-    return withJobRedis(async redis => {
-        await redis.set(metaKey(jobId), meta, JOB_TTL_OPTS);
+    return withJobStore(async store => {
+        await store.set(metaKey(jobId), meta, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -69,7 +68,7 @@ export async function setJobMeta(jobId: string, meta: JobMeta): Promise<void> {
  *   or never set) or Upstash env is not configured.
  */
 export async function getJobStatus(jobId: string): Promise<JobStatus | null> {
-    return withJobRedis(redis => redis.get<JobStatus>(statusKey(jobId)), null);
+    return withJobStore(store => store.get<JobStatus>(statusKey(jobId)), null);
 }
 
 /**
@@ -86,8 +85,8 @@ export async function getJobStatus(jobId: string): Promise<JobStatus | null> {
 export async function getJobResult(
     jobId: string
 ): Promise<Record<string, unknown> | null> {
-    return withJobRedis(
-        redis => redis.get<Record<string, unknown>>(resultKey(jobId)),
+    return withJobStore(
+        store => store.get<Record<string, unknown>>(resultKey(jobId)),
         null
     );
 }
@@ -100,7 +99,7 @@ export async function getJobResult(
  *   is not configured.
  */
 export async function getJobError(jobId: string): Promise<string | null> {
-    return withJobRedis(redis => redis.get<string>(errorKey(jobId)), null);
+    return withJobStore(store => store.get<string>(errorKey(jobId)), null);
 }
 
 /**
@@ -111,7 +110,7 @@ export async function getJobError(jobId: string): Promise<string | null> {
  *   not configured.
  */
 export async function getJobMeta(jobId: string): Promise<JobMeta | null> {
-    return withJobRedis(redis => redis.get<JobMeta>(metaKey(jobId)), null);
+    return withJobStore(store => store.get<JobMeta>(metaKey(jobId)), null);
 }
 
 /**
@@ -129,8 +128,8 @@ export async function setJobStatus(
     jobId: string,
     status: JobStatus
 ): Promise<void> {
-    return withJobRedis(async redis => {
-        await redis.set(statusKey(jobId), status, JOB_TTL_OPTS);
+    return withJobStore(async store => {
+        await store.set(statusKey(jobId), status, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -150,8 +149,8 @@ export async function setJobResult(
     jobId: string,
     result: Record<string, unknown>
 ): Promise<void> {
-    return withJobRedis(async redis => {
-        await redis.set(resultKey(jobId), result, JOB_TTL_OPTS);
+    return withJobStore(async store => {
+        await store.set(resultKey(jobId), result, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -170,8 +169,8 @@ export async function setJobError(
     jobId: string,
     message: string
 ): Promise<void> {
-    return withJobRedis(async redis => {
-        await redis.set(errorKey(jobId), message, JOB_TTL_OPTS);
+    return withJobStore(async store => {
+        await store.set(errorKey(jobId), message, JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -187,8 +186,8 @@ export async function setJobError(
  * @param jobId - The job identifier.
  */
 export async function cancelJob(jobId: string): Promise<void> {
-    return withJobRedis(async redis => {
-        await redis.set(cancelledKey(jobId), '1', JOB_TTL_OPTS);
+    return withJobStore(async store => {
+        await store.set(cancelledKey(jobId), '1', JOB_TTL_OPTS);
     }, undefined);
 }
 
@@ -201,15 +200,15 @@ export async function cancelJob(jobId: string): Promise<void> {
  *   Redis).
  */
 export async function isJobCancelled(jobId: string): Promise<boolean> {
-    return withJobRedis(
-        async redis => (await redis.get<string>(cancelledKey(jobId))) === '1',
+    return withJobStore(
+        async store => (await store.get<string>(cancelledKey(jobId))) === '1',
         false
     );
 }
 
 /**
- * Delete every Redis key associated with a job (status, result, error,
- * meta, cancelled).
+ * Delete every key associated with a job (status, result, error, meta,
+ * cancelled).
  *
  * Called from `pollAnalysis` once a terminal outcome (`done` or `error`)
  * has been observed and consumed by the caller. Cleanup failures are
@@ -220,8 +219,8 @@ export async function isJobCancelled(jobId: string): Promise<boolean> {
  * @param jobId - The job identifier.
  */
 export async function cleanupJob(jobId: string): Promise<void> {
-    return withJobRedis(async redis => {
-        await redis.del(
+    return withJobStore(async store => {
+        await store.deleteMany(
             statusKey(jobId),
             resultKey(jobId),
             errorKey(jobId),
