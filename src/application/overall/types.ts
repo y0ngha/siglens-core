@@ -61,7 +61,7 @@ export interface OverallDependencyInputs {
     companyName?: string;
     /** Bar resolution used for the technical analysis axis. */
     timeframe: Timeframe;
-    /** LLM model identifier scoped across all three axes. */
+    /** LLM model identifier scoped across all four axes. */
     modelId: ModelId;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
@@ -293,7 +293,7 @@ export interface DependencyStateMissNoTrigger {
 /**
  * Result returned by {@link resolveOverallDependencies}.
  *
- * - `cached` — all three axes resolved from cache; the results are embedded.
+ * - `cached` — all four axes resolved from cache; the results are embedded.
  * - `pending` — one or more axes submitted new jobs; caller should poll.
  * - `error` — one axis returned an error (tier gate, usage limit, or fetch failure).
  * - `miss_no_trigger` — at least one axis missed cache and the resolver was
@@ -314,11 +314,11 @@ export type DependencyState =
  *
  * Extends {@link OverallDependencyInputs} with background-task hooks plus an
  * overall-scoped tier/usage gate. The caller is responsible for constructing
- * all three dependency-axis options before invoking {@link submitOverallAnalysis}.
+ * all four dependency-axis options before invoking {@link submitOverallAnalysis}.
  *
  * Usage tracking is intentionally owned at this layer (not per axis): a
  * single `submitOverallAnalysis` call must count as exactly one analysis,
- * even though it dispatches three axis submits internally. The dependency
+ * even though it dispatches four axis submits internally. The dependency
  * resolver therefore drops any `usage` provided in `technical`/`fundamental`/
  * `news` axis options when called from overall — see
  * {@link resolveOverallDependencies}.
@@ -352,7 +352,7 @@ export interface SubmitOverallAnalysisCached {
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
- * `submitOverallAnalysis` once all three are resolved.
+ * `submitOverallAnalysis` once all four are resolved.
  */
 export interface SubmitOverallAnalysisPendingDependencies {
     status: 'pending_dependencies';
@@ -375,7 +375,7 @@ export interface SubmitOverallAnalysisSubmitted {
  */
 export interface SubmitOverallAnalysisError {
     status: 'error';
-    /** Axis that failed: `'technical'`, `'fundamental'`, or `'news'`. */
+    /** Axis that failed: `'technical'`, `'fundamental'`, `'news'`, or `'options'`. */
     axis: OverallAxis;
     /** Error payload from the failing axis submit result. */
     error: unknown;
@@ -407,7 +407,7 @@ export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
  * 1. At least one sub-axis cache missed — the dependency resolver
  *    short-circuits to `kind: 'miss_no_trigger'` and the overall cache is
  *    never even checked.
- * 2. All three sub-axes resolved from cache, but the overall cache itself
+ * 2. All four sub-axes resolved from cache, but the overall cache itself
  *    missed — `submitOverallAnalysis` short-circuits after the overall
  *    cache lookup.
  *
