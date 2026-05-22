@@ -84,6 +84,12 @@ export interface StrikeVolumeAggregate {
     putVolume: number;
 }
 
+/** @internal Return type of computeMidAndSpread — not part of the public API. */
+export interface MidAndSpread {
+    mid: number | null;
+    spread: number | null;
+}
+
 /** Bid/ask quote snapshot for one of the top OI strikes — surfaces liquidity at the levels the market is anchored to. */
 export interface TopOiQuote {
     /** Strike price in the underlying's currency. */

@@ -4,6 +4,7 @@ import { calculateImpliedMove } from './calculateImpliedMove';
 import { calculateMaxPain } from './calculateMaxPain';
 import { calculatePutCallRatio } from './calculatePutCallRatio';
 import type {
+    MidAndSpread,
     OptionsChain,
     OptionsContract,
     OptionsExpirationMetrics,
@@ -33,7 +34,8 @@ const TOP_STRIKES_COUNT = 3;
  *   ATM strike. Without it, the helper falls back to the median strike,
  *   which is a rougher proxy and can be misleading on skewed chains.
  * @returns Single-expiration metrics including Max Pain, P/C ratio, ATM IV,
- *   the top 3 OI strikes, and implied move %.
+ *   the top 3 OI strikes, top 3 volume strikes, top-OI bid/ask quotes, and
+ *   implied move %.
  */
 export function summarizeChainForLlm(
     chain: OptionsChain,
@@ -71,11 +73,6 @@ export function summarizeChainForLlm(
         topVolumeStrikes: topVolume,
         topOiBidAskSummary,
     };
-}
-
-interface MidAndSpread {
-    mid: number | null;
-    spread: number | null;
 }
 
 /** Build a bid/ask quote snapshot for one strike from the first matching call and put. */
