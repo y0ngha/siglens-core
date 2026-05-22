@@ -28,6 +28,7 @@ import type {
     ModelId,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
+    OptionsSnapshot,
     OverallAnalysisResponse,
     Tier,
     TierConfig,
@@ -36,6 +37,7 @@ import type {
 import type {
     SubmitOptionsAnalysisLimitError,
     SubmitOptionsAnalysisApiKeyRequiredError,
+    SubmitOptionsAnalysisOptions,
 } from '@/application/options/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
@@ -184,7 +186,7 @@ export interface OverallDependencyInputs {
      * gracefully — the resolver returns kind: 'options_skipped' and the
      * prompt builder receives a null options context.
      */
-    optionsSnapshot?: import('@/domain/types').OptionsSnapshot;
+    optionsSnapshot?: OptionsSnapshot;
 
     /**
      * Per-axis options forwarded verbatim to `submitOptionsAnalysis`.
@@ -193,7 +195,7 @@ export interface OverallDependencyInputs {
      * do not set it here.
      */
     options?: Pick<
-        import('@/application/options/types').SubmitOptionsAnalysisOptions,
+        SubmitOptionsAnalysisOptions,
         'usage' | 'tier' | 'tierConfig' | 'modelId' | 'userApiKey' | 'waitUntil'
     >;
 
