@@ -1,5 +1,19 @@
 # Fix Log
 
+## [PR #92 Round 2 | refactor/ports-ai-module | 2026-05-22]
+- B1: `src/index.ts` + `src/index.client.ts` — Round 1에서 Tier 4 공개 타입 `GeminiRole` / `GeminiPart` / `GeminiContent`를 deprecated alias 없이 완전히 삭제. 외부 소비자가 `import type { GeminiContent } from '@y0ngha/siglens-core'` 사용 시 TS2305 컴파일 오류 발생. 두 entrypoint에 deprecated alias 3개 추가 (`GeminiRole = ConversationRole`, `GeminiPart = { text: string }`, `GeminiContent = ConversationTurn`)로 backward compatibility 유지. 각 alias에 `@deprecated` JSDoc + 대체 타입 안내.
+  - Rule: MISTAKES.md §Public API #3 — Tier 4 public type 삭제 시 deprecated alias 필수 (consumers passing 기존 import는 컴파일 유지되어야 함).
+- S1: `src/application/chat/requestChatCompletion.ts` — `@/domain/ports/aiProvider` import가 `@/domain/types` import 뒤에 있어 알파벳 순서 위반(`ports` < `types`). domain group 내 일관성을 위해 `@/domain/ports/aiProvider`를 `@/domain/types` 앞으로 이동.
+  - Rule: import 정렬 일관성 — 동일 alias prefix 그룹 내에서 서브경로 알파벳 정렬.
+
+## [PR #92 | refactor/ports-ai-module | 2026-05-22]
+- B1: `src/domain/ports/aiProvider.ts` — port declared "Provider-neutral AI chat-completion contract" in the JSDoc header but body exposed Gemini SDK schema types (`GeminiRole`, `GeminiPart`, `GeminiContent`) and `AiContents = string | GeminiContent[]`. domain/CLAUDE.md ports rule: "Each port is a pure interface — no behavior, no implementation, no SDK references." Replaced with provider-neutral `ConversationRole` / `ConversationTurn`; `AiContents = string | ConversationTurn[]`. Updated `application/chat/requestChatCompletion.ts` `toAiContents` to translate `ChatMessage.role` (`'user' | 'model'`) → `ConversationRole` (`'user' | 'assistant'`). Updated test fixtures and removed Gemini-specific exports from `src/index.ts` and `src/index.client.ts`. Adapters (consumer-owned) must now translate `ConversationTurn[]` → upstream SDK shape (e.g. Gemini `contents`).
+  - Rule: domain/CLAUDE.md §Ports — port interfaces must be SDK-neutral; provider-specific schema belongs in the adapter (consumer code or infrastructure/<module>/).
+- B3: `docs/ARCHITECTURE.md` folder tree omitted `domain/ports/` (added in PR #91, expanded by this PR); inline comment on `infrastructure/ai/` still said "AI provider type contracts (no SDK adapter)" though the type contracts moved to `domain/ports/aiProvider.ts` and only `extractJsonWithRepair` remains. Body description of `ai/` likewise stale. `src/infrastructure/CLAUDE.md` responsibility table row for `ai/` likewise stale. All three updated to reference the new port location.
+  - Rule: Documentation Sync — ARCHITECTURE.md folder tree / module descriptions and infrastructure/CLAUDE.md responsibility table must be updated in the same PR that moves code across layers.
+- S2: `src/domain/ports/aiProvider.ts` — `systemInstruction` JSDoc referenced Gemini-specific `config.systemInstruction` path. Provider-neutral ports must describe semantic purpose, not upstream API paths. Replaced with "Optional system-level instruction prepended before the conversation."
+  - Rule: domain/CLAUDE.md §Ports — port JSDoc must describe the contract abstractly, not refer to provider-internal API paths.
+
 ## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
 - Violation: `create<Port>Provider()` factory introduced in infrastructure but neither exported from `src/index.ts` nor adopted by application call-sites in the same PR
 - Rule: MISTAKES.md Public API §9.5 — exported module symbols not re-exported in `src/index.ts` must carry `/** @internal */`; and Adapter Composition convention (`src/application/CLAUDE.md`) requires use-cases to call `create<Port>Provider()` factories instead of `new Adapter()` once the port migration lands
@@ -338,6 +352,19 @@
 - Violation: skipEnqueueIfMiss option not propagated from top-level to sub-axis submits inside submitOverallAnalysis
 - Rule: bot-gating intent — skipEnqueueIfMiss must prevent worker enqueue at every layer it triggers
 - Context: Gemini high-priority — resolveOverallDependencies was called BEFORE the existing guard at line 231, and the resolver forwarded options to submitAnalysis / submitFundamentalAnalysis / submitNewsAnalysis WITHOUT the flag. A bot request would have triggered three sub-axis workers before reaching the overall-level guard. Fixed by (1) moving skipEnqueueIfMiss onto OverallDependencyInputs so the resolver sees it, (2) forcing skipEnqueueIfMiss into all three sub-axis option objects in the resolver, and (3) adding a new DependencyStateMissNoTrigger short-circuit so submitOverallAnalysis returns miss_no_trigger directly when any axis returns miss_no_trigger. Added 5 new resolver tests + 1 new submit test (74 → 80 in the overall suite) to lock in propagation behavior.
+
+## [PR #92 | refactor/ports-ai-module | 2026-05-22]
+- Violation: `@deprecated` JSDoc migration hint points to a non-equivalent type (`ConversationTurn['text']` is `string`, but the deprecated alias `GeminiPart` is an object `{ text: string }`)
+- Rule: MISTAKES.md Documentation/JSDoc — deprecation notes must accurately describe the migration path; misleading guidance is worse than no guidance
+- Context: Suggestion S1 (round 3) — `GeminiPart` deprecation note "Use `ConversationTurn['text']` instead" would mislead consumers into replacing `{ text: string }` with `string`. Rewrote the JSDoc on both `src/index.ts` and `src/index.client.ts` to explain that `parts: GeminiPart[]` was flattened into `text: string` on `ConversationTurn` and that the type has no direct equivalent.
+
+- Violation: alphabetical import order broken — `@/domain/ports/aiProvider` placed AFTER `@/domain/types` even though `'ports'` < `'types'`
+- Rule: CONVENTIONS.md import ordering — within the same path-alias group, imports must be alphabetically sorted by full module path
+- Context: Suggestion S1 (round 4) — `src/application/chat/types.ts` had the same out-of-order pattern that was fixed in `requestChatCompletion.ts` during round 2 but was missed here. Moved `import type { CallAiProvider } from '@/domain/ports/aiProvider'` to precede the `@/domain/types` block. Lesson: when applying an ordering fix in one file, sweep the entire module/feature for the same pattern instead of relying on the reviewer to flag siblings one round at a time.
+
+- Violation: `@port` tag placed on file-level module JSDoc instead of the actual port interface/type JSDoc
+- Rule: domain/CLAUDE.md "Authoring rules" — "Tag the interface JSDoc with `@port` so adapters and reviewers can identify it"; the tag must annotate the port contract, not the module header
+- Context: Suggestion S2 (round 4) — `src/domain/ports/aiProvider.ts` had `@port` on the file-leading block comment, but the port contract is `CallAiProvider` at the bottom of the file. Tools / readers scanning for `@port` on type declarations (matching the `CacheProvider` example) would miss it. Moved the tag onto the `CallAiProvider` type JSDoc and kept the module-level prose as a plain header.
 
 ## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
 - Violation: `@adapter implements {@link Port}` JSDoc tag applied to a factory function (createSkillsProvider) rather than the implementing class

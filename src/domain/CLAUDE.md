@@ -25,6 +25,7 @@ under "Currently migrated" actually exist today):**
 
 ```
 domain/ports/
+  aiProvider.ts        → CallAiProvider, CallAiProviderOptions, ... ✅ migrated
   cache.ts             → CacheProvider           ✅ migrated
   chatTokenStore.ts    → ChatTokenStore           ✅ migrated
   fundamentalDataProvider.ts → FundamentalDataProvider ✅ migrated

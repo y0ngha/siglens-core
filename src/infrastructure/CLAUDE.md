@@ -11,7 +11,7 @@ Each sub-directory corresponds to exactly **one** external system:
 
 | Sub-directory | External system |
 |---|---|
-| `ai/` | AI provider client interface (Claude, Gemini, OpenAI) |
+| `ai/` | LLM response JSON salvage helper (`extractJsonWithRepair`); the `CallAiProvider` port lives in `domain/ports/aiProvider.ts` |
 | `cache/` | Upstash Redis — TTL-based cache + cache-key builders |
 | `chat/` | Chat token store (Upstash Redis-backed daily token bucket) |
 | `db/` | Persistence interfaces (Neon / PostgreSQL — usage logs, user tier) |

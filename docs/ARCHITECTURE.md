@@ -127,11 +127,11 @@ const key = process.env.API_KEY; // 금지
     │   ├── chat
     │   ├── constants
     │   ├── indicators
-    │   ├── ports
+    │   ├── ports          # Port interfaces (CacheProvider, CallAiProvider, …)
     │   ├── signals
     │   └── utils
     ├── infrastructure
-    │   ├── ai            # AI provider type contracts (no SDK adapter)
+    │   ├── ai            # LLM response JSON salvage helper (no SDK adapter); port lives in domain/ports/aiProvider.ts
     │   ├── cache
     │   ├── chat
     │   ├── db            # Abstract repository interfaces only (no Drizzle/Neon)
@@ -200,7 +200,7 @@ no external imports, pure functions only.
 외부 시스템과의 경계를 담당한다. 각 서브디렉토리는 **하나의 외부 시스템**에만 대응하며,
 `types.ts`에 정의된 인터페이스를 구현한다.
 
-- `ai/` — AI 프로바이더 호출 시그니처(`callAiProvider`) 타입 계약. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
+- `ai/` — LLM 응답 JSON salvage 헬퍼(`extractJsonWithRepair`)만 보유. AI 프로바이더 호출 시그니처(`CallAiProvider`)는 `domain/ports/aiProvider.ts`(port)로 이전됨. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
 - `cache/` — Upstash Redis 래퍼 (TTL 기반 캐시)
 - `chat/` — Upstash Redis 기반 채팅 토큰 저장소
 - `db/` — 추상 Repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`) + 사용량/티어 union 타입. 실제 DB 어댑터(Drizzle/Neon)는 consumer 소유.
