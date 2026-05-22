@@ -1,5 +1,10 @@
 # Fix Log
 
+## [PR #93 Round 1 | worktree-agent-a20856e6094365c94 | 2026-05-22]
+- Violation: `domain/ports/chatTokenStore.ts` JSDoc references infrastructure path (`infrastructure/chat/`) and concrete adapter function name (`hashClientIp`) — gemini-code-assist inline comment
+- Rule: domain layer must remain isolated from infrastructure; port JSDoc should describe policy (e.g. "identifiers are hashed") rather than naming concrete adapter modules/functions
+- Context: Migration PR moved `ChatTokenStore` into `domain/ports/`, but the JSDoc still pointed adapters consumers at a specific infrastructure subdirectory and helper name. Rewrote the port description to refer to "implementations" / "the adapter" abstractly so the port contract stays direction-agnostic.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).
