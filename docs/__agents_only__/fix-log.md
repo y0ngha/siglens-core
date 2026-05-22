@@ -1,5 +1,18 @@
 # Fix Log
 
+## [PR #96 Round 2 follow-up | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- S1: `src/domain/ports/jobStateStore.ts` — `JobStateStore` 인터페이스 메서드(get/set/deleteMany)에 per-method JSDoc 한 줄 설명 누락. 기존 공개 포트(`CacheProvider`)는 각 메서드에 한 줄 설명을 갖추고 있어 IDE hover 시 의도 파악이 즉시 가능. `@internal` 포트라도 어댑터 개발자 / 내부 리뷰어의 가독성을 위해 동일 패턴을 적용. 특히 `deleteMany`는 단일 키 `delete`와 달리 다중 키 + 삭제 개수 반환이라는 차이를 명시.
+  - Rule: Domain ports authoring 패턴 일관성 — 기존 포트(`CacheProvider`)와 동일하게 각 메서드 한 줄 JSDoc 추가.
+
+## [PR #96 Round 2 | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- B1: `src/domain/ports/jobRedisClient.ts` (renamed → `jobStateStore.ts`) — 도메인 포트 이름 `JobRedisClient`가 인프라 기술명("Redis")을 노출하고 `domain/CLAUDE.md` Ports authoring rules가 권장하는 접미사(`Provider`/`Repository`/`Dispatcher`/`Store`)를 따르지 않음. 또한 `RedisSetOpts.ex` 필드와 `del(...)` 메서드 이름은 Redis CLI 약어를 그대로 도메인에 노출. 포트를 `JobStateStore`(메서드 `deleteMany`, 옵션 필드 `ttlSeconds`)로 전면 개명하고 어댑터(`infrastructure/jobs/redis.ts`)에서 Upstash 시그니처(`{ ex }`, `del(...)`)로 번역하도록 변경. 어댑터 팩토리도 `createJobRedis` → `createJobStateStore`로 변경.
+  - Rule: `src/domain/CLAUDE.md` Ports > Authoring rules — 도메인 포트 이름은 구현 기술에 무관해야 하며 허용된 접미사(`Provider`/`Repository`/`Dispatcher`/`Store`)를 사용해야 한다.
+- B2: `src/domain/ports/jobStateStore.ts` — `set` 메서드 반환 타입이 `Promise<unknown>`이라 호출부 계약이 모호. 모든 호출부가 반환값을 무시하고 `CacheProvider.set`도 `Promise<void>`이므로 `Promise<void>`로 변경. 어댑터에서 Upstash의 `"OK"` 응답을 흡수.
+  - Rule: FF.md Predictability — 사용되지 않는 반환값은 `void`로 선언해 호출부 계약을 명확히.
+- B3: `docs/API.md` (line 139 영역) — Job 모듈 "구현 위치" 다이어그램이 여전히 `JobRedisClient` 인터페이스가 `infrastructure/jobs/types.ts`에 있다고 표시. 포트 마이그레이션 후 새 이름(`JobStateStore`, `JobStateSetOpts`)과 위치(`domain/ports/jobStateStore.ts`)로 갱신.
+  - Rule: MISTAKES.md Documentation Sync — 외부 서비스 사용처/포트 위치 변경 시 같은 PR 내에서 `docs/API.md` 갱신.
+- Reject: `src/infrastructure/jobs/queue.ts:6` (gemini) — `JobStatus`/`JobMeta`를 `domain/types.ts`로 이동 제안. 이 PR은 포트 인터페이스 마이그레이션이 스코프이며, DTO 분류는 별도 brainstorming + PR이 필요한 결정. queue.ts에 답글로 거부 사유 게시.
+
 ## [PR #88 Round 4 | feat/options-0dte-slot-and-cache-hit | 2026-05-22]
 - S1: `src/domain/options/types.ts` + `src/domain/options/expirationSlots.ts` — 공개 `ExpirationSlotKey` / `EXPIRATION_SLOTS` JSDoc이 `@internal` 상수 `ZERO_DTE_MAX_DAYS`를 직접 참조. npm 소비자가 IDE hover 시 import 불가능한 내부 심볼명을 보게 됨. 두 곳 모두 구체 숫자(`6 days out`)로 치환.
   - Rule: MISTAKES.md §9.5/§9.6 — 공개 API JSDoc에서 `@internal` 심볼 참조 금지(소비자 측에서 접근 불가).
@@ -307,4 +320,9 @@
 - Violation: skipEnqueueIfMiss option not propagated from top-level to sub-axis submits inside submitOverallAnalysis
 - Rule: bot-gating intent — skipEnqueueIfMiss must prevent worker enqueue at every layer it triggers
 - Context: Gemini high-priority — resolveOverallDependencies was called BEFORE the existing guard at line 231, and the resolver forwarded options to submitAnalysis / submitFundamentalAnalysis / submitNewsAnalysis WITHOUT the flag. A bot request would have triggered three sub-axis workers before reaching the overall-level guard. Fixed by (1) moving skipEnqueueIfMiss onto OverallDependencyInputs so the resolver sees it, (2) forcing skipEnqueueIfMiss into all three sub-axis option objects in the resolver, and (3) adding a new DependencyStateMissNoTrigger short-circuit so submitOverallAnalysis returns miss_no_trigger directly when any axis returns miss_no_trigger. Added 5 new resolver tests + 1 new submit test (74 → 80 in the overall suite) to lock in propagation behavior.
+
+## [PR #96 | worktree-refactor+ports-jobs-slice | 2026-05-22]
+- Violation: Multiple JSDoc tags packed on a single line (`@port @internal`) — standard JSDoc/TypeDoc parsers consume `@internal` as `@port`'s description text instead of treating it as an independent tag
+- Rule: JSDoc tag declaration — each block tag must be on its own line so parsers (TypeDoc included) recognize them as independent tags
+- Context: Round 3 suggestion on src/domain/ports/jobStateStore.ts JobStateStore interface — split `@port @internal` into two separate lines so TypeDoc honors the `@internal` exclusion when generating docs
 
