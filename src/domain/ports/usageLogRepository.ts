@@ -23,6 +23,11 @@ export interface CreateUsageLogInput {
  * Adapters are owned by consumers (Drizzle/Neon implementations live in the
  * consuming application); `siglens-core` declares only the contract the
  * domain depends on.
+ *
+ * **IP handling contract:** adapters of this port receive an *already hashed*
+ * IP via `CreateUsageLogInput.ipHash` and persist it as-is. Hashing happens at
+ * the caller (typically alongside an authenticated request that has already
+ * derived the daily IP hash), so this port performs no IP transformation.
  */
 export interface UsageLogRepository {
     /**

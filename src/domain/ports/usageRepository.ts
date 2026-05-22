@@ -16,7 +16,14 @@ export interface RecordUsageInput {
     occurredAt?: Date;
 }
 
-/** Daily usage counts grouped by action type. */
+/**
+ * Daily usage counts grouped by action type.
+ *
+ * Only the action types that participate in the daily rate-limit aggregation
+ * are surfaced here. `premium_model` is intentionally omitted because those
+ * events are tracked separately through {@link UsageLogRepository} for billing
+ * purposes and do not contribute to the per-IP daily quota.
+ */
 export interface UsageCounts {
     /** Number of analysis requests recorded for the UTC day. */
     analysis: number;
@@ -31,6 +38,11 @@ export interface UsageCounts {
  * Adapters are owned by consumers (Drizzle/Neon implementations live in the
  * consuming application); `siglens-core` declares only the contract the
  * domain depends on.
+ *
+ * **IP handling contract:** adapters of this port receive the *raw* client IP
+ * via `RecordUsageInput.ipAddress` and are responsible for hashing it (together
+ * with any daily salt) before persistence. The raw IP must never be stored. The
+ * resulting hash is what `getUsageToday` expects as its `ipHash` argument.
  */
 export interface UsageRepository {
     /**

@@ -9,6 +9,11 @@
 - Rule: MISTAKES.md Documentation Sync — code refactor and folder-structure docs must be updated in the same PR (extends §2/§3 from infra-only to architecture-level moves).
 - Context: PR introduced `domain/ports/{cache,usageRepository,usageLogRepository,userTierRepository}.ts` and deleted `infrastructure/db/`, but the folder-structure tree, dependency-rule paragraph, and infrastructure module list in ARCHITECTURE.md still referenced db/ and never mentioned ports/.
 
+## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22] (Round 2)
+- Violation: `src/domain/CLAUDE.md` port-layout block listed `UsageLogRecord` and `UsageActionType` under `usageLogRepository.ts` / `usageRepository.ts`, but those symbols actually live in `domain/types.ts` (the ports only import them).
+- Rule: MISTAKES.md Documentation Sync §3 — code refactor / type relocation and the symbol-mapping doc must be updated in the same PR (and ports.ts authoring rule: "DTOs the port returns or receives stay in `domain/types.ts`").
+- Context: Round 1 lifted both DTO types out of the per-port files into `domain/types.ts` to break a circular import, but the CLAUDE.md mapping table still credited the port files as the definition site, so future agents searching for the symbols would open the wrong file.
+
 - Violation: Custom JSDoc tag `@internal-sync` used on a public Tier 4 union without being defined anywhere in project docs.
 - Rule: CONVENTIONS.md JSDoc Rules — public symbols must use documented tags so IDE/TypeDoc render correctly. Custom unrecognized tags become noise for npm consumers.
 - Context: `UsageActionType` carried a hand-rolled `@internal-sync` block explaining cross-repo sync requirements with siglens. Replaced with the standard `@remarks` block, which TypeDoc and IDEs render natively. Same content, standard tag.
