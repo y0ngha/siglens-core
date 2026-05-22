@@ -6,10 +6,10 @@
  * expose a refund operation so failed downstream calls can release the slot
  * back to the user.
  *
- * Implementations surface the underlying client's errors to the caller —
- * graceful degradation (e.g. treating a store outage as "limit not reached"
- * so chat remains usable) is the responsibility of the adapter or the
- * application-layer caller depending on the operation.
+ * Adapters may degrade gracefully on infrastructure outages — for example,
+ * treating a store failure as "limit not reached" so chat remains available —
+ * or surface underlying errors to the caller for the caller to handle.
+ * Which behavior applies is an adapter-level decision.
  *
  * All identifiers are expected to be already hashed before being passed to
  * this port — the port never sees raw client IPs.
