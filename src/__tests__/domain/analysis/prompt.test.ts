@@ -3612,12 +3612,12 @@ describe('prompt', () => {
             expect(result).toContain('Equilibrium Zone: 150.00 ~ 160.00');
             expect(result).toContain('Discount Zone: 140.00 ~ 150.00');
             expect(result).toMatch(
-                /Snapshot price \(.+\) is in (premium|discount|equilibrium|neutral) zone/
+                /Snapshot Price \(.+\) is in (premium|discount|equilibrium|neutral) zone/
             );
             expect(result).toContain('is in premium zone');
         });
 
-        it('labels SMC price-zone line as "Snapshot price" (not "Current price")', () => {
+        it('labels SMC price-zone line as "Snapshot Price" (not "Current price")', () => {
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,
                 premiumZone: { high: 170.0, low: 160.0, type: 'premium' },
@@ -3637,7 +3637,7 @@ describe('prompt', () => {
                 '1Day'
             );
             expect(prompt).toMatch(
-                /Snapshot price \([\d.]+\) is in (premium|discount|equilibrium|neutral) zone/
+                /Snapshot Price \([\d.]+\) is in (premium|discount|equilibrium|neutral) zone/
             );
             expect(prompt).not.toMatch(/Current price \(/);
         });
@@ -3698,7 +3698,10 @@ describe('prompt', () => {
                 makeIndicators({ smc })
             );
             const indicatorIdx = result.indexOf('## Indicator Values');
-            const smcIdx = result.indexOf('## Smart Money Concepts (SMC)');
+            // lastIndexOf: ANALYSIS_GUIDELINES의 'Price Reference Naming' 항목이
+            // '## Smart Money Concepts (SMC)' 문자열을 참조하므로, 실제 SMC 섹션
+            // 시작점을 찾으려면 마지막 등장 위치를 사용한다.
+            const smcIdx = result.lastIndexOf('## Smart Money Concepts (SMC)');
             expect(indicatorIdx).toBeGreaterThan(-1);
             expect(smcIdx).toBeGreaterThan(indicatorIdx);
         });

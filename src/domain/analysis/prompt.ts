@@ -534,7 +534,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     const currentPriceLine =
         currentPrice !== null
             ? [
-                  `- Snapshot price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
+                  `- Snapshot Price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
               ]
             : [];
     const marketZonesSection =
@@ -758,10 +758,9 @@ const ANALYSIS_GUIDELINES = [
     '- Mention the conflict explicitly in the summary so the user understands the mixed picture.',
     '',
     '### Price Reference Naming',
-    '- The "Snapshot Price" in ## Analysis Snapshot is the bar close at the moment this analysis was captured, not a live market quote.',
-    '- In the Korean summary, actionRecommendation text fields, strategyResults summaries, and any other long-form Korean prose, refer to this value as "분석 시점 가격" or "분석 당시 종가".',
+    '- The "Snapshot Price" labels in ## Analysis Snapshot and ## Smart Money Concepts (SMC) represent the bar close at the moment this analysis was captured, not a live market quote.',
+    '- In all Korean output fields (summary, actionRecommendation, strategyResults, etc.), refer to this value consistently as "분석 시점 가격" or "분석 당시 종가".',
     '- NEVER call it "현재 가격" or "실시간 가격" — those phrases imply a live market quote, which this analysis does not have.',
-    '- The same rule applies to the SMC "Snapshot price" reference: phrase it as "분석 시점 가격" in Korean output.',
     '',
     '### Readable Text Formatting Rules',
     '- All long-form Korean prose fields must be easy to render in a UI without becoming one dense line.',
@@ -987,7 +986,7 @@ function byName(a: Skill, b: Skill): number {
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
  * Composes a fully-rendered English prompt that the worker LLM consumes to
- * produce an `AnalysisResponse`. Sections include current market status,
+ * produce an `AnalysisResponse`. Sections include analysis snapshot,
  * long-term context, recent bars with detected candle patterns, buy / sell
  * volume split, every indicator value with timeframe-aware trend labels,
  * SMC structure, and per-skill writing rules.
