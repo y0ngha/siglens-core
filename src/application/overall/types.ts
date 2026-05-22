@@ -202,8 +202,9 @@ export interface OverallDependencyInputs {
     /**
      * OI snapshot staleness marker. Forwarded to the prompt as a hint and
      * echoed back on `OverallAnalysisResponse.optionsOiStale` so the UI can
-     * show a stale badge. Computed by the caller (app side) using
-     * isOpenInterestSnapshotStale + isUsOptionsRegularSession.
+     * show a stale badge. Caller-determined: set to `true` when the snapshot
+     * was captured outside U.S. options regular trading hours and the
+     * open-interest counts are stale (still reflecting the previous session).
      */
     optionsOiStale?: boolean;
 

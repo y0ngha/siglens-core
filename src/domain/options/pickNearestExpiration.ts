@@ -10,7 +10,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * `now`. Returns null when no future expiration exists (NoChains-like edge).
  *
  * `snapshot.chains` is documented as ascending-sorted by `expirationDate`, so
- * we scan once and return the first hit per branch.
+ * the filtered list is also ascending and `.find()` returns the first hit per
+ * branch (filter + find is O(n) twice but the chain list is trivially small).
  *
  * Used only by the overall dependency resolver; not re-exported from the
  * package public surface.
@@ -22,13 +23,15 @@ export function pickNearestExpiration(
     const nowMs = now.getTime();
     const preferredMinMs = nowMs + PREFERRED_MIN_DAYS * MS_PER_DAY;
 
-    let earliestFuture: string | null = null;
-    for (const chain of snapshot.chains) {
+    const futureChains = snapshot.chains.filter(chain => {
         const ms = Date.parse(chain.expirationDate);
-        if (Number.isNaN(ms)) continue;
-        if (ms < nowMs) continue;
-        if (earliestFuture === null) earliestFuture = chain.expirationDate;
-        if (ms >= preferredMinMs) return chain.expirationDate;
-    }
-    return earliestFuture;
+        return !Number.isNaN(ms) && ms >= nowMs;
+    });
+
+    const preferred = futureChains.find(
+        chain => Date.parse(chain.expirationDate) >= preferredMinMs
+    );
+    if (preferred !== undefined) return preferred.expirationDate;
+
+    return futureChains[0]?.expirationDate ?? null;
 }
