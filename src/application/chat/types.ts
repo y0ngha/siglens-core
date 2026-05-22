@@ -8,7 +8,7 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
-import type { CallAiProviderOptions } from '@/infrastructure/ai/types';
+import type { CallAiProviderOptions } from '@/domain/ports/aiProvider';
 import type { ChatTokenStore } from '@/infrastructure/chat/types';
 import type { UsageLogRepository, UsageRepository } from '@/infrastructure/db';
 

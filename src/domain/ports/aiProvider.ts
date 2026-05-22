@@ -1,3 +1,16 @@
+/**
+ * @port
+ * Provider-neutral AI chat-completion contract the domain depends on for
+ * generating analysis text, briefings, and chat replies.
+ *
+ * Adapters live in consumer codebases (this library does not ship a concrete
+ * AI SDK adapter — see `docs/ARCHITECTURE.md`). Implementations must route by
+ * `options.model` to the appropriate upstream provider (Gemini, OpenAI,
+ * Anthropic, …) and return the generated text. Upstream provider errors
+ * should be surfaced to the caller — the application layer maps them to
+ * typed error codes.
+ */
+
 /** Speaker role accepted by the Gemini contents schema. */
 export type GeminiRole = 'user' | 'model';
 
@@ -36,3 +49,12 @@ export interface CallAiProviderOptions {
     /** Optional system instruction passed via `config.systemInstruction`. */
     systemInstruction?: string;
 }
+
+/**
+ * Callable port shape for the AI provider. Adapters implement this signature
+ * directly (no class wrapper) and the application layer accepts the function
+ * as a dependency.
+ */
+export type CallAiProvider = (
+    options: CallAiProviderOptions
+) => Promise<string>;

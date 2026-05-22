@@ -391,8 +391,9 @@ export type {
     GeminiRole,
     GeminiContent,
     GeminiPart,
+    CallAiProvider,
     CallAiProviderOptions,
-} from './infrastructure/ai/types';
+} from './domain/ports/aiProvider';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {
     ChatActionResult,

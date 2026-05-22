@@ -458,11 +458,12 @@ export type {
 } from './application/usage';
 export type {
     AiContents,
+    CallAiProvider,
     CallAiProviderOptions,
     GeminiContent,
     GeminiPart,
     GeminiRole,
-} from './infrastructure/ai/types';
+} from './domain/ports/aiProvider';
 export type { CacheProvider } from './domain/ports/cache';
 export type { ChatTokenStore } from './infrastructure/chat/types';
 export type {

@@ -14,7 +14,7 @@ import type {
     Tier,
     TierConfig,
 } from '@/domain/types';
-import type { AiContents } from '@/infrastructure/ai/types';
+import type { AiContents } from '@/domain/ports/aiProvider';
 import {
     createChatTokenStore,
     hashClientIp,
