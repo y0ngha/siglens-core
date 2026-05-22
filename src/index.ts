@@ -464,7 +464,7 @@ export type {
     GeminiRole,
 } from './infrastructure/ai/types';
 export type { CacheProvider } from './domain/ports/cache';
-export type { ChatTokenStore } from './infrastructure/chat/types';
+export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type {
     CreateUsageLogInput,
     RecordUsageInput,
