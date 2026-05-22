@@ -27,11 +27,16 @@ import type {
     FundamentalAnalysisResponse,
     ModelId,
     NewsAnalysisResponse,
+    OptionsAnalysisResponse,
     OverallAnalysisResponse,
     Tier,
     TierConfig,
     Timeframe,
 } from '@/domain/types';
+import type {
+    SubmitOptionsAnalysisLimitError,
+    SubmitOptionsAnalysisApiKeyRequiredError,
+} from '@/application/options/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
 /** Axis identifier for the four-axis overall analysis pipeline. */
@@ -215,12 +220,19 @@ export interface OverallDependencyInputs {
 // Dependency resolver output types
 // ─────────────────────────────────────────
 
-/** All three dependency axes resolved from cache — overall analysis can be built immediately. */
+/**
+ * All four dependency axes resolved — overall analysis can be built immediately.
+ *
+ * `options` is `null` when the axis was gracefully skipped (the caller omitted
+ * `optionsSnapshot` or `submitOptionsAnalysis` returned `no_chains_error`).
+ * Non-null payloads carry the full options analysis to feed into the prompt.
+ */
 export interface DependencyStateCached {
     kind: 'cached';
     technical: AnalysisResponse;
     fundamental: FundamentalAnalysisResponse;
     news: NewsAnalysisResponse;
+    options: OptionsAnalysisResponse | null;
 }
 
 /**
@@ -259,7 +271,9 @@ export interface DependencyStateError {
         | SubmitFundamentalAnalysisApiKeyRequiredError
         | SubmitNewsAnalysisNoNewsError
         | SubmitNewsAnalysisLimitError
-        | SubmitNewsAnalysisApiKeyRequiredError;
+        | SubmitNewsAnalysisApiKeyRequiredError
+        | SubmitOptionsAnalysisLimitError
+        | SubmitOptionsAnalysisApiKeyRequiredError;
 }
 
 /**

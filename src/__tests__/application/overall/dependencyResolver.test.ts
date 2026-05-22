@@ -1,20 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 
-// ── Mock the three submit functions before importing the resolver ──
+// ── Mock the four submit functions before importing the resolver ──
 vi.mock('@/application/market/submitAnalysis');
 vi.mock('@/application/fundamental/submitFundamentalAnalysis');
 vi.mock('@/application/news/submitNewsAnalysis');
+vi.mock('@/application/options/submitOptionsAnalysis');
 
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type { OverallDependencyInputs } from '@/application/overall/types';
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
+import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
 import type {
     AnalysisResponse,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
+    OptionsSnapshot,
+    OptionsChain,
 } from '@/domain/types';
 import {
     makeEnrichedNewsItem,
@@ -25,6 +29,36 @@ import {
 const mockSubmitAnalysis = submitAnalysis as Mock;
 const mockSubmitFundamentalAnalysis = submitFundamentalAnalysis as Mock;
 const mockSubmitNewsAnalysis = submitNewsAnalysis as Mock;
+const mockSubmitOptionsAnalysis = submitOptionsAnalysis as Mock;
+
+// ─── Options snapshot helpers ──────────────────────────────────────────────
+function makeOptionsChain(date: string): OptionsChain {
+    return {
+        expirationDate: date,
+        calls: [],
+        puts: [],
+    } as OptionsChain;
+}
+
+/** Snapshot with one chain ~7 days out — passes pickNearestExpiration's ≥3d floor. */
+function makeSnapshot(): OptionsSnapshot {
+    return {
+        symbol: 'AAPL',
+        underlyingPrice: 100,
+        chains: [makeOptionsChain('2099-01-08')],
+        capturedAt: '2099-01-01T00:00:00Z',
+    };
+}
+
+/** Snapshot with no chains — pickNearestExpiration returns null so the resolver short-circuits. */
+function makeEmptySnapshot(): OptionsSnapshot {
+    return {
+        symbol: 'AAPL',
+        underlyingPrice: 100,
+        chains: [],
+        capturedAt: '2099-01-01T00:00:00Z',
+    };
+}
 
 // ─────────────────────────────────────────
 // Fixtures
@@ -981,6 +1015,173 @@ describe('resolveOverallDependencies 함수는', () => {
             );
 
             expect(state).toEqual({ kind: 'miss_no_trigger' });
+        });
+    });
+
+    describe('options axis', () => {
+        beforeEach(() => {
+            // Reset the options mock between tests so `mockResolvedValueOnce`
+            // queues from earlier tests don't leak forward (vi.clearAllMocks
+            // resets call history but not queued resolutions).
+            mockSubmitOptionsAnalysis.mockReset();
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+        });
+
+        it('returns options: null when optionsSnapshot is undefined', async () => {
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: undefined })
+            );
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toBeNull();
+            }
+            // The options axis was never dispatched.
+            expect(mockSubmitOptionsAnalysis).not.toHaveBeenCalled();
+        });
+
+        it('returns options: null when submitOptionsAnalysis returns no_chains_error', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No options chains available',
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeEmptySnapshot() })
+            );
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toBeNull();
+            }
+        });
+
+        it('surfaces options limit_error like other axis errors', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'limit_error',
+                code: 'usage_limit_exceeded',
+                error: { code: 'usage_limit_exceeded', message: 'limit' },
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('options');
+            }
+        });
+
+        it('surfaces options key_error like other axis errors', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: 'BYOK required',
+                modelId: 'gemini-2.5-pro',
+                tier: 'member',
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('error');
+            if (state.kind === 'error') {
+                expect(state.axis).toBe('options');
+            }
+        });
+
+        it('includes options jobId in pendingJobs when submitted', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'submitted',
+                jobId: 'opt-123',
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('pending');
+            if (state.kind === 'pending') {
+                expect(state.pendingJobs.options).toBe('opt-123');
+            }
+        });
+
+        it('returns cached options payload when submitOptionsAnalysis hits cache', async () => {
+            const cachedOptions = {
+                summary: 'Options summary',
+                tone: 'neutral',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2099-01-01T00:00:00Z',
+            };
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'cached',
+                result: cachedOptions,
+            });
+            const state = await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot() })
+            );
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toEqual(cachedOptions);
+            }
+        });
+
+        it('drops options.usage when dropAxisUsage is true', async () => {
+            const fakeUsage = {
+                usageRepository: {
+                    recordUsage: vi.fn(),
+                    getUsageToday: vi.fn(),
+                },
+                clientIp: '203.0.113.10',
+            };
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No usable chains',
+            });
+            await resolveOverallDependencies(
+                makeInputs({
+                    optionsSnapshot: makeSnapshot(),
+                    options: {
+                        usage: fakeUsage,
+                        modelId: 'claude-sonnet-4-6',
+                    },
+                }),
+                { dropAxisUsage: true }
+            );
+            const optionsOpts = mockSubmitOptionsAnalysis.mock.calls[0]?.[0];
+            expect(optionsOpts).not.toHaveProperty('usage');
+        });
+
+        it('forwards top-level force to all 4 axes', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No usable chains',
+            });
+            await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot(), force: true })
+            );
+            // The technical axis receives `force` as the 4th positional arg.
+            const technicalArgs = mockSubmitAnalysis.mock.calls[0];
+            expect(technicalArgs?.[3]).toBe(true);
+
+            // The other three axes receive `force` inside the options object.
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: true })
+            );
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: true })
+            );
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ force: true })
+            );
         });
     });
 });
