@@ -33,7 +33,7 @@ import {
     cleanupJob,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { FileSkillsLoader } from '@/infrastructure/skills/loader';
+import { createSkillsProvider } from '@/infrastructure/skills/loader';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 
@@ -82,9 +82,9 @@ describe('pollAnalysis 함수는', () => {
         mockCleanupJob.mockResolvedValue(undefined);
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheSet.mockResolvedValue(undefined);
-        (FileSkillsLoader as Mock).mockImplementation(() => ({
+        (createSkillsProvider as Mock).mockReturnValue({
             loadSkills: mockLoadSkills,
-        }));
+        });
         mockLoadSkills.mockResolvedValue([]);
         mockEnrichAnalysisWithConfidence.mockReturnValue(rawResult);
         mockPostProcessAnalysisWithReconcile.mockReturnValue(rawResult);
