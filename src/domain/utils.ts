@@ -72,8 +72,8 @@ export function computeSecondsUntilCacheExpiry(
     return Math.max(1, Math.floor(diffMs / MS_PER_SECOND));
 }
 
-// U.S. regular-session open/close times (ET). Exposed publicly as the single
-// source of truth shared by siglens' options UI, cache, and analysis gating.
+// U.S. regular-session open/close times (ET) — single source of truth for
+// cross-module session gating.
 /** U.S. regular-session open hour in Eastern Time. */
 export const MARKET_OPEN_HOUR = 9;
 /** U.S. regular-session open minute in Eastern Time (opens at 09:30). */
@@ -125,8 +125,8 @@ function etSessionParts(now: Date): EtSessionParts {
  *
  * DST-safe: `Intl.DateTimeFormat('America/New_York')` resolves EDT/EST from the
  * calendar position of `now`, so callers never handle the summer-time shift.
- * Pure function — the caller passes an explicit `now` so the domain layer stays
- * deterministic and tests can freeze the clock without mocking.
+ * Pure function — the caller supplies an explicit `now` so results are
+ * deterministic and testable without mocking the system clock.
  *
  * @param now - The instant to classify.
  * @returns `'weekend'` (Sat/Sun), `'open'` (weekday 09:30–16:00 ET with the

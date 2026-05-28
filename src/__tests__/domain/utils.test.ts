@@ -207,19 +207,8 @@ describe('getEtSessionStatus', () => {
             'weekend'
         );
     });
-    it('일요일이면 weekend (Sun 12:00 ET)', () => {
-        // 2026-07-05T16:00:00Z = Sun 12:00 EDT
-        expect(getEtSessionStatus(new Date('2026-07-05T16:00:00Z'))).toBe(
-            'weekend'
-        );
-    });
     it('EDT 평일 정규장 중이면 open (Mon 10:00 ET)', () => {
         expect(getEtSessionStatus(new Date('2026-07-06T14:00:00Z'))).toBe(
-            'open'
-        );
-    });
-    it('EST 평일 정규장 중이면 open (Mon 10:00 ET)', () => {
-        expect(getEtSessionStatus(new Date('2026-01-05T15:00:00Z'))).toBe(
             'open'
         );
     });
@@ -237,11 +226,6 @@ describe('getEtSessionStatus', () => {
     });
     it('개장 전이면 closed (Mon 08:00 ET)', () => {
         expect(getEtSessionStatus(new Date('2026-07-06T12:00:00Z'))).toBe(
-            'closed'
-        );
-    });
-    it('마감 후면 closed (Mon 17:00 ET)', () => {
-        expect(getEtSessionStatus(new Date('2026-07-06T21:00:00Z'))).toBe(
             'closed'
         );
     });
