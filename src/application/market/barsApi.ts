@@ -33,8 +33,8 @@ function computeFromDay(timeframe: Timeframe, now: Date): string {
  * @returns Bars and the computed indicator results, ready to be passed to
  *   downstream prompt builders or signal detectors.
  *
- * @throws {Error} If the configured market data provider rejects the request
- *   (e.g. missing API credentials, network error, upstream rate limit).
+ * @throws {Error} If the injected provider's `getBars` call fails
+ *   (e.g. network error, upstream rate limit).
  *
  * @example
  * ```ts

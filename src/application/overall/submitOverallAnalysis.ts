@@ -126,6 +126,9 @@ function stripVolatileOptionsFields(
  *   news, calendar) and optional background-task hooks.
  * @returns The submission outcome — see {@link SubmitOverallAnalysisResult}.
  *
+ * @throws {Error} If `options.marketDataProvider` is absent on a cache miss
+ *   that proceeds to fetch, or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
+ *
  * @example
  * ```ts
  * const res = await submitOverallAnalysis({ symbol: 'AAPL', timeframe: '1Day', modelId: '...', ... });
