@@ -1,8 +1,10 @@
 import {
     KST_OFFSET_HOURS,
+    MINUTES_PER_DAY,
     MS_PER_DAY,
     MS_PER_HOUR,
     MS_PER_SECOND,
+    SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
 
 const MARKDOWN_CODE_BLOCK_PATTERN = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
@@ -106,7 +108,7 @@ function etSessionParts(now: Date): EtSessionParts {
     return { weekdayIndex, minutesOfDay: hour * 60 + minute };
 }
 
-/** @internal DST-safe 정규장 오픈 여부 헬퍼. `computeBarsEffectiveTtl`에서 사용. */
+/** @internal DST 안전한 뉴욕 정규장(09:30–16:00 ET) 개장 여부를 반환한다. */
 export function isEtRegularSessionOpen(now: Date): boolean {
     const { weekdayIndex, minutesOfDay } = etSessionParts(now);
     if (weekdayIndex === 0 || weekdayIndex === 6) return false;
@@ -127,7 +129,7 @@ function daysToNextWeekday(fromWeekdayIndex: number): number {
     return offset;
 }
 
-/** @internal 다음 정규장 개장까지 남은 초. `computeBarsEffectiveTtl`에서 사용. */
+/** @internal 다음 뉴욕 정규장 개장(09:30 ET)까지 남은 초를 반환한다. */
 export function secondsUntilNextEtRegularOpen(now: Date): number {
     const { weekdayIndex, minutesOfDay } = etSessionParts(now);
     const isWeekday = weekdayIndex >= 1 && weekdayIndex <= 5;
@@ -138,6 +140,6 @@ export function secondsUntilNextEtRegularOpen(now: Date): number {
             : daysToNextWeekday(weekdayIndex);
 
     const minutesUntilOpen =
-        dayOffset * 24 * 60 + ET_REGULAR_OPEN_MINUTES - minutesOfDay;
-    return Math.max(1, minutesUntilOpen * 60 - now.getUTCSeconds());
+        dayOffset * MINUTES_PER_DAY + ET_REGULAR_OPEN_MINUTES - minutesOfDay;
+    return minutesUntilOpen * SECONDS_PER_MINUTE - now.getUTCSeconds();
 }

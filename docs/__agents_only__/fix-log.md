@@ -1,5 +1,11 @@
 # Fix Log
 
+## [PR #102 | feat/bars-cache-ttl | 2026-05-28] — Oscillation resolution
+- Symbol: `secondsUntilNextEtRegularOpen` `Math.max(1, ...)` guard
+- R1 (review-agent): suggested wrapping in `Math.max(1, ...)` for a defensive min-1s TTL → applied.
+- R2 (review-agent): flagged it as provably-unreachable dead code (MISTAKES.md Design & Cohesion #6) → user decided to REMOVE it.
+- Resolution: Math.max removed. The guard is mathematically unreachable (dayOffset=0 ⇒ minutesOfDay<570 ⇒ result ≥ 1). If a future round re-suggests adding it, cite this decision and decline.
+
 ## [PR #98 | worktree-agent-a72bc4671dbf75a3c | 2026-05-22] (Round 4)
 - Violation: `{@link UsageLogRepository}` JSDoc tag in `src/domain/types.ts` (base layer) referencing a symbol declared in `src/domain/ports/usageLogRepository.ts` (upper layer that imports from `domain/types.ts`).
 - Rule: ARCHITECTURE.md — layer dependency direction `domain/types.ts → (no upward imports/refs)`; documentation references should follow the same direction as code imports to avoid implying a reverse coupling.
