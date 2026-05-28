@@ -101,3 +101,13 @@
 - Rule: JSDoc tag declaration — each block tag must be on its own line so parsers (TypeDoc included) recognize them as independent tags
 - Context: Round 3 suggestion on src/domain/ports/jobStateStore.ts JobStateStore interface — split `@port @internal` into two separate lines so TypeDoc honors the `@internal` exclusion when generating docs
 
+## [PR #104 | refactor/fear-greed-public-api | 2026-05-28]
+- Violation: `scoreToLabel` function promoted from `@internal` to public API (Tier 2) without upgrading JSDoc to Tier 2 standard
+- Rule: MISTAKES.md §Documentation 4.5 — Tier 2 public functions require @param and @returns JSDoc tags for IDE hover documentation; @returns type must match actual implementation
+- Context: Round 1 required finding — when promoting an `@internal` function to public, its JSDoc must be upgraded from bare description to full Tier 2 format (@param input, @returns type). Applied in Round 2 by adding @param and @returns tags to scoreToLabel JSDoc.
+- Pattern note: This violation type is systematic when promoting internal functions. When promoting `@internal` to public, always upgrade JSDoc tags: add missing @param blocks for each parameter and @returns for the function's return type. Easy to miss during refactoring.
+
+- Violation: New public exports added to src/index.ts and src/index.client.ts without smoke test assertions
+- Rule: Public API Smoke Tests — when wiring new public symbols through entrypoints, add basic assertions in corresponding .test.ts and .client.test.ts files to verify exports are present and callable
+- Context: Round 2 recommended findings — scoreToLabel, FEAR_GREED_LABEL_CUTOFFS, POC_WINDOW_DEFAULT were added to entrypoints but had no entrypoint smoke tests. Added 3 assertions to index.test.ts (scoreToLabel callability, CUTOFFS presence/type) and 3 to index.client.test.ts verifying all three symbols export correctly.
+

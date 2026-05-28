@@ -32,10 +32,10 @@ const toPercent = (v: number | null | undefined): number | null =>
  * always receive a structurally complete snapshot even when individual FMP calls
  * return null.
  *
- * Infrastructure adapters (e.g. the siglens FMP client) must map
- * `RawProfile.mktCap` → `FundamentalProfile.marketCap` when constructing the
- * input bundle, since `mktCap` is the FMP wire-format field name and `marketCap` is
- * the domain-neutral name used here.
+ * Infrastructure adapters (e.g. the siglens FMP client) must map FMP's
+ * wire-format `mktCap` → `FundamentalProfile.marketCap` when constructing the
+ * input bundle, since `mktCap` is the FMP field name and `marketCap` is the
+ * domain-neutral name used here.
  *
  * @param input - Aggregated domain-neutral inputs; see {@link NormalizeFundamentalSnapshotInput}.
  * @returns A fully typed `FundamentalSnapshot` ready for prompt builders and UI.

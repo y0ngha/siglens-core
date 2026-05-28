@@ -4,9 +4,9 @@ import type { FactorValues } from '@/domain/indicators/fearGreed/types';
 
 const VOL_Z_WINDOW = 20;
 /**
- * Default Volume Profile window for POC distance factor. Must match the value used by walkForward.
- *
- * @internal Imported by walkForward.ts; not part of the public API.
+ * Default Volume Profile window (in bars) for the POC distance factor. Must
+ * match the value used by walkForward. Public so consumers can label the factor
+ * window consistently (e.g. "POC distance (60 bar)").
  */
 export const POC_WINDOW_DEFAULT = 60;
 const MA200_WINDOW = 200;

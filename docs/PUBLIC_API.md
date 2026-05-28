@@ -196,11 +196,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `detectSignals` | `domain/signals/index.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
-**Fear & Greed Index (per-stock) (2)**
+**Fear & Greed Index (per-stock) (3)**
 | Symbol | Source |
 |---|---|
 | `computeFearGreedIndex(bars, buySellVolume, options?)` — per-stock Fear & Greed snapshot. Returns `FearGreedSnapshot \| null`. | `domain/indicators/fearGreed/walkForward.ts` |
 | `computeFearGreedHistory(bars, buySellVolume, options?)` — walk-forward 1-year score history. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/fearGreed/walkForward.ts` |
+| `scoreToLabel(score)` — map a 0..100 score to its 5-stage `FearGreedLabel`, using `FEAR_GREED_LABEL_CUTOFFS`. | `domain/indicators/fearGreed/composition.ts` |
 
 **프롬프트 빌더 (8 + 1 상수)**
 | Symbol | Source |
@@ -395,6 +396,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **지표 상수** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `EMA_DEFAULT_PERIODS` 등 `src/domain/indicators/constants.ts`의 지표 계산 기본값과 임계값.
 
+**Fear & Greed 상수** — `FEAR_GREED_LABEL_CUTOFFS` (5단계 분류 경계 25/45/55/75), `POC_WINDOW_DEFAULT` (= 60, POC 거리 팩터 기본 창) (`domain/indicators/fearGreed/`). siglens 게이지 세그먼트 렌더링·점수→라벨 분류에서 사용.
+
 **티어 제한 상수** — `DEFAULT_TIER`, `TIER_CONFIG` (`domain/tier.ts`).
 
 **시장 세션 상수/타입** — `MARKET_OPEN_HOUR`, `MARKET_OPEN_MINUTE`, `MARKET_CLOSE_HOUR`, `MARKET_CLOSE_MINUTE` (`domain/utils.ts`), `EtSessionStatus` (`domain/types.ts`). US 정규장 개장/마감 시각(ET) 상수와 세션 상태 union. siglens 옵션 UI·캐시·분석 게이팅에서 사용.
@@ -529,3 +532,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-22 | Market 모듈 domain/ports 마이그레이션 (PR #97). Tier 4 `MarketDataProvider`와 `GetBarsOptions`의 source가 `infrastructure/market/types.ts` → `domain/ports/marketDataProvider.ts`로 이동(port/adapter 분리). `src/index.ts`/`src/index.client.ts`의 `export type` 경로만 갱신되며 공개 시그니처/필드 변경은 없다. `MarketDataProviderType = 'alpaca' \| 'fmp'`는 `MARKET_DATA_PROVIDER` env var로 제어되는 내부 디스패치 식별자이므로 공개 export 하지 않고 `@internal`로 유지(MISTAKES.md §Public API #6.5 — consumer가 import할 필요가 없는 internal 심볼). `createMarketDataProvider`의 반환 타입은 그대로 `MarketDataProvider`. |
 | 2026-05-28 | **Market provider ejection (PR #104)**. Tier 3 `createMarketDataProvider` export **제거** — consumer(siglens)가 자체 FMP/Alpaca 어댑터를 소유. Tier 1 시그니처 변경: `fetchBarsWithIndicators`, `getMarketSummary`, `getMarketSummaryWithBriefing`, `getSectorSignals`의 첫 번째 positional 인자가 `provider: MarketDataProvider`로 추가됨(BREAKING). `submitAnalysis`의 `options.marketDataProvider?: MarketDataProvider`와 `submitOverallAnalysis`의 `options.marketDataProvider?: MarketDataProvider`(via `OverallDependencyInputs`) 선택적 필드 추가 — cache miss 경로에서 필수; `skipEnqueueIfMiss: true`일 때만 생략 가능. |
 | 2026-05-28 | Tier 2/4 Market session 추가 — `isEtRegularSessionOpen`(기존 `@internal` 제거 후 public화), `getEtSessionStatus`(`'weekend' \| 'open' \| 'closed'` 3-state, 신규) 및 Tier 4 상수 `MARKET_OPEN_HOUR`/`MARKET_OPEN_MINUTE`/`MARKET_CLOSE_HOUR`/`MARKET_CLOSE_MINUTE`와 `EtSessionStatus` union을 인벤토리에 등록. DST-safe(`Intl.DateTimeFormat('America/New_York')`), 마감 정각 16:00은 `'open'`에서 제외(exclusive). siglens가 자체 `shared/lib/marketSession.ts`의 정규장 판정을 제거하고 이 심볼을 import하도록 통합하기 위한 단일 source of truth. `secondsUntilNextEtRegularOpen`은 bars 캐시 TTL 전용이라 `@internal` 유지. 0.x semver minor bump. |
+| 2026-05-29 | Tier 2/4 Fear & Greed 분류 상수 공개 — `scoreToLabel`(기존 `@internal` 제거 후 public화, 0..100 score → 5단계 `FearGreedLabel`) 및 Tier 4 상수 `FEAR_GREED_LABEL_CUTOFFS`(경계 25/45/55/75), `POC_WINDOW_DEFAULT`(= 60)를 인벤토리에 등록. siglens가 자체 `entities/fear-greed/lib/classifier.ts`의 복제 분류 로직(`FEAR_GREED_SCORE_BOUNDARIES`/`classifyScore`)을 제거하고 이 심볼을 import하도록 통합하기 위한 단일 source of truth — `computeFearGreedIndex`가 반환하는 최상위 label로는 그룹 점수·history fallback 분류를 커버하지 못해 별도 노출 필요. `FEAR_GREED_WARNING_THRESHOLDS`/`FEAR_GREED_CONFIDENCE_THRESHOLDS`는 consumer 수요가 없어 `@internal` 유지. 함께 `infrastructure/fundamental/types.ts`(미export·미사용 FMP raw payload 타입, fundamental→domain/ports 이전 시 잔존한 고아 파일) 삭제 — 공개 API 영향 없음. 0.x semver minor bump. |

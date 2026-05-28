@@ -59,6 +59,9 @@ describe('browser public API exports', () => {
         expect(typeof isTimeframeAllowed).toBe('function');
         expect(typeof detectGoldenCross).toBe('function');
         expect(normalizeTrend('bullish')).toBe('bullish');
+        expect(clientApi.FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX).toBe(55);
+        expect(clientApi.POC_WINDOW_DEFAULT).toBe(60);
+        expect(clientApi.scoreToLabel(10)).toBe('EXTREME_FEAR');
         expect(skillType).toBe('indicator_guide');
     });
 
