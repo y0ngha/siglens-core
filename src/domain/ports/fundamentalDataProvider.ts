@@ -22,8 +22,8 @@ import type {
  * valuation, ratios, growth, scores, peers, analyst consensus, sector
  * performance, and earnings data.
  *
- * Adapters live in `infrastructure/fundamental/` (and the consumer, e.g.
- * siglens, may provide its own adapter built on FMP `/stable/*` endpoints).
+ * Adapters live in the consumer (e.g. siglens provides its own adapter built
+ * on FMP `/stable/*` endpoints).
  * Provider implementations are responsible for adapting their source-specific
  * shapes (e.g. FMP's `mktCap`) to the domain-neutral input interfaces below
  * before returning — the port surface references only domain types.
