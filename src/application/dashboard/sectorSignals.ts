@@ -99,8 +99,8 @@ function combineResults(
  * compact result. Results are cached per `(timeframe, time-bucket)` so
  * concurrent dashboard loads within the same bucket share a single fetch.
  *
- * Provider calls are chunked (10 at a time) to stay below FMP/Alpaca rate
- * limits. Per-ticker failures are dropped from the result (graceful
+ * Provider calls are chunked (10 at a time) to stay below the market data
+ * provider's rate limits. Per-ticker failures are dropped from the result (graceful
  * degradation): if one symbol's bars or quote rejects, the rest of the
  * dashboard still renders.
  *
