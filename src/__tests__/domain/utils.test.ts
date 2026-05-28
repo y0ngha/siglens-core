@@ -166,6 +166,14 @@ describe('isEtRegularSessionOpen', () => {
     it('주말이면 false (Sat 14:00 ET)', () => {
         expect(isEtRegularSessionOpen(new Date('2026-07-04T18:00:00Z'))).toBe(false);
     });
+    it('정확히 09:30 ET = 개장 포함 (boundary inclusive)', () => {
+        // 2026-07-06T13:30:00Z = Mon 09:30 EDT
+        expect(isEtRegularSessionOpen(new Date('2026-07-06T13:30:00Z'))).toBe(true);
+    });
+    it('정확히 16:00 ET = 마감 제외 (boundary exclusive)', () => {
+        // 2026-07-06T20:00:00Z = Mon 16:00 EDT
+        expect(isEtRegularSessionOpen(new Date('2026-07-06T20:00:00Z'))).toBe(false);
+    });
 });
 
 describe('secondsUntilNextEtRegularOpen', () => {
@@ -189,5 +197,10 @@ describe('secondsUntilNextEtRegularOpen', () => {
     it('금요일 마감 후 → 월요일 개장까지 (Fri 17:00 ET → 3870분)', () => {
         expect(secondsUntilNextEtRegularOpen(new Date('2026-07-03T21:00:00Z')))
             .toBe(3870 * SECONDS_PER_MINUTE);
+    });
+    it('일요일 → 월요일 개장까지 (Sun 14:00 ET → 1170분)', () => {
+        // 2026-07-05T18:00:00Z = Sun 14:00 EDT
+        expect(secondsUntilNextEtRegularOpen(new Date('2026-07-05T18:00:00Z')))
+            .toBe(1170 * SECONDS_PER_MINUTE);
     });
 });

@@ -157,7 +157,7 @@ describe('computeBarsEffectiveTtl', () => {
     });
     it('장외 + 다음 개장이 24h 이내면 그 시각까지 (Mon 17:00 ET → 59400s)', () => {
         expect(computeBarsEffectiveTtl('1Day', new Date('2026-07-06T21:00:00Z')))
-            .toBe(59400);
+            .toBe(990 * SECONDS_PER_MINUTE);
     });
     it('장외 + 다음 개장이 24h 초과면 24h로 캡 (Sat 14:00 ET)', () => {
         expect(computeBarsEffectiveTtl('1Day', new Date('2026-07-04T18:00:00Z')))
