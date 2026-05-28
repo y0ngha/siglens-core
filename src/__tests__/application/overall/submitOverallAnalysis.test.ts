@@ -1046,8 +1046,9 @@ describe('submitOverallAnalysis 함수는', () => {
     describe('marketDataProvider 가드', () => {
         it('options.marketDataProvider가 없으면 에러를 던진다', async () => {
             // Guard sits after resolveOverallDependencies, cache check, and
-            // readWorkerConfig — reproduce the same cache-miss + worker-config
-            // setup the other cache-miss tests use, but omit marketDataProvider.
+            // skipEnqueueIfMiss early-return, but before readWorkerConfig —
+            // reproduce the same cache-miss + worker-config setup the other
+            // cache-miss tests use, but omit marketDataProvider.
             mockResolveOverallDependencies.mockResolvedValue({
                 kind: 'cached',
                 technical: cachedTechnical,
