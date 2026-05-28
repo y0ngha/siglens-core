@@ -1,5 +1,21 @@
 # Changelog
 
+# [0.13.0](https://github.com/y0ngha/siglens-core/compare/v0.12.0...v0.13.0) (2026-05-28)
+
+
+### Bug Fixes
+
+* address PR [#102](https://github.com/y0ngha/siglens-core/issues/102) review — [@internal](https://github.com/internal) tags, English public JSDoc, h23 hour cycle, second-precise TTL ([e3ded7b](https://github.com/y0ngha/siglens-core/commit/e3ded7b93bc625609f188f744bf3510546db735a))
+* address PR [#102](https://github.com/y0ngha/siglens-core/issues/102) round 2 — extract minute constants, remove dead guard, refine JSDoc, add Sunday test ([3fcb7d5](https://github.com/y0ngha/siglens-core/commit/3fcb7d5e065d141783bfbf9e8f99db6ebd7c5cb6))
+* address PR [#102](https://github.com/y0ngha/siglens-core/issues/102) round 3 — literal MINUTES_PER_DAY, drop [@internal](https://github.com/internal) [@link](https://github.com/link) in public JSDoc ([0cd331d](https://github.com/y0ngha/siglens-core/commit/0cd331dc44a1cba84b9d53d259f8146bd00648f2))
+
+
+### Features
+
+* add computeBarsEffectiveTtl (open-boundary bars cache TTL) ([fdc37cd](https://github.com/y0ngha/siglens-core/commit/fdc37cd0061fd39a2edf7e54a36ad501fb528411))
+* add DST-safe ET regular-session helpers (isEtRegularSessionOpen, secondsUntilNextEtRegularOpen) ([7294372](https://github.com/y0ngha/siglens-core/commit/7294372fce0b1aca72dad84a263ac654bc496987))
+* export computeBarsEffectiveTtl from public API ([496ccc9](https://github.com/y0ngha/siglens-core/commit/496ccc9144cff944ff016d00d7afca1b8b120748))
+
 # [0.12.0](https://github.com/y0ngha/siglens-core/compare/v0.11.4...v0.12.0) (2026-05-22)
 
 
