@@ -139,19 +139,23 @@ function resolveSubmitAnalysisArgs(
  *   hooks. Pass Vercel's `waitUntil` so the worker dispatch can continue after
  *   the response. Pass `usage` to enable daily usage limit checking and recording.
  *   Pass `modelId` to scope the cache to a specific AI model identifier.
+ *   Pass `marketDataProvider` when a cache miss is possible — it is required at
+ *   the fetch site and omitting it on a cache miss will throw a clear runtime error.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
  *   see {@link SubmitAnalysisGatedResult}.
  *
- * @throws {Error} If the market data provider rejects (`fetchBarsWithIndicators`
- *   throws), or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
+ * @throws {Error} If `options.marketDataProvider` is absent on a cache miss,
+ *   if the market data provider rejects (`fetchBarsWithIndicators` throws),
+ *   or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
  *
  * @example
  * ```ts
- * const submission = await submitAnalysis('AAPL', '1Day');
- * // or include a company display name for the prompt:
- * const named = await submitAnalysis('AAPL', 'Apple Inc.', '1Day');
+ * // `marketDataProvider` is injected by the consumer (e.g. the siglens app):
+ * const submission = await submitAnalysis('AAPL', '1Day', false, undefined, {
+ *     marketDataProvider,
+ * });
  * if (submission.status === 'cached') return submission.result;
- * if (submission.status === 'miss_no_trigger') return null; // bot/crawler fallback
+ * if (submission.status === 'miss_no_trigger') return null;
  * if (submission.status === 'error') return submission.error;
  * const polled = await pollAnalysis(submission.jobId);
  * ```
@@ -265,9 +269,17 @@ export async function submitAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
+    const { marketDataProvider } = options;
+    if (marketDataProvider == null) {
+        throw new Error(
+            'submitAnalysis: options.marketDataProvider is required to fetch bars on a cache miss'
+        );
+    }
+
     const { workerUrl, workerSecret } = readWorkerConfig();
 
     const { bars, indicators } = await fetchBarsWithIndicators(
+        marketDataProvider,
         symbol,
         timeframe,
         fmpSymbol
@@ -291,7 +303,12 @@ export async function submitAnalysis(
     const dailyDataPromise =
         timeframe === '1Day'
             ? Promise.resolve({ bars, indicators })
-            : fetchBarsWithIndicators(symbol, '1Day', fmpSymbol);
+            : fetchBarsWithIndicators(
+                  marketDataProvider,
+                  symbol,
+                  '1Day',
+                  fmpSymbol
+              );
 
     const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
         .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))

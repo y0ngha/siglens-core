@@ -126,6 +126,9 @@ function stripVolatileOptionsFields(
  *   news, calendar) and optional background-task hooks.
  * @returns The submission outcome — see {@link SubmitOverallAnalysisResult}.
  *
+ * @throws {Error} If `options.marketDataProvider` is absent on a cache miss
+ *   that proceeds to fetch, or if `WORKER_URL` / `WORKER_SECRET` are missing in env.
+ *
  * @example
  * ```ts
  * const res = await submitOverallAnalysis({ symbol: 'AAPL', timeframe: '1Day', modelId: '...', ... });
@@ -292,14 +295,22 @@ export async function submitOverallAnalysis(
     }
 
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
-    const { workerUrl, workerSecret } = readWorkerConfig();
 
     // Daily fearGreed snapshot — injected as the sentiment context for the overall prompt.
     // Computed directly from daily raw data rather than reusing the technical-axis
     // result, so the daily-only assumption holds regardless of timeframe.
     // On compute failure, log and fall back to fearGreed=null so the overall analysis proceeds.
     const fmpSymbol = options.technical.fmpSymbol;
+    const { marketDataProvider } = options;
+    if (marketDataProvider == null) {
+        throw new Error(
+            'submitOverallAnalysis: options.marketDataProvider is required to fetch the daily fear/greed snapshot'
+        );
+    }
+
+    const { workerUrl, workerSecret } = readWorkerConfig();
     const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
+        marketDataProvider,
         symbol,
         '1Day',
         fmpSymbol

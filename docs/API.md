@@ -11,7 +11,7 @@
 레이어 내부에서만 발생하며, 각 서비스는 `types.ts`의 인터페이스를 통해 추상화된다.
 
 호출자(consumer)가 직접 사용하는 외부 API(FMP, Alpaca 등 시세 프로바이더)는 consumer가
-구현한 뒤 `infrastructure/market/`의 `MarketDataProvider` 인터페이스에 주입한다.
+구현한 뒤 `domain/ports/`의 `MarketDataProvider` 인터페이스에 주입한다.
 
 ---
 
@@ -23,11 +23,8 @@ UPSTASH_REDIS_REST_URL=             # Upstash Redis REST URL
 UPSTASH_REDIS_REST_TOKEN=           # master 토큰 (읽기/쓰기)
 UPSTASH_REDIS_REST_READONLY_TOKEN=  # readonly 토큰 (없으면 master 사용)
 
-# Market Data Provider (선택 — 기본값 fmp)
-MARKET_DATA_PROVIDER=fmp            # fmp | alpaca
-FMP_API_KEY=                        # MARKET_DATA_PROVIDER=fmp 시 필수
-ALPACA_API_KEY=                     # MARKET_DATA_PROVIDER=alpaca 시 필수
-ALPACA_API_SECRET=                  # MARKET_DATA_PROVIDER=alpaca 시 필수 (legacy alias: ALPACA_SECRET_KEY)
+# FMP API (선택 — consumer가 FMP 기반 MarketDataProvider를 사용할 때)
+FMP_API_KEY=                        # readFmpConfig / tryReadFmpConfig 에서 읽음
 
 # Worker (선택 — submitAnalysis 시 외부 worker에 위임할 때만)
 WORKER_URL=                         # worker 엔드포인트 URL
@@ -177,11 +174,18 @@ Body (JSON):
 
 ---
 
-## 5. Market Data Provider Config Reader
+## 5. FMP Config Reader
 
-`infrastructure/market/config.ts`와 `infrastructure/fmp/config.ts`는 `MARKET_DATA_PROVIDER`,
-`FMP_API_KEY`, `ALPACA_API_KEY`, `ALPACA_API_SECRET` (legacy alias `ALPACA_SECRET_KEY`)을
-읽어 consumer가 주입할 `MarketDataProvider` 구현체에 전달할 설정 객체를 만든다.
+`infrastructure/fmp/config.ts`는 `FMP_API_KEY`를 읽어 consumer가 주입할 FMP 기반
+`MarketDataProvider` 구현체에 전달할 설정 객체를 만든다.
+
+- `readFmpConfig()` — API 키 미설정 시 throw. 반드시 FMP가 필요한 경로에서 사용.
+- `tryReadFmpConfig()` — API 키 미설정 시 `null` 반환. 선택적 경로(FMP cancel 신호 등)에서 사용.
+
+`MARKET_DATA_PROVIDER`, `ALPACA_API_KEY`, `ALPACA_API_SECRET` 환경변수는 PR #104에서
+Alpaca fetch provider 및 provider-type reader(`readAlpacaConfig`, `readMarketProviderType`)가
+코어에서 제거되면서 더 이상 코어가 읽지 않는다. 시세 프로바이더 선택과 Alpaca HTTP 호출은
+consumer(siglens) 측이 직접 담당한다.
 
 코어 라이브러리 자체는 FMP/Alpaca의 HTTP 엔드포인트를 호출하지 않는다. 호출은 consumer가
 주입한 `MarketDataProvider` 구현체에서 이뤄진다.

@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 
-const getMarketSummaryMock = vi.fn<() => Promise<MarketSummaryData>>();
+// fakeProvider is passed to getMarketSummaryWithBriefing and forwarded to the
+// (fully-mocked) getMarketSummary — the actual provider methods are never called.
+const fakeProvider = {} as MarketDataProvider;
+
+const getMarketSummaryMock =
+    vi.fn<(p: MarketDataProvider) => Promise<MarketSummaryData>>();
 const submitBriefingMock =
     vi.fn<
         (
@@ -12,7 +18,7 @@ const submitBriefingMock =
     >();
 
 vi.mock('@/application/dashboard/getMarketSummary', () => ({
-    getMarketSummary: () => getMarketSummaryMock(),
+    getMarketSummary: (p: MarketDataProvider) => getMarketSummaryMock(p),
 }));
 vi.mock('@/application/market/submitBriefing', () => ({
     submitBriefing: (
@@ -40,7 +46,7 @@ describe('getMarketSummaryWithBriefing', () => {
         getMarketSummaryMock.mockResolvedValue(summary);
         submitBriefingMock.mockResolvedValue(briefing);
 
-        const result = await getMarketSummaryWithBriefing();
+        const result = await getMarketSummaryWithBriefing(fakeProvider);
         expect(result).toEqual({ summary, briefing });
         expect(submitBriefingMock).toHaveBeenCalledWith(summary, undefined);
     });
@@ -58,7 +64,7 @@ describe('getMarketSummaryWithBriefing', () => {
         getMarketSummaryMock.mockResolvedValue(summary);
         submitBriefingMock.mockResolvedValue(briefing);
 
-        await getMarketSummaryWithBriefing(options);
+        await getMarketSummaryWithBriefing(fakeProvider, options);
 
         expect(submitBriefingMock).toHaveBeenCalledWith(summary, options);
     });

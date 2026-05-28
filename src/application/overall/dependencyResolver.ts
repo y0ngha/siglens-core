@@ -86,6 +86,7 @@ export async function resolveOverallDependencies(
         timeframe,
         modelId,
         fundamentalProvider,
+        marketDataProvider,
         newsItems: newsItemsInput,
         upcomingCalendar,
         technical: technicalOptions,
@@ -226,6 +227,7 @@ export async function resolveOverallDependencies(
                 technicalFmpSymbol,
                 {
                     ...technicalAxisOptions,
+                    marketDataProvider,
                     modelId: technicalAxisOptions.modelId ?? modelId,
                     userApiKey:
                         technicalAxisOptions.userApiKey ?? topLevelUserApiKey,

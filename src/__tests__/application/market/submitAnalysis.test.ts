@@ -9,6 +9,7 @@ import type {
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
@@ -52,6 +53,11 @@ const mockGetUsageToday = vi.fn();
 const mockUsageRepository: UsageRepository = {
     recordUsage: mockRecordUsage,
     getUsageToday: mockGetUsageToday,
+};
+
+const fakeProvider: MarketDataProvider = {
+    getBars: vi.fn().mockResolvedValue([]),
+    getQuote: vi.fn().mockResolvedValue(null),
 };
 
 const mockSymbol = 'AAPL';
@@ -179,6 +185,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: restrictedTierConfig,
                     tierContext: { userId: 'user-1', tier: 'free' },
                 }
@@ -208,11 +215,15 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                '5Min'
+                '5Min',
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 mockSymbol,
                 '5Min',
                 undefined
@@ -248,6 +259,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     modelId: 'gemini-2.5-flash',
                 }
             );
@@ -278,6 +290,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierContext: { userId: 'user-1', tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
@@ -314,6 +327,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
@@ -336,12 +350,15 @@ describe('submitAnalysis 함수는', () => {
                 mockSymbol,
                 mockCompanyName,
                 mockTimeframe,
-                true
+                true,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 mockSymbol,
                 mockTimeframe,
                 undefined
@@ -359,10 +376,14 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 mockSymbol,
                 mockTimeframe,
                 undefined
@@ -389,11 +410,18 @@ describe('submitAnalysis 함수는', () => {
             expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
         });
 
-        it('기존 공개 시그니처(symbol, timeframe)를 계속 지원한다', async () => {
-            const result = await submitAnalysis(mockSymbol, mockTimeframe);
+        it('cache miss 시 marketDataProvider를 주입하면 submitted를 반환한다', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(result.status).toBe('submitted');
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 mockSymbol,
                 mockTimeframe,
                 undefined
@@ -411,6 +439,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: restrictedTierConfig,
                     tierContext: { userId: null, tier: 'free' },
                     usage: {
@@ -445,6 +474,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     modelId: 'gemini-2.5-flash',
                     usage: {
                         usageRepository: mockUsageRepository,
@@ -471,6 +501,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: restrictedTierConfig,
                     tierContext: { userId: null, tier: 'free' },
                     usage: {
@@ -502,6 +533,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierContext: { userId: null, tier: 'free' },
                     usage: {
                         usageRepository: mockUsageRepository,
@@ -534,6 +566,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: restrictedTierConfig,
                     tierContext: { userId: null, tier: 'free' },
                     usage: {
@@ -574,6 +607,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: restrictedTierConfig,
                     tierContext: { userId: null, tier: 'free' },
                     usage: {
@@ -602,6 +636,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     waitUntil,
                 }
             );
@@ -612,11 +647,36 @@ describe('submitAnalysis 함수는', () => {
         it('WORKER_URL이 없으면 에러를 던진다', async () => {
             delete process.env.WORKER_URL;
 
+            // marketDataProvider must be supplied so the provider guard (which
+            // now runs before readWorkerConfig) does not short-circuit first.
             await expect(
-                submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe)
+                submitAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                )
             ).rejects.toThrow(
                 'WORKER_URL and WORKER_SECRET environment variables are required'
             );
+        });
+
+        it('marketDataProvider가 없으면 에러를 던진다', async () => {
+            // Guard sits after the cache check and skipEnqueueIfMiss early-return,
+            // but before readWorkerConfig — omit marketDataProvider from options
+            // to trigger the guard.
+            await expect(
+                submitAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    {}
+                )
+            ).rejects.toThrow('marketDataProvider');
         });
 
         it('Skills 로딩 실패 시에도 Worker에 요청을 보낸다', async () => {
@@ -628,7 +688,10 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
@@ -644,6 +707,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     modelId: 'gemini-2.5-flash',
                 }
             );
@@ -662,6 +726,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     userApiKey: 'sk-user-key-123',
                 }
             );
@@ -677,7 +742,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('userApiKey가 없으면 X-AI-API-KEY 헤더를 포함하지 않는다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             const headers = mockFetch.mock.calls[0][1].headers as Record<
                 string,
@@ -700,10 +772,12 @@ describe('submitAnalysis 함수는', () => {
                 'S&P 500 Index',
                 mockTimeframe,
                 false,
-                mockFmpSymbol
+                mockFmpSymbol,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 'SPX',
                 mockTimeframe,
                 mockFmpSymbol
@@ -718,7 +792,10 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
@@ -733,7 +810,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('마지막 bar 종가(lastClose)를 meta에 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -749,6 +833,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     modelId: 'gemini-2.5-flash',
                 }
             );
@@ -760,7 +845,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('modelId가 없으면 기본값으로 jobMeta에 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -774,7 +866,14 @@ describe('submitAnalysis 함수는', () => {
                 indicators: { ...mockBarsData.indicators, atr: [null, 2.5, 3] },
             });
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -791,7 +890,14 @@ describe('submitAnalysis 함수는', () => {
                 },
             });
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -800,7 +906,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('ATR 배열이 비어있으면 undefined로 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -824,6 +937,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: testTierConfig,
                     tierContext: { tier: 'member', userId: null },
                     modelId: 'gemini-2.5-pro',
@@ -845,6 +959,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: testTierConfig,
                     tierContext: { tier: 'member', userId: null },
                     modelId: 'gemini-2.5-pro',
@@ -867,6 +982,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: testTierConfig,
                     tierContext: { tier: 'member', userId: null },
                     modelId: 'gemini-2.5-pro',
@@ -897,6 +1013,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: testTierConfig,
                     tierContext: { tier: 'pro', userId: null },
                     modelId: 'gemini-2.5-pro',
@@ -921,6 +1038,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: testTierConfig,
                     tierContext: { tier: 'free', userId: null },
                     modelId: 'gemini-2.5-flash',
@@ -942,6 +1060,7 @@ describe('submitAnalysis 함수는', () => {
                 false,
                 undefined,
                 {
+                    marketDataProvider: fakeProvider,
                     tierConfig: testTierConfig,
                     modelId: 'gemini-2.5-flash',
                 }
@@ -977,12 +1096,16 @@ describe('submitAnalysis 함수는', () => {
             await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                '1Day' as Timeframe
+                '1Day' as Timeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             // 추가 일봉 fetch 없이 1번만 호출됨.
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 mockSymbol,
                 '1Day',
                 undefined
@@ -1003,18 +1126,23 @@ describe('submitAnalysis 함수는', () => {
             await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                '4Hour' as Timeframe
+                '4Hour' as Timeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
             expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
                 1,
+                fakeProvider,
                 mockSymbol,
                 '4Hour',
                 undefined
             );
             expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
                 2,
+                fakeProvider,
                 mockSymbol,
                 '1Day',
                 undefined
@@ -1033,7 +1161,10 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                '4Hour' as Timeframe
+                '4Hour' as Timeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
@@ -1067,7 +1198,7 @@ describe('submitAnalysis 함수는', () => {
                 mockTimeframe,
                 false,
                 undefined,
-                { skipEnqueueIfMiss: true }
+                { marketDataProvider: fakeProvider, skipEnqueueIfMiss: true }
             );
 
             expect(result).toEqual({ status: 'miss_no_trigger' });
@@ -1085,20 +1216,23 @@ describe('submitAnalysis 함수는', () => {
                 mockTimeframe,
                 false,
                 undefined,
-                { skipEnqueueIfMiss: true }
+                { marketDataProvider: fakeProvider, skipEnqueueIfMiss: true }
             );
 
             expect(result.status).toBe('cached');
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
-        it('옵션이 생략되면 기존대로 캐시 미스 시 submitted를 반환한다', async () => {
+        it('marketDataProvider가 제공되면 캐시 미스 시 submitted를 반환한다', async () => {
             mockCacheGet.mockResolvedValue(null);
 
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');

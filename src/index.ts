@@ -293,9 +293,6 @@ export { createCacheProvider } from './infrastructure/cache/redis';
 // codebases that parse raw LLM JSON before storing job results.
 export { extractJsonWithRepair } from './infrastructure/ai/extractJsonWithRepair';
 
-// Market data providers
-export { createMarketDataProvider } from './infrastructure/market/factory';
-
 // Chat token store
 export {
     CHAT_TOKEN_LIMIT,

@@ -40,6 +40,7 @@ import type {
     SubmitOptionsAnalysisOptions,
 } from '@/application/options/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 /** Axis identifier for the four-axis overall analysis pipeline. */
 export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';
@@ -67,6 +68,16 @@ export interface OverallDependencyInputs {
     modelId: ModelId;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
+    /**
+     * Market data provider injected by the consumer (siglens app).
+     *
+     * Must be provided when a cache miss can occur and the daily fear/greed
+     * bars will be fetched for the overall prompt.
+     * May be omitted only when the overall submission is guaranteed to
+     * short-circuit before the fetch site (e.g. `skipEnqueueIfMiss: true` in
+     * {@link SubmitOverallAnalysisOptions}).
+     */
+    marketDataProvider?: MarketDataProvider;
     /**
      * Resolved subscription tier. Optional for backward compatibility with
      * direct test callers; submitOverallAnalysis defaults to DEFAULT_TIER

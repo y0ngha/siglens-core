@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type { MarketSummaryWithBriefing } from '@/domain/types';
 import { getMarketSummary } from '@/application/dashboard/getMarketSummary';
 import { submitBriefing } from '@/application/market/submitBriefing';
@@ -11,6 +12,8 @@ import { submitBriefing } from '@/application/market/submitBriefing';
  * exposed as a single call so dashboard pages can await one promise and
  * render both the summary and the briefing status together.
  *
+ * @param provider - Injected market data provider forwarded to
+ *   {@link getMarketSummary}.
  * @param options - Optional background-task hooks forwarded to
  *   {@link submitBriefing}. Pass Vercel's `waitUntil` so briefing worker
  *   dispatch can continue after the response.
@@ -21,9 +24,10 @@ import { submitBriefing } from '@/application/market/submitBriefing';
  * @see submitBriefing
  */
 export async function getMarketSummaryWithBriefing(
+    provider: MarketDataProvider,
     options?: BackgroundTaskOptions
 ): Promise<MarketSummaryWithBriefing> {
-    const summary = await getMarketSummary();
+    const summary = await getMarketSummary(provider);
     const briefing = await submitBriefing(summary, options);
     return { summary, briefing };
 }

@@ -77,8 +77,20 @@ consumers call use-cases with domain inputs only (`submitAnalysis(params)`) and
 should not be burdened with adapter wiring. The library owns wiring; the consumer
 owns the call site.
 
-The exception is test seams: when a factory's return value is a singleton or otherwise
-hard to substitute at runtime, mock the factory module with `vi.mock` (see Testing).
+**Intentional exception — externally-owned I/O providers:**
+`MarketDataProvider` (and `callAiProvider` before it, see Phase 4.5 in
+`docs/PUBLIC_API.md`) are injected as explicit parameters because the *consumer*
+owns the real external I/O implementation; core only owns the port contract.
+Injecting them is the right boundary: core must not hard-wire a specific FMP or
+Alpaca adapter, just as it must not hard-wire a specific AI provider SDK.
+These parameters are required when a cache miss occurs (the fetch path) and must
+be supplied by the siglens app call site.
+This is an intentional, permanent exception to the "library owns wiring" rule —
+do not revert it to a factory call.
+
+The general test-seam exception still applies: when a factory's return value is a
+singleton or otherwise hard to substitute at runtime, mock the factory module with
+`vi.mock` (see Testing).
 
 ## Coding Rules
 

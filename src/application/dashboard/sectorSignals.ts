@@ -22,9 +22,7 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { createMarketDataProvider } from '@/infrastructure/market/factory';
-
-// FMP/Alpaca 동시 요청 제한 — 429 회피를 위한 청크 크기
+// 시장 데이터 provider 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;
 
 interface BarsAndQuotesResults {
@@ -101,11 +99,12 @@ function combineResults(
  * compact result. Results are cached per `(timeframe, time-bucket)` so
  * concurrent dashboard loads within the same bucket share a single fetch.
  *
- * Provider calls are chunked (10 at a time) to stay below FMP/Alpaca rate
- * limits. Per-ticker failures are dropped from the result (graceful
+ * Provider calls are chunked (10 at a time) to stay below the market data
+ * provider's rate limits. Per-ticker failures are dropped from the result (graceful
  * degradation): if one symbol's bars or quote rejects, the rest of the
  * dashboard still renders.
  *
+ * @param provider - Market data provider injected by the consumer (siglens app).
  * @param timeframe - Dashboard bar resolution. Defaults to
  *   `DEFAULT_DASHBOARD_TIMEFRAME`.
  * @param now - Override the "now" reference used to compute the time bucket
@@ -113,12 +112,11 @@ function combineResults(
  * @returns Computation timestamp plus per-stock signal results —
  *   see {@link SectorSignalsResult}.
  *
- * @throws {Error} If the market data provider cannot be constructed.
- *
  * @see getMarketSummary
  * @see bucketedTimestamp
  */
 export async function getSectorSignals(
+    provider: MarketDataProvider,
     timeframe: DashboardTimeframe = DEFAULT_DASHBOARD_TIMEFRAME,
     now: Date = new Date()
 ): Promise<SectorSignalsResult> {
@@ -135,7 +133,6 @@ export async function getSectorSignals(
         }
     }
 
-    const provider = createMarketDataProvider();
     const fromIso = lookbackIsoFromNow(timeframe, now);
     const { barsResults, quoteResults } = await fetchBarsAndQuotes(
         provider,

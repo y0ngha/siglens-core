@@ -19,7 +19,7 @@ Each sub-directory corresponds to exactly **one** external system:
 | `fundamental/` | Fundamental data provider interface (raw FMP shapes → domain) |
 | `hash/` | Deterministic input hashing helpers used in cache keys |
 | `jobs/` | Redis-based job queue (enqueue / dequeue / status / meta) |
-| `market/` | Market data provider abstraction (Alpaca / FMP adapters) |
+| `market/` | Worker config reader, fetch-timeout constant, re-analysis cooldown |
 | `skills/` | Filesystem Skills loader (`skills/*.md` → `Skill[]`) |
 | `upstash/` | Upstash Redis client factory + config |
 | `usage/` | Daily-salt IP hashing helper for cross-DB usage tracking |
