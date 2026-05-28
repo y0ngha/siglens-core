@@ -267,6 +267,10 @@ export {
     lookbackIsoFromNow,
 } from './domain/dashboard';
 
+// Market session — DST-safe US regular-session (ET) classification.
+// Single source of truth shared by siglens UI, cache, and analysis gating.
+export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
+
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
 // =============================================================================
@@ -343,6 +347,15 @@ export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
+
+// Market session times + state (single source of truth, shared with siglens UI)
+export {
+    MARKET_CLOSE_HOUR,
+    MARKET_CLOSE_MINUTE,
+    MARKET_OPEN_HOUR,
+    MARKET_OPEN_MINUTE,
+} from './domain/utils';
+export type { EtSessionStatus } from './domain/types';
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {

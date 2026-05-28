@@ -4,6 +4,7 @@ import {
     parseJsonResponse,
     stripMarkdownCodeBlock,
     computeSecondsUntilCacheExpiry,
+    getEtSessionStatus,
     isEtRegularSessionOpen,
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
@@ -196,6 +197,43 @@ describe('isEtRegularSessionOpen', () => {
         // 2026-07-05T16:00:00Z = Sun 12:00 EDT
         expect(isEtRegularSessionOpen(new Date('2026-07-05T16:00:00Z'))).toBe(
             false
+        );
+    });
+});
+
+describe('getEtSessionStatus', () => {
+    it('토요일이면 weekend (Sat 14:00 ET)', () => {
+        expect(getEtSessionStatus(new Date('2026-07-04T18:00:00Z'))).toBe(
+            'weekend'
+        );
+    });
+    it('EDT 평일 정규장 중이면 open (Mon 10:00 ET)', () => {
+        expect(getEtSessionStatus(new Date('2026-07-06T14:00:00Z'))).toBe(
+            'open'
+        );
+    });
+    it('정확히 09:30 ET = open (개장 포함, boundary inclusive)', () => {
+        // 2026-07-06T13:30:00Z = Mon 09:30 EDT
+        expect(getEtSessionStatus(new Date('2026-07-06T13:30:00Z'))).toBe(
+            'open'
+        );
+    });
+    it('정확히 16:00 ET = closed (마감 정각 제외, boundary exclusive)', () => {
+        // 2026-07-06T20:00:00Z = Mon 16:00 EDT
+        expect(getEtSessionStatus(new Date('2026-07-06T20:00:00Z'))).toBe(
+            'closed'
+        );
+    });
+    it('개장 전이면 closed (Mon 08:00 ET)', () => {
+        expect(getEtSessionStatus(new Date('2026-07-06T12:00:00Z'))).toBe(
+            'closed'
+        );
+    });
+    it('서머타임 갈림: 동일 13:30Z가 겨울엔 ET 08:30 → closed', () => {
+        // 2026-01-05T13:30:00Z = Mon 08:30 EST (개장 전). 같은 UTC라도 여름엔
+        // 09:30 EDT라 open인 것과 대비 — DST 처리 검증.
+        expect(getEtSessionStatus(new Date('2026-01-05T13:30:00Z'))).toBe(
+            'closed'
         );
     });
 });

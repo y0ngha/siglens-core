@@ -3,6 +3,9 @@ import type { OptionsAnalysisResponse } from './options/types';
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 
+/** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
+export type EtSessionStatus = 'weekend' | 'open' | 'closed';
+
 /** Definition of a market index tracked by the dashboard. */
 export interface IndexTicker {
     symbol: string;
