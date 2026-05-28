@@ -4,8 +4,10 @@ import {
     parseJsonResponse,
     stripMarkdownCodeBlock,
     computeSecondsUntilCacheExpiry,
+    isEtRegularSessionOpen,
+    secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
-import { SECONDS_PER_DAY, SECONDS_PER_HOUR } from '@/domain/constants/time';
+import { SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from '@/domain/constants/time';
 
 const TEST_EXPIRY_HOUR_KST = 17;
 
@@ -145,5 +147,47 @@ describe('computeSecondsUntilCacheExpiry', () => {
         );
         // KST 17:00 is 17 hours later = 61200 seconds
         expect(result).toBe(17 * SECONDS_PER_HOUR);
+    });
+});
+
+describe('isEtRegularSessionOpen', () => {
+    it('EDT 평일 정규장 중이면 true (Mon 10:00 ET)', () => {
+        expect(isEtRegularSessionOpen(new Date('2026-07-06T14:00:00Z'))).toBe(true);
+    });
+    it('EST 평일 정규장 중이면 true (Mon 10:00 ET)', () => {
+        expect(isEtRegularSessionOpen(new Date('2026-01-05T15:00:00Z'))).toBe(true);
+    });
+    it('개장 전이면 false (Mon 08:00 ET)', () => {
+        expect(isEtRegularSessionOpen(new Date('2026-07-06T12:00:00Z'))).toBe(false);
+    });
+    it('마감 후면 false (Mon 17:00 ET)', () => {
+        expect(isEtRegularSessionOpen(new Date('2026-07-06T21:00:00Z'))).toBe(false);
+    });
+    it('주말이면 false (Sat 14:00 ET)', () => {
+        expect(isEtRegularSessionOpen(new Date('2026-07-04T18:00:00Z'))).toBe(false);
+    });
+});
+
+describe('secondsUntilNextEtRegularOpen', () => {
+    // 09:30 ET 개장. EDT는 13:30 UTC, EST는 14:30 UTC.
+    it('EDT 개장 전 → 오늘 개장까지 (Mon 08:00 ET → 90분)', () => {
+        expect(secondsUntilNextEtRegularOpen(new Date('2026-07-06T12:00:00Z')))
+            .toBe(90 * SECONDS_PER_MINUTE);
+    });
+    it('EST 개장 전 → 오늘 개장까지 (Mon 09:00 ET → 30분)', () => {
+        expect(secondsUntilNextEtRegularOpen(new Date('2026-01-05T14:00:00Z')))
+            .toBe(30 * SECONDS_PER_MINUTE);
+    });
+    it('EDT 마감 후 → 다음 평일 개장까지 (Mon 17:00 ET → 990분)', () => {
+        expect(secondsUntilNextEtRegularOpen(new Date('2026-07-06T21:00:00Z')))
+            .toBe(990 * SECONDS_PER_MINUTE);
+    });
+    it('토요일 → 월요일 개장까지 (Sat 14:00 ET → 2610분)', () => {
+        expect(secondsUntilNextEtRegularOpen(new Date('2026-07-04T18:00:00Z')))
+            .toBe(2610 * SECONDS_PER_MINUTE);
+    });
+    it('금요일 마감 후 → 월요일 개장까지 (Fri 17:00 ET → 3870분)', () => {
+        expect(secondsUntilNextEtRegularOpen(new Date('2026-07-03T21:00:00Z')))
+            .toBe(3870 * SECONDS_PER_MINUTE);
     });
 });
