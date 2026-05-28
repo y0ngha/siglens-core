@@ -14,7 +14,7 @@ import type { MarketQuote, MarketSummaryData } from '@/domain/types';
  * `changesPercentage` defaulted to `0` (so the dashboard renders fully even
  * if a single quote is unavailable).
  *
- * @param provider - Injected market data provider.
+ * @param provider - Market data provider injected by the consumer (siglens app).
  * @returns Indices and sector ETFs with their most recent quote data —
  *   see {@link MarketSummaryData}.
  *

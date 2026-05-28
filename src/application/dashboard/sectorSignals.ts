@@ -104,6 +104,7 @@ function combineResults(
  * degradation): if one symbol's bars or quote rejects, the rest of the
  * dashboard still renders.
  *
+ * @param provider - Market data provider injected by the consumer (siglens app).
  * @param timeframe - Dashboard bar resolution. Defaults to
  *   `DEFAULT_DASHBOARD_TIMEFRAME`.
  * @param now - Override the "now" reference used to compute the time bucket
