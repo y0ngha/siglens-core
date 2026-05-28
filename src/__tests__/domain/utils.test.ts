@@ -194,7 +194,9 @@ describe('isEtRegularSessionOpen', () => {
     });
     it('일요일이면 false (Sun 12:00 ET)', () => {
         // 2026-07-05T16:00:00Z = Sun 12:00 EDT
-        expect(isEtRegularSessionOpen(new Date('2026-07-05T16:00:00Z'))).toBe(false);
+        expect(isEtRegularSessionOpen(new Date('2026-07-05T16:00:00Z'))).toBe(
+            false
+        );
     });
 });
 

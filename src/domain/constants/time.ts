@@ -10,4 +10,4 @@ export const SECONDS_PER_HOUR = 3_600;
 export const SECONDS_PER_DAY = 86_400;
 export const SECONDS_PER_YEAR = 31_536_000;
 
-export const MINUTES_PER_DAY = 24 * 60;
+export const MINUTES_PER_DAY = 1_440;

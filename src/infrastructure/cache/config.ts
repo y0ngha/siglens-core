@@ -95,9 +95,9 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
 /**
  * Computes the effective cache TTL (seconds) for bars (OHLCV + indicators) at `now`.
  *
- * - During regular session: {@link BARS_OPEN_TTL_SECONDS} (60 s) — the last bar is
+ * - During regular session: 60 s (`BARS_OPEN_TTL_SECONDS`) — the last bar is
  *   still forming; stale data must not survive past the next bar's close.
- * - Off-hours / weekends: `min(`{@link BARS_OFFHOURS_TTL_CEILING_SECONDS}`, seconds until next open)` —
+ * - Off-hours / weekends: `min(BARS_OFFHOURS_TTL_CEILING_SECONDS, seconds until next open)` —
  *   completed bars do not change until the next session opens, so the cache can
  *   survive exactly until that boundary.
  *
