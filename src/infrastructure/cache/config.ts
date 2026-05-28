@@ -4,7 +4,11 @@ import {
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
-import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
+import {
+    computeSecondsUntilCacheExpiry,
+    isEtRegularSessionOpen,
+    secondsUntilNextEtRegularOpen,
+} from '@/domain/utils';
 
 /**
  * TTL for cached market briefings (in seconds).
@@ -80,6 +84,33 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     return Math.min(
         ANALYSIS_CACHE_TTL[timeframe],
         computeSecondsUntilCacheExpiry(now, CACHE_EXPIRY_HOUR_KST)
+    );
+}
+
+/** 개장 중 bars 캐시 TTL(초). 마지막 봉이 실시간 형성되나 FMP 시세는 최대 15분 지연이라 1분이면 충분. */
+export const BARS_OPEN_TTL_SECONDS = SECONDS_PER_MINUTE;
+/** 장외/주말 bars 캐시 TTL 상한(초). 다음 개장까지가 이보다 길면 이 값으로 캡. */
+export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
+
+/**
+ * bars(OHLCV+지표) 캐시의 effective TTL(초)을 `now` 기준으로 계산.
+ *
+ * - 정규장 중: {@link BARS_OPEN_TTL_SECONDS}(60s) — 마지막 봉이 형성 중.
+ * - 장외/주말: `min(`{@link BARS_OFFHOURS_TTL_CEILING_SECONDS}`, 다음 개장까지)` —
+ *   마감 후 완성된 봉은 다음 개장 전까지 변하지 않으므로 개장 직전 만료.
+ *
+ * 분석 캐시({@link computeEffectiveTtl}, 마감 경계)와 달리 **개장 경계**를 쓴다.
+ * @param _timeframe - 봉 해상도(현재 모든 TF 동일 정책, 시그니처 일관성 위해 유지).
+ * @param now - 기준 시각(테스트용).
+ */
+export function computeBarsEffectiveTtl(
+    _timeframe: Timeframe,
+    now: Date
+): number {
+    if (isEtRegularSessionOpen(now)) return BARS_OPEN_TTL_SECONDS;
+    return Math.min(
+        BARS_OFFHOURS_TTL_CEILING_SECONDS,
+        secondsUntilNextEtRegularOpen(now)
     );
 }
 
