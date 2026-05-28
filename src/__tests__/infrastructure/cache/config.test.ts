@@ -5,6 +5,8 @@ import {
 } from '@/domain/constants/time';
 import {
     ANALYSIS_CACHE_TTL,
+    BARS_OFFHOURS_TTL_CEILING_SECONDS,
+    BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
     buildFundamentalCacheKey,
@@ -13,6 +15,7 @@ import {
     buildSectorSignalsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     CACHE_KEY_SCHEMA_VERSION,
+    computeBarsEffectiveTtl,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
@@ -140,5 +143,28 @@ describe('new analysis cache keys', () => {
         expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
         expect(NEWS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
         expect(OVERALL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+    });
+});
+
+describe('computeBarsEffectiveTtl', () => {
+    it('개장 중이면 BARS_OPEN_TTL_SECONDS (Mon 10:00 ET)', () => {
+        expect(
+            computeBarsEffectiveTtl('1Day', new Date('2026-07-06T14:00:00Z'))
+        ).toBe(BARS_OPEN_TTL_SECONDS);
+    });
+    it('개장 중이면 timeframe 무관 동일 (5Min, Mon 10:00 ET)', () => {
+        expect(
+            computeBarsEffectiveTtl('5Min', new Date('2026-07-06T14:00:00Z'))
+        ).toBe(BARS_OPEN_TTL_SECONDS);
+    });
+    it('장외 + 다음 개장이 24h 이내면 그 시각까지 (Mon 17:00 ET → 59400s)', () => {
+        expect(
+            computeBarsEffectiveTtl('1Day', new Date('2026-07-06T21:00:00Z'))
+        ).toBe(990 * SECONDS_PER_MINUTE);
+    });
+    it('장외 + 다음 개장이 24h 초과면 24h로 캡 (Sat 14:00 ET)', () => {
+        expect(
+            computeBarsEffectiveTtl('1Day', new Date('2026-07-04T18:00:00Z'))
+        ).toBe(BARS_OFFHOURS_TTL_CEILING_SECONDS);
     });
 });

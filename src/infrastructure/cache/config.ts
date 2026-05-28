@@ -4,7 +4,11 @@ import {
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
-import { computeSecondsUntilCacheExpiry } from '@/domain/utils';
+import {
+    computeSecondsUntilCacheExpiry,
+    isEtRegularSessionOpen,
+    secondsUntilNextEtRegularOpen,
+} from '@/domain/utils';
 
 /**
  * TTL for cached market briefings (in seconds).
@@ -80,6 +84,40 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     return Math.min(
         ANALYSIS_CACHE_TTL[timeframe],
         computeSecondsUntilCacheExpiry(now, CACHE_EXPIRY_HOUR_KST)
+    );
+}
+
+/** @internal Cache TTL (seconds) for bars during a regular NYSE session (09:30–16:00 ET). */
+export const BARS_OPEN_TTL_SECONDS = SECONDS_PER_MINUTE;
+/** @internal Max cache TTL (seconds) for bars outside a regular session; caps "time until next open" when the next session is >24h away. */
+export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
+
+/**
+ * Computes the effective cache TTL (seconds) for bars (OHLCV + indicators) at `now`.
+ *
+ * - During regular session: 60 s (`BARS_OPEN_TTL_SECONDS`) — the last bar is
+ *   still forming; stale data must not survive past the next bar's close.
+ * - Off-hours / weekends: `min(BARS_OFFHOURS_TTL_CEILING_SECONDS, seconds until next open)` —
+ *   completed bars do not change until the next session opens, so the cache can
+ *   survive exactly until that boundary.
+ *
+ * Unlike {@link computeEffectiveTtl} (which uses the close boundary), this function
+ * uses the **open boundary**.
+ *
+ * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
+ *   the parameter is kept for signature consistency with {@link computeEffectiveTtl}.
+ * @param now - Reference time for market-session detection. Pass explicitly for
+ *   deterministic testing.
+ * @returns Effective TTL in seconds.
+ */
+export function computeBarsEffectiveTtl(
+    _timeframe: Timeframe,
+    now: Date
+): number {
+    if (isEtRegularSessionOpen(now)) return BARS_OPEN_TTL_SECONDS;
+    return Math.min(
+        BARS_OFFHOURS_TTL_CEILING_SECONDS,
+        secondsUntilNextEtRegularOpen(now)
     );
 }
 

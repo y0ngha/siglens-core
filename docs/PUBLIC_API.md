@@ -273,7 +273,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 3 — Infrastructure Factories & Config
 
-**캐시 (1 factory + 13 helper/const)**
+**캐시 (1 factory + 14 helper/const)**
 | Symbol | Source |
 |---|---|
 | `createCacheProvider` | `infrastructure/cache/redis.ts` |
@@ -283,6 +283,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildAnalysisCacheKey` | `infrastructure/cache/config.ts` |
 | `buildBriefingCacheKey` | `infrastructure/cache/config.ts` |
 | `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
+| `computeBarsEffectiveTtl` | `infrastructure/cache/config.ts` |
 
 > **@internal (not exported)**: `FUNDAMENTAL_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS`,
 > `OVERALL_CACHE_TTL_SECONDS`, `buildFundamentalCacheKey`,

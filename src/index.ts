@@ -279,6 +279,7 @@ export {
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
     CACHE_EXPIRY_HOUR_KST,
+    computeBarsEffectiveTtl,
     computeEffectiveTtl,
     MARKET_BRIEFING_CACHE_TTL,
 } from './infrastructure/cache/config';
