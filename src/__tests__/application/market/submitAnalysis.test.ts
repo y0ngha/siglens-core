@@ -663,7 +663,10 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
@@ -714,7 +717,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('userApiKey가 없으면 X-AI-API-KEY 헤더를 포함하지 않는다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             const headers = mockFetch.mock.calls[0][1].headers as Record<
                 string,
@@ -757,7 +767,10 @@ describe('submitAnalysis 함수는', () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');
@@ -772,7 +785,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('마지막 bar 종가(lastClose)를 meta에 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -800,7 +820,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('modelId가 없으면 기본값으로 jobMeta에 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -814,7 +841,14 @@ describe('submitAnalysis 함수는', () => {
                 indicators: { ...mockBarsData.indicators, atr: [null, 2.5, 3] },
             });
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -831,7 +865,14 @@ describe('submitAnalysis 함수는', () => {
                 },
             });
 
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -840,7 +881,14 @@ describe('submitAnalysis 함수는', () => {
         });
 
         it('ATR 배열이 비어있으면 undefined로 저장한다', async () => {
-            await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -1150,13 +1198,16 @@ describe('submitAnalysis 함수는', () => {
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
-        it('옵션이 생략되면 기존대로 캐시 미스 시 submitted를 반환한다', async () => {
+        it('marketDataProvider가 제공되면 캐시 미스 시 submitted를 반환한다', async () => {
             mockCacheGet.mockResolvedValue(null);
 
             const result = await submitAnalysis(
                 mockSymbol,
                 mockCompanyName,
-                mockTimeframe
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
             );
 
             expect(result.status).toBe('submitted');

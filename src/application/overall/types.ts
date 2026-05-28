@@ -68,8 +68,8 @@ export interface OverallDependencyInputs {
     modelId: ModelId;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
-    /** Market data provider injected by the consumer (siglens app). */
-    marketDataProvider: MarketDataProvider;
+    /** Market data provider. Required only when bars must be fetched; injected by the consumer. */
+    marketDataProvider?: MarketDataProvider;
     /**
      * Resolved subscription tier. Optional for backward compatibility with
      * direct test callers; submitOverallAnalysis defaults to DEFAULT_TIER

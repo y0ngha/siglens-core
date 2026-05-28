@@ -299,8 +299,14 @@ export async function submitOverallAnalysis(
     // result, so the daily-only assumption holds regardless of timeframe.
     // On compute failure, log and fall back to fearGreed=null so the overall analysis proceeds.
     const fmpSymbol = options.technical.fmpSymbol;
+    const { marketDataProvider } = options;
+    if (marketDataProvider === undefined) {
+        throw new Error(
+            'submitOverallAnalysis: options.marketDataProvider is required to fetch the daily fear/greed snapshot'
+        );
+    }
     const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
-        options.marketDataProvider,
+        marketDataProvider,
         symbol,
         '1Day',
         fmpSymbol

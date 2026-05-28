@@ -28,8 +28,8 @@ export type { AnalysisUsageOptions };
 
 /** Options controlling analysis submission behavior. */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
-    /** Market data provider injected by the consumer (siglens app). */
-    marketDataProvider: MarketDataProvider;
+    /** Market data provider. Required only when the analysis cache misses and bars must be fetched; injected by the consumer (siglens app). */
+    marketDataProvider?: MarketDataProvider;
     /** Optional usage tracking. Omitted callers keep the previous behavior. */
     usage?: AnalysisUsageOptions;
     /** Request-scoped tier context used to enforce timeframe access. */
