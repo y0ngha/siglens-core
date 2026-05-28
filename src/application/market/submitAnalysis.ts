@@ -269,14 +269,14 @@ export async function submitAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    const { workerUrl, workerSecret } = readWorkerConfig();
-
     const { marketDataProvider } = options;
     if (marketDataProvider == null) {
         throw new Error(
             'submitAnalysis: options.marketDataProvider is required to fetch bars on a cache miss'
         );
     }
+
+    const { workerUrl, workerSecret } = readWorkerConfig();
 
     const { bars, indicators } = await fetchBarsWithIndicators(
         marketDataProvider,

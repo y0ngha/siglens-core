@@ -647,17 +647,26 @@ describe('submitAnalysis 함수는', () => {
         it('WORKER_URL이 없으면 에러를 던진다', async () => {
             delete process.env.WORKER_URL;
 
+            // marketDataProvider must be supplied so the provider guard (which
+            // now runs before readWorkerConfig) does not short-circuit first.
             await expect(
-                submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe)
+                submitAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                )
             ).rejects.toThrow(
                 'WORKER_URL and WORKER_SECRET environment variables are required'
             );
         });
 
         it('marketDataProvider가 없으면 에러를 던진다', async () => {
-            // Guard sits after cache check and readWorkerConfig — reproduce
-            // the same cache-miss + worker-config setup the other cache-miss
-            // tests use, but omit marketDataProvider from options.
+            // Guard sits after the cache check and skipEnqueueIfMiss early-return,
+            // but before readWorkerConfig — omit marketDataProvider from options
+            // to trigger the guard.
             await expect(
                 submitAnalysis(
                     mockSymbol,

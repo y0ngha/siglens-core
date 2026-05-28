@@ -22,7 +22,7 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-// FMP/Alpaca 동시 요청 제한 — 429 회피를 위한 청크 크기
+// 시장 데이터 provider 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;
 
 interface BarsAndQuotesResults {

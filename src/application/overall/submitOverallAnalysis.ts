@@ -292,7 +292,6 @@ export async function submitOverallAnalysis(
     }
 
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
-    const { workerUrl, workerSecret } = readWorkerConfig();
 
     // Daily fearGreed snapshot — injected as the sentiment context for the overall prompt.
     // Computed directly from daily raw data rather than reusing the technical-axis
@@ -305,6 +304,8 @@ export async function submitOverallAnalysis(
             'submitOverallAnalysis: options.marketDataProvider is required to fetch the daily fear/greed snapshot'
         );
     }
+
+    const { workerUrl, workerSecret } = readWorkerConfig();
     const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
         marketDataProvider,
         symbol,
