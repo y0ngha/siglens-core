@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.15.0](https://github.com/y0ngha/siglens-core/compare/v0.14.1...v0.15.0) (2026-05-28)
+
+
+### Features
+
+* expose fear-greed classifier constants in public API ([2ba8e1f](https://github.com/y0ngha/siglens-core/commit/2ba8e1f20a9d29852f37b3f723a65f76a593f1a8))
+
 ## [0.14.1](https://github.com/y0ngha/siglens-core/compare/v0.14.0...v0.14.1) (2026-05-28)
 
 
