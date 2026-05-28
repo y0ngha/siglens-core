@@ -87,21 +87,28 @@ export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
     );
 }
 
-/** 개장 중 bars 캐시 TTL(초). 마지막 봉이 실시간 형성되나 FMP 시세는 최대 15분 지연이라 1분이면 충분. */
+/** @internal Cache TTL (seconds) for bars during a regular NYSE session (09:30–16:00 ET). */
 export const BARS_OPEN_TTL_SECONDS = SECONDS_PER_MINUTE;
-/** 장외/주말 bars 캐시 TTL 상한(초). 다음 개장까지가 이보다 길면 이 값으로 캡. */
+/** @internal Max cache TTL (seconds) for bars outside a regular session; caps "time until next open" when the next session is >24h away. */
 export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
 
 /**
- * bars(OHLCV+지표) 캐시의 effective TTL(초)을 `now` 기준으로 계산.
+ * Computes the effective cache TTL (seconds) for bars (OHLCV + indicators) at `now`.
  *
- * - 정규장 중: {@link BARS_OPEN_TTL_SECONDS}(60s) — 마지막 봉이 형성 중.
- * - 장외/주말: `min(`{@link BARS_OFFHOURS_TTL_CEILING_SECONDS}`, 다음 개장까지)` —
- *   마감 후 완성된 봉은 다음 개장 전까지 변하지 않으므로 개장 직전 만료.
+ * - During regular session: {@link BARS_OPEN_TTL_SECONDS} (60 s) — the last bar is
+ *   still forming; stale data must not survive past the next bar's close.
+ * - Off-hours / weekends: `min(`{@link BARS_OFFHOURS_TTL_CEILING_SECONDS}`, seconds until next open)` —
+ *   completed bars do not change until the next session opens, so the cache can
+ *   survive exactly until that boundary.
  *
- * 분석 캐시({@link computeEffectiveTtl}, 마감 경계)와 달리 **개장 경계**를 쓴다.
- * @param _timeframe - 봉 해상도(현재 모든 TF 동일 정책, 시그니처 일관성 위해 유지).
- * @param now - 기준 시각(테스트용).
+ * Unlike {@link computeEffectiveTtl} (which uses the close boundary), this function
+ * uses the **open boundary**.
+ *
+ * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
+ *   the parameter is kept for signature consistency with {@link computeEffectiveTtl}.
+ * @param now - Reference time for market-session detection. Pass explicitly for
+ *   deterministic testing.
+ * @returns Effective TTL in seconds.
  */
 export function computeBarsEffectiveTtl(
     _timeframe: Timeframe,

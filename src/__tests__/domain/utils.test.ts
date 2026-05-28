@@ -201,6 +201,12 @@ describe('secondsUntilNextEtRegularOpen', () => {
             secondsUntilNextEtRegularOpen(new Date('2026-07-06T12:00:00Z'))
         ).toBe(90 * SECONDS_PER_MINUTE);
     });
+    it('현재 분의 경과 초를 빼서 정확히 개장 시각에 만료된다 (Mon 08:00:30 ET)', () => {
+        // 2026-07-06T12:00:30Z = Mon 08:00:30 EDT → 90분 후 개장, 30초 보정
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2026-07-06T12:00:30Z'))
+        ).toBe(90 * SECONDS_PER_MINUTE - 30);
+    });
     it('EST 개장 전 → 오늘 개장까지 (Mon 09:00 ET → 30분)', () => {
         expect(
             secondsUntilNextEtRegularOpen(new Date('2026-01-05T14:00:00Z'))

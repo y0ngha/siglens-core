@@ -276,8 +276,6 @@ export {
 // Cache
 export {
     ANALYSIS_CACHE_TTL,
-    BARS_OFFHOURS_TTL_CEILING_SECONDS,
-    BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
     CACHE_EXPIRY_HOUR_KST,
