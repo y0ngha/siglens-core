@@ -51,9 +51,6 @@ export async function fetchBarsWithIndicators(
     fmpSymbol?: string,
     now = new Date()
 ): Promise<BarsData> {
-    if (provider == null) {
-        throw new Error('fetchBarsWithIndicators: provider is required');
-    }
     const fromDay = computeFromDay(timeframe, now);
     const limit = TIMEFRAME_BARS_LIMIT[timeframe];
     const bars = await provider.getBars({

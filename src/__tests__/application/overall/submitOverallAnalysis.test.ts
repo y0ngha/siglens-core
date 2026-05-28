@@ -1043,6 +1043,27 @@ describe('submitOverallAnalysis 함수는', () => {
         });
     });
 
+    describe('marketDataProvider 가드', () => {
+        it('options.marketDataProvider가 없으면 에러를 던진다', async () => {
+            // Guard sits after resolveOverallDependencies, cache check, and
+            // readWorkerConfig — reproduce the same cache-miss + worker-config
+            // setup the other cache-miss tests use, but omit marketDataProvider.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await expect(
+                submitOverallAnalysis(
+                    makeOptions({ marketDataProvider: undefined })
+                )
+            ).rejects.toThrow('marketDataProvider');
+        });
+    });
+
     describe('skipEnqueueIfMiss 옵션이 true일 때', () => {
         beforeEach(() => {
             // 이 파일의 다른 테스트들이 mockResolvedValueOnce 큐를 남기는

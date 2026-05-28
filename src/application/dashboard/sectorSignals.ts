@@ -119,9 +119,6 @@ export async function getSectorSignals(
     timeframe: DashboardTimeframe = DEFAULT_DASHBOARD_TIMEFRAME,
     now: Date = new Date()
 ): Promise<SectorSignalsResult> {
-    if (provider == null) {
-        throw new Error('getSectorSignals: provider is required');
-    }
     const cache = createCacheProvider();
     const bucket = bucketedTimestamp(timeframe, now);
     const cacheKey = buildSectorSignalsCacheKey(timeframe, bucket);

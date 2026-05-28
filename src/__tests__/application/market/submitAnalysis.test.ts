@@ -654,6 +654,22 @@ describe('submitAnalysis 함수는', () => {
             );
         });
 
+        it('marketDataProvider가 없으면 에러를 던진다', async () => {
+            // Guard sits after cache check and readWorkerConfig — reproduce
+            // the same cache-miss + worker-config setup the other cache-miss
+            // tests use, but omit marketDataProvider from options.
+            await expect(
+                submitAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    {}
+                )
+            ).rejects.toThrow('marketDataProvider');
+        });
+
         it('Skills 로딩 실패 시에도 Worker에 요청을 보낸다', async () => {
             const consoleSpy = vi
                 .spyOn(console, 'error')
