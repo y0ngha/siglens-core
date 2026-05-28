@@ -269,6 +269,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeStockSignalResult` | `domain/dashboard.ts` |
 | `lookbackIsoFromNow` | `domain/dashboard.ts` |
 
+**시장 세션 (Market session) (2)**
+| Symbol | Source |
+|---|---|
+| `isEtRegularSessionOpen(now)` — DST-safe US 정규장(09:30–16:00 ET, 마감 정각 제외) 개장 여부. | `domain/utils.ts` |
+| `getEtSessionStatus(now)` — `'weekend' \| 'open' \| 'closed'` 3-state 세션 분류. | `domain/utils.ts` |
+
+> **@internal (not exported)**: `secondsUntilNextEtRegularOpen` — bars 캐시 TTL 계산 전용으로 cache config 내부에서만 사용.
+
 **모델 스펙 헬퍼 (9)** — `getProvider`, `isClaudeModel`, `isGeminiModel`, `isChatGPTModel`, `getThinkingBudgetSequence` (`domain/analysis/modelSpecs.ts`), `isReasoningModelSpec`, `isSamplingModelSpec`, `isClaudeReasoningModelSpec`, `isClaudeSamplingModelSpec` (`domain/types.ts`). `is*ModelSpec` 가드는 `ModelSpec` union을 effort-bearing 변종 또는 sampling 변종으로 좁히는 데 사용한다.
 
 ### Tier 3 — Infrastructure Factories & Config
@@ -388,6 +396,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 **지표 상수** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `EMA_DEFAULT_PERIODS` 등 `src/domain/indicators/constants.ts`의 지표 계산 기본값과 임계값.
 
 **티어 제한 상수** — `DEFAULT_TIER`, `TIER_CONFIG` (`domain/tier.ts`).
+
+**시장 세션 상수/타입** — `MARKET_OPEN_HOUR`, `MARKET_OPEN_MINUTE`, `MARKET_CLOSE_HOUR`, `MARKET_CLOSE_MINUTE` (`domain/utils.ts`), `EtSessionStatus` (`domain/types.ts`). US 정규장 개장/마감 시각(ET) 상수와 세션 상태 union. siglens 옵션 UI·캐시·분석 게이팅에서 사용.
 
 **모델 스펙 (단일 source of truth)** — `MODEL_SPECS`, `THINKING_BUDGET_FALLBACK_STEPS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `ClaudeSamplingModelSpec`, `ClaudeReasoningModelSpec`, `GeminiModelSpec`, `ChatGPTModelSpec`, `EffortLevel`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId` (`domain/analysis/modelSpecs.ts`, types in `domain/types.ts`). AI SDK 호출자(워커, 서버 액션, UI)가 직접 lookup하는 단일 source of truth — provider 라우팅, max output tokens, thinking budget(`ClaudeSamplingModelSpec` / `GeminiModelSpec`) 또는 reasoning effort(`ClaudeReasoningModelSpec` / `ChatGPTModelSpec`), sampling 파라미터를 모델 식별자(`ActiveModelId`) 별로 보관한다. `EffortLevel` (`'low' | 'medium' | 'high'`)은 reasoning 변종에서 effort 필드 타입으로 사용된다. provider-specific subset 타입(`ClaudeModelId` 등)은 `is*Model` 타입 predicate가 narrowing할 때 노출된다. spec 변종 narrowing은 `is*ModelSpec` 가드(Tier 2)를 사용한다. 새 모델 추가는 이 맵에 한 줄 추가 + core publish로 끝난다.
 
@@ -518,3 +528,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-22 | AI provider 포트가 `infrastructure/ai/types.ts` → `domain/ports/aiProvider.ts`로 이전. Tier 4 신규 export(`CallAiProvider` 함수 타입 별칭 — adapters가 직접 구현하는 canonical signature, `ConversationRole`, `ConversationTurn`). 기존 `CallAiProviderOptions`, `AiContents` export는 새 경로(`domain/ports/aiProvider.ts`)에서 재노출되며 호환됨. `AiContents`가 provider-neutral 형태로 재정의됨(`string \| ConversationTurn[]`) — Gemini SDK 스키마 타입(`GeminiRole`, `GeminiPart`, `GeminiContent`)은 도메인에서 제거되어 더 이상 export되지 않는다. `RequestChatCompletionDependencies.callAiProvider` 필드 타입이 인라인 시그니처에서 `CallAiProvider` 별칭 사용으로 전환(MISTAKES.md TypeScript #5 준수). consumer adapters는 `ConversationTurn[]`을 받아 자신의 upstream SDK 스키마(예: Gemini `contents`)로 변환해야 한다. 0.x semver minor bump(BREAKING for adapters — 기존 어댑터가 `GeminiContent[]`를 직접 받았다면 `ConversationTurn[]` → Gemini 스키마 매핑 로직을 추가해야 한다). |
 | 2026-05-22 | Market 모듈 domain/ports 마이그레이션 (PR #97). Tier 4 `MarketDataProvider`와 `GetBarsOptions`의 source가 `infrastructure/market/types.ts` → `domain/ports/marketDataProvider.ts`로 이동(port/adapter 분리). `src/index.ts`/`src/index.client.ts`의 `export type` 경로만 갱신되며 공개 시그니처/필드 변경은 없다. `MarketDataProviderType = 'alpaca' \| 'fmp'`는 `MARKET_DATA_PROVIDER` env var로 제어되는 내부 디스패치 식별자이므로 공개 export 하지 않고 `@internal`로 유지(MISTAKES.md §Public API #6.5 — consumer가 import할 필요가 없는 internal 심볼). `createMarketDataProvider`의 반환 타입은 그대로 `MarketDataProvider`. |
 | 2026-05-28 | **Market provider ejection (PR #104)**. Tier 3 `createMarketDataProvider` export **제거** — consumer(siglens)가 자체 FMP/Alpaca 어댑터를 소유. Tier 1 시그니처 변경: `fetchBarsWithIndicators`, `getMarketSummary`, `getMarketSummaryWithBriefing`, `getSectorSignals`의 첫 번째 positional 인자가 `provider: MarketDataProvider`로 추가됨(BREAKING). `submitAnalysis`의 `options.marketDataProvider?: MarketDataProvider`와 `submitOverallAnalysis`의 `options.marketDataProvider?: MarketDataProvider`(via `OverallDependencyInputs`) 선택적 필드 추가 — cache miss 경로에서 필수; `skipEnqueueIfMiss: true`일 때만 생략 가능. |
+| 2026-05-28 | Tier 2/4 Market session 추가 — `isEtRegularSessionOpen`(기존 `@internal` 제거 후 public화), `getEtSessionStatus`(`'weekend' \| 'open' \| 'closed'` 3-state, 신규) 및 Tier 4 상수 `MARKET_OPEN_HOUR`/`MARKET_OPEN_MINUTE`/`MARKET_CLOSE_HOUR`/`MARKET_CLOSE_MINUTE`와 `EtSessionStatus` union을 인벤토리에 등록. DST-safe(`Intl.DateTimeFormat('America/New_York')`), 마감 정각 16:00은 `'open'`에서 제외(exclusive). siglens가 자체 `shared/lib/marketSession.ts`의 정규장 판정을 제거하고 이 심볼을 import하도록 통합하기 위한 단일 source of truth. `secondsUntilNextEtRegularOpen`은 bars 캐시 TTL 전용이라 `@internal` 유지. 0.x semver minor bump. |

@@ -1,5 +1,18 @@
 # Changelog
 
+# [0.14.0](https://github.com/y0ngha/siglens-core/compare/v0.13.0...v0.14.0) (2026-05-28)
+
+
+### Bug Fixes
+
+* address PR [#103](https://github.com/y0ngha/siglens-core/issues/103) review comments — tier exports, move EtSessionStatus to domain/types, English docs ([38e470e](https://github.com/y0ngha/siglens-core/commit/38e470e6430d81d0e47414a7047018f0f27bb982))
+* address PR [#103](https://github.com/y0ngha/siglens-core/issues/103) review round 2 feedback ([cfcdfe7](https://github.com/y0ngha/siglens-core/commit/cfcdfe7447cdb503a672f3850e000b6e368f9aae))
+
+
+### Features
+
+* public ET session API (isEtRegularSessionOpen, getEtSessionStatus, market-hour constants) ([937c385](https://github.com/y0ngha/siglens-core/commit/937c3853628cbe08475ae8230742e66b85a19387))
+
 # [0.13.0](https://github.com/y0ngha/siglens-core/compare/v0.12.0...v0.13.0) (2026-05-28)
 
 

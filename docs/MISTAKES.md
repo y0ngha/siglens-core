@@ -501,6 +501,19 @@ and have been removed from this file.
       Task 6: FUNDAMENTAL_CACHE_TTL JSDoc claims dynamic TTL (hardcoded constant, no dynamic behavior).
       Always verify @returns type, @param discriminants, and @example code against actual function before approval.
 
+4.7. Tier 2/Tier 4 public symbols documented in Korean instead of English
+   → All exported public functions, types, constants, and interfaces must have English JSDoc and comments
+   → Package consumers read TypeDoc and IDE autocomplete in English; non-English documentation is inaccessible and breaks contract clarity
+   ❌ export function getEtSessionStatus(date: Date) { /** 세션 상태 조회 */ ... }  // Korean description
+   ❌ export type EtSessionStatus = 'open' | 'closed'; // 시장 세션 상태  // Korean comment
+   ❌ // 미국 마켓 오픈 시간 / export const MARKET_OPEN_HOUR = 9;  // Korean comment
+   ✅ export function getEtSessionStatus(date: Date) { /** Get current ET market session status. @param date ... @returns ... */ ... }
+   ✅ export type EtSessionStatus = 'open' | 'closed'; // US market session state
+   ✅ // US market open time (9:30 ET) / export const MARKET_OPEN_HOUR = 9;
+   → Recurring (PR #103 R1–R2): 4+ instances across getEtSessionStatus, isEtRegularSessionOpen, EtSessionStatus type, and MARKET_* constants.
+      Pattern: public functions and types have Korean JSDoc; block comments above constants are in Korean.
+      Checkpoint before approving: scan all new public exports for Korean text; rewrite to English if found.
+
 5. JSDoc tags reference specific call-sites instead of describing timeless purpose
    → @internal, @param, @returns must describe the function's role independent of any caller
    → JSDoc is documentation for all consumers, not a call-site comment
