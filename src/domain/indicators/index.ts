@@ -49,7 +49,13 @@ export * from './donchianChannel';
 export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
-export { computeFearGreedIndex, computeFearGreedHistory } from './fearGreed';
+export {
+    computeFearGreedIndex,
+    computeFearGreedHistory,
+    FEAR_GREED_LABEL_CUTOFFS,
+    scoreToLabel,
+    POC_WINDOW_DEFAULT,
+} from './fearGreed';
 export * from './constants';
 export * from './utils';
 

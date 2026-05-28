@@ -24,6 +24,7 @@ import {
     EXCLUDED_SINGLE_PATTERNS,
     extendTrendline,
     extractReconciledActionLines,
+    FEAR_GREED_LABEL_CUTOFFS,
     filterAnalysisResult,
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_PRO_MODEL,
@@ -39,9 +40,11 @@ import {
     isTimeframeAllowed,
     normalizeActionRecommendation,
     normalizeTrend,
+    POC_WINDOW_DEFAULT,
     postProcessAnalysisWithReconcile,
     requestChatCompletion,
     RSI_DEFAULT_PERIOD,
+    scoreToLabel,
     TIER_CONFIG,
     VALID_CHAT_MODELS,
     validateActionPrices,
@@ -54,6 +57,9 @@ describe('public API exports', () => {
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);
         expect(EMPTY_INDICATOR_RESULT.smc).toBe(EMPTY_SMC_RESULT);
         expect(HIGH_CONFIDENCE_WEIGHT).toBe(0.8);
+        expect(FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX).toBe(55);
+        expect(POC_WINDOW_DEFAULT).toBe(60);
+        expect(scoreToLabel(10)).toBe('EXTREME_FEAR');
     });
 
     it('exports advanced domain helpers from package entrypoint', () => {

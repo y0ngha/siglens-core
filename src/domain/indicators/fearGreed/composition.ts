@@ -11,8 +11,9 @@ import type {
 import { percentile } from '@/domain/indicators/fearGreed/percentile';
 
 /**
- * @internal 5-stage cutoffs (strict less-than). 0..100 score → label.
- * Used internally by composeSnapshot and walkForward; not part of the public API.
+ * 5-stage sentiment cutoffs (strict less-than) for mapping a 0..100 score to a
+ * label. Public so consumers can render gauge segments and classify arbitrary
+ * scores consistently with {@link scoreToLabel}.
  */
 export const FEAR_GREED_LABEL_CUTOFFS = {
     EXTREME_FEAR_MAX: 25,
@@ -46,9 +47,11 @@ export const FEAR_GREED_CONFIDENCE_THRESHOLDS = {
 } as const;
 
 /**
- * Map a 0..100 score to a 5-stage label.
+ * Map a 0..100 fear-greed score to its 5-stage sentiment label. Boundaries are
+ * defined by {@link FEAR_GREED_LABEL_CUTOFFS}.
  *
- * @internal Used internally by composeSnapshot and walkForward.
+ * @param score - Composite fear-greed score in the 0..100 range.
+ * @returns The 5-stage sentiment label for `score`.
  */
 export function scoreToLabel(score: number): FearGreedLabel {
     if (score < FEAR_GREED_LABEL_CUTOFFS.EXTREME_FEAR_MAX)
