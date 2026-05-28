@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 // ── Mock dependencies before importing the module under test ──
 vi.mock('@/application/overall/dependencyResolver');
@@ -148,6 +149,11 @@ const mockCacheProvider = {
 
 const mockFetch = vi.fn();
 
+const fakeProvider: MarketDataProvider = {
+    getBars: vi.fn().mockResolvedValue([]),
+    getQuote: vi.fn().mockResolvedValue(null),
+};
+
 /** Default options for submitOverallAnalysis. */
 function makeOptions(
     overrides: Partial<SubmitOverallAnalysisOptions> = {}
@@ -157,6 +163,7 @@ function makeOptions(
         timeframe: '1Day',
         modelId: 'gemini-2.5-flash',
         fundamentalProvider: minimalProvider,
+        marketDataProvider: fakeProvider,
         newsItems: [makeEnrichedNewsItem('n001')],
         upcomingCalendar: [makeCalendarItem('2026-07-25')],
         technical: {},
@@ -788,6 +795,7 @@ describe('submitOverallAnalysis 함수는', () => {
             // 일봉 데이터가 정확히 1번 fetch됨 (overall은 daily-only).
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 'AAPL',
                 '1Day',
                 undefined
@@ -840,6 +848,7 @@ describe('submitOverallAnalysis 함수는', () => {
             );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
                 'AAPL',
                 '1Day',
                 'AAPL.US'

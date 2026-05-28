@@ -300,6 +300,7 @@ export async function submitOverallAnalysis(
     // On compute failure, log and fall back to fearGreed=null so the overall analysis proceeds.
     const fmpSymbol = options.technical.fmpSymbol;
     const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
+        options.marketDataProvider,
         symbol,
         '1Day',
         fmpSymbol

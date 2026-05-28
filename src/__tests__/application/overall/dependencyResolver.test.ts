@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 // ── Mock the four submit functions before importing the resolver ──
 vi.mock('@/application/market/submitAnalysis');
@@ -104,6 +105,11 @@ const cachedNews: NewsAnalysisResponse = {
 };
 
 /** Baseline inputs — all three axes have cached results. */
+const fakeMarketProvider: MarketDataProvider = {
+    getBars: vi.fn().mockResolvedValue([]),
+    getQuote: vi.fn().mockResolvedValue(null),
+};
+
 function makeInputs(
     overrides: Partial<OverallDependencyInputs> = {}
 ): OverallDependencyInputs {
@@ -112,6 +118,7 @@ function makeInputs(
         timeframe: '1Day',
         modelId: 'gemini-2.5-flash',
         fundamentalProvider: minimalProvider,
+        marketDataProvider: fakeMarketProvider,
         newsItems: [makeEnrichedNewsItem('n001')],
         upcomingCalendar: [makeCalendarItem('2026-07-25')],
         technical: {},

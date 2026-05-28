@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Mock } from 'vitest';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import {
     DEFAULT_TIMEFRAME,
@@ -14,11 +13,13 @@ import {
     MACD_SLOW_PERIOD,
     RSI_DEFAULT_PERIOD,
 } from '@/domain/indicators/constants';
-import { createMarketDataProvider } from '@/infrastructure/market/factory';
-
-vi.mock('@/infrastructure/market/factory');
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 const mockGetBars = vi.fn();
+const fakeProvider: MarketDataProvider = {
+    getBars: mockGetBars,
+    getQuote: vi.fn().mockResolvedValue(null),
+};
 
 const mockBar = {
     time: 1705312200,
@@ -32,9 +33,6 @@ const mockBar = {
 describe('fetchBarsWithIndicators 함수는', () => {
     beforeEach(() => {
         mockGetBars.mockReset();
-        (createMarketDataProvider as Mock).mockReturnValue({
-            getBars: mockGetBars,
-        });
     });
 
     describe('정상 응답일 때', () => {
@@ -42,6 +40,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce([mockBar]);
 
             const result = await fetchBarsWithIndicators(
+                fakeProvider,
                 'AAPL',
                 DEFAULT_TIMEFRAME
             );
@@ -83,6 +82,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce([mockBar]);
 
             const result = await fetchBarsWithIndicators(
+                fakeProvider,
                 'AAPL',
                 DEFAULT_TIMEFRAME
             );
@@ -111,6 +111,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce(shortBars);
 
             const result = await fetchBarsWithIndicators(
+                fakeProvider,
                 'AAPL',
                 DEFAULT_TIMEFRAME
             );
@@ -126,6 +127,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce(shortBars);
 
             const result = await fetchBarsWithIndicators(
+                fakeProvider,
                 'AAPL',
                 DEFAULT_TIMEFRAME
             );
@@ -143,6 +145,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce(shortBars);
 
             const result = await fetchBarsWithIndicators(
+                fakeProvider,
                 'AAPL',
                 DEFAULT_TIMEFRAME
             );
@@ -160,6 +163,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce(shortBars);
 
             const result = await fetchBarsWithIndicators(
+                fakeProvider,
                 'AAPL',
                 DEFAULT_TIMEFRAME
             );
@@ -182,6 +186,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
                 expectedFromDate.toISOString().substring(0, 10) + 'T00:00:00Z';
 
             await fetchBarsWithIndicators(
+                fakeProvider,
                 'TSLA',
                 DEFAULT_TIMEFRAME,
                 undefined,
@@ -201,7 +206,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
         it('fmpSymbol이 주어지면 getBars에 fmpSymbol을 전달한다', async () => {
             mockGetBars.mockResolvedValueOnce([]);
 
-            await fetchBarsWithIndicators('SPX', DEFAULT_TIMEFRAME, '^SPX');
+            await fetchBarsWithIndicators(fakeProvider, 'SPX', DEFAULT_TIMEFRAME, '^SPX');
 
             expect(mockGetBars).toHaveBeenCalledWith(
                 expect.objectContaining({ symbol: '^SPX' })
@@ -216,7 +221,7 @@ describe('fetchBarsWithIndicators 함수는', () => {
             );
 
             await expect(
-                fetchBarsWithIndicators('AAPL', DEFAULT_TIMEFRAME)
+                fetchBarsWithIndicators(fakeProvider, 'AAPL', DEFAULT_TIMEFRAME)
             ).rejects.toThrow('Failed to fetch bars');
         });
     });

@@ -12,6 +12,7 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 export type { UserApiKeyRequiredError };
 
@@ -27,6 +28,8 @@ export type { AnalysisUsageOptions };
 
 /** Options controlling analysis submission behavior. */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
+    /** Market data provider injected by the consumer (siglens app). */
+    marketDataProvider: MarketDataProvider;
     /** Optional usage tracking. Omitted callers keep the previous behavior. */
     usage?: AnalysisUsageOptions;
     /** Request-scoped tier context used to enforce timeframe access. */

@@ -86,7 +86,7 @@ function resolveSubmitAnalysisArgs(
                 typeof fmpSymbolOrOptions === 'object' &&
                 fmpSymbolOrOptions !== null
                     ? fmpSymbolOrOptions
-                    : {},
+                    : ({} as SubmitAnalysisOptions),
         };
     }
 
@@ -103,7 +103,7 @@ function resolveSubmitAnalysisArgs(
             (typeof fmpSymbolOrOptions === 'object' &&
             fmpSymbolOrOptions !== null
                 ? fmpSymbolOrOptions
-                : {}),
+                : ({} as SubmitAnalysisOptions)),
     };
 }
 
@@ -268,6 +268,7 @@ export async function submitAnalysis(
     const { workerUrl, workerSecret } = readWorkerConfig();
 
     const { bars, indicators } = await fetchBarsWithIndicators(
+        options.marketDataProvider,
         symbol,
         timeframe,
         fmpSymbol
@@ -291,7 +292,12 @@ export async function submitAnalysis(
     const dailyDataPromise =
         timeframe === '1Day'
             ? Promise.resolve({ bars, indicators })
-            : fetchBarsWithIndicators(symbol, '1Day', fmpSymbol);
+            : fetchBarsWithIndicators(
+                  options.marketDataProvider,
+                  symbol,
+                  '1Day',
+                  fmpSymbol
+              );
 
     const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
         .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
