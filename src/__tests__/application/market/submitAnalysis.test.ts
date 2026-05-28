@@ -410,7 +410,7 @@ describe('submitAnalysis 함수는', () => {
             expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
         });
 
-        it('기존 공개 시그니처(symbol, timeframe, options)를 계속 지원한다', async () => {
+        it('cache miss 시 marketDataProvider를 주입하면 submitted를 반환한다', async () => {
             const result = await submitAnalysis(
                 mockSymbol,
                 mockTimeframe,

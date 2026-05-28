@@ -73,8 +73,9 @@ export interface OverallDependencyInputs {
      *
      * Must be provided when a cache miss can occur and the daily fear/greed
      * bars will be fetched for the overall prompt.
-     * May be omitted when `skipEnqueueIfMiss: true` — that path short-circuits
-     * before the fetch site.
+     * May be omitted only when the overall submission is guaranteed to
+     * short-circuit before the fetch site (e.g. `skipEnqueueIfMiss: true` in
+     * {@link SubmitOverallAnalysisOptions}).
      */
     marketDataProvider?: MarketDataProvider;
     /**
