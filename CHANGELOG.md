@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.1](https://github.com/y0ngha/siglens-core/compare/v0.14.0...v0.14.1) (2026-05-28)
+
+
+### Bug Fixes
+
+* address PR [#104](https://github.com/y0ngha/siglens-core/issues/104) review (document DI pattern, PUBLIC_API sync, JSDoc, provider guards) ([242358f](https://github.com/y0ngha/siglens-core/commit/242358f257206eebbb8aa84c766117b5daf3f3c6))
+* address PR [#104](https://github.com/y0ngha/siglens-core/issues/104) round-2 review (remove redundant provider guards, test optional-provider throw, docs/API.md sync) ([420ed47](https://github.com/y0ngha/siglens-core/commit/420ed473c6c87f68b73adf4fbf66810b9fae3c0e))
+* address PR [#104](https://github.com/y0ngha/siglens-core/issues/104) round-3 review (optional-field JSDoc wording, stale Alpaca comment, guard order) ([5a45978](https://github.com/y0ngha/siglens-core/commit/5a45978172dd025b53426052cd0a279dd11929d4))
+* remove remaining stale Alpaca reference in getSectorSignals JSDoc ([08b72ad](https://github.com/y0ngha/siglens-core/commit/08b72ad180fcc066853f526a1240faf6c980757f))
+
 # [0.14.0](https://github.com/y0ngha/siglens-core/compare/v0.13.0...v0.14.0) (2026-05-28)
 
 
