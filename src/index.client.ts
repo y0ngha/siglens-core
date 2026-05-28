@@ -275,14 +275,14 @@ export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
 // LLM provider constants
 export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
-// Market session times (single source of truth, shared with siglens UI)
+// Market session times + state (single source of truth, shared with siglens UI)
 export {
     MARKET_CLOSE_HOUR,
     MARKET_CLOSE_MINUTE,
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
-    type EtSessionStatus,
 } from './domain/utils';
+export type { EtSessionStatus } from './domain/types';
 
 // Dashboard tickers / sectors
 export {

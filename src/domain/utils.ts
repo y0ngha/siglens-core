@@ -6,6 +6,7 @@ import {
     MS_PER_SECOND,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
+import type { EtSessionStatus } from '@/domain/types';
 
 const MARKDOWN_CODE_BLOCK_PATTERN = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
 
@@ -73,9 +74,13 @@ export function computeSecondsUntilCacheExpiry(
 
 // U.S. regular-session open/close times (ET). Exposed publicly as the single
 // source of truth shared by siglens' options UI, cache, and analysis gating.
+/** U.S. regular-session open hour in Eastern Time. */
 export const MARKET_OPEN_HOUR = 9;
+/** U.S. regular-session open minute in Eastern Time (opens at 09:30). */
 export const MARKET_OPEN_MINUTE = 30;
+/** U.S. regular-session close hour in Eastern Time. */
 export const MARKET_CLOSE_HOUR = 16;
+/** U.S. regular-session close minute in Eastern Time (closes at 16:00, exclusive). */
 export const MARKET_CLOSE_MINUTE = 0;
 
 /** US 정규장 개장 시각을 자정 기준 분으로 환산 (09:30 → 570). */
@@ -114,9 +119,6 @@ function etSessionParts(now: Date): EtSessionParts {
     const minute = Number.parseInt(get('minute'), 10);
     return { weekdayIndex, minutesOfDay: hour * 60 + minute };
 }
-
-/** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
-export type EtSessionStatus = 'weekend' | 'open' | 'closed';
 
 /**
  * Classify an instant into a U.S. regular-session state in Eastern Time.
