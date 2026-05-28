@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
+
+const mockGetQuote = vi.fn();
+const mockGetBars = vi.fn();
+
+const fakeProvider: MarketDataProvider = {
+    getQuote: mockGetQuote,
+    getBars: mockGetBars,
+};
 
 const getMarketSummaryMock = vi.fn<() => Promise<MarketSummaryData>>();
 const submitBriefingMock =
@@ -40,7 +49,7 @@ describe('getMarketSummaryWithBriefing', () => {
         getMarketSummaryMock.mockResolvedValue(summary);
         submitBriefingMock.mockResolvedValue(briefing);
 
-        const result = await getMarketSummaryWithBriefing();
+        const result = await getMarketSummaryWithBriefing(fakeProvider);
         expect(result).toEqual({ summary, briefing });
         expect(submitBriefingMock).toHaveBeenCalledWith(summary, undefined);
     });
@@ -58,7 +67,7 @@ describe('getMarketSummaryWithBriefing', () => {
         getMarketSummaryMock.mockResolvedValue(summary);
         submitBriefingMock.mockResolvedValue(briefing);
 
-        await getMarketSummaryWithBriefing(options);
+        await getMarketSummaryWithBriefing(fakeProvider, options);
 
         expect(submitBriefingMock).toHaveBeenCalledWith(summary, options);
     });

@@ -3,8 +3,8 @@ import {
     MARKET_SUMMARY_FMP_SYMBOLS,
     SECTOR_ETFS,
 } from '@/domain/constants/dashboard-tickers';
+import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type { MarketQuote, MarketSummaryData } from '@/domain/types';
-import { createMarketDataProvider } from '@/infrastructure/market/factory';
 
 /**
  * Fetch real-time quotes for all dashboard market indices and sector ETFs.
@@ -14,18 +14,16 @@ import { createMarketDataProvider } from '@/infrastructure/market/factory';
  * `changesPercentage` defaulted to `0` (so the dashboard renders fully even
  * if a single quote is unavailable).
  *
+ * @param provider - Injected market data provider.
  * @returns Indices and sector ETFs with their most recent quote data —
  *   see {@link MarketSummaryData}.
- *
- * @throws {Error} If the market data provider cannot be constructed (missing
- *   FMP credentials, etc.).
  *
  * @see getMarketSummaryWithBriefing
  * @see getSectorSignals
  */
-export async function getMarketSummary(): Promise<MarketSummaryData> {
-    const provider = createMarketDataProvider();
-
+export async function getMarketSummary(
+    provider: MarketDataProvider
+): Promise<MarketSummaryData> {
     const quotes = await Promise.all(
         MARKET_SUMMARY_FMP_SYMBOLS.map(sym => provider.getQuote(sym))
     );

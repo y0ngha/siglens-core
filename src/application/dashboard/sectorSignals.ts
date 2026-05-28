@@ -22,8 +22,6 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { createMarketDataProvider } from '@/infrastructure/market/factory';
-
 // FMP/Alpaca 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;
 
@@ -113,12 +111,11 @@ function combineResults(
  * @returns Computation timestamp plus per-stock signal results —
  *   see {@link SectorSignalsResult}.
  *
- * @throws {Error} If the market data provider cannot be constructed.
- *
  * @see getMarketSummary
  * @see bucketedTimestamp
  */
 export async function getSectorSignals(
+    provider: MarketDataProvider,
     timeframe: DashboardTimeframe = DEFAULT_DASHBOARD_TIMEFRAME,
     now: Date = new Date()
 ): Promise<SectorSignalsResult> {
@@ -135,7 +132,6 @@ export async function getSectorSignals(
         }
     }
 
-    const provider = createMarketDataProvider();
     const fromIso = lookbackIsoFromNow(timeframe, now);
     const { barsResults, quoteResults } = await fetchBarsAndQuotes(
         provider,
