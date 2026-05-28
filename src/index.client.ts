@@ -264,12 +264,25 @@ export {
     lookbackIsoFromNow,
 } from './domain/dashboard';
 
+// Market session — DST-safe US regular-session (ET) classification. Pure and
+// browser-safe (no Node deps), so it belongs in the client entrypoint too.
+export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
+
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
 
 // LLM provider constants
 export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
+
+// Market session times (single source of truth, shared with siglens UI)
+export {
+    MARKET_CLOSE_HOUR,
+    MARKET_CLOSE_MINUTE,
+    MARKET_OPEN_HOUR,
+    MARKET_OPEN_MINUTE,
+    type EtSessionStatus,
+} from './domain/utils';
 
 // Dashboard tickers / sectors
 export {

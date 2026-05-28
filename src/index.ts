@@ -285,6 +285,18 @@ export {
 } from './infrastructure/cache/config';
 export { createCacheProvider } from './infrastructure/cache/redis';
 
+// Market session — DST-safe US 정규장(ET) 판정. siglens 옵션 UI·캐시·분석
+// 게이팅이 공유하는 단일 source of truth.
+export {
+    getEtSessionStatus,
+    isEtRegularSessionOpen,
+    MARKET_CLOSE_HOUR,
+    MARKET_CLOSE_MINUTE,
+    MARKET_OPEN_HOUR,
+    MARKET_OPEN_MINUTE,
+} from './domain/utils';
+export type { EtSessionStatus } from './domain/utils';
+
 // LLM response JSON parsing with `jsonrepair` salvage — used by worker
 // codebases that parse raw LLM JSON before storing job results.
 export { extractJsonWithRepair } from './infrastructure/ai/extractJsonWithRepair';

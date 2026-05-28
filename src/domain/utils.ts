@@ -71,10 +71,17 @@ export function computeSecondsUntilCacheExpiry(
     return Math.max(1, Math.floor(diffMs / MS_PER_SECOND));
 }
 
-/** US 정규장 개장 시각 = 09:30 ET → 분 단위(570). */
-const ET_REGULAR_OPEN_MINUTES = 9 * 60 + 30;
-/** US 정규장 마감 시각 = 16:00 ET → 분 단위(960). */
-const ET_REGULAR_CLOSE_MINUTES = 16 * 60;
+// U.S. regular-session open/close times (ET). Exposed publicly as the single
+// source of truth shared by siglens' options UI, cache, and analysis gating.
+export const MARKET_OPEN_HOUR = 9;
+export const MARKET_OPEN_MINUTE = 30;
+export const MARKET_CLOSE_HOUR = 16;
+export const MARKET_CLOSE_MINUTE = 0;
+
+/** US 정규장 개장 시각을 자정 기준 분으로 환산 (09:30 → 570). */
+const ET_REGULAR_OPEN_MINUTES = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
+/** US 정규장 마감 시각을 자정 기준 분으로 환산 (16:00 → 960). */
+const ET_REGULAR_CLOSE_MINUTES = MARKET_CLOSE_HOUR * 60 + MARKET_CLOSE_MINUTE;
 
 const ET_SESSION_FORMATTER = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -108,14 +115,42 @@ function etSessionParts(now: Date): EtSessionParts {
     return { weekdayIndex, minutesOfDay: hour * 60 + minute };
 }
 
-/** @internal DST 안전한 뉴욕 정규장(09:30–16:00 ET) 개장 여부를 반환한다. */
-export function isEtRegularSessionOpen(now: Date): boolean {
+/** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
+export type EtSessionStatus = 'weekend' | 'open' | 'closed';
+
+/**
+ * Classify an instant into a U.S. regular-session state in Eastern Time.
+ *
+ * DST-safe: `Intl.DateTimeFormat('America/New_York')` resolves EDT/EST from the
+ * calendar position of `now`, so callers never handle the summer-time shift.
+ * Pure function — the caller passes an explicit `now` so the domain layer stays
+ * deterministic and tests can freeze the clock without mocking.
+ *
+ * @param now - The instant to classify.
+ * @returns `'weekend'` (Sat/Sun), `'open'` (weekday 09:30–16:00 ET with the
+ *   16:00 close **excluded**), or `'closed'` (any other weekday time).
+ */
+export function getEtSessionStatus(now: Date): EtSessionStatus {
     const { weekdayIndex, minutesOfDay } = etSessionParts(now);
-    if (weekdayIndex === 0 || weekdayIndex === 6) return false;
-    return (
+    if (weekdayIndex === 0 || weekdayIndex === 6) return 'weekend';
+    if (
         minutesOfDay >= ET_REGULAR_OPEN_MINUTES &&
         minutesOfDay < ET_REGULAR_CLOSE_MINUTES
-    );
+    ) {
+        return 'open';
+    }
+    return 'closed';
+}
+
+/**
+ * Whether `now` is inside the U.S. regular session (ET 09:30–16:00, close
+ * excluded). DST-safe; thin wrapper over {@link getEtSessionStatus}.
+ *
+ * @param now - The instant to test.
+ * @returns `true` only while the regular session is open.
+ */
+export function isEtRegularSessionOpen(now: Date): boolean {
+    return getEtSessionStatus(now) === 'open';
 }
 
 /** @internal 주어진 ET 요일 인덱스(0=일~6=토) 기준 다음 평일까지의 일수. 주말은 건너뛴다. */
