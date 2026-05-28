@@ -28,7 +28,12 @@ export type { AnalysisUsageOptions };
 
 /** Options controlling analysis submission behavior. */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
-    /** Market data provider. Required only when the analysis cache misses and bars must be fetched; injected by the consumer (siglens app). */
+    /**
+     * Market data provider injected by the consumer (siglens app).
+     *
+     * Required unless `skipEnqueueIfMiss` is true; omitting it on a cache miss
+     * that proceeds to fetch will throw at runtime.
+     */
     marketDataProvider?: MarketDataProvider;
     /** Optional usage tracking. Omitted callers keep the previous behavior. */
     usage?: AnalysisUsageOptions;

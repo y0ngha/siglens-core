@@ -68,7 +68,12 @@ export interface OverallDependencyInputs {
     modelId: ModelId;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
-    /** Market data provider. Required only when bars must be fetched; injected by the consumer. */
+    /**
+     * Market data provider injected by the consumer (siglens app).
+     *
+     * Required unless `skipEnqueueIfMiss` is true; omitting it on a cache miss
+     * that proceeds to fetch will throw at runtime.
+     */
     marketDataProvider?: MarketDataProvider;
     /**
      * Resolved subscription tier. Optional for backward compatibility with

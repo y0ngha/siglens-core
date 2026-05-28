@@ -8,4 +8,3 @@ export interface WorkerConfig {
     workerUrl: string;
     workerSecret: string;
 }
-

@@ -272,7 +272,7 @@ export async function submitAnalysis(
     const { workerUrl, workerSecret } = readWorkerConfig();
 
     const { marketDataProvider } = options;
-    if (marketDataProvider === undefined) {
+    if (marketDataProvider == null) {
         throw new Error(
             'submitAnalysis: options.marketDataProvider is required to fetch bars on a cache miss'
         );

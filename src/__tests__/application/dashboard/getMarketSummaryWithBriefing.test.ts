@@ -3,15 +3,12 @@ import type { BackgroundTaskOptions } from '@/application/types';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 
-const mockGetQuote = vi.fn();
-const mockGetBars = vi.fn();
+// fakeProvider is passed to getMarketSummaryWithBriefing and forwarded to the
+// (fully-mocked) getMarketSummary — the actual provider methods are never called.
+const fakeProvider = {} as MarketDataProvider;
 
-const fakeProvider: MarketDataProvider = {
-    getQuote: mockGetQuote,
-    getBars: mockGetBars,
-};
-
-const getMarketSummaryMock = vi.fn<() => Promise<MarketSummaryData>>();
+const getMarketSummaryMock =
+    vi.fn<(p: MarketDataProvider) => Promise<MarketSummaryData>>();
 const submitBriefingMock =
     vi.fn<
         (
@@ -21,7 +18,7 @@ const submitBriefingMock =
     >();
 
 vi.mock('@/application/dashboard/getMarketSummary', () => ({
-    getMarketSummary: () => getMarketSummaryMock(),
+    getMarketSummary: (p: MarketDataProvider) => getMarketSummaryMock(p),
 }));
 vi.mock('@/application/market/submitBriefing', () => ({
     submitBriefing: (

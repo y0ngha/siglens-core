@@ -300,7 +300,7 @@ export async function submitOverallAnalysis(
     // On compute failure, log and fall back to fearGreed=null so the overall analysis proceeds.
     const fmpSymbol = options.technical.fmpSymbol;
     const { marketDataProvider } = options;
-    if (marketDataProvider === undefined) {
+    if (marketDataProvider == null) {
         throw new Error(
             'submitOverallAnalysis: options.marketDataProvider is required to fetch the daily fear/greed snapshot'
         );

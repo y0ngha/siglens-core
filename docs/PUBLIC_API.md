@@ -160,15 +160,15 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 | Symbol | Source |
 |---|---|
-| `submitAnalysis` | `application/market/submitAnalysis.ts` |
+| `submitAnalysis(..., options?)` — `options.marketDataProvider?: MarketDataProvider` added. Required on cache miss (omitting it throws at runtime); optional when `skipEnqueueIfMiss: true` because cache hits return early before the fetch site. | `application/market/submitAnalysis.ts` |
 | `pollAnalysis` | `application/market/pollAnalysis.ts` |
 | `cancelAnalysisJob` | `application/market/cancelAnalysisJob.ts` |
-| `fetchBarsWithIndicators` | `application/market/barsApi.ts` |
+| `fetchBarsWithIndicators(provider, symbol, timeframe, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/market/barsApi.ts` |
 | `submitBriefing` | `application/market/submitBriefing.ts` |
 | `pollBriefing` | `application/market/pollBriefing.ts` |
-| `getMarketSummary` | `application/dashboard/getMarketSummary.ts` |
-| `getMarketSummaryWithBriefing` | `application/dashboard/getMarketSummaryWithBriefing.ts` |
-| `getSectorSignals` | `application/dashboard/sectorSignals.ts` |
+| `getMarketSummary(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/getMarketSummary.ts` |
+| `getMarketSummaryWithBriefing(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/getMarketSummaryWithBriefing.ts` |
+| `getSectorSignals(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/sectorSignals.ts` |
 | `checkAnalysisLimit` | `application/usage/limits.ts` |
 | `checkChatbotLimit` | `application/usage/limits.ts` |
 | `requestChatCompletion` | `application/chat/requestChatCompletion.ts` |
@@ -180,7 +180,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `cancelNewsAnalysisJob` | `application/news/cancelNewsAnalysisJob.ts` |
 | `submitNewsCardAnalysis` | `application/news/submitNewsCardAnalysis.ts` |
 | `pollNewsCardAnalysis` | `application/news/pollNewsCardAnalysis.ts` |
-| `submitOverallAnalysis` | `application/overall/submitOverallAnalysis.ts` |
+| `submitOverallAnalysis(options)` — `options.marketDataProvider?: MarketDataProvider` added (via `OverallDependencyInputs`). Required on cache miss when proceeding to fetch daily bars for the fear/greed snapshot; optional when `skipEnqueueIfMiss: true`. | `application/overall/submitOverallAnalysis.ts` |
 | `pollOverallAnalysis` | `application/overall/pollOverallAnalysis.ts` |
 | `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
 | `submitOptionsAnalysis` | `application/options/submitOptionsAnalysis.ts` |
@@ -305,10 +305,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `CHAT_TOKEN_LIMIT` | `infrastructure/chat/tokenStore.ts` |
 | `CHAT_TOKEN_TTL_SEC` | `infrastructure/chat/tokenStore.ts` |
 
-**시장 데이터 (1)**
-| Symbol | Source |
-|---|---|
-| `createMarketDataProvider` | `infrastructure/market/factory.ts` |
+**시장 데이터**
+
+> **Market provider ejection**: `createMarketDataProvider` is **removed** from
+> the public API (was Tier 3). The consumer (siglens app) now owns the market
+> data adapter entirely and injects it via the `provider: MarketDataProvider`
+> parameter on each call site. Core retains only the `MarketDataProvider` port
+> interface (Tier 4) and the `MarketDataProviderType` internal discriminant
+> (not exported). No Tier 3 market factory symbols remain in core.
 
 **Skills (2)**
 | Symbol | Source |
@@ -513,3 +517,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-22 | Tier 4 `StrikeVolumeAggregate`, `TopOiQuote` 신규 타입을 인벤토리에 등록. `OptionsExpirationMetrics`에 `topVolumeStrikes: ReadonlyArray<StrikeVolumeAggregate>`와 `topOiBidAskSummary: ReadonlyArray<TopOiQuote>` 두 필드 추가(additive — 기존 필드 변경 없음, 0.x semver minor bump). 신규 `aggregateVolume` 헬퍼는 내부 모듈로만 노출되며 `summarizeChainForLlm`이 사용. `buildOptionsAnalysisPrompt`의 `== 해석 가이드 ==` 섹션에 두 줄 추가(`topVolumeStrikes`, `topOiBidAskSummary` 해설). Tier 4 `CurrentAnalysisContext` 유니온이 `\| { kind: 'options'; payload: OptionsAnalysisResponse }` variant를 추가해 확장 — 0.x semver minor bump이지만, `CurrentAnalysisContext.kind`에 exhaustive switch를 쓰는 소비자는 `'options'` 케이스를 추가해야 컴파일된다. `buildChatPrompt`의 `formatCurrentAnalysisContext` switch에 `'options'` 분기 추가(symbol-level summary + per-expiration commentary + signals + analyzedAt을 plain `Key: Value` 라인으로 합류). |
 | 2026-05-22 | AI provider 포트가 `infrastructure/ai/types.ts` → `domain/ports/aiProvider.ts`로 이전. Tier 4 신규 export(`CallAiProvider` 함수 타입 별칭 — adapters가 직접 구현하는 canonical signature, `ConversationRole`, `ConversationTurn`). 기존 `CallAiProviderOptions`, `AiContents` export는 새 경로(`domain/ports/aiProvider.ts`)에서 재노출되며 호환됨. `AiContents`가 provider-neutral 형태로 재정의됨(`string \| ConversationTurn[]`) — Gemini SDK 스키마 타입(`GeminiRole`, `GeminiPart`, `GeminiContent`)은 도메인에서 제거되어 더 이상 export되지 않는다. `RequestChatCompletionDependencies.callAiProvider` 필드 타입이 인라인 시그니처에서 `CallAiProvider` 별칭 사용으로 전환(MISTAKES.md TypeScript #5 준수). consumer adapters는 `ConversationTurn[]`을 받아 자신의 upstream SDK 스키마(예: Gemini `contents`)로 변환해야 한다. 0.x semver minor bump(BREAKING for adapters — 기존 어댑터가 `GeminiContent[]`를 직접 받았다면 `ConversationTurn[]` → Gemini 스키마 매핑 로직을 추가해야 한다). |
 | 2026-05-22 | Market 모듈 domain/ports 마이그레이션 (PR #97). Tier 4 `MarketDataProvider`와 `GetBarsOptions`의 source가 `infrastructure/market/types.ts` → `domain/ports/marketDataProvider.ts`로 이동(port/adapter 분리). `src/index.ts`/`src/index.client.ts`의 `export type` 경로만 갱신되며 공개 시그니처/필드 변경은 없다. `MarketDataProviderType = 'alpaca' \| 'fmp'`는 `MARKET_DATA_PROVIDER` env var로 제어되는 내부 디스패치 식별자이므로 공개 export 하지 않고 `@internal`로 유지(MISTAKES.md §Public API #6.5 — consumer가 import할 필요가 없는 internal 심볼). `createMarketDataProvider`의 반환 타입은 그대로 `MarketDataProvider`. |
+| 2026-05-28 | **Market provider ejection (PR #104)**. Tier 3 `createMarketDataProvider` export **제거** — consumer(siglens)가 자체 FMP/Alpaca 어댑터를 소유. Tier 1 시그니처 변경: `fetchBarsWithIndicators`, `getMarketSummary`, `getMarketSummaryWithBriefing`, `getSectorSignals`의 첫 번째 positional 인자가 `provider: MarketDataProvider`로 추가됨(BREAKING). `submitAnalysis`의 `options.marketDataProvider?: MarketDataProvider`와 `submitOverallAnalysis`의 `options.marketDataProvider?: MarketDataProvider`(via `OverallDependencyInputs`) 선택적 필드 추가 — cache miss 경로에서 필수; `skipEnqueueIfMiss: true`일 때만 생략 가능. |

@@ -24,6 +24,9 @@ import type { MarketQuote, MarketSummaryData } from '@/domain/types';
 export async function getMarketSummary(
     provider: MarketDataProvider
 ): Promise<MarketSummaryData> {
+    if (provider == null) {
+        throw new Error('getMarketSummary: provider is required');
+    }
     const quotes = await Promise.all(
         MARKET_SUMMARY_FMP_SYMBOLS.map(sym => provider.getQuote(sym))
     );

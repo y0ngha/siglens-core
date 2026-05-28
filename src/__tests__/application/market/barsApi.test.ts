@@ -206,7 +206,12 @@ describe('fetchBarsWithIndicators 함수는', () => {
         it('fmpSymbol이 주어지면 getBars에 fmpSymbol을 전달한다', async () => {
             mockGetBars.mockResolvedValueOnce([]);
 
-            await fetchBarsWithIndicators(fakeProvider, 'SPX', DEFAULT_TIMEFRAME, '^SPX');
+            await fetchBarsWithIndicators(
+                fakeProvider,
+                'SPX',
+                DEFAULT_TIMEFRAME,
+                '^SPX'
+            );
 
             expect(mockGetBars).toHaveBeenCalledWith(
                 expect.objectContaining({ symbol: '^SPX' })
