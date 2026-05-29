@@ -77,6 +77,7 @@ function nextState(
     };
 }
 
+/** @internal Parabolic SAR — trailing stop-and-reverse trend dots. */
 export function calculateParabolicSAR(
     bars: Bar[],
     afStart = PSAR_AF_START,

@@ -18,6 +18,7 @@ function midpointAt(
     return h != null && l != null ? (h + l) / 2 : null;
 }
 
+/** @internal Ichimoku Cloud — tenkan/kijun/senkou/chikou lines per bar. */
 export function calculateIchimoku(
     bars: Bar[],
     conversionPeriod = ICHIMOKU_CONVERSION_PERIOD,

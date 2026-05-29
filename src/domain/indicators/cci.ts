@@ -2,6 +2,7 @@ import type { Bar } from '@/domain/types';
 import { CCI_DEFAULT_PERIOD, CCI_NORMALIZATION_CONSTANT } from './constants';
 import { typicalPrice } from './utils';
 
+/** @internal Commodity Channel Index — typical-price deviation oscillator. */
 export function calculateCCI(
     bars: Bar[],
     period = CCI_DEFAULT_PERIOD

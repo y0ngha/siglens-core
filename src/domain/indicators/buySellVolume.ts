@@ -1,5 +1,6 @@
 import type { Bar, BuySellVolumeResult } from '@/domain/types';
 
+/** @internal Splits each bar's volume into estimated buy and sell pressure. */
 export function calculateBuySellVolume(bars: Bar[]): BuySellVolumeResult[] {
     return bars.map(bar => {
         const range = bar.high - bar.low;

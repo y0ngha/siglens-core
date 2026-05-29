@@ -1,5 +1,6 @@
 import type { Bar } from '@/domain/types';
 
+/** @internal On-Balance Volume — running volume accumulator keyed on price direction. */
 export function calculateOBV(bars: Bar[]): number[] {
     if (bars.length === 0) return [];
 

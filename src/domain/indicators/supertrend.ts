@@ -13,6 +13,7 @@ interface SupertrendState {
 
 const NULL_RESULT: SupertrendResult = { supertrend: null, trend: null };
 
+/** @internal Supertrend — ATR-banded trend-following line with direction. */
 export function calculateSupertrend(
     bars: Bar[],
     atrPeriod = SUPERTREND_ATR_PERIOD,

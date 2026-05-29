@@ -40,6 +40,7 @@ function trueRangeAt(bar: Bar, prev: Bar): number {
     );
 }
 
+/** @internal Squeeze Momentum — Bollinger/Keltner squeeze state with momentum histogram. */
 export function calculateSqueezeMomentum(
     bars: Bar[],
     bbLength = SQUEEZE_MOMENTUM_BB_LENGTH,

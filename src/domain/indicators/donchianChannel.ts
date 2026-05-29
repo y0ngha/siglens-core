@@ -2,6 +2,7 @@ import type { Bar, DonchianChannelResult } from '@/domain/types';
 import { DONCHIAN_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import { slidingMax, slidingMin } from '@/domain/indicators/utils';
 
+/** @internal Donchian Channel — rolling highest-high / lowest-low price envelope. */
 export function calculateDonchianChannel(
     bars: Bar[],
     period = DONCHIAN_DEFAULT_PERIOD

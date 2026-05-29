@@ -5,6 +5,7 @@ interface WilderState {
     avgLoss: number;
 }
 
+/** @internal Relative Strength Index — Wilder-smoothed momentum oscillator. */
 export function calculateRSI(
     closes: number[],
     period = RSI_DEFAULT_PERIOD

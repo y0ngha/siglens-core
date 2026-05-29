@@ -7,6 +7,7 @@ function clv(bar: Bar): number {
     return (bar.close - bar.low - (bar.high - bar.close)) / range;
 }
 
+/** @internal Chaikin Money Flow — volume-weighted accumulation/distribution over a period. */
 export function calculateCMF(
     bars: Bar[],
     period = CMF_DEFAULT_PERIOD

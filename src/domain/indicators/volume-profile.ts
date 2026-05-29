@@ -63,6 +63,7 @@ function expandValueArea(
     return state;
 }
 
+/** @internal Volume Profile — per-price-row volume distribution with POC and value area. */
 export function calculateVolumeProfile(
     bars: Bar[],
     rowSize: number = VP_DEFAULT_ROW_SIZE

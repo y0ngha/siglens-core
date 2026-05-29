@@ -9,6 +9,7 @@ interface VWAPState {
     results: (number | null)[];
 }
 
+/** @internal Volume-Weighted Average Price — session-anchored running VWAP. */
 export function calculateVWAP(bars: Bar[]): (number | null)[] {
     if (bars.length === 0) return [];
 
