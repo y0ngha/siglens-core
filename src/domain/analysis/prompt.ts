@@ -177,8 +177,8 @@ interface PromptCandlePatternEntry {
     patternName: string;
 }
 
-// Alias for brevity in the prompt-line templates below; identical to formatNullableNumber(n, 2).
-const fmt = formatNullableNumber;
+// Brevity alias used across the prompt-line templates below.
+const fmt = (n: number | null): string => formatNullableNumber(n, 2);
 
 const formatVolume = (n: number): string =>
     Math.round(n)

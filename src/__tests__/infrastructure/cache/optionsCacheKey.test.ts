@@ -5,6 +5,8 @@ import {
 } from '@/infrastructure/cache/config';
 
 describe('buildOptionsCacheKey', () => {
+    const base = buildOptionsCacheKey('AAPL', '2026-05-22', 'm', 'h1');
+
     it('builds a deterministic key with every input segment', () => {
         const key = buildOptionsCacheKey(
             'AAPL',
@@ -16,8 +18,6 @@ describe('buildOptionsCacheKey', () => {
             `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:AAPL:2026-05-22:claude-haiku:abc123`
         );
     });
-
-    const base = buildOptionsCacheKey('AAPL', '2026-05-22', 'm', 'h1');
 
     it('differs when the symbol changes', () => {
         expect(buildOptionsCacheKey('TSLA', '2026-05-22', 'm', 'h1')).not.toBe(
