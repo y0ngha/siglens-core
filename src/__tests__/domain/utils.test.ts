@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     parseNumberOrDefault,
-    parseJsonResponse,
-    stripMarkdownCodeBlock,
     computeSecondsUntilCacheExpiry,
     getEtSessionStatus,
     isEtRegularSessionOpen,
@@ -43,58 +41,6 @@ describe('parseNumberOrDefault', () => {
 
     it('returns defaultValue for Infinity', () => {
         expect(parseNumberOrDefault('Infinity', 5)).toBe(5);
-    });
-});
-
-describe('stripMarkdownCodeBlock', () => {
-    it('strips ```json code block', () => {
-        const input = '```json\n{"key": "value"}\n```';
-        expect(stripMarkdownCodeBlock(input)).toBe('{"key": "value"}');
-    });
-
-    it('strips plain ``` code block', () => {
-        const input = '```\n{"key": "value"}\n```';
-        expect(stripMarkdownCodeBlock(input)).toBe('{"key": "value"}');
-    });
-
-    it('returns trimmed text as-is when no code block', () => {
-        const input = '  {"key": "value"}  ';
-        expect(stripMarkdownCodeBlock(input)).toBe('{"key": "value"}');
-    });
-
-    it('trims the extracted content', () => {
-        const input = '```json\n  {"key": "value"}  \n```';
-        expect(stripMarkdownCodeBlock(input)).toBe('{"key": "value"}');
-    });
-});
-
-describe('parseJsonResponse', () => {
-    it('parses plain JSON string', () => {
-        const result = parseJsonResponse('{"n":1}', 'test');
-        expect(result).toEqual({ n: 1 });
-    });
-
-    it('parses JSON inside markdown code block', () => {
-        const result = parseJsonResponse('```json\n{"n":1}\n```', 'test');
-        expect(result).toEqual({ n: 1 });
-    });
-
-    it('throws on invalid JSON', () => {
-        expect(() =>
-            parseJsonResponse('not valid json', 'gemini')
-        ).toThrowError('Failed to parse gemini response as JSON');
-    });
-
-    it('thrown error has cause', () => {
-        expect.assertions(1);
-        try {
-            parseJsonResponse('bad json', 'gemini');
-        } catch (err) {
-            // parseJsonResponse는 { cause: error } 옵션과 함께 Error를 던지므로 cause 필드가 런타임에 항상 존재
-            expect((err as { cause: unknown }).cause).toBeInstanceOf(
-                SyntaxError
-            );
-        }
     });
 });
 

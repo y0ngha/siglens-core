@@ -1,3 +1,5 @@
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import type { Bar, BuySellVolumeResult } from '@/domain/types';
 import {
     computeFactorsAtT,
@@ -22,7 +24,9 @@ function buildFactorTS(
 }
 
 function isoDate(unixSec: number): string {
-    return new Date(unixSec * 1000).toISOString().slice(0, 10);
+    return new Date(unixSec * MS_PER_SECOND)
+        .toISOString()
+        .slice(0, ISO_DATE_PREFIX_LENGTH);
 }
 
 /**

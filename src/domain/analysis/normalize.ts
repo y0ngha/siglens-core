@@ -247,6 +247,21 @@ export function normalizeTrendline(v: unknown): Trendline | null {
 
 // --- ActionRecommendation ---
 
+function normalizeReconciledActionLevels(
+    raw: unknown
+): ReconciledActionLevels | undefined {
+    const o = asObject(raw);
+    if (!o) return undefined;
+
+    return {
+        stopLoss: asNumber(o.stopLoss),
+        takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
+        exit: asString(o.exit),
+        riskReward: asString(o.riskReward),
+        reason: asString(o.reason),
+    };
+}
+
 export function normalizeActionRecommendation(
     raw: unknown
 ): ActionRecommendation | undefined {
@@ -276,20 +291,5 @@ export function normalizeActionRecommendation(
         stopLoss: asNumber(o.stopLoss),
         takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
         reconciledLevels: normalizeReconciledActionLevels(o.reconciledLevels),
-    };
-}
-
-export function normalizeReconciledActionLevels(
-    raw: unknown
-): ReconciledActionLevels | undefined {
-    const o = asObject(raw);
-    if (!o) return undefined;
-
-    return {
-        stopLoss: asNumber(o.stopLoss),
-        takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
-        exit: asString(o.exit),
-        riskReward: asString(o.riskReward),
-        reason: asString(o.reason),
     };
 }

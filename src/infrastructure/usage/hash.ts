@@ -1,15 +1,16 @@
 import { createHash } from 'node:crypto';
 
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
+
 const SHA_256_ALGORITHM = 'sha256';
 const HEX_DIGEST_ENCODING = 'hex';
-const UTC_DATE_LENGTH = 10;
 
 /**
  * Shared UTC YYYY-MM-DD formatter used as the daily salt for usage hashing.
  * File-private — only consumed by {@link hashUsageIp} in this module.
  */
 function toUtcDateString(date: Date): string {
-    return date.toISOString().slice(0, UTC_DATE_LENGTH);
+    return date.toISOString().slice(0, ISO_DATE_PREFIX_LENGTH);
 }
 
 /**

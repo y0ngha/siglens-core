@@ -6,6 +6,7 @@ import type {
     RequestChatCompletionParams,
 } from '@/application/chat/types';
 import { buildUsageLimitError, checkChatbotLimit } from '@/application/usage';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import type { AiContents, ConversationRole } from '@/domain/ports/aiProvider';
 import { DEFAULT_TIER, TIER_CONFIG, isModelAllowed } from '@/domain/tier';
@@ -25,7 +26,6 @@ import { type UsageRepository } from '@/domain/ports/usageRepository';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { constants } from 'node:http2';
 
-const ISO_DATE_LENGTH = 10;
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
 
 const COMPENSATED_CHAT_ERRORS = [
@@ -99,7 +99,7 @@ function isPremiumChatModel(model: ModelId, config: TierConfig): boolean {
 }
 
 function toUsageDate(date: Date): string {
-    return date.toISOString().slice(0, ISO_DATE_LENGTH);
+    return date.toISOString().slice(0, ISO_DATE_PREFIX_LENGTH);
 }
 
 function toConversationRole(role: ChatMessage['role']): ConversationRole {

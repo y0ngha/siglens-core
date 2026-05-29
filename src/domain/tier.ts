@@ -9,8 +9,8 @@ import type {
 } from '@/domain/types';
 import { TIMEFRAMES } from '@/domain/constants/market';
 
-/** @internal All supported subscription tiers, ordered free -> member -> pro. */
-export const TIER_VALUES = [
+/** All supported subscription tiers, ordered free -> member -> pro. */
+const TIER_VALUES = [
     'free',
     'member',
     'pro',

@@ -8,8 +8,6 @@ import {
 } from '@/domain/constants/time';
 import type { EtSessionStatus } from '@/domain/types';
 
-const MARKDOWN_CODE_BLOCK_PATTERN = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
-
 export function parseNumberOrDefault(
     raw: string | undefined,
     defaultValue: number
@@ -17,31 +15,6 @@ export function parseNumberOrDefault(
     if (raw == null || raw === '') return defaultValue;
     const parsed = Number.parseFloat(raw);
     return Number.isFinite(parsed) ? parsed : defaultValue;
-}
-
-export function stripMarkdownCodeBlock(text: string): string {
-    const match = MARKDOWN_CODE_BLOCK_PATTERN.exec(text.trim());
-    return match ? match[1].trim() : text.trim();
-}
-
-/**
- * Parse an LLM response string as JSON with markdown-fence stripping.
- *
- * Pure-domain helper — no salvage. Consumers needing tolerance for
- * truncated / unquoted-key / trailing-comma payloads should use the
- * infrastructure-layer `extractJsonWithRepair` wrapper.
- *
- * @param text   - Raw response from the LLM.
- * @param source - Caller label for the error message (e.g. `'koreanTranslator'`).
- */
-export function parseJsonResponse(text: string, source: string): unknown {
-    try {
-        return JSON.parse(stripMarkdownCodeBlock(text));
-    } catch (error) {
-        throw new Error(`Failed to parse ${source} response as JSON`, {
-            cause: error,
-        });
-    }
 }
 
 export function computeSecondsUntilCacheExpiry(
