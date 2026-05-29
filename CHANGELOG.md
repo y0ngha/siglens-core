@@ -1,5 +1,20 @@
 # Changelog
 
+# [0.17.0](https://github.com/y0ngha/siglens-core/compare/v0.15.0...v0.17.0) (2026-05-29)
+
+
+### Bug Fixes
+
+* 리뷰 코멘트 반영 — 커버리지 기준 90%로 통일 ([07660a6](https://github.com/y0ngha/siglens-core/commit/07660a6e21c7a2c8e4772c23269bd765792d7c9f))
+* address PR [#108](https://github.com/y0ngha/siglens-core/issues/108) review (declarative const+catch, unused-param naming, test cleanup) ([42e256f](https://github.com/y0ngha/siglens-core/commit/42e256f94c56c87cf19fb3667c69cca42c6b6fa9))
+* restore consumer-used public exports SectorGroupDef + NewsTimeRange ([747adab](https://github.com/y0ngha/siglens-core/commit/747adab576d645525fe3b23f19ee7a6c73f7d362))
+
+
+### Features
+
+* add read-only peekAnalysisCache getter ([d1ab74b](https://github.com/y0ngha/siglens-core/commit/d1ab74b8c7a6a5ac05a4139943d924433ef15d1a))
+* add read-only peekOverallAnalysisCache getter ([cf34bce](https://github.com/y0ngha/siglens-core/commit/cf34bcefc208056ba150a709d05fdf5c28085a63))
+
 # [0.15.0](https://github.com/y0ngha/siglens-core/compare/v0.14.1...v0.15.0) (2026-05-28)
 
 
