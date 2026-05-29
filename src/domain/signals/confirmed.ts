@@ -82,7 +82,7 @@ export function findCross(
     return null;
 }
 
-/** @internal 스칼라 임계값 돌파 인덱스를 반환한다. */
+/** @internal Returns the index of the first scalar threshold cross within the lookback window. */
 export function findThresholdCross(
     values: (number | null)[],
     threshold: number,
