@@ -68,6 +68,8 @@ function normalizeNewsImpact(value: unknown): NewsImpact {
  * @param raw - Raw string/object from the LLM worker or cache.
  * @returns A fully-typed {@link NewsCardAnalysis}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
+ *
+ * @internal Normalizes a single news-card LLM response; used by poll use-cases.
  */
 export function normalizeNewsCardAnalysis(raw: unknown): NewsCardAnalysis {
     const parsed = parseLlmPayload(raw);
@@ -100,6 +102,8 @@ export function normalizeNewsCardAnalysis(raw: unknown): NewsCardAnalysis {
  * @param raw - Raw string/object from the LLM worker or cache.
  * @returns A fully-typed {@link NewsAnalysisResponse}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
+ *
+ * @internal Normalizes the news-analysis LLM response; used by poll use-cases.
  */
 export function normalizeNewsAnalysisResponse(
     raw: unknown

@@ -11,6 +11,7 @@ import { EXCLUDED_SINGLE_PATTERNS } from '@/domain/analysis/candle-trend';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
+/** @internal Number of recent bars scanned for candle patterns; used by detection internals. */
 export const CANDLE_PATTERN_DETECTION_BARS = 15;
 
 /** Extra bars needed before the detection window to detect 3-bar multi-candle patterns at the start */

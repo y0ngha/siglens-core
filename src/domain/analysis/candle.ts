@@ -59,6 +59,8 @@ const isNearPrice = (a: number, b: number): boolean =>
  * @see detectMultiCandlePattern
  * @see getSinglePatternTrend
  * @see getCandlePatternLabel
+ *
+ * @internal Single-bar candle pattern detector; used by detection internals.
  */
 export function detectCandlePattern(bar: Bar): CandlePattern {
     const range = calcRange(bar);
@@ -439,6 +441,8 @@ function detect3CandlePattern(
  * @see detectCandlePattern
  * @see detectCandlePatternEntries
  * @see getMultiPatternTrend
+ *
+ * @internal Multi-bar candle pattern detector; used by detection internals.
  */
 export function detectMultiCandlePattern(
     bars: Bar[]

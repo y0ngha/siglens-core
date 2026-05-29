@@ -17,6 +17,8 @@ import type { MarketIndexData, MarketSectorData } from '@/domain/types';
  * @returns The fully-rendered prompt string.
  *
  * @see normalizeMarketBriefing
+ *
+ * @internal Builds the market-briefing LLM prompt; used by submit use-cases.
  */
 export function buildMarketBriefingPrompt(
     indices: MarketIndexData[],

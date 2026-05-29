@@ -1009,6 +1009,8 @@ function byName(a: Skill, b: Skill): number {
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
+ *
+ * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
  */
 export function buildAnalysisPrompt(
     symbol: string,

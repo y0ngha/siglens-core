@@ -52,6 +52,8 @@ function normalizeVolatilityAnalysis(
  * @returns A safe-to-render {@link MarketBriefingResponse}.
  *
  * @see buildMarketBriefingPrompt
+ *
+ * @internal Normalizes the market-briefing LLM response; used by poll use-cases.
  */
 export function normalizeMarketBriefing(raw: unknown): MarketBriefingResponse {
     const o = asObject(raw);

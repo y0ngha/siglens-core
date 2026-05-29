@@ -7,8 +7,6 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
-    asArray,
-    CANDLE_PATTERN_DETECTION_BARS,
     checkAnalysisLimit,
     checkChatbotLimit,
     clusterKeyLevels,
@@ -17,11 +15,8 @@ import {
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
-    EXCLUDED_SINGLE_PATTERNS,
-    extendTrendline,
     extractReconciledActionLines,
     FEAR_GREED_LABEL_CUTOFFS,
-    filterAnalysisResult,
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_PRO_MODEL,
     getAllowedModels,
@@ -34,10 +29,7 @@ import {
     isModelAllowed,
     isTier,
     isTimeframeAllowed,
-    normalizeActionRecommendation,
-    normalizeTrend,
     POC_WINDOW_DEFAULT,
-    postProcessAnalysisWithReconcile,
     requestChatCompletion,
     RSI_DEFAULT_PERIOD,
     scoreToLabel,
@@ -61,13 +53,6 @@ describe('public API exports', () => {
     it('exports advanced domain helpers from package entrypoint', () => {
         const trend: PatternTrend = 'neutral';
 
-        expect(CANDLE_PATTERN_DETECTION_BARS).toBe(15);
-        expect(EXCLUDED_SINGLE_PATTERNS.has('flat')).toBe(true);
-        expect(normalizeTrend('bullish')).toBe('bullish');
-        expect(normalizeActionRecommendation({})).toBeUndefined();
-        expect(asArray(null)).toEqual([]);
-        expect(typeof extendTrendline).toBe('function');
-        expect(typeof postProcessAnalysisWithReconcile).toBe('function');
         expect(typeof clusterKeyLevels).toBe('function');
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
@@ -113,7 +98,6 @@ describe('public API exports', () => {
         expect(usageLimitError.code).toBe('analysis_limit_exceeded');
         expect(chatUsageLimitError.feature).toBe('chatbotPerDay');
         expect(gateError.status).toBe('error');
-        expect(typeof filterAnalysisResult).toBe('function');
     });
 
     it('exports the usage IP hash helper from package entrypoint', () => {

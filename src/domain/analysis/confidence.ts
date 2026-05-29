@@ -130,6 +130,8 @@ export function filterPatterns(patterns: PatternResult[]): PatternResult[] {
  * @returns A fully-validated, weight-enriched {@link AnalysisResponse}.
  *
  * @see buildAnalysisPrompt
+ *
+ * @internal Enriches analysis with confidence weights; used by poll use-cases.
  */
 export function enrichAnalysisWithConfidence(
     rawInput: unknown,
