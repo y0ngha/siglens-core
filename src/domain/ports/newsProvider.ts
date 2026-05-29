@@ -5,9 +5,10 @@ import type {
 } from '@/domain/types';
 
 /**
- * @internal
- * Lookback window for news article queries (parameter of the internal
- * {@link NewsProvider} port).
+ * Lookback window for news article queries.
+ *
+ * Public because consumers (siglens, siglens-trader) own their news-fetch
+ * adapters and type the `range` argument with this union.
  *
  * - `'24h'` — last 24 hours (used for chart-page news augment A2/A3 section).
  * - `'7d'`  — last 7 days (default for news analysis page).

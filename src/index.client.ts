@@ -380,6 +380,7 @@ export type {
     SkillShowcaseItem,
     IndexTicker,
     SectorEtf,
+    SectorGroupDef,
     SectorStock,
     SectorSignalsResult,
     StockSignalResult,

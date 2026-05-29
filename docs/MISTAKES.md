@@ -773,9 +773,20 @@ and have been removed from this file.
    ✅ Contradiction scan must include bare `export type { X }` re-export statements, not only type definitions in their source files
       — Intermediate re-export statements can carry @internal tags that contradict the public export at src/index.ts (e.g., `/** @internal */ export type { UserApiKeyRequiredError }` in module-level re-export when UserApiKeyRequiredError is reachable from public SubmitAnalysisErrorResult)
       — grep for both `export type \{` and `export interface \{` statements; verify none carry @internal if the type is in the reachability closure
+   → **NEW FACET: Mandatory consumer cross-check (post-v0.15.0)** — Core-only reachability analysis is necessary but NOT sufficient:
+      (1) Before removing or demoting (@internal) ANY public export, cross-check it against the 3 consumer repos (../siglens, ../siglens-worker, ../siglens-trader):
+         - grep each consumer's `src` directory for `import ... from '@y0ngha/siglens-core'` patterns AND for the exact symbol name
+         - Search for consumer-side implementations of domain ports (if the symbol is a port interface, grep for `implements <PortName>` or adapter classes)
+      (2) A symbol imported or type-implemented by any consumer is public contract, regardless of whether core's internal reachability audit marks it unused
+      (3) Special cases requiring extra caution:
+         - Domain ports and their parameter/return types: consumers provide adapters implementing the port interface; port signatures are public contracts even if no core function calls them by name
+         - Config instantiation types: a type can be "unused inside core" yet consumers type their own constant definitions with it (e.g. SectorGroupDef for consumer's SECTOR_GROUPS)
+      (4) Final gate: post-merge, compute intersection (removed-since-version public symbols ∩ all consumer-repo imports from '@y0ngha/siglens-core') — must be empty (zero) before release
+   → Recurring (PR #6–PR7 post-merge validation 2026-05-30): SectorGroupDef deleted + NewsTimeRange @internal'd despite both used in consumer code. Root cause: pre-sweep audit verified reachability only from core's public entrypoints, ignoring consumer implementations (NewsProvider adapters) and consumer-instantiated types (SECTOR_GROUPS). All three review rounds (core review-agent, GitHub claude-review, Gemini) missed this because they reviewed only siglens-core source, never cross-checked against consumer repos.
+      Process: (1) before removal/demotion, **grep each of 3 consumer repos for symbol imports and implementations**, (2) exclude all consumer-imported or consumer-implemented symbols from removal/demotion, (3) after merge, run final intersection check against all 3 consumer repos, (4) do not release a version if intersection is non-empty.
    → Recurring (PR #110 R1–R2 ×123 types, PR #3–PR6 series ×30+ instances): bulk sweeps target dead symbols by name without analyzing reachability graphs.
       Root cause: absence of mandatory pre-sweep reachability audit and failure to check transitive field/union membership, AND failure to scan intermediate re-export statements for contradictory @internal tags.
-      Process: (1) before removal, **compute full transitive reachability closure from public entrypoints**, (2) exclude all types in closure from @internal/@removal, (3) scan both type definitions AND bare re-export statements for contradictions, (4) add tsc "not exported" zero-error check to PR checklist, (5) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts).
+      Process: (1) before removal, **compute full transitive reachability closure from public entrypoints**, (2) exclude all types in closure from @internal/@removal, (3) scan both type definitions AND bare re-export statements for contradictions, (4) add tsc "not exported" zero-error check to PR checklist, (5) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts), (6) **cross-check with all consumer repos before merge**.
 ```
 
 ---

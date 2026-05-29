@@ -122,6 +122,18 @@ export type PollBriefingResult =
     | { status: 'done'; briefing: MarketBriefingResponse; generatedAt: string }
     | { status: 'error'; error: string };
 
+/**
+ * Definition of a sector grouping (label + member symbols).
+ *
+ * Consumers (siglens, siglens-trader) type their own dashboard
+ * `SECTOR_GROUPS` arrays with this shape, so it is part of the public API
+ * even though core no longer ships a `SECTOR_GROUPS` constant.
+ */
+export interface SectorGroupDef {
+    label: string;
+    symbols: readonly string[];
+}
+
 /** OHLCV price bar — the canonical input for every indicator and signal. */
 export interface Bar {
     /** Unix timestamp (seconds since epoch). */
