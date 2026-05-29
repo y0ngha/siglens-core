@@ -14,15 +14,15 @@ import type {
 } from '@/domain/types';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
-/** @internal Re-exported for use by this module's analysis option/result types. */
 export type { UserApiKeyRequiredError };
 
 /**
- * @internal
- * Usage tracking and daily limit options for analysis submissions. Re-exported
- * here so every analysis use-case (technical, fundamental, news, overall) shares
- * one canonical definition — see `usage/types.ts`. Not part of the public API
- * surface (removed from `src/index.ts` in PR6).
+ * Usage tracking and daily limit options for analysis submissions.
+ *
+ * Re-exported from `@/application/usage/types` so existing public imports
+ * (`@y0ngha/siglens-core` → `AnalysisUsageOptions`) keep working. The same
+ * type is shared by every analysis use-case (technical, fundamental, news,
+ * overall) — see the canonical definition in `usage/types.ts`.
  */
 export type { AnalysisUsageOptions };
 
