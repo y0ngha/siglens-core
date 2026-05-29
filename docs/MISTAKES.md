@@ -131,8 +131,8 @@ and have been removed from this file.
     ✅ const result = []; for (const val of values) { result.push(transform(val)); } return result;
     ✅ Use pre-allocated typed array for performance-critical indicators (ATR, EMA, MA)
 
-15. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <100% branches
-    → Every new domain / infrastructure function must have dedicated unit tests with 100% branch coverage
+15. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <90% branches
+    → Every new domain / infrastructure function must have dedicated unit tests with at least 90% branch coverage
     ❌ callGeminiWithKeyFallback added to infrastructure/ai/gemini.ts without src/__tests__/infrastructure/ test file
     ❌ extractReconciledActionLines added to domain/analysis/ without corresponding unit tests for 8+ cases
     ✅ src/__tests__/domain/analysis/actionRecommendation.test.ts with cases: undefined rec, missing levels, duplicates, zero values, empty result
@@ -324,7 +324,7 @@ and have been removed from this file.
       Background job: cache.set(symbol, { symbol, name, koreanName })  // fmpSymbol missing
    ✅ Both paths: cache.set(symbol, { symbol, name, koreanName, fmpSymbol })
 
-2. Infrastructure functions must have 100% branch coverage
+2. Infrastructure functions must have at least 90% branch coverage
    → All if/else, optional chaining (?.), nullish coalescing (??) paths tested
    → Test edge cases like subsecond boundaries, zero values, Math.max guard behavior
    → Includes guard branches, sentinel-check paths, and throw branches that appear to be dead code in the main flow

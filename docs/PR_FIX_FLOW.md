@@ -137,7 +137,7 @@ After applying, verify against the checklist matching each modified file type:
 
 **Test Layer Checklist:**
 - [ ] Test file exists for every new domain/infrastructure file
-- [ ] 100% branch coverage (domain and infrastructure)
+- [ ] 90% branch coverage (domain and infrastructure)
 - [ ] describe/it text is human-readable, not code expressions
 - [ ] Period-based indicators include all 5 required test cases
 - [ ] No if-guarded assertions (unconditional expect only)

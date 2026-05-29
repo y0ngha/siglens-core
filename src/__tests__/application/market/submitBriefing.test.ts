@@ -178,7 +178,9 @@ describe('submitBriefing 함수는', () => {
             const result = await submitBriefing(mockData);
 
             expect(result.status).toBe('submitted');
-            // fire-and-forget dispatch 의 .catch 는 microtask 로 실행되므로 flush.
+            // fire-and-forget dispatch 의 .catch 는 microtask 로 큐잉되므로,
+            // macrotask(setTimeout 0)로 한 틱 양보해 대기 중인 microtask 가 모두
+            // 비워진 뒤 .catch 가 실행 완료된 상태를 보장한다.
             await new Promise(resolve => setTimeout(resolve, 0));
             expect(consoleErrorSpy).toHaveBeenCalledWith(
                 '[Briefing/Submit] Worker request failed:',

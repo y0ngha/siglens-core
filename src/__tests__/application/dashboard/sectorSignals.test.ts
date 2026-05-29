@@ -3,6 +3,7 @@ import type {
     Bar,
     MarketQuote,
     SectorSignalsResult,
+    SectorStock,
     StockSignalResult,
 } from '@/domain/types';
 import type { CacheProvider } from '@/domain/ports/cache';
@@ -32,7 +33,7 @@ vi.mock('@/infrastructure/cache/redis', () => ({
 const computeStockSignalResultMock =
     vi.fn<
         (
-            stock: unknown,
+            stock: SectorStock,
             bars: Bar[],
             quote: MarketQuote | null
         ) => StockSignalResult | null
@@ -43,7 +44,7 @@ vi.mock('@/domain/dashboard', async importActual => {
     return {
         ...actual,
         computeStockSignalResult: (
-            stock: unknown,
+            stock: SectorStock,
             bars: Bar[],
             quote: MarketQuote | null
         ) => computeStockSignalResultMock(stock, bars, quote),

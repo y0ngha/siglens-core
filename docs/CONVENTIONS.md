@@ -249,12 +249,14 @@ src/__tests__/infrastructure/cache/redis.test.ts
 ### Coverage Targets
 
 ```
-domain/         100% (필수)
-infrastructure/ 100% (필수)
+domain/         90% (필수)
+infrastructure/ 90% (필수)
+application/    90% (필수)
 ```
 
-The entire published surface lives under `domain/` and `infrastructure/`, so both
-require 100% branch coverage.
+`domain/`, `infrastructure/`, and `application/` are all measured for coverage; the
+threshold is 90% branch coverage, enforced as a global aggregate in `vitest.config.ts`.
+Pure type/interface files (`domain/ports/**`, `*/types.ts`, `index.ts`) are excluded.
 
 ### Test Structure
 

@@ -194,7 +194,7 @@ return results;
 
 ## Testing
 
-- Coverage target: **100% branch coverage** (required).
+- Coverage target: **90% branch coverage** (required).
 - Test file location: `src/__tests__/domain/<sub-folder>/<file>.test.ts`
 - No mocks needed — pure functions are trivially testable with direct inputs.
 

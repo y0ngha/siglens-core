@@ -179,7 +179,7 @@ Do not define generator pipelines in infrastructure — those belong in `domain/
 
 ## Testing
 
-- Coverage target: **100% branch coverage** (required).
+- Coverage target: **90% branch coverage** (required).
 - Test file location: `src/__tests__/infrastructure/<sub-folder>/<file>.test.ts`
 - Never hit real Upstash / Neon / AI endpoints in tests.
 - Inject stub implementations via the interface, not `vi.spyOn` on private members.

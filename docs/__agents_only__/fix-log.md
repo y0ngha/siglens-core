@@ -124,3 +124,12 @@
 - Rule: Edge-case test coverage — when testing edge input (NaN, null, empty), fixture must assert normal accumulation resumes after the edge case passes
 - Context: Round 1 recommended findings — OBV accumulator logic must recover after a NaN bar. Extended test fixture to assert normal accumulation continues on the next finite-close bar.
 
+## [PR #106 | test/improve-coverage-hardening | 2026-05-29] — review comment fixes
+- Violation: Coverage threshold lowered in vitest.config.ts without updating the docs that mandate the target
+- Rule: Documentation Sync — when changing an enforced threshold/policy in config, every doc stating that policy must be updated in the same change, or config and docs silently diverge
+- Context: vitest threshold was lowered 100%→90% and `application/` added to coverage.include, but CONVENTIONS.md / MISTAKES.md / layer CLAUDE.md still said "100% (필수)". Per maintainer decision, aligned all docs (CONVENTIONS.md §Coverage Targets, MISTAKES.md rules 15 & Infrastructure 2, domain/infra/application CLAUDE.md, PR_FIX_FLOW.md checklist) to 90%.
+
+- Violation: Test mock generic declared a parameter as `unknown` instead of the real domain type
+- Rule: TypeScript — a mock/stub generic signature should use the actual domain type so it is verified against the real function signature at compile time (the test-file `as`-cast exception does not justify widening a typed mock generic to `unknown`)
+- Context: sectorSignals.test.ts stubbed computeStockSignalResult with `vi.fn<(stock: unknown, ...)>`; the real first parameter is `SectorStock`. Imported SectorStock and replaced both `unknown` occurrences.
+
