@@ -128,3 +128,8 @@
 - Rule: TypeScript — a mock/stub generic signature should use the actual domain type so it is verified against the real function signature at compile time (the test-file `as`-cast exception does not justify widening a typed mock generic to `unknown`)
 - Context: sectorSignals.test.ts stubbed computeStockSignalResult with `vi.fn<(stock: unknown, ...)>`; the real first parameter is `SectorStock`. Imported SectorStock and replaced both `unknown` occurrences.
 
+## [PR #114 R2 | refactor/fear-greed-public-api | 2026-05-29] — @internal re-export contradiction
+- Violation: `src/application/market/types.ts:17` and `:27` had `@internal` tags on bare `export type { X }` re-export statements (UserApiKeyRequiredError, AnalysisUsageOptions) even though both types are reachable from public exports in src/index.ts (union member of public SubmitAnalysisErrorResult; field of public SubmitAnalysisOptions)
+- Rule: MISTAKES.md §Public API & Module Exports Rule 9 — re-export statement contradiction scan must include bare `export type { X }` statements, not just type definitions. Intermediate re-export statements can carry @internal tags that contradict the public export, hidden from plain definition audits.
+- Context: Reverted both re-export statements to origin/main form (no @internal, accurate comment). Full contradiction scan (definitions + bare `export type { X }` re-exports vs index exports) now reports 0. Updated MISTAKES.md Rule 9 to explicitly cover re-export-statement scan in the reachability audit procedure.
+

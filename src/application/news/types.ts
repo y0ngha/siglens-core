@@ -19,17 +19,6 @@ import type {
 // Submit News Analysis
 // ─────────────────────────────────────────
 
-/**
- * @deprecated Use {@link AnalysisUsageOptions} instead. Kept as an alias for
- *   one minor version so existing callers keep compiling. Will be removed in
- *   a future minor release.
- *
- * The unified {@link AnalysisUsageOptions} adds optional `userId`,
- * `modelUsed`, and `occurredAt` fields needed by `recordUsage` on cache-hit
- * and post-submit paths.
- */
-export type NewsAnalysisUsageOptions = AnalysisUsageOptions;
-
 /** Options controlling news analysis submission behavior. */
 export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
@@ -88,33 +77,43 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     force?: boolean;
 }
 
-/** The caller receives a cached analysis — no new job was created. */
+/**
+ * The caller receives a cached analysis — no new job was created.
+ */
 export interface SubmitNewsAnalysisCached {
     status: 'cached';
     result: NewsAnalysisResponse;
 }
 
-/** A new analysis job was submitted; poll with `jobId` for the result. */
+/**
+ * A new analysis job was submitted; poll with `jobId` for the result.
+ */
 export interface SubmitNewsAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** Result variant when no news items were provided to analyze. */
+/**
+ * Result variant when no news items were provided to analyze.
+ */
 export interface SubmitNewsAnalysisNoNewsError {
     status: 'error';
     code: 'no_news';
     error: string;
 }
 
-/** Result variant when the daily analysis limit is exceeded. */
+/**
+ * Result variant when the daily analysis limit is exceeded.
+ */
 export interface SubmitNewsAnalysisLimitError {
     status: 'error';
     code: 'usage_limit_exceeded';
     error: AnalysisLimitError;
 }
 
-/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+/**
+ * Result variant when a user BYOK API key is required for the requested model+tier combo.
+ */
 export type SubmitNewsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
@@ -149,7 +148,9 @@ export type PollNewsAnalysisResult =
 // Submit News Card Analysis
 // ─────────────────────────────────────────
 
-/** Options controlling per-card news analysis submission behavior. */
+/**
+ * Options controlling per-card news analysis submission behavior.
+ */
 export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     /** The raw news item to analyze. */
     item: NewsItem;
@@ -164,7 +165,9 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     thinkingBudget?: number;
 }
 
-/** A new card analysis job was submitted; poll with `jobId` for the result. */
+/**
+ * A new card analysis job was submitted; poll with `jobId` for the result.
+ */
 export interface SubmitNewsCardAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
@@ -178,12 +181,6 @@ export interface SubmitNewsCardAnalysisSubmitted {
  * this function.
  */
 export type SubmitNewsCardAnalysisResult = SubmitNewsCardAnalysisSubmitted;
-
-/**
- * @deprecated Redis result caching was removed in 0.8.0. `submitNewsCardAnalysis`
- * always returns `submitted`. Remove this check from your call sites.
- */
-export type SubmitNewsCardAnalysisCached = never;
 
 // ─────────────────────────────────────────
 // Poll News Card Analysis

@@ -17,7 +17,9 @@ import type {
 // Submit Options Analysis
 // ─────────────────────────────────────────
 
-/** Options controlling options analysis submission behavior. */
+/**
+ * Options controlling options analysis submission behavior.
+ */
 export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
@@ -75,19 +77,25 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     force?: boolean;
 }
 
-/** The caller receives a cached analysis — no new job was created. */
+/**
+ * The caller receives a cached analysis — no new job was created.
+ */
 export interface SubmitOptionsAnalysisCached {
     status: 'cached';
     result: OptionsAnalysisResponse;
 }
 
-/** A new analysis job was submitted; poll with `jobId` for the result. */
+/**
+ * A new analysis job was submitted; poll with `jobId` for the result.
+ */
 export interface SubmitOptionsAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** The analysis cache missed but no job was enqueued (`skipEnqueueIfMiss`). */
+/**
+ * The analysis cache missed but no job was enqueued (`skipEnqueueIfMiss`).
+ */
 export interface SubmitOptionsAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
@@ -118,7 +126,9 @@ export interface SubmitOptionsAnalysisNoChainsError {
     error: string;
 }
 
-/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+/**
+ * Result variant when a user BYOK API key is required for the requested model+tier combo.
+ */
 export type SubmitOptionsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /** Union of all possible outcomes from `submitOptionsAnalysis`. */
@@ -134,18 +144,24 @@ export type SubmitOptionsAnalysisResult =
 // Poll Options Analysis
 // ─────────────────────────────────────────
 
-/** Worker has not finished yet — caller should retry. */
+/**
+ * Worker has not finished yet — caller should retry.
+ */
 export interface PollOptionsAnalysisProcessing {
     status: 'processing';
 }
 
-/** Worker finished successfully — `result` is the normalized analysis. */
+/**
+ * Worker finished successfully — `result` is the normalized analysis.
+ */
 export interface PollOptionsAnalysisDone {
     status: 'done';
     result: OptionsAnalysisResponse;
 }
 
-/** Worker reported a failure, result missing, or normalization failed. */
+/**
+ * Worker reported a failure, result missing, or normalization failed.
+ */
 export interface PollOptionsAnalysisError {
     status: 'error';
     error: string;

@@ -14,7 +14,6 @@ export { submitBriefing } from './application/market/submitBriefing';
 
 // Dashboard
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
-export { getMarketSummaryWithBriefing } from './application/dashboard/getMarketSummaryWithBriefing';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
 // Application background-task options (used by market / dashboard use-cases)
@@ -24,7 +23,6 @@ export type { BackgroundTaskOptions } from './application/types';
 export {
     GEMINI_2_5_FLASH_LITE_MODEL,
     GEMINI_2_5_FLASH_MODEL,
-    GEMINI_2_5_PRO_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 export { requestChatCompletion } from './application/chat/requestChatCompletion';
@@ -135,6 +133,7 @@ export {
 // Market session — DST-safe US regular-session (ET) classification.
 // Single source of truth shared by siglens UI, cache, and analysis gating.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
+export type { EtSessionStatus } from './domain/types';
 
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
@@ -206,7 +205,6 @@ export {
 // =============================================================================
 
 // LLM provider constants
-export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
@@ -218,13 +216,11 @@ export {
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
 } from './domain/utils';
-export type { EtSessionStatus } from './domain/types';
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {
     DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
-    THINKING_BUDGET_FALLBACK_STEPS,
     type ChatGPTModelId,
     type ClaudeModelId,
     type GeminiModelId,
@@ -247,17 +243,6 @@ export {
 } from './domain/types';
 
 // Dashboard tickers / sectors
-export {
-    DASHBOARD_TIMEFRAME_LABELS,
-    DASHBOARD_TIMEFRAMES,
-    DEFAULT_DASHBOARD_TIMEFRAME,
-    MARKET_INDICES,
-    MARKET_SUMMARY_FMP_SYMBOLS,
-    SECTOR_ETFS,
-    SECTOR_GROUPS,
-    SECTOR_STOCKS,
-    SIGNAL_SECTORS,
-} from './domain/constants/dashboard-tickers';
 
 // Indicator constants
 export {
@@ -298,8 +283,6 @@ export type {
     ChatbotLimitError,
     ChatbotLimitErrorCode,
     UsageLimitDependencies,
-    UsageLimitError,
-    UsageLimitErrorCode,
     UsageLimitInput,
 } from './application/usage';
 export type {
@@ -346,10 +329,8 @@ export type {
     ChatErrorCode,
     RequestChatCompletionDependencies,
     RequestChatCompletionParams,
-    RequestChatCompletionResult,
 } from './application/chat/types';
 export type {
-    FundamentalAnalysisUsageOptions,
     PollFundamentalAnalysisResult,
     SubmitFundamentalAnalysisApiKeyRequiredError,
     SubmitFundamentalAnalysisCached,
@@ -371,7 +352,6 @@ export type {
     UserApiKeyRequiredError,
 } from './application/market/types';
 export type {
-    NewsAnalysisUsageOptions,
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
     SubmitNewsAnalysisApiKeyRequiredError,
@@ -385,7 +365,6 @@ export type {
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
     SubmitNewsCardAnalysisSubmitted,
-    SubmitNewsCardAnalysisCached,
 } from './application/news/types';
 export type {
     OverallAxis,
@@ -399,11 +378,6 @@ export type {
     SubmitOverallAnalysisLimitError,
     SubmitOverallAnalysisApiKeyRequiredError,
     SubmitOverallAnalysisMissNoTrigger,
-    DependencyState,
-    DependencyStateCached,
-    DependencyStatePending,
-    DependencyStateError,
-    DependencyStateMissNoTrigger,
     OverallDependencyInputs,
 } from './application/overall/types';
 
@@ -442,7 +416,6 @@ export type {
     ConfirmedSignalType,
     ConflictInfo,
     ConflictResolution,
-    CrossDirection,
     DashboardTimeframe,
     DMIResult,
     EarningsCalendarItem,
@@ -465,35 +438,21 @@ export type {
     FundamentalCategoryAssessment,
     FundamentalCategory,
     FundamentalFinancialScoresInput,
-    FundamentalFutureDirection,
     FundamentalGradesConsensusInput,
-    FundamentalGrowth,
     FundamentalGrowthInput,
-    FundamentalHealth,
-    FundamentalPeer,
     FundamentalPeerInput,
     FundamentalPriceTargetConsensusInput,
     FundamentalPriceTargetSummaryInput,
-    FundamentalProfitability,
     FundamentalRatiosInput,
-    FundamentalSectorDirection,
     FundamentalSectorHistoricalInput,
     FundamentalSectorPerformanceInput,
     FundamentalSentiment,
-    FundamentalSnapshot,
     FundamentalProfile,
-    FundamentalProfileInput,
-    FundamentalValuation,
     FundamentalValuationMetrics,
-    NormalizeFundamentalSnapshotInput,
     PriceTargetAvg,
     GradesAction,
-    GradesConsensus,
     GradesEvent,
     EntryRecommendation,
-    FilteredActionRecommendation,
-    FilteredAnalysisResponse,
-    FilteredAnalysisResult,
     ExpectedSignalType,
     IchimokuFuturePoint,
     IchimokuResult,
@@ -504,7 +463,6 @@ export type {
     KeyLevel,
     KeyLevels,
     KeyPrice,
-    LevelSource,
     MACDResult,
     MarketBriefingResponse,
     NewsAnalysisResponse,
@@ -519,8 +477,6 @@ export type {
     MarketQuote,
     MarketSectorData,
     MarketSummaryData,
-    MarketSummaryWithBriefing,
-    ChatModel,
     ModelId,
     MultiCandlePattern,
     MultiCandlePatternEntry,
@@ -537,21 +493,12 @@ export type {
     OverallAnalysisResponse,
     OverallScenario,
     OverallScenarioName,
-    PriceTargetConsensus,
-    PriceTargetSummary,
-    PromptConfig,
     QuadrantKey,
-    RawAnalysisResponse,
     ReconciledActionLevels,
     ReconciledActionLineData,
     ReconciledTpEntry,
-    ReconcileResult,
-    ResolvedLevel,
     RiskLevel,
-    RunAnalysisInput,
     SectorEtf,
-    SectorGroupDef,
-    SectorHistoricalPoint,
     SectorSignalsResult,
     SectorStock,
     Signal,
@@ -636,7 +583,6 @@ export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).
-export { EXPIRATION_SLOTS } from './domain/options/expirationSlots';
 
 // --- Tier 2 — Options domain functions ---
 //

@@ -743,6 +743,33 @@ and have been removed from this file.
    → Recurring mistake (fix/post-210a423 PR #75 R8, Task 7 R3): 22+ union variant instances (14 Raw* types, 8 SubmitXxx variants, OverallAxis, usage option types).
       Each submission or provider function round-trip misses variants or contradicts @internal status.
       Process: (1) list all types in function signature, (2) verify each is exported from src/index.ts without @internal, (3) no aliases to internal types in public signatures.
+
+9. Bulk @internal/@removal sweeps exclude parameter/return types of still-public functions AND their transitive field/union/extends closure
+   → **Mandatory pre-sweep reachability audit:** Before bulk refactoring @internal tags or removing exports, compute the full transitive reachability closure from src/index.ts and src/index.client.ts
+   → Closure includes: (1) parameter/return types of exported functions, (2) fields of exported types, (3) union members / extends chains of exported types, (4) array element types, (5) discriminated union variants
+   → When a public function's signature or an exported type's structure references a type, that type must not be tagged @internal or removed from public exports
+   → Failure cascades: public function/type stays exported but its reachable members become unreachable by consumers, forcing workarounds (inline casts, manual narrowing)
+   ❌ getEtSessionStatus (public) returns EtSessionStatus, but EtSessionStatus tagged @internal and removed from src/index.ts exports
+   ❌ isEtRegularSessionOpen (public, Tier 2) parameter type ExchangeDate removed from src/index.ts during bulk removal pass
+   ❌ IndicatorResult exported but MACDResult, SMCResult, and 11 other sub-types (returned as .indicator.value fields) wrongly @internal'd; consumers must cast to access
+   ❌ FearGreedGroup exported but FearGreedFactor, FearGreedGroupName (fields of FearGreedGroup) removed from exports; consumers cannot type their variables
+   ❌ SlotMapping exported but ExpirationSlot, ExpirationSlotKey (fields/union members of SlotMapping) removed; consumers must cast to access mapping keys
+   ❌ ModelSpec exported but BudgetModelSpec, StandardModelSpec, PremiumModelSpec, EnterpriseModelSpec (union members) @internal'd; consumers cannot narrow union
+   ❌ PUBLIC_API.md inventory not updated after bulk removal, leaving stale references to removed types
+   ✅ **Before bulk @internal sweep:** compute transitive closure using TypeScript compiler API or manual audit:
+      (1) list all re-exported functions from src/index.ts + src/index.client.ts
+      (2) for each function: collect all parameter types + return type
+      (3) for each exported type: recursively collect all field types, union members, extends parents, array element types
+      (4) mark all types in the closure as protected (carve-out from removal)
+   ✅ After @internal/@removal: verify all types in the closure remain exported and untagged @internal; update PUBLIC_API.md to reflect actual exports
+   ✅ Diff check: grep src/index.ts for all public function signatures and exported type definitions; cross-check that every type mentioned is either exported without @internal or provably internal-only
+   ✅ Post-audit: run tsc with noEmit=true and scan for "is not exported" errors on types used in public signatures — zero errors means closure is complete
+   ✅ Contradiction scan must include bare `export type { X }` re-export statements, not only type definitions in their source files
+      — Intermediate re-export statements can carry @internal tags that contradict the public export at src/index.ts (e.g., `/** @internal */ export type { UserApiKeyRequiredError }` in module-level re-export when UserApiKeyRequiredError is reachable from public SubmitAnalysisErrorResult)
+      — grep for both `export type \{` and `export interface \{` statements; verify none carry @internal if the type is in the reachability closure
+   → Recurring (PR #110 R1–R2 ×123 types, PR #3–PR6 series ×30+ instances): bulk sweeps target dead symbols by name without analyzing reachability graphs.
+      Root cause: absence of mandatory pre-sweep reachability audit and failure to check transitive field/union membership, AND failure to scan intermediate re-export statements for contradictory @internal tags.
+      Process: (1) before removal, **compute full transitive reachability closure from public entrypoints**, (2) exclude all types in closure from @internal/@removal, (3) scan both type definitions AND bare re-export statements for contradictions, (4) add tsc "not exported" zero-error check to PR checklist, (5) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts).
 ```
 
 ---

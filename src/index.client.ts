@@ -27,7 +27,6 @@ export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export {
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
-    GEMINI_2_5_PRO_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 
@@ -58,10 +57,7 @@ export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
 export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
-export {
-    EXPIRATION_SLOTS,
-    mapExpirationsToSlots,
-} from './domain/options/expirationSlots';
+export { mapExpirationsToSlots } from './domain/options/expirationSlots';
 export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 export type {
     BuildOptionsAnalysisPromptOptions,
@@ -128,13 +124,13 @@ export {
 // Market session — DST-safe US regular-session (ET) classification. Pure and
 // browser-safe (no Node deps), so it belongs in the client entrypoint too.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
+export type { EtSessionStatus } from './domain/types';
 
 // =============================================================================
 // Tier 4 — Public Types & Constants
 // =============================================================================
 
 // LLM provider constants
-export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Market session times + state (single source of truth, shared with siglens UI)
 export {
@@ -143,26 +139,13 @@ export {
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
 } from './domain/utils';
-export type { EtSessionStatus } from './domain/types';
 
 // Dashboard tickers / sectors
-export {
-    DASHBOARD_TIMEFRAMES,
-    DASHBOARD_TIMEFRAME_LABELS,
-    DEFAULT_DASHBOARD_TIMEFRAME,
-    MARKET_INDICES,
-    MARKET_SUMMARY_FMP_SYMBOLS,
-    SECTOR_ETFS,
-    SECTOR_GROUPS,
-    SECTOR_STOCKS,
-    SIGNAL_SECTORS,
-} from './domain/constants/dashboard-tickers';
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {
     DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
-    THINKING_BUDGET_FALLBACK_STEPS,
     type ChatGPTModelId,
     type ClaudeModelId,
     type GeminiModelId,
@@ -240,7 +223,6 @@ export type {
     ChatErrorCode,
     RequestChatCompletionParams,
     RequestChatCompletionDependencies,
-    RequestChatCompletionResult,
 } from './application/chat/types';
 export type {
     SubmitAnalysisGatedResult,
@@ -257,7 +239,6 @@ export type {
 // Domain types
 export type {
     AnalysisSignalType,
-    ChatModel,
     EarningsCalendarItem,
     EarningsReport,
     EnrichedNewsItem,
@@ -277,28 +258,18 @@ export type {
     FundamentalCategory,
     FundamentalCategoryAssessment,
     FundamentalFinancialScoresInput,
-    FundamentalFutureDirection,
     FundamentalGradesConsensusInput,
-    FundamentalGrowth,
     FundamentalGrowthInput,
-    FundamentalHealth,
-    FundamentalPeer,
     FundamentalPeerInput,
     FundamentalPriceTargetConsensusInput,
     FundamentalPriceTargetSummaryInput,
     FundamentalProfile,
-    FundamentalProfileInput,
-    FundamentalProfitability,
     FundamentalRatiosInput,
-    FundamentalSectorDirection,
     FundamentalSectorHistoricalInput,
     FundamentalSectorPerformanceInput,
     FundamentalSentiment,
-    FundamentalSnapshot,
-    FundamentalValuation,
     FundamentalValuationMetrics,
     GradesAction,
-    GradesConsensus,
     GradesEvent,
     ModelId,
     NewsAnalysisResponse,
@@ -306,14 +277,10 @@ export type {
     NewsCategory,
     NewsItem,
     NewsSentiment,
-    NormalizeFundamentalSnapshotInput,
     OverallAnalysisResponse,
     OverallScenario,
     OverallScenarioName,
     PriceTargetAvg,
-    PriceTargetConsensus,
-    PriceTargetSummary,
-    SectorHistoricalPoint,
     Timeframe,
     Tier,
     TierConfig,
@@ -369,9 +336,6 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
-    FilteredActionRecommendation,
-    FilteredAnalysisResponse,
-    FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,
@@ -409,18 +373,15 @@ export type {
     MarketBriefingResponse,
     MarketBriefingSectorAnalysis,
     MarketBriefingVolatilityAnalysis,
-    CrossDirection,
     CandlePattern,
     MultiCandlePattern,
     CandlePatternEntry,
     SingleCandlePatternEntry,
     MultiCandlePatternEntry,
-    PromptConfig,
     SkillCounts,
     SkillShowcaseItem,
     IndexTicker,
     SectorEtf,
-    SectorGroupDef,
     SectorStock,
     SectorSignalsResult,
     StockSignalResult,
@@ -430,17 +391,11 @@ export type {
     DashboardTimeframe,
     MarketQuote,
     MarketSummaryData,
-    MarketSummaryWithBriefing,
     BarsData,
     PollAnalysisResult,
     SubmitBriefingResult,
     PollBriefingResult,
-    LevelSource,
-    ResolvedLevel,
-    ReconcileResult,
     ReconciledTpEntry,
-    RunAnalysisInput,
-    RawAnalysisResponse,
     BacktestSignalResult,
     BacktestAiResult,
     BacktestExitReason,

@@ -26,7 +26,9 @@ export type { UserApiKeyRequiredError };
  */
 export type { AnalysisUsageOptions };
 
-/** Options controlling analysis submission behavior. */
+/**
+ * Options controlling analysis submission behavior.
+ */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     /**
      * Market data provider injected by the consumer (siglens app).
@@ -58,7 +60,9 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     skipEnqueueIfMiss?: boolean;
 }
 
-/** Error returned when application tier gates block a timeframe request. */
+/**
+ * Error returned when application tier gates block a timeframe request.
+ */
 export interface TierTimeframeAccessError {
     /** Machine-readable reason for the denial. */
     code: 'timeframe_not_allowed';
@@ -72,13 +76,17 @@ export interface TierTimeframeAccessError {
     allowedTimeframes: Timeframe[];
 }
 
-/** Analysis error result when tier timeframe access is denied. */
+/**
+ * Analysis error result when tier timeframe access is denied.
+ */
 export interface TierGateErrorResult {
     status: 'error';
     error: TierTimeframeAccessError;
 }
 
-/** Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required. */
+/**
+ * Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required.
+ */
 export type SubmitAnalysisErrorResult =
     | { status: 'error'; error: AnalysisLimitError }
     | UserApiKeyRequiredError

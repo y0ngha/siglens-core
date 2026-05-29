@@ -22,6 +22,7 @@ export type ChatErrorCode =
     | 'server_busy'
     | 'user_api_key_required';
 
+/** Input params for `requestChatCompletion`. */
 export interface RequestChatCompletionParams {
     symbol: string;
     /** Full company name forwarded to the chat prompt. Defaults to `symbol` when omitted. */
@@ -68,6 +69,7 @@ export interface RequestChatCompletionParams {
     currentAnalysisContext?: CurrentAnalysisContext;
 }
 
+/** Injectable dependencies for `requestChatCompletion`. */
 export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;
@@ -89,5 +91,3 @@ export type ChatActionResult =
     | { ok: true; message: string; remainingTokens: number }
     | { ok: false; error: ChatErrorCode }
     | { ok: false; error: ChatbotLimitError };
-
-export type RequestChatCompletionResult = ChatActionResult;

@@ -97,7 +97,10 @@ export const MODEL_SPECS = {
     },
 } as const satisfies Record<ActiveModelId, ModelSpec>;
 
-/** Standard thinking-budget fallback steps used when MAX_TOKENS retry occurs. */
+/**
+ * @internal
+ * Standard thinking-budget fallback steps used when MAX_TOKENS retry occurs.
+ */
 export const THINKING_BUDGET_FALLBACK_STEPS = [8192, 4096, 2048] as const;
 
 /** Disabled thinking budget — last step in the fallback sequence. */

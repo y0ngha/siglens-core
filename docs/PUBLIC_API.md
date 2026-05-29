@@ -156,7 +156,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (24)
+### Tier 1 — Application Entrypoints (23)
 
 | Symbol | Source |
 |---|---|
@@ -168,7 +168,6 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `submitBriefing` | `application/market/submitBriefing.ts` |
 | `pollBriefing` | `application/market/pollBriefing.ts` |
 | `getMarketSummary(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/getMarketSummary.ts` |
-| `getMarketSummaryWithBriefing(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/getMarketSummaryWithBriefing.ts` |
 | `getSectorSignals(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/sectorSignals.ts` |
 | `checkAnalysisLimit` | `application/usage/limits.ts` |
 | `checkChatbotLimit` | `application/usage/limits.ts` |
@@ -212,16 +211,15 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
 
-**옵션 분석 헬퍼 (4 + 1 상수)**
+**옵션 분석 헬퍼 (4)**
 | Symbol | Source |
 |---|---|
 | `summarizeChainForLlm` | `domain/options/summarizeChainForLlm.ts` |
 | `aggregateOpenInterest` | `domain/options/aggregateOpenInterest.ts` |
 | `sanitizeOptionsChain` | `domain/options/sanitizeOptionsChain.ts` |
 | `mapExpirationsToSlots` | `domain/options/expirationSlots.ts` |
-| `EXPIRATION_SLOTS` | `domain/options/expirationSlots.ts` |
 
-> **@internal (not exported)**: `calculateMaxPain`, `calculatePutCallRatio`, `calculateImpliedMove` — single-purpose calculators consumed only by `summarizeChainForLlm`. Consumers should call `summarizeChainForLlm` (or read derived fields on `OptionsExpirationMetrics`) instead of recomputing.
+> **@internal (not exported)**: `calculateMaxPain`, `calculatePutCallRatio`, `calculateImpliedMove` — single-purpose calculators consumed only by `summarizeChainForLlm`. Consumers should call `summarizeChainForLlm` (or read derived fields on `OptionsExpirationMetrics`) instead of recomputing. PR6에서 `EXPIRATION_SLOTS` 상수도 `@internal` 전환 — `mapExpirationsToSlots`가 내부 참조(슬롯 타입 `ExpirationSlot`/`ExpirationSlotKey`/`SlotMapping`은 public 유지).
 
 **응답 정규화** — 모든 `normalize*` 함수와 `enrichAnalysisWithConfidence`는 이제 **internal**이다. submit/poll use-case가 LLM 응답 정규화에 내부적으로 사용하며, consumer는 use-case 결과(`*AnalysisResponse`)를 직접 받으므로 정규화 함수를 직접 호출할 필요가 없다.
 
@@ -345,7 +343,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 새로 추가된 도메인 타입:
 - `CurrentAnalysisContext` — 챗봇 시스템 프롬프트에 주입되는 현재 분석 컨텍스트 tagged union (Task 1.17).
-- 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalSnapshot`, `FundamentalProfile`, `FundamentalValuation`, `FundamentalPeer`, `FundamentalProfitability`, `FundamentalGrowth`, `FundamentalHealth`, `FundamentalFutureDirection`, `GradesConsensus`, `GradesEvent`, `GradesAction`, `PriceTargetConsensus`, `PriceTargetSummary`, `FundamentalSectorDirection`, `SectorHistoricalPoint`.
+- 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalProfile`, `GradesEvent`, `GradesAction`. (PR6에서 `@internal` 전환 — 정규화 입력 타입 `FundamentalSnapshot`과 그 하위 `FundamentalValuation`/`FundamentalPeer`/`FundamentalProfitability`/`FundamentalGrowth`/`FundamentalHealth`/`FundamentalFutureDirection`/`FundamentalSectorDirection`/`SectorHistoricalPoint`/`GradesConsensus`/`PriceTargetConsensus`/`PriceTargetSummary`는 public 타입에서 도달 불가하고 consumer 미사용이라 internal화. public 응답 타입 `FundamentalAnalysisResponse`는 유지.)
 - 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
 - 종합: `OverallAnalysisResponse`, `OverallScenario`, `OverallScenarioName`.
 - Fear & Greed Index (per-stock):
@@ -370,7 +368,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn` — 모두 `domain/ports/aiProvider.ts`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
 
-**대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
+**대시보드 상수** — PR6에서 public 표면 전부 제거. consumer 미사용분(`DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `SECTOR_GROUPS`, `SIGNAL_SECTORS`)은 완전 삭제, 내부 use-case가 참조하는 분(`MARKET_INDICES`, `SECTOR_ETFS`, `SECTOR_STOCKS`, `MARKET_SUMMARY_FMP_SYMBOLS`, `DEFAULT_DASHBOARD_TIMEFRAME`)은 `@internal`로 전환(`domain/constants/dashboard-tickers.ts`).
 
 **지표 상수 (consumer 사용분)** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `RSI_OVERBOUGHT_LEVEL`, `RSI_OVERSOLD_LEVEL`, `EMA_DEFAULT_PERIODS`, `MA_DEFAULT_PERIODS`, `MACD_FAST_PERIOD`/`MACD_SIGNAL_PERIOD`/`MACD_SLOW_PERIOD`, `CCI_DEFAULT_PERIOD`/`CCI_OVERBOUGHT_LEVEL`/`CCI_OVERSOLD_LEVEL`/`CCI_ZERO_LEVEL`, `DMI_DEFAULT_PERIOD`, `STOCHASTIC_*`/`STOCH_RSI_*`, `HIGH_CONFIDENCE_WEIGHT`, `MIN_CONFIDENCE_WEIGHT` 등 consumer가 실제 사용하는 `constants.ts` 값만 public. 나머지 계산 기본값/임계값(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등)은 internal.
 
@@ -380,7 +378,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **시장 세션 상수/타입** — `MARKET_OPEN_HOUR`, `MARKET_OPEN_MINUTE`, `MARKET_CLOSE_HOUR`, `MARKET_CLOSE_MINUTE` (`domain/utils.ts`), `EtSessionStatus` (`domain/types.ts`). US 정규장 개장/마감 시각(ET) 상수와 세션 상태 union. siglens 옵션 UI·캐시·분석 게이팅에서 사용.
 
-**모델 스펙 (단일 source of truth)** — `MODEL_SPECS`, `THINKING_BUDGET_FALLBACK_STEPS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `ClaudeSamplingModelSpec`, `ClaudeReasoningModelSpec`, `GeminiModelSpec`, `ChatGPTModelSpec`, `EffortLevel`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId` (`domain/analysis/modelSpecs.ts`, types in `domain/types.ts`). AI SDK 호출자(워커, 서버 액션, UI)가 직접 lookup하는 단일 source of truth — provider 라우팅, max output tokens, thinking budget(`ClaudeSamplingModelSpec` / `GeminiModelSpec`) 또는 reasoning effort(`ClaudeReasoningModelSpec` / `ChatGPTModelSpec`), sampling 파라미터를 모델 식별자(`ActiveModelId`) 별로 보관한다. `EffortLevel` (`'low' | 'medium' | 'high'`)은 reasoning 변종에서 effort 필드 타입으로 사용된다. provider-specific subset 타입(`ClaudeModelId` 등)은 `is*Model` 타입 predicate가 narrowing할 때 노출된다. spec 변종 narrowing은 `is*ModelSpec` 가드(Tier 2)를 사용한다. 새 모델 추가는 이 맵에 한 줄 추가 + core publish로 끝난다.
+**모델 스펙 (단일 source of truth)** — `MODEL_SPECS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `ClaudeSamplingModelSpec`, `ClaudeReasoningModelSpec`, `GeminiModelSpec`, `ChatGPTModelSpec`, `EffortLevel`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId` (`domain/analysis/modelSpecs.ts`, types in `domain/types.ts`). AI SDK 호출자(워커, 서버 액션, UI)가 직접 lookup하는 단일 source of truth — provider 라우팅, max output tokens, thinking budget(`ClaudeSamplingModelSpec` / `GeminiModelSpec`) 또는 reasoning effort(`ClaudeReasoningModelSpec` / `ChatGPTModelSpec`), sampling 파라미터를 모델 식별자(`ActiveModelId`) 별로 보관한다. `EffortLevel` (`'low' | 'medium' | 'high'`)은 reasoning 변종에서 effort 필드 타입으로 사용된다. provider-specific subset 타입(`ClaudeModelId` 등)은 `is*Model` 타입 predicate가 narrowing할 때 노출된다. spec 변종 narrowing은 `is*ModelSpec` 가드(Tier 2)를 사용한다. 새 모델 추가는 이 맵에 한 줄 추가 + core publish로 끝난다.
 
 **고급 도메인 헬퍼** — key-level 클러스터링(`clusterKeyLevels`/`validateKeyLevels`)과 action recommendation 검증(`validateActionPrices`/`extractReconciledActionLines`)은 consumer의 세부 검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다. 그 외 정규화 함수(`normalize*`/`asString`/`asArray`/`compact`)·AI 레벨 보정·추세선·candle 라벨/감지 상수·프롬프트 빌더·개별 신호 감지기는 모두 internal(공개 aggregate·use-case가 내부 호출).
 
@@ -519,3 +517,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-29 | **Dead-export 정리 PR3 (PR #111, 트래킹 이슈 #110).** `src/index.ts`/`src/index.client.ts`에서 미사용 indicators surface 제거 — 개별 계산기 `calculate*` 24종(`calculateATR`~`calculateWilliamsR`) + barrel 유틸(`computeEMAValues`/`lastNonNull`/`linreg`/`rollingHighest`/`rollingLowest`/`slidingMax`/`slidingMin`/`sma`/`stdDev`/`typicalPrice`) + 지표 상수 36종(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등) export 제거 + 정의부에 `@internal` 태그 추가(MISTAKES.md #9.5/#9.6). **aggregate `calculateIndicators()`는 MISTAKES.md Architecture #6에 따라 public Tier 2 entry point로 유지** — 개별 계산기 구현은 이것이 내부 호출하여 보존. `calculateIchimokuFutureCloud`·`computeFearGreedIndex`/`computeFearGreedHistory`·`FEAR_GREED_LABEL_CUTOFFS`·`POC_WINDOW_DEFAULT`·`scoreToLabel` 및 consumer 사용 상수(RSI/MACD/STOCHASTIC/STOCH_RSI/CCI/DMI/EMA_DEFAULT/MA_DEFAULT/EMPTY_*/CONFIDENCE_WEIGHT)는 public 유지. 0.x semver minor bump(package.json은 PR2의 0.16.0 유지). |
 | 2026-05-29 | **Dead-export 정리 PR4 (트래킹 이슈 #110).** `src/index.ts`/`src/index.client.ts`에서 미사용 signals surface 제거 — 개별 신호 감지기 25종(anticipation 8 + confirmed 17) + 신호 상수 22종(`signals/constants.ts` 전체: CCI/CMF cross level, `GOLDEN_CROSS_*`, `DIVERGENCE_*`, `SQUEEZE_*`, `SR_*`, `TREND_*` 등) export 제거 + 정의부 `@internal` 태그(MISTAKES.md #9.5/#9.6). **aggregate `detectSignals()` / `classifyTrend()`는 Tier 2 public entry point로 유지** — 개별 감지기 구현은 `detectSignals`가 내부 호출하여 보존. 0.x semver minor bump(package.json은 0.16.0 유지). |
 | 2026-05-29 | **Dead-export 정리 PR5 (트래킹 이슈 #110).** `domain/analysis/` 미사용 헬퍼 제거 — 프롬프트 빌더 6종(`buildAnalysisPrompt`·`buildFundamentalAnalysisPrompt`·`buildMarketBriefingPrompt`·`buildNewsAnalysisPrompt`·`buildNewsCardAnalysisPrompt`·`buildOverallAnalysisPrompt`), 응답 정규화 전체(`enrichAnalysisWithConfidence` + 모든 `normalize*`: market/fundamental/news/overall/options + action/risk/keyLevels/priceTargets/indicatorGuide/pattern/strategy/candlePattern/trend/trendline), 정규화 프리미티브(`asArray`/`asString`/`compact`), 캔들 `detectCandlePattern`·`detectMultiCandlePattern`·`findCandlePatternLabel`·`CANDLE_PATTERN_DETECTION_BARS`·`CANDLE_PATTERN_LABELS`·`MULTI_CANDLE_PATTERN_LABELS`·`EXCLUDED_SINGLE_PATTERNS`, `extendTrendline`·`postProcessAnalysisWithReconcile`·`filterAnalysisResult` export 제거 + 정의부 `@internal`(22파일/37심볼, MISTAKES.md #9.5/#9.6). 구현은 submit/poll use-case·프롬프트 빌더가 내부 호출하여 보존. 살아있는 candle getter(`getCandlePatternLabel`/`getMultiCandlePatternLabel`/`getSinglePatternTrend`/`getMultiPatternTrend`/`detectCandlePatternEntries`/`getDetectionBars`/`selectLastCandlePatternEntries`)·`clusterKeyLevels`·`validateKeyLevels`·`validateActionPrices`·`extractReconciledActionLines`·`AI_SYSTEM_PROMPT`·`buildOptionsAnalysisPrompt`(options)·`buildChatPrompt`(chat)는 public 유지. 0.x semver minor bump(package.json은 0.16.0 유지). |
+| 2026-05-29 | **Dead-export 정리 PR6 (트래킹 이슈 #110).** 도메인/use-case 타입 표면에서 **도달 불가(unreachable) + consumer 미사용** 타입만 제거하고, **public API에서 도달 가능한 타입은 전부 유지**(MISTAKES.md Rule #9 — public 함수의 파라미터/반환 타입과 public 타입의 필드/union/배열/extends 타입은 제거 대상에서 제외). **완전 삭제(dead)**: 타입 `RequestChatCompletionResult`·`FundamentalAnalysisUsageOptions`·`NewsAnalysisUsageOptions`·`SubmitNewsCardAnalysisCached`·`RunAnalysisInput`·`FundamentalProfileInput`·`MarketSummaryWithBriefing`·`SectorGroupDef`(유일 인스턴스화처 `SECTOR_GROUPS` 삭제로 고아화, public 타입에서 도달 불가), 파일 `domain/llm/constants.ts`(`LLM_PROVIDER_VALUES`), 대시보드 상수 4종(`DASHBOARD_TIMEFRAMES`/`DASHBOARD_TIMEFRAME_LABELS`/`SECTOR_GROUPS`/`SIGNAL_SECTORS`). **Tier 1 `getMarketSummaryWithBriefing` use-case 제거**(consumer 미사용; `getMarketSummary`+`submitBriefing` 직접 조합으로 대체) — 구현·테스트·`MarketSummaryWithBriefing` 반환 타입 삭제. **`@internal` 전환(도달 불가, consumer 미사용)**: 정규화 입력 트리 `FundamentalSnapshot`+하위(`FundamentalValuation`/`FundamentalPeer`/`FundamentalProfitability`/`FundamentalGrowth`/`FundamentalHealth`/`FundamentalFutureDirection`/`FundamentalSectorDirection`/`SectorHistoricalPoint`/`GradesConsensus`/`PriceTargetConsensus`/`PriceTargetSummary`), 리졸버 내부 `DependencyState*`, 마스킹 `Filtered*`, `Raw*`/`Normalize*Input`, `ChatModel`/`LevelSource`/`CrossDirection`/`ResolvedLevel`/`PromptConfig`/`ReconcileResult`/`UsageLimitError`/`UsageLimitErrorCode`, 상수 `THINKING_BUDGET_FALLBACK_STEPS`/`EXPIRATION_SLOTS`/`GEMINI_2_5_PRO_MODEL` 및 대시보드 상수 5종(`MARKET_INDICES`/`SECTOR_ETFS`/`SECTOR_STOCKS`/`MARKET_SUMMARY_FMP_SYMBOLS`/`DEFAULT_DASHBOARD_TIMEFRAME`). 초기 sweep이 reachable한 public 타입 123종(IndicatorResult 하위 결과 타입, `Submit*Result`/`Poll*Result` union 멤버, TierConfig 트리, ModelSpec union 멤버, 옵션 도메인 타입, FearGreed 필드 타입, public 함수 파라미터 타입 등)을 잘못 @internal/제거했으나 GitHub 리뷰 지적으로 전부 main 상태(public)로 복원. `EtSessionStatus` 동일하게 복원. Tier 1 24→23. 0.x semver minor bump(package.json은 0.16.0 유지). |

@@ -1,11 +1,5 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
-import type {
-    ChatbotLimitError,
-    PatternTrend,
-    TierGateErrorResult,
-    UsageLimitError,
-    UsageRepository,
-} from '@/index';
+import type { PatternTrend, UsageRepository } from '@/index';
 import {
     checkAnalysisLimit,
     checkChatbotLimit,
@@ -18,7 +12,6 @@ import {
     extractReconciledActionLines,
     FEAR_GREED_LABEL_CUTOFFS,
     GEMINI_2_5_FLASH_MODEL,
-    GEMINI_2_5_PRO_MODEL,
     getAllowedModels,
     getAllowedTimeframes,
     getTierLimit,
@@ -60,29 +53,6 @@ describe('public API exports', () => {
     });
 
     it('exports tier gating helpers from package entrypoint', () => {
-        const usageLimitError: UsageLimitError = {
-            code: 'analysis_limit_exceeded',
-            message: 'Daily analysis usage limit exceeded.',
-            feature: 'analysisPerDay',
-            tier: 'free',
-        };
-        const chatUsageLimitError: ChatbotLimitError = {
-            code: 'chatbot_limit_exceeded',
-            message: 'Daily chatbot usage limit exceeded.',
-            feature: 'chatbotPerDay',
-            tier: 'free',
-        };
-        const gateError: TierGateErrorResult = {
-            status: 'error',
-            error: {
-                code: 'timeframe_not_allowed',
-                message: 'Timeframe 5Min is not available for free tier.',
-                tier: 'free',
-                timeframe: '5Min',
-                allowedTimeframes: getAllowedTimeframes('free'),
-            },
-        };
-
         expect(DEFAULT_TIER).toBe('free');
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
         expect(isAllowed('free', 'analysisPerDay')).toBe(true);
@@ -95,9 +65,6 @@ describe('public API exports', () => {
         expect(isTier('member')).toBe(true);
         expect(typeof checkAnalysisLimit).toBe('function');
         expect(typeof checkChatbotLimit).toBe('function');
-        expect(usageLimitError.code).toBe('analysis_limit_exceeded');
-        expect(chatUsageLimitError.feature).toBe('chatbotPerDay');
-        expect(gateError.status).toBe('error');
     });
 
     it('exports the usage IP hash helper from package entrypoint', () => {
@@ -128,7 +95,6 @@ describe('public API exports', () => {
         expect(typeof requestChatCompletion).toBe('function');
         expect(typeof createChatTokenStore).toBe('function');
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
-        expect(GEMINI_2_5_PRO_MODEL).toBe('gemini-2.5-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
     });
 });

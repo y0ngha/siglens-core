@@ -74,7 +74,9 @@ export interface StrikeOpenInterest {
     putOpenInterest: number;
 }
 
-/** Per-strike aggregated trading volume (today's session). */
+/**
+ * Per-strike aggregated trading volume (today's session).
+ */
 export interface StrikeVolumeAggregate {
     /** Strike price in the underlying's currency. */
     strike: number;
@@ -90,7 +92,9 @@ export interface MidAndSpread {
     spread: number | null;
 }
 
-/** Bid/ask quote snapshot for one of the top OI strikes — surfaces liquidity at the levels the market is anchored to. */
+/**
+ * Bid/ask quote snapshot for one of the top OI strikes — surfaces liquidity at the levels the market is anchored to.
+ */
 export interface TopOiQuote {
     /** Strike price in the underlying's currency. */
     strike: number;
@@ -148,7 +152,9 @@ export interface OptionsPerExpirationCommentary {
     tone: OptionsTone;
 }
 
-/** Structured AI signal — single concise trading observation. */
+/**
+ * Structured AI signal — single concise trading observation.
+ */
 export interface OptionsSignal {
     /** Signal category (bullish / bearish / neutral / volatility-focused). */
     kind: OptionsSignalKind;

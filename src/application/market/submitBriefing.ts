@@ -39,7 +39,6 @@ import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
  * ```
  *
  * @see pollBriefing
- * @see getMarketSummaryWithBriefing
  */
 export async function submitBriefing(
     data: MarketSummaryData,

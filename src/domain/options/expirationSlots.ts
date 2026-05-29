@@ -10,6 +10,7 @@ import type { ExpirationSlot, SlotMapping } from './types';
 export const ZERO_DTE_MAX_DAYS = 6;
 
 /**
+ * @internal
  * Canonical chip slots in render order. Frontends pick the closest matching
  * provider expiration per slot.
  *

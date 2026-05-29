@@ -1,6 +1,8 @@
 import type { WaitUntil } from '@/domain/types';
 
-/** Runtime hooks for background tasks started by application use-cases. */
+/**
+ * Runtime hooks for background tasks started by application use-cases.
+ */
 export interface BackgroundTaskOptions {
     /**
      * Optional serverless lifetime extender for fire-and-forget work.

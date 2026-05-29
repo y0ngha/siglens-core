@@ -16,17 +16,6 @@ import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProv
 // Submit
 // ─────────────────────────────────────────
 
-/**
- * @deprecated Use {@link AnalysisUsageOptions} instead. Kept as an alias for
- *   one minor version so existing callers keep compiling. Will be removed in
- *   a future minor release.
- *
- * The unified {@link AnalysisUsageOptions} adds optional `userId`,
- * `modelUsed`, and `occurredAt` fields needed by `recordUsage` on cache-hit
- * and post-submit paths.
- */
-export type FundamentalAnalysisUsageOptions = AnalysisUsageOptions;
-
 /** Options controlling fundamental analysis submission behavior. */
 export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
@@ -81,33 +70,43 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
     force?: boolean;
 }
 
-/** The caller receives a cached analysis — no new job was created. */
+/**
+ * The caller receives a cached analysis — no new job was created.
+ */
 export interface SubmitFundamentalAnalysisCached {
     status: 'cached';
     result: FundamentalAnalysisResponse;
 }
 
-/** A new analysis job was submitted; poll with `jobId` for the result. */
+/**
+ * A new analysis job was submitted; poll with `jobId` for the result.
+ */
 export interface SubmitFundamentalAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** Result variant when the daily analysis limit is exceeded. */
+/**
+ * Result variant when the daily analysis limit is exceeded.
+ */
 export interface SubmitFundamentalAnalysisLimitError {
     status: 'error';
     code: 'usage_limit_exceeded';
     error: AnalysisLimitError;
 }
 
-/** Result variant when the provider fetch or data normalization fails. */
+/**
+ * Result variant when the provider fetch or data normalization fails.
+ */
 export interface SubmitFundamentalAnalysisFetchError {
     status: 'error';
     code: 'fetch_failed';
     error?: string;
 }
 
-/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+/**
+ * Result variant when a user BYOK API key is required for the requested model+tier combo.
+ */
 export type SubmitFundamentalAnalysisApiKeyRequiredError =
     UserApiKeyRequiredError;
 
