@@ -14,6 +14,7 @@ import type {
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';
+export { peekAnalysisCache } from './application/market/peekAnalysisCache';
 export { pollAnalysis } from './application/market/pollAnalysis';
 export { pollBriefing } from './application/market/pollBriefing';
 export { submitAnalysis } from './application/market/submitAnalysis';
