@@ -4,6 +4,7 @@ import { WILLIAMS_R_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 const WILLIAMS_R_MIDPOINT = -50;
 const WILLIAMS_R_SCALE = -100;
 
+/** @internal Williams %R — overbought/oversold momentum oscillator. */
 export function calculateWilliamsR(
     bars: Bar[],
     period = WILLIAMS_R_DEFAULT_PERIOD

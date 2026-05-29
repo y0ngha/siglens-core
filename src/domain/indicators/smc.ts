@@ -417,6 +417,7 @@ function detectZones(
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
+/** @internal Smart Money Concepts — swing points, order blocks, FVGs, and zones. */
 export function calculateSmc(
     bars: Bar[],
     swingPeriod = SMC_SWING_PERIOD

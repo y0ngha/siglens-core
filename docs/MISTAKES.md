@@ -108,10 +108,19 @@ and have been removed from this file.
     ✅ const CACHE_EXPIRY_HOUR_KST = 17; function computeSecondsUntilCacheExpiry() { ... }
     ✅ const PRICE_DECIMAL_FACTOR = 100; Math.round(rawPrice * PRICE_DECIMAL_FACTOR) / PRICE_DECIMAL_FACTOR
 
-14. Defaulting to imperative for-loop + push when a higher-order function is equally readable and efficient
+14. Manual field-by-field object mapping instead of destructuring with rest operator
+    → When filtering sensitive fields or unwanted properties, use destructuring with rest syntax
+    → Manual mapping silently drops new fields added to the source interface (maintainability hole)
+    → destructuring rest syntax automatically includes all new fields, catching breaking changes at the type level
+    ❌ const safeUser = { id: user.id, email: user.email, name: user.name };  // if user gains a field, it's silently omitted
+    ❌ return { id: record.id, email: record.email, name: record.name };  // same maintainability issue
+    ✅ const { passwordHash: _passwordHash, ...safeUser } = user;  // passwordHash discarded; all other fields preserved
+    ✅ return { ...user, passwordHash: undefined };  // or explicitly exclude sensitive fields with spreading
+
+14.5. Defaulting to imperative for-loop + push when a higher-order function is equally readable and efficient
     → Prefer map, filter, flatMap, reduce for straightforward one-item → one-result transformations
     → for-loop + push is acceptable when:
-      · The functional equivalent would increase time complexity (see #14.5 — spread inside flatMap/reduce causes O(N²))
+      · The functional equivalent would increase time complexity (see #15.5 — spread inside flatMap/reduce causes O(N²))
       · Conditional multi-push per iteration makes flatMap + spread harder to read without measurable clarity gain
     ❌ const result = []; for (const item of data) { result.push(transform(item)); } return result;
        → replace with data.map(transform); no complexity difference, declarative wins
@@ -123,7 +132,7 @@ and have been removed from this file.
        }
        → each iteration conditionally appends 0–2 items; flatMap + spread equivalent adds intermediate arrays without clarity gain
 
-14.5. Reduce + spread operator causing O(N²) array accumulation
+15.5. Reduce + spread operator causing O(N²) array accumulation
     → When reducing values into an array, use pre-allocated array + for loop or for loop + push, NOT reduce + spread
     → Applies to sliding windows, EMA calculations, and any cumulative sequence building
     ❌ reduce((acc, val) => [...acc, transform(val)], [])  // O(N²) — new array copied each iteration
@@ -131,14 +140,14 @@ and have been removed from this file.
     ✅ const result = []; for (const val of values) { result.push(transform(val)); } return result;
     ✅ Use pre-allocated typed array for performance-critical indicators (ATR, EMA, MA)
 
-15. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <90% branches
+16. Domain / infrastructure functions incomplete test coverage — missing unit tests entirely or covering <90% branches
     → Every new domain / infrastructure function must have dedicated unit tests with at least 90% branch coverage
     ❌ callGeminiWithKeyFallback added to infrastructure/ai/gemini.ts without src/__tests__/infrastructure/ test file
     ❌ extractReconciledActionLines added to domain/analysis/ without corresponding unit tests for 8+ cases
     ✅ src/__tests__/domain/analysis/actionRecommendation.test.ts with cases: undefined rec, missing levels, duplicates, zero values, empty result
     ✅ New infrastructure functions tested in parallel src/__tests__/infrastructure/ test file with all branches covered
 
-16. Inadequate defensive checks on financial data (division by zero, negative values, bounds)
+17. Inadequate defensive checks on financial data (division by zero, negative values, bounds)
     → Financial values require explicit guards before use — null/undefined checks insufficient
     → takeProfit, entryPrice, stoploss must be validated for sensible ranges (>0, within bounds)
     → Prevent negative R:R, invalid leverage, or meaningless outputs
@@ -147,7 +156,7 @@ and have been removed from this file.
     ✅ Number.isFinite(tp) && tp > 0 && tp !== entryPrice; return early if invalid
     ✅ if (tp <= entryPrice) return ''; // meaningless result, prevent
 
-17. Shared constants duplicated across module boundaries without documentation
+18. Shared constants duplicated across module boundaries without documentation
     → When a module cannot import shared constants (environment constraints), duplicate with explicit JSDoc linking to the source
     → Every duplicate must reference the original constant and document the sync requirement
     ❌ worker/src/index.ts: JOB_TTL_SECONDS = 3600  // matches queue.ts but no link or comment

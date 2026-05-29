@@ -13,6 +13,7 @@ const NULL_RESULT: KeltnerChannelResult = {
     lower: null,
 };
 
+/** @internal Keltner Channel — EMA midline with ATR-scaled upper/lower bands. */
 export function calculateKeltnerChannel(
     bars: Bar[],
     emaPeriod = KELTNER_EMA_PERIOD,

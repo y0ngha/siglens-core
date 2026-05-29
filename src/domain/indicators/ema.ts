@@ -1,5 +1,6 @@
 import type { Bar } from '@/domain/types';
 
+/** @internal Core exponential moving average over a numeric series. */
 export function computeEMAValues(
     values: number[],
     period: number
@@ -27,6 +28,7 @@ export function computeEMAValues(
     return result;
 }
 
+/** @internal Exponential moving average of bar closes for a given period. */
 export function calculateEMA(bars: Bar[], period: number): (number | null)[] {
     return computeEMAValues(
         bars.map(bar => bar.close),

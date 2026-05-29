@@ -30,6 +30,7 @@ function calcRaw(bar: Bar, prev: Bar): RawDM {
     return { tr, dmPlus, dmMinus };
 }
 
+/** @internal Directional Movement Index — +DI / -DI / ADX trend-strength components. */
 export function calculateDMI(
     bars: Bar[],
     period = DMI_DEFAULT_PERIOD

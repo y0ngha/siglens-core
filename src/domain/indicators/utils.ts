@@ -1,12 +1,15 @@
+/** @internal Simple moving average of the last `period` values. */
 export function sma(values: number[], period: number): number | null {
     if (values.length < period) return null;
     return values.slice(-period).reduce((sum, v) => sum + v, 0) / period;
 }
 
+/** @internal Typical price — mean of high, low, and close. */
 export function typicalPrice(high: number, low: number, close: number): number {
     return (high + low + close) / 3;
 }
 
+/** @internal Population standard deviation over the last `period` values. */
 export function stdDev(values: number[], period: number): number | null {
     if (values.length < period) return null;
     const vals = values.slice(-period);
@@ -15,6 +18,7 @@ export function stdDev(values: number[], period: number): number | null {
     return Math.sqrt(variance);
 }
 
+/** @internal Highest value within the last `period` values. */
 export function rollingHighest(
     values: number[],
     period: number
@@ -23,11 +27,13 @@ export function rollingHighest(
     return Math.max(...values.slice(-period));
 }
 
+/** @internal Lowest value within the last `period` values. */
 export function rollingLowest(values: number[], period: number): number | null {
     if (values.length < period) return null;
     return Math.min(...values.slice(-period));
 }
 
+/** @internal O(N) sliding-window maximum via monotone deque. */
 // O(N) sliding window max via monotone deque — each index pushed/popped at most once.
 export function slidingMax(
     values: number[],
@@ -46,6 +52,7 @@ export function slidingMax(
     return result;
 }
 
+/** @internal O(N) sliding-window minimum via monotone deque. */
 // O(N) sliding window min via monotone deque — each index pushed/popped at most once.
 export function slidingMin(
     values: number[],
@@ -64,10 +71,12 @@ export function slidingMin(
     return result;
 }
 
+/** @internal Last non-null value in the array, or null if none. */
 export function lastNonNull(arr: readonly (number | null)[]): number | null {
     return arr.findLast((v): v is number => v !== null) ?? null;
 }
 
+/** @internal Linear-regression endpoint value over the last `period` values. */
 // Equivalent to PineScript linreg(source, length, 0).
 export function linreg(values: number[], period: number): number | null {
     if (values.length < period) return null;

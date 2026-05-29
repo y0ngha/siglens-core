@@ -4,6 +4,7 @@ import { typicalPrice } from '@/domain/indicators/utils';
 
 const MFI_MAX = 100;
 
+/** @internal Money Flow Index — volume-weighted RSI-style oscillator. */
 export function calculateMFI(
     bars: Bar[],
     period = MFI_DEFAULT_PERIOD

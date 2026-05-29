@@ -12,6 +12,7 @@
 // Aggregate calculators / detectors
 export {
     calculateIchimokuFutureCloud,
+    calculateIndicators,
     computeFearGreedHistory,
     computeFearGreedIndex,
     FEAR_GREED_LABEL_CUTOFFS,

@@ -6,6 +6,7 @@ import {
     MACD_SLOW_PERIOD,
 } from '@/domain/indicators/constants';
 
+/** @internal MACD — fast/slow EMA difference with signal and histogram. */
 export function calculateMACD(
     bars: Bar[],
     fastPeriod = MACD_FAST_PERIOD,

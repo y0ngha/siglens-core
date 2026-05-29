@@ -7,6 +7,8 @@ import {
     STOCH_RSI_STOCH_PERIOD,
 } from '@/domain/indicators/constants';
 /**
+ * @internal Stochastic RSI — %K / %D oscillator applied to RSI values.
+ *
  * Stochastic RSI = (RSI - min(RSI, stochPeriod)) / (max(RSI, stochPeriod) - min(RSI, stochPeriod))
  * %K = SMA(Stochastic RSI, kSmoothing)
  * %D = SMA(%K, dPeriod)

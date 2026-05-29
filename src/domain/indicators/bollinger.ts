@@ -4,6 +4,7 @@ import {
     BOLLINGER_DEFAULT_STD_DEV,
 } from '@/domain/indicators/constants';
 
+/** @internal Bollinger Bands — middle SMA with upper/lower standard-deviation bands. */
 export function calculateBollinger(
     bars: Bar[],
     period = BOLLINGER_DEFAULT_PERIOD,

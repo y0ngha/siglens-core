@@ -58,6 +58,7 @@ function clampPercentage(value: number): number {
     );
 }
 
+/** @internal Stochastic Oscillator — %K / %D over the high-low range. */
 export function calculateStochastic(
     bars: Bar[],
     kPeriod = STOCHASTIC_K_PERIOD,

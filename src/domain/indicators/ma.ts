@@ -1,5 +1,6 @@
 import type { Bar } from '@/domain/types';
 
+/** @internal Simple moving average of bar closes for a given period. */
 export function calculateMA(bars: Bar[], period: number): (number | null)[] {
     if (bars.length === 0 || period <= 0) return [];
 
