@@ -5,7 +5,9 @@ import type {
 } from '@/domain/types';
 
 /**
- * Lookback window for news article queries.
+ * @internal
+ * Lookback window for news article queries (parameter of the internal
+ * {@link NewsProvider} port).
  *
  * - `'24h'` — last 24 hours (used for chart-page news augment A2/A3 section).
  * - `'7d'`  — last 7 days (default for news analysis page).
@@ -14,6 +16,7 @@ import type {
 export type NewsTimeRange = '24h' | '7d' | '30d';
 
 /**
+ * @internal Port for fetching news articles and earnings calendar/report data.
  * @port
  * News + earnings calendar fetcher abstraction the domain depends on for
  * retrieving articles, earnings schedules, and earnings reports.

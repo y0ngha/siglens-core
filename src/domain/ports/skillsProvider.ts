@@ -1,6 +1,7 @@
 import type { Skill } from '@/domain/types';
 
 /**
+ * @internal
  * @port
  * Contract for loading the skill catalog the domain depends on for
  * prompt enrichment, signal scoring, and showcase rendering.

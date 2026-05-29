@@ -15,7 +15,7 @@ import {
 } from '@/domain/utils';
 
 /**
- * TTL for cached market briefings (in seconds).
+ * @internal TTL for cached market briefings (in seconds).
  *
  * Set to one hour so all callers within a given hour share a single AI
  * briefing for the same dashboard summary. The briefing cache key
@@ -23,10 +23,12 @@ import {
  */
 export const MARKET_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
 
-// 대시보드 섹터 시그널: 타임프레임별 데이터 갱신 주기에 맞춘 TTL
+/** @internal 1시간봉 섹터 시그널 캐시 TTL(분) — 데이터 갱신 주기에 맞춤. */
 export const SECTOR_SIGNALS_1HOUR_TTL_MINUTES = 15;
+/** @internal 15분봉 섹터 시그널 캐시 TTL(분) — 데이터 갱신 주기에 맞춤. */
 export const SECTOR_SIGNALS_15MIN_TTL_MINUTES = 5;
 
+/** @internal 타임프레임별 섹터 시그널 캐시 TTL(초) 매핑. */
 export const SECTOR_SIGNALS_TTL_BY_TIMEFRAME: Record<
     DashboardTimeframe,
     number
@@ -37,7 +39,7 @@ export const SECTOR_SIGNALS_TTL_BY_TIMEFRAME: Record<
 };
 
 /**
- * Per-timeframe TTL (seconds) for cached symbol analyses.
+ * @internal Per-timeframe TTL (seconds) for cached symbol analyses.
  *
  * Keyed by {@link Timeframe} — shorter timeframes get shorter TTLs so
  * stale results never stay cached longer than the underlying bar
@@ -54,7 +56,7 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
 };
 
 /**
- * Daily cache-expiry boundary in KST hours (24-hour clock).
+ * @internal Daily cache-expiry boundary in KST hours (24-hour clock).
  *
  * KST 05:00 = UTC 20:00 (prev day) = EDT 16:00 — aligned with U.S.
  * regular-session close so cached analyses expire as the final price is
@@ -73,7 +75,7 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
 export const CACHE_EXPIRY_HOUR_KST = 5;
 
 /**
- * Compute the effective analysis-cache TTL for a given timeframe at `now`.
+ * @internal Compute the effective analysis-cache TTL for a given timeframe at `now`.
  *
  * Returns the smaller of:
  * - `ANALYSIS_CACHE_TTL[timeframe]` — the static per-timeframe ceiling.
@@ -105,11 +107,11 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  *   completed bars do not change until the next session opens, so the cache can
  *   survive exactly until that boundary.
  *
- * Unlike {@link computeEffectiveTtl} (which uses the close boundary), this function
- * uses the **open boundary**.
+ * Unlike the analysis-cache TTL policy (which clamps to the session **close**
+ * boundary), this function uses the session **open** boundary.
  *
  * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
- *   the parameter is kept for signature consistency with {@link computeEffectiveTtl}.
+ *   the parameter is kept for signature consistency with the analysis-cache TTL helper.
  * @param now - Reference time for market-session detection. Pass explicitly for
  *   deterministic testing.
  * @returns Effective TTL in seconds.
@@ -129,7 +131,7 @@ export function computeBarsEffectiveTtl(
 export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
- * Build the Redis key for a cached symbol analysis.
+ * @internal Build the Redis key for a cached symbol analysis.
  *
  * Format: `analysis:<symbol>:<timeframe>:<modelId>`. Symbol is used verbatim
  * — pass the canonical uppercase form. Including the model identifier ensures
@@ -156,7 +158,7 @@ export function buildAnalysisCacheKey(
 }
 
 /**
- * Build the Redis key for a cached market briefing.
+ * @internal Build the Redis key for a cached market briefing.
  *
  * Format: `briefing:market:<dateHour>`. The `dateHour` argument is the ISO
  * date+hour prefix (e.g. `"2026-04-26T14"`) so all callers within a given
@@ -169,6 +171,7 @@ export function buildBriefingCacheKey(dateHour: string): string {
     return `briefing:market:${dateHour}`;
 }
 
+/** @internal 타임프레임+버킷 기준 섹터 시그널 캐시 키 빌더. */
 export function buildSectorSignalsCacheKey(
     timeframe: DashboardTimeframe,
     bucket: string
@@ -305,7 +308,7 @@ export function buildOverallPeekCacheKey(
 }
 
 /**
- * Build the Redis key for a cached options analysis result.
+ * @internal Build the Redis key for a cached options analysis result.
  *
  * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<snapshotInputHash>`.
  *

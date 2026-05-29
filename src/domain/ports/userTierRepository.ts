@@ -10,6 +10,7 @@ import type { Tier } from '@/domain/types';
 export type UserTier = Tier;
 
 /**
+ * @internal Port for reading and updating a user's subscription tier.
  * @port
  * Persistence operations required by tier-gating use-cases.
  *

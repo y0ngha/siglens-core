@@ -43,7 +43,7 @@ async function withJobStore<T>(
 // 따라서 JSON.stringify/JSON.parse를 수동으로 호출하지 않는다.
 
 /**
- * Persist a job's metadata (`symbol`, `timeframe`, `lastClose`, etc.) under a 1-hour TTL.
+ * @internal Persist a job's metadata (`symbol`, `timeframe`, `lastClose`, etc.) under a 1-hour TTL.
  *
  * Called by `submitAnalysis` immediately after generating the `jobId`. The
  * metadata is later read by `pollAnalysis` to drive cache-key construction
@@ -61,7 +61,7 @@ export async function setJobMeta(jobId: string, meta: JobMeta): Promise<void> {
 }
 
 /**
- * Read the current job status (`processing` / `done` / `error`).
+ * @internal Read the current job status (`processing` / `done` / `error`).
  *
  * @param jobId - The job identifier.
  * @returns The current status, or `null` when no record exists (TTL expired
@@ -72,7 +72,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus | null> {
 }
 
 /**
- * Read the worker's raw JSON result for a completed job.
+ * @internal Read the worker's raw JSON result for a completed job.
  *
  * The Upstash REST client deserializes the stored JSON automatically, so
  * the returned value is already a `Record<string, unknown>` (typically the
@@ -92,7 +92,7 @@ export async function getJobResult(
 }
 
 /**
- * Read the error message stored for a failed job.
+ * @internal Read the error message stored for a failed job.
  *
  * @param jobId - The job identifier.
  * @returns The error string, or `null` when none is stored or Upstash env
@@ -103,7 +103,7 @@ export async function getJobError(jobId: string): Promise<string | null> {
 }
 
 /**
- * Read the metadata previously written by {@link setJobMeta}.
+ * @internal Read the metadata previously written by {@link setJobMeta}.
  *
  * @param jobId - The job identifier.
  * @returns The metadata, or `null` when no record exists or Upstash env is
@@ -114,7 +114,7 @@ export async function getJobMeta(jobId: string): Promise<JobMeta | null> {
 }
 
 /**
- * Update the job status. Worker writes `processing` on pickup and
+ * @internal Update the job status. Worker writes `processing` on pickup and
  * transitions to `done` or `error` on completion.
  *
  * Stored under a 1-hour TTL.
@@ -134,7 +134,7 @@ export async function setJobStatus(
 }
 
 /**
- * Persist the worker's raw JSON result. Stored under a 1-hour TTL.
+ * @internal Persist the worker's raw JSON result. Stored under a 1-hour TTL.
  *
  * Called by the worker immediately before transitioning the status to
  * `done`. The Upstash REST client serializes the object as JSON
@@ -155,7 +155,7 @@ export async function setJobResult(
 }
 
 /**
- * Persist a worker error message. Stored under a 1-hour TTL.
+ * @internal Persist a worker error message. Stored under a 1-hour TTL.
  *
  * Called by the worker immediately before transitioning the status to
  * `error`.
@@ -175,8 +175,10 @@ export async function setJobError(
 }
 
 /**
- * Mark a job as cancelled. Worker should consult {@link isJobCancelled}
- * between expensive steps and abort early when set.
+ * Mark a job as cancelled.
+ *
+ * Sets a cancellation flag that the internal polling use-case checks between
+ * processing steps; the job aborts on the next poll cycle.
  *
  * Stored under a 1-hour TTL — long enough to outlive any reasonable worker
  * run, then auto-cleaned.
@@ -184,6 +186,8 @@ export async function setJobError(
  * No-op when Upstash env is not configured.
  *
  * @param jobId - The job identifier.
+ * @returns Promise that resolves once the cancellation flag is set (or
+ *   immediately when Upstash env is not configured).
  */
 export async function cancelJob(jobId: string): Promise<void> {
     return withJobStore(async store => {
@@ -192,7 +196,7 @@ export async function cancelJob(jobId: string): Promise<void> {
 }
 
 /**
- * Check whether {@link cancelJob} has been called for a job.
+ * @internal Check whether {@link cancelJob} has been called for a job.
  *
  * @param jobId - The job identifier.
  * @returns `true` when the cancel flag is set; `false` when not set or
@@ -207,7 +211,7 @@ export async function isJobCancelled(jobId: string): Promise<boolean> {
 }
 
 /**
- * Delete every key associated with a job (status, result, error, meta,
+ * @internal Delete every key associated with a job (status, result, error, meta,
  * cancelled).
  *
  * Called from `pollAnalysis` once a terminal outcome (`done` or `error`)

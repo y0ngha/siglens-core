@@ -201,9 +201,7 @@ export {
 
 // Domain ports + infrastructure type-only interfaces are safe for browser consumers.
 export type { CacheProvider } from './domain/ports/cache';
-export type { SkillsProvider } from './domain/ports/skillsProvider';
 export type { FmpConfig } from './infrastructure/fmp/types';
-export type { JobStatus, JobMeta } from './infrastructure/jobs/types';
 export type {
     MarketDataProvider,
     GetBarsOptions,

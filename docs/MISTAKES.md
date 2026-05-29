@@ -81,6 +81,12 @@ and have been removed from this file.
    ✅ /** @internal */ export function createSessionCookie(user) { ... }
    ✅ /** @internal */ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;
    ✅ Before considering @internal tagging complete, grep for `export ` in the whole file; verify every non-re-exported symbol has the tag
+   ✅ **During @internal sweep, also audit public JSDoc for broken {@link} references:**
+      After @internal'ing symbols in a sweep, grep the codebase for `{@link symbol-name}` patterns.
+      For each match, verify the target symbol is still exported (not @internal).
+      Rewrite any `{@link}` references to symbols that became @internal as prose descriptions (e.g., "Use the `ComputeEffectiveTtl` approach instead of...").
+      TypeDoc with `excludeInternal: true` renders `{@link @internal-symbol}` as broken links that mislead consumers.
+      This check must run BEFORE completing the sweep, not as a follow-up audit.
 
 9.6. Bare @internal tag without descriptive comment
    → Bare /** @internal */ is valid but a one-line role description is preferred for clarity

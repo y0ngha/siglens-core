@@ -1,10 +1,10 @@
 import type { Timeframe } from '@/domain/types';
 
-/** Lifecycle status of an analysis or briefing job. */
+/** @internal Lifecycle status of an analysis or briefing job. */
 export type JobStatus = 'processing' | 'done' | 'error';
 
 /**
- * Per-job metadata stored alongside the result so {@link pollAnalysis} can
+ * @internal Per-job metadata stored alongside the result so {@link pollAnalysis} can
  * reconstruct cache keys and run domain-side reconciliation without fetching
  * the bars again.
  */

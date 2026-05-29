@@ -156,7 +156,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (23)
+### Tier 1 — Application Entrypoints (22)
 
 | Symbol | Source |
 |---|---|
@@ -186,7 +186,6 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
 | `submitOptionsAnalysis` | `application/options/submitOptionsAnalysis.ts` |
 | `pollOptionsAnalysis` | `application/options/pollOptionsAnalysis.ts` |
-| `buildOptionsCacheKey` | `infrastructure/cache/config.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -262,17 +261,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 ### Tier 3 — Infrastructure Factories & Config
 
-**캐시 (1 factory + 14 helper/const)**
+**캐시 (1 factory + 1 helper)**
 | Symbol | Source |
 |---|---|
 | `createCacheProvider` | `infrastructure/cache/redis.ts` |
-| `ANALYSIS_CACHE_TTL` | `infrastructure/cache/config.ts` |
-| `MARKET_BRIEFING_CACHE_TTL` | `infrastructure/cache/config.ts` |
-| `CACHE_EXPIRY_HOUR_KST` | `infrastructure/cache/config.ts` |
-| `buildAnalysisCacheKey` | `infrastructure/cache/config.ts` |
-| `buildBriefingCacheKey` | `infrastructure/cache/config.ts` |
-| `computeEffectiveTtl` | `infrastructure/cache/config.ts` |
 | `computeBarsEffectiveTtl` | `infrastructure/cache/config.ts` |
+
+> **PR7에서 `@internal` 전환** (도달 불가 + consumer 미사용, 내부 use-case 전용): `ANALYSIS_CACHE_TTL`, `MARKET_BRIEFING_CACHE_TTL`, `CACHE_EXPIRY_HOUR_KST`, `buildAnalysisCacheKey`, `buildBriefingCacheKey`, `buildOptionsCacheKey`, `computeEffectiveTtl`. 캐시 키/TTL은 submit·poll use-case가 내부적으로만 구성한다.
 
 > **@internal (not exported)**: `FUNDAMENTAL_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS`,
 > `OVERALL_CACHE_TTL_SECONDS`, `buildFundamentalCacheKey`,
@@ -286,13 +281,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 > `ASSET_INFO_CACHE_TTL_WITHOUT_KOREAN`, `buildTickerSearchCacheKey`,
 > `buildAssetInfoCacheKey`는 Phase 4에서 siglens로 이전 완료.
 
-**채팅 토큰 저장소 (1 factory + 3 helper/const)**
+**채팅 토큰 저장소 (1 factory + 1 helper)**
 | Symbol | Source |
 |---|---|
 | `createChatTokenStore` | `infrastructure/chat/tokenStore.ts` |
 | `hashClientIp` | `infrastructure/chat/tokenStore.ts` |
-| `CHAT_TOKEN_LIMIT` | `infrastructure/chat/tokenStore.ts` |
-| `CHAT_TOKEN_TTL_SEC` | `infrastructure/chat/tokenStore.ts` |
+
+> **PR7에서 `@internal` 전환** (consumer 미사용, tokenStore 내부 전용): `CHAT_TOKEN_LIMIT`, `CHAT_TOKEN_TTL_SEC`.
 
 **시장 데이터**
 
@@ -303,11 +298,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 > interface (Tier 4) and the `MarketDataProviderType` internal discriminant
 > (not exported). No Tier 3 market factory symbols remain in core.
 
-**Skills (2)**
-| Symbol | Source |
-|---|---|
-| `createSkillsProvider` | `infrastructure/skills/loader.ts` |
-| `FileSkillsLoader` | `infrastructure/skills/loader.ts` |
+**Skills**
+
+> **PR7에서 public 표면 전부 제거** (`@internal` 전환, 도달 불가 + consumer 미사용): `createSkillsProvider`, `FileSkillsLoader` (factory/loader), 그리고 port `SkillsProvider`. 분석 use-case가 내부적으로 `createSkillsProvider()`를 호출하므로 외부 주입 표면이 필요 없다.
 
 **Config readers (2)**
 | Symbol | Source |
@@ -321,14 +314,12 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `hashUsageIp` | `infrastructure/usage/hash.ts` |
 | (참고) `UsageRepository` / `UsageLogRepository` / `UserTierRepository` 인터페이스는 각각 `domain/ports/usageRepository.ts`, `domain/ports/usageLogRepository.ts`, `domain/ports/userTierRepository.ts`에 정의된 도메인 port로, 분석 use-case가 DI로 소비. 공유 도메인 타입(`UsageActionType`, `UsageLogRecord`)은 `domain/types.ts`에서 정의되어 port 간 순환 import를 방지. Drizzle/Neon 어댑터는 siglens consumer가 소유. |
 
-**Job queue (worker용) (11)**
+**Job queue (worker용) (1)**
 | Symbol | Source |
 |---|---|
-| `setJobMeta` / `getJobMeta` | `infrastructure/jobs/queue.ts` |
-| `getJobStatus` / `setJobStatus` | `infrastructure/jobs/queue.ts` |
-| `getJobResult` / `setJobResult` | `infrastructure/jobs/queue.ts` |
-| `getJobError` / `setJobError` | `infrastructure/jobs/queue.ts` |
-| `cancelJob` / `isJobCancelled` / `cleanupJob` | `infrastructure/jobs/queue.ts` |
+| `cancelJob` | `infrastructure/jobs/queue.ts` |
+
+> **PR7에서 `@internal` 전환** (도달 불가 + consumer 미사용, 워커 내부 전용): `getJobMeta`/`setJobMeta`, `getJobStatus`/`setJobStatus`, `getJobResult`/`setJobResult`, `getJobError`/`setJobError`, `isJobCancelled`, `cleanupJob`, 그리고 그 시그니처 타입 `JobMeta`/`JobStatus`. 공개로 남는 `cancelJob(jobId: string)`은 이들을 재노출하지 않는다.
 
 **쿨다운 (3)**
 | Symbol | Source |
@@ -355,8 +346,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 새로 추가된 Provider 인터페이스:
 - `FundamentalDataProvider` — `domain/ports/fundamentalDataProvider.ts`. Core가 의존하는 추상 펀더멘털 데이터 fetcher 인터페이스 (siglens가 FMP로 구현).
-- `NewsProvider` — `domain/ports/newsProvider.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스.
-- `NewsTimeRange` — `domain/ports/newsProvider.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`).
+- `NewsProvider` — `domain/ports/newsProvider.ts`. 뉴스 + 실적 캘린더 fetcher 인터페이스. **PR7에서 `@internal` 전환** — 유지 public에서 도달 불가, consumer 미사용.
+- `NewsTimeRange` — `domain/ports/newsProvider.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`). **PR7에서 `@internal` 전환** — `NewsProvider.fetchNews()` 파라미터 전용이며 `NewsProvider`가 internal이라 독립적 public 경로가 없음.
 - `OptionsDataProvider` — `domain/ports/optionsDataProvider.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
 
 새로 추가된 use-case option/result 타입:
@@ -366,7 +357,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - 기술적: `SubmitAnalysisMissNoTrigger` — 0.10.0에서 추가된 봇/크롤러 게이팅용 결과 variant.
 - 옵션: `SubmitOptionsAnalysisOptions`, `SubmitOptionsAnalysisResult`, `SubmitOptionsAnalysisCached`, `SubmitOptionsAnalysisSubmitted`, `SubmitOptionsAnalysisMissNoTrigger`, `SubmitOptionsAnalysisLimitError`, `SubmitOptionsAnalysisNoChainsError`, `SubmitOptionsAnalysisApiKeyRequiredError`, `PollOptionsAnalysisResult`, `PollOptionsAnalysisProcessing`, `PollOptionsAnalysisDone`, `PollOptionsAnalysisError`. 도메인 타입(`OptionsContract`, `OptionsChain`, `OptionsSnapshot`, `StrikeOpenInterest`, `StrikeVolumeAggregate`, `TopOiQuote`, `OptionsExpirationMetrics`, `OptionsPerExpirationCommentary`, `OptionsSignal`, `OptionsAnalysisResponse`, `OptionsTone`, `OptionsSignalKind`, `OptionsExpirationFilter`)과 슬롯 매핑(`ExpirationSlot`, `ExpirationSlotKey`, `SlotMapping`), 프롬프트 옵션(`BuildOptionsAnalysisPromptOptions`) 포함.
 
-**인터페이스** — `CacheProvider`, `ChatTokenStore`, `SkillsProvider`, `FmpConfig`, `JobStatus`, `JobMeta`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`, `UserTierRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn` — 모두 `domain/ports/aiProvider.ts`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입.
+**인터페이스** — `CacheProvider`, `ChatTokenStore`, `FmpConfig`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn` — 모두 `domain/ports/aiProvider.ts`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입. (PR7에서 `SkillsProvider`·`JobStatus`·`JobMeta`·`UserTierRepository`는 `@internal` 전환 — 유지 public에서 도달 불가.)
 
 **대시보드 상수** — PR6에서 public 표면 전부 제거. consumer 미사용분(`DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `SECTOR_GROUPS`, `SIGNAL_SECTORS`)은 완전 삭제, 내부 use-case가 참조하는 분(`MARKET_INDICES`, `SECTOR_ETFS`, `SECTOR_STOCKS`, `MARKET_SUMMARY_FMP_SYMBOLS`, `DEFAULT_DASHBOARD_TIMEFRAME`)은 `@internal`로 전환(`domain/constants/dashboard-tickers.ts`).
 
@@ -518,3 +509,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-29 | **Dead-export 정리 PR4 (트래킹 이슈 #110).** `src/index.ts`/`src/index.client.ts`에서 미사용 signals surface 제거 — 개별 신호 감지기 25종(anticipation 8 + confirmed 17) + 신호 상수 22종(`signals/constants.ts` 전체: CCI/CMF cross level, `GOLDEN_CROSS_*`, `DIVERGENCE_*`, `SQUEEZE_*`, `SR_*`, `TREND_*` 등) export 제거 + 정의부 `@internal` 태그(MISTAKES.md #9.5/#9.6). **aggregate `detectSignals()` / `classifyTrend()`는 Tier 2 public entry point로 유지** — 개별 감지기 구현은 `detectSignals`가 내부 호출하여 보존. 0.x semver minor bump(package.json은 0.16.0 유지). |
 | 2026-05-29 | **Dead-export 정리 PR5 (트래킹 이슈 #110).** `domain/analysis/` 미사용 헬퍼 제거 — 프롬프트 빌더 6종(`buildAnalysisPrompt`·`buildFundamentalAnalysisPrompt`·`buildMarketBriefingPrompt`·`buildNewsAnalysisPrompt`·`buildNewsCardAnalysisPrompt`·`buildOverallAnalysisPrompt`), 응답 정규화 전체(`enrichAnalysisWithConfidence` + 모든 `normalize*`: market/fundamental/news/overall/options + action/risk/keyLevels/priceTargets/indicatorGuide/pattern/strategy/candlePattern/trend/trendline), 정규화 프리미티브(`asArray`/`asString`/`compact`), 캔들 `detectCandlePattern`·`detectMultiCandlePattern`·`findCandlePatternLabel`·`CANDLE_PATTERN_DETECTION_BARS`·`CANDLE_PATTERN_LABELS`·`MULTI_CANDLE_PATTERN_LABELS`·`EXCLUDED_SINGLE_PATTERNS`, `extendTrendline`·`postProcessAnalysisWithReconcile`·`filterAnalysisResult` export 제거 + 정의부 `@internal`(22파일/37심볼, MISTAKES.md #9.5/#9.6). 구현은 submit/poll use-case·프롬프트 빌더가 내부 호출하여 보존. 살아있는 candle getter(`getCandlePatternLabel`/`getMultiCandlePatternLabel`/`getSinglePatternTrend`/`getMultiPatternTrend`/`detectCandlePatternEntries`/`getDetectionBars`/`selectLastCandlePatternEntries`)·`clusterKeyLevels`·`validateKeyLevels`·`validateActionPrices`·`extractReconciledActionLines`·`AI_SYSTEM_PROMPT`·`buildOptionsAnalysisPrompt`(options)·`buildChatPrompt`(chat)는 public 유지. 0.x semver minor bump(package.json은 0.16.0 유지). |
 | 2026-05-29 | **Dead-export 정리 PR6 (트래킹 이슈 #110).** 도메인/use-case 타입 표면에서 **도달 불가(unreachable) + consumer 미사용** 타입만 제거하고, **public API에서 도달 가능한 타입은 전부 유지**(MISTAKES.md Rule #9 — public 함수의 파라미터/반환 타입과 public 타입의 필드/union/배열/extends 타입은 제거 대상에서 제외). **완전 삭제(dead)**: 타입 `RequestChatCompletionResult`·`FundamentalAnalysisUsageOptions`·`NewsAnalysisUsageOptions`·`SubmitNewsCardAnalysisCached`·`RunAnalysisInput`·`FundamentalProfileInput`·`MarketSummaryWithBriefing`·`SectorGroupDef`(유일 인스턴스화처 `SECTOR_GROUPS` 삭제로 고아화, public 타입에서 도달 불가), 파일 `domain/llm/constants.ts`(`LLM_PROVIDER_VALUES`), 대시보드 상수 4종(`DASHBOARD_TIMEFRAMES`/`DASHBOARD_TIMEFRAME_LABELS`/`SECTOR_GROUPS`/`SIGNAL_SECTORS`). **Tier 1 `getMarketSummaryWithBriefing` use-case 제거**(consumer 미사용; `getMarketSummary`+`submitBriefing` 직접 조합으로 대체) — 구현·테스트·`MarketSummaryWithBriefing` 반환 타입 삭제. **`@internal` 전환(도달 불가, consumer 미사용)**: 정규화 입력 트리 `FundamentalSnapshot`+하위(`FundamentalValuation`/`FundamentalPeer`/`FundamentalProfitability`/`FundamentalGrowth`/`FundamentalHealth`/`FundamentalFutureDirection`/`FundamentalSectorDirection`/`SectorHistoricalPoint`/`GradesConsensus`/`PriceTargetConsensus`/`PriceTargetSummary`), 리졸버 내부 `DependencyState*`, 마스킹 `Filtered*`, `Raw*`/`Normalize*Input`, `ChatModel`/`LevelSource`/`CrossDirection`/`ResolvedLevel`/`PromptConfig`/`ReconcileResult`/`UsageLimitError`/`UsageLimitErrorCode`, 상수 `THINKING_BUDGET_FALLBACK_STEPS`/`EXPIRATION_SLOTS`/`GEMINI_2_5_PRO_MODEL` 및 대시보드 상수 5종(`MARKET_INDICES`/`SECTOR_ETFS`/`SECTOR_STOCKS`/`MARKET_SUMMARY_FMP_SYMBOLS`/`DEFAULT_DASHBOARD_TIMEFRAME`). 초기 sweep이 reachable한 public 타입 123종(IndicatorResult 하위 결과 타입, `Submit*Result`/`Poll*Result` union 멤버, TierConfig 트리, ModelSpec union 멤버, 옵션 도메인 타입, FearGreed 필드 타입, public 함수 파라미터 타입 등)을 잘못 @internal/제거했으나 GitHub 리뷰 지적으로 전부 main 상태(public)로 복원. `EtSessionStatus` 동일하게 복원. Tier 1 24→23. 0.x semver minor bump(package.json은 0.16.0 유지). |
+| 2026-05-29 | **Dead-export 정리 PR7 (트래킹 이슈 #110).** Tier 3 infra 표면에서 **reachability 사전 감사(fixpoint) 통과분만** `@internal` 전환 — 유지되는 public 심볼에서 도달 불가 + consumer 미사용인 27종: 캐시 키/TTL 7종(`ANALYSIS_CACHE_TTL`/`CACHE_EXPIRY_HOUR_KST`/`MARKET_BRIEFING_CACHE_TTL`/`computeEffectiveTtl`/`buildAnalysisCacheKey`/`buildBriefingCacheKey`/`buildOptionsCacheKey`), 채팅 토큰 상수 2종(`CHAT_TOKEN_LIMIT`/`CHAT_TOKEN_TTL_SEC`), `extractJsonWithRepair`, Skills(`createSkillsProvider`/`FileSkillsLoader`/port `SkillsProvider`), ports `NewsProvider`(+sibling `NewsTimeRange` — `fetchNews` 파라미터 전용)/`UserTierRepository`, job queue 함수 10종(`getJobMeta`/`setJobMeta`/`getJobStatus`/`setJobStatus`/`getJobResult`/`setJobResult`/`getJobError`/`setJobError`/`isJobCancelled`/`cleanupJob`)+시그니처 타입 `JobMeta`/`JobStatus`. 구현·내부 호출은 보존(use-case가 내부적으로만 사용). **reachability로 제거 보류(public 유지)**: `ChatTokenStore`·`CallAiProvider`·`ConversationRole`·`UsageLogRepository`·`CreateUsageLogInput`(공개 `requestChatCompletion`의 `RequestChatCompletionDependencies`에서 도달), `FmpConfig`(공개 `readFmpConfig`/`tryReadFmpConfig` 반환 타입). 유지: `createCacheProvider`·`computeBarsEffectiveTtl`·`createChatTokenStore`·`hashClientIp`·`hashUsageIp`·`cancelJob`·`readFmpConfig`·`tryReadFmpConfig`·reanalyze-cooldown. `SkillsProvider`/`JobMeta`/`JobStatus`는 양 entrypoint에서 제거. `buildOptionsCacheKey`는 Tier 1 인벤토리에서도 제거(Tier 1 23→22). 부수적으로 `cache/config.ts`의 sector-signals 형제 export(`SECTOR_SIGNALS_1HOUR_TTL_MINUTES`/`SECTOR_SIGNALS_15MIN_TTL_MINUTES`/`SECTOR_SIGNALS_TTL_BY_TIMEFRAME`/`buildSectorSignalsCacheKey`)에 누락됐던 `@internal` 태그 보강(MISTAKES.md #9.5 whole-file sweep). 유지 public 함수(`hashClientIp`)의 Tier 3 JSDoc 완결(description+@param+@returns) 및 `cancelJob` `@returns` 보강. public JSDoc이 이제 `@internal`이 된 심볼을 가리키던 `{@link}` 참조 정리(`cancelJob`→`isJobCancelled`, `computeBarsEffectiveTtl`→`computeEffectiveTtl`, `peekAnalysisCache`→`buildAnalysisCacheKey`) — TypeDoc(excludeInternal) broken link 방지. 0.x semver minor bump(package.json은 0.16.0 유지). |

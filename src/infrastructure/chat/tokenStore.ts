@@ -4,13 +4,25 @@ import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
+/** @internal Daily per-client chat token allowance. */
 export const CHAT_TOKEN_LIMIT = 5;
+/** @internal TTL (seconds) for the daily chat token bucket; one day. */
 export const CHAT_TOKEN_TTL_SEC = SECONDS_PER_DAY;
 
 function buildChatTokenKey(hashedClientId: string): string {
     return `chat:tokens:${hashedClientId}`;
 }
 
+/**
+ * Produce a stable, unlinkable key for a client IP address.
+ *
+ * Hashes the raw IP with SHA-256 so the original address cannot be recovered
+ * from the result, keeping the daily token-bucket key free of personally
+ * identifiable data.
+ *
+ * @param clientIp - Raw client IP string (e.g. `"203.0.113.42"`).
+ * @returns Hex-encoded SHA-256 digest used as the token-bucket key suffix.
+ */
 export function hashClientIp(clientIp: string): string {
     return createHash('sha256').update(clientIp).digest('hex');
 }
