@@ -185,14 +185,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
 | `submitOptionsAnalysis` | `application/options/submitOptionsAnalysis.ts` |
 | `pollOptionsAnalysis` | `application/options/pollOptionsAnalysis.ts` |
-| `buildOptionsCacheKey` | `application/options/cacheKey.ts` |
+| `buildOptionsCacheKey` | `infrastructure/cache/config.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
-**통합 계산기/감지기 (3)**
+**통합 감지기 (2)**
 | Symbol | Source |
 |---|---|
-| `calculateIndicators` | `domain/indicators/index.ts` |
 | `detectSignals` | `domain/signals/index.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
@@ -394,7 +393,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **캔들 패턴 감지 상수** — `CANDLE_PATTERN_DETECTION_BARS`, `EXCLUDED_SINGLE_PATTERNS` (`domain/candles/`).
 
-**지표 상수** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `EMA_DEFAULT_PERIODS` 등 `src/domain/indicators/constants.ts`의 지표 계산 기본값과 임계값.
+**지표 상수 (consumer 사용분)** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `RSI_OVERBOUGHT_LEVEL`, `RSI_OVERSOLD_LEVEL`, `EMA_DEFAULT_PERIODS`, `MA_DEFAULT_PERIODS`, `MACD_FAST_PERIOD`/`MACD_SIGNAL_PERIOD`/`MACD_SLOW_PERIOD`, `CCI_DEFAULT_PERIOD`/`CCI_OVERBOUGHT_LEVEL`/`CCI_OVERSOLD_LEVEL`/`CCI_ZERO_LEVEL`, `DMI_DEFAULT_PERIOD`, `STOCHASTIC_*`/`STOCH_RSI_*`, `HIGH_CONFIDENCE_WEIGHT`, `MIN_CONFIDENCE_WEIGHT` 등 consumer가 실제 사용하는 `constants.ts` 값만 public. 나머지 계산 기본값/임계값(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등)은 internal.
 
 **Fear & Greed 상수** — `FEAR_GREED_LABEL_CUTOFFS` (5단계 분류 경계 25/45/55/75), `POC_WINDOW_DEFAULT` (= 60, POC 거리 팩터 기본 창) (`domain/indicators/fearGreed/`). siglens 게이지 세그먼트 렌더링·점수→라벨 분류에서 사용.
 
@@ -412,7 +411,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 다음 함수/상수는 다른 public 함수의 보조 구현이며, **`src/index.ts`에서 export하지 않고** 정의부에 `/** @internal */` 태그를 붙인다.
 
-**개별 지표 계산기** — `calculateRSI`, `calculateMA`, `calculateMACD`, `calculateBollinger`, `calculateStochastic`, `calculateATR`, `calculateOBV`, `calculateSAR`, `calculateWilliamsR`, `calculateSupertrend`, `calculateMFI`, `calculateKeltner`, `calculateCMF`, `calculateDonchian`, `calculateVWAP`, `calculateEMA`, `calculateSMC`, `calculateSqueezeMomentum`, `calculateIchimoku`, `calculateCCI`, `calculateDMI` 등 → `calculateIndicators()`로 통합 호출.
+**개별 지표 계산기** — `calculateRSI`, `calculateMA`, `calculateMACD`, `calculateBollinger`, `calculateStochastic`, `calculateATR`, `calculateOBV`, `calculateSAR`, `calculateWilliamsR`, `calculateSupertrend`, `calculateMFI`, `calculateKeltner`, `calculateCMF`, `calculateDonchian`, `calculateVWAP`, `calculateEMA`, `calculateSMC`, `calculateSqueezeMomentum`, `calculateIchimoku`, `calculateCCI`, `calculateDMI` 및 이들을 묶는 `calculateIndicators()` aggregate 모두 internal — consumer는 application-layer `fetchBarsWithIndicators()`가 반환하는 precomputed `IndicatorResult`를 사용한다. (`calculateIchimokuFutureCloud`만 미래 클라우드 시각화용으로 public 유지.)
 
 **개별 신호 감지기** — `detectRsiOversold`, `detectRsiOverbought`, `detectGoldenCross`, `detectDeathCross`, `detectMacdBullishCross`, `detectMacdBearishCross`, `detectBollingerLowerBounce`, `detectBollingerUpperBreakout`, `detectSupertrendBullishFlip`, `detectIchimokuCloudBreakout`, `detectCciBullishCross`, `detectDmiBullishCross`, `detectCmfBullishFlip`, `detectMfiOversoldBounce`, `detectParabolicSarFlip`, `detectKeltnerUpperBreakout`, `detectSqueezeMomentumBullish`, `detectRsiBullishDivergence`, `detectRsiBearishDivergence`, `detectMacdHistogramBullishConvergence`, `detectMacdHistogramBearishConvergence`, `detectBollingerSqueezeBullish`, `detectBollingerSqueezeBearish`, `detectSupportProximityBullish`, `detectResistanceProximityBearish` → `detectSignals()`로 통합 호출.
 
@@ -534,3 +533,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-28 | Tier 2/4 Market session 추가 — `isEtRegularSessionOpen`(기존 `@internal` 제거 후 public화), `getEtSessionStatus`(`'weekend' \| 'open' \| 'closed'` 3-state, 신규) 및 Tier 4 상수 `MARKET_OPEN_HOUR`/`MARKET_OPEN_MINUTE`/`MARKET_CLOSE_HOUR`/`MARKET_CLOSE_MINUTE`와 `EtSessionStatus` union을 인벤토리에 등록. DST-safe(`Intl.DateTimeFormat('America/New_York')`), 마감 정각 16:00은 `'open'`에서 제외(exclusive). siglens가 자체 `shared/lib/marketSession.ts`의 정규장 판정을 제거하고 이 심볼을 import하도록 통합하기 위한 단일 source of truth. `secondsUntilNextEtRegularOpen`은 bars 캐시 TTL 전용이라 `@internal` 유지. 0.x semver minor bump. |
 | 2026-05-29 | Tier 2/4 Fear & Greed 분류 상수 공개 — `scoreToLabel`(기존 `@internal` 제거 후 public화, 0..100 score → 5단계 `FearGreedLabel`) 및 Tier 4 상수 `FEAR_GREED_LABEL_CUTOFFS`(경계 25/45/55/75), `POC_WINDOW_DEFAULT`(= 60)를 인벤토리에 등록. siglens가 자체 `entities/fear-greed/lib/classifier.ts`의 복제 분류 로직(`FEAR_GREED_SCORE_BOUNDARIES`/`classifyScore`)을 제거하고 이 심볼을 import하도록 통합하기 위한 단일 source of truth — `computeFearGreedIndex`가 반환하는 최상위 label로는 그룹 점수·history fallback 분류를 커버하지 못해 별도 노출 필요. `FEAR_GREED_WARNING_THRESHOLDS`/`FEAR_GREED_CONFIDENCE_THRESHOLDS`는 consumer 수요가 없어 `@internal` 유지. 함께 `infrastructure/fundamental/types.ts`(미export·미사용 FMP raw payload 타입, fundamental→domain/ports 이전 시 잔존한 고아 파일) 삭제 — 공개 API 영향 없음. 0.x semver minor bump. |
 | 2026-05-29 | **Dead-code 정리 시리즈 시작 (PR1~2).** PR1(`refactor: dedup & relocate`): 내부 dead 헬퍼(JSON-fence 파서 `parseJsonResponse`/`stripMarkdownCodeBlock`, `addSeconds`) 삭제, 매직넘버(`1000`/`10`/`MS_PER_DAY`)를 canonical 상수로 통합, `buildOptionsCacheKey`를 `application/options/cacheKey.ts` → `infrastructure/cache/config.ts`로 이전(형제 cache-key 빌더와 병치, 공개 export 시그니처·경로 불변). PR2(`refactor: drop deprecated Gemini aliases`): 폐기 type alias `GeminiRole`/`GeminiPart`/`GeminiContent`를 `src/index.ts`/`src/index.client.ts`에서 **최종 제거**(2026-05-22 provider-neutral rename 후 호환용으로 남겨둔 별칭 — 3개 컨슈머 모두 미사용 확인). 신규 코드는 `ConversationRole`/`ConversationTurn` 사용. 0.x semver minor bump. |
+| 2026-05-29 | **Dead-export 정리 PR3 (#110).** `src/index.ts`/`src/index.client.ts`에서 미사용 indicators surface 제거 — 개별 계산기 `calculate*` 25종 + `calculateIndicators()` aggregate + barrel 유틸(`computeEMAValues`/`lastNonNull`/`linreg`/`rollingHighest`/`rollingLowest`/`slidingMax`/`slidingMin`/`sma`/`stdDev`/`typicalPrice`) + 지표 상수 36종(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등) export 제거. 구현은 `calculateIndicators`→`fetchBarsWithIndicators` 내부 체인에서 사용되어 유지(export 키워드만 제거, knip 확인). `calculateIchimokuFutureCloud`·`computeFearGreedIndex`/`computeFearGreedHistory`·`FEAR_GREED_LABEL_CUTOFFS`·`POC_WINDOW_DEFAULT`·`scoreToLabel` 및 consumer 사용 상수(RSI/MACD/STOCHASTIC/STOCH_RSI/CCI/DMI/EMA_DEFAULT/MA_DEFAULT/EMPTY_*/CONFIDENCE_WEIGHT)는 public 유지. PUBLIC_API.md가 이미 calculate*를 internal로 문서화했던 것과 코드를 일치시킴. 0.x semver minor bump(package.json은 PR2의 0.16.0 유지). |
