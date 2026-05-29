@@ -128,3 +128,8 @@
 - Rule: TypeScript — a mock/stub generic signature should use the actual domain type so it is verified against the real function signature at compile time (the test-file `as`-cast exception does not justify widening a typed mock generic to `unknown`)
 - Context: sectorSignals.test.ts stubbed computeStockSignalResult with `vi.fn<(stock: unknown, ...)>`; the real first parameter is `SectorStock`. Imported SectorStock and replaced both `unknown` occurrences.
 
+## [PR #110 | refactor/110/prune-signals-surface | 2026-05-29] — R1 → R2 approved
+- Violation: 8 signal helper functions (findPivotLows, findPivotHighs, computeBbWidth, computePctB, computeEmaSlope, percentileRank in anticipation.ts; findCross, findThresholdCross in confirmed.ts) were exported but lacked @internal JSDoc tag
+- Rule: MISTAKES.md §#9.5 — Every module-internal export must have /** @internal */ JSDoc; when batch-adding @internal tags during dead-export cleanup, enumerate ALL non-re-exported exports, not just the symbols being demoted in this PR
+- Context: During batch @internal tagging for demoted public symbols (25 detect* + 22 constants), the main detector functions/constants were tagged but adjacent helper functions in the same files (findCross, findPivotLows, etc.) were skipped. All 8 helpers are internal-only exports not re-exported in src/index.ts. Root cause: incomplete enumeration of module scope when applying the demotion pattern. Pattern for next round: when adding @internal tags to a module during dead-export cleanup, scan the entire module for ALL exports and tag everything not re-exported, not just the named symbols being demoted in this PR. This prevents sibling-helper gaps that surface in later PRs.
+

@@ -39,14 +39,17 @@ function findPivots(
         });
 }
 
+/** @internal Indices of pivot lows within a rolling window (divergence helper). */
 export function findPivotLows(lows: number[], window: number): number[] {
     return findPivots(lows, window, (cur, n) => cur < n);
 }
 
+/** @internal Indices of pivot highs within a rolling window (divergence helper). */
 export function findPivotHighs(highs: number[], window: number): number[] {
     return findPivots(highs, window, (cur, n) => cur > n);
 }
 
+/** @internal Bollinger band width ratio ((upper-lower)/middle). */
 export function computeBbWidth(bb: BollingerResult): number | null {
     if (bb.upper === null || bb.middle === null || bb.lower === null)
         return null;
@@ -54,6 +57,7 @@ export function computeBbWidth(bb: BollingerResult): number | null {
     return (bb.upper - bb.lower) / bb.middle;
 }
 
+/** @internal Bollinger %B position of close within the bands. */
 export function computePctB(close: number, bb: BollingerResult): number | null {
     if (bb.upper === null || bb.lower === null) return null;
     const denom = bb.upper - bb.lower;
@@ -61,6 +65,7 @@ export function computePctB(close: number, bb: BollingerResult): number | null {
     return (close - bb.lower) / denom;
 }
 
+/** @internal Relative EMA slope over a lookback window. */
 export function computeEmaSlope(
     ema: (number | null)[],
     lookback: number
@@ -72,6 +77,7 @@ export function computeEmaSlope(
     return (last - prev) / prev;
 }
 
+/** @internal Rank-based percentile (0..1) used by squeeze detection. */
 // 표준 mean-rank 아닌 rank-based — squeeze 감지에서 min→0, max→1이 되도록 설계.
 export function percentileRank(value: number, xs: number[]): number | null {
     const n = xs.length;
@@ -144,6 +150,7 @@ function detectRegularDivergence(
     return p2;
 }
 
+/** @internal Detects regular bullish RSI divergence (anticipation signal). */
 export function detectRsiBullishDivergence(
     bars: Bar[],
     indicators: IndicatorResult
@@ -158,6 +165,7 @@ export function detectRsiBullishDivergence(
     };
 }
 
+/** @internal Detects regular bearish RSI divergence (anticipation signal). */
 export function detectRsiBearishDivergence(
     bars: Bar[],
     indicators: IndicatorResult
@@ -172,6 +180,7 @@ export function detectRsiBearishDivergence(
     };
 }
 
+/** @internal Detects narrowing negative MACD histogram (bullish anticipation signal). */
 export function detectMacdHistogramBullishConvergence(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -197,6 +206,7 @@ export function detectMacdHistogramBullishConvergence(
     };
 }
 
+/** @internal Detects narrowing positive MACD histogram (bearish anticipation signal). */
 export function detectMacdHistogramBearishConvergence(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -256,6 +266,7 @@ function computeSqueezeState(
     return { lastIdx, pctB, slope };
 }
 
+/** @internal Detects a Bollinger squeeze with bullish bias (anticipation signal). */
 export function detectBollingerSqueezeBullish(
     bars: Bar[],
     indicators: IndicatorResult
@@ -272,6 +283,7 @@ export function detectBollingerSqueezeBullish(
     };
 }
 
+/** @internal Detects a Bollinger squeeze with bearish bias (anticipation signal). */
 export function detectBollingerSqueezeBearish(
     bars: Bar[],
     indicators: IndicatorResult
@@ -300,6 +312,7 @@ function isWithinProximity(
     return close < ma;
 }
 
+/** @internal Detects price falling into support-MA proximity (bullish anticipation signal). */
 export function detectSupportProximityBullish(
     bars: Bar[],
     indicators: IndicatorResult
@@ -330,6 +343,7 @@ export function detectSupportProximityBullish(
     return null;
 }
 
+/** @internal Detects price rising into resistance-MA proximity (bearish anticipation signal). */
 export function detectResistanceProximityBearish(
     bars: Bar[],
     indicators: IndicatorResult
