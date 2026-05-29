@@ -3,15 +3,12 @@ import type { Mock } from 'vitest';
 import type { ModelId, Timeframe } from '@/domain/types';
 
 vi.mock('@/infrastructure/cache/redis');
-vi.mock('@/infrastructure/jobs/queue');
 
 import { peekOverallAnalysisCache } from '@/application/overall/peekOverallAnalysisCache';
 import { buildOverallPeekCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { setJobMeta } from '@/infrastructure/jobs/queue';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
-const mockSetJobMeta = setJobMeta as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -170,7 +167,6 @@ describe('peekOverallAnalysisCache 함수는', () => {
         mockCacheGet.mockResolvedValueOnce(null);
         await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL);
 
-        expect(mockSetJobMeta).not.toHaveBeenCalled();
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();
     });

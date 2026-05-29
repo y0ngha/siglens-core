@@ -52,7 +52,7 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * payload all resolve to `null`.
  *
  * @param symbol - U.S. equity ticker (canonical uppercase, matching the writer).
- * @param companyName - Accepted for call-site symmetry with the overall submit
+ * @param _companyName - Accepted for call-site symmetry with the overall submit
  *   inputs; the peek cache key is not scoped by company name, so this argument
  *   does not affect the lookup.
  * @param timeframe - Bar resolution used for the technical axis.
@@ -66,12 +66,10 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  */
 export async function peekOverallAnalysisCache(
     symbol: string,
-    companyName: string,
+    _companyName: string,
     timeframe: Timeframe,
     modelId?: ModelId
 ): Promise<OverallAnalysisResponse | null> {
-    void companyName;
-
     if (modelId === undefined) return null;
 
     const cache = createCacheProvider();
@@ -79,15 +77,13 @@ export async function peekOverallAnalysisCache(
 
     const cacheKey = buildOverallPeekCacheKey(symbol, timeframe, modelId);
 
-    let cached: unknown;
-    try {
-        cached = await cache.get<OverallAnalysisResponse>(cacheKey);
-    } catch (error) {
-        console.error('[Peek] Overall cache read failed:', error);
-        return null;
-    }
-
-    if (cached === null || cached === undefined) return null;
+    const cached = await cache
+        .get<OverallAnalysisResponse>(cacheKey)
+        .catch((error: unknown) => {
+            console.error('[Peek] Overall cache read failed:', error);
+            return null;
+        });
+    if (cached == null) return null;
 
     try {
         // No optionsOiStale context: staleness is a function of the *current*

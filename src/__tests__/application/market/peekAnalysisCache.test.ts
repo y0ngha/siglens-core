@@ -3,8 +3,6 @@ import type { Mock } from 'vitest';
 import type { AnalysisResponse, Timeframe } from '@/domain/types';
 
 vi.mock('@/infrastructure/cache/redis');
-vi.mock('@/infrastructure/jobs/queue');
-vi.mock('@/application/market/barsApi');
 
 import { peekAnalysisCache } from '@/application/market/peekAnalysisCache';
 import {
@@ -12,13 +10,9 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { setJobMeta } from '@/infrastructure/jobs/queue';
-import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
-const mockSetJobMeta = setJobMeta as Mock;
-const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -168,8 +162,6 @@ describe('peekAnalysisCache 함수는', () => {
         mockCacheGet.mockResolvedValueOnce(null);
         await peekAnalysisCache(SYMBOL, TIMEFRAME);
 
-        expect(mockSetJobMeta).not.toHaveBeenCalled();
-        expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();
     });

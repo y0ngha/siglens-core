@@ -62,7 +62,7 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *
  * @param symbol - U.S. equity ticker (canonical uppercase, matching the writer).
  * @param timeframe - Bar resolution literal.
- * @param fmpSymbol - Accepted for call-site symmetry with `submitAnalysis`;
+ * @param _fmpSymbol - Accepted for call-site symmetry with `submitAnalysis`;
  *   the technical analysis cache key is not scoped by `fmpSymbol`, so this
  *   argument does not affect the lookup. Kept in the signature so a consumer
  *   can forward the same positional args it would pass to `submitAnalysis`.
@@ -77,11 +77,9 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
 export async function peekAnalysisCache(
     symbol: string,
     timeframe: Timeframe,
-    fmpSymbol?: string,
+    _fmpSymbol?: string,
     modelId?: ModelId
 ): Promise<AnalysisResponse | null> {
-    void fmpSymbol;
-
     const cache = createCacheProvider();
     if (cache === null) return null;
 
@@ -91,15 +89,13 @@ export async function peekAnalysisCache(
         modelId ?? DEFAULT_ANALYSIS_MODEL_ID
     );
 
-    let cached: unknown;
-    try {
-        cached = await cache.get<AnalysisResponse>(cacheKey);
-    } catch (error) {
-        console.error('[Peek] Analysis cache read failed:', error);
-        return null;
-    }
-
-    if (cached === null || cached === undefined) return null;
+    const cached = await cache
+        .get<AnalysisResponse>(cacheKey)
+        .catch((error: unknown) => {
+            console.error('[Peek] Analysis cache read failed:', error);
+            return null;
+        });
+    if (cached == null) return null;
 
     try {
         const result = normalizeCachedAnalysisResponse(cached);
