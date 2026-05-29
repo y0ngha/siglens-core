@@ -24,8 +24,11 @@ import {
  * - `error`: the worker reported a failure, the result was missing, or the
  *   payload could not be normalized.
  * - `done`: the result is ready. The raw worker response is normalized via
- *   {@link normalizeOverallAnalysisResponse} and cached under the
- *   pre-computed `cacheKey` from job metadata before being returned.
+ *   {@link normalizeOverallAnalysisResponse} and cached under two keys: the
+ *   pre-computed `cacheKey` (exact-input canonical key) and the content-free
+ *   peek key ({@link buildOverallPeekCacheKey}) for zero-cost SSR surfacing via
+ *   {@link peekOverallAnalysisCache}. The peek key is written only when `meta`
+ *   carries all of `symbol`, `timeframe`, and `modelId`.
  *
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).

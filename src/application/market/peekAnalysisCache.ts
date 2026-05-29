@@ -62,10 +62,13 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *
  * @param symbol - U.S. equity ticker (canonical uppercase, matching the writer).
  * @param timeframe - Bar resolution literal.
- * @param _fmpSymbol - Accepted for call-site symmetry with `submitAnalysis`;
- *   the technical analysis cache key is not scoped by `fmpSymbol`, so this
- *   argument does not affect the lookup. Kept in the signature so a consumer
- *   can forward the same positional args it would pass to `submitAnalysis`.
+ * @param _fmpSymbol - Currently unused: the technical analysis cache key is not
+ *   scoped by `fmpSymbol`, so this argument does not affect the lookup. Retained
+ *   in the signature for API-surface familiarity with `submitAnalysis` (a caller
+ *   that already tracks an `fmpSymbol` can keep passing it). Note the positions
+ *   differ — `submitAnalysis(symbol, timeframe, force?, fmpSymbol?, options?)`
+ *   carries it at index 3, whereas it sits at index 2 here — so this is not a
+ *   drop-in positional match.
  * @param modelId - LLM model identifier. Defaults to
  *   {@link DEFAULT_ANALYSIS_MODEL_ID} — the same default `submitAnalysis`
  *   applies — so an un-modelled peek reads the same key the writer wrote.
