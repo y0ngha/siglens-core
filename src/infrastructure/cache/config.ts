@@ -273,6 +273,38 @@ export function buildOverallCacheKey(
 }
 
 /**
+ * Build the **content-free** "peek" key for the latest cached overall analysis.
+ *
+ * Format: `{version}:analysis:overall:peek:<symbol>:<timeframe>:<modelId>`.
+ *
+ * Unlike {@link buildOverallCacheKey}, this key omits the input hash so it can
+ * be reconstructed from `(symbol, timeframe, modelId)` alone — without
+ * resolving the four dependency axes (which is the only way to derive the
+ * input hash, and which would entail cache reads / potential generation).
+ *
+ * {@link pollOverallAnalysis} writes the normalized result under **both** keys:
+ * the canonical hashed key (for the exact-input cache the submit path looks up)
+ * and this peek key (an overwrite-latest pointer to the most recently generated
+ * overall analysis for the symbol/timeframe/model). `peekOverallAnalysisCache`
+ * reads this key to surface a cached overall analysis in SSR HTML at zero LLM
+ * cost — accepting "latest cached" semantics because a content-free read cannot
+ * reproduce the input hash.
+ *
+ * @internal
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param timeframe - Bar resolution used for the technical axis.
+ * @param modelId - LLM model identifier.
+ * @returns The content-free peek cache key.
+ */
+export function buildOverallPeekCacheKey(
+    symbol: string,
+    timeframe: Timeframe,
+    modelId: string
+): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}`;
+}
+
+/**
  * Build the Redis key for a cached options analysis result.
  *
  * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<snapshotInputHash>`.
