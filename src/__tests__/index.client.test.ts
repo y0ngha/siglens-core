@@ -20,6 +20,7 @@ import * as clientApi from '@/index.client';
 import type {
     ModelId,
     OverallAnalysisResponse,
+    SectorGroupDef,
     SkillType,
     TierConfig,
 } from '@/index.client';
@@ -29,6 +30,11 @@ describe('browser public API exports', () => {
         const skillType: SkillType = 'indicator_guide';
         const modelId: ModelId = 'gemini-2.5-pro';
         const tierConfig: TierConfig = TIER_CONFIG;
+        const sectorGroup: SectorGroupDef = {
+            label: 'Technology',
+            symbols: ['AAPL'],
+        };
+        expect(sectorGroup.label).toBe('Technology');
 
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');

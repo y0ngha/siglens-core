@@ -5,12 +5,10 @@ import type {
 } from '@/domain/types';
 
 /**
- * @internal
- * Lookback window for news article queries (parameter of the internal
- * {@link NewsProvider} port).
+ * Lookback window for news article queries.
  *
- * - `'24h'` — last 24 hours (used for chart-page news augment A2/A3 section).
- * - `'7d'`  — last 7 days (default for news analysis page).
+ * - `'24h'` — last 24 hours.
+ * - `'7d'`  — last 7 days.
  * - `'30d'` — last 30 days (extended context for low-activity symbols).
  */
 export type NewsTimeRange = '24h' | '7d' | '30d';

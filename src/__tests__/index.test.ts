@@ -1,5 +1,10 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
-import type { PatternTrend, UsageRepository } from '@/index';
+import type {
+    NewsTimeRange,
+    PatternTrend,
+    SectorGroupDef,
+    UsageRepository,
+} from '@/index';
 import {
     checkAnalysisLimit,
     checkChatbotLimit,
@@ -50,6 +55,17 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
+    });
+
+    it('exports consumer-implemented port/config types from package entrypoint', () => {
+        const range: NewsTimeRange = '7d';
+        const sectorGroup: SectorGroupDef = {
+            label: 'Technology',
+            symbols: ['AAPL', 'MSFT'],
+        };
+
+        expect(range).toBe('7d');
+        expect(sectorGroup.symbols).toContain('AAPL');
     });
 
     it('exports tier gating helpers from package entrypoint', () => {
