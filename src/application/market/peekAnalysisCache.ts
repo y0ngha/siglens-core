@@ -39,9 +39,9 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *
  * This is the read-only twin of {@link submitAnalysis}: it reuses the exact
  * same internal cache key (`buildAnalysisCacheKey`) and the exact same read +
- * validate path (the env-configured {@link createCacheProvider} plus
- * {@link normalizeCachedAnalysisResponse}) that `submitAnalysis` runs on a
- * cache hit — but it omits the enqueue/fetch/generate branch entirely.
+ * validate path (the env-configured {@link createCacheProvider} plus the
+ * internal `normalizeCachedAnalysisResponse` normalizer) that `submitAnalysis`
+ * runs on a cache hit — but it omits the enqueue/fetch/generate branch entirely.
  *
  * Intended for search-engine bots in Server-Side Rendering: an RSC can surface
  * a cached analysis in the initial HTML at zero LLM cost, and render a fallback
@@ -52,11 +52,12 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * writes. A cache miss, a missing cache provider (Upstash env absent), a read
  * error, or a corrupt/empty cached payload all resolve to `null`.
  *
- * The "corrupt → null" guard is necessary because
- * {@link normalizeCachedAnalysisResponse} never throws on a non-string garbage
- * payload — it synthesises a content-free shape (empty/fallback summary, all
- * arrays empty). {@link isEmptyAnalysis} detects that shape so a poisoned or
- * empty cache entry surfaces as a miss (`null`) rather than as an empty body.
+ * The "corrupt → null" guard is necessary because the internal
+ * `normalizeCachedAnalysisResponse` normalizer never throws on a non-string
+ * garbage payload — it synthesises a content-free shape (empty/fallback summary,
+ * all arrays empty). The internal `isEmptyAnalysis` check detects that shape so a
+ * poisoned or empty cache entry surfaces as a miss (`null`) rather than as an
+ * empty body.
  * (`pollAnalysis` already refuses to *write* such fallback shapes — see its
  * `isFallbackAnalysis` guard — so a valid HIT always carries real content.)
  *
@@ -69,8 +70,8 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *   differ — `submitAnalysis(symbol, timeframe, force?, fmpSymbol?, options?)`
  *   carries it at index 3, whereas it sits at index 2 here — so this is not a
  *   drop-in positional match.
- * @param modelId - LLM model identifier. Defaults to
- *   {@link DEFAULT_ANALYSIS_MODEL_ID} — the same default `submitAnalysis`
+ * @param modelId - LLM model identifier. Defaults to the internal
+ *   `DEFAULT_ANALYSIS_MODEL_ID` — the same default `submitAnalysis`
  *   applies — so an un-modelled peek reads the same key the writer wrote.
  * @returns The cached {@link AnalysisResponse} on a valid hit, or `null` on a
  *   miss / corrupt entry.
