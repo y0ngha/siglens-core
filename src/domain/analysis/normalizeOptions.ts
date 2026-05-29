@@ -68,6 +68,8 @@ function normalizeSignalItem(item: unknown): OptionsSignal | null {
 }
 
 /**
+ * @internal Normalizes the options-analysis LLM response.
+ *
  * Normalize a raw LLM options analysis response into a fully-typed
  * OptionsAnalysisResponse. Never throws — every field has a fallback so
  * downstream rendering is safe even when the model returns garbage.
@@ -87,8 +89,6 @@ function normalizeSignalItem(item: unknown): OptionsSignal | null {
  * @param raw - Worker JSON / cached payload / arbitrary unknown.
  * @param now - Reference clock; always used as `analyzedAt`.
  * @returns Fully-typed normalized response with every field populated.
- *
- * @internal Normalizes the options-analysis LLM response.
  */
 export function normalizeOptionsAnalysisResponse(
     raw: unknown,

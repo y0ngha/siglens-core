@@ -10,6 +10,8 @@ const WARNING_NOTE: Record<NonNullable<FearGreedWarning>, string> = {
 };
 
 /**
+ * @internal Formats the fear-greed sentiment section; not part of the public API.
+ *
  * Format a fearGreed snapshot as an English prompt section.
  *
  * Emits the spec §4.4 / §4.5 sentiment block:
@@ -28,8 +30,6 @@ const WARNING_NOTE: Record<NonNullable<FearGreedWarning>, string> = {
  * @throws {Error} When the snapshot is missing the Flow or Trend group.
  *   `composeSnapshot` always emits both Flow and Trend groups; this guard
  *   fires only for manually constructed or externally corrupted snapshots.
- *
- * @internal Formats the fear-greed sentiment section; not part of the public API.
  */
 export function formatFearGreedSection(fg: FearGreedSnapshot): string {
     const flowGroup = fg.groups.find(g => g.name === 'Flow');

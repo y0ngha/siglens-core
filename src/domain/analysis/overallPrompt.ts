@@ -247,6 +247,8 @@ function formatOptions(
 }
 
 /**
+ * @internal Builds the multi-axis overall-analysis LLM prompt.
+ *
  * Build the 4-axis overall analysis prompt.
  *
  * Combines completed technical, fundamental, news, and options analysis
@@ -275,8 +277,6 @@ function formatOptions(
  * @param optionsOiStale - When `true`, appends a stale-OI caveat to the options
  *                         section so the LLM tempers positioning claims.
  * @returns Prompt string ready to be sent to the LLM worker.
- *
- * @internal Builds the multi-axis overall-analysis LLM prompt.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
 // companyName) was removed — submitOverallAnalysis and dependencyResolver

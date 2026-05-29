@@ -68,6 +68,8 @@ function normalizeCategoryAssessment(
 }
 
 /**
+ * @internal Normalizes the fundamental LLM response.
+ *
  * Normalize a raw LLM response string into a typed {@link FundamentalAnalysisResponse}.
  *
  * Strips optional markdown code fences (` ```json ` / ` ``` `), parses JSON, and
@@ -78,8 +80,6 @@ function normalizeCategoryAssessment(
  * @param raw - Raw string/object from the LLM worker or cache.
  * @returns A fully-typed {@link FundamentalAnalysisResponse}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
- *
- * @internal Normalizes the fundamental LLM response.
  */
 export function normalizeFundamentalAnalysisResponse(
     raw: unknown

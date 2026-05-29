@@ -45,6 +45,8 @@ const isNearPrice = (a: number, b: number): boolean =>
 // ─── Single Candle Pattern ────────────────────────────────────────────────────
 
 /**
+ * @internal Single-bar candle pattern detector.
+ *
  * Classify a single OHLCV bar into a {@link CandlePattern}.
  *
  * Pattern selection follows the standard taxonomy: doji / dragonfly /
@@ -59,8 +61,6 @@ const isNearPrice = (a: number, b: number): boolean =>
  * @see detectMultiCandlePattern
  * @see getSinglePatternTrend
  * @see getCandlePatternLabel
- *
- * @internal Single-bar candle pattern detector.
  */
 export function detectCandlePattern(bar: Bar): CandlePattern {
     const range = calcRange(bar);
@@ -426,6 +426,8 @@ function detect3CandlePattern(
 // ─── Multi Candle Pattern ─────────────────────────────────────────────────────
 
 /**
+ * @internal Multi-bar candle pattern detector.
+ *
  * Detect a 2- or 3-bar {@link MultiCandlePattern} ending at the last bar.
  *
  * Examines the final 3 bars (or 2 when only 2 are available) and returns
@@ -441,8 +443,6 @@ function detect3CandlePattern(
  * @see detectCandlePattern
  * @see detectCandlePatternEntries
  * @see getMultiPatternTrend
- *
- * @internal Multi-bar candle pattern detector.
  */
 export function detectMultiCandlePattern(
     bars: Bar[]

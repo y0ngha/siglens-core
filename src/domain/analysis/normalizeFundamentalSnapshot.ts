@@ -24,6 +24,8 @@ const toPercent = (v: number | null | undefined): number | null =>
     v == null ? null : v * 100;
 
 /**
+ * @internal Builds the fundamental snapshot.
+ *
  * Normalize raw FMP provider responses into the domain {@link FundamentalSnapshot}.
  *
  * Accepts all raw pieces collected by the application layer and maps field names
@@ -39,8 +41,6 @@ const toPercent = (v: number | null | undefined): number | null =>
  *
  * @param input - Aggregated domain-neutral inputs; see {@link NormalizeFundamentalSnapshotInput}.
  * @returns A fully typed `FundamentalSnapshot` ready for prompt builders and UI.
- *
- * @internal Builds the fundamental snapshot.
  */
 export function normalizeFundamentalSnapshot(
     input: NormalizeFundamentalSnapshotInput

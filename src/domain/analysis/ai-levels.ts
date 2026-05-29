@@ -355,9 +355,9 @@ function computeEntryPriceMid(
 }
 
 /**
- * AnalysisResponse에 reconciledLevels를 병기한다. entryPrice 결정 불가 시 원본 반환.
- *
  * @internal Reconciles AI key levels into the analysis.
+ *
+ * AnalysisResponse에 reconciledLevels를 병기한다. entryPrice 결정 불가 시 원본 반환.
  */
 export function postProcessAnalysisWithReconcile(
     response: AnalysisResponse,

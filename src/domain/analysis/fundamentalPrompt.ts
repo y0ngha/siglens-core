@@ -56,6 +56,8 @@ function formatSectorDirection(
 }
 
 /**
+ * @internal Builds the fundamental-analysis LLM prompt.
+ *
  * Build the AI fundamental-analysis prompt.
  *
  * Accepts the normalised {@link FundamentalSnapshot} and a list of loaded
@@ -69,8 +71,6 @@ function formatSectorDirection(
  * @param snapshot - Normalised fundamental data for the symbol.
  * @param skills   - All loaded skills; non-fundamental / low-weight entries are filtered out.
  * @returns Prompt string ready to be sent to the LLM worker.
- *
- * @internal Builds the fundamental-analysis LLM prompt.
  */
 export function buildFundamentalAnalysisPrompt(
     symbol: string,

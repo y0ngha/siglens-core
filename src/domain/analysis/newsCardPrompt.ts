@@ -3,6 +3,8 @@
 import type { NewsItem } from '@/domain/types';
 
 /**
+ * @internal Builds the per-news-card LLM prompt.
+ *
  * Build the per-card news analysis prompt for the flash-lite model.
  *
  * Each {@link NewsItem} is processed individually: this prompt asks the model
@@ -16,8 +18,6 @@ import type { NewsItem } from '@/domain/types';
  *
  * @param item - The raw news article to analyse.
  * @returns Prompt string ready to be sent to the flash-lite LLM.
- *
- * @internal Builds the per-news-card LLM prompt.
  */
 export function buildNewsCardAnalysisPrompt(item: NewsItem): string {
     const bodySection =

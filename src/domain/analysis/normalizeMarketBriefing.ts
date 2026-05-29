@@ -37,6 +37,8 @@ function normalizeVolatilityAnalysis(
 }
 
 /**
+ * @internal Normalizes the market-briefing LLM response.
+ *
  * Convert an arbitrary worker payload into a fully-validated
  * {@link MarketBriefingResponse}.
  *
@@ -52,8 +54,6 @@ function normalizeVolatilityAnalysis(
  * @returns A safe-to-render {@link MarketBriefingResponse}.
  *
  * @see buildMarketBriefingPrompt
- *
- * @internal Normalizes the market-briefing LLM response.
  */
 export function normalizeMarketBriefing(raw: unknown): MarketBriefingResponse {
     const o = asObject(raw);

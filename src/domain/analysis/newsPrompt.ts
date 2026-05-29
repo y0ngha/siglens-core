@@ -50,6 +50,8 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
 }
 
 /**
+ * @internal Builds the news-analysis LLM prompt.
+ *
  * Build the AI news-analysis prompt.
  *
  * Accepts enriched news items (each already tagged with a
@@ -67,8 +69,6 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * @param upcomingCalendar  - Upcoming or recent earnings events for the symbol.
  * @param skills            - All loaded skills; non-news / low-weight entries are filtered out.
  * @returns Prompt string ready to be sent to the LLM worker.
- *
- * @internal Builds the news-analysis LLM prompt.
  */
 export function buildNewsAnalysisPrompt(
     symbol: string,

@@ -92,6 +92,8 @@ export function getMultiCandlePatternLabel(
 }
 
 /**
+ * @internal Resolves a pattern id to its Korean label.
+ *
  * Look up the Korean label for an arbitrary pattern-name string.
  *
  * Useful when the pattern identifier comes from an external source (e.g. a
@@ -101,8 +103,6 @@ export function getMultiCandlePatternLabel(
  *
  * @param patternName - The pattern identifier — may be any string.
  * @returns The Korean label, or the original `patternName` when unknown.
- *
- * @internal Resolves a pattern id to its Korean label.
  */
 export function findCandlePatternLabel(patternName: string): string {
     // Safe: CANDLE_PATTERN_LABELS / MULTI_CANDLE_PATTERN_LABELS keys are CandlePattern /

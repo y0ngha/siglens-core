@@ -68,6 +68,8 @@ export interface NormalizeOverallContext {
 }
 
 /**
+ * @internal Normalizes the overall-analysis LLM response.
+ *
  * Normalize a raw LLM response string into a typed {@link OverallAnalysisResponse}.
  *
  * Strips optional markdown code fences (` ```json ` / ` ``` `), parses JSON, and
@@ -88,8 +90,6 @@ export interface NormalizeOverallContext {
  * @param context - Optional normalization context (see {@link NormalizeOverallContext}).
  * @returns A fully-typed {@link OverallAnalysisResponse}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
- *
- * @internal Normalizes the overall-analysis LLM response.
  */
 export function normalizeOverallAnalysisResponse(
     raw: unknown,
