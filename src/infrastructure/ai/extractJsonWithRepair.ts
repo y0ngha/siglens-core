@@ -52,7 +52,7 @@ function looksJsonShaped(text: string): boolean {
 }
 
 /**
- * Parse an LLM response as JSON, with markdown-fence stripping AND
+ * @internal Parse an LLM response as JSON, with markdown-fence stripping AND
  * `jsonrepair`-based salvage on parse failure.
  *
  * Salvage strategy: on initial `JSON.parse` failure (truncated output,

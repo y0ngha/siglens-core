@@ -270,6 +270,7 @@ export async function countSkillFiles(): Promise<SkillCounts> {
 }
 
 /**
+ * @internal Filesystem-backed {@link SkillsProvider} adapter that parses `skills/*.md`.
  * @adapter implements {@link SkillsProvider}
  *
  * Filesystem-backed implementation of {@link SkillsProvider}.
@@ -315,6 +316,8 @@ export class FileSkillsLoader implements SkillsProvider {
 }
 
 /**
+ * @internal Factory constructing a filesystem-backed {@link SkillsProvider}.
+ *
  * Construct a {@link SkillsProvider} backed by the filesystem. Thin
  * wrapper around {@link FileSkillsLoader} that aligns the skills module
  * with the `create<Port>Provider()` convention used by other adapters

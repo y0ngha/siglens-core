@@ -4,7 +4,9 @@ import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
+/** @internal Daily per-client chat token allowance. */
 export const CHAT_TOKEN_LIMIT = 5;
+/** @internal TTL (seconds) for the daily chat token bucket; one day. */
 export const CHAT_TOKEN_TTL_SEC = SECONDS_PER_DAY;
 
 function buildChatTokenKey(hashedClientId: string): string {

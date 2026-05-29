@@ -14,6 +14,7 @@ import type {
 export type NewsTimeRange = '24h' | '7d' | '30d';
 
 /**
+ * @internal Port for fetching news articles and earnings calendar/report data.
  * @port
  * News + earnings calendar fetcher abstraction the domain depends on for
  * retrieving articles, earnings schedules, and earnings reports.
