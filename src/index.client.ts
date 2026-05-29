@@ -133,61 +133,6 @@ export {
     type PatternTrend,
 } from './domain/analysis/candle-trend';
 
-// Signal constants / detectors
-export {
-    CCI_BULLISH_CROSS_LEVEL,
-    CCI_OVERSOLD_CROSS_LEVEL,
-    CMF_BULLISH_CROSS_LEVEL,
-    CROSS_LOOKBACK_BARS,
-    DIVERGENCE_FRESHNESS_BARS,
-    DIVERGENCE_LOOKBACK_BARS,
-    DMI_ADX_TREND_THRESHOLD,
-    GOLDEN_CROSS_FAST_PERIOD,
-    GOLDEN_CROSS_SLOW_PERIOD,
-    HISTOGRAM_CONVERGENCE_BARS,
-    MFI_OVERSOLD_LEVEL,
-    PIVOT_WINDOW,
-    SQUEEZE_LOOKBACK_BARS,
-    SQUEEZE_MOMENTUM_ZERO_CROSS,
-    SQUEEZE_PCT_B_THRESHOLD,
-    SQUEEZE_PERCENTILE,
-    SR_APPROACH_LOOKBACK,
-    SR_MA_PERIODS,
-    SR_PROXIMITY_PCT,
-    TREND_EMA_PERIOD,
-    TREND_SLOPE_LOOKBACK,
-    TREND_SLOPE_THRESHOLD,
-} from './domain/signals/constants';
-export {
-    detectBollingerLowerBounce,
-    detectBollingerUpperBreakout,
-    detectCciBullishCross,
-    detectCmfBullishFlip,
-    detectDeathCross,
-    detectDmiBullishCross,
-    detectGoldenCross,
-    detectIchimokuCloudBreakout,
-    detectKeltnerUpperBreakout,
-    detectMacdBearishCross,
-    detectMacdBullishCross,
-    detectMfiOversoldBounce,
-    detectParabolicSarFlip,
-    detectRsiOverbought,
-    detectRsiOversold,
-    detectSqueezeMomentumBullish,
-    detectSupertrendBullishFlip,
-} from './domain/signals/confirmed';
-export {
-    detectBollingerSqueezeBearish,
-    detectBollingerSqueezeBullish,
-    detectMacdHistogramBearishConvergence,
-    detectMacdHistogramBullishConvergence,
-    detectResistanceProximityBearish,
-    detectRsiBearishDivergence,
-    detectRsiBullishDivergence,
-    detectSupportProximityBullish,
-} from './domain/signals/anticipation';
-
 // Analysis normalization / helpers
 export {
     normalizeActionRecommendation,

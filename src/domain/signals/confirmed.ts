@@ -22,6 +22,7 @@ import {
     SQUEEZE_MOMENTUM_ZERO_CROSS,
 } from '@/domain/signals/constants';
 
+/** @internal Detects RSI in oversold territory (bullish confirmed signal). */
 export function detectRsiOversold(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -40,6 +41,7 @@ export function detectRsiOversold(
     };
 }
 
+/** @internal Detects RSI in overbought territory (bearish confirmed signal). */
 export function detectRsiOverbought(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -58,6 +60,7 @@ export function detectRsiOverbought(
     };
 }
 
+/** @internal First fast/slow line cross index within the lookback window. */
 export function findCross(
     fast: (number | null)[],
     slow: (number | null)[],
@@ -79,7 +82,7 @@ export function findCross(
     return null;
 }
 
-/** 스칼라 임계값 돌파 인덱스를 반환한다. */
+/** @internal 스칼라 임계값 돌파 인덱스를 반환한다. */
 export function findThresholdCross(
     values: (number | null)[],
     threshold: number,
@@ -99,6 +102,7 @@ export function findThresholdCross(
     return null;
 }
 
+/** @internal Detects a fast-over-slow MA golden cross (bullish confirmed signal). */
 export function detectGoldenCross(
     bars: Bar[],
     indicators: IndicatorResult
@@ -120,6 +124,7 @@ export function detectGoldenCross(
     };
 }
 
+/** @internal Detects a fast-under-slow MA death cross (bearish confirmed signal). */
 export function detectDeathCross(
     bars: Bar[],
     indicators: IndicatorResult
@@ -154,6 +159,7 @@ function findMacdCross(
     );
 }
 
+/** @internal Detects MACD line crossing above its signal line (bullish confirmed signal). */
 export function detectMacdBullishCross(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -168,6 +174,7 @@ export function detectMacdBullishCross(
     };
 }
 
+/** @internal Detects MACD line crossing below its signal line (bearish confirmed signal). */
 export function detectMacdBearishCross(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -182,6 +189,7 @@ export function detectMacdBearishCross(
     };
 }
 
+/** @internal Detects a bounce off the lower Bollinger band (bullish confirmed signal). */
 export function detectBollingerLowerBounce(
     bars: Bar[],
     indicators: IndicatorResult
@@ -204,6 +212,7 @@ export function detectBollingerLowerBounce(
     };
 }
 
+/** @internal Detects a close above the upper Bollinger band (bearish confirmed signal). */
 export function detectBollingerUpperBreakout(
     bars: Bar[],
     indicators: IndicatorResult
@@ -224,6 +233,7 @@ export function detectBollingerUpperBreakout(
     };
 }
 
+/** @internal Detects a Supertrend flip from down to up (bullish confirmed signal). */
 export function detectSupertrendBullishFlip(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -247,6 +257,7 @@ export function detectSupertrendBullishFlip(
     return null;
 }
 
+/** @internal Detects a close breaking above the Ichimoku cloud (bullish confirmed signal). */
 export function detectIchimokuCloudBreakout(
     bars: Bar[],
     indicators: IndicatorResult
@@ -281,6 +292,7 @@ export function detectIchimokuCloudBreakout(
     };
 }
 
+/** @internal Detects CCI crossing up through an oversold/momentum level (bullish confirmed signal). */
 export function detectCciBullishCross(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -307,6 +319,7 @@ export function detectCciBullishCross(
     return null;
 }
 
+/** @internal Detects +DI crossing above -DI with strong ADX (bullish confirmed signal). */
 export function detectDmiBullishCross(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -328,6 +341,7 @@ export function detectDmiBullishCross(
     };
 }
 
+/** @internal Detects CMF crossing above zero into accumulation (bullish confirmed signal). */
 export function detectCmfBullishFlip(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -349,6 +363,7 @@ export function detectCmfBullishFlip(
     };
 }
 
+/** @internal Detects MFI crossing up out of oversold (bullish confirmed signal). */
 export function detectMfiOversoldBounce(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -369,6 +384,7 @@ export function detectMfiOversoldBounce(
     };
 }
 
+/** @internal Detects a Parabolic SAR flip from down to up (bullish confirmed signal). */
 export function detectParabolicSarFlip(
     _bars: Bar[],
     indicators: IndicatorResult
@@ -392,6 +408,7 @@ export function detectParabolicSarFlip(
     return null;
 }
 
+/** @internal Detects a close breaking above the upper Keltner channel (bullish confirmed signal). */
 export function detectKeltnerUpperBreakout(
     bars: Bar[],
     indicators: IndicatorResult
@@ -415,6 +432,7 @@ export function detectKeltnerUpperBreakout(
     };
 }
 
+/** @internal Detects squeeze momentum crossing above zero (bullish confirmed signal). */
 export function detectSqueezeMomentumBullish(
     _bars: Bar[],
     indicators: IndicatorResult

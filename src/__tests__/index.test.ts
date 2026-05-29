@@ -9,15 +9,11 @@ import type {
 import {
     asArray,
     CANDLE_PATTERN_DETECTION_BARS,
-    CCI_BULLISH_CROSS_LEVEL,
     checkAnalysisLimit,
     checkChatbotLimit,
     clusterKeyLevels,
     createChatTokenStore,
-    CROSS_LOOKBACK_BARS,
     DEFAULT_TIER,
-    detectBollingerSqueezeBearish,
-    detectGoldenCross,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
@@ -65,10 +61,6 @@ describe('public API exports', () => {
     it('exports advanced domain helpers from package entrypoint', () => {
         const trend: PatternTrend = 'neutral';
 
-        expect(CROSS_LOOKBACK_BARS).toBe(3);
-        expect(CCI_BULLISH_CROSS_LEVEL).toBe(100);
-        expect(typeof detectGoldenCross).toBe('function');
-        expect(typeof detectBollingerSqueezeBearish).toBe('function');
         expect(CANDLE_PATTERN_DETECTION_BARS).toBe(15);
         expect(EXCLUDED_SINGLE_PATTERNS.has('flat')).toBe(true);
         expect(normalizeTrend('bullish')).toBe('bullish');

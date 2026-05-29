@@ -3,7 +3,6 @@ import {
     AI_SYSTEM_PROMPT,
     CANDLE_PATTERN_DETECTION_BARS,
     DEFAULT_TIER,
-    detectGoldenCross,
     EMA_DEFAULT_PERIODS,
     filterAnalysisResult,
     GEMINI_2_5_FLASH_MODEL,
@@ -57,7 +56,6 @@ describe('browser public API exports', () => {
         expect(typeof isModelAllowed).toBe('function');
         expect(typeof isTier).toBe('function');
         expect(typeof isTimeframeAllowed).toBe('function');
-        expect(typeof detectGoldenCross).toBe('function');
         expect(normalizeTrend('bullish')).toBe('bullish');
         expect(clientApi.FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX).toBe(55);
         expect(clientApi.POC_WINDOW_DEFAULT).toBe(60);
