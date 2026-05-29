@@ -97,6 +97,20 @@ describe('normalizeNewsAnalysisResponse 함수는', () => {
             ).toThrow();
         });
     });
+
+    describe('객체가 아닌 값이 직접 주어졌을 때', () => {
+        it('배열을 전달하면 빈 객체로 취급해 모든 기본값을 채운다', () => {
+            // 배열은 typeof "object"라 JSON 파싱은 건너뛰지만 asObject가 거부 →
+            // `?? {}` fallback 경로를 탄다.
+            const result = normalizeNewsAnalysisResponse([1, 2, 3]);
+            expect(result).toEqual({
+                currentDriverKo: '',
+                keyEventsKo: [],
+                upcomingEventsKo: [],
+                overallSentiment: 'neutral',
+            });
+        });
+    });
 });
 
 describe('normalizeNewsCardAnalysis 함수는', () => {
@@ -180,6 +194,20 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
     describe('유효하지 않은 JSON 문자열이 주어졌을 때', () => {
         it('파싱 불가능한 문자열이면 에러를 던진다', () => {
             expect(() => normalizeNewsCardAnalysis('not valid json')).toThrow();
+        });
+    });
+
+    describe('객체가 아닌 값이 직접 주어졌을 때', () => {
+        it('배열을 전달하면 빈 객체로 취급해 모든 기본값을 채운다', () => {
+            const result = normalizeNewsCardAnalysis([1, 2, 3]);
+            expect(result).toEqual({
+                titleKo: '',
+                bodyKo: null,
+                summaryKo: '',
+                sentiment: 'neutral',
+                category: 'other',
+                priceImpact: 'negligible',
+            });
         });
     });
 });

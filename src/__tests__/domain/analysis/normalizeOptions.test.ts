@@ -164,4 +164,40 @@ describe('normalizeOptionsAnalysisResponse', () => {
         expect(second.analyzedAt).toBe(first.analyzedAt);
         expect(first.analyzedAt).toBe(now.toISOString());
     });
+
+    it('drops perExpiration entries that are not objects', () => {
+        // Array elements that are primitives/arrays/null make asObject return
+        // null → normalizePerExpirationItem returns null and they are compacted.
+        const raw = {
+            perExpiration: [
+                'not-an-object',
+                123,
+                null,
+                ['nested-array'],
+                {
+                    expirationDate: '2026-05-22',
+                    commentary: 'ok',
+                    tone: 'neutral',
+                },
+            ],
+        };
+        const result = normalizeOptionsAnalysisResponse(raw, now);
+        expect(result.perExpiration).toHaveLength(1);
+        expect(result.perExpiration[0].expirationDate).toBe('2026-05-22');
+    });
+
+    it('drops signals entries that are not objects', () => {
+        const raw = {
+            signals: [
+                'not-an-object',
+                123,
+                null,
+                ['nested-array'],
+                { kind: 'bullish', message: 'ok' },
+            ],
+        };
+        const result = normalizeOptionsAnalysisResponse(raw, now);
+        expect(result.signals).toHaveLength(1);
+        expect(result.signals[0].message).toBe('ok');
+    });
 });

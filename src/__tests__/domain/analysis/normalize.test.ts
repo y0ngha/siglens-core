@@ -79,6 +79,32 @@ describe('normalizeKeyLevels', () => {
         expect(result.support).toHaveLength(0);
         expect(result.resistance).toHaveLength(0);
     });
+
+    it('support 배열의 무효 원소(null/비객체/price 없음)는 걸러내고 유효한 것만 남긴다', () => {
+        const result = normalizeKeyLevels({
+            support: [
+                { price: 100, reason: 'a' },
+                null,
+                'bad',
+                { reason: 'no price' },
+            ],
+        });
+        expect(result.support).toEqual([{ price: 100, reason: 'a' }]);
+    });
+
+    it('support/resistance가 배열이 아니면(문자열 등) 빈 배열로 정규화한다', () => {
+        const result = normalizeKeyLevels({
+            support: 'wrong',
+            resistance: 42,
+        });
+        expect(result.support).toEqual([]);
+        expect(result.resistance).toEqual([]);
+    });
+
+    it('poc의 price가 없으면 poc는 undefined가 된다', () => {
+        const result = normalizeKeyLevels({ poc: { reason: 'no price' } });
+        expect(result.poc).toBeUndefined();
+    });
 });
 
 describe('normalizePriceTarget', () => {
@@ -140,6 +166,16 @@ describe('normalizeSignal', () => {
 
     it('null이면 null을 반환한다', () => {
         expect(normalizeSignal(null)).toBeNull();
+    });
+
+    it('trend가 유효하지 않으면 neutral, strength가 유효하지 않으면 undefined가 된다', () => {
+        const result = normalizeSignal({
+            description: 'd',
+            trend: 'sideways',
+            strength: 'ultra',
+        });
+        expect(result?.trend).toBe('neutral');
+        expect(result?.strength).toBeUndefined();
     });
 });
 
@@ -227,6 +263,40 @@ describe('normalizePatternSummary', () => {
     it('null이면 null을 반환한다', () => {
         expect(normalizePatternSummary(null)).toBeNull();
     });
+
+    it('patternName 또는 skillName이 비어 있으면 null을 반환한다', () => {
+        expect(normalizePatternSummary({ patternName: 'X' })).toBeNull();
+        expect(normalizePatternSummary({ skillName: 'Y' })).toBeNull();
+    });
+
+    it('keyPrices/patternLines 키가 없거나 배열이 아니면 [] 아닌 undefined가 된다', () => {
+        // 소스는 `Array.isArray(...) ? compact(...) : undefined` 이므로
+        // 누락/비배열은 빈 배열이 아니라 undefined로 구분된다.
+        const missing = normalizePatternSummary({
+            patternName: 'X',
+            skillName: 'Y',
+        });
+        expect(missing?.keyPrices).toBeUndefined();
+        expect(missing?.patternLines).toBeUndefined();
+
+        const nonArray = normalizePatternSummary({
+            patternName: 'X',
+            skillName: 'Y',
+            keyPrices: 'notarray',
+            patternLines: 42,
+        });
+        expect(nonArray?.keyPrices).toBeUndefined();
+        expect(nonArray?.patternLines).toBeUndefined();
+    });
+
+    it('keyPrices 배열의 무효 원소를 걸러내고 유효한 KeyPrice만 남긴다', () => {
+        const result = normalizePatternSummary({
+            patternName: 'X',
+            skillName: 'Y',
+            keyPrices: [{ price: 100, label: 'a' }, null, 'bad', {}],
+        });
+        expect(result?.keyPrices).toEqual([{ label: 'a', price: 100 }]);
+    });
 });
 
 describe('normalizeStrategyResult', () => {
@@ -280,6 +350,46 @@ describe('normalizeActionRecommendation', () => {
 
     it('텍스트 필드가 모두 비어있으면 undefined를 반환한다', () => {
         expect(normalizeActionRecommendation(null)).toBeUndefined();
+    });
+
+    it('숫자 필드만 있고 텍스트 4개 필드가 모두 비면 undefined를 반환한다', () => {
+        // The 4 text fields are the presence signal; numeric fields alone are
+        // treated as "no recommendation" per the source contract.
+        expect(
+            normalizeActionRecommendation({
+                entryPrices: [100],
+                stopLoss: 95,
+                takeProfitPrices: [110],
+            })
+        ).toBeUndefined();
+    });
+
+    it('entryPrices 배열의 비유한·비숫자 원소를 걸러내고 유한 숫자만 남긴다', () => {
+        const result = normalizeActionRecommendation({
+            entry: 'buy',
+            entryPrices: [100, 'x', NaN, null, Infinity, -Infinity, 110],
+            takeProfitPrices: [120, {}, 130],
+        });
+        expect(result?.entryPrices).toEqual([100, 110]);
+        expect(result?.takeProfitPrices).toEqual([120, 130]);
+    });
+
+    it('entryPrices/takeProfitPrices가 배열이 아니면 undefined가 된다', () => {
+        const result = normalizeActionRecommendation({
+            entry: 'buy',
+            entryPrices: 42,
+            takeProfitPrices: 'nope',
+        });
+        expect(result?.entryPrices).toBeUndefined();
+        expect(result?.takeProfitPrices).toBeUndefined();
+    });
+
+    it('stopLoss가 비유한 숫자(NaN/Infinity)이면 undefined가 된다', () => {
+        const result = normalizeActionRecommendation({
+            entry: 'buy',
+            stopLoss: Infinity,
+        });
+        expect(result?.stopLoss).toBeUndefined();
     });
 });
 

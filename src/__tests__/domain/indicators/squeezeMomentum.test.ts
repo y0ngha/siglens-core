@@ -100,5 +100,21 @@ describe('calculateSqueezeMomentum', () => {
             const firstValid = result.find(r => r.momentum !== null);
             expect(firstValid?.momentum).toBeCloseTo(4.75, 5);
         });
+
+        it('변동성이 확장되면(close 표준편차 > 평균 TR) sqzOff가 true가 된다', () => {
+            // high-low 폭은 좁게(2) 유지하고 close 를 큰 step(5)으로 끌어올리면
+            // close 표준편차 >> 평균 TR → Bollinger Band 가 Keltner Channel 밖으로
+            // 확장되어 sqzOff(=BB outside KC) 분기를 탄다.
+            const bars = Array.from(
+                { length: SQUEEZE_MOMENTUM_MIN_BARS + 5 },
+                (_, i) =>
+                    makeBar(100 + i * 5 + 1, 100 + i * 5 - 1, 100 + i * 5, i)
+            );
+            const result = calculateSqueezeMomentum(bars);
+            const last = result[result.length - 1];
+            expect(last.sqzOff).toBe(true);
+            expect(last.sqzOn).toBe(false);
+            expect(last.noSqz).toBe(false);
+        });
     });
 });

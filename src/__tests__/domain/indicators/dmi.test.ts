@@ -49,6 +49,37 @@ describe('calculateDMI', () => {
             });
         });
 
+        it('하락 추세에서 diMinus > diPlus이다', () => {
+            // 지속 하락: high, low, close 모두 감소 → downMove > 0 이고
+            // downMove > upMove → dmMinus 계산 분기(line 29)를 탄다.
+            const bars = Array.from({ length: 40 }, (_, i) =>
+                makeBar(100 - i * 2, 90 - i * 2, 95 - i * 2, i)
+            );
+            const result = calculateDMI(bars, DMI_DEFAULT_PERIOD);
+            const valid = result.filter(r => r.diMinus !== null);
+            expect(valid.length).toBeGreaterThan(0);
+            valid.forEach(r => {
+                expect(r.diMinus!).toBeGreaterThan(r.diPlus!);
+            });
+        });
+
+        it('모든 봉이 동일하면(완전 정지) 0-division 방어로 DI/DX가 0이 된다', () => {
+            // high=low=close 가 모두 같으면 TR=0, +DM=-DM=0 →
+            // `s.tr === 0 ? 0 : ...` (diPlus/diMinus) 와 `diSum === 0 ? 0 : ...`
+            // (dx) 의 0-division 가드 분기를 탄다.
+            const flat = Array.from({ length: 40 }, (_, i) =>
+                makeBar(100, 100, 100, i)
+            );
+            const result = calculateDMI(flat, DMI_DEFAULT_PERIOD);
+            const valid = result.filter(r => r.diPlus !== null);
+            expect(valid.length).toBeGreaterThan(0);
+            valid.forEach(r => {
+                expect(r.diPlus).toBe(0);
+                expect(r.diMinus).toBe(0);
+                expect(r.adx).toBe(0);
+            });
+        });
+
         it('반환 배열 길이는 입력과 같다', () => {
             const bars = Array.from({ length: 40 }, (_, i) =>
                 makeBar(100 + i, 90 + i, 95 + i, i)

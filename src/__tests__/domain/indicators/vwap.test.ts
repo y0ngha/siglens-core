@@ -57,4 +57,24 @@ describe('calculateVWAP', () => {
         );
         expect(calculateVWAP(bars)).toHaveLength(5);
     });
+
+    describe('극단 입력', () => {
+        it('같은 날 모든 volume이 0이면 누적 volume도 0이라 전부 null이다', () => {
+            // 누적 volume이 계속 0 → newVolume === 0 가드로 매 봉 null 반환
+            const bars = [makeBar(100, 0, 0), makeBar(200, 0, 1)];
+            expect(calculateVWAP(bars)).toEqual([null, null]);
+        });
+
+        it('누적 volume이 0으로 상쇄되면 해당 봉은 null이다', () => {
+            // bar1의 음수 volume이 bar0 volume을 정확히 상쇄 → 누적 0 → null
+            const bars = [makeBar(100, 1000, 0), makeBar(200, -1000, 0)];
+            const result = calculateVWAP(bars);
+            expect(result[0]).toBeCloseTo(100, 5);
+            expect(result[1]).toBeNull();
+        });
+
+        it('음수 가격에서도 VWAP을 계산한다', () => {
+            expect(calculateVWAP([makeBar(-100, 1000, 0)])).toEqual([-100]);
+        });
+    });
 });

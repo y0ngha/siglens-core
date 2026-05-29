@@ -157,4 +157,52 @@ describe('buildNewsAnalysisPrompt', () => {
         expect(prompt).toContain('upcomingEventsKo: []');
         expect(prompt).toContain('set overallSentiment to "neutral"');
     });
+
+    it('5-인자 오버로드(companyName 명시)도 회사명을 헤더에 포함한다', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [UPCOMING_EARNINGS],
+            [NEWS_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain('AAPL');
+        expect(prompt).toContain('Apple Inc.');
+        expect(prompt).toContain('Apple reports record Q2 earnings beat');
+    });
+
+    it('companyName 오버로드에서 skills 인자가 누락되면 빈 스킬로 처리한다', () => {
+        // 5-인자 시그니처에서 skills 를 undefined 로 넘기면 `maybeSkills ?? []`
+        // fallback 경로를 탄다 (호출자 실수에 대한 방어).
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [UPCOMING_EARNINGS],
+            undefined as unknown as Skill[]
+        );
+
+        expect(prompt).toContain('No additional news skills loaded.');
+    });
+
+    it('실적 actual EPS가 있고 매출 추정치가 없으면 Actual EPS와 Rev est. N/A를 렌더한다', () => {
+        // epsActual != null → "Actual EPS:" 분기 + actEps truthy 분기,
+        // revenueEstimated == null → "Rev est. N/A" 분기를 동시에 커버한다.
+        const item: EarningsCalendarItem = {
+            ...UPCOMING_EARNINGS,
+            epsActual: 1.55,
+            revenueEstimated: null,
+        };
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [NEWS_ITEM_1],
+            [item],
+            []
+        );
+
+        expect(prompt).toContain('Actual EPS:');
+        expect(prompt).toContain('1.55');
+        expect(prompt).toContain('Rev est. N/A');
+    });
 });

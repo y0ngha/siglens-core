@@ -225,6 +225,89 @@ describe('buildOverallAnalysisPrompt', () => {
         expect(prompt).toContain('ascending'); // dominant
     });
 
+    it('패턴 요약·미감지 캔들·동수 추세선(mixed)을 올바르게 렌더한다', () => {
+        // patternSummaries.length > 0 (line 97), detected 0개일 때
+        // candlePatterns[0]을 latest로 사용 (line 110), ascending === descending
+        // 일 때 dominant=mixed (line 136) — 세 분기를 한 번에 덮는다.
+        const technical: AnalysisResponse = {
+            ...MOCK_TECHNICAL,
+            patternSummaries: [
+                {
+                    id: 'p1',
+                    patternName: 'head_and_shoulders',
+                    skillName: '헤드앤숄더',
+                    detected: true,
+                    trend: 'bearish',
+                    summary: '헤드앤숄더 요약',
+                    confidenceWeight: 0.8,
+                },
+            ],
+            candlePatterns: [
+                {
+                    id: 'c1',
+                    patternName: 'doji',
+                    detected: false,
+                    trend: 'neutral',
+                    summary: '도지 캔들',
+                },
+            ],
+            trendlines: [
+                {
+                    direction: 'ascending',
+                    start: { time: 1, price: 100 },
+                    end: { time: 2, price: 110 },
+                },
+                {
+                    direction: 'descending',
+                    start: { time: 3, price: 120 },
+                    end: { time: 4, price: 110 },
+                },
+            ],
+        };
+
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            technical,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Hour' as Timeframe
+        );
+
+        expect(prompt).toContain('Chart Patterns: head_and_shoulders');
+        expect(prompt).toContain('0/1 detected; latest "doji"');
+        expect(prompt).toContain('dominant: mixed');
+    });
+
+    it('하락 추세선이 우세하면 dominant: descending으로 렌더한다', () => {
+        const technical: AnalysisResponse = {
+            ...MOCK_TECHNICAL,
+            trendlines: [
+                {
+                    direction: 'descending',
+                    start: { time: 1, price: 120 },
+                    end: { time: 2, price: 110 },
+                },
+                {
+                    direction: 'descending',
+                    start: { time: 3, price: 110 },
+                    end: { time: 4, price: 100 },
+                },
+            ],
+        };
+
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            technical,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Hour' as Timeframe
+        );
+
+        expect(prompt).toContain('dominant: descending');
+    });
+
     describe('buildOverallAnalysisPrompt — fearGreed integration', () => {
         it('omits fear-greed section when fearGreed is undefined', () => {
             const prompt = buildOverallAnalysisPrompt(
@@ -453,6 +536,31 @@ describe('buildOverallAnalysisPrompt', () => {
             expect(prompt).toContain(
                 '옵션 시장 데이터는 분석에 포함되지 않았습니다'
             );
+        });
+
+        it('옵션 perExpiration/signals가 빈 배열이면 해당 섹션을 생략한다', () => {
+            // perExpiration.length === 0 (line 222) 및 signals.length === 0
+            // (line 232) 의 빈 배열 분기를 덮는다.
+            const emptyOptions: OptionsAnalysisResponse = {
+                summary: '옵션 요약만 존재합니다.',
+                perExpiration: [],
+                signals: [],
+                analyzedAt: '2026-05-22T13:30:00Z',
+            };
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                emptyOptions
+            );
+
+            expect(prompt).toContain('옵션 요약만 존재합니다.');
+            expect(prompt).not.toContain('- Per-Expiration:');
+            expect(prompt).not.toContain('- Signals:');
         });
     });
 });

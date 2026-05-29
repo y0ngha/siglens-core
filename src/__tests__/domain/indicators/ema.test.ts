@@ -58,6 +58,11 @@ describe('computeEMAValues', () => {
             const result = computeEMAValues([10, 10, 10, 8], 3);
             expect(result[3]).toBeCloseTo(9, 10);
         });
+
+        it('period=1이면 multiplier=1이라 각 값을 그대로 반환한다', () => {
+            // multiplier = 2/(1+1) = 1 → EMA = current value, 평활 없음
+            expect(computeEMAValues([10, 20, 30], 1)).toEqual([10, 20, 30]);
+        });
     });
 });
 

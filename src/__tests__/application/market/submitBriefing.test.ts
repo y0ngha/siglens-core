@@ -148,4 +148,43 @@ describe('submitBriefing 함수는', () => {
             expect(mockCacheGet).not.toHaveBeenCalled();
         });
     });
+
+    describe('캐시 읽기가 실패할 때', () => {
+        it('에러를 로깅하고 worker 제출로 진행한다 (캐시 장애가 제출을 막지 않음)', async () => {
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockRejectedValueOnce(new Error('cache down'));
+
+            const result = await submitBriefing(mockData);
+
+            expect(result.status).toBe('submitted');
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '[Briefing/Submit] Cache read failed:',
+                expect.any(Error)
+            );
+            expect(mockFetch).toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
+        });
+    });
+
+    describe('Worker 요청이 실패할 때', () => {
+        it('dispatch 에러를 로깅하지만 submitted를 반환한다', async () => {
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockFetch.mockRejectedValueOnce(new Error('network error'));
+
+            const result = await submitBriefing(mockData);
+
+            expect(result.status).toBe('submitted');
+            // fire-and-forget dispatch 의 .catch 는 microtask 로 실행되므로 flush.
+            await new Promise(resolve => setTimeout(resolve, 0));
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '[Briefing/Submit] Worker request failed:',
+                expect.any(Error)
+            );
+            consoleErrorSpy.mockRestore();
+        });
+    });
 });

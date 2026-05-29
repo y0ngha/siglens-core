@@ -226,6 +226,22 @@ describe('submitFundamentalAnalysis 함수는', () => {
             // recorded only after a successful submit.
             expect(recordUsage).toHaveBeenCalledTimes(1);
         });
+
+        it('캐시 읽기가 실패하면 catch에서 흡수하고 submit 경로로 진행한다', async () => {
+            // cache.get rejecting must be caught (logged), not propagated; the
+            // function should fall through to the provider/submit path.
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockDataProvider.getProfile).toHaveBeenCalled();
+            expect(mockSetJobMeta).toHaveBeenCalled();
+        });
     });
 
     describe('캐시 미스일 때', () => {
@@ -328,6 +344,92 @@ describe('submitFundamentalAnalysis 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
+        });
+
+        it('profile.sector가 비어 있으면 getHistoricalSectorPerformance를 호출하지 않고 submitted를 반환한다', async () => {
+            // Empty sector → the `sectorName ? ... : []` ternary takes the
+            // falsy branch, so the historical-sector fetch must be skipped.
+            mockDataProvider.getProfile.mockResolvedValueOnce({
+                ...validProfile,
+                sector: '',
+            });
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(
+                mockDataProvider.getHistoricalSectorPerformance
+            ).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).toHaveBeenCalled();
+        });
+
+        it('sector 스냅샷·과거 데이터·실적 보고가 모두 채워진 경우에도 submitted를 반환한다', async () => {
+            // Drives the truthy/matching branches: sectorSnapshot.find matches
+            // the profile sector (line 97 match branch), the historical array is
+            // non-empty so the .map callback runs (lines 114-117), and a
+            // non-null earnings report exercises the earningsDate branch.
+            mockDataProvider.getSectorPerformanceSnapshot.mockResolvedValueOnce(
+                [
+                    { sector: 'Technology', changesPercentage: 1.23 },
+                    { sector: 'Energy', changesPercentage: -0.5 },
+                ]
+            );
+            mockDataProvider.getHistoricalSectorPerformance.mockResolvedValueOnce(
+                [
+                    {
+                        date: '2026-05-28',
+                        sector: 'Technology',
+                        changesPercentage: 0.42,
+                    },
+                    {
+                        date: '2026-05-27',
+                        sector: 'Technology',
+                        changesPercentage: -0.11,
+                    },
+                ]
+            );
+            mockDataProvider.getEarningsReport.mockResolvedValueOnce({
+                symbol: 'AAPL',
+                earningsDate: '2026-06-15',
+            });
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(
+                mockDataProvider.getHistoricalSectorPerformance
+            ).toHaveBeenCalledWith('Technology');
+            expect(mockSetJobMeta).toHaveBeenCalled();
+        });
+
+        it('워커 fetch가 거부되어도 catch에서 흡수하고 submitted를 반환한다', async () => {
+            // The fire-and-forget dispatch attaches a .catch handler; a rejected
+            // fetch must be swallowed there (logged) without surfacing an error.
+            mockFireAndForget.mockImplementationOnce(
+                (promise: Promise<unknown>) => {
+                    // Await so the .catch handler in the source actually runs.
+                    return promise;
+                }
+            );
+            mockFetch.mockRejectedValueOnce(new Error('worker unreachable'));
+
+            const result = await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockSetJobMeta).toHaveBeenCalled();
+            expect(mockFetch).toHaveBeenCalled();
         });
 
         it('provider getProfile 호출 시 에러가 발생하면 error 상태를 반환한다', async () => {

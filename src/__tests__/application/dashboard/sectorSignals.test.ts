@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Bar, MarketQuote, SectorSignalsResult } from '@/domain/types';
+import type {
+    Bar,
+    MarketQuote,
+    SectorSignalsResult,
+    StockSignalResult,
+} from '@/domain/types';
 import type { CacheProvider } from '@/domain/ports/cache';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
@@ -21,6 +26,30 @@ vi.mock('@/infrastructure/cache/redis', () => ({
     createCacheProvider: () => createCacheProviderMock(),
 }));
 
+// combineResults 의 분기(라인 79/83/90)를 결정적으로 구동하기 위해
+// computeStockSignalResult 만 스텁하고, 실제 흐름이 의존하는
+// bucketedTimestamp / lookbackIsoFromNow 는 실제 구현을 유지한다.
+const computeStockSignalResultMock =
+    vi.fn<
+        (
+            stock: unknown,
+            bars: Bar[],
+            quote: MarketQuote | null
+        ) => StockSignalResult | null
+    >();
+
+vi.mock('@/domain/dashboard', async importActual => {
+    const actual = await importActual<typeof import('@/domain/dashboard')>();
+    return {
+        ...actual,
+        computeStockSignalResult: (
+            stock: unknown,
+            bars: Bar[],
+            quote: MarketQuote | null
+        ) => computeStockSignalResultMock(stock, bars, quote),
+    };
+});
+
 const fakeProvider: MarketDataProvider = {
     getQuote: mockGetQuote,
     getBars: mockGetBars,
@@ -41,6 +70,9 @@ describe('getSectorSignals', () => {
         mockGetQuote.mockResolvedValue(null);
         mockGetBars.mockReset();
         mockGetBars.mockResolvedValue([]);
+        computeStockSignalResultMock.mockReset();
+        // 기본: bar 가 비어 있어 신호가 없으므로 결과는 null (line 90 의 [] 경로).
+        computeStockSignalResultMock.mockReturnValue(null);
     });
 
     afterEach(() => {
@@ -97,5 +129,88 @@ describe('getSectorSignals', () => {
         await getSectorSignals(fakeProvider, undefined, fixedNow);
         const [key] = mockCache.set.mock.calls[0];
         expect(key).toMatch(/^dashboard:signals:1Day:/);
+    });
+
+    it('getBars 가 reject 된 ticker 는 결과에서 제외된다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        // 첫 ticker(AAPL)의 getBars 만 reject → combineResults line 79 의 drop 경로.
+        mockGetBars.mockReset();
+        mockGetBars.mockRejectedValueOnce(new Error('bars down'));
+        mockGetBars.mockResolvedValue([]);
+        // 신호 계산이 호출되더라도 결과를 만들지 않도록 null 유지.
+        computeStockSignalResultMock.mockReturnValue(null);
+
+        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+
+        expect(result.stocks).toEqual([]);
+        // reject 된 ticker 는 computeStockSignalResult 에 전달되지 않는다.
+        const calledSymbols = computeStockSignalResultMock.mock.calls.map(
+            ([stock]) => (stock as { symbol: string }).symbol
+        );
+        expect(calledSymbols).not.toContain('AAPL');
+    });
+
+    it('quote 가 reject 된 ticker 는 null quote 로 신호를 계산한다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        const bars: Bar[] = [
+            { time: 0, open: 1, high: 1, low: 1, close: 1, volume: 1 },
+            { time: 1, open: 2, high: 2, low: 2, close: 2, volume: 1 },
+        ];
+        mockGetBars.mockReset();
+        mockGetBars.mockResolvedValue(bars);
+        // 첫 ticker(AAPL)의 getQuote 만 reject → combineResults line 83/84 의 null 경로.
+        mockGetQuote.mockReset();
+        mockGetQuote.mockRejectedValueOnce(new Error('quote down'));
+        mockGetQuote.mockResolvedValue(null);
+        computeStockSignalResultMock.mockReturnValue(null);
+
+        await getSectorSignals(fakeProvider, '1Day', fixedNow);
+
+        const firstCall = computeStockSignalResultMock.mock.calls[0];
+        expect((firstCall[0] as { symbol: string }).symbol).toBe('AAPL');
+        // quote reject → null 로 전달.
+        expect(firstCall[2]).toBeNull();
+    });
+
+    it('fulfilled quote 와 non-null 신호는 결과에 포함된다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        const bars: Bar[] = [
+            { time: 0, open: 100, high: 100, low: 100, close: 100, volume: 1 },
+            { time: 1, open: 110, high: 110, low: 110, close: 110, volume: 1 },
+        ];
+        const quote: MarketQuote = {
+            symbol: 'AAPL',
+            price: 150,
+            changesPercentage: 1.5,
+            name: 'Apple',
+        };
+        const signalResult: StockSignalResult = {
+            symbol: 'AAPL',
+            koreanName: '애플',
+            sectorSymbol: 'XLK',
+            price: 150,
+            changePercent: 1.5,
+            trend: 'uptrend',
+            signals: [],
+        };
+        // 첫 ticker(AAPL): bars + fulfilled quote 제공.
+        mockGetBars.mockReset();
+        mockGetBars.mockResolvedValueOnce(bars);
+        mockGetBars.mockResolvedValue([]);
+        mockGetQuote.mockReset();
+        mockGetQuote.mockResolvedValueOnce(quote);
+        mockGetQuote.mockResolvedValue(null);
+        // quote 가 non-null 로 전달될 때만 non-null 결과를 반환 → line 84(quote.value) + line 90([result]) 동시 검증.
+        computeStockSignalResultMock.mockImplementation((_stock, _bars, q) =>
+            q !== null ? signalResult : null
+        );
+
+        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+
+        // line 84: fulfilled quote.value 가 그대로 전달되었는지 확인.
+        const firstCall = computeStockSignalResultMock.mock.calls[0];
+        expect(firstCall[2]).toEqual(quote);
+        // line 90: non-null 결과가 유지된다.
+        expect(result.stocks).toEqual([signalResult]);
     });
 });

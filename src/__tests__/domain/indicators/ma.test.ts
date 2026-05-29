@@ -129,4 +129,26 @@ describe('calculateMA', () => {
             });
         });
     });
+
+    describe('극단 입력', () => {
+        it('period=1이면 선행 null 없이 각 close를 그대로 반환한다', () => {
+            const result = calculateMA(makeBars([10, 20, 30]), 1);
+            expect(result).toEqual([10, 20, 30]);
+        });
+
+        it('NaN close는 윈도우에 들어온 시점부터 이후 모든 값으로 전파된다', () => {
+            // 슬라이딩 windowSum이 NaN을 누적하면 이후 NaN - NaN = NaN 으로
+            // 회복되지 않아 끝까지 NaN이 유지된다.
+            const result = calculateMA(makeBars([10, NaN, 30, 40]), 2);
+            expect(result[0]).toBeNull();
+            expect(result[1]).toBeNaN();
+            expect(result[2]).toBeNaN();
+            expect(result[3]).toBeNaN();
+        });
+
+        it('음수 close에서도 단순 평균을 계산한다', () => {
+            const result = calculateMA(makeBars([-10, -20, -30]), 3);
+            expect(result[2]).toBeCloseTo(-20, 10);
+        });
+    });
 });

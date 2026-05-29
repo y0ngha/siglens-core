@@ -839,6 +839,52 @@ describe('confidence', () => {
                 },
             });
         });
+
+        it('rawInput이 객체가 아니면(배열) 빈 객체로 취급해 fallback 결과를 만든다', () => {
+            const result = normalizeCachedAnalysisResponse([1, 2, 3]);
+            expect(result.summary).toBe(EMPTY_ANALYSIS_FALLBACK_SUMMARY);
+            expect(result.patternSummaries).toEqual([]);
+            expect(result.strategyResults).toEqual([]);
+            expect(result.candlePatterns).toEqual([]);
+        });
+
+        it('객체가 아닌 캐시 항목(원시값/배열/null)은 정규화에서 탈락한다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: ['x', 1, null, ['a']],
+                strategyResults: ['y', 2, null],
+                candlePatterns: ['z', 3, null],
+            });
+            expect(result.patternSummaries).toEqual([]);
+            expect(result.strategyResults).toEqual([]);
+            expect(result.candlePatterns).toEqual([]);
+        });
+
+        it('confidenceWeight가 없는 캐시 패턴/전략은 UNMATCHED 기본값으로 채운다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                patternSummaries: [
+                    {
+                        patternName: '패턴',
+                        skillName: '스킬',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '요약',
+                    },
+                ],
+                strategyResults: [
+                    {
+                        strategyName: '전략',
+                        trend: 'bullish',
+                        summary: '요약',
+                    },
+                ],
+            });
+            expect(result.patternSummaries[0].confidenceWeight).toBe(
+                UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+            );
+            expect(result.strategyResults[0].confidenceWeight).toBe(
+                UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+            );
+        });
     });
 
     describe('isFallbackAnalysis', () => {
@@ -981,6 +1027,20 @@ describe('confidence', () => {
                     },
                 })
             ).toBe(false);
+        });
+
+        it('bearish가 null이어도 나머지가 비어 있으면 fallback으로 판정한다', () => {
+            // bearish가 null이면 `bearish?.targets.length ?? 0` 의 `?? 0`
+            // fallback 분기를 탄다 (앞 조건이 모두 true여야 도달).
+            expect(
+                isFallbackAnalysis({
+                    ...base(),
+                    priceTargets: {
+                        bullish: { targets: [], condition: '' },
+                        bearish: null,
+                    },
+                })
+            ).toBe(true);
         });
     });
 });

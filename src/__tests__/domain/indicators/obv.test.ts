@@ -54,4 +54,26 @@ describe('calculateOBV', () => {
             expect(calculateOBV(bars)).toHaveLength(10);
         });
     });
+
+    describe('극단 입력', () => {
+        it('NaN close는 방향 판정 불가로 직전 OBV를 유지하고, 이후 유한 close에서 정상 회복한다', () => {
+            // NaN 봉: close > prevClose / close < prevClose 모두 NaN 비교라
+            // false → 보합처럼 prev 유지. NaN 봉 직후 봉도 prevClose가 NaN이라
+            // 유지되지만, 그 다음 봉부터는 직전 유한 close와 비교되어 정상
+            // 누적이 재개된다.
+            const bars = [
+                makeBar(100, 1000, 0),
+                makeBar(NaN, 500, 1), // 방향 불명 → 0 유지
+                makeBar(110, 300, 2), // 110 vs NaN → 0 유지
+                makeBar(120, 200, 3), // 120 > 110(직전 유한 close) → +200 회복
+            ];
+            expect(calculateOBV(bars)).toEqual([0, 0, 0, 200]);
+        });
+
+        it('음수 volume이면 상승 봉에서 OBV가 오히려 감소한다', () => {
+            // 상승 봉이지만 volume이 음수 → prev + (-500)
+            const bars = [makeBar(100, 1000, 0), makeBar(110, -500, 1)];
+            expect(calculateOBV(bars)).toEqual([0, -500]);
+        });
+    });
 });

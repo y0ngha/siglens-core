@@ -1239,4 +1239,158 @@ describe('submitAnalysis 함수는', () => {
             expect(mockFetch).toHaveBeenCalled();
         });
     });
+
+    describe('인자 해석(short overload)의 선택적 인자 폴백', () => {
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+        });
+
+        it('short overload에서 force/fmpSymbol/options를 모두 생략하면 기본값으로 폴백한다', async () => {
+            // (symbol, timeframe) 형태의 short overload만 호출 → companyNameOrTimeframe가
+            // 타임프레임으로 인식되는 첫 번째 브랜치 진입.
+            // timeframeOrForce가 boolean이 아니므로 force=false(80번 라인),
+            // forceOrFmpSymbol이 string이 아니므로 fmpSymbol=undefined(84번 라인),
+            // fmpSymbolOrOptions가 object가 아니므로 options={}(89번 라인)로 폴백.
+            // options={}이면 marketDataProvider가 없으므로 캐시 히트로 fetch 경로를 회피.
+            mockCacheGet.mockResolvedValue(mockResult);
+
+            const result = await submitAnalysis(mockSymbol, mockTimeframe);
+
+            expect(result.status).toBe('cached');
+            // companyName은 symbol로 폴백(첫 번째 브랜치) → 캐시 키는 symbol 기준.
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:${mockSymbol}:${mockTimeframe}:${DEFAULT_ANALYSIS_MODEL_ID}`
+            );
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+        });
+
+        it('short overload에서 fmpSymbol을 문자열로 넘기면 그대로 사용한다', async () => {
+            // (symbol, timeframe, force, fmpSymbol) 형태 → forceOrFmpSymbol이 string이므로
+            // fmpSymbol에 그 문자열이 그대로 들어감(83번 라인 then-브랜치).
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockTimeframe,
+                false,
+                '^SPX',
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
+                mockSymbol,
+                mockTimeframe,
+                '^SPX'
+            );
+        });
+    });
+
+    describe('인자 해석(long overload)의 options 위치 폴백', () => {
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+        });
+
+        it('long overload에서 options를 5번째 인자(fmpSymbol 슬롯)로 넘기면 options로 해석한다', async () => {
+            // (symbol, companyName, timeframe, force, options) 형태 →
+            // maybeOptions는 undefined, fmpSymbolOrOptions가 object이므로
+            // 중첩 삼항(104-105번 라인)에서 fmpSymbolOrOptions를 options로 사용.
+            mockCacheGet.mockResolvedValue(null);
+
+            // 타입상 5번째 인자는 fmpSymbol(string)이지만, 구현은 object가
+            // 오면 options로 해석하는 런타임 폴백을 가진다. 그 방어 경로를
+            // 검증하기 위해 의도적으로 캐스팅해 호출한다.
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                {
+                    marketDataProvider: fakeProvider,
+                    modelId: 'gemini-2.5-flash',
+                } as unknown as string
+            );
+
+            expect(result.status).toBe('submitted');
+            // options.modelId가 정상 해석되었음을 캐시 키로 확인.
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:${mockSymbol}:${mockTimeframe}:gemini-2.5-flash`
+            );
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
+                mockSymbol,
+                mockTimeframe,
+                undefined
+            );
+        });
+    });
+
+    describe('캐시 조회가 실패할 때', () => {
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+        });
+
+        it('cache.get이 reject하면 에러를 로깅하고 캐시 미스로 처리해 Worker에 제출한다', async () => {
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockRejectedValue(new Error('redis down'));
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(consoleSpy).toHaveBeenCalledWith(
+                '[Submit] Cache read failed:',
+                expect.any(Error)
+            );
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalled();
+            expect(mockFetch).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+    });
+
+    describe('Worker fetch가 실패할 때', () => {
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+        });
+
+        it('fetch가 reject해도 에러를 로깅만 하고 submitted를 반환한다', async () => {
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockResolvedValue(null);
+            mockFetch.mockRejectedValueOnce(new Error('network error'));
+            // dispatch promise가 등록되어 .catch가 실행되도록 waitUntil로 완료를 기다린다.
+            const pending: Promise<unknown>[] = [];
+            const waitUntil = (p: Promise<unknown>) => {
+                pending.push(p);
+            };
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, waitUntil }
+            );
+
+            await Promise.all(pending);
+
+            expect(result.status).toBe('submitted');
+            expect(consoleSpy).toHaveBeenCalledWith(
+                '[Submit] Worker request failed:',
+                expect.any(Error)
+            );
+            consoleSpy.mockRestore();
+        });
+    });
 });
