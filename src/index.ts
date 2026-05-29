@@ -283,7 +283,6 @@ export type {
     MarketDataProvider,
 } from './domain/ports/marketDataProvider';
 export type { AcquireReanalyzeCooldownResult } from './infrastructure/market/types';
-export type { NewsTimeRange } from './domain/ports/newsProvider';
 
 // Application types
 export type {

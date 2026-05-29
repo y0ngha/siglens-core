@@ -175,8 +175,10 @@ export async function setJobError(
 }
 
 /**
- * Mark a job as cancelled. Worker should consult {@link isJobCancelled}
- * between expensive steps and abort early when set.
+ * Mark a job as cancelled.
+ *
+ * Sets a cancellation flag that the internal polling use-case checks between
+ * processing steps; the job aborts on the next poll cycle.
  *
  * Stored under a 1-hour TTL — long enough to outlive any reasonable worker
  * run, then auto-cleaned.

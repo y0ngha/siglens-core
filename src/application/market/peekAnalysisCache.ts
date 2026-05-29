@@ -38,7 +38,7 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * Read a cached technical analysis WITHOUT triggering any generation.
  *
  * This is the read-only twin of {@link submitAnalysis}: it reuses the exact
- * same cache key ({@link buildAnalysisCacheKey}) and the exact same read +
+ * same internal cache key (`buildAnalysisCacheKey`) and the exact same read +
  * validate path (the env-configured {@link createCacheProvider} plus
  * {@link normalizeCachedAnalysisResponse}) that `submitAnalysis` runs on a
  * cache hit — but it omits the enqueue/fetch/generate branch entirely.

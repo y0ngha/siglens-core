@@ -107,11 +107,11 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  *   completed bars do not change until the next session opens, so the cache can
  *   survive exactly until that boundary.
  *
- * Unlike {@link computeEffectiveTtl} (which uses the close boundary), this function
- * uses the **open boundary**.
+ * Unlike the analysis-cache TTL policy (which clamps to the session **close**
+ * boundary), this function uses the session **open** boundary.
  *
  * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
- *   the parameter is kept for signature consistency with {@link computeEffectiveTtl}.
+ *   the parameter is kept for signature consistency with the analysis-cache TTL helper.
  * @param now - Reference time for market-session detection. Pass explicitly for
  *   deterministic testing.
  * @returns Effective TTL in seconds.
