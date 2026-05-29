@@ -125,12 +125,12 @@ export type PollBriefingResult =
 /**
  * Definition of a sector grouping (label + member symbols).
  *
- * Consumers (siglens, siglens-trader) type their own dashboard
- * `SECTOR_GROUPS` arrays with this shape, so it is part of the public API
- * even though core no longer ships a `SECTOR_GROUPS` constant.
+ * Consumers define their own sector-group arrays using this shape.
  */
 export interface SectorGroupDef {
+    /** Human-readable sector label (e.g. `"Technology"`). */
     label: string;
+    /** Constituent ticker symbols belonging to this sector group. */
     symbols: readonly string[];
 }
 

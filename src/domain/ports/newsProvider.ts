@@ -7,11 +7,11 @@ import type {
 /**
  * Lookback window for news article queries.
  *
- * Public because consumers (siglens, siglens-trader) own their news-fetch
- * adapters and type the `range` argument with this union.
+ * Exposed so consumers can type the `range` argument of their own
+ * news-fetch adapters.
  *
- * - `'24h'` — last 24 hours (used for chart-page news augment A2/A3 section).
- * - `'7d'`  — last 7 days (default for news analysis page).
+ * - `'24h'` — last 24 hours.
+ * - `'7d'`  — last 7 days.
  * - `'30d'` — last 30 days (extended context for low-activity symbols).
  */
 export type NewsTimeRange = '24h' | '7d' | '30d';

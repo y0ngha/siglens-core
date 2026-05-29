@@ -58,8 +58,8 @@ describe('public API exports', () => {
     });
 
     it('exports consumer-implemented port/config types from package entrypoint', () => {
-        // siglens / siglens-trader type their own news-fetch adapters and
-        // dashboard sector groups with these — they must stay public.
+        // Consumers type their own news-fetch adapters and dashboard sector
+        // groups with these, so both must stay on the public surface.
         const range: NewsTimeRange = '7d';
         const sectorGroup: SectorGroupDef = {
             label: 'Technology',
