@@ -1,4 +1,8 @@
-import type { DashboardTimeframe, Timeframe } from '@/domain/types';
+import type {
+    DashboardTimeframe,
+    OptionsExpirationFilter,
+    Timeframe,
+} from '@/domain/types';
 import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
@@ -266,4 +270,30 @@ export function buildOverallCacheKey(
     inputHash: string
 ): string {
     return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}`;
+}
+
+/**
+ * Build the Redis key for a cached options analysis result.
+ *
+ * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<snapshotInputHash>`.
+ *
+ * The schema-version prefix ({@link CACHE_KEY_SCHEMA_VERSION}) ensures future
+ * shape changes invalidate the cache automatically, matching the sibling
+ * analysis cache-key builders above.
+ *
+ * @param symbol - Underlying ticker (uppercase).
+ * @param expirationDate - {@link OptionsExpirationFilter} — `'YYYY-MM-DD'` or the
+ *   `'all'` sentinel for aggregate analysis across every available expiration.
+ * @param modelId - LLM model identifier scoping the cache.
+ * @param snapshotInputHash - Hash of the snapshot inputs — a fresher snapshot
+ *   produces a different hash and therefore a new cache entry.
+ * @returns The cache key.
+ */
+export function buildOptionsCacheKey(
+    symbol: string,
+    expirationDate: OptionsExpirationFilter,
+    modelId: string,
+    snapshotInputHash: string
+): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}`;
 }

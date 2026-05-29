@@ -1,7 +1,7 @@
+import { MS_PER_DAY } from '@/domain/constants/time';
 import type { OptionsSnapshot } from '@/domain/types';
 
 const PREFERRED_MIN_DAYS = 3;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * @internal Pick the nearest expiration that's ≥ `now + 3 days` to avoid

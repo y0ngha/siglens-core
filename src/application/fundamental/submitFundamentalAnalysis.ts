@@ -15,6 +15,7 @@ import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normaliz
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -75,7 +76,7 @@ async function fetchProviderData(
             dataProvider.getPriceTargetSummary(symbol),
             dataProvider.getEarningsReport(symbol),
             dataProvider.getSectorPerformanceSnapshot(
-                occurredAt.toISOString().slice(0, 10)
+                occurredAt.toISOString().slice(0, ISO_DATE_PREFIX_LENGTH)
             ),
             loadSkillsCached(),
         ]);
