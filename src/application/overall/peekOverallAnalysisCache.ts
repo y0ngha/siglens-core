@@ -61,6 +61,17 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * @returns The cached {@link OverallAnalysisResponse} on a valid hit, or `null`
  *   on a miss / corrupt entry.
  *
+ * @example
+ * ```ts
+ * const cached = await peekOverallAnalysisCache(
+ *     'AAPL',
+ *     'Apple Inc.',
+ *     '1Day',
+ *     'gemini-2.5-flash'
+ * );
+ * if (cached !== null) return cached; // serve in SSR at zero cost
+ * ```
+ *
  * @see submitOverallAnalysis
  * @see pollOverallAnalysis
  */

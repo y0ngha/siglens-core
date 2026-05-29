@@ -12,6 +12,7 @@ import {
     buildFundamentalCacheKey,
     buildNewsCacheKey,
     buildOverallCacheKey,
+    buildOverallPeekCacheKey,
     buildSectorSignalsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     CACHE_KEY_SCHEMA_VERSION,
@@ -131,6 +132,12 @@ describe('new analysis cache keys', () => {
             buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3')
         ).toBe(
             `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-2.5-pro:h3`
+        );
+    });
+
+    it('buildOverallPeekCacheKey is content-free (no input hash) with peek segment and version prefix', () => {
+        expect(buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-2.5-pro')).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-2.5-pro`
         );
     });
 

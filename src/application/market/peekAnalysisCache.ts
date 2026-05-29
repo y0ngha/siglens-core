@@ -72,6 +72,12 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * @returns The cached {@link AnalysisResponse} on a valid hit, or `null` on a
  *   miss / corrupt entry.
  *
+ * @example
+ * ```ts
+ * const cached = await peekAnalysisCache('AAPL', '1Day');
+ * if (cached !== null) return cached; // serve in SSR at zero cost
+ * ```
+ *
  * @see submitAnalysis
  */
 export async function peekAnalysisCache(

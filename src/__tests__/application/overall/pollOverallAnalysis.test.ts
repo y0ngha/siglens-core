@@ -198,6 +198,42 @@ describe('pollOverallAnalysis 함수는', () => {
             );
         });
 
+        it('symbol이 없으면 peek 키 저장을 건너뛴다 (canonical만 저장)', async () => {
+            mockGetJobMeta.mockResolvedValueOnce({
+                timeframe: '1Day' as const,
+                modelId: 'gemini-2.5-flash',
+                cacheKey: 'overall:AAPL:1Day:flash:abc123',
+            });
+            mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+            await pollOverallAnalysis('job-no-symbol');
+
+            expect(mockCacheSet).toHaveBeenCalledTimes(1);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'overall:AAPL:1Day:flash:abc123',
+                expect.anything(),
+                expect.any(Number)
+            );
+        });
+
+        it('modelId가 없으면 peek 키 저장을 건너뛴다 (canonical만 저장)', async () => {
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'AAPL',
+                timeframe: '1Day' as const,
+                cacheKey: 'overall:AAPL:1Day:flash:abc123',
+            });
+            mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+            await pollOverallAnalysis('job-no-model');
+
+            expect(mockCacheSet).toHaveBeenCalledTimes(1);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'overall:AAPL:1Day:flash:abc123',
+                expect.anything(),
+                expect.any(Number)
+            );
+        });
+
         it('meta.cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
             mockGetJobMeta.mockResolvedValueOnce({
                 symbol: 'AAPL',
