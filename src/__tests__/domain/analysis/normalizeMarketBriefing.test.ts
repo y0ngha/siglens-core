@@ -66,6 +66,47 @@ describe('normalizeMarketBriefing 함수는', () => {
             expect(result.volatilityAnalysis.description).toBe('설명');
         });
 
+        it('vixLevel이 숫자가 아니거나 비유한 값이면 undefined로 정규화한다', () => {
+            expect(
+                normalizeMarketBriefing({
+                    volatilityAnalysis: { vixLevel: 'high', description: 'd' },
+                }).volatilityAnalysis.vixLevel
+            ).toBeUndefined();
+            expect(
+                normalizeMarketBriefing({
+                    volatilityAnalysis: {
+                        vixLevel: Infinity,
+                        description: 'd',
+                    },
+                }).volatilityAnalysis.vixLevel
+            ).toBeUndefined();
+        });
+
+        it('volatilityAnalysis가 객체가 아니면(배열 등) 기본 빈 분석을 반환한다', () => {
+            const result = normalizeMarketBriefing({
+                volatilityAnalysis: [1, 2, 3],
+            });
+            expect(result.volatilityAnalysis).toEqual({
+                vixLevel: undefined,
+                description: '',
+            });
+        });
+
+        it('sectorAnalysis 배열 내 비문자열 섹터는 필터링된다', () => {
+            const result = normalizeMarketBriefing({
+                sectorAnalysis: {
+                    leadingSectors: ['XLK', 42, null, 'XLF'],
+                    laggingSectors: ['XLE', {}, ''],
+                    performanceDescription: '설명',
+                },
+            });
+            expect(result.sectorAnalysis.leadingSectors).toEqual([
+                'XLK',
+                'XLF',
+            ]);
+            expect(result.sectorAnalysis.laggingSectors).toEqual(['XLE']);
+        });
+
         it('riskSentiment가 없으면 빈 문자열을 반환한다', () => {
             const result = normalizeMarketBriefing({});
             expect(result.riskSentiment).toBe('');

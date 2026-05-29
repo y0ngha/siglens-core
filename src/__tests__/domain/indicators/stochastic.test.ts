@@ -97,4 +97,19 @@ describe('calculateStochastic', () => {
             );
         });
     });
+
+    describe('극단 입력', () => {
+        it('완전 정지(high=low=close)면 range=0 가드로 Fast %K가 50이 되어 %K도 50이다', () => {
+            // range === 0 → MIDPOINT_PERCENTAGE(50). SMA 평활을 거쳐도 50 유지.
+            const bars = Array.from({ length: MIN_BARS_FOR_D + 5 }, (_, i) =>
+                makeBar(100, 100, 100, i)
+            );
+            const result = calculateStochastic(bars);
+            const valid = result.filter(r => r.percentK !== null);
+            expect(valid.length).toBeGreaterThan(0);
+            valid.forEach(r => {
+                expect(r.percentK).toBe(50);
+            });
+        });
+    });
 });

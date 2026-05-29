@@ -12,8 +12,12 @@
 import { jsonrepair } from 'jsonrepair';
 import { stripLlmJsonFence } from '@/domain/analysis/promptFormat';
 
-/** Capture a small window around a JSON.parse error position for diagnostic logs. */
-function snippetAroundPosition(text: string, position: number): string {
+/**
+ * Capture a small window around a JSON.parse error position for diagnostic logs.
+ * Adds leading/trailing ellipses when the window is clipped from a longer text.
+ * @internal
+ */
+export function snippetAroundPosition(text: string, position: number): string {
     const start = Math.max(0, position - 60);
     const end = Math.min(text.length, position + 60);
     const prefix = start > 0 ? '…' : '';
@@ -21,8 +25,11 @@ function snippetAroundPosition(text: string, position: number): string {
     return `${prefix}${text.slice(start, end)}${suffix}`;
 }
 
-/** Extract a numeric `position` from a SyntaxError message, or `null` if absent. */
-function parseSyntaxErrorPosition(message: string): number | null {
+/**
+ * Extract a numeric `position` from a SyntaxError message, or `null` if absent.
+ * @internal
+ */
+export function parseSyntaxErrorPosition(message: string): number | null {
     const match = /position\s+(\d+)/.exec(message);
     if (!match) return null;
     const n = Number.parseInt(match[1], 10);

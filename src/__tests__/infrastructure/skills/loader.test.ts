@@ -396,3 +396,179 @@ describe('createSkillsProvider', () => {
         expect(first).not.toBe(second);
     });
 });
+
+// ─────────────────────────────────────────
+// display config (nested YAML) + toSkill normalization edge cases
+// ─────────────────────────────────────────
+
+describe('FileSkillsLoader — display config & YAML value edge cases', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('display 중첩 블록을 파싱해 SkillDisplay 와 pattern 을 채운다 (따옴표 문자열 포함)', async () => {
+        // color uses double quotes, label uses single quotes — exercises both
+        // quote-stripping branches in parseYamlValue. The nested display →
+        // chart → leaves structure drives the recursive parseYamlBlock path.
+        const fm = `---
+name: Display Skill
+description: Has display config
+type: indicator_guide
+category: neutral
+pattern: golden-cross
+indicators: [RSI]
+confidence_weight: 0.5
+display:
+  chart:
+    show: true
+    type: line
+    color: "#FF0000"
+    label: 'RSI Line'
+---
+Body content`;
+        mockReaddir.mockResolvedValue([makeDirent('display.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].pattern).toBe('golden-cross');
+        expect(skills[0].display).toEqual({
+            chart: {
+                show: true,
+                type: 'line',
+                color: '#FF0000',
+                label: 'RSI Line',
+            },
+        });
+    });
+
+    it('display.chart.type 이 유효하지 않으면 display 와 무효 type 은 undefined 가 된다', async () => {
+        const fm = `---
+name: Bad Type
+description: d
+type: not_a_real_type
+category: neutral
+indicators: []
+confidence_weight: 0.5
+display:
+  chart:
+    show: true
+    type: bogus
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('bad-type.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].type).toBeUndefined();
+        expect(skills[0].display).toBeUndefined();
+    });
+
+    it('display.chart 가 객체가 아니면 display 는 undefined', async () => {
+        const fm = `---
+name: Chart Not Object
+description: d
+display:
+  chart: just-a-string
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('chart-str.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].display).toBeUndefined();
+    });
+
+    it('display.chart.show 가 boolean/문자열불리언이 아니면 display 는 undefined', async () => {
+        const fm = `---
+name: Bad Show
+description: d
+display:
+  chart:
+    show: maybe
+    type: line
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('bad-show.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].display).toBeUndefined();
+    });
+
+    it('display 값 자체가 객체가 아니면(문자열) display 는 undefined', async () => {
+        const fm = `---
+name: Display String
+description: d
+display: just-text
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('display-str.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].display).toBeUndefined();
+    });
+
+    it('name/description 누락·type/category 무효·indicators 비배열·confidence_weight 비숫자는 안전한 기본값으로 정규화한다', async () => {
+        const fm = `---
+foo: bar
+type: invalid_type
+category: invalid_category
+indicators: not-an-array
+confidence_weight: high
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('minimal.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].name).toBe('');
+        expect(skills[0].description).toBe('');
+        expect(skills[0].type).toBeUndefined();
+        expect(skills[0].category).toBeUndefined();
+        expect(skills[0].pattern).toBeUndefined();
+        expect(skills[0].indicators).toEqual([]);
+        expect(skills[0].confidenceWeight).toBe(0);
+    });
+
+    it('공백만 들어 있는 대괄호([ ])는 빈 배열로 파싱한다', async () => {
+        const fm = `---
+name: Spaced Empty Array
+description: d
+indicators: [ ]
+confidence_weight: 0.5
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('spaced.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].indicators).toEqual([]);
+    });
+
+    it('최상위에서 더 깊게 들여쓴 줄(deeper)과 빈 줄(skip)은 건너뛴다', async () => {
+        // The leading indented line hits the `deeper` branch and the blank
+        // line hits the `skip` branch of parseYamlBlock's classify loop.
+        const fm = `---
+  orphan: indented
+
+name: Edge YAML
+description: d
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('edge-yaml.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].name).toBe('Edge YAML');
+        expect(skills[0].description).toBe('d');
+    });
+});

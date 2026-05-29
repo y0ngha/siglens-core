@@ -80,4 +80,33 @@ describe('calculateRSI', () => {
             expect(result[RSI_DEFAULT_PERIOD]).not.toBeNull();
         });
     });
+
+    describe('극단 입력', () => {
+        it('period=1이면 단 한 개의 선행 null 뒤로 RSI를 계산한다', () => {
+            // period=1: 첫 봉만 null, 이후 각 봉은 직전 대비 상승=100/하락=0
+            const result = calculateRSI([10, 11, 9], 1);
+            expect(result[0]).toBeNull();
+            expect(result[1]).toBeCloseTo(100, 10); // 상승 → avgLoss=0 → 100
+            expect(result[2]).toBeCloseTo(0, 10); // 하락 → avgGain=0 → 0
+        });
+
+        it('NaN close는 변동 없음(무방향)으로 흡수되어 NaN을 전파하지 않는다', () => {
+            // diff(=close-prevClose)가 NaN이면 NaN>0, NaN<0 모두 false →
+            // gain=0, loss=0으로 취급된다. 결과는 유한한 숫자로 유지된다.
+            const result = calculateRSI([10, 11, 12, 13, NaN, 15, 16], 3);
+            const computed = result.filter(v => v !== null);
+            expect(computed.length).toBeGreaterThan(0);
+            computed.forEach(v => {
+                expect(Number.isNaN(v as number)).toBe(false);
+                expect(v).toBeCloseTo(100, 10); // 단조 상승 흐름 → RSI 100 유지
+            });
+        });
+
+        it('Infinity close는 NaN으로 전파된다', () => {
+            // diff에 Infinity - Infinity = NaN이 끼어 들어 RSI가 NaN이 된다.
+            const result = calculateRSI([10, 11, Infinity, 13, 14], 3);
+            expect(result[3]).toBeNaN();
+            expect(result[4]).toBeNaN();
+        });
+    });
 });

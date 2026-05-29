@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { extractJsonWithRepair } from '@/infrastructure/ai/extractJsonWithRepair';
+import { describe, it, expect, vi } from 'vitest';
+import {
+    extractJsonWithRepair,
+    snippetAroundPosition,
+    parseSyntaxErrorPosition,
+} from '@/infrastructure/ai/extractJsonWithRepair';
 
 // ─────────────────────────────────────────
 // LLM-response JSON parsing with `jsonrepair` salvage.
@@ -81,8 +85,10 @@ describe('extractJsonWithRepair — augmented SyntaxError on total failure', () 
         expect(caught?.cause).toBeInstanceOf(Error);
     });
 
-    it('position 정보가 있는 SyntaxError 는 snippet 을 augmented 메시지에 포함한다', () => {
-        // `{:1}` — JSON.parse fails at position 1 (`:`); not recoverable by jsonrepair either.
+    it('position 정보가 없는 SyntaxError 는 near snippet 없이 payload length 만 포함한다', () => {
+        // ':' 는 JSON-shaped 가 아니라 salvage 를 우회하고, JSON.parse 에러
+        // 메시지에 position 토큰이 없어 snippet 이 생략된다. position 이 있어
+        // near 가 포함되는 경로는 아래 '{a 1}' 케이스가 결정적으로 검증한다.
         let caught: SyntaxError | null = null;
         try {
             extractJsonWithRepair(':');
@@ -90,10 +96,77 @@ describe('extractJsonWithRepair — augmented SyntaxError on total failure', () 
             caught = e as SyntaxError;
         }
         expect(caught).toBeInstanceOf(SyntaxError);
-        // Snippet inclusion is best-effort; assert when position parsed successfully.
-        const msg = caught?.message ?? '';
-        if (/position\s+\d+/.test(msg)) {
-            expect(msg).toContain('near:');
+        expect(caught?.message).toContain('payload length');
+        expect(caught?.message).not.toContain('near:');
+    });
+
+    it('JSON-shape 이지만 jsonrepair 도 복구 실패하면 augmented SyntaxError + near snippet 을 throw', () => {
+        // `{a 1}` looks JSON-shaped (passes the salvage gate) but jsonrepair
+        // throws ("Colon expected"), exercising the inner catch + augmented
+        // throw with a parsed position snippet.
+        let caught: SyntaxError | null = null;
+        try {
+            extractJsonWithRepair('{a 1}');
+        } catch (e) {
+            caught = e as SyntaxError;
         }
+        expect(caught).toBeInstanceOf(SyntaxError);
+        const msg = caught?.message ?? '';
+        expect(msg).toContain('payload length');
+        // JSON.parse('{a 1}') reports a position, so the snippet must be present.
+        expect(msg).toContain('near:');
+    });
+
+    it('initialError 가 Error 가 아니면 String() 으로 직렬화해 메시지에 담는다', () => {
+        // JSON.parse never throws a non-Error in practice; force the defensive
+        // String(initialError) branch by making it throw a raw string.
+        const parseSpy = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+            throw 'raw-string-error';
+        });
+        let caught: SyntaxError | null = null;
+        try {
+            // 'xyz' is NOT JSON-shaped → salvage gate skipped → no second
+            // JSON.parse call, so the single mockImplementationOnce suffices.
+            extractJsonWithRepair('xyz');
+        } catch (e) {
+            caught = e as SyntaxError;
+        }
+        parseSpy.mockRestore();
+        expect(caught).toBeInstanceOf(SyntaxError);
+        expect(caught?.message).toContain('raw-string-error');
+        expect(caught?.cause).toBe('raw-string-error');
+    });
+});
+
+describe('snippetAroundPosition — boundary windows', () => {
+    it('position 이 시작 부근이고 텍스트가 짧으면 양쪽 줄임표가 없다', () => {
+        // start === 0 (no leading …) and end === text.length (no trailing …)
+        expect(snippetAroundPosition('{a 1}', 1)).toBe('{a 1}');
+    });
+
+    it('position 양쪽으로 60자 넘게 남으면 앞뒤 줄임표(…)를 모두 붙인다', () => {
+        const left = 'L'.repeat(100);
+        const right = 'R'.repeat(100);
+        const text = left + 'X' + right; // position 100 sits in the middle
+        const snippet = snippetAroundPosition(text, 100);
+        expect(snippet.startsWith('…')).toBe(true);
+        expect(snippet.endsWith('…')).toBe(true);
+        expect(snippet).toContain('X');
+        // window is 60 chars either side of the position
+        expect(snippet).toBe('…' + 'L'.repeat(60) + 'X' + 'R'.repeat(59) + '…');
+    });
+});
+
+describe('parseSyntaxErrorPosition — message extraction', () => {
+    it('position 토큰이 있으면 숫자를 반환한다', () => {
+        expect(
+            parseSyntaxErrorPosition('Unexpected token at position 42')
+        ).toBe(42);
+    });
+
+    it('position 토큰이 없으면 null 을 반환한다', () => {
+        expect(parseSyntaxErrorPosition('Unexpected end of JSON input')).toBe(
+            null
+        );
     });
 });

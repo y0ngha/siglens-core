@@ -26,6 +26,14 @@ describe('asString', () => {
     it('fallback 인자를 사용한다', () => {
         expect(asString(null, 'fallback')).toBe('fallback');
     });
+
+    it('빈 문자열과 공백 문자열은 트리밍하지 않고 그대로 통과시킨다', () => {
+        // asString only checks `typeof v === 'string'`; it never trims, so empty
+        // and whitespace-only strings are valid passthroughs (the fallback only
+        // applies to non-string inputs).
+        expect(asString('')).toBe('');
+        expect(asString('   ', 'fallback')).toBe('   ');
+    });
 });
 
 describe('asNumber', () => {
@@ -169,11 +177,34 @@ describe('asIsoDate', () => {
         expect(asIsoDate('2026/05/14')).toBeNull();
     });
 
+    it('returns null when month is out of range (Date.parse rejects)', () => {
+        // Regex matches \d{2} but Date.parse returns NaN for impossible months.
+        expect(asIsoDate('2026-13-01')).toBeNull();
+        expect(asIsoDate('2026-00-10')).toBeNull();
+    });
+
+    it('does NOT strictly validate the calendar — Feb 30 passes through unchanged', () => {
+        // The helper only enforces the regex + Date.parse. Date.parse rolls an
+        // overflowing day forward instead of rejecting, so a structurally valid
+        // but calendar-impossible date is returned verbatim, not corrected.
+        expect(asIsoDate('2026-02-30')).toBe('2026-02-30');
+    });
+
+    it('returns null for empty and whitespace-only strings (regex miss)', () => {
+        expect(asIsoDate('')).toBeNull();
+        expect(asIsoDate('   ')).toBeNull();
+    });
+
     it('returns null for non-string inputs', () => {
         expect(asIsoDate(null)).toBeNull();
         expect(asIsoDate(undefined)).toBeNull();
         expect(asIsoDate(123)).toBeNull();
         expect(asIsoDate({})).toBeNull();
         expect(asIsoDate([])).toBeNull();
+    });
+
+    it('returns null for non-finite numeric inputs (NaN / Infinity)', () => {
+        expect(asIsoDate(NaN)).toBeNull();
+        expect(asIsoDate(Infinity)).toBeNull();
     });
 });

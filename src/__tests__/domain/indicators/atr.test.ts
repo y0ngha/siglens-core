@@ -76,4 +76,20 @@ describe('calculateATR', () => {
             expect(result[ATR_DEFAULT_PERIOD]).not.toBeNull();
         });
     });
+
+    describe('극단 입력', () => {
+        it('period=1이면 선행 null이 하나뿐이고 Wilder 평활이 무력화되어 ATR=TR이다', () => {
+            // period=1: ATR[i] = (ATR[i-1]*0 + TR[i])/1 = TR[i]
+            // closes [10,11,13]: TR = [|11-10|, |13-11|] = [1, 2]
+            const bars = makeBars([10, 11, 13]);
+            const result = calculateATR(bars, 1);
+            expect(result[0]).toBeNull();
+            expect(result[1]).toBeCloseTo(1, 10);
+            expect(result[2]).toBeCloseTo(2, 10);
+        });
+
+        it('단일 봉이면 period보다 짧으므로 null 하나를 반환한다', () => {
+            expect(calculateATR(makeBars([10]), 3)).toEqual([null]);
+        });
+    });
 });

@@ -201,4 +201,40 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
             ).toThrow();
         });
     });
+
+    describe('문자열이 아닌 입력(이미 파싱된 객체/비정상 타입)이 주어졌을 때', () => {
+        it('이미 파싱된 객체는 JSON.parse를 건너뛰고 그대로 정규화한다', () => {
+            const result = normalizeOverallAnalysisResponse(validPayload);
+            expect(result.headlineKo).toBe(validPayload.headlineKo);
+            expect(result.scenarios).toHaveLength(2);
+        });
+
+        it('null/undefined/배열/숫자는 모든 필드를 기본값으로 반환한다', () => {
+            const expected = {
+                headlineKo: '',
+                technicalBulletsKo: [],
+                fundamentalBulletsKo: [],
+                newsBulletsKo: [],
+                optionsBulletsKo: [],
+                integratedConclusionKo: '',
+                scenarios: [],
+                riskFactorsKo: [],
+            };
+            expect(normalizeOverallAnalysisResponse(null)).toEqual(expected);
+            expect(normalizeOverallAnalysisResponse(undefined)).toEqual(
+                expected
+            );
+            expect(normalizeOverallAnalysisResponse([1, 2, 3])).toEqual(
+                expected
+            );
+            expect(normalizeOverallAnalysisResponse(42)).toEqual(expected);
+        });
+
+        it('비정상 입력이어도 context.optionsOiStale는 그대로 부착된다', () => {
+            const result = normalizeOverallAnalysisResponse(null, {
+                optionsOiStale: true,
+            });
+            expect(result.optionsOiStale).toBe(true);
+        });
+    });
 });

@@ -34,6 +34,13 @@ describe('calculateMACD', () => {
             const result = calculateMACD(bars);
             result.forEach(r => expect(r.macd).toBeNull());
         });
+
+        it('단일 bar는 빈 배열 가드를 피하고 all-null 결과 하나를 반환한다', () => {
+            const result = calculateMACD(makeBars([100]));
+            expect(result).toEqual([
+                { macd: null, signal: null, histogram: null },
+            ]);
+        });
     });
 
     describe('MACD 계산', () => {

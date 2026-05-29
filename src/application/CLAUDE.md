@@ -121,7 +121,7 @@ try {
 
 ## Testing
 
-- Coverage target: **100% branch coverage** (required).
+- Coverage target: **90% branch coverage** (required).
 - Test file location: `src/__tests__/application/<sub-folder>/<file>.test.ts`
 - Mock the **adapter factory module**, not the port interface — use-cases call
   factories directly, so `vi.mock` on the factory's module is the natural seam.

@@ -75,4 +75,17 @@ describe('calculateMFI', () => {
             expect(result).toHaveLength(MFI_DEFAULT_PERIOD + 5);
         });
     });
+
+    describe('극단 입력', () => {
+        it('완전 정지(TP가 변하지 않음)면 음/양 흐름이 모두 0이라 negative=0 가드로 MFI=100이다', () => {
+            // 모든 봉이 동일 → tp>prev, tp<prev 모두 거짓 → positive=negative=0
+            // negative === 0 분기로 MFI_MAX(100)을 반환한다 (상승장과 같은 가드, 다른 경로).
+            const bars = Array.from(
+                { length: MFI_DEFAULT_PERIOD + 2 },
+                (_, i) => makeBar(12, 6, 9, 1000, i)
+            );
+            const result = calculateMFI(bars, MFI_DEFAULT_PERIOD);
+            expect(result[result.length - 1]).toBe(100);
+        });
+    });
 });

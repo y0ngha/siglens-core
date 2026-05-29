@@ -66,4 +66,21 @@ describe('aggregateOpenInterest', () => {
         });
         expect(result).toEqual([]);
     });
+
+    it('aggregates multiple contracts at the same strike (sums each side)', () => {
+        // Two calls and two puts at strike 200: the second contract on each
+        // side finds `prev` already in the map, exercising the
+        // `prev?.callOpenInterest ?? 0` / `prev?.putOpenInterest ?? 0`
+        // prev-defined branches (line 23-24).
+        const chain: OptionsChain = {
+            expirationDate: '2026-05-22',
+            daysToExpiration: 8,
+            calls: [makeContract(200, 100), makeContract(200, 50)],
+            puts: [makeContract(200, 20), makeContract(200, 10)],
+        };
+        const result = aggregateOpenInterest(chain);
+        expect(result).toEqual([
+            { strike: 200, callOpenInterest: 150, putOpenInterest: 30 },
+        ]);
+    });
 });
