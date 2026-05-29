@@ -34,7 +34,7 @@ export function rollingLowest(values: number[], period: number): number | null {
 }
 
 /** @internal O(N) sliding-window maximum via monotone deque. */
-// O(N) sliding window max via monotone deque — each index pushed/popped at most once.
+// Each index is pushed/popped at most once, so the whole pass stays O(N).
 export function slidingMax(
     values: number[],
     period: number
@@ -53,7 +53,7 @@ export function slidingMax(
 }
 
 /** @internal O(N) sliding-window minimum via monotone deque. */
-// O(N) sliding window min via monotone deque — each index pushed/popped at most once.
+// Each index is pushed/popped at most once, so the whole pass stays O(N).
 export function slidingMin(
     values: number[],
     period: number
