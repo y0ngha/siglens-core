@@ -205,15 +205,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeFearGreedHistory(bars, buySellVolume, options?)` — walk-forward 1-year score history. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/fearGreed/walkForward.ts` |
 | `scoreToLabel(score)` — map a 0..100 score to its 5-stage `FearGreedLabel`, using `FEAR_GREED_LABEL_CUTOFFS`. | `domain/indicators/fearGreed/composition.ts` |
 
-**프롬프트 빌더 (8 + 1 상수)**
+**프롬프트 빌더 (2 + 1 상수)**
 | Symbol | Source |
 |---|---|
-| `buildAnalysisPrompt` | `domain/analysis/prompt.ts` |
-| `buildFundamentalAnalysisPrompt` | `domain/analysis/fundamentalPrompt.ts` |
-| `buildMarketBriefingPrompt` | `domain/analysis/marketBriefingPrompt.ts` |
-| `buildNewsAnalysisPrompt` | `domain/analysis/newsPrompt.ts` |
-| `buildNewsCardAnalysisPrompt` | `domain/analysis/newsCardPrompt.ts` |
-| `buildOverallAnalysisPrompt` | `domain/analysis/overallPrompt.ts` |
 | `buildOptionsAnalysisPrompt` | `domain/options/optionsPrompt.ts` |
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
@@ -229,39 +223,25 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > **@internal (not exported)**: `calculateMaxPain`, `calculatePutCallRatio`, `calculateImpliedMove` — single-purpose calculators consumed only by `summarizeChainForLlm`. Consumers should call `summarizeChainForLlm` (or read derived fields on `OptionsExpirationMetrics`) instead of recomputing.
 
-**응답 정규화 (6)**
-| Symbol | Source |
-|---|---|
-| `enrichAnalysisWithConfidence` | `domain/analysis/confidence.ts` |
-| `normalizeMarketBriefing` | `domain/analysis/normalizeMarketBriefing.ts` |
-| `normalizeFundamentalAnalysisResponse` | `domain/analysis/normalizeFundamental.ts` |
-| `normalizeFundamentalSnapshot` | `domain/analysis/normalizeFundamentalSnapshot.ts` |
-| `normalizeNewsAnalysisResponse` | `domain/analysis/normalizeNews.ts` |
-| `normalizeNewsCardAnalysis` | `domain/analysis/normalizeNews.ts` |
-| `normalizeOverallAnalysisResponse` | `domain/analysis/normalizeOverall.ts` |
-| `normalizeOptionsAnalysisResponse` | `domain/analysis/normalizeOptions.ts` |
+**응답 정규화** — 모든 `normalize*` 함수와 `enrichAnalysisWithConfidence`는 이제 **internal**이다. submit/poll use-case가 LLM 응답 정규화에 내부적으로 사용하며, consumer는 use-case 결과(`*AnalysisResponse`)를 직접 받으므로 정규화 함수를 직접 호출할 필요가 없다.
 
-**티어 게이트 (Tier gating) (13)**
+**티어 게이트 (Tier gating) (12)**
 | Symbol | Source |
 |---|---|
-| `filterAnalysisResult` | `domain/analysis/filterAnalysisResult.ts` |
 | `isAllowed` / `getTierLimit` / `getAllowedTimeframes` / `getAllowedModels` | `domain/tier.ts` |
 | `isTimeframeAllowed` / `isInfoDepthAllowed` / `isModelAllowed` | `domain/tier.ts` |
 | `isPremiumModel` / `isFreeModel` / `requiresByokKey` | `domain/tier.ts` |
 | `isTier` | `domain/tier.ts` |
 | `TIER_CONFIG` / `DEFAULT_TIER` | `domain/tier.ts` |
 
-**캔들 패턴 (UI/프롬프트에서 사용) (10)**
+**캔들 패턴 (UI/프롬프트에서 사용) (7)**
 | Symbol | Source |
 |---|---|
-| `detectCandlePattern` | `domain/analysis/candle.ts` |
-| `detectMultiCandlePattern` | `domain/analysis/candle.ts` |
 | `detectCandlePatternEntries` | `domain/analysis/candle-detection.ts` |
 | `getDetectionBars` | `domain/analysis/candle-detection.ts` |
 | `selectLastCandlePatternEntries` | `domain/analysis/candle-detection.ts` |
 | `getCandlePatternLabel` | `domain/analysis/candle-labels.ts` |
 | `getMultiCandlePatternLabel` | `domain/analysis/candle-labels.ts` |
-| `findCandlePatternLabel` | `domain/analysis/candle-labels.ts` |
 | `getSinglePatternTrend` | `domain/analysis/candle-trend.ts` |
 | `getMultiPatternTrend` | `domain/analysis/candle-trend.ts` |
 
@@ -392,10 +372,6 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **대시보드 상수** — `DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `DEFAULT_DASHBOARD_TIMEFRAME`, `MARKET_INDICES`, `MARKET_SUMMARY_FMP_SYMBOLS`, `SECTOR_ETFS`, `SECTOR_GROUPS`, `SECTOR_STOCKS`, `SIGNAL_SECTORS`.
 
-**캔들 라벨 맵** — `CANDLE_PATTERN_LABELS`, `MULTI_CANDLE_PATTERN_LABELS`.
-
-**캔들 패턴 감지 상수** — `CANDLE_PATTERN_DETECTION_BARS`, `EXCLUDED_SINGLE_PATTERNS` (`domain/candles/`).
-
 **지표 상수 (consumer 사용분)** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `RSI_OVERBOUGHT_LEVEL`, `RSI_OVERSOLD_LEVEL`, `EMA_DEFAULT_PERIODS`, `MA_DEFAULT_PERIODS`, `MACD_FAST_PERIOD`/`MACD_SIGNAL_PERIOD`/`MACD_SLOW_PERIOD`, `CCI_DEFAULT_PERIOD`/`CCI_OVERBOUGHT_LEVEL`/`CCI_OVERSOLD_LEVEL`/`CCI_ZERO_LEVEL`, `DMI_DEFAULT_PERIOD`, `STOCHASTIC_*`/`STOCH_RSI_*`, `HIGH_CONFIDENCE_WEIGHT`, `MIN_CONFIDENCE_WEIGHT` 등 consumer가 실제 사용하는 `constants.ts` 값만 public. 나머지 계산 기본값/임계값(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등)은 internal.
 
 **Fear & Greed 상수** — `FEAR_GREED_LABEL_CUTOFFS` (5단계 분류 경계 25/45/55/75), `POC_WINDOW_DEFAULT` (= 60, POC 거리 팩터 기본 창) (`domain/indicators/fearGreed/`). siglens 게이지 세그먼트 렌더링·점수→라벨 분류에서 사용.
@@ -406,7 +382,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **모델 스펙 (단일 source of truth)** — `MODEL_SPECS`, `THINKING_BUDGET_FALLBACK_STEPS`, `DISABLED_THINKING_BUDGET`, `ModelSpec`, `ClaudeSamplingModelSpec`, `ClaudeReasoningModelSpec`, `GeminiModelSpec`, `ChatGPTModelSpec`, `EffortLevel`, `AIProvider`, `ActiveModelId`, `ClaudeModelId`, `GeminiModelId`, `ChatGPTModelId` (`domain/analysis/modelSpecs.ts`, types in `domain/types.ts`). AI SDK 호출자(워커, 서버 액션, UI)가 직접 lookup하는 단일 source of truth — provider 라우팅, max output tokens, thinking budget(`ClaudeSamplingModelSpec` / `GeminiModelSpec`) 또는 reasoning effort(`ClaudeReasoningModelSpec` / `ChatGPTModelSpec`), sampling 파라미터를 모델 식별자(`ActiveModelId`) 별로 보관한다. `EffortLevel` (`'low' | 'medium' | 'high'`)은 reasoning 변종에서 effort 필드 타입으로 사용된다. provider-specific subset 타입(`ClaudeModelId` 등)은 `is*Model` 타입 predicate가 narrowing할 때 노출된다. spec 변종 narrowing은 `is*ModelSpec` 가드(Tier 2)를 사용한다. 새 모델 추가는 이 맵에 한 줄 추가 + core publish로 끝난다.
 
-**고급 도메인 헬퍼** — 정규화 함수, AI 레벨 보정, 추세선/키레벨/action recommendation 보조 함수는 외부 consumer의 세부 렌더링·검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다. (개별 신호 감지기·신호 상수는 internal — 공개 aggregate `detectSignals()` / `classifyTrend()`로 통합 호출.) 공개 정규화 헬퍼: `asString`, `asArray`, `compact`, `normalizeTrend`, `normalizeRiskLevel`, `normalizeKeyLevels`, `normalizePriceTargets`, `normalizeIndicatorGuideResult`.
+**고급 도메인 헬퍼** — key-level 클러스터링(`clusterKeyLevels`/`validateKeyLevels`)과 action recommendation 검증(`validateActionPrices`/`extractReconciledActionLines`)은 consumer의 세부 검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다. 그 외 정규화 함수(`normalize*`/`asString`/`asArray`/`compact`)·AI 레벨 보정·추세선·candle 라벨/감지 상수·프롬프트 빌더·개별 신호 감지기는 모두 internal(공개 aggregate·use-case가 내부 호출).
 
 전체 타입 목록은 `src/domain/types.ts`와 `src/index.ts`의 `export type {...}` 블록을 참고한다.
 
@@ -420,9 +396,13 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **신호 헬퍼** — `findCross`, `findThresholdCross`, `findPivotLows`, `findPivotHighs`, `computeBbWidth`, `computePctB`, `computeEmaSlope`, `percentileRank`.
 
-**정규화 헬퍼 (internal)** — `asNumber`, `asBoolean`, `asEnum`, `asObject`, `normalizeKeyLevel`, `normalizePriceTarget`, `normalizeSignal`. (`asString`, `asArray`, `compact`, `normalizeTrend`, `normalizeRiskLevel`, `normalizeKeyLevels`, `normalizePriceTargets`, `normalizeIndicatorGuideResult`는 public export — 아래 "고급 도메인 헬퍼" 참조)
+**캔들 패턴 (internal)** — `detectCandlePattern`, `detectMultiCandlePattern`, `findCandlePatternLabel`, `CANDLE_PATTERN_LABELS`, `MULTI_CANDLE_PATTERN_LABELS`, `CANDLE_PATTERN_DETECTION_BARS`, `EXCLUDED_SINGLE_PATTERNS` → UI/프롬프트는 살아있는 `getCandlePatternLabel`/`getMultiCandlePatternLabel`/`detectCandlePatternEntries` 등(Tier 2)을 사용.
 
-**액션/리스크 유틸** — `validateActionPrices`, `extractReconciledActionLines`, `isValidBullishStopLoss`, `isValidBullishTakeProfit`, `deriveFallbackStopLoss`, `deriveFallbackTakeProfit`, `resolveBullishStopLoss`, `resolveBullishTakeProfit`, `buildBullishExitText`, `buildBullishRiskRewardText`, `reconcileBullishActionRecommendation`.
+**프롬프트 빌더 (internal)** — `buildAnalysisPrompt`, `buildFundamentalAnalysisPrompt`, `buildMarketBriefingPrompt`, `buildNewsAnalysisPrompt`, `buildNewsCardAnalysisPrompt`, `buildOverallAnalysisPrompt` → submit use-case가 내부 호출. (`buildOptionsAnalysisPrompt`/`buildChatPrompt`는 아직 public.)
+
+**정규화 헬퍼 (internal)** — `asNumber`, `asBoolean`, `asEnum`, `asOptionalEnum`, `asObject`, `asString`, `asArray`, `compact`, `enrichAnalysisWithConfidence` 및 모든 `normalize*` 함수(`normalizeTrend`/`normalizeRiskLevel`/`normalizeKeyLevels`/`normalizePriceTargets`/`normalizeIndicatorGuideResult`/`normalizeKeyLevel`/`normalizePriceTarget`/`normalizePriceScenario`/`normalizeSignal`/`normalizeKeyPrice`/`normalizeTrendlinePoint`/`normalizePatternLine`/`normalizeTimeRange`/`normalizeActionRecommendation`/`normalizeCandlePatternSummary`/`normalizePatternSummary`/`normalizeStrategyResult`/`normalizeTrendline` + `normalize*AnalysisResponse`/`normalizeFundamentalSnapshot`/`normalizeMarketBriefing`). submit/poll use-case가 LLM 응답 정규화에 내부 사용.
+
+**액션/리스크 유틸 (internal)** — `isValidBullishStopLoss`, `isValidBullishTakeProfit`, `deriveFallbackStopLoss`, `deriveFallbackTakeProfit`, `resolveBullishStopLoss`, `resolveBullishTakeProfit`, `buildBullishExitText`, `buildBullishRiskRewardText`, `reconcileBullishActionRecommendation`, `postProcessAnalysisWithReconcile`, `extendTrendline`, `filterAnalysisResult`. (`validateActionPrices`/`extractReconciledActionLines`/`clusterKeyLevels`/`validateKeyLevels`는 public — '고급 도메인 헬퍼' 참조.)
 
 **내부 디테일 상수** — `ISO_DATE_HOUR_PREFIX_LENGTH`, `ISO_DATE_PREFIX_LENGTH`, `PROMPT_CONFIG_BY_TIMEFRAME`, `MULTI_CANDLE_PATTERN_BUFFER` — 모두 public 함수의 동작 디테일이며 consumer가 직접 다루지 않는다.
 
@@ -538,3 +518,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-05-29 | **Dead-code 정리 시리즈 시작 (PR1~2).** PR1(`refactor: dedup & relocate`): 내부 dead 헬퍼(JSON-fence 파서 `parseJsonResponse`/`stripMarkdownCodeBlock`, `addSeconds`) 삭제, 매직넘버(`1000`/`10`/`MS_PER_DAY`)를 canonical 상수로 통합, `buildOptionsCacheKey`를 `application/options/cacheKey.ts` → `infrastructure/cache/config.ts`로 이전(형제 cache-key 빌더와 병치, 공개 export 시그니처·경로 불변). PR2(`refactor: drop deprecated Gemini aliases`): 폐기 type alias `GeminiRole`/`GeminiPart`/`GeminiContent`를 `src/index.ts`/`src/index.client.ts`에서 **최종 제거**(2026-05-22 provider-neutral rename 후 호환용으로 남겨둔 별칭 — 3개 컨슈머 모두 미사용 확인). 신규 코드는 `ConversationRole`/`ConversationTurn` 사용. 0.x semver minor bump. |
 | 2026-05-29 | **Dead-export 정리 PR3 (PR #111, 트래킹 이슈 #110).** `src/index.ts`/`src/index.client.ts`에서 미사용 indicators surface 제거 — 개별 계산기 `calculate*` 24종(`calculateATR`~`calculateWilliamsR`) + barrel 유틸(`computeEMAValues`/`lastNonNull`/`linreg`/`rollingHighest`/`rollingLowest`/`slidingMax`/`slidingMin`/`sma`/`stdDev`/`typicalPrice`) + 지표 상수 36종(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등) export 제거 + 정의부에 `@internal` 태그 추가(MISTAKES.md #9.5/#9.6). **aggregate `calculateIndicators()`는 MISTAKES.md Architecture #6에 따라 public Tier 2 entry point로 유지** — 개별 계산기 구현은 이것이 내부 호출하여 보존. `calculateIchimokuFutureCloud`·`computeFearGreedIndex`/`computeFearGreedHistory`·`FEAR_GREED_LABEL_CUTOFFS`·`POC_WINDOW_DEFAULT`·`scoreToLabel` 및 consumer 사용 상수(RSI/MACD/STOCHASTIC/STOCH_RSI/CCI/DMI/EMA_DEFAULT/MA_DEFAULT/EMPTY_*/CONFIDENCE_WEIGHT)는 public 유지. 0.x semver minor bump(package.json은 PR2의 0.16.0 유지). |
 | 2026-05-29 | **Dead-export 정리 PR4 (트래킹 이슈 #110).** `src/index.ts`/`src/index.client.ts`에서 미사용 signals surface 제거 — 개별 신호 감지기 25종(anticipation 8 + confirmed 17) + 신호 상수 22종(`signals/constants.ts` 전체: CCI/CMF cross level, `GOLDEN_CROSS_*`, `DIVERGENCE_*`, `SQUEEZE_*`, `SR_*`, `TREND_*` 등) export 제거 + 정의부 `@internal` 태그(MISTAKES.md #9.5/#9.6). **aggregate `detectSignals()` / `classifyTrend()`는 Tier 2 public entry point로 유지** — 개별 감지기 구현은 `detectSignals`가 내부 호출하여 보존. 0.x semver minor bump(package.json은 0.16.0 유지). |
+| 2026-05-29 | **Dead-export 정리 PR5 (트래킹 이슈 #110).** `domain/analysis/` 미사용 헬퍼 제거 — 프롬프트 빌더 6종(`buildAnalysisPrompt`·`buildFundamentalAnalysisPrompt`·`buildMarketBriefingPrompt`·`buildNewsAnalysisPrompt`·`buildNewsCardAnalysisPrompt`·`buildOverallAnalysisPrompt`), 응답 정규화 전체(`enrichAnalysisWithConfidence` + 모든 `normalize*`: market/fundamental/news/overall/options + action/risk/keyLevels/priceTargets/indicatorGuide/pattern/strategy/candlePattern/trend/trendline), 정규화 프리미티브(`asArray`/`asString`/`compact`), 캔들 `detectCandlePattern`·`detectMultiCandlePattern`·`findCandlePatternLabel`·`CANDLE_PATTERN_DETECTION_BARS`·`CANDLE_PATTERN_LABELS`·`MULTI_CANDLE_PATTERN_LABELS`·`EXCLUDED_SINGLE_PATTERNS`, `extendTrendline`·`postProcessAnalysisWithReconcile`·`filterAnalysisResult` export 제거 + 정의부 `@internal`(22파일/37심볼, MISTAKES.md #9.5/#9.6). 구현은 submit/poll use-case·프롬프트 빌더가 내부 호출하여 보존. 살아있는 candle getter(`getCandlePatternLabel`/`getMultiCandlePatternLabel`/`getSinglePatternTrend`/`getMultiPatternTrend`/`detectCandlePatternEntries`/`getDetectionBars`/`selectLastCandlePatternEntries`)·`clusterKeyLevels`·`validateKeyLevels`·`validateActionPrices`·`extractReconciledActionLines`·`AI_SYSTEM_PROMPT`·`buildOptionsAnalysisPrompt`(options)·`buildChatPrompt`(chat)는 public 유지. 0.x semver minor bump(package.json은 0.16.0 유지). |

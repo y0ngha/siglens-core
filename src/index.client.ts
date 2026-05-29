@@ -22,12 +22,6 @@ export {
 export { classifyTrend, detectSignals } from './domain/signals';
 
 // Prompt builders
-export { buildAnalysisPrompt } from './domain/analysis/prompt';
-export { buildFundamentalAnalysisPrompt } from './domain/analysis/fundamentalPrompt';
-export { buildMarketBriefingPrompt } from './domain/analysis/marketBriefingPrompt';
-export { buildNewsAnalysisPrompt } from './domain/analysis/newsPrompt';
-export { buildNewsCardAnalysisPrompt } from './domain/analysis/newsCardPrompt';
-export { buildOverallAnalysisPrompt } from './domain/analysis/overallPrompt';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export {
@@ -56,18 +50,6 @@ export {
     isTimeframeAllowed,
     requiresByokKey,
 } from './domain/tier';
-
-// Response normalization
-export { enrichAnalysisWithConfidence } from './domain/analysis/confidence';
-export { normalizeMarketBriefing } from './domain/analysis/normalizeMarketBriefing';
-export { normalizeFundamentalAnalysisResponse } from './domain/analysis/normalizeFundamental';
-export { normalizeFundamentalSnapshot } from './domain/analysis/normalizeFundamentalSnapshot';
-export {
-    normalizeNewsAnalysisResponse,
-    normalizeNewsCardAnalysis,
-} from './domain/analysis/normalizeNews';
-export { normalizeOverallAnalysisResponse } from './domain/analysis/normalizeOverall';
-export { normalizeOptionsAnalysisResponse } from './domain/analysis/normalizeOptions';
 
 // Options analysis — domain helpers (server-only submit/poll use-cases are
 // intentionally omitted; only pure domain functions belong on the browser
@@ -112,11 +94,6 @@ export {
 
 // Candle patterns
 export {
-    detectCandlePattern,
-    detectMultiCandlePattern,
-} from './domain/analysis/candle';
-export {
-    CANDLE_PATTERN_DETECTION_BARS,
     detectCandlePatternEntries,
     getDetectionBars,
     selectLastCandlePatternEntries,
@@ -124,35 +101,14 @@ export {
 export {
     getCandlePatternLabel,
     getMultiCandlePatternLabel,
-    findCandlePatternLabel,
 } from './domain/analysis/candle-labels';
 export {
-    EXCLUDED_SINGLE_PATTERNS,
     getSinglePatternTrend,
     getMultiPatternTrend,
     type PatternTrend,
 } from './domain/analysis/candle-trend';
 
 // Analysis normalization / helpers
-export {
-    normalizeActionRecommendation,
-    normalizeCandlePatternSummary,
-    normalizeIndicatorGuideResult,
-    normalizeKeyLevels,
-    normalizePatternSummary,
-    normalizePriceTargets,
-    normalizeRiskLevel,
-    normalizeStrategyResult,
-    normalizeTrend,
-    normalizeTrendline,
-} from './domain/analysis/normalize';
-export {
-    asArray,
-    asString,
-    compact,
-} from './domain/analysis/normalizePrimitives';
-export { extendTrendline } from './domain/analysis/trendline';
-export { postProcessAnalysisWithReconcile } from './domain/analysis/ai-levels';
 export {
     clusterKeyLevels,
     validateKeyLevels,
@@ -161,7 +117,6 @@ export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
-export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 
 // Dashboard helpers
 export {
@@ -202,12 +157,6 @@ export {
     SECTOR_STOCKS,
     SIGNAL_SECTORS,
 } from './domain/constants/dashboard-tickers';
-
-// Candle pattern label maps
-export {
-    CANDLE_PATTERN_LABELS,
-    MULTI_CANDLE_PATTERN_LABELS,
-} from './domain/analysis/candle-labels';
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {

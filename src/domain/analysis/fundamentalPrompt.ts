@@ -56,6 +56,8 @@ function formatSectorDirection(
 }
 
 /**
+ * @internal Builds the fundamental-analysis LLM prompt.
+ *
  * Build the AI fundamental-analysis prompt.
  *
  * Accepts the normalised {@link FundamentalSnapshot} and a list of loaded

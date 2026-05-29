@@ -68,6 +68,8 @@ export interface NormalizeOverallContext {
 }
 
 /**
+ * @internal Normalizes the overall-analysis LLM response.
+ *
  * Normalize a raw LLM response string into a typed {@link OverallAnalysisResponse}.
  *
  * Strips optional markdown code fences (` ```json ` / ` ``` `), parses JSON, and

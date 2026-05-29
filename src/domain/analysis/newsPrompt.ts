@@ -50,6 +50,8 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
 }
 
 /**
+ * @internal Builds the news-analysis LLM prompt.
+ *
  * Build the AI news-analysis prompt.
  *
  * Accepts enriched news items (each already tagged with a

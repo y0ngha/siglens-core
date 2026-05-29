@@ -1,6 +1,8 @@
 import type { MarketIndexData, MarketSectorData } from '@/domain/types';
 
 /**
+ * @internal Builds the market-briefing LLM prompt.
+ *
  * Build the AI market-briefing prompt from the dashboard summary data.
  *
  * Renders a compact JSON-schema prompt that asks the worker LLM for a

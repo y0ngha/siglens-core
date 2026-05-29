@@ -59,6 +59,8 @@ function normalizeNewsImpact(value: unknown): NewsImpact {
 }
 
 /**
+ * @internal Normalizes a single news-card LLM response.
+ *
  * Normalize a raw LLM response string into a typed {@link NewsCardAnalysis}.
  *
  * Strips optional markdown code fences, parses JSON, and defensively normalizes
@@ -91,6 +93,8 @@ export function normalizeNewsCardAnalysis(raw: unknown): NewsCardAnalysis {
 }
 
 /**
+ * @internal Normalizes the news-analysis LLM response.
+ *
  * Normalize a raw LLM response string into a typed {@link NewsAnalysisResponse}.
  *
  * Strips optional markdown code fences, parses JSON, and defensively normalizes

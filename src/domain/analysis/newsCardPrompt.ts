@@ -3,6 +3,8 @@
 import type { NewsItem } from '@/domain/types';
 
 /**
+ * @internal Builds the per-news-card LLM prompt.
+ *
  * Build the per-card news analysis prompt for the flash-lite model.
  *
  * Each {@link NewsItem} is processed individually: this prompt asks the model

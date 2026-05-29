@@ -37,6 +37,8 @@ function normalizeVolatilityAnalysis(
 }
 
 /**
+ * @internal Normalizes the market-briefing LLM response.
+ *
  * Convert an arbitrary worker payload into a fully-validated
  * {@link MarketBriefingResponse}.
  *

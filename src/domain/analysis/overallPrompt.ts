@@ -247,6 +247,8 @@ function formatOptions(
 }
 
 /**
+ * @internal Builds the multi-axis overall-analysis LLM prompt.
+ *
  * Build the 4-axis overall analysis prompt.
  *
  * Combines completed technical, fundamental, news, and options analysis

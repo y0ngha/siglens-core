@@ -8,16 +8,28 @@ import type {
 
 /** AI SL/TP 검증 + ATR 기반 fallback resolver. AI 원본 필드를 수정하지 않고 reconciledLevels에 보정값을 병기한다. */
 
-/** ATR 배수 한도 — entryPrice - ATR*5 보다 더 낮은 SL은 비현실적으로 간주한다. */
+/**
+ * @internal ATR 배수 상한 SL 가드.
+ * ATR 배수 한도 — entryPrice - ATR*5 보다 더 낮은 SL은 비현실적으로 간주한다.
+ */
 export const SL_MAX_ATR_MULTIPLIER = 5;
 
-/** ATR 배수 한도 — entryPrice + ATR*10 보다 더 높은 TP는 비현실적으로 간주한다. */
+/**
+ * @internal ATR 배수 상한 TP 가드.
+ * ATR 배수 한도 — entryPrice + ATR*10 보다 더 높은 TP는 비현실적으로 간주한다.
+ */
 export const TP_MAX_ATR_MULTIPLIER = 10;
 
-/** Fallback SL 배수 — entryPrice - ATR*1.5. */
+/**
+ * @internal Fallback SL ATR 배수.
+ * Fallback SL 배수 — entryPrice - ATR*1.5.
+ */
 export const SL_FALLBACK_ATR_MULTIPLIER = 1.5;
 
-/** Fallback TP 배수 — entryPrice + ATR*2.0 (risk:reward ≈ 1:1.33). */
+/**
+ * @internal Fallback TP ATR 배수.
+ * Fallback TP 배수 — entryPrice + ATR*2.0 (risk:reward ≈ 1:1.33).
+ */
 export const TP_FALLBACK_ATR_MULTIPLIER = 2.0;
 
 function isFinitePositive(n: number | undefined): n is number {
@@ -28,7 +40,10 @@ function hasUsableAtr(atr: number | undefined): atr is number {
     return isFinitePositive(atr);
 }
 
-/** SL이 bullish 포지션에서 유효한지 검증한다 (양수·entry 미만·ATR 배수 범위 내). */
+/**
+ * @internal Validates a bullish stop-loss level.
+ * SL이 bullish 포지션에서 유효한지 검증한다 (양수·entry 미만·ATR 배수 범위 내).
+ */
 export function isValidBullishStopLoss(
     sl: number | undefined,
     entryPrice: number,
@@ -43,7 +58,10 @@ export function isValidBullishStopLoss(
     return true;
 }
 
-/** TP가 bullish 포지션에서 유효한지 검증한다 (entry 초과·ATR 배수 범위 내). */
+/**
+ * @internal Validates a bullish take-profit level.
+ * TP가 bullish 포지션에서 유효한지 검증한다 (entry 초과·ATR 배수 범위 내).
+ */
 export function isValidBullishTakeProfit(
     tp: number | undefined,
     entryPrice: number,
@@ -58,6 +76,7 @@ export function isValidBullishTakeProfit(
     return true;
 }
 
+/** @internal Derives an ATR-based fallback stop-loss. */
 export function deriveFallbackStopLoss(
     entryPrice: number,
     atr: number | undefined
@@ -66,6 +85,7 @@ export function deriveFallbackStopLoss(
     return entryPrice - atr * SL_FALLBACK_ATR_MULTIPLIER;
 }
 
+/** @internal Derives an ATR-based fallback take-profit. */
 export function deriveFallbackTakeProfit(
     entryPrice: number,
     atr: number | undefined
@@ -74,6 +94,7 @@ export function deriveFallbackTakeProfit(
     return entryPrice + atr * TP_FALLBACK_ATR_MULTIPLIER;
 }
 
+/** @internal Resolves the effective bullish stop-loss (AI value or fallback). */
 export function resolveBullishStopLoss(
     aiValue: number | undefined,
     entryPrice: number,
@@ -89,6 +110,7 @@ export function resolveBullishStopLoss(
     return { value: undefined, source: 'missing' };
 }
 
+/** @internal Resolves the effective bullish take-profit (AI value or fallback). */
 export function resolveBullishTakeProfit(
     aiValue: number | undefined,
     entryPrice: number,
@@ -151,7 +173,10 @@ function buildExitSlPart(
     return `손절 $${stopLoss.toFixed(2)} (${formatSignedPct(entryPrice, stopLoss)})`;
 }
 
-/** bullish 포지션 SL/TP 기반 exit 텍스트 생성. 유효하지 않은 파트는 생략한다. */
+/**
+ * @internal Builds the bullish exit text from SL/TP.
+ * bullish 포지션 SL/TP 기반 exit 텍스트 생성. 유효하지 않은 파트는 생략한다.
+ */
 export function buildBullishExitText(
     entryPrice: number,
     stopLoss: number | undefined,
@@ -170,7 +195,10 @@ export function buildBullishExitText(
     return parts.length > 0 ? parts.join(', ') + '.' : '';
 }
 
-/** bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL/TP 중 하나라도 무효면 빈 문자열. */
+/**
+ * @internal Builds the bullish risk:reward text.
+ * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL/TP 중 하나라도 무효면 빈 문자열.
+ */
 export function buildBullishRiskRewardText(
     entryPrice: number,
     stopLoss: number | undefined,
@@ -222,7 +250,10 @@ function buildReconcileReason(
         : 'AI가 제시한 목표가가 내부 기준을 벗어나 보정했습니다.';
 }
 
-/** bullish 추천에 SL/TP 보정을 적용한다. AI 원본 필드는 수정하지 않고 reconciledLevels에만 보정값을 병기한다. */
+/**
+ * @internal Applies SL/TP reconciliation to a bullish recommendation.
+ * bullish 추천에 SL/TP 보정을 적용한다. AI 원본 필드는 수정하지 않고 reconciledLevels에만 보정값을 병기한다.
+ */
 export function reconcileBullishActionRecommendation(
     rec: ActionRecommendation,
     entryPrice: number,
@@ -323,7 +354,11 @@ function computeEntryPriceMid(
     return fallback;
 }
 
-/** AnalysisResponse에 reconciledLevels를 병기한다. entryPrice 결정 불가 시 원본 반환. */
+/**
+ * @internal Reconciles AI key levels into the analysis.
+ *
+ * AnalysisResponse에 reconciledLevels를 병기한다. entryPrice 결정 불가 시 원본 반환.
+ */
 export function postProcessAnalysisWithReconcile(
     response: AnalysisResponse,
     fallbackEntryPrice: number | undefined,

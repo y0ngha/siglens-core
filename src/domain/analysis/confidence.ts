@@ -108,6 +108,8 @@ export function filterPatterns(patterns: PatternResult[]): PatternResult[] {
 }
 
 /**
+ * @internal Enriches analysis with confidence weights.
+ *
  * Normalize a raw worker response and weight each result by skill confidence.
  *
  * Pipeline:

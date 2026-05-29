@@ -56,6 +56,8 @@ export function stripLlmJsonFence(raw: string): string {
 }
 
 /**
+ * @internal
+ *
  * Strip optional ` ```json ` / ` ``` ` markdown code fences from an LLM response
  * and parse the inner content as JSON.
  *
@@ -69,7 +71,6 @@ export function stripLlmJsonFence(raw: string): string {
  * infrastructure-layer `extractJsonWithRepair` wrapper, which retries via
  * `jsonrepair` on failure.
  *
- * @internal
  * @param raw - Raw string from the LLM response. May be fenced, prose-wrapped, or plain JSON.
  * @returns Parsed JSON value as `unknown` — callers must validate the shape.
  * @throws {SyntaxError} When the string (after fence removal) is not valid JSON.

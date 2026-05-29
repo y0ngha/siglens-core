@@ -65,7 +65,10 @@ const INDICATOR_DECIMAL_PLACES = 2;
 const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
 
-// 테스트/외부 호출자가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
+/**
+ * @internal Per-timeframe prompt configuration (trend sample counts, decimal places 등).
+ * 테스트가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
+ */
 export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
     '5Min': {
         trendSampleCount: 12,
@@ -984,6 +987,8 @@ function byName(a: Skill, b: Skill): number {
 }
 
 /**
+ * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
+ *
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
  * Composes a fully-rendered English prompt that the worker LLM consumes to
