@@ -30,7 +30,6 @@ describe('browser public API exports', () => {
         const skillType: SkillType = 'indicator_guide';
         const modelId: ModelId = 'gemini-2.5-pro';
         const tierConfig: TierConfig = TIER_CONFIG;
-        // Consumers type their own dashboard sector-group arrays with this.
         const sectorGroup: SectorGroupDef = {
             label: 'Technology',
             symbols: ['AAPL'],

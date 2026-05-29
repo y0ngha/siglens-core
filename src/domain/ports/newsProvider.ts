@@ -7,9 +7,6 @@ import type {
 /**
  * Lookback window for news article queries.
  *
- * Exposed so consumers can type the `range` argument of their own
- * news-fetch adapters.
- *
  * - `'24h'` — last 24 hours.
  * - `'7d'`  — last 7 days.
  * - `'30d'` — last 30 days (extended context for low-activity symbols).

@@ -124,8 +124,6 @@ export type PollBriefingResult =
 
 /**
  * Definition of a sector grouping (label + member symbols).
- *
- * Consumers define their own sector-group arrays using this shape.
  */
 export interface SectorGroupDef {
     /** Human-readable sector label (e.g. `"Technology"`). */
