@@ -21,13 +21,14 @@ import type {
     ModelId,
     OverallAnalysisResponse,
     SkillType,
+    TierConfig,
 } from '@/index.client';
 
 describe('browser public API exports', () => {
     it('exports domain values used by browser consumers', () => {
         const skillType: SkillType = 'indicator_guide';
         const modelId: ModelId = 'gemini-2.5-pro';
-        const tierConfig = TIER_CONFIG;
+        const tierConfig: TierConfig = TIER_CONFIG;
 
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');

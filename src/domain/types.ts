@@ -122,12 +122,6 @@ export type PollBriefingResult =
     | { status: 'done'; briefing: MarketBriefingResponse; generatedAt: string }
     | { status: 'error'; error: string };
 
-/** Definition of a sector grouping (label + member symbols). */
-export interface SectorGroupDef {
-    label: string;
-    symbols: readonly string[];
-}
-
 /** OHLCV price bar — the canonical input for every indicator and signal. */
 export interface Bar {
     /** Unix timestamp (seconds since epoch). */

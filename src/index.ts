@@ -499,7 +499,6 @@ export type {
     ReconciledTpEntry,
     RiskLevel,
     SectorEtf,
-    SectorGroupDef,
     SectorSignalsResult,
     SectorStock,
     Signal,

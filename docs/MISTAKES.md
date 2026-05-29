@@ -764,9 +764,12 @@ and have been removed from this file.
    ✅ After @internal/@removal: verify all types in the closure remain exported and untagged @internal; update PUBLIC_API.md to reflect actual exports
    ✅ Diff check: grep src/index.ts for all public function signatures and exported type definitions; cross-check that every type mentioned is either exported without @internal or provably internal-only
    ✅ Post-audit: run tsc with noEmit=true and scan for "is not exported" errors on types used in public signatures — zero errors means closure is complete
+   ✅ Contradiction scan must include bare `export type { X }` re-export statements, not only type definitions in their source files
+      — Intermediate re-export statements can carry @internal tags that contradict the public export at src/index.ts (e.g., `/** @internal */ export type { UserApiKeyRequiredError }` in module-level re-export when UserApiKeyRequiredError is reachable from public SubmitAnalysisErrorResult)
+      — grep for both `export type \{` and `export interface \{` statements; verify none carry @internal if the type is in the reachability closure
    → Recurring (PR #110 R1–R2 ×123 types, PR #3–PR6 series ×30+ instances): bulk sweeps target dead symbols by name without analyzing reachability graphs.
-      Root cause: absence of mandatory pre-sweep reachability audit and failure to check transitive field/union membership.
-      Process: (1) before removal, **compute full transitive reachability closure from public entrypoints**, (2) exclude all types in closure from @internal/@removal, (3) add tsc "not exported" zero-error check to PR checklist, (4) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts).
+      Root cause: absence of mandatory pre-sweep reachability audit and failure to check transitive field/union membership, AND failure to scan intermediate re-export statements for contradictory @internal tags.
+      Process: (1) before removal, **compute full transitive reachability closure from public entrypoints**, (2) exclude all types in closure from @internal/@removal, (3) scan both type definitions AND bare re-export statements for contradictions, (4) add tsc "not exported" zero-error check to PR checklist, (5) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts).
 ```
 
 ---

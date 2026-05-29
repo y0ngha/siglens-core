@@ -3,7 +3,7 @@ import type { ModelId } from '@/domain/types';
 
 export const GEMINI_2_5_FLASH_MODEL = 'gemini-2.5-flash';
 export const GEMINI_2_5_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
-/** @internal Gemini 2.5 Pro model identifier used in chat completion routing. */
+/** @internal Gemini 2.5 Pro premium model identifier (test fixture for premium-tier chat scenarios). */
 export const GEMINI_2_5_PRO_MODEL = 'gemini-2.5-pro';
 
 /**
