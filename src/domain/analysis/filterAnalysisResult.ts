@@ -165,7 +165,7 @@ function filterActionRecommendation(
  * const shouldShowEntryPaywall = lockedInfoDepth.includes('entry');
  * ```
  *
- * @internal Applies tier-based field masking; used by poll use-cases.
+ * @internal Applies tier-based field masking.
  */
 export function filterAnalysisResult(
     result: AnalysisResponse,

@@ -128,16 +128,3 @@
 - Rule: TypeScript — a mock/stub generic signature should use the actual domain type so it is verified against the real function signature at compile time (the test-file `as`-cast exception does not justify widening a typed mock generic to `unknown`)
 - Context: sectorSignals.test.ts stubbed computeStockSignalResult with `vi.fn<(stock: unknown, ...)>`; the real first parameter is `SectorStock`. Imported SectorStock and replaced both `unknown` occurrences.
 
-## [PR #5 | refactor/110/prune-analysis-helpers | 2026-05-29] — R1 → R2 approved
-- Violation: When batch-tagging 37 removed symbols with @internal, sibling internal exports in touched files were not tagged: normalizePrimitives.ts (asNumber/asBoolean/asEnum/asOptionalEnum/asObject), normalize.ts (8 lower-level normalizeXxx), ai-levels.ts (4 constants + 9 functions)
-- Rule: MISTAKES.md §#9.5 — Every module-internal export must have /** @internal */ JSDoc; when batch-adding @internal tags during dead-export cleanup, enumerate ALL non-re-exported exports, not just the symbols being demoted in this PR
-- Context: Round 1 required finding — root cause mirrors PR #110: incomplete enumeration during batch @internal tagging. When removing public exports and adding @internal to the demoted symbols, all non-re-exported helpers in each touched file must also be tagged. This is the 2nd+ occurrence of the same pattern.
-
-- Violation: PUBLIC_API.md stale in multiple sections: Tier 2 inventory table missing removed exports; Tier 4 subsections (캔들 라벨 맵, 캔들 패턴 감지 상수) not updated; '고급 도메인 헬퍼' prose paragraph references removed symbols; Internal-section cross-references inconsistent; validateActionPrices/extractReconciledActionLines mis-filed as Internal but are public
-- Rule: MISTAKES.md §Public API & Module Exports rule 7 — PUBLIC_API.md documentation inventory becomes stale when exports change; update all document sections (Tier tables, Tier 4 subsections, prose paragraphs, Internal cross-references) consistently
-- Context: Round 2 required findings — comprehensive audit found stale documentation spread across multiple PUBLIC_API.md sections, requiring updates in 5+ locations. Indicates need for more rigorous checklist: when removing/promoting exports, audit entire PUBLIC_API.md document, not just the main Tier table.
-
-- Violation: Removed all exports under "// Section" comment headers left dead comment orphans (// Response normalization, // Candle pattern label maps)
-- Rule: Dead code & unused structures — when removing all exports under a section comment, delete the orphan section comment header
-- Context: Round 2 required finding — live exports in domain/ files removed, leaving section headers that no longer serve any purpose. Dead comments waste code review time and confuse future refactoring.
-

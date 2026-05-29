@@ -56,7 +56,7 @@ const BEARISH_MULTI_PATTERNS: ReadonlySet<MultiCandlePattern> = new Set([
     'upside_gap_two_crows',
 ]);
 
-/** @internal Single patterns excluded from trend scoring; used by trend internals. */
+/** @internal Single patterns excluded from trend scoring. */
 export const EXCLUDED_SINGLE_PATTERNS: ReadonlySet<CandlePattern> = new Set([
     'bullish',
     'bearish',

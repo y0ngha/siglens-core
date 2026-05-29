@@ -276,7 +276,7 @@ function formatOptions(
  *                         section so the LLM tempers positioning claims.
  * @returns Prompt string ready to be sent to the LLM worker.
  *
- * @internal Builds the multi-axis overall-analysis LLM prompt; used by submit use-cases.
+ * @internal Builds the multi-axis overall-analysis LLM prompt.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
 // companyName) was removed — submitOverallAnalysis and dependencyResolver

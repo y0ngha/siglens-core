@@ -70,7 +70,7 @@ function formatSectorDirection(
  * @param skills   - All loaded skills; non-fundamental / low-weight entries are filtered out.
  * @returns Prompt string ready to be sent to the LLM worker.
  *
- * @internal Builds the fundamental-analysis LLM prompt; used by submit use-cases.
+ * @internal Builds the fundamental-analysis LLM prompt.
  */
 export function buildFundamentalAnalysisPrompt(
     symbol: string,

@@ -56,19 +56,19 @@ function normalizeNumberArray(v: unknown): number[] | undefined {
 
 // --- enum 래퍼 ---
 
-/** @internal Coerces an unknown value to a Trend enum; used by normalizers. */
+/** @internal Coerces an unknown value to a Trend enum (defaults to 'neutral'). */
 export function normalizeTrend(v: unknown): Trend {
     return asEnum(v, VALID_TRENDS, 'neutral');
 }
 
-/** @internal Coerces an unknown value to a RiskLevel enum; used by normalizers. */
+/** @internal Coerces an unknown value to a RiskLevel enum (defaults to 'medium'). */
 export function normalizeRiskLevel(v: unknown): RiskLevel {
     return asEnum(v, VALID_RISK_LEVELS, 'medium');
 }
 
 // --- KeyLevel ---
 
-/** @internal Normalizes a single key level; used by normalizers. */
+/** @internal Normalizes a single key level. */
 export function normalizeKeyLevel(v: unknown): KeyLevel | null {
     const o = asObject(v);
     if (!o) return null;
@@ -77,7 +77,7 @@ export function normalizeKeyLevel(v: unknown): KeyLevel | null {
     return { price, reason: asString(o.reason) };
 }
 
-/** @internal Normalizes support/resistance/POC key levels; used by normalizers. */
+/** @internal Normalizes support/resistance/POC key levels. */
 export function normalizeKeyLevels(v: unknown): KeyLevels {
     const o = asObject(v);
     if (!o) return { support: [], resistance: [], poc: undefined };
@@ -90,7 +90,7 @@ export function normalizeKeyLevels(v: unknown): KeyLevels {
 
 // --- PriceTargets ---
 
-/** @internal Normalizes a single price target; used by normalizers. */
+/** @internal Normalizes a single price target. */
 export function normalizePriceTarget(v: unknown): PriceTarget | null {
     const o = asObject(v);
     if (!o) return null;
@@ -99,7 +99,7 @@ export function normalizePriceTarget(v: unknown): PriceTarget | null {
     return { price, basis: asString(o.basis) };
 }
 
-/** @internal Normalizes a price scenario; used by normalizers. */
+/** @internal Normalizes a price scenario. */
 export function normalizePriceScenario(v: unknown): PriceScenario | null {
     const o = asObject(v);
     if (!o) return null;
@@ -109,7 +109,7 @@ export function normalizePriceScenario(v: unknown): PriceScenario | null {
     };
 }
 
-/** @internal Normalizes bullish/bearish price targets; used by normalizers. */
+/** @internal Normalizes bullish/bearish price targets. */
 export function normalizePriceTargets(v: unknown): PriceTargets {
     const o = asObject(v);
     if (!o) return { bullish: null, bearish: null };
@@ -121,7 +121,7 @@ export function normalizePriceTargets(v: unknown): PriceTargets {
 
 // --- Signals / IndicatorGuideResult ---
 
-/** @internal Normalizes an analysis signal; used by normalizers. */
+/** @internal Normalizes an analysis signal. */
 export function normalizeSignal(v: unknown): AnalysisSignal | null {
     const o = asObject(v);
     if (!o) return null;
@@ -134,7 +134,7 @@ export function normalizeSignal(v: unknown): AnalysisSignal | null {
     };
 }
 
-/** @internal Normalizes an indicator-guide result; used by normalizers. */
+/** @internal Normalizes an indicator-guide result. */
 export function normalizeIndicatorGuideResult(
     v: unknown
 ): IndicatorGuideResult | null {
@@ -150,7 +150,7 @@ export function normalizeIndicatorGuideResult(
 
 // --- Pattern / Strategy / Candle ---
 
-/** @internal Normalizes a key price; used by normalizers. */
+/** @internal Normalizes a key price. */
 export function normalizeKeyPrice(v: unknown): KeyPrice | null {
     const o = asObject(v);
     if (!o) return null;
@@ -159,7 +159,7 @@ export function normalizeKeyPrice(v: unknown): KeyPrice | null {
     return { label: asString(o.label), price };
 }
 
-/** @internal Normalizes a trendline point; used by normalizers. */
+/** @internal Normalizes a trendline point. */
 export function normalizeTrendlinePoint(v: unknown): TrendlinePoint | null {
     const o = asObject(v);
     if (!o) return null;
@@ -169,7 +169,7 @@ export function normalizeTrendlinePoint(v: unknown): TrendlinePoint | null {
     return { time, price };
 }
 
-/** @internal Normalizes a pattern line; used by normalizers. */
+/** @internal Normalizes a pattern line. */
 export function normalizePatternLine(v: unknown): PatternLine | null {
     const o = asObject(v);
     if (!o) return null;
@@ -179,7 +179,7 @@ export function normalizePatternLine(v: unknown): PatternLine | null {
     return { label: asString(o.label), start, end };
 }
 
-/** @internal Normalizes a time range; used by normalizers. */
+/** @internal Normalizes a time range. */
 export function normalizeTimeRange(
     v: unknown
 ): { start: number; end: number } | undefined {
@@ -191,7 +191,7 @@ export function normalizeTimeRange(
     return { start, end };
 }
 
-/** @internal Normalizes a chart-pattern summary; used by normalizers. */
+/** @internal Normalizes a chart-pattern summary. */
 export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
     const o = asObject(v);
     if (!o) return null;
@@ -218,7 +218,7 @@ export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
     };
 }
 
-/** @internal Normalizes a strategy result; used by normalizers. */
+/** @internal Normalizes a strategy result. */
 export function normalizeStrategyResult(v: unknown): RawStrategyResult | null {
     const o = asObject(v);
     if (!o) return null;
@@ -233,7 +233,7 @@ export function normalizeStrategyResult(v: unknown): RawStrategyResult | null {
 
 type RawCandlePatternSummary = Omit<CandlePatternSummary, 'id'>;
 
-/** @internal Normalizes a candle-pattern summary; used by normalizers. */
+/** @internal Normalizes a candle-pattern summary. */
 export function normalizeCandlePatternSummary(
     v: unknown
 ): RawCandlePatternSummary | null {
@@ -251,7 +251,7 @@ export function normalizeCandlePatternSummary(
 
 // --- Trendline ---
 
-/** @internal Normalizes a trendline; used by normalizers. */
+/** @internal Normalizes a trendline. */
 export function normalizeTrendline(v: unknown): Trendline | null {
     const o = asObject(v);
     if (!o) return null;
@@ -279,7 +279,7 @@ function normalizeReconciledActionLevels(
     };
 }
 
-/** @internal Normalizes an action recommendation; used by normalizers. */
+/** @internal Normalizes an action recommendation. */
 export function normalizeActionRecommendation(
     raw: unknown
 ): ActionRecommendation | undefined {

@@ -53,7 +53,7 @@ function normalizeVolatilityAnalysis(
  *
  * @see buildMarketBriefingPrompt
  *
- * @internal Normalizes the market-briefing LLM response; used by poll use-cases.
+ * @internal Normalizes the market-briefing LLM response.
  */
 export function normalizeMarketBriefing(raw: unknown): MarketBriefingResponse {
     const o = asObject(raw);

@@ -29,7 +29,7 @@ const WARNING_NOTE: Record<NonNullable<FearGreedWarning>, string> = {
  *   `composeSnapshot` always emits both Flow and Trend groups; this guard
  *   fires only for manually constructed or externally corrupted snapshots.
  *
- * @internal Used by analysis prompt builders; not part of the public API.
+ * @internal Formats the fear-greed sentiment section; not part of the public API.
  */
 export function formatFearGreedSection(fg: FearGreedSnapshot): string {
     const flowGroup = fg.groups.find(g => g.name === 'Flow');

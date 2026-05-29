@@ -131,7 +131,7 @@ export function filterPatterns(patterns: PatternResult[]): PatternResult[] {
  *
  * @see buildAnalysisPrompt
  *
- * @internal Enriches analysis with confidence weights; used by poll use-cases.
+ * @internal Enriches analysis with confidence weights.
  */
 export function enrichAnalysisWithConfidence(
     rawInput: unknown,

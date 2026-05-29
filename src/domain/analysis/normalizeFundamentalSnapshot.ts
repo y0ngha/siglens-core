@@ -40,7 +40,7 @@ const toPercent = (v: number | null | undefined): number | null =>
  * @param input - Aggregated domain-neutral inputs; see {@link NormalizeFundamentalSnapshotInput}.
  * @returns A fully typed `FundamentalSnapshot` ready for prompt builders and UI.
  *
- * @internal Builds the fundamental snapshot; used by submit use-cases.
+ * @internal Builds the fundamental snapshot.
  */
 export function normalizeFundamentalSnapshot(
     input: NormalizeFundamentalSnapshotInput

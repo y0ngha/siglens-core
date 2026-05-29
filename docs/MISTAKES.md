@@ -72,10 +72,15 @@ and have been removed from this file.
 9.5. Module-internal exports missing @internal JSDoc tag
    → Every function/constant exported from a module but not re-exported in src/index.ts must have /** @internal */ JSDoc
    → Enables IDE tooling and consumers to distinguish public API from internal helpers
+   → **Critical during batch refactoring:** When adding @internal tags during dead-export cleanup, enumerate ALL non-re-exported exports in each touched file
+      Do not tag symbol-by-symbol from a removal list; instead, grep the whole file for every `export ` and confirm each one is tagged.
+      This prevents sibling exports from being missed (recurrent pattern: PR #110, PR #5 R1, PR #5 R2 all missed siblings).
    ❌ export function createSessionCookie(user) { ... }  // in sessionCookie.ts, not in src/index.ts
    ❌ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;  // private constant, no @internal tag
+   ❌ Batch-tagging during cleanup: tagged removedFunction1, removedFunction2, but missed sibling helperFunction that was never public
    ✅ /** @internal */ export function createSessionCookie(user) { ... }
    ✅ /** @internal */ export const DEFAULT_SESSION_TTL_SECONDS = 2592000;
+   ✅ Before considering @internal tagging complete, grep for `export ` in the whole file; verify every non-re-exported symbol has the tag
 
 9.6. Bare @internal tag without descriptive comment
    → Bare /** @internal */ is valid but a one-line role description is preferred for clarity

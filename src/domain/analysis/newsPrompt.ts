@@ -68,7 +68,7 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * @param skills            - All loaded skills; non-news / low-weight entries are filtered out.
  * @returns Prompt string ready to be sent to the LLM worker.
  *
- * @internal Builds the news-analysis LLM prompt; used by submit use-cases.
+ * @internal Builds the news-analysis LLM prompt.
  */
 export function buildNewsAnalysisPrompt(
     symbol: string,

@@ -17,7 +17,7 @@ import type { NewsItem } from '@/domain/types';
  * @param item - The raw news article to analyse.
  * @returns Prompt string ready to be sent to the flash-lite LLM.
  *
- * @internal Builds the per-news-card LLM prompt; used by submit use-cases.
+ * @internal Builds the per-news-card LLM prompt.
  */
 export function buildNewsCardAnalysisPrompt(item: NewsItem): string {
     const bodySection =

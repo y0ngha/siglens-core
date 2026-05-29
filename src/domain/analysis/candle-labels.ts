@@ -2,7 +2,7 @@ import type { CandlePattern, MultiCandlePattern } from '@/domain/types';
 
 // ─── Single Candle Pattern Labels ─────────────────────────────────────────────
 
-/** @internal Korean labels for single-candle patterns; used by label lookup. */
+/** @internal Korean labels for single-candle patterns. */
 export const CANDLE_PATTERN_LABELS: Record<CandlePattern, string> = {
     flat: '보합',
     gravestone_doji: '비석형 도지',
@@ -23,7 +23,7 @@ export const CANDLE_PATTERN_LABELS: Record<CandlePattern, string> = {
 
 // ─── Multi Candle Pattern Labels ──────────────────────────────────────────────
 
-/** @internal Korean labels for multi-candle patterns; used by label lookup. */
+/** @internal Korean labels for multi-candle patterns. */
 export const MULTI_CANDLE_PATTERN_LABELS: Record<MultiCandlePattern, string> = {
     bullish_engulfing: '상승 장악형',
     bullish_harami: '상승 잉태형',
@@ -102,7 +102,7 @@ export function getMultiCandlePatternLabel(
  * @param patternName - The pattern identifier — may be any string.
  * @returns The Korean label, or the original `patternName` when unknown.
  *
- * @internal Resolves a pattern id to its Korean label; used by prompt builders.
+ * @internal Resolves a pattern id to its Korean label.
  */
 export function findCandlePatternLabel(patternName: string): string {
     // Safe: CANDLE_PATTERN_LABELS / MULTI_CANDLE_PATTERN_LABELS keys are CandlePattern /

@@ -79,7 +79,7 @@ function normalizeCategoryAssessment(
  * @returns A fully-typed {@link FundamentalAnalysisResponse}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
  *
- * @internal Normalizes the fundamental LLM response; used by poll use-cases.
+ * @internal Normalizes the fundamental LLM response.
  */
 export function normalizeFundamentalAnalysisResponse(
     raw: unknown

@@ -88,7 +88,7 @@ function normalizeSignalItem(item: unknown): OptionsSignal | null {
  * @param now - Reference clock; always used as `analyzedAt`.
  * @returns Fully-typed normalized response with every field populated.
  *
- * @internal Normalizes the options-analysis LLM response; used by poll use-cases.
+ * @internal Normalizes the options-analysis LLM response.
  */
 export function normalizeOptionsAnalysisResponse(
     raw: unknown,
