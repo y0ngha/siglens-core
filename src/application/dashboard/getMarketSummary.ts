@@ -18,7 +18,6 @@ import type { MarketQuote, MarketSummaryData } from '@/domain/types';
  * @returns Indices and sector ETFs with their most recent quote data —
  *   see {@link MarketSummaryData}.
  *
- * @see getMarketSummaryWithBriefing
  * @see getSectorSignals
  */
 export async function getMarketSummary(

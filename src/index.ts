@@ -14,17 +14,14 @@ export { submitBriefing } from './application/market/submitBriefing';
 
 // Dashboard
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
-export { getMarketSummaryWithBriefing } from './application/dashboard/getMarketSummaryWithBriefing';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
 // Application background-task options (used by market / dashboard use-cases)
-export type { BackgroundTaskOptions } from './application/types';
 
 // Chat
 export {
     GEMINI_2_5_FLASH_LITE_MODEL,
     GEMINI_2_5_FLASH_MODEL,
-    GEMINI_2_5_PRO_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 export { requestChatCompletion } from './application/chat/requestChatCompletion';
@@ -135,6 +132,7 @@ export {
 // Market session — DST-safe US regular-session (ET) classification.
 // Single source of truth shared by siglens UI, cache, and analysis gating.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
+export type { EtSessionStatus } from './domain/types';
 
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
@@ -206,7 +204,6 @@ export {
 // =============================================================================
 
 // LLM provider constants
-export { LLM_PROVIDER_VALUES } from './domain/llm/constants';
 
 // Tier gating constants
 export { DEFAULT_TIER, TIER_CONFIG } from './domain/tier';
@@ -218,13 +215,11 @@ export {
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
 } from './domain/utils';
-export type { EtSessionStatus } from './domain/types';
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {
     DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
-    THINKING_BUDGET_FALLBACK_STEPS,
     type ChatGPTModelId,
     type ClaudeModelId,
     type GeminiModelId,
@@ -232,11 +227,7 @@ export {
 export type {
     ActiveModelId,
     AIProvider,
-    ChatGPTModelSpec,
-    ClaudeReasoningModelSpec,
-    ClaudeSamplingModelSpec,
     EffortLevel,
-    GeminiModelSpec,
     ModelSpec,
 } from './domain/types';
 export {
@@ -247,17 +238,6 @@ export {
 } from './domain/types';
 
 // Dashboard tickers / sectors
-export {
-    DASHBOARD_TIMEFRAME_LABELS,
-    DASHBOARD_TIMEFRAMES,
-    DEFAULT_DASHBOARD_TIMEFRAME,
-    MARKET_INDICES,
-    MARKET_SUMMARY_FMP_SYMBOLS,
-    SECTOR_ETFS,
-    SECTOR_GROUPS,
-    SECTOR_STOCKS,
-    SIGNAL_SECTORS,
-} from './domain/constants/dashboard-tickers';
 
 // Indicator constants
 export {
@@ -292,16 +272,6 @@ export {
 } from './domain/indicators/constants';
 
 // Infrastructure interfaces
-export type {
-    AnalysisLimitError,
-    AnalysisLimitErrorCode,
-    ChatbotLimitError,
-    ChatbotLimitErrorCode,
-    UsageLimitDependencies,
-    UsageLimitError,
-    UsageLimitErrorCode,
-    UsageLimitInput,
-} from './application/usage';
 export type {
     AiContents,
     CallAiProvider,
@@ -341,70 +311,25 @@ export type { NewsProvider, NewsTimeRange } from './domain/ports/newsProvider';
 export type { SkillsProvider } from './domain/ports/skillsProvider';
 
 // Application types
+export type { ChatActionResult, ChatErrorCode } from './application/chat/types';
 export type {
-    ChatActionResult,
-    ChatErrorCode,
-    RequestChatCompletionDependencies,
-    RequestChatCompletionParams,
-    RequestChatCompletionResult,
-} from './application/chat/types';
-export type {
-    FundamentalAnalysisUsageOptions,
     PollFundamentalAnalysisResult,
-    SubmitFundamentalAnalysisApiKeyRequiredError,
-    SubmitFundamentalAnalysisCached,
-    SubmitFundamentalAnalysisFetchError,
-    SubmitFundamentalAnalysisLimitError,
-    SubmitFundamentalAnalysisMissNoTrigger,
     SubmitFundamentalAnalysisOptions,
     SubmitFundamentalAnalysisResult,
-    SubmitFundamentalAnalysisSubmitted,
 } from './application/fundamental/types';
+export type { SubmitAnalysisGatedResult } from './application/market/types';
 export type {
-    AnalysisUsageOptions,
-    SubmitAnalysisGatedResult,
-    SubmitAnalysisMissNoTrigger,
-    SubmitAnalysisOptions,
-    SubmitAnalysisErrorResult,
-    TierGateErrorResult,
-    TierTimeframeAccessError,
-    UserApiKeyRequiredError,
-} from './application/market/types';
-export type {
-    NewsAnalysisUsageOptions,
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
-    SubmitNewsAnalysisApiKeyRequiredError,
-    SubmitNewsAnalysisCached,
-    SubmitNewsAnalysisLimitError,
-    SubmitNewsAnalysisMissNoTrigger,
-    SubmitNewsAnalysisNoNewsError,
     SubmitNewsAnalysisOptions,
     SubmitNewsAnalysisResult,
-    SubmitNewsAnalysisSubmitted,
-    SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
-    SubmitNewsCardAnalysisSubmitted,
-    SubmitNewsCardAnalysisCached,
 } from './application/news/types';
 export type {
     OverallAxis,
     PollOverallAnalysisResult,
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
-    SubmitOverallAnalysisCached,
-    SubmitOverallAnalysisPendingDependencies,
-    SubmitOverallAnalysisSubmitted,
-    SubmitOverallAnalysisError,
-    SubmitOverallAnalysisLimitError,
-    SubmitOverallAnalysisApiKeyRequiredError,
-    SubmitOverallAnalysisMissNoTrigger,
-    DependencyState,
-    DependencyStateCached,
-    DependencyStatePending,
-    DependencyStateError,
-    DependencyStateMissNoTrigger,
-    OverallDependencyInputs,
 } from './application/overall/types';
 
 // Domain types
@@ -415,9 +340,7 @@ export type {
     AnalysisSignal,
     AnalysisSignalType,
     CurrentAnalysisContext,
-    BacktestAiAnalysis,
     BacktestAiEntryRecommendation,
-    BacktestAiPriceTarget,
     BacktestAiResult,
     BacktestCase,
     BacktestData,
@@ -427,34 +350,22 @@ export type {
     BacktestSignalResult,
     Bar,
     BarsData,
-    BollingerResult,
     BuySellVolumeResult,
-    CandlePattern,
     CandlePatternEntry,
-    CandlePatternSummary,
-    ChartDisplayType,
     ChatLoadingPhase,
     ChatMessage,
-    ChatPromptPayload,
     ChatSession,
     ClusteredKeyLevel,
     ClusteredKeyLevels,
-    ConfirmedSignalType,
     ConflictInfo,
     ConflictResolution,
-    CrossDirection,
     DashboardTimeframe,
-    DMIResult,
     EarningsCalendarItem,
     EarningsReport,
     EnrichedNewsItem,
-    DonchianChannelResult,
-    ComputeFearGreedOptions,
     FearGreedConfidence,
-    FearGreedFactor,
     FearGreedFactorKey,
     FearGreedGroup,
-    FearGreedGroupName,
     FearGreedHistoryPoint,
     FearGreedLabel,
     FearGreedSnapshot,
@@ -462,50 +373,25 @@ export type {
     FundamentalAnalysisResponse,
     FundamentalAnalystEstimateInput,
     FundamentalCashFlowInput,
-    FundamentalCategoryAssessment,
     FundamentalCategory,
     FundamentalFinancialScoresInput,
-    FundamentalFutureDirection,
     FundamentalGradesConsensusInput,
-    FundamentalGrowth,
     FundamentalGrowthInput,
-    FundamentalHealth,
-    FundamentalPeer,
     FundamentalPeerInput,
     FundamentalPriceTargetConsensusInput,
     FundamentalPriceTargetSummaryInput,
-    FundamentalProfitability,
     FundamentalRatiosInput,
-    FundamentalSectorDirection,
     FundamentalSectorHistoricalInput,
     FundamentalSectorPerformanceInput,
     FundamentalSentiment,
-    FundamentalSnapshot,
     FundamentalProfile,
-    FundamentalProfileInput,
-    FundamentalValuation,
     FundamentalValuationMetrics,
-    NormalizeFundamentalSnapshotInput,
-    PriceTargetAvg,
     GradesAction,
-    GradesConsensus,
     GradesEvent,
     EntryRecommendation,
-    FilteredActionRecommendation,
-    FilteredAnalysisResponse,
-    FilteredAnalysisResult,
-    ExpectedSignalType,
     IchimokuFuturePoint,
-    IchimokuResult,
     IndexTicker,
-    IndicatorGuideResult,
     IndicatorResult,
-    KeltnerChannelResult,
-    KeyLevel,
-    KeyLevels,
-    KeyPrice,
-    LevelSource,
-    MACDResult,
     MarketBriefingResponse,
     NewsAnalysisResponse,
     NewsCardAnalysis,
@@ -513,45 +399,23 @@ export type {
     NewsImpact,
     NewsItem,
     NewsSentiment,
-    MarketBriefingSectorAnalysis,
-    MarketBriefingVolatilityAnalysis,
     MarketIndexData,
     MarketQuote,
     MarketSectorData,
     MarketSummaryData,
-    MarketSummaryWithBriefing,
-    ChatModel,
     ModelId,
-    MultiCandlePattern,
-    MultiCandlePatternEntry,
-    ParabolicSARResult,
-    PatternLine,
     PatternResult,
-    PatternSummary,
     PollAnalysisResult,
     PollBriefingResult,
     PriceScenario,
-    PriceTarget,
-    PriceTargets,
-    PriceTrend,
     OverallAnalysisResponse,
     OverallScenario,
     OverallScenarioName,
-    PriceTargetConsensus,
-    PriceTargetSummary,
-    PromptConfig,
     QuadrantKey,
-    RawAnalysisResponse,
-    ReconciledActionLevels,
     ReconciledActionLineData,
-    ReconciledTpEntry,
-    ReconcileResult,
-    ResolvedLevel,
     RiskLevel,
-    RunAnalysisInput,
     SectorEtf,
     SectorGroupDef,
-    SectorHistoricalPoint,
     SectorSignalsResult,
     SectorStock,
     Signal,
@@ -559,7 +423,6 @@ export type {
     SignalPhase,
     SignalStrength,
     SignalType,
-    SingleCandlePatternEntry,
     Skill,
     SkillCategory,
     SkillChartDisplay,
@@ -567,43 +430,18 @@ export type {
     SkillDisplay,
     SkillShowcaseItem,
     SkillType,
-    SMCBreakType,
-    SMCEqualLevel,
-    SMCFairValueGap,
-    SMCOrderBlock,
-    SMCResult,
-    SMCStructureBreak,
-    SMCStructureDirection,
-    SMCSwingPoint,
-    SMCSwingPointType,
-    SMCZone,
-    SMCZoneType,
-    SqueezeMomentumResult,
-    StochasticResult,
-    StochRSIResult,
     StockSignalResult,
     StockWithConflict,
     StrategyResult,
     SubmitBriefingResult,
-    SupertrendResult,
     Tier,
-    TierConfig,
-    TierFeatureFlags,
-    TierFeatureLimits,
-    TierInfoDepth,
-    TierLimitedFeature,
-    TierModel,
     Timeframe,
     Trend,
-    TrendDirection,
     Trendline,
     TrendlineDirection,
-    TrendlinePoint,
-    TrendState,
     UserTierContext,
     LlmProvider,
     ValidatedActionPrices,
-    VolumeProfileResult,
     VolumeProfileRow,
     WaitUntil,
 } from './domain/types';
@@ -612,23 +450,14 @@ export type {
 // `buildOptionsAnalysisPrompt` input shape). Routed through the
 // `./domain/types` barrel so every domain type follows the same import path.
 export type {
-    BuildOptionsAnalysisPromptOptions,
     OptionsContract,
     OptionsChain,
     OptionsSnapshot,
-    StrikeOpenInterest,
-    StrikeVolumeAggregate,
-    TopOiQuote,
     OptionsExpirationMetrics,
-    OptionsPerExpirationCommentary,
-    OptionsSignal,
     OptionsAnalysisResponse,
     OptionsTone,
     OptionsSignalKind,
-    ExpirationSlot,
-    ExpirationSlotKey,
     SlotMapping,
-    OptionsExpirationFilter,
 } from './domain/types';
 
 // Options analysis — provider interface (implementation injected by consumer)
@@ -636,7 +465,6 @@ export type { OptionsDataProvider } from './domain/ports/optionsDataProvider';
 
 // Options analysis — Tier 4 constant (canonical chip slot table consumed by
 // frontends for rendering and routing).
-export { EXPIRATION_SLOTS } from './domain/options/expirationSlots';
 
 // --- Tier 2 — Options domain functions ---
 //
@@ -671,16 +499,6 @@ export {
     pollOptionsAnalysis,
 } from './application/options';
 export type {
-    SubmitOptionsAnalysisOptions,
     SubmitOptionsAnalysisResult,
-    SubmitOptionsAnalysisCached,
-    SubmitOptionsAnalysisSubmitted,
-    SubmitOptionsAnalysisMissNoTrigger,
-    SubmitOptionsAnalysisLimitError,
-    SubmitOptionsAnalysisNoChainsError,
-    SubmitOptionsAnalysisApiKeyRequiredError,
     PollOptionsAnalysisResult,
-    PollOptionsAnalysisProcessing,
-    PollOptionsAnalysisDone,
-    PollOptionsAnalysisError,
 } from './application/options';

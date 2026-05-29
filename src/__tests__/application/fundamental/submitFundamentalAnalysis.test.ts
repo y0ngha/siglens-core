@@ -533,37 +533,6 @@ describe('submitFundamentalAnalysis 함수는', () => {
                 expect(result.jobId).toEqual(expect.any(String));
             }
         });
-
-        it('FundamentalAnalysisUsageOptions 별칭(@deprecated)도 동일하게 동작한다', async () => {
-            mockCacheGet.mockResolvedValueOnce(null);
-            const recordUsage = vi.fn().mockResolvedValue(undefined);
-            // Imported as a type alias of AnalysisUsageOptions — same shape at runtime.
-            const usage = {
-                usageRepository: {
-                    recordUsage,
-                    getUsageToday: vi
-                        .fn()
-                        .mockResolvedValue({ analysis: 0, chatbot: 0 }),
-                },
-                clientIp: '203.0.113.10',
-                userId: 'user-abc',
-                modelUsed: 'override-model',
-            };
-
-            await submitFundamentalAnalysis({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-                usage,
-            });
-
-            expect(recordUsage).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    userId: 'user-abc',
-                    modelUsed: 'override-model',
-                })
-            );
-        });
     });
 
     describe('사용량 제한이 적용될 때', () => {

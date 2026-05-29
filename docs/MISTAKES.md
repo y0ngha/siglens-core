@@ -743,6 +743,20 @@ and have been removed from this file.
    → Recurring mistake (fix/post-210a423 PR #75 R8, Task 7 R3): 22+ union variant instances (14 Raw* types, 8 SubmitXxx variants, OverallAxis, usage option types).
       Each submission or provider function round-trip misses variants or contradicts @internal status.
       Process: (1) list all types in function signature, (2) verify each is exported from src/index.ts without @internal, (3) no aliases to internal types in public signatures.
+
+9. Bulk @internal/@removal sweeps exclude parameter/return types of still-public functions
+   → Before bulk refactoring @internal tags or removing exports, carve out types reachable via parameter or return signatures of still-public functions
+   → When a public function's signature uses a type, that type must not be tagged @internal or removed from public exports
+   → Failure cascades: public function stays exported but its return/parameter types become unreachable by consumers
+   ❌ getEtSessionStatus (public) returns EtSessionStatus, but EtSessionStatus tagged @internal and removed from src/index.ts exports
+   ❌ isEtRegularSessionOpen (public, Tier 2) parameter type ExchangeDate removed from src/index.ts during bulk removal pass
+   ❌ PUBLIC_API.md inventory not updated after bulk removal, leaving stale references to removed types
+   ✅ Before bulk @internal sweep, identify all still-public functions and mark their parameter/return types as carve-out exceptions
+   ✅ After @internal/@removal: verify return/parameter types of public functions remain exported; update PUBLIC_API.md to reflect actual exports
+   ✅ Diff check: grep src/index.ts for all public function signatures; cross-check that every type in those signatures is either exported or known-internal
+   → Recurring (PR #110 R1–R2, PR #3–PR6 series): calculateIndicators return type, EtSessionStatus return type, SubmitAnalysis return type variants all escaped removal.
+      Root cause: bulk sweeps target dead symbols by name without first analyzing reachability graphs.
+      Process: (1) before removal, build reachability map of public function signatures, (2) exclude all types in those signatures from @internal/@removal, (3) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts).
 ```
 
 ---

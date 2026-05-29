@@ -39,12 +39,16 @@ export type FearGreedFactorKey =
     | 'range_position';
 
 /**
+ * @internal
  * Group label for the two-tier composition. The final score is the equal-weight
  * average of the Flow and Trend group scores.
  */
 export type FearGreedGroupName = 'Flow' | 'Trend';
 
-/** A single factor's raw value and its walk-forward percentile rank. */
+/**
+ * @internal
+ * A single factor's raw value and its walk-forward percentile rank.
+ */
 export interface FearGreedFactor {
     /** Discriminator identifying which factor this entry represents. */
     key: FearGreedFactorKey;
@@ -99,7 +103,10 @@ export interface FearGreedHistoryPoint {
     label: FearGreedLabel | null;
 }
 
-/** Optional configuration for the public `computeFearGreedIndex` / `computeFearGreedHistory` APIs. */
+/**
+ * @internal
+ * Optional configuration for the public `computeFearGreedIndex` / `computeFearGreedHistory` APIs.
+ */
 export interface ComputeFearGreedOptions {
     /** Volume Profile window (in bars) used to derive POC for the POC-distance factor. Defaults to 60. */
     pocWindow?: number;

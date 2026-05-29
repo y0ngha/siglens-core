@@ -106,6 +106,20 @@
 - Rule: Public API Smoke Tests — when wiring new public symbols through entrypoints, add basic assertions in corresponding .test.ts and .client.test.ts files to verify exports are present and callable
 - Context: Round 2 recommended findings — scoreToLabel, FEAR_GREED_LABEL_CUTOFFS, POC_WINDOW_DEFAULT were added to entrypoints but had no entrypoint smoke tests. Added 3 assertions to index.test.ts (scoreToLabel callability, CUTOFFS presence/type) and 3 to index.client.test.ts verifying all three symbols export correctly.
 
+## [PR #110 | refactor/110/prune-domain-types | 2026-05-29] — Round 1 approved
+- Violation: Public-API return-type regression — `EtSessionStatus` wrongly tagged `@internal` AND removed from `src/index.ts` / `src/index.client.ts` exports during bulk type-removal pass. But it is the return type of public Tier 2 functions `getEtSessionStatus` / `isEtRegularSessionOpen` (and was public on origin/main).
+- Rule: MISTAKES.md Public API Rule 9 — Bulk @internal/@removal sweeps must exclude parameter/return types of still-public functions
+- Context: Bulk removal pass removed 174 type/constant symbols without first carving out return/parameter types of still-public functions. Fixed by removing @internal tag and re-exporting EtSessionStatus from both src/index.ts and src/index.client.ts.
+- Pattern note: This violation recurred across PR #3–PR6 (calculateIndicators return type, SubmitAnalysis variants, TierTimeframeAccessError in public return types). Root cause: no reachability analysis before bulk @internal sweep. New rule MISTAKES.md Public API #9 added to consolidate this pattern.
+
+- Violation: PUBLIC_API.md inventory out of sync — Tier 4 '인터페이스' section still listed 7 symbols (AnalysisUsageOptions, SubmitAnalysisOptions, SubmitAnalysisErrorResult, TierTimeframeAccessError, UserApiKeyRequiredError, BackgroundTaskOptions, UsageLimit*) as public after they were @internal'd / removed from entrypoints.
+- Rule: MISTAKES.md Public API Rule 7 — Documentation Sync when exports change; PUBLIC_API.md inventory must stay synchronized with actual exports
+- Context: During bulk removal, symbols were removed from exports but PUBLIC_API.md not updated. Fixed by correcting the inventory line to remove the 7 symbols.
+
+- Violation: Stale inline comment — src/application/market/types.ts JSDoc above AnalysisUsageOptions re-export claimed the public import path `@y0ngha/siglens-core → AnalysisUsageOptions` "keeps working", which became false after the symbol was removed from src/index.ts.
+- Rule: MISTAKES.md Documentation Sync Rule 3 — Inline code comments must reference current behavior, not removed or changed implementation
+- Context: Comment read "keeps working" implying public import path valid; after bulk removal, path invalid. Fixed by rewriting the comment and tagging the module-level re-exports @internal to reflect their true visibility status.
+
 ## [Test Coverage Hardening Pass | main | 2026-05-29] — Round 1→2 approved
 - Violation: Vacuous/conditional test assertion in extractJsonWithRepair.test.ts wrapped key assertion inside if-guard
 - Rule: Test assertions must be deterministic and unconditional — assertions wrapped in if-guards silently skip when input does not match the guard condition, masking incomplete test coverage

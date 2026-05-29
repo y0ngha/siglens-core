@@ -2,10 +2,10 @@ import type {
     DashboardTimeframe,
     IndexTicker,
     SectorEtf,
-    SectorGroupDef,
     SectorStock,
 } from '@/domain/types';
 
+/** @internal Market index tickers rendered on the dashboard summary. */
 export const MARKET_INDICES: readonly IndexTicker[] = [
     {
         symbol: 'GSPC',
@@ -33,6 +33,7 @@ export const MARKET_INDICES: readonly IndexTicker[] = [
     },
 ];
 
+/** @internal Sector SPDR ETF tickers used for dashboard sector rows. */
 export const SECTOR_ETFS: readonly SectorEtf[] = [
     { symbol: 'XLK', sectorName: 'Technology', koreanName: '기술' },
     { symbol: 'XLF', sectorName: 'Financials', koreanName: '금융' },
@@ -47,18 +48,13 @@ export const SECTOR_ETFS: readonly SectorEtf[] = [
     { symbol: 'XLC', sectorName: 'Comm. Svc.', koreanName: '통신서비스' },
 ];
 
-// GICS 기반 섹터 분류: 성장 / 경기민감 / 방어
-export const SECTOR_GROUPS: readonly SectorGroupDef[] = [
-    { label: '성장', symbols: ['XLK', 'XLC', 'XLY', 'XLF'] },
-    { label: '경기민감', symbols: ['XLE', 'XLI', 'XLB'] },
-    { label: '방어', symbols: ['XLV', 'XLP', 'XLU', 'XLRE'] },
-];
-
+/** @internal FMP symbols fetched for the market summary (indices + sector ETFs). */
 export const MARKET_SUMMARY_FMP_SYMBOLS: readonly string[] = [
     ...MARKET_INDICES.map(i => i.fmpSymbol),
     ...SECTOR_ETFS.map(e => e.symbol),
 ];
 
+/** @internal Representative constituent stocks per dashboard sector. */
 export const SECTOR_STOCKS: readonly SectorStock[] = [
     // Technology (XLK) — 8
     { symbol: 'AAPL', koreanName: '애플', sectorSymbol: 'XLK' },
@@ -148,21 +144,5 @@ export const SECTOR_STOCKS: readonly SectorStock[] = [
     { symbol: 'IBM', koreanName: '아이비엠', sectorSymbol: 'QNTM' },
 ];
 
-export const DASHBOARD_TIMEFRAMES: readonly DashboardTimeframe[] = [
-    '15Min',
-    '1Hour',
-    '1Day',
-];
-
+/** @internal Default timeframe applied when a dashboard caller omits one. */
 export const DEFAULT_DASHBOARD_TIMEFRAME: DashboardTimeframe = '1Day';
-
-export const DASHBOARD_TIMEFRAME_LABELS: Record<DashboardTimeframe, string> = {
-    '15Min': '15분',
-    '1Hour': '1시간',
-    '1Day': '1일',
-};
-
-export const SIGNAL_SECTORS: readonly SectorEtf[] = [
-    ...SECTOR_ETFS,
-    { symbol: 'QNTM', sectorName: 'Quantum', koreanName: '양자' },
-];

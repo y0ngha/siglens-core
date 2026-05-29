@@ -4,7 +4,6 @@ import {
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
     GEMINI_2_5_FLASH_MODEL,
-    GEMINI_2_5_PRO_MODEL,
     getAllowedModels,
     getAllowedTimeframes,
     getTierLimit,
@@ -19,22 +18,19 @@ import {
 } from '@/index.client';
 import * as clientApi from '@/index.client';
 import type {
-    FundamentalSnapshot,
     ModelId,
     OverallAnalysisResponse,
     SkillType,
-    TierConfig,
 } from '@/index.client';
 
 describe('browser public API exports', () => {
     it('exports domain values used by browser consumers', () => {
         const skillType: SkillType = 'indicator_guide';
         const modelId: ModelId = 'gemini-2.5-pro';
-        const tierConfig: TierConfig = TIER_CONFIG;
+        const tierConfig = TIER_CONFIG;
 
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
-        expect(GEMINI_2_5_PRO_MODEL).toBe('gemini-2.5-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
         expect(DEFAULT_TIER).toBe('free');
         expect(getAllowedModels('free')).toContain('claude-opus-4-7');
@@ -56,11 +52,6 @@ describe('browser public API exports', () => {
     });
 
     it('exports fundamental / news / overall domain symbols for browser consumers', () => {
-        // Type-level imports — verify the new domain types are reachable from the
-        // browser entry by assigning a representative literal to each.
-        const snapshotKeys: Array<keyof FundamentalSnapshot> = ['profile'];
-        expect(snapshotKeys).toContain('profile');
-
         // Runtime exports must be callable on the browser entry.
         expect(typeof AI_SYSTEM_PROMPT).toBe('string');
         expect(AI_SYSTEM_PROMPT.length).toBeGreaterThan(0);

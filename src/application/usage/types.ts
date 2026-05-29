@@ -2,6 +2,7 @@ import type { Tier, TierConfig } from '@/domain/types';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
 
 /**
+ * @internal
  * Usage tracking and daily limit options shared by every analysis use-case
  * (technical, fundamental, news, overall).
  *
@@ -33,13 +34,19 @@ export interface AnalysisUsageOptions {
     occurredAt?: Date;
 }
 
-/** Dependencies required by daily usage limit checks. */
+/**
+ * @internal
+ * Dependencies required by daily usage limit checks.
+ */
 export interface UsageLimitDependencies {
     /** Repository that reads usage counts for a hashed IP. */
     usage: Pick<UsageRepository, 'getUsageToday'>;
 }
 
-/** Input shared by daily usage limit checks. */
+/**
+ * @internal
+ * Input shared by daily usage limit checks.
+ */
 export interface UsageLimitInput {
     /** SHA-256 IP hash for the UTC day. */
     ipHash: string;
@@ -51,13 +58,22 @@ export interface UsageLimitInput {
     config?: TierConfig;
 }
 
-/** Structured error code returned by analysis usage-limit checks. */
+/**
+ * @internal
+ * Structured error code returned by analysis usage-limit checks.
+ */
 export type AnalysisLimitErrorCode = 'analysis_limit_exceeded';
 
-/** Structured error code returned by chatbot usage-limit checks. */
+/**
+ * @internal
+ * Structured error code returned by chatbot usage-limit checks.
+ */
 export type ChatbotLimitErrorCode = 'chatbot_limit_exceeded';
 
-/** Structured error returned when analysis usage is blocked. */
+/**
+ * @internal
+ * Structured error returned when analysis usage is blocked.
+ */
 export interface AnalysisLimitError {
     /** Machine-readable error code. */
     code: AnalysisLimitErrorCode;
@@ -69,7 +85,10 @@ export interface AnalysisLimitError {
     tier: Tier;
 }
 
-/** Structured error returned when chatbot usage is blocked. */
+/**
+ * @internal
+ * Structured error returned when chatbot usage is blocked.
+ */
 export interface ChatbotLimitError {
     /** Machine-readable error code. */
     code: ChatbotLimitErrorCode;
@@ -81,12 +100,18 @@ export interface ChatbotLimitError {
     tier: Tier;
 }
 
-/** Error code returned when a daily usage limit blocks a request. */
+/**
+ * @internal
+ * Error code returned when a daily usage limit blocks a request.
+ */
 export type UsageLimitErrorCode =
     | AnalysisLimitError['code']
     | ChatbotLimitError['code'];
 
-/** Structured usage-limit error payload. */
+/**
+ * @internal
+ * Structured usage-limit error payload.
+ */
 export type UsageLimitError = AnalysisLimitError | ChatbotLimitError;
 
 /** @internal Error payload templates before the request tier is attached. */

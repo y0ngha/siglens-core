@@ -50,6 +50,7 @@ export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';
 // ─────────────────────────────────────────
 
 /**
+ * @internal
  * Inputs carried by the overall dependency resolver.
  *
  * The `technical` field forwards the minimal options that `submitAnalysis`
@@ -244,6 +245,7 @@ export interface OverallDependencyInputs {
 // ─────────────────────────────────────────
 
 /**
+ * @internal
  * All four dependency axes resolved — overall analysis can be built immediately.
  *
  * `options` is `null` when the axis was gracefully skipped (the caller omitted
@@ -265,6 +267,7 @@ export interface DependencyStateCached {
 }
 
 /**
+ * @internal
  * One or more dependency axes are still being processed.
  *
  * `pendingJobs` maps each axis to its background `jobId`, or `undefined`
@@ -276,6 +279,7 @@ export interface DependencyStatePending {
 }
 
 /**
+ * @internal
  * One of the dependency axes returned `status: 'error'` or `status: 'key_error'`
  * from its submit function.
  *
@@ -306,6 +310,7 @@ export interface DependencyStateError {
 }
 
 /**
+ * @internal
  * Resolver state indicating at least one axis missed cache and the resolver
  * was told (via `skipEnqueueIfMiss`) not to trigger a job. The overall caller
  * should surface a fallback without enqueueing anything itself.
@@ -315,6 +320,7 @@ export interface DependencyStateMissNoTrigger {
 }
 
 /**
+ * @internal
  * Result returned by {@link resolveOverallDependencies}.
  *
  * - `cached` — all four axes resolved from cache; the results are embedded.
@@ -366,13 +372,17 @@ export interface SubmitOverallAnalysisOptions
     now?: Date;
 }
 
-/** The caller receives a cached overall analysis — no new job was created. */
+/**
+ * @internal
+ * The caller receives a cached overall analysis — no new job was created.
+ */
 export interface SubmitOverallAnalysisCached {
     status: 'cached';
     result: OverallAnalysisResponse;
 }
 
 /**
+ * @internal
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
@@ -387,13 +397,17 @@ export interface SubmitOverallAnalysisPendingDependencies {
     pendingJobs: Record<OverallAxis, string | undefined>;
 }
 
-/** A new overall analysis job was submitted; poll with `jobId` for the result. */
+/**
+ * @internal
+ * A new overall analysis job was submitted; poll with `jobId` for the result.
+ */
 export interface SubmitOverallAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
 /**
+ * @internal
  * One of the dependency axes returned an error (tier gate, usage limit, or
  * fetch failure). The overall job is not submitted.
  */
@@ -406,6 +420,7 @@ export interface SubmitOverallAnalysisError {
 }
 
 /**
+ * @internal
  * Daily analysis limit was exceeded by the overall-scoped usage check.
  * No axis submit was dispatched.
  *
@@ -421,10 +436,14 @@ export interface SubmitOverallAnalysisLimitError {
     error: AnalysisLimitError;
 }
 
-/** Result variant when BYOK API key is required for the overall job's own AI call. */
+/**
+ * @internal
+ * Result variant when BYOK API key is required for the overall job's own AI call.
+ */
 export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
+ * @internal
  * Result indicating no overall analysis job was enqueued because the caller
  * opted out via `skipEnqueueIfMiss`. Returned in two cases:
  *

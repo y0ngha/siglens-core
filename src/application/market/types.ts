@@ -14,19 +14,22 @@ import type {
 } from '@/domain/types';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
+/** @internal Re-exported for use by this module's analysis option/result types. */
 export type { UserApiKeyRequiredError };
 
 /**
- * Usage tracking and daily limit options for analysis submissions.
- *
- * Re-exported from `@/application/usage/types` so existing public imports
- * (`@y0ngha/siglens-core` → `AnalysisUsageOptions`) keep working. The same
- * type is shared by every analysis use-case (technical, fundamental, news,
- * overall) — see the canonical definition in `usage/types.ts`.
+ * @internal
+ * Usage tracking and daily limit options for analysis submissions. Re-exported
+ * here so every analysis use-case (technical, fundamental, news, overall) shares
+ * one canonical definition — see `usage/types.ts`. Not part of the public API
+ * surface (removed from `src/index.ts` in PR6).
  */
 export type { AnalysisUsageOptions };
 
-/** Options controlling analysis submission behavior. */
+/**
+ * @internal
+ * Options controlling analysis submission behavior.
+ */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     /**
      * Market data provider injected by the consumer (siglens app).
@@ -58,7 +61,10 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     skipEnqueueIfMiss?: boolean;
 }
 
-/** Error returned when application tier gates block a timeframe request. */
+/**
+ * @internal
+ * Error returned when application tier gates block a timeframe request.
+ */
 export interface TierTimeframeAccessError {
     /** Machine-readable reason for the denial. */
     code: 'timeframe_not_allowed';
@@ -72,19 +78,26 @@ export interface TierTimeframeAccessError {
     allowedTimeframes: Timeframe[];
 }
 
-/** Analysis error result when tier timeframe access is denied. */
+/**
+ * @internal
+ * Analysis error result when tier timeframe access is denied.
+ */
 export interface TierGateErrorResult {
     status: 'error';
     error: TierTimeframeAccessError;
 }
 
-/** Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required. */
+/**
+ * @internal
+ * Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required.
+ */
 export type SubmitAnalysisErrorResult =
     | { status: 'error'; error: AnalysisLimitError }
     | UserApiKeyRequiredError
     | TierGateErrorResult;
 
 /**
+ * @internal
  * Result indicating the analysis cache missed but no job was enqueued because
  * the caller opted out via `skipEnqueueIfMiss`. The consumer is expected to
  * render a fallback in this case.

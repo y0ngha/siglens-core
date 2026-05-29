@@ -17,7 +17,10 @@ import type {
 // Submit Options Analysis
 // ─────────────────────────────────────────
 
-/** Options controlling options analysis submission behavior. */
+/**
+ * @internal
+ * Options controlling options analysis submission behavior.
+ */
 export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
@@ -75,24 +78,34 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     force?: boolean;
 }
 
-/** The caller receives a cached analysis — no new job was created. */
+/**
+ * @internal
+ * The caller receives a cached analysis — no new job was created.
+ */
 export interface SubmitOptionsAnalysisCached {
     status: 'cached';
     result: OptionsAnalysisResponse;
 }
 
-/** A new analysis job was submitted; poll with `jobId` for the result. */
+/**
+ * @internal
+ * A new analysis job was submitted; poll with `jobId` for the result.
+ */
 export interface SubmitOptionsAnalysisSubmitted {
     status: 'submitted';
     jobId: string;
 }
 
-/** The analysis cache missed but no job was enqueued (`skipEnqueueIfMiss`). */
+/**
+ * @internal
+ * The analysis cache missed but no job was enqueued (`skipEnqueueIfMiss`).
+ */
 export interface SubmitOptionsAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
 
 /**
+ * @internal
  * Result variant when the daily analysis limit is exceeded.
  *
  * The `status` is `'limit_error'` (not `'error'`) so callers can
@@ -106,6 +119,7 @@ export interface SubmitOptionsAnalysisLimitError {
 }
 
 /**
+ * @internal
  * Result variant when the underlying snapshot has no chains to analyze.
  *
  * The `status` is `'no_chains_error'` (not `'error'`) so callers can
@@ -118,7 +132,10 @@ export interface SubmitOptionsAnalysisNoChainsError {
     error: string;
 }
 
-/** Result variant when a user BYOK API key is required for the requested model+tier combo. */
+/**
+ * @internal
+ * Result variant when a user BYOK API key is required for the requested model+tier combo.
+ */
 export type SubmitOptionsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /** Union of all possible outcomes from `submitOptionsAnalysis`. */
@@ -134,18 +151,27 @@ export type SubmitOptionsAnalysisResult =
 // Poll Options Analysis
 // ─────────────────────────────────────────
 
-/** Worker has not finished yet — caller should retry. */
+/**
+ * @internal
+ * Worker has not finished yet — caller should retry.
+ */
 export interface PollOptionsAnalysisProcessing {
     status: 'processing';
 }
 
-/** Worker finished successfully — `result` is the normalized analysis. */
+/**
+ * @internal
+ * Worker finished successfully — `result` is the normalized analysis.
+ */
 export interface PollOptionsAnalysisDone {
     status: 'done';
     result: OptionsAnalysisResponse;
 }
 
-/** Worker reported a failure, result missing, or normalization failed. */
+/**
+ * @internal
+ * Worker reported a failure, result missing, or normalization failed.
+ */
 export interface PollOptionsAnalysisError {
     status: 'error';
     error: string;
