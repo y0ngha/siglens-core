@@ -5,7 +5,7 @@ import type {
     KeyLevels,
 } from '@/domain/types';
 
-export const DEFAULT_EPSILON_PERCENT = 0.005;
+const DEFAULT_EPSILON_PERCENT = 0.005;
 const PRICE_DECIMAL_FACTOR = 100;
 
 function isValidKeyLevel(level: KeyLevel | null | undefined): boolean {

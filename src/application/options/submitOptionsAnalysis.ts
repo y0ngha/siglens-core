@@ -16,7 +16,7 @@ import { normalizeOptionsAnalysisResponse } from '@/domain/analysis/normalizeOpt
 import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
-import { buildOptionsCacheKey } from '@/application/options/cacheKey';
+import { buildOptionsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';

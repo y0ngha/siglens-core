@@ -3,7 +3,7 @@ import type { Bar } from '@/domain/types';
 export const TEST_BAR_BASE_TIME = 1700000000;
 export const TEST_BAR_INTERVAL = 60;
 export const TEST_BAR_BASE_PRICE = 100;
-export const TEST_BAR_VOLUME = 1000;
+const TEST_BAR_VOLUME = 1000;
 export const HAMMER_BODY_OFFSET = 3;
 export const HAMMER_HIGH_OFFSET = 5;
 export const HAMMER_LOW_OFFSET = -15;

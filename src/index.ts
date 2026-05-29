@@ -285,6 +285,7 @@ export {
     ANALYSIS_CACHE_TTL,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildOptionsCacheKey,
     CACHE_EXPIRY_HOUR_KST,
     computeBarsEffectiveTtl,
     computeEffectiveTtl,
@@ -871,7 +872,6 @@ export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
 export {
     submitOptionsAnalysis,
     pollOptionsAnalysis,
-    buildOptionsCacheKey,
 } from './application/options';
 export type {
     SubmitOptionsAnalysisOptions,

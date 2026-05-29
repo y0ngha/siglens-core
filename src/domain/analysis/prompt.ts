@@ -34,6 +34,7 @@ import {
     SUPERTREND_MULTIPLIER,
     WILLIAMS_R_DEFAULT_PERIOD,
 } from '@/domain/indicators/constants';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { detectCandlePattern } from '@/domain/analysis/candle';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
 import {
@@ -56,13 +57,13 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
+import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 
 type SkillGroupKey = SkillType | 'regular';
 
 const INDICATOR_DECIMAL_PLACES = 2;
 const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
-const SECONDS_TO_MS = 1000;
 
 // 테스트/외부 호출자가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
 export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
@@ -176,8 +177,8 @@ interface PromptCandlePatternEntry {
     patternName: string;
 }
 
-const fmt = (n: number | null): string =>
-    n === null ? 'N/A' : n.toFixed(INDICATOR_DECIMAL_PLACES);
+// Alias for brevity in the prompt-line templates below; identical to formatNullableNumber(n, 2).
+const fmt = formatNullableNumber;
 
 const formatVolume = (n: number): string =>
     Math.round(n)
@@ -243,7 +244,7 @@ const formatLongTermContext = (bars: Bar[]): string => {
 };
 
 const formatBarRow = (bar: Bar): string => {
-    const datetime = new Date(bar.time * SECONDS_TO_MS)
+    const datetime = new Date(bar.time * MS_PER_SECOND)
         .toISOString()
         .replace('T', ' ')
         .slice(0, DATETIME_DISPLAY_LENGTH);
