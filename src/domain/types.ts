@@ -72,7 +72,6 @@ export interface MarketSummaryData {
 }
 
 /**
- * @internal
  * Sector ranking + descriptive commentary fragment of a market briefing.
  */
 export interface MarketBriefingSectorAnalysis {
@@ -85,7 +84,6 @@ export interface MarketBriefingSectorAnalysis {
 }
 
 /**
- * @internal
  * Volatility (VIX) commentary fragment of a market briefing.
  */
 export interface MarketBriefingVolatilityAnalysis {
@@ -149,7 +147,6 @@ export interface Bar {
 }
 
 /**
- * @internal
  * Per-bar MACD output: line, signal, histogram. `null` during the warm-up window.
  */
 export interface MACDResult {
@@ -159,7 +156,6 @@ export interface MACDResult {
 }
 
 /**
- * @internal
  * Per-bar Bollinger Band output: upper / middle / lower. `null` during the warm-up window.
  */
 export interface BollingerResult {
@@ -169,7 +165,6 @@ export interface BollingerResult {
 }
 
 /**
- * @internal
  * Per-bar DMI output: +DI, -DI, ADX. `null` during the warm-up window.
  */
 export interface DMIResult {
@@ -179,7 +174,6 @@ export interface DMIResult {
 }
 
 /**
- * @internal
  * Per-bar Stochastic output: %K, %D. `null` during the warm-up window.
  */
 export interface StochasticResult {
@@ -188,7 +182,6 @@ export interface StochasticResult {
 }
 
 /**
- * @internal
  * Result of `calculateStochRSI`. `null` during the warm-up window.
  */
 export interface StochRSIResult {
@@ -197,7 +190,6 @@ export interface StochRSIResult {
 }
 
 /**
- * @internal
  * Single price-level row of a volume profile histogram.
  */
 export interface VolumeProfileRow {
@@ -206,7 +198,6 @@ export interface VolumeProfileRow {
 }
 
 /**
- * @internal
  * Result of `calculateVolumeProfile`: POC + value-area boundaries + histogram.
  */
 export interface VolumeProfileResult {
@@ -221,7 +212,6 @@ export interface VolumeProfileResult {
 }
 
 /**
- * @internal
  * Result of `calculateIchimoku`. `null` during the warm-up window.
  */
 export interface IchimokuResult {
@@ -239,19 +229,16 @@ export interface IchimokuFuturePoint {
 }
 
 /**
- * @internal
  * Direction of price movement (up / down).
  */
 export type PriceTrend = 'up' | 'down';
 
 /**
- * @internal
  * Indicator trend direction; `null` indicates "not yet determined".
  */
 export type TrendDirection = PriceTrend | null;
 
 /**
- * @internal
  * Result of `calculateParabolicSAR`. `null` during the warm-up window.
  */
 export interface ParabolicSARResult {
@@ -260,7 +247,6 @@ export interface ParabolicSARResult {
 }
 
 /**
- * @internal
  * Result of `calculateSupertrend`. `null` during the warm-up window.
  */
 export interface SupertrendResult {
@@ -269,7 +255,6 @@ export interface SupertrendResult {
 }
 
 /**
- * @internal
  * Result of `calculateKeltnerChannel`. `null` during the warm-up window.
  */
 export interface KeltnerChannelResult {
@@ -279,7 +264,6 @@ export interface KeltnerChannelResult {
 }
 
 /**
- * @internal
  * Result of `calculateDonchianChannel`. `null` during the warm-up window.
  */
 export interface DonchianChannelResult {
@@ -315,28 +299,23 @@ export type {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * @internal
  * Direction of an SMC structure break or order block.
  */
 export type SMCStructureDirection = 'bullish' | 'bearish';
 /**
- * @internal
  * SMC structure break type: BOS = Break of Structure; CHoCH = Change of Character.
  */
 export type SMCBreakType = 'bos' | 'choch';
 /**
- * @internal
  * Whether an SMC swing point is a high or a low.
  */
 export type SMCSwingPointType = 'high' | 'low';
 /**
- * @internal
  * SMC zone classification.
  */
 export type SMCZoneType = 'premium' | 'discount' | 'equilibrium';
 
 /**
- * @internal
  * A detected swing high or swing low used by SMC structure analysis.
  */
 export interface SMCSwingPoint {
@@ -346,7 +325,6 @@ export interface SMCSwingPoint {
 }
 
 /**
- * @internal
  * A detected order block. `isMitigated` flips when price returns through it.
  */
 export interface SMCOrderBlock {
@@ -358,7 +336,6 @@ export interface SMCOrderBlock {
 }
 
 /**
- * @internal
  * A detected fair-value gap. `isMitigated` flips when price fills the gap.
  */
 export interface SMCFairValueGap {
@@ -370,7 +347,6 @@ export interface SMCFairValueGap {
 }
 
 /**
- * @internal
  * A pair of equal swing points (e.g. equal highs / equal lows).
  */
 export interface SMCEqualLevel {
@@ -381,7 +357,6 @@ export interface SMCEqualLevel {
 }
 
 /**
- * @internal
  * A premium / discount / equilibrium price band on the chart.
  */
 export interface SMCZone {
@@ -391,7 +366,6 @@ export interface SMCZone {
 }
 
 /**
- * @internal
  * A structure break event (BOS or CHoCH) at a specific bar/price.
  */
 export interface SMCStructureBreak {
@@ -402,7 +376,6 @@ export interface SMCStructureBreak {
 }
 
 /**
- * @internal
  * Aggregated SMC analysis output produced by `calculateSmc`.
  */
 export interface SMCResult {
@@ -426,7 +399,6 @@ export interface SMCResult {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * @internal
  * Result of `calculateSqueezeMomentum` for a single bar.
  */
 export interface SqueezeMomentumResult {
@@ -502,7 +474,6 @@ export interface IndicatorResult {
 }
 
 /**
- * @internal
  * How a chart-display directive should render (line / marker / region).
  */
 export type ChartDisplayType = 'line' | 'marker' | 'region';
@@ -578,7 +549,6 @@ export type SignalStrength = 'strong' | 'moderate' | 'weak';
 export type Trend = 'bullish' | 'bearish' | 'neutral';
 
 /**
- * @internal
  * Single-bar candle pattern label. See {@link detectCandlePattern}.
  */
 export type CandlePattern =
@@ -603,7 +573,6 @@ export type CandlePattern =
     | 'bearish';
 
 /**
- * @internal
  * Multi-bar candle pattern label. See {@link detectMultiCandlePattern}.
  */
 export type MultiCandlePattern =
@@ -646,7 +615,6 @@ export type MultiCandlePattern =
     | 'in_neck';
 
 /**
- * @internal
  * Detected single-bar pattern entry.
  */
 export interface SingleCandlePatternEntry {
@@ -657,7 +625,6 @@ export interface SingleCandlePatternEntry {
 }
 
 /**
- * @internal
  * Detected multi-bar pattern entry.
  */
 export interface MultiCandlePatternEntry {
@@ -697,7 +664,6 @@ export interface AnalysisSignal {
 }
 
 /**
- * @internal
  * AI interpretation of a single indicator-guide skill.
  */
 export interface IndicatorGuideResult {
@@ -708,7 +674,6 @@ export interface IndicatorGuideResult {
 }
 
 /**
- * @internal
  * A single support / resistance level with explanatory reason.
  */
 export interface KeyLevel {
@@ -719,7 +684,6 @@ export interface KeyLevel {
 }
 
 /**
- * @internal
  * A labelled price reference inside a pattern (e.g. `"넥라인"` at 150.00).
  */
 export interface KeyPrice {
@@ -728,7 +692,6 @@ export interface KeyPrice {
 }
 
 /**
- * @internal
  * Set of support / resistance levels and the optional volume Point-of-Control.
  */
 export interface KeyLevels {
@@ -754,7 +717,6 @@ export interface ClusteredKeyLevels {
 }
 
 /**
- * @internal
  * A single price target (price + rationale string).
  */
 export interface PriceTarget {
@@ -773,7 +735,6 @@ export interface PriceScenario {
 }
 
 /**
- * @internal
  * Bullish + bearish scenarios for AI-projected price targets.
  */
 export interface PriceTargets {
@@ -784,7 +745,6 @@ export interface PriceTargets {
 }
 
 /**
- * @internal
  * Diagonal trendline owned by a specific pattern (e.g. wedge boundary, neckline).
  */
 export interface PatternLine {
@@ -794,7 +754,6 @@ export interface PatternLine {
 }
 
 /**
- * @internal
  * AI summary of a chart pattern detection (used inside `patternSummaries`).
  */
 export interface PatternSummary {
@@ -840,7 +799,6 @@ export interface StrategyResult {
 }
 
 /**
- * @internal
  * AI summary of a detected candle pattern (for the `candlePatterns` field).
  */
 export interface CandlePatternSummary {
@@ -864,7 +822,6 @@ export type RawStrategyResult = Omit<StrategyResult, 'confidenceWeight' | 'id'>;
 export type TrendlineDirection = 'ascending' | 'descending';
 
 /**
- * @internal
  * Single endpoint of a trendline (Unix timestamp + price).
  */
 export interface TrendlinePoint {
@@ -917,7 +874,6 @@ export interface ValidatedActionPrices {
 export type EntryRecommendation = 'enter' | 'wait' | 'avoid';
 
 /**
- * @internal
  * Domain-reconciled stopLoss/takeProfit fallback levels for an ActionRecommendation.
  */
 export interface ReconciledActionLevels {
@@ -934,7 +890,6 @@ export interface ReconciledActionLevels {
 }
 
 /**
- * @internal
  * 보정값 takeProfit 단일 항목 — 차트 라벨 분기에 사용.
  */
 export interface ReconciledTpEntry {
@@ -1195,7 +1150,6 @@ export type SignalDirection = 'bullish' | 'bearish';
 export type SignalPhase = 'confirmed' | 'expected';
 
 /**
- * @internal
  * Signals detected after a confirming event has fired.
  */
 export type ConfirmedSignalType =
@@ -1218,7 +1172,6 @@ export type ConfirmedSignalType =
     | 'squeeze_momentum_bullish';
 
 /**
- * @internal
  * Anticipation signals — early warnings that may or may not develop.
  */
 export type ExpectedSignalType =
@@ -1247,7 +1200,6 @@ export interface Signal {
 }
 
 /**
- * @internal
  * Trend classification used by the dashboard sector grid.
  */
 export type TrendState = 'uptrend' | 'downtrend' | 'sideways';
@@ -1318,7 +1270,6 @@ export interface ChatSession {
 }
 
 /**
- * @internal
  * Chat prompt payload returned by {@link buildChatPrompt}.
  */
 export interface ChatPromptPayload {
@@ -1334,13 +1285,11 @@ export interface ChatPromptPayload {
 export type Tier = 'free' | 'member' | 'pro';
 
 /**
- * @internal
  * Daily usage-limited feature identifiers.
  */
 export type TierLimitedFeature = 'analysisPerDay' | 'chatbotPerDay';
 
 /**
- * @internal
  * Analysis detail fragments exposed per tier.
  *
  * Values use the serialized AI response field names, so multi-word fragments
@@ -1377,7 +1326,6 @@ interface BaseModelSpec {
 }
 
 /**
- * @internal
  * Claude model without adaptive thinking.
  */
 export interface ClaudeSamplingModelSpec extends BaseModelSpec {
@@ -1395,7 +1343,6 @@ export interface ClaudeSamplingModelSpec extends BaseModelSpec {
 }
 
 /**
- * @internal
  * Claude model using adaptive thinking effort.
  */
 export interface ClaudeReasoningModelSpec extends BaseModelSpec {
@@ -1410,7 +1357,6 @@ export interface ClaudeReasoningModelSpec extends BaseModelSpec {
 }
 
 /**
- * @internal
  * Gemini model using thinking-budget controls and sampling temperature.
  */
 export interface GeminiModelSpec extends BaseModelSpec {
@@ -1425,7 +1371,6 @@ export interface GeminiModelSpec extends BaseModelSpec {
 }
 
 /**
- * @internal
  * ChatGPT Responses API reasoning model.
  */
 export interface ChatGPTModelSpec extends BaseModelSpec {
@@ -1518,7 +1463,6 @@ export function isClaudeSamplingModelSpec(
 }
 
 /**
- * @internal
  * AI model identifiers allowed by tier gating.
  */
 export type TierModel =
@@ -1563,7 +1507,6 @@ export type ModelId = TierModel;
 export type ChatModel = ModelId;
 
 /**
- * @internal
  * Usage limits keyed by feature for every tier.
  */
 export type TierFeatureLimits = Record<
@@ -1572,7 +1515,6 @@ export type TierFeatureLimits = Record<
 >;
 
 /**
- * @internal
  * Toggle set controlling which tier gates are enforced at runtime.
  */
 export interface TierFeatureFlags {
@@ -1580,7 +1522,6 @@ export interface TierFeatureFlags {
 }
 
 /**
- * @internal
  * Centralized tier configuration consumed by domain and application gates.
  */
 export interface TierConfig {
@@ -1660,7 +1601,6 @@ export type BacktestAiResult = 'win' | 'loss' | 'neutral';
 export type BacktestExitReason = 'take_profit' | 'stop_loss' | 'time';
 
 /**
- * @internal
  * Internal: AI-suggested price target stored in a backtest case.
  */
 export interface BacktestAiPriceTarget {
@@ -1672,7 +1612,6 @@ export interface BacktestAiPriceTarget {
 export type BacktestAiEntryRecommendation = 'enter' | 'wait' | 'avoid';
 
 /**
- * @internal
  * Internal: AI analysis snapshot stored alongside a backtest case.
  */
 export interface BacktestAiAnalysis {
@@ -1755,7 +1694,6 @@ export type FundamentalCategory =
     | 'futureDirection';
 
 /**
- * @internal
  * Per-category assessment summary used by the fundamental analysis response.
  */
 export interface FundamentalCategoryAssessment {
@@ -2008,7 +1946,6 @@ export interface FundamentalPriceTargetConsensusInput {
 }
 
 /**
- * @internal
  * Single average price target bucket (1-month, 3-month, or 12-month window).
  */
 export interface PriceTargetAvg {

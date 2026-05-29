@@ -18,7 +18,6 @@ import type {
 // ─────────────────────────────────────────
 
 /**
- * @internal
  * Options controlling options analysis submission behavior.
  */
 export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
@@ -79,7 +78,6 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
- * @internal
  * The caller receives a cached analysis — no new job was created.
  */
 export interface SubmitOptionsAnalysisCached {
@@ -88,7 +86,6 @@ export interface SubmitOptionsAnalysisCached {
 }
 
 /**
- * @internal
  * A new analysis job was submitted; poll with `jobId` for the result.
  */
 export interface SubmitOptionsAnalysisSubmitted {
@@ -97,7 +94,6 @@ export interface SubmitOptionsAnalysisSubmitted {
 }
 
 /**
- * @internal
  * The analysis cache missed but no job was enqueued (`skipEnqueueIfMiss`).
  */
 export interface SubmitOptionsAnalysisMissNoTrigger {
@@ -105,7 +101,6 @@ export interface SubmitOptionsAnalysisMissNoTrigger {
 }
 
 /**
- * @internal
  * Result variant when the daily analysis limit is exceeded.
  *
  * The `status` is `'limit_error'` (not `'error'`) so callers can
@@ -119,7 +114,6 @@ export interface SubmitOptionsAnalysisLimitError {
 }
 
 /**
- * @internal
  * Result variant when the underlying snapshot has no chains to analyze.
  *
  * The `status` is `'no_chains_error'` (not `'error'`) so callers can
@@ -133,7 +127,6 @@ export interface SubmitOptionsAnalysisNoChainsError {
 }
 
 /**
- * @internal
  * Result variant when a user BYOK API key is required for the requested model+tier combo.
  */
 export type SubmitOptionsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
@@ -152,7 +145,6 @@ export type SubmitOptionsAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * @internal
  * Worker has not finished yet — caller should retry.
  */
 export interface PollOptionsAnalysisProcessing {
@@ -160,7 +152,6 @@ export interface PollOptionsAnalysisProcessing {
 }
 
 /**
- * @internal
  * Worker finished successfully — `result` is the normalized analysis.
  */
 export interface PollOptionsAnalysisDone {
@@ -169,7 +160,6 @@ export interface PollOptionsAnalysisDone {
 }
 
 /**
- * @internal
  * Worker reported a failure, result missing, or normalization failed.
  */
 export interface PollOptionsAnalysisError {

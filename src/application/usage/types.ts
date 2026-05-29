@@ -2,7 +2,6 @@ import type { Tier, TierConfig } from '@/domain/types';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
 
 /**
- * @internal
  * Usage tracking and daily limit options shared by every analysis use-case
  * (technical, fundamental, news, overall).
  *
@@ -35,7 +34,6 @@ export interface AnalysisUsageOptions {
 }
 
 /**
- * @internal
  * Dependencies required by daily usage limit checks.
  */
 export interface UsageLimitDependencies {
@@ -44,7 +42,6 @@ export interface UsageLimitDependencies {
 }
 
 /**
- * @internal
  * Input shared by daily usage limit checks.
  */
 export interface UsageLimitInput {
@@ -59,19 +56,16 @@ export interface UsageLimitInput {
 }
 
 /**
- * @internal
  * Structured error code returned by analysis usage-limit checks.
  */
 export type AnalysisLimitErrorCode = 'analysis_limit_exceeded';
 
 /**
- * @internal
  * Structured error code returned by chatbot usage-limit checks.
  */
 export type ChatbotLimitErrorCode = 'chatbot_limit_exceeded';
 
 /**
- * @internal
  * Structured error returned when analysis usage is blocked.
  */
 export interface AnalysisLimitError {
@@ -86,7 +80,6 @@ export interface AnalysisLimitError {
 }
 
 /**
- * @internal
  * Structured error returned when chatbot usage is blocked.
  */
 export interface ChatbotLimitError {

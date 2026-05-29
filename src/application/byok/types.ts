@@ -1,7 +1,6 @@
 import type { ModelId, Tier } from '@/domain/types';
 
 /**
- * @internal
  * BYOK gate denial result.
  *
  * Returned when a non-pro tier user requests a premium model without

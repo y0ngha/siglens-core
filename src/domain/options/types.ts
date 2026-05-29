@@ -62,7 +62,6 @@ export interface OptionsSnapshot {
 }
 
 /**
- * @internal
  * Per-strike aggregated open interest across the call and put sides of a
  * single expiration.
  */
@@ -76,7 +75,6 @@ export interface StrikeOpenInterest {
 }
 
 /**
- * @internal
  * Per-strike aggregated trading volume (today's session).
  */
 export interface StrikeVolumeAggregate {
@@ -95,7 +93,6 @@ export interface MidAndSpread {
 }
 
 /**
- * @internal
  * Bid/ask quote snapshot for one of the top OI strikes — surfaces liquidity at the levels the market is anchored to.
  */
 export interface TopOiQuote {
@@ -143,7 +140,6 @@ export interface OptionsExpirationMetrics {
 }
 
 /**
- * @internal
  * Per-expiration AI commentary entry — the human-readable narrative for one
  * expiration produced by the analysis model.
  */
@@ -157,7 +153,6 @@ export interface OptionsPerExpirationCommentary {
 }
 
 /**
- * @internal
  * Structured AI signal — single concise trading observation.
  */
 export interface OptionsSignal {
@@ -212,7 +207,6 @@ export interface RawOptionsAnalysisResponse {
 }
 
 /**
- * @internal
  * Stable identifier for each canonical expiration chip slot. Seven fixed
  * tokens used both as React-tree keys (in consumer apps) and routing-
  * friendly URL fragments. `0D` (same-week expiration, accepting
@@ -223,7 +217,6 @@ export interface RawOptionsAnalysisResponse {
 export type ExpirationSlotKey = '0D' | '1W' | '2W' | '1M' | '2M' | '3M' | '6M';
 
 /**
- * @internal
  * One canonical chip slot in the options expiration picker UI. The set is
  * fixed across the codebase — adding a slot here changes which chips the
  * frontend renders.
@@ -253,7 +246,6 @@ export interface SlotMapping {
 }
 
 /**
- * @internal
  * Input options for `buildOptionsAnalysisPrompt`.
  *
  * Exported as part of the Tier 4 public API so consumers can type-annotate
@@ -269,7 +261,6 @@ export interface BuildOptionsAnalysisPromptOptions {
 }
 
 /**
- * @internal
  * Expiration filter accepted by options analysis use-cases. `'YYYY-MM-DD'`
  * selects a single expiration; `'all'` aggregates every expiration in the
  * snapshot.

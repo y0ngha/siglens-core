@@ -78,7 +78,6 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
- * @internal
  * The caller receives a cached analysis — no new job was created.
  */
 export interface SubmitNewsAnalysisCached {
@@ -87,7 +86,6 @@ export interface SubmitNewsAnalysisCached {
 }
 
 /**
- * @internal
  * A new analysis job was submitted; poll with `jobId` for the result.
  */
 export interface SubmitNewsAnalysisSubmitted {
@@ -96,7 +94,6 @@ export interface SubmitNewsAnalysisSubmitted {
 }
 
 /**
- * @internal
  * Result variant when no news items were provided to analyze.
  */
 export interface SubmitNewsAnalysisNoNewsError {
@@ -106,7 +103,6 @@ export interface SubmitNewsAnalysisNoNewsError {
 }
 
 /**
- * @internal
  * Result variant when the daily analysis limit is exceeded.
  */
 export interface SubmitNewsAnalysisLimitError {
@@ -116,13 +112,11 @@ export interface SubmitNewsAnalysisLimitError {
 }
 
 /**
- * @internal
  * Result variant when a user BYOK API key is required for the requested model+tier combo.
  */
 export type SubmitNewsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
- * @internal
  * Result indicating the analysis cache missed but no job was enqueued because
  * the caller opted out via `skipEnqueueIfMiss`. The consumer is expected to
  * render a fallback in this case.
@@ -155,7 +149,6 @@ export type PollNewsAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * @internal
  * Options controlling per-card news analysis submission behavior.
  */
 export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
@@ -173,7 +166,6 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
- * @internal
  * A new card analysis job was submitted; poll with `jobId` for the result.
  */
 export interface SubmitNewsCardAnalysisSubmitted {

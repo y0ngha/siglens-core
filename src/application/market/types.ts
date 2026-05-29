@@ -27,7 +27,6 @@ export type { UserApiKeyRequiredError };
 export type { AnalysisUsageOptions };
 
 /**
- * @internal
  * Options controlling analysis submission behavior.
  */
 export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
@@ -62,7 +61,6 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
- * @internal
  * Error returned when application tier gates block a timeframe request.
  */
 export interface TierTimeframeAccessError {
@@ -79,7 +77,6 @@ export interface TierTimeframeAccessError {
 }
 
 /**
- * @internal
  * Analysis error result when tier timeframe access is denied.
  */
 export interface TierGateErrorResult {
@@ -88,7 +85,6 @@ export interface TierGateErrorResult {
 }
 
 /**
- * @internal
  * Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required.
  */
 export type SubmitAnalysisErrorResult =
@@ -97,7 +93,6 @@ export type SubmitAnalysisErrorResult =
     | TierGateErrorResult;
 
 /**
- * @internal
  * Result indicating the analysis cache missed but no job was enqueued because
  * the caller opted out via `skipEnqueueIfMiss`. The consumer is expected to
  * render a fallback in this case.

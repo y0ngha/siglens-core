@@ -22,7 +22,7 @@ export type ChatErrorCode =
     | 'server_busy'
     | 'user_api_key_required';
 
-/** @internal Input params for `requestChatCompletion`. */
+/** Input params for `requestChatCompletion`. */
 export interface RequestChatCompletionParams {
     symbol: string;
     /** Full company name forwarded to the chat prompt. Defaults to `symbol` when omitted. */
@@ -69,7 +69,7 @@ export interface RequestChatCompletionParams {
     currentAnalysisContext?: CurrentAnalysisContext;
 }
 
-/** @internal Injectable dependencies for `requestChatCompletion`. */
+/** Injectable dependencies for `requestChatCompletion`. */
 export interface RequestChatCompletionDependencies {
     tokenStore?: ChatTokenStore;
     usageRepository?: UsageRepository;

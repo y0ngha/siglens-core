@@ -71,7 +71,6 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
 }
 
 /**
- * @internal
  * The caller receives a cached analysis — no new job was created.
  */
 export interface SubmitFundamentalAnalysisCached {
@@ -80,7 +79,6 @@ export interface SubmitFundamentalAnalysisCached {
 }
 
 /**
- * @internal
  * A new analysis job was submitted; poll with `jobId` for the result.
  */
 export interface SubmitFundamentalAnalysisSubmitted {
@@ -89,7 +87,6 @@ export interface SubmitFundamentalAnalysisSubmitted {
 }
 
 /**
- * @internal
  * Result variant when the daily analysis limit is exceeded.
  */
 export interface SubmitFundamentalAnalysisLimitError {
@@ -99,7 +96,6 @@ export interface SubmitFundamentalAnalysisLimitError {
 }
 
 /**
- * @internal
  * Result variant when the provider fetch or data normalization fails.
  */
 export interface SubmitFundamentalAnalysisFetchError {
@@ -109,14 +105,12 @@ export interface SubmitFundamentalAnalysisFetchError {
 }
 
 /**
- * @internal
  * Result variant when a user BYOK API key is required for the requested model+tier combo.
  */
 export type SubmitFundamentalAnalysisApiKeyRequiredError =
     UserApiKeyRequiredError;
 
 /**
- * @internal
  * Result indicating the analysis cache missed but no job was enqueued because
  * the caller opted out via `skipEnqueueIfMiss`. The consumer is expected to
  * render a fallback in this case.

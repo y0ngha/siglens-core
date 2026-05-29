@@ -39,14 +39,12 @@ export type FearGreedFactorKey =
     | 'range_position';
 
 /**
- * @internal
  * Group label for the two-tier composition. The final score is the equal-weight
  * average of the Flow and Trend group scores.
  */
 export type FearGreedGroupName = 'Flow' | 'Trend';
 
 /**
- * @internal
  * A single factor's raw value and its walk-forward percentile rank.
  */
 export interface FearGreedFactor {
@@ -104,7 +102,6 @@ export interface FearGreedHistoryPoint {
 }
 
 /**
- * @internal
  * Optional configuration for the public `computeFearGreedIndex` / `computeFearGreedHistory` APIs.
  */
 export interface ComputeFearGreedOptions {

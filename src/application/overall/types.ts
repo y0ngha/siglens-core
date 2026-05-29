@@ -50,7 +50,6 @@ export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';
 // ─────────────────────────────────────────
 
 /**
- * @internal
  * Inputs carried by the overall dependency resolver.
  *
  * The `technical` field forwards the minimal options that `submitAnalysis`
@@ -373,7 +372,6 @@ export interface SubmitOverallAnalysisOptions
 }
 
 /**
- * @internal
  * The caller receives a cached overall analysis — no new job was created.
  */
 export interface SubmitOverallAnalysisCached {
@@ -382,7 +380,6 @@ export interface SubmitOverallAnalysisCached {
 }
 
 /**
- * @internal
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
@@ -398,7 +395,6 @@ export interface SubmitOverallAnalysisPendingDependencies {
 }
 
 /**
- * @internal
  * A new overall analysis job was submitted; poll with `jobId` for the result.
  */
 export interface SubmitOverallAnalysisSubmitted {
@@ -407,7 +403,6 @@ export interface SubmitOverallAnalysisSubmitted {
 }
 
 /**
- * @internal
  * One of the dependency axes returned an error (tier gate, usage limit, or
  * fetch failure). The overall job is not submitted.
  */
@@ -420,7 +415,6 @@ export interface SubmitOverallAnalysisError {
 }
 
 /**
- * @internal
  * Daily analysis limit was exceeded by the overall-scoped usage check.
  * No axis submit was dispatched.
  *
@@ -437,13 +431,11 @@ export interface SubmitOverallAnalysisLimitError {
 }
 
 /**
- * @internal
  * Result variant when BYOK API key is required for the overall job's own AI call.
  */
 export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
 /**
- * @internal
  * Result indicating no overall analysis job was enqueued because the caller
  * opted out via `skipEnqueueIfMiss`. Returned in two cases:
  *
