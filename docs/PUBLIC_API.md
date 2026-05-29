@@ -161,6 +161,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | Symbol | Source |
 |---|---|
 | `submitAnalysis(..., options?)` — `options.marketDataProvider?: MarketDataProvider` added. Required on cache miss (omitting it throws at runtime); optional when `skipEnqueueIfMiss: true` because cache hits return early before the fetch site. | `application/market/submitAnalysis.ts` |
+| `peekAnalysisCache(symbol, timeframe, fmpSymbol?, modelId?)` — **read-only**. Reads the same `buildAnalysisCacheKey` the writer uses and the same `normalizeCachedAnalysisResponse` validate path; never enqueues/fetches/generates. Returns `Promise<AnalysisResponse \| null>` (null on miss / no provider / read error / corrupt or content-free payload). For SSR/bot surfacing at zero LLM cost. | `application/market/peekAnalysisCache.ts` |
 | `pollAnalysis` | `application/market/pollAnalysis.ts` |
 | `cancelAnalysisJob` | `application/market/cancelAnalysisJob.ts` |
 | `fetchBarsWithIndicators(provider, symbol, timeframe, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/market/barsApi.ts` |
@@ -181,7 +182,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `submitNewsCardAnalysis` | `application/news/submitNewsCardAnalysis.ts` |
 | `pollNewsCardAnalysis` | `application/news/pollNewsCardAnalysis.ts` |
 | `submitOverallAnalysis(options)` — `options.marketDataProvider?: MarketDataProvider` added (via `OverallDependencyInputs`). Required on cache miss when proceeding to fetch daily bars for the fear/greed snapshot; optional when `skipEnqueueIfMiss: true`. | `application/overall/submitOverallAnalysis.ts` |
-| `pollOverallAnalysis` | `application/overall/pollOverallAnalysis.ts` |
+| `peekOverallAnalysisCache(symbol, companyName, timeframe, modelId?)` — **read-only**. Reads a content-free "overwrite-latest" peek key (`pollOverallAnalysis` writes every result under it in addition to the canonical hashed key). Never resolves dependencies / enqueues / fetches / generates. Returns `Promise<OverallAnalysisResponse \| null>` (null on missing `modelId` / miss / no provider / read error / corrupt or content-free payload). "Latest cached" semantics — a content-free read cannot reproduce the canonical input hash. | `application/overall/peekOverallAnalysisCache.ts` |
+| `pollOverallAnalysis` — now writes the normalized result under **two** keys: the canonical hashed key (`meta.cacheKey`) and the content-free `buildOverallPeekCacheKey(symbol, timeframe, modelId)` peek key (only when all three meta fields are present). | `application/overall/pollOverallAnalysis.ts` |
 | `cancelOverallAnalysisJob` | `application/overall/cancelOverallAnalysisJob.ts` |
 | `submitOptionsAnalysis` | `application/options/submitOptionsAnalysis.ts` |
 | `pollOptionsAnalysis` | `application/options/pollOptionsAnalysis.ts` |

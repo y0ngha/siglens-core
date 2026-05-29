@@ -4,7 +4,10 @@ import type { PollOverallAnalysisResult } from '@/application/overall/types';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import type { OverallAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { OVERALL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
+import {
+    buildOverallPeekCacheKey,
+    OVERALL_CACHE_TTL_SECONDS,
+} from '@/infrastructure/cache/config';
 import {
     getJobError,
     getJobMeta,
@@ -112,6 +115,15 @@ export async function pollOverallAnalysis(
     }
 
     // Cache the normalized result if a pre-computed cache key is available.
+    //
+    // Two keys are written:
+    //  1. `meta.cacheKey` — the canonical hashed key the submit path looks up
+    //     for an exact-input cache hit (see submitOverallAnalysis).
+    //  2. the content-free "peek" key (overwrite-latest) — derived from
+    //     symbol/timeframe/modelId so `peekOverallAnalysisCache` can read the
+    //     most recent overall analysis without reconstructing the input hash
+    //     (a content-free RSC read cannot derive the hash). Only written when
+    //     all three meta fields are present.
     if (meta?.cacheKey) {
         const cache = createCacheProvider();
         if (cache !== null) {
@@ -126,6 +138,25 @@ export async function pollOverallAnalysis(
                     ),
                 options
             );
+
+            if (meta.symbol && meta.timeframe && meta.modelId) {
+                const peekKey = buildOverallPeekCacheKey(
+                    meta.symbol,
+                    meta.timeframe,
+                    meta.modelId
+                );
+                fireAndForget(
+                    cache
+                        .set(peekKey, result, OVERALL_CACHE_TTL_SECONDS)
+                        .catch(error =>
+                            console.error(
+                                '[PollOverall] Peek cache write failed:',
+                                error
+                            )
+                        ),
+                    options
+                );
+            }
         }
     }
 

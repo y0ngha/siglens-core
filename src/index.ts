@@ -53,6 +53,7 @@ export { submitNewsCardAnalysis } from './application/news/submitNewsCardAnalysi
 
 // Overall analysis use-cases
 export { cancelOverallAnalysisJob } from './application/overall/cancelOverallAnalysisJob';
+export { peekOverallAnalysisCache } from './application/overall/peekOverallAnalysisCache';
 export { pollOverallAnalysis } from './application/overall/pollOverallAnalysis';
 export { submitOverallAnalysis } from './application/overall/submitOverallAnalysis';
 
