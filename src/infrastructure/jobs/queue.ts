@@ -184,6 +184,8 @@ export async function setJobError(
  * No-op when Upstash env is not configured.
  *
  * @param jobId - The job identifier.
+ * @returns Promise that resolves once the cancellation flag is set (or
+ *   immediately when Upstash env is not configured).
  */
 export async function cancelJob(jobId: string): Promise<void> {
     return withJobStore(async store => {
