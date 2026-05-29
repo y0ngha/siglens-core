@@ -38,7 +38,7 @@ const cachedResult: AnalysisResponse = {
     trend: 'bullish',
     indicatorResults: [],
     riskLevel: 'low',
-    keyLevels: { support: [{ price: 100, label: '지지' }], resistance: [] },
+    keyLevels: { support: [{ price: 100, reason: '지지' }], resistance: [] },
     priceTargets: {
         bullish: { targets: [], condition: '' },
         bearish: { targets: [], condition: '' },
