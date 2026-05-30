@@ -22,8 +22,10 @@ import {
  * - `error`: missing or malformed result (`summary` field absent), or the
  *   worker reported a failure.
  * - `done`: normalized briefing plus its `generatedAt` timestamp. The result
- *   is also written to the hourly briefing cache so subsequent
- *   {@link submitBriefing} calls within the same hour return it as cached.
+ *   is written under the same input-hashed cache key recorded in the job meta
+ *   at submit time, so only callers with identical inputs within the same hour
+ *   get a cache hit. If the job meta / `cacheKey` is absent (e.g. TTL expiry),
+ *   the cache write is skipped.
  *
  * On every terminal outcome (`error` or `done`) the job is cleaned up from
  * Redis (best-effort).

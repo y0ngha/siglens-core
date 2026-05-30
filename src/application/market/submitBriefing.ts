@@ -125,6 +125,11 @@ export async function submitBriefing(
     // under the SAME key the submit path looked up — without this, the poll
     // step (which has no access to the index/sector data) could not
     // reconstruct the input hash and read/write keys would diverge.
+    //
+    // INTENTIONAL graceful degradation: the cache write is best-effort/optional.
+    // If the meta isn't stored, poll simply skips the cache write (a cold-but-
+    // correct path). A meta-store failure must never block job submission, so we
+    // log and continue rather than propagate.
     try {
         await setJobMeta(jobId, { symbol: BRIEFING_JOB_SYMBOL, cacheKey });
     } catch (error) {

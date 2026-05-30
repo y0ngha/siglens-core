@@ -176,6 +176,16 @@ describe('pollBriefing 함수는', () => {
             expect(mockCacheSet).not.toHaveBeenCalled();
         });
 
+        it('job meta는 있지만 cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce({ symbol: 'market' });
+
+            const result = await pollBriefing('job-meta-no-cachekey');
+
+            expect(result.status).toBe('done');
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
         it('waitUntil이 제공되면 캐시 저장과 cleanup promise를 등록한다', async () => {
             const waitUntil = vi.fn();
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
