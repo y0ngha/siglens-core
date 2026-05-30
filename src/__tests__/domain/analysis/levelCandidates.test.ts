@@ -289,6 +289,36 @@ describe('levelCandidates', () => {
                 expect(prompt).toContain('[POC]');
             });
 
+            it('renders only the resistance subsection when support has no candidates', () => {
+                const bars = [makeBar(CURRENT_PRICE)];
+                const indicators = makeIndicators({
+                    smc: makeSmc({
+                        swingHighs: [makeSwing(106, 'high')],
+                    }),
+                });
+
+                const prompt = buildAnalysisPrompt(
+                    'AAPL',
+                    'Apple Inc.',
+                    bars,
+                    indicators,
+                    []
+                );
+
+                expect(prompt).toContain(
+                    '## Support/Resistance Candidates (precomputed)'
+                );
+                expect(prompt).toContain(
+                    '### Resistance Candidates (above price)'
+                );
+                expect(prompt).not.toContain(
+                    '### Support Candidates (below price)'
+                );
+                expect(prompt).not.toContain(
+                    'No candidates could be derived from the available data'
+                );
+            });
+
             it('renders a no-candidates note when none can be derived', () => {
                 const bars = [makeBar(CURRENT_PRICE)];
 

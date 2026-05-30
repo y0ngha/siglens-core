@@ -1018,12 +1018,13 @@ function buildAnalysisPrompt(
 3. 최근 봉 데이터 (최근 30봉) — 각 봉에 캔들 패턴 태깅 + 다봉 패턴 감지
 4. 거래량 분석 (평균 대비 비율)
 5. 인디케이터 수치 (RSI, MACD, 볼린저, DMI, Stochastic, StochRSI, CCI, Volume Profile POC/VAH/VAL, Ichimoku 전환선/기준선/SpanA/SpanB/후행스팬)
-6. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
-7. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
-8. 전략 분석 (type='strategy' skills, confidence >= 0.5)
-9. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
-10. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
-11. 분석 요청 및 JSON 응답 형식 지시
+6. 지지/저항 후보 (사전계산, `## Support/Resistance Candidates (precomputed)`) — `computeLevelCandidates`가 Volume Profile(POC/VAH/VAL)·MA/EMA·Bollinger 경계·SMC 스윙에서 결정론적으로 도출한 후보 레벨. 현재가 기준으로 저항(위)/지지(아래)로 분리, side별 nearest-first 정렬 + 상위 N개(`MAX_LEVEL_CANDIDATES_PER_SIDE`)만 노출. AI는 가격을 직접 계산하지 않고 이 후보 중에서 keyLevels를 **선택**한다(price-arithmetic hallucination 제거). 양측 모두 비면 "No candidates could be derived" note만 렌더링.
+7. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
+8. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
+9. 전략 분석 (type='strategy' skills, confidence >= 0.5)
+10. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
+11. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
+12. 분석 요청 및 JSON 응답 형식 지시
 ```
 
 ### 응답 형식 (JSON)

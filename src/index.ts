@@ -104,10 +104,7 @@ export {
     clusterKeyLevels,
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
-export {
-    computeLevelCandidates,
-    MAX_LEVEL_CANDIDATES_PER_SIDE,
-} from './domain/analysis/levelCandidates';
+export { computeLevelCandidates } from './domain/analysis/levelCandidates';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
