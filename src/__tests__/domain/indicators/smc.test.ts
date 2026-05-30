@@ -339,6 +339,12 @@ describe('calculateSmc', () => {
 
             const result = calculateSmc(bars);
             expect(result.equalHighs.length).toBeGreaterThan(0);
+            expect(result.equalHighs[0]).toEqual({
+                price: expect.any(Number),
+                firstIndex: expect.any(Number),
+                secondIndex: expect.any(Number),
+            });
+            expect(result.equalHighs[0]).not.toHaveProperty('type');
         });
     });
 });
