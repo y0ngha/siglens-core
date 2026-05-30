@@ -16,6 +16,8 @@ import {
     SMC_ATR_PERIOD,
     SMC_DISCOUNT_RATIO,
     SMC_EQUAL_LEVEL_ATR_MULTIPLIER,
+    SMC_EQUAL_LEVEL_MIN_TOUCHES,
+    SMC_MAX_EQUAL_LEVELS_RETAINED,
     SMC_PREMIUM_RATIO,
     SMC_SWING_PERIOD,
 } from '@/domain/indicators/constants';
@@ -285,34 +287,64 @@ function detectEqualLevels(
     };
 }
 
-function* findMatchingLevels(
-    swings: SMCSwingPoint[],
-    startJ: number,
-    swing: SMCSwingPoint,
-    threshold: number
-): Generator<SMCEqualLevel> {
-    for (let j = startJ; j < swings.length; j++) {
-        if (Math.abs(swings[j].price - swing.price) <= threshold) {
-            yield {
-                price: (swing.price + swings[j].price) / 2,
-                firstIndex: swing.index,
-                secondIndex: swings[j].index,
-            };
-        }
-    }
-}
-
+// Equal highs/lows are liquidity levels — a price zone revisited by multiple
+// swings, not the cartesian product of touching pairs. Enumerating every swing
+// pair within an ATR threshold is O(n²) output: on a flat/penny-stock series
+// where nearly every bar is a swing point at one price, that explodes to tens
+// of thousands of entries — far more output than downstream consumers can
+// handle efficiently. So we cluster greedily instead — each unused swing anchors a
+// cluster that absorbs every later swing within its ATR threshold, emitting ONE
+// level per cluster of ≥2 touches. Output is bounded by ⌊n/2⌋ and hard-capped to
+// the most recent SMC_MAX_EQUAL_LEVELS_RETAINED levels. firstIndex/secondIndex
+// span the cluster's first-touch → most-recent-touch swing indices (consumers
+// read secondIndex as recency and secondIndex − firstIndex as the level span).
+//
+// Membership is anchor-relative (distance to the anchor price), NOT
+// centroid-relative, by design — a single greedy pass. The emitted price is the
+// cluster average, so on a drifting series a member can sit slightly beyond
+// `threshold` from the final centroid; that is acceptable and intended (avoids
+// an O(n²) reclustering pass).
 function findEqualLevels(
     swings: SMCSwingPoint[],
     atrValues: (number | null)[]
 ): SMCEqualLevel[] {
-    return swings.flatMap((swing, i) => {
-        const atr = atrValues[swing.index];
-        if (atr === null) return [];
+    const n = swings.length;
+    const used = new Array<boolean>(n).fill(false);
+    const levels: SMCEqualLevel[] = [];
+
+    for (let i = 0; i < n; i++) {
+        if (used[i]) continue;
+        const anchorSwing = swings[i];
+        const atr = atrValues[anchorSwing.index];
+        if (atr === null) continue;
 
         const threshold = SMC_EQUAL_LEVEL_ATR_MULTIPLIER * atr;
-        return [...findMatchingLevels(swings, i + 1, swing, threshold)];
-    });
+        const anchorPrice = anchorSwing.price;
+        const cluster: SMCSwingPoint[] = [anchorSwing];
+        used[i] = true;
+
+        for (let j = i + 1; j < n; j++) {
+            if (used[j]) continue;
+            if (Math.abs(swings[j].price - anchorPrice) <= threshold) {
+                cluster.push(swings[j]);
+                used[j] = true;
+            }
+        }
+
+        const clusterSize = cluster.length;
+        if (clusterSize >= SMC_EQUAL_LEVEL_MIN_TOUCHES) {
+            const priceSum = cluster.reduce((sum, p) => sum + p.price, 0);
+            levels.push({
+                price: priceSum / clusterSize,
+                firstIndex: cluster[0].index,
+                secondIndex: cluster[clusterSize - 1].index,
+            });
+        }
+    }
+
+    // Defense-in-depth cap: bound output regardless of swing count growth.
+    // Consumers read only the most recent levels (slice(-N)), so keep the tail.
+    return levels.slice(-SMC_MAX_EQUAL_LEVELS_RETAINED);
 }
 
 // ─── Premium / Discount / Equilibrium zones ───────────────────────────────────

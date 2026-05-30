@@ -691,10 +691,16 @@ null 없음 (첫 봉부터 값 존재 — 첫 봉은 0)
    - 결과: orderBlocks[] (각각 { startIndex, high, low, type, isMitigated })
 
 5. Equal Highs / Equal Lows (EQH / EQL)
-   - 두 스윙 고점의 가격 차이 ≤ ATR × equalLevelAtrMult(0.5) → Equal High
-   - 두 스윙 저점의 가격 차이 ≤ ATR × equalLevelAtrMult(0.5) → Equal Low
-   - 가격: 두 피벗의 중간값
-   - 결과: equalHighs[], equalLows[] (각각 { price, firstIndex, secondIndex, type })
+   - 스윙 고/저점을 가격으로 클러스터링 (all-pairs 나열이 아님):
+     - 미사용 스윙을 앵커로, |스윙 가격 − 앵커 가격| ≤ ATR × equalLevelAtrMult(0.5)
+       인 이후 스윙들을 한 클러스터로 흡수
+     - 멤버십 판정은 앵커 가격 기준(centroid 아님) — greedy 단일 패스
+     - 터치 ≥ 2인 클러스터만 레벨로 emit
+   - 가격: 클러스터 구성 스윙들의 평균값
+   - firstIndex/secondIndex: 최초 터치 / 최근 터치 인덱스 (firstIndex < secondIndex)
+   - 출력 상한: ⌊n/2⌋ 로 bounded + 최근 SMC_MAX_EQUAL_LEVELS_RETAINED(50)개로 hard-cap
+     (평탄·페니스톡 등 degenerate 시리즈에서 O(n²) 폭발 방지 → 캐시 비대 차단)
+   - 결과: equalHighs[], equalLows[] (각각 { price, firstIndex, secondIndex })
 
 6. Premium / Equilibrium / Discount Zones
    - 최근 구조 이탈(BOS/CHoCH)을 앵커로 range 를 산출 (resolveZoneRange)

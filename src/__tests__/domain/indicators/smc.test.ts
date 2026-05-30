@@ -4,6 +4,7 @@ import {
     EMPTY_SMC_RESULT,
     SMC_SWING_PERIOD,
     SMC_ATR_PERIOD,
+    SMC_MAX_EQUAL_LEVELS_RETAINED,
 } from '@/domain/indicators/constants';
 import type { Bar } from '@/domain/types';
 
@@ -345,6 +346,149 @@ describe('calculateSmc', () => {
                 secondIndex: expect.any(Number),
             });
             expect(result.equalHighs[0]).not.toHaveProperty('type');
+        });
+
+        it('같은 가격대의 여러 swing은 쌍 나열이 아니라 클러스터 1개로 묶인다', () => {
+            const P = SMC_SWING_PERIOD;
+            const WARMUP = SMC_ATR_PERIOD;
+            const bars: Bar[] = [];
+            let t = 0;
+
+            for (let i = 0; i < WARMUP + P; i++) {
+                bars.push(makeBar(100, 98, 99, t++));
+            }
+            // Three separate humps at the same high (105) → one liquidity level,
+            // not C(3,2)=3 pair entries.
+            for (let hump = 0; hump < 3; hump++) {
+                bars.push(makeBar(105, 98, 101.5, t++));
+                for (let i = 0; i < P * 2 + 1; i++) {
+                    bars.push(makeBar(100, 98, 99, t++));
+                }
+            }
+
+            const result = calculateSmc(bars);
+            const highsAt105 = result.equalHighs.filter(
+                eq => Math.abs(eq.price - 105) < 1
+            );
+            expect(highsAt105).toHaveLength(1);
+            // price is the cluster average; all three humps are exactly 105.
+            expect(highsAt105[0].price).toBeCloseTo(105);
+            // firstIndex/secondIndex span first-touch → most-recent-touch.
+            expect(highsAt105[0].secondIndex).toBeGreaterThan(
+                highsAt105[0].firstIndex
+            );
+        });
+
+        it('평탄한 가격(penny-stock degenerate) 시리즈에서도 출력이 폭발하지 않고 상한 안에 묶인다', () => {
+            // Every bar identical → nearly every bar is a swing point at one price.
+            // All-pairs would emit O(n²) entries (~tens of thousands); clustering
+            // collapses them to a single level.
+            const bars: Bar[] = Array.from({ length: 400 }, (_, i) =>
+                makeBar(0.0001, 0.0001, 0.0001, i)
+            );
+
+            const result = calculateSmc(bars);
+
+            expect(result.equalHighs.length).toBeLessThanOrEqual(
+                SMC_MAX_EQUAL_LEVELS_RETAINED
+            );
+            expect(result.equalLows.length).toBeLessThanOrEqual(
+                SMC_MAX_EQUAL_LEVELS_RETAINED
+            );
+            // A perfectly flat series is one price level, not thousands of pairs.
+            expect(result.equalHighs).toHaveLength(1);
+            expect(result.equalLows).toHaveLength(1);
+        });
+
+        it('클러스터가 상한을 초과하면 가장 최근 SMC_MAX_EQUAL_LEVELS_RETAINED개로 잘린다', () => {
+            // Staircase of (cap + 5) distinct price plateaus, each touched twice
+            // → one cluster per level. More clusters than the cap form, so the
+            // slice(-N) trim path is exercised (not trivially under the cap).
+            const P = SMC_SWING_PERIOD;
+            const STEP = 6;
+            const PEAK_H = 2;
+            const BASE0 = 1000;
+            const LEVELS = SMC_MAX_EQUAL_LEVELS_RETAINED + 5;
+            const priceAt = (k: number) => BASE0 + k * STEP + PEAK_H;
+
+            const bars: Bar[] = [];
+            let t = 0;
+            // Warmup so ATR is non-null at the first counted peaks.
+            for (let i = 0; i < SMC_ATR_PERIOD + P; i++) {
+                bars.push(makeBar(BASE0, BASE0 - 1, BASE0 - 0.5, t++));
+            }
+            for (let k = 0; k < LEVELS; k++) {
+                const base = BASE0 + k * STEP;
+                const peak = priceAt(k);
+                bars.push(makeBar(peak, base, base + PEAK_H / 2, t++)); // touch 1
+                for (let i = 0; i < P * 2 + 1; i++) {
+                    bars.push(makeBar(base, base - 1, base - 0.5, t++)); // bridge
+                }
+                bars.push(makeBar(peak, base, base + PEAK_H / 2, t++)); // touch 2
+                for (let i = 0; i < P; i++) {
+                    bars.push(makeBar(base, base - 1, base - 0.5, t++)); // trail
+                }
+            }
+
+            const result = calculateSmc(bars);
+
+            // Trimmed to exactly the cap, not the (cap + 5) clusters formed.
+            expect(result.equalHighs).toHaveLength(
+                SMC_MAX_EQUAL_LEVELS_RETAINED
+            );
+            // Tail kept: the most recent (highest) level survives the trim ...
+            expect(result.equalHighs.at(-1)!.price).toBeCloseTo(
+                priceAt(LEVELS - 1)
+            );
+            // ... while the oldest levels are dropped from the front.
+            expect(result.equalHighs[0].price).toBeCloseTo(
+                priceAt(LEVELS - SMC_MAX_EQUAL_LEVELS_RETAINED)
+            );
+        });
+
+        it('이미 흡수된 swing을 이후 앵커가 만나면 건너뛴다 (used[j] 분기)', () => {
+            // Interleaved levels in time order [A, B, A, B]: anchor A absorbs the
+            // later A-touch that sits *after* B's anchor, so B's inner scan
+            // re-encounters an already-used swing and takes the `used[j]` skip.
+            const P = SMC_SWING_PERIOD;
+            const LO = 98;
+            const A = 100;
+            const B = 130;
+
+            const bars: Bar[] = [];
+            let t = 0;
+            const pushValley = (count: number) => {
+                for (let i = 0; i < count; i++) {
+                    bars.push(makeBar(LO, LO - 1, LO - 0.5, t++));
+                }
+            };
+            const pushPeak = (price: number) =>
+                bars.push(makeBar(price, LO, (price + LO) / 2, t++));
+
+            pushValley(SMC_ATR_PERIOD + P); // warmup so ATR is non-null
+            pushPeak(A);
+            pushValley(P * 2 + 1);
+            pushPeak(B);
+            pushValley(P * 2 + 1);
+            pushPeak(A);
+            pushValley(P * 2 + 1);
+            pushPeak(B);
+            pushValley(P);
+
+            const result = calculateSmc(bars);
+            const clusterA = result.equalHighs.find(
+                eq => Math.abs(eq.price - A) < 1
+            );
+            const clusterB = result.equalHighs.find(
+                eq => Math.abs(eq.price - B) < 1
+            );
+
+            expect(clusterA).toBeDefined();
+            expect(clusterB).toBeDefined();
+            // A's span straddles B's anchor → A absorbed a touch after B's first
+            // index, reachable only via the `used[j]` skip in B's inner scan.
+            expect(clusterA!.firstIndex).toBeLessThan(clusterB!.firstIndex);
+            expect(clusterB!.firstIndex).toBeLessThan(clusterA!.secondIndex);
         });
     });
 });
