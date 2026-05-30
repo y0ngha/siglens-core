@@ -23,6 +23,12 @@ describe('buildOptionsAnalysisPrompt', () => {
         ],
     };
 
+    const allExpirationsPrompt = buildOptionsAnalysisPrompt({
+        expirationDate: 'all',
+        companyName: 'Apple Inc.',
+        snapshot,
+    });
+
     it('filters to specific expiration when given', () => {
         const prompt = buildOptionsAnalysisPrompt({
             expirationDate: '2026-05-22',
@@ -34,69 +40,55 @@ describe('buildOptionsAnalysisPrompt', () => {
     });
 
     it('uses all chains when expirationDate is "all"', () => {
-        const prompt = buildOptionsAnalysisPrompt({
-            expirationDate: 'all',
-            companyName: 'Apple Inc.',
-            snapshot,
-        });
-        expect(prompt).toContain('2026-05-22');
-        expect(prompt).toContain('2026-06-19');
+        expect(allExpirationsPrompt).toContain('2026-05-22');
+        expect(allExpirationsPrompt).toContain('2026-06-19');
     });
 
     it('includes company name and current price', () => {
-        const prompt = buildOptionsAnalysisPrompt({
-            expirationDate: 'all',
-            companyName: 'Apple Inc.',
-            snapshot,
-        });
-        expect(prompt).toContain('Apple Inc.');
-        expect(prompt).toContain('AAPL');
-        expect(prompt).toContain('$198');
+        expect(allExpirationsPrompt).toContain('Apple Inc.');
+        expect(allExpirationsPrompt).toContain('AAPL');
+        expect(allExpirationsPrompt).toContain('$198');
     });
 
     it('includes interpretation guidance for topVolumeStrikes and topOiBidAskSummary', () => {
-        const prompt = buildOptionsAnalysisPrompt({
-            expirationDate: 'all',
-            companyName: 'Apple Inc.',
-            snapshot,
-        });
-        expect(prompt).toContain('topVolumeStrikes');
-        expect(prompt).toContain('topOiBidAskSummary');
+        expect(allExpirationsPrompt).toContain('topVolumeStrikes');
+        expect(allExpirationsPrompt).toContain('topOiBidAskSummary');
     });
 
     it('uses English instructions without markdown JSON fences', () => {
-        const prompt = buildOptionsAnalysisPrompt({
-            expirationDate: 'all',
-            companyName: 'Apple Inc.',
-            snapshot,
-        });
-        expect(prompt).toContain('You are an options market analyst');
-        expect(prompt).toContain('Current price:');
-        expect(prompt).toContain('== Output Schema ==');
-        expect(prompt).toContain('== Interpretation Guide ==');
-        expect(prompt).toContain(
+        expect(allExpirationsPrompt).toContain(
+            'You are an options market analyst'
+        );
+        expect(allExpirationsPrompt).toContain('Current price:');
+        expect(allExpirationsPrompt).toContain('== Output Schema ==');
+        expect(allExpirationsPrompt).toContain('== Interpretation Guide ==');
+        expect(allExpirationsPrompt).toContain(
             'Respond with valid JSON only. No markdown fences.'
         );
-        expect(prompt).not.toContain('```json');
+        expect(allExpirationsPrompt).not.toContain('```json');
     });
 
-    it('keeps the output schema fields and Korean output directives', () => {
-        const prompt = buildOptionsAnalysisPrompt({
-            expirationDate: 'all',
-            companyName: 'Apple Inc.',
-            snapshot,
-        });
-        expect(prompt).toContain('"summary"');
-        expect(prompt).toContain('"perExpiration"');
-        expect(prompt).toContain('"signals"');
-        expect(prompt).toContain('"expirationDate"');
-        expect(prompt).toContain('"commentary"');
-        expect(prompt).toContain('"tone"');
-        expect(prompt).toContain('"kind"');
-        expect(prompt).toContain('"message"');
-        expect(prompt).toContain('bullish | bearish | neutral | cautious');
-        expect(prompt).toContain('bullish | bearish | neutral | volatility');
+    it('keeps the output schema field names', () => {
+        expect(allExpirationsPrompt).toContain('"summary"');
+        expect(allExpirationsPrompt).toContain('"perExpiration"');
+        expect(allExpirationsPrompt).toContain('"signals"');
+        expect(allExpirationsPrompt).toContain('"expirationDate"');
+        expect(allExpirationsPrompt).toContain('"commentary"');
+        expect(allExpirationsPrompt).toContain('"tone"');
+        expect(allExpirationsPrompt).toContain('"kind"');
+        expect(allExpirationsPrompt).toContain('"message"');
+    });
+
+    it('keeps the Korean output directives and tone/kind enums', () => {
+        expect(allExpirationsPrompt).toContain(
+            'bullish | bearish | neutral | cautious'
+        );
+        expect(allExpirationsPrompt).toContain(
+            'bullish | bearish | neutral | volatility'
+        );
         // Model output must remain Korean.
-        expect(prompt).toContain('전체 옵션 시장에 대한 한 문단 요약');
+        expect(allExpirationsPrompt).toContain(
+            '전체 옵션 시장에 대한 한 문단 요약'
+        );
     });
 });

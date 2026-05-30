@@ -39,7 +39,7 @@ export function buildOptionsAnalysisPrompt(
         JSON.stringify(summaries, null, 2),
         '',
         '== Output Schema ==',
-        'Respond only with the JSON schema below. Do not include any other text.',
+        'Respond only with a JSON object matching the schema below. Do not include any other text.',
         '{',
         '  "summary": "전체 옵션 시장에 대한 한 문단 요약 (3-5문장, 친근한 어투, 한국어)",',
         '  "perExpiration": [',
