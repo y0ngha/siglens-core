@@ -895,7 +895,7 @@ const ANALYSIS_GUIDELINES = [
     '',
     '### Trendline Detection',
     '- Return 0 to 3 trendlines maximum',
-    '- Prefer SELECTING trendlines from the ## Trendline Candidates (precomputed) section — these are derived from real swing points, so reuse their exact start/end time and price values verbatim. Only construct a non-candidate trendline when you have strong, explicitly-stated justification the candidates do not cover.',
+    `- Prefer SELECTING trendlines from the ${TRENDLINE_CANDIDATES_HEADER} section — these are derived from real swing points, so reuse their exact start/end time and price values verbatim. Only construct a non-candidate trendline when you have strong, explicitly-stated justification the candidates do not cover.`,
     '- ascending: connect higher lows (at least 2 clear swing low points)',
     '- descending: connect lower highs (at least 2 clear swing high points)',
     '- Use the Unix timestamp values from the provided bar data for the time field. Each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value into the time field. Do not calculate or guess timestamps.',

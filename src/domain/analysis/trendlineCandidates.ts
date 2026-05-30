@@ -78,8 +78,9 @@ const isFinitePositive = (value: number): boolean =>
 
 /**
  * Resolve same-side swing points to `{ time, price }` using their bar timestamps.
- * Swings whose `index` falls outside the bar array (or non-finite prices) are
- * skipped so every endpoint maps to a real bar.
+ * Swings whose `index` falls outside the bar array are dropped so every endpoint
+ * maps to a real bar. Price positivity is enforced separately at the call site via
+ * {@link isFinitePositive}; this function only guards against a non-finite price.
  */
 const resolveSwings = (
     swings: readonly SMCSwingPoint[],
@@ -121,14 +122,11 @@ const scorePair = (
         end,
     };
 
-    let touches = 0;
-    for (const swing of sameSideSwings) {
+    const touches = sameSideSwings.filter(swing => {
         const expected = extendTrendline(trendline, swing.time).price;
         const tolerance = TRENDLINE_TOUCH_PRICE_FRACTION * swing.price;
-        if (Math.abs(swing.price - expected) <= tolerance) {
-            touches += 1;
-        }
-    }
+        return Math.abs(swing.price - expected) <= tolerance;
+    }).length;
 
     if (touches < MIN_TRENDLINE_TOUCHES) return null;
 
@@ -174,7 +172,7 @@ const dedupAndCap = (
             const sameLine =
                 Math.abs(existing.slope - candidate.slope) <
                     SLOPE_DEDUP_EPSILON &&
-                Math.abs(existing.intercept - candidate.intercept) <=
+                Math.abs(existing.intercept - candidate.intercept) <
                     interceptEpsilon;
             return sameEndpoints || sameLine;
         });

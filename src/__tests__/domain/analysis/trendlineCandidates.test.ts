@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { computeTrendlineCandidates } from '@/domain/analysis/trendlineCandidates';
+import {
+    computeTrendlineCandidates,
+    MAX_TRENDLINE_CANDIDATES,
+} from '@/domain/analysis/trendlineCandidates';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import type { Bar, SMCResult, SMCSwingPoint } from '@/domain/types';
 
@@ -202,7 +205,7 @@ describe('computeTrendlineCandidates', () => {
 
         const result = computeTrendlineCandidates(bars, smc);
 
-        expect(result.length).toBeLessThanOrEqual(3);
+        expect(result.length).toBeLessThanOrEqual(MAX_TRENDLINE_CANDIDATES);
         expect(result.length).toBeGreaterThan(0);
     });
 
@@ -228,8 +231,11 @@ describe('computeTrendlineCandidates', () => {
 
     it('breaks rank ties by end-time recency then span', () => {
         const bars = makeBars(11);
-        // Two equally-strong (2-touch) resistance lines that share the same end
-        // time but different spans, exercising the end-time and span tiebreakers.
+        // Three swing highs at the SAME price (indices 0, 4, 8) all lie on every
+        // pair's line, so each candidate pair is an equally-strong 3-touch line.
+        // The tie is broken by end-time recency first, then by span: the line
+        // ending at index 8 wins, and among those the longest span (start at
+        // index 0) wins — exercising both tiebreakers.
         const smc = makeSmc({
             swingHighs: [
                 swing(0, 100, 'high'),
