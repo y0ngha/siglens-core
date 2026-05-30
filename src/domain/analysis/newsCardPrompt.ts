@@ -63,6 +63,9 @@ Rules:
 - bodyKo: natural Korean translation of the article body; null if no body was provided.
 - summaryKo: an informative Korean summary (존댓말) that explains what happened, why it matters for the named symbol, and what investors should watch.
 - summaryKo must add substance beyond the title. Do not copy, lightly paraphrase, or translate teaser phrases such as "what investors need to know"; resolve the actual point from the body instead.
+- Few-shot for summaryKo (given a title like "Nvidia unveils next-gen AI chip platform — what investors need to know"):
+  - BAD (restates/translates the title, leaves the point unresolved): "엔비디아가 차세대 AI 칩 플랫폼을 공개했으며 투자자가 알아야 할 내용을 정리했습니다."
+  - GOOD (resolves the body's actual point — figures + why it matters): "엔비디아가 데이터센터용 차세대 AI 칩을 공개했고, 이전 세대 대비 3배 성능 향상을 내세워 데이터센터 매출 성장 기대를 키우는 점이 핵심입니다."
 - When the body contains evidence, summaryKo should be as detailed as needed to preserve the most decision-useful specifics: reported figures, growth rates, guidance, investor reaction, regulatory risk, management comment, or next catalyst.
 - Keep summaryKo concise, but never omit material information merely to satisfy brevity.
 - Preserve important numbers and comparisons from the article body when they are material to the news implication.

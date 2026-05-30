@@ -53,6 +53,10 @@ describe('buildNewsCardAnalysisPrompt', () => {
             'never omit material information merely to satisfy brevity'
         );
         expect(prompt).not.toContain('80-140');
+        // Few-shot good/bad pair for summaryKo
+        expect(prompt).toContain('Few-shot for summaryKo');
+        expect(prompt).toContain('BAD (restates/translates the title');
+        expect(prompt).toContain("GOOD (resolves the body's actual point");
         expect(prompt).toContain('Preserve important numbers');
         expect(prompt).toContain('sentiment');
         expect(prompt).toContain('category');
