@@ -9,7 +9,7 @@ export type JobStatus = 'processing' | 'done' | 'error';
  * the bars again.
  */
 export interface JobMeta {
-    /** U.S. equity ticker. */
+    /** U.S. equity ticker, or the sentinel `market` for market-briefing jobs. */
     symbol: string;
     /**
      * Bar resolution. Required for technical-analysis jobs and overall

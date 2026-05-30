@@ -90,6 +90,7 @@ describe('submitBriefing 함수는', () => {
                 expect(result.briefing).toBe(mockBriefing);
             }
             expect(mockFetch).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
         });
     });
 
