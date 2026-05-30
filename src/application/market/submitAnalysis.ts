@@ -13,6 +13,7 @@ import {
 import { normalizeCachedAnalysisResponse } from '@/domain/analysis/confidence';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
@@ -365,6 +366,7 @@ export async function submitAnalysis(
             tier,
             analysisType: 'technical' satisfies AnalysisType,
             system: AI_SYSTEM_PROMPT,
+            responseSchema: TECHNICAL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
