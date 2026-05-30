@@ -113,6 +113,26 @@ const nestedEnumValues = (
     return prop.enum.toSorted();
 };
 
+/**
+ * Reads a nullable enum (`type: ['string', 'null']`) and splits its members into
+ * the non-null values (sorted) plus whether `null` is present. A nullable enum
+ * must include `null` so the value can actually be null — otherwise the enum
+ * contradicts its nullable type. The non-null values are compared against the
+ * union's exhaustiveness set.
+ */
+const nullableEnumValues = (
+    itemSchema: ResponseJsonSchema,
+    key: string
+): { values: string[]; includesNull: boolean } => {
+    const prop = itemSchema.properties[key] as {
+        enum: readonly (string | null)[];
+    };
+    return {
+        values: prop.enum.filter((v): v is string => v !== null).toSorted(),
+        includesNull: prop.enum.includes(null),
+    };
+};
+
 // Expected enum value sets, encoded inline from the union definitions.
 
 // bullish/neutral/bearish is shared by all three sentiment unions today. Keying a
@@ -570,11 +590,12 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         expect(propertyKeys(signal)).toEqual(sortedKeys(signalSample));
         expect(signal.additionalProperties).toBe(false);
         expect(nestedEnumValues(signal, 'type')).toEqual(SIGNAL_TYPE_VALUES);
-        expect(nestedEnumValues(signal, 'strength')).toEqual(
-            SIGNAL_STRENGTH_VALUES
-        );
+        // optional strength → nullable string enum: enum must include null so it
+        // matches the nullable type, with the non-null values equal to the union.
+        const strengthEnum = nullableEnumValues(signal, 'strength');
+        expect(strengthEnum.includesNull).toBe(true);
+        expect(strengthEnum.values).toEqual(SIGNAL_STRENGTH_VALUES);
         expect(nestedEnumValues(signal, 'trend')).toEqual(TREND_VALUES);
-        // optional strength → nullable string enum
         expect(propType(signal, 'strength')).toEqual(['null', 'string']);
     });
 
@@ -713,9 +734,12 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         expect(sortedRequired(action)).toEqual(sortedKeys(actionSample));
         expect(propertyKeys(action)).toEqual(sortedKeys(actionSample));
         expect(action.additionalProperties).toBe(false);
-        expect(nestedEnumValues(action, 'entryRecommendation')).toEqual(
-            ENTRY_RECOMMENDATION_VALUES
-        );
+        // optional entryRecommendation → nullable string enum: enum must include
+        // null so it matches the nullable type, with the non-null values equal to
+        // the union.
+        const entryRecEnum = nullableEnumValues(action, 'entryRecommendation');
+        expect(entryRecEnum.includesNull).toBe(true);
+        expect(entryRecEnum.values).toEqual(ENTRY_RECOMMENDATION_VALUES);
         // optional fields → nullable
         expect(propType(action, 'entryRecommendation')).toEqual([
             'null',

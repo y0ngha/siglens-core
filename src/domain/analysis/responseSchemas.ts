@@ -350,7 +350,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                                 description: { type: 'string' },
                                 strength: {
                                     type: ['string', 'null'],
-                                    enum: ['strong', 'moderate', 'weak'],
+                                    enum: ['strong', 'moderate', 'weak', null],
                                 },
                                 trend: TREND_SCHEMA,
                             },
@@ -518,7 +518,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                 riskReward: { type: 'string' },
                 entryRecommendation: {
                     type: ['string', 'null'],
-                    enum: ['enter', 'wait', 'avoid'],
+                    enum: ['enter', 'wait', 'avoid', null],
                 },
                 entryPrices: {
                     type: ['array', 'null'],
