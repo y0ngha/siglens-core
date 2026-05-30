@@ -148,6 +148,12 @@ export const SQUEEZE_MOMENTUM_MIN_BARS = 2 * SQUEEZE_MOMENTUM_KC_LENGTH - 1;
 export const SMC_SWING_PERIOD = 5;
 /** @internal SMC equal-high/low tolerance as an ATR multiple. */
 export const SMC_EQUAL_LEVEL_ATR_MULTIPLIER = 0.5;
+/**
+ * @internal Hard cap on emitted equal-high/low clusters (most recent kept).
+ * Bounds the cached SMC payload even on degenerate flat-price series; consumers
+ * read only the last few levels, so trimming the tail loses nothing useful.
+ */
+export const SMC_MAX_EQUAL_LEVELS_RETAINED = 50;
 /** @internal SMC ATR period used for level/zone sizing. */
 export const SMC_ATR_PERIOD = 14;
 /** @internal SMC premium-zone threshold ratio of the dealing range. */

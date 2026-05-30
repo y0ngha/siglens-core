@@ -351,7 +351,12 @@ export interface SMCFairValueGap {
 }
 
 /**
- * A pair of equal swing points (e.g. equal highs / equal lows).
+ * A clustered equal-level liquidity zone (equal highs / equal lows) — a price
+ * level revisited by ≥2 swing points within an ATR threshold.
+ *
+ * `firstIndex`/`secondIndex` span the cluster: the first-touch and the
+ * most-recent-touch swing indices (firstIndex < secondIndex). `price` is the
+ * average price of the swings in the cluster.
  */
 export interface SMCEqualLevel {
     price: number;

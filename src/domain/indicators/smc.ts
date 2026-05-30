@@ -17,6 +17,7 @@ import {
     SMC_ATR_PERIOD,
     SMC_DISCOUNT_RATIO,
     SMC_EQUAL_LEVEL_ATR_MULTIPLIER,
+    SMC_MAX_EQUAL_LEVELS_RETAINED,
     SMC_PREMIUM_RATIO,
     SMC_SWING_PERIOD,
 } from '@/domain/indicators/constants';
@@ -286,37 +287,64 @@ function detectEqualLevels(
     };
 }
 
-function* findMatchingLevels(
-    swings: SMCSwingPoint[],
-    startJ: number,
-    swing: SMCSwingPoint,
-    threshold: number,
-    type: SMCSwingPointType
-): Generator<SMCEqualLevel> {
-    for (let j = startJ; j < swings.length; j++) {
-        if (Math.abs(swings[j].price - swing.price) <= threshold) {
-            yield {
-                price: (swing.price + swings[j].price) / 2,
-                firstIndex: swing.index,
-                secondIndex: swings[j].index,
-                type,
-            };
-        }
-    }
-}
-
+// Greedy price clustering of swing points instead of all-pairs matching.
+//
+// The previous impl emitted one SMCEqualLevel per (swing[i], swing[j]) pair
+// within ATR threshold — O(n²) output. On a flat/penny-stock series where
+// nearly every bar is a swing point at the same price, that exploded to tens
+// of thousands of entries (~10MB per ticker), tripping Upstash's 10MB request
+// limit when the bars cache value was written.
+//
+// A liquidity level is a *price zone revisited by multiple swings*, not the
+// cartesian product of touching pairs. So we cluster: each unused swing anchors
+// a cluster that absorbs every later swing within its ATR threshold, and we emit
+// ONE level per cluster of ≥2 touches. Output is bounded by ⌊n/2⌋ (and hard-capped
+// to the most recent SMC_MAX_EQUAL_LEVELS_RETAINED). The SMCEqualLevel shape is
+// preserved; firstIndex/secondIndex now span first-touch → most-recent-touch.
 function findEqualLevels(
     swings: SMCSwingPoint[],
     atrValues: (number | null)[],
     type: SMCSwingPointType
 ): SMCEqualLevel[] {
-    return swings.flatMap((swing, i) => {
-        const atr = atrValues[swing.index];
-        if (atr === null) return [];
+    const used = new Array<boolean>(swings.length).fill(false);
+    const levels: SMCEqualLevel[] = [];
+
+    for (let i = 0; i < swings.length; i++) {
+        if (used[i]) continue;
+        const atr = atrValues[swings[i].index];
+        if (atr === null) continue;
 
         const threshold = SMC_EQUAL_LEVEL_ATR_MULTIPLIER * atr;
-        return [...findMatchingLevels(swings, i + 1, swing, threshold, type)];
-    });
+        const cluster: SMCSwingPoint[] = [swings[i]];
+        used[i] = true;
+
+        // Membership is anchor-relative (distance to swings[i].price), NOT
+        // centroid-relative, by design — a single greedy pass. The emitted
+        // price is the cluster average, so on a drifting series a member can
+        // sit slightly beyond `threshold` from the final centroid; that is
+        // acceptable and intended (avoids an O(n²) reclustering pass).
+        for (let j = i + 1; j < swings.length; j++) {
+            if (used[j]) continue;
+            if (Math.abs(swings[j].price - swings[i].price) <= threshold) {
+                cluster.push(swings[j]);
+                used[j] = true;
+            }
+        }
+
+        if (cluster.length >= 2) {
+            const priceSum = cluster.reduce((sum, p) => sum + p.price, 0);
+            levels.push({
+                price: priceSum / cluster.length,
+                firstIndex: cluster[0].index,
+                secondIndex: cluster[cluster.length - 1].index,
+                type,
+            });
+        }
+    }
+
+    // Defense-in-depth cap: bound output regardless of swing count growth.
+    // Consumers read only the most recent levels (slice(-N)), so keep the tail.
+    return levels.slice(-SMC_MAX_EQUAL_LEVELS_RETAINED);
 }
 
 // ─── Premium / Discount / Equilibrium zones ───────────────────────────────────

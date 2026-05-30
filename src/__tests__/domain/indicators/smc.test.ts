@@ -4,6 +4,7 @@ import {
     EMPTY_SMC_RESULT,
     SMC_SWING_PERIOD,
     SMC_ATR_PERIOD,
+    SMC_MAX_EQUAL_LEVELS_RETAINED,
 } from '@/domain/indicators/constants';
 import type { Bar } from '@/domain/types';
 
@@ -339,6 +340,56 @@ describe('calculateSmc', () => {
 
             const result = calculateSmc(bars);
             expect(result.equalHighs.length).toBeGreaterThan(0);
+        });
+
+        it('같은 가격대의 여러 swing은 쌍 나열이 아니라 클러스터 1개로 묶인다', () => {
+            const P = SMC_SWING_PERIOD;
+            const WARMUP = SMC_ATR_PERIOD;
+            const bars: Bar[] = [];
+            let t = 0;
+
+            for (let i = 0; i < WARMUP + P; i++) {
+                bars.push(makeBar(100, 98, 99, t++));
+            }
+            // Three separate humps at the same high (105) → one liquidity level,
+            // not C(3,2)=3 pair entries.
+            for (let hump = 0; hump < 3; hump++) {
+                bars.push(makeBar(105, 98, 101.5, t++));
+                for (let i = 0; i < P * 2 + 1; i++) {
+                    bars.push(makeBar(100, 98, 99, t++));
+                }
+            }
+
+            const result = calculateSmc(bars);
+            const highsAt105 = result.equalHighs.filter(
+                eq => Math.abs(eq.price - 105) < 1
+            );
+            expect(highsAt105).toHaveLength(1);
+            // firstIndex/secondIndex span first-touch → most-recent-touch.
+            expect(highsAt105[0].secondIndex).toBeGreaterThan(
+                highsAt105[0].firstIndex
+            );
+        });
+
+        it('평탄한 가격(penny-stock degenerate) 시리즈에서도 출력이 폭발하지 않고 상한 안에 묶인다', () => {
+            // Every bar identical → nearly every bar is a swing point at one price.
+            // All-pairs would emit O(n²) entries (~tens of thousands); clustering
+            // collapses them to a single level.
+            const bars: Bar[] = Array.from({ length: 400 }, (_, i) =>
+                makeBar(0.0001, 0.0001, 0.0001, i)
+            );
+
+            const result = calculateSmc(bars);
+
+            expect(result.equalHighs.length).toBeLessThanOrEqual(
+                SMC_MAX_EQUAL_LEVELS_RETAINED
+            );
+            expect(result.equalLows.length).toBeLessThanOrEqual(
+                SMC_MAX_EQUAL_LEVELS_RETAINED
+            );
+            // A perfectly flat series is one price level, not thousands of pairs.
+            expect(result.equalHighs).toHaveLength(1);
+            expect(result.equalLows).toHaveLength(1);
         });
     });
 });
