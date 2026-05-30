@@ -21,6 +21,14 @@ import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
 const BRIEFING_JOB_SYMBOL = 'market';
 
 /**
+ * @internal
+ * Fixed model identifier for the market briefing. Core owns this choice and
+ * sends it on the dispatch body; it is also folded into the briefing cache key
+ * so a model change misses the old cache.
+ */
+export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+
+/**
  * Derive a short deterministic hash of the index/sector values driving the
  * briefing prompt.
  *
@@ -98,7 +106,11 @@ export async function submitBriefing(
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
     const inputHash = hashBriefingInput(data.indices, data.sectors);
-    const cacheKey = buildBriefingCacheKey(dateHour, inputHash);
+    const cacheKey = buildBriefingCacheKey(
+        dateHour,
+        BRIEFING_MODEL_ID,
+        inputHash
+    );
 
     const cache = createCacheProvider();
     if (cache !== null) {
@@ -143,7 +155,7 @@ export async function submitBriefing(
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
         },
-        body: JSON.stringify({ jobId, prompt }),
+        body: JSON.stringify({ jobId, prompt, model: BRIEFING_MODEL_ID }),
         signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
     }).catch(error => {
         console.error('[Briefing/Submit] Worker request failed:', error);

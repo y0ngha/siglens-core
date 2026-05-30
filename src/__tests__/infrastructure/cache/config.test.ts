@@ -87,15 +87,25 @@ describe('cache key builders', () => {
         );
     });
 
-    it('buildBriefingCacheKey includes the date-hour prefix and input hash', () => {
-        expect(buildBriefingCacheKey('2026-04-26T14', 'abc123')).toBe(
-            'briefing:market:2026-04-26T14:abc123'
-        );
+    it('buildBriefingCacheKey includes the date-hour prefix, model, and input hash', () => {
+        expect(
+            buildBriefingCacheKey(
+                '2026-04-26T14',
+                'gemini-2.5-flash-lite',
+                'abc123'
+            )
+        ).toBe('briefing:market:2026-04-26T14:gemini-2.5-flash-lite:abc123');
     });
 
     it('buildBriefingCacheKey: a different input hash yields a different key', () => {
-        const a = buildBriefingCacheKey('2026-04-26T14', 'hashA');
-        const b = buildBriefingCacheKey('2026-04-26T14', 'hashB');
+        const a = buildBriefingCacheKey('2026-04-26T14', 'model-x', 'hashA');
+        const b = buildBriefingCacheKey('2026-04-26T14', 'model-x', 'hashB');
+        expect(a).not.toBe(b);
+    });
+
+    it('buildBriefingCacheKey: a different model yields a different key', () => {
+        const a = buildBriefingCacheKey('2026-04-26T14', 'model-x', 'hash');
+        const b = buildBriefingCacheKey('2026-04-26T14', 'model-y', 'hash');
         expect(a).not.toBe(b);
     });
 
