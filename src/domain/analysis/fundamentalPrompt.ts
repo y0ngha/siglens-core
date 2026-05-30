@@ -10,6 +10,9 @@ import type {
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
+/** Decimal places used when rendering peer valuation metrics (PER / PSR). */
+const PEER_METRIC_DECIMAL_PLACES = 1;
+
 /** Filter skills to fundamental category with sufficient confidence weight. */
 function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
     return skills.filter(
@@ -37,13 +40,11 @@ function formatPriceTargetSummary(summary: PriceTargetSummary | null): string {
     return `1M Avg: ${fmt(summary.month1Avg)}, 3M Avg: ${fmt(summary.month3Avg)}, 1Y Avg: ${fmt(summary.year1Avg)}`;
 }
 
-/**
- * Format an optional peer valuation metric (PER / PSR) for the peer line.
- *
- * Renders the value to `dp` decimal places when it is a finite number, else
- * the literal `'N/A'` — covering `undefined`, `null`, `NaN`, and `Infinity`.
- */
-function formatPeerMetric(n: number | null | undefined, dp = 1): string {
+/** Format a peer valuation metric as a fixed-decimal string, or 'N/A' for non-finite / null / undefined values. */
+function formatPeerMetric(
+    n: number | null | undefined,
+    dp = PEER_METRIC_DECIMAL_PLACES
+): string {
     return typeof n === 'number' && Number.isFinite(n) ? n.toFixed(dp) : 'N/A';
 }
 

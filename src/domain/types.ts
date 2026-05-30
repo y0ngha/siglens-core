@@ -2058,9 +2058,9 @@ export interface FundamentalPeerInput {
     symbol: string;
     companyName: string;
     marketCap: number;
-    /** Trailing-twelve-month price/earnings ratio; null when unavailable. */
+    /** Trailing-twelve-month price/earnings ratio; omitted or null when unavailable. */
     per?: number | null;
-    /** Trailing-twelve-month price/sales ratio; null when unavailable. */
+    /** Trailing-twelve-month price/sales ratio; omitted or null when unavailable. */
     psr?: number | null;
 }
 
