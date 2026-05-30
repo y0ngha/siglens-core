@@ -105,8 +105,10 @@ describe('pivotFib', () => {
                 const result = computePivotFibLevels([], makeIndicators());
                 expect(result.standardPivot).toBeNull();
             });
+        });
 
-            it('returns null when there is no prior period (fewer than 2 bars)', () => {
+        describe('when pivot inputs are insufficient or invalid', () => {
+            it('returns null pivots when there is no prior period (fewer than 2 bars)', () => {
                 const result = computePivotFibLevels(
                     [makeBar()],
                     makeIndicators()
@@ -115,7 +117,7 @@ describe('pivotFib', () => {
                 expect(result.fibonacciPivot).toBeNull();
             });
 
-            it('returns null when a prior-bar OHLC value is non-positive', () => {
+            it('returns null pivots when a prior-bar OHLC value is non-positive', () => {
                 const result = computePivotFibLevels(
                     withPriorBar({ low: 0 }),
                     makeIndicators()
@@ -124,7 +126,7 @@ describe('pivotFib', () => {
                 expect(result.fibonacciPivot).toBeNull();
             });
 
-            it('returns null when a prior-bar OHLC value is non-finite', () => {
+            it('returns null pivots when a prior-bar OHLC value is non-finite', () => {
                 const result = computePivotFibLevels(
                     withPriorBar({ high: Number.NaN }),
                     makeIndicators()
@@ -315,12 +317,23 @@ describe('pivotFib', () => {
                 expect(result.fibonacci).toBeNull();
             });
 
-            it('returns null when a swing price is non-positive', () => {
+            it('returns null when the swing low price is non-positive', () => {
                 const result = computePivotFibLevels(
                     [makeBar()],
                     makeIndicators(
                         [makeSwing(SWING_HIGH_PRICE, 'high', 5)],
                         [makeSwing(0, 'low', 1)]
+                    )
+                );
+                expect(result.fibonacci).toBeNull();
+            });
+
+            it('returns null when the swing high price is non-positive', () => {
+                const result = computePivotFibLevels(
+                    [makeBar()],
+                    makeIndicators(
+                        [makeSwing(0, 'high', 5)],
+                        [makeSwing(SWING_LOW_PRICE, 'low', 1)]
                     )
                 );
                 expect(result.fibonacci).toBeNull();
