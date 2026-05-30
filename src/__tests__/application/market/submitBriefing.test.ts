@@ -6,10 +6,8 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
-import {
-    submitBriefing,
-    BRIEFING_MODEL_ID,
-} from '@/application/market/submitBriefing';
+import { submitBriefing } from '@/application/market/submitBriefing';
+import { BRIEFING_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
@@ -122,7 +120,6 @@ describe('submitBriefing 함수는', () => {
                 { body: string },
             ];
             const body = JSON.parse(init.body) as Record<string, unknown>;
-            expect(body.model).toBe(BRIEFING_MODEL_ID);
             expect(body).toMatchObject({
                 jobId: expect.any(String),
                 prompt: 'mock prompt',

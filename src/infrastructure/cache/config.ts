@@ -131,6 +131,14 @@ export function computeBarsEffectiveTtl(
 export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
+ * @internal
+ * Fixed model identifier for the market briefing. Core owns this choice and
+ * sends it on the dispatch body; it is also folded into the briefing cache key
+ * so a model change misses the old cache.
+ */
+export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+
+/**
  * Prompt-template version folded into the technical and fundamental analysis
  * cache keys.
  *
