@@ -287,56 +287,58 @@ function detectEqualLevels(
     };
 }
 
-// Greedy price clustering of swing points instead of all-pairs matching.
+// Equal highs/lows are liquidity levels — a price zone revisited by multiple
+// swings, not the cartesian product of touching pairs. Enumerating every swing
+// pair within an ATR threshold is O(n²) output: on a flat/penny-stock series
+// where nearly every bar is a swing point at one price, that explodes to tens
+// of thousands of entries (~10MB per ticker) and trips Upstash's 10MB cache
+// payload limit. So we cluster greedily instead — each unused swing anchors a
+// cluster that absorbs every later swing within its ATR threshold, emitting ONE
+// level per cluster of ≥2 touches. Output is bounded by ⌊n/2⌋ and hard-capped to
+// the most recent SMC_MAX_EQUAL_LEVELS_RETAINED levels. The SMCEqualLevel shape
+// is preserved; firstIndex/secondIndex span the cluster's first-touch →
+// most-recent-touch swing indices.
 //
-// The previous impl emitted one SMCEqualLevel per (swing[i], swing[j]) pair
-// within ATR threshold — O(n²) output. On a flat/penny-stock series where
-// nearly every bar is a swing point at the same price, that exploded to tens
-// of thousands of entries (~10MB per ticker), tripping Upstash's 10MB request
-// limit when the bars cache value was written.
-//
-// A liquidity level is a *price zone revisited by multiple swings*, not the
-// cartesian product of touching pairs. So we cluster: each unused swing anchors
-// a cluster that absorbs every later swing within its ATR threshold, and we emit
-// ONE level per cluster of ≥2 touches. Output is bounded by ⌊n/2⌋ (and hard-capped
-// to the most recent SMC_MAX_EQUAL_LEVELS_RETAINED). The SMCEqualLevel shape is
-// preserved; firstIndex/secondIndex now span first-touch → most-recent-touch.
+// Membership is anchor-relative (distance to the anchor price), NOT
+// centroid-relative, by design — a single greedy pass. The emitted price is the
+// cluster average, so on a drifting series a member can sit slightly beyond
+// `threshold` from the final centroid; that is acceptable and intended (avoids
+// an O(n²) reclustering pass).
 function findEqualLevels(
     swings: SMCSwingPoint[],
     atrValues: (number | null)[],
     type: SMCSwingPointType
 ): SMCEqualLevel[] {
-    const used = new Array<boolean>(swings.length).fill(false);
+    const n = swings.length;
+    const used = new Array<boolean>(n).fill(false);
     const levels: SMCEqualLevel[] = [];
 
-    for (let i = 0; i < swings.length; i++) {
+    for (let i = 0; i < n; i++) {
         if (used[i]) continue;
-        const atr = atrValues[swings[i].index];
+        const anchorSwing = swings[i];
+        const atr = atrValues[anchorSwing.index];
         if (atr === null) continue;
 
         const threshold = SMC_EQUAL_LEVEL_ATR_MULTIPLIER * atr;
-        const cluster: SMCSwingPoint[] = [swings[i]];
+        const anchorPrice = anchorSwing.price;
+        const cluster: SMCSwingPoint[] = [anchorSwing];
         used[i] = true;
 
-        // Membership is anchor-relative (distance to swings[i].price), NOT
-        // centroid-relative, by design — a single greedy pass. The emitted
-        // price is the cluster average, so on a drifting series a member can
-        // sit slightly beyond `threshold` from the final centroid; that is
-        // acceptable and intended (avoids an O(n²) reclustering pass).
-        for (let j = i + 1; j < swings.length; j++) {
+        for (let j = i + 1; j < n; j++) {
             if (used[j]) continue;
-            if (Math.abs(swings[j].price - swings[i].price) <= threshold) {
+            if (Math.abs(swings[j].price - anchorPrice) <= threshold) {
                 cluster.push(swings[j]);
                 used[j] = true;
             }
         }
 
-        if (cluster.length >= 2) {
+        const clusterSize = cluster.length;
+        if (clusterSize >= 2) {
             const priceSum = cluster.reduce((sum, p) => sum + p.price, 0);
             levels.push({
-                price: priceSum / cluster.length,
+                price: priceSum / clusterSize,
                 firstIndex: cluster[0].index,
-                secondIndex: cluster[cluster.length - 1].index,
+                secondIndex: cluster[clusterSize - 1].index,
                 type,
             });
         }

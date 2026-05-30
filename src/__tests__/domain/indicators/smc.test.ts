@@ -365,6 +365,8 @@ describe('calculateSmc', () => {
                 eq => Math.abs(eq.price - 105) < 1
             );
             expect(highsAt105).toHaveLength(1);
+            // price is the cluster average; all three humps are exactly 105.
+            expect(highsAt105[0].price).toBeCloseTo(105);
             // firstIndex/secondIndex span first-touch → most-recent-touch.
             expect(highsAt105[0].secondIndex).toBeGreaterThan(
                 highsAt105[0].firstIndex
