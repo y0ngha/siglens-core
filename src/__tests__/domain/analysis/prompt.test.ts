@@ -3708,7 +3708,6 @@ describe('prompt', () => {
                         price: 165.0,
                         firstIndex: 70,
                         secondIndex: 85,
-                        type: 'high',
                     },
                 ],
                 equalLows: [
@@ -3716,7 +3715,6 @@ describe('prompt', () => {
                         price: 140.0,
                         firstIndex: 60,
                         secondIndex: 78,
-                        type: 'low',
                     },
                 ],
             };
@@ -3726,11 +3724,14 @@ describe('prompt', () => {
                 bars,
                 makeIndicators({ smc })
             );
+            // totalBars = 100 (bars.length).
+            // Equal Highs: secondIndex 85 → 100-1-85 = 14 bars ago; span 85-70 = 15.
             expect(result).toContain(
-                'Equal Highs at 165.00 (sell-side liquidity)'
+                '- Equal Highs at 165.00 (sell-side liquidity) (14 bars ago, span 15 bars)'
             );
+            // Equal Lows: secondIndex 78 → 100-1-78 = 21 bars ago; span 78-60 = 18.
             expect(result).toContain(
-                'Equal Lows at 140.00 (buy-side liquidity)'
+                '- Equal Lows at 140.00 (buy-side liquidity) (21 bars ago, span 18 bars)'
             );
             expect(result).toContain('Liquidity Pools');
         });

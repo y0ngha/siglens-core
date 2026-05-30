@@ -63,6 +63,7 @@ import type {
     PromptConfig,
     Skill,
     SkillType,
+    SMCEqualLevel,
     SMCResult,
     SMCZone,
     SqueezeMomentumResult,
@@ -430,8 +431,20 @@ const formatSqueezeMomentumLine = (
     return `- Squeeze Momentum(BB:${SQUEEZE_MOMENTUM_BB_LENGTH},KC:${SQUEEZE_MOMENTUM_KC_LENGTH},mult:${SQUEEZE_MOMENTUM_KC_MULT}): momentum ${fmt(last.momentum)}${sqzDirectionLabel(last)}${trendLabel(momentumTrend)} / ${sqzStateLabel(last)}${durationStr}${crossStr}`;
 };
 
+const barsAgoCount = (index: number, totalBars: number): number =>
+    totalBars - 1 - index;
+
 const barsAgo = (index: number, totalBars: number): string =>
-    `(${totalBars - 1 - index} bars ago)`;
+    `(${barsAgoCount(index, totalBars)} bars ago)`;
+
+// Equal Highs/Lows differ only by label + liquidity-kind text; share one formatter.
+const formatLiquidityLine = (
+    label: string,
+    liquidityKind: string,
+    eq: SMCEqualLevel,
+    totalBars: number
+): string =>
+    `- ${label} at ${fmt(eq.price)} (${liquidityKind}) (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
 
 // When adding a new field to SMCResult, update this check accordingly.
 const isSMCEmpty = (smc: SMCResult): boolean =>
@@ -532,13 +545,21 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
         eqHighs.length > 0 || eqLows.length > 0
             ? [
                   '### Liquidity Pools',
-                  ...eqHighs.map(
-                      eq =>
-                          `- Equal Highs at ${fmt(eq.price)} (sell-side liquidity)`
+                  ...eqHighs.map(eq =>
+                      formatLiquidityLine(
+                          'Equal Highs',
+                          'sell-side liquidity',
+                          eq,
+                          totalBars
+                      )
                   ),
-                  ...eqLows.map(
-                      eq =>
-                          `- Equal Lows at ${fmt(eq.price)} (buy-side liquidity)`
+                  ...eqLows.map(eq =>
+                      formatLiquidityLine(
+                          'Equal Lows',
+                          'buy-side liquidity',
+                          eq,
+                          totalBars
+                      )
                   ),
               ]
             : [];

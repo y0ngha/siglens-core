@@ -10,7 +10,6 @@ import type {
     SMCStructureBreak,
     SMCStructureDirection,
     SMCSwingPoint,
-    SMCSwingPointType,
 } from '@/domain/types';
 import {
     EMPTY_SMC_RESULT,
@@ -281,8 +280,8 @@ function detectEqualLevels(
     atrValues: (number | null)[]
 ): { equalHighs: SMCEqualLevel[]; equalLows: SMCEqualLevel[] } {
     return {
-        equalHighs: findEqualLevels(swingHighs, atrValues, 'high'),
-        equalLows: findEqualLevels(swingLows, atrValues, 'low'),
+        equalHighs: findEqualLevels(swingHighs, atrValues),
+        equalLows: findEqualLevels(swingLows, atrValues),
     };
 }
 
@@ -290,8 +289,7 @@ function* findMatchingLevels(
     swings: SMCSwingPoint[],
     startJ: number,
     swing: SMCSwingPoint,
-    threshold: number,
-    type: SMCSwingPointType
+    threshold: number
 ): Generator<SMCEqualLevel> {
     for (let j = startJ; j < swings.length; j++) {
         if (Math.abs(swings[j].price - swing.price) <= threshold) {
@@ -299,7 +297,6 @@ function* findMatchingLevels(
                 price: (swing.price + swings[j].price) / 2,
                 firstIndex: swing.index,
                 secondIndex: swings[j].index,
-                type,
             };
         }
     }
@@ -307,15 +304,14 @@ function* findMatchingLevels(
 
 function findEqualLevels(
     swings: SMCSwingPoint[],
-    atrValues: (number | null)[],
-    type: SMCSwingPointType
+    atrValues: (number | null)[]
 ): SMCEqualLevel[] {
     return swings.flatMap((swing, i) => {
         const atr = atrValues[swing.index];
         if (atr === null) return [];
 
         const threshold = SMC_EQUAL_LEVEL_ATR_MULTIPLIER * atr;
-        return [...findMatchingLevels(swings, i + 1, swing, threshold, type)];
+        return [...findMatchingLevels(swings, i + 1, swing, threshold)];
     });
 }
 

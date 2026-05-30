@@ -357,7 +357,6 @@ export interface SMCEqualLevel {
     price: number;
     firstIndex: number;
     secondIndex: number;
-    type: SMCSwingPointType;
 }
 
 /**
