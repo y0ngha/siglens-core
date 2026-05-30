@@ -19,6 +19,7 @@ vi.mock('@/domain/indicators/fearGreed', () => ({
 import { submitOverallAnalysis } from '@/application/overall/submitOverallAnalysis';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
@@ -967,6 +968,7 @@ describe('submitOverallAnalysis 함수는', () => {
             ) as Record<string, unknown>;
             expect(body.analysisType).toBe('overall');
             expect(body.system).toBe(OVERALL_SYSTEM_PROMPT);
+            expect(body.seed).toBe(analysisSeed(body.prompt as string));
         });
 
         it('treats missing tier as DEFAULT_TIER (free) in worker POST body', async () => {

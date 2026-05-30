@@ -28,6 +28,7 @@ import {
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { createSkillsProvider } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
@@ -414,6 +415,7 @@ describe('submitAnalysis 함수는', () => {
             expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
             expect(body.analysisType).toBe('technical');
             expect(body.system).toBe(AI_SYSTEM_PROMPT);
+            expect(body.seed).toBe(analysisSeed(body.prompt as string));
         });
 
         it('cache miss 시 marketDataProvider를 주입하면 submitted를 반환한다', async () => {

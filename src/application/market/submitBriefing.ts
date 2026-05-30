@@ -15,7 +15,10 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
-import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashAnalysisInput,
+} from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
@@ -151,7 +154,12 @@ export async function submitBriefing(
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
         },
-        body: JSON.stringify({ jobId, prompt, model: BRIEFING_MODEL_ID }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: BRIEFING_MODEL_ID,
+            seed: analysisSeed(prompt),
+        }),
         signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
     }).catch(error => {
         console.error('[Briefing/Submit] Worker request failed:', error);

@@ -1,6 +1,9 @@
 import { fireAndForget } from '@/application/background';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
-import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashAnalysisInput,
+} from '@/infrastructure/hash/analysisInput';
 import {
     buildUsageLimitError,
     checkAnalysisUsageAllowed,
@@ -273,6 +276,7 @@ export async function submitOptionsAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            seed: analysisSeed(prompt),
             model: modelId,
             tier,
             analysisType: 'options' satisfies AnalysisType,

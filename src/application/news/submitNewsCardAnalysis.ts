@@ -8,6 +8,7 @@ import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { NEWS_CARD_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import type { AnalysisType } from '@/domain/types';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 
@@ -76,6 +77,7 @@ export async function submitNewsCardAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            seed: analysisSeed(prompt),
             model: NEWS_CARD_MODEL_ID,
             ...(thinkingBudget !== undefined && { thinkingBudget }),
             analysisType: 'newsCard' satisfies AnalysisType,

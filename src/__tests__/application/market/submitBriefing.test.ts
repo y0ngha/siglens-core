@@ -9,6 +9,7 @@ vi.mock('@/domain/analysis/marketBriefingPrompt');
 import { submitBriefing } from '@/application/market/submitBriefing';
 import { BRIEFING_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
@@ -125,6 +126,7 @@ describe('submitBriefing 함수는', () => {
                 prompt: 'mock prompt',
                 model: BRIEFING_MODEL_ID,
             });
+            expect(body.seed).toBe(analysisSeed(body.prompt as string));
         });
 
         it('submitted 상태와 jobId를 반환한다', async () => {

@@ -1,7 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
-import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashAnalysisInput,
+} from '@/infrastructure/hash/analysisInput';
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type {
     SubmitOverallAnalysisApiKeyRequiredError,
@@ -366,6 +369,7 @@ export async function submitOverallAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            seed: analysisSeed(prompt),
             model: modelId,
             tier,
             analysisType: 'overall' satisfies AnalysisType,
