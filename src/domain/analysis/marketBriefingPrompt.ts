@@ -49,8 +49,8 @@ Schema (string fields are Korean 존댓말; numeric fields are JSON numbers, not
   "summary": "string — 한국어(존댓말) 한 문장 전체 시장 요약",
   "dominantThemes": ["string — 한국어 테마 키워드", ...],
   "sectorAnalysis": {
-    "leadingSectors": ["string — 상승 주도 섹터 ETF 티커 (예: \\"XLK\\")", ...],
-    "laggingSectors": ["string — 부진한 섹터 ETF 티커 (예: \\"XLE\\")", ...],
+    "leadingSectors": ["string — 상승 주도 섹터 ETF 티커 (예: 'XLK')", ...],
+    "laggingSectors": ["string — 부진한 섹터 ETF 티커 (예: 'XLE')", ...],
     "performanceDescription": "string — 한국어(존댓말) 섹터 등락 요약"
   },
   "volatilityAnalysis": {
