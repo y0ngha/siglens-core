@@ -9,6 +9,7 @@ import { pollBriefing } from '@/application/market/pollBriefing';
 import {
     getJobStatus,
     getJobError,
+    getJobMeta,
     getJobResult,
     cleanupJob,
 } from '@/infrastructure/jobs/queue';
@@ -17,6 +18,7 @@ import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefi
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
+const mockGetJobMeta = getJobMeta as Mock;
 const mockGetJobResult = getJobResult as Mock;
 const mockCleanupJob = cleanupJob as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -41,6 +43,10 @@ describe('pollBriefing 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
+        mockGetJobMeta.mockResolvedValue({
+            symbol: 'market',
+            cacheKey: 'briefing:market:2025-01-15T12:deadbeefdeadbeef',
+        });
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheSet.mockResolvedValue(undefined);
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
@@ -144,12 +150,30 @@ describe('pollBriefing 함수는', () => {
             }
         });
 
-        it('캐시에 briefing을 저장한다', async () => {
+        it('job meta의 입력 해시 캐시 키로 briefing을 저장한다 (read==write)', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'market',
+                cacheKey: 'briefing:market:2025-01-15T12:cafebabecafebabe',
+            });
 
             await pollBriefing('job-cache');
 
-            expect(mockCacheSet).toHaveBeenCalled();
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'briefing:market:2025-01-15T12:cafebabecafebabe',
+                expect.objectContaining({ briefing: mockBriefing }),
+                expect.any(Number)
+            );
+        });
+
+        it('job meta에 cacheKey가 없으면 캐시 저장을 건너뛴다 (잘못된 키로 쓰지 않음)', async () => {
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce(null);
+
+            const result = await pollBriefing('job-no-meta');
+
+            expect(result.status).toBe('done');
+            expect(mockCacheSet).not.toHaveBeenCalled();
         });
 
         it('waitUntil이 제공되면 캐시 저장과 cleanup promise를 등록한다', async () => {

@@ -181,15 +181,24 @@ export function buildAnalysisCacheKey(
 /**
  * @internal Build the Redis key for a cached market briefing.
  *
- * Format: `briefing:market:<dateHour>`. The `dateHour` argument is the ISO
- * date+hour prefix (e.g. `"2026-04-26T14"`) so all callers within a given
- * hour share a single cached briefing.
+ * Format: `briefing:market:<dateHour>:<inputHash>`. The `dateHour` argument is
+ * the ISO date+hour prefix (e.g. `"2026-04-26T14"`) so callers within a given
+ * hour share a cached briefing, while `inputHash` folds in a deterministic
+ * hash of the index/sector values so changed underlying data within the same
+ * hour produces a new key (cache miss) instead of returning a stale briefing.
  *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitBriefing`. Do not depend on this function from outside the
+ *   core library.
  * @param dateHour - ISO date+hour prefix.
+ * @param inputHash - Short hash of the index/sector values used as prompt input.
  * @returns The cache key.
  */
-export function buildBriefingCacheKey(dateHour: string): string {
-    return `briefing:market:${dateHour}`;
+export function buildBriefingCacheKey(
+    dateHour: string,
+    inputHash: string
+): string {
+    return `briefing:market:${dateHour}:${inputHash}`;
 }
 
 /** @internal 타임프레임+버킷 기준 섹터 시그널 캐시 키 빌더. */

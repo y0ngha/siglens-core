@@ -5,14 +5,11 @@ import type {
     PollBriefingResult,
 } from '@/domain/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
-import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    buildBriefingCacheKey,
-    MARKET_BRIEFING_CACHE_TTL,
-} from '@/infrastructure/cache/config';
+import { MARKET_BRIEFING_CACHE_TTL } from '@/infrastructure/cache/config';
 import {
     getJobError,
+    getJobMeta,
     getJobResult,
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
@@ -68,12 +65,17 @@ export async function pollBriefing(
         return { status: 'error', error: 'Invalid briefing result' };
     }
 
-    const now = new Date();
-    const generatedAt = now.toISOString();
-    const dateHour = generatedAt.slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-    const cacheKey = buildBriefingCacheKey(dateHour);
+    const generatedAt = new Date().toISOString();
+
+    // The briefing cache key folds in an input hash of the index/sector data,
+    // which only the submit path can compute. submitBriefing stored that exact
+    // key in the job meta, so we write under the SAME key here (read == write).
+    // If the meta key is missing (e.g. TTL expiry), skip the write rather than
+    // reconstruct a key that would diverge from the submit-side lookup.
+    const meta = await getJobMeta(jobId);
+    const cacheKey = meta?.cacheKey;
     const cache = createCacheProvider();
-    if (cache !== null) {
+    if (cacheKey !== undefined && cache !== null) {
         fireAndForget(
             cache
                 .set(
