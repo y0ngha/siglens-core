@@ -14,6 +14,7 @@ import type {
 } from '@/application/options/types';
 import { normalizeOptionsAnalysisResponse } from '@/domain/analysis/normalizeOptions';
 import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
+import { OPTIONS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildOptionsCacheKey } from '@/infrastructure/cache/config';
@@ -267,7 +268,14 @@ export async function submitOptionsAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: modelId,
+            tier,
+            analysisType: 'options',
+            system: OPTIONS_SYSTEM_PROMPT,
+        }),
         signal: AbortSignal.timeout(SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error(`${LOG_PREFIX} Worker request failed:`, error);

@@ -9,6 +9,7 @@ import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalys
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
+import { OPTIONS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { OptionsSnapshot, TierConfig } from '@/domain/types';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
@@ -511,6 +512,8 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(typeof body.prompt).toBe('string');
             expect(body.model).toBe('gemini-2.5-flash');
             expect(body.tier).toBe('free');
+            expect(body.analysisType).toBe('options');
+            expect(body.system).toBe(OPTIONS_SYSTEM_PROMPT);
         });
 
         it('setJobMeta가 실패해도 submitted를 반환한다 (fail-open)', async () => {

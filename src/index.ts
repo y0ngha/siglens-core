@@ -352,6 +352,7 @@ export type {
     AnalysisResponse,
     AnalysisSignal,
     AnalysisSignalType,
+    AnalysisType,
     CurrentAnalysisContext,
     BacktestAiAnalysis,
     BacktestAiEntryRecommendation,

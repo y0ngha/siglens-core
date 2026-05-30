@@ -15,6 +15,7 @@ import {
 } from '@/application/usage';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
+import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
@@ -360,7 +361,14 @@ export async function submitOverallAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: modelId,
+            tier,
+            analysisType: 'overall',
+            system: OVERALL_SYSTEM_PROMPT,
+        }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitOverallAnalysis] Worker request failed:', error);

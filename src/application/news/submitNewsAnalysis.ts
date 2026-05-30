@@ -14,6 +14,7 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
+import { NEWS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildNewsCacheKey } from '@/infrastructure/cache/config';
@@ -208,7 +209,14 @@ export async function submitNewsAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: modelId,
+            tier,
+            analysisType: 'news',
+            system: NEWS_SYSTEM_PROMPT,
+        }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[submitNewsAnalysis] Worker request failed:', error);

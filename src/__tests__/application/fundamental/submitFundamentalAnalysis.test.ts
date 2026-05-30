@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { TierConfig } from '@/domain/types';
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
+import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
@@ -642,6 +643,8 @@ describe('submitFundamentalAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.tier).toBe('member');
+            expect(body.analysisType).toBe('fundamental');
+            expect(body.system).toBe(FUNDAMENTAL_SYSTEM_PROMPT);
         });
 
         it('proceeds when pro premium without BYOK (tier in body, no header)', async () => {

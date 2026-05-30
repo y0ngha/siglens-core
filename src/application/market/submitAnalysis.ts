@@ -11,6 +11,7 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { normalizeCachedAnalysisResponse } from '@/domain/analysis/confidence';
+import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
@@ -354,7 +355,14 @@ export async function submitAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: effectiveModelId, tier }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: effectiveModelId,
+            tier,
+            analysisType: 'technical',
+            system: AI_SYSTEM_PROMPT,
+        }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error('[Submit] Worker request failed:', error);

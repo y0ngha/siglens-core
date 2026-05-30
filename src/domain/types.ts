@@ -2281,6 +2281,21 @@ export interface OverallAnalysisResponse {
 }
 
 /**
+ * Discriminates which analysis produced a dispatched worker job. Sent on the
+ * `/analyze` dispatch body so the worker can apply per-analysis behavior
+ * (system prompt, response schema, seed, thinking). Optional on the wire for
+ * backward compatibility with older workers.
+ */
+export type AnalysisType =
+    | 'technical'
+    | 'overall'
+    | 'news'
+    | 'newsCard'
+    | 'fundamental'
+    | 'options'
+    | 'briefing';
+
+/**
  * Tagged union representing the analysis result currently in view by the chatbot.
  * Injected as context into the chat system prompt so the assistant can reference
  * live numbers from the user's current page.

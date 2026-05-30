@@ -32,6 +32,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { createSkillsProvider } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
@@ -411,6 +412,8 @@ describe('submitAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
+            expect(body.analysisType).toBe('technical');
+            expect(body.system).toBe(AI_SYSTEM_PROMPT);
         });
 
         it('cache miss 시 marketDataProvider를 주입하면 submitted를 반환한다', async () => {
