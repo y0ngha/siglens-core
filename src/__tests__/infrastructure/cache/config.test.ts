@@ -23,6 +23,7 @@ import {
     MARKET_BRIEFING_CACHE_TTL,
     NEWS_CACHE_TTL_SECONDS,
     OVERALL_CACHE_TTL_SECONDS,
+    PROMPT_TEMPLATE_VERSION,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
@@ -74,15 +75,15 @@ describe('computeEffectiveTtl', () => {
 });
 
 describe('cache key builders', () => {
-    it('buildAnalysisCacheKey includes model identifier', () => {
+    it('buildAnalysisCacheKey includes model identifier and prompt-template version', () => {
         expect(buildAnalysisCacheKey('AAPL', '1Hour', 'gemini-2.5-flash')).toBe(
-            'analysis:AAPL:1Hour:gemini-2.5-flash'
+            `analysis:AAPL:1Hour:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
         );
     });
 
     it('buildAnalysisCacheKey uses DEFAULT_ANALYSIS_MODEL_ID when modelId is omitted', () => {
         expect(buildAnalysisCacheKey('AAPL', '1Day')).toBe(
-            `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`
+            `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${PROMPT_TEMPLATE_VERSION}`
         );
     });
 
@@ -114,10 +115,10 @@ describe('cache key builders', () => {
 });
 
 describe('new analysis cache keys', () => {
-    it('returns {v}:analysis:fundamental:{symbol}:{model} format', () => {
+    it('returns {v}:analysis:fundamental:{symbol}:{model}:{promptVersion} format', () => {
         const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
         expect(a).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${PROMPT_TEMPLATE_VERSION}`
         );
     });
 
@@ -150,6 +151,25 @@ describe('new analysis cache keys', () => {
         expect(FUNDAMENTAL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
         expect(NEWS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
         expect(OVERALL_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+    });
+});
+
+describe('PROMPT_TEMPLATE_VERSION in technical & fundamental keys', () => {
+    it('is a non-empty string, separate from CACHE_KEY_SCHEMA_VERSION', () => {
+        expect(typeof PROMPT_TEMPLATE_VERSION).toBe('string');
+        expect(PROMPT_TEMPLATE_VERSION.length).toBeGreaterThan(0);
+        // Distinct invalidation axes — must not be conflated.
+        expect(PROMPT_TEMPLATE_VERSION).not.toBe(CACHE_KEY_SCHEMA_VERSION);
+    });
+
+    it('technical key ends with the prompt-template version segment', () => {
+        const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-pro');
+        expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
+    });
+
+    it('fundamental key ends with the prompt-template version segment', () => {
+        const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
     });
 });
 

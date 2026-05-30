@@ -131,11 +131,32 @@ export function computeBarsEffectiveTtl(
 export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
- * @internal Build the Redis key for a cached symbol analysis.
+ * Prompt-template version folded into the technical and fundamental analysis
+ * cache keys.
  *
- * Format: `analysis:<symbol>:<timeframe>:<modelId>`. Symbol is used verbatim
- * — pass the canonical uppercase form. Including the model identifier ensures
- * results from different AI models are cached independently.
+ * This is a **separate invalidation axis** from {@link CACHE_KEY_SCHEMA_VERSION}:
+ * the schema version tracks the cached *response shape*, while this tracks the
+ * *prompt template* fed to the LLM. The technical/fundamental keys carry no
+ * input/prompt hash (unlike news/overall, which fold a skill fingerprint into
+ * their input hash), so without this lever editing a prompt template would not
+ * invalidate already-cached analyses until the TTL elapsed.
+ *
+ * Bump this string whenever a technical or fundamental prompt template changes
+ * in a way that would make previously cached results stale. Old keys (e.g.
+ * `p1`) are simply never looked up after a bump and naturally expire via TTL.
+ *
+ * @internal
+ */
+export const PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
+ * @internal Build the Redis key for a cached symbol (technical) analysis.
+ *
+ * Format: `analysis:<symbol>:<timeframe>:<modelId>:<promptVersion>`. Symbol is
+ * used verbatim — pass the canonical uppercase form. Including the model
+ * identifier ensures results from different AI models are cached independently;
+ * the trailing {@link PROMPT_TEMPLATE_VERSION} segment invalidates the cache
+ * when the technical prompt template changes.
  *
  * @param symbol - U.S. equity ticker.
  * @param timeframe - Bar resolution.
@@ -146,7 +167,7 @@ export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
  * @example
  * ```ts
  * const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash');
- * // → 'analysis:AAPL:1Day:gemini-2.5-flash'
+ * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1'
  * ```
  */
 export function buildAnalysisCacheKey(
@@ -154,7 +175,7 @@ export function buildAnalysisCacheKey(
     timeframe: Timeframe,
     modelId = DEFAULT_ANALYSIS_MODEL_ID
 ): string {
-    return `analysis:${symbol}:${timeframe}:${modelId}`;
+    return `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
 }
 
 /**
@@ -208,15 +229,16 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /**
  * Build the Redis key for a cached fundamental analysis result.
  *
- * Format: `{version}:analysis:fundamental:<symbol>:<modelId>`.
+ * Format: `{version}:analysis:fundamental:<symbol>:<modelId>:<promptVersion>`.
  *
  * The key is intentionally free of an input hash so that the cache lookup
  * can happen before any FMP data fetch — avoiding 13 parallel API calls on
  * every page load when a warm result already exists. Cache freshness is
- * governed solely by the 24-hour TTL ({@link FUNDAMENTAL_CACHE_TTL_SECONDS})
- * and the schema-version prefix ({@link CACHE_KEY_SCHEMA_VERSION}): bump the
- * version whenever the response shape or prompt logic changes in a way that
- * would make old cached results incorrect.
+ * governed by the 24-hour TTL ({@link FUNDAMENTAL_CACHE_TTL_SECONDS}), the
+ * schema-version prefix ({@link CACHE_KEY_SCHEMA_VERSION}) for response-shape
+ * changes, and the trailing {@link PROMPT_TEMPLATE_VERSION} segment for
+ * prompt-template changes: bump the relevant axis whenever a change would make
+ * old cached results incorrect.
  *
  * @internal
  * @param symbol - U.S. equity ticker (canonical uppercase).
@@ -227,7 +249,7 @@ export function buildFundamentalCacheKey(
     symbol: string,
     modelId: string
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
 }
 
 /**
