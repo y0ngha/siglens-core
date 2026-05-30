@@ -9,13 +9,16 @@ import {
 import type {
     FundamentalAnalysisResponse,
     FundamentalCategoryAssessment,
+    FundamentalSentiment,
     NewsAnalysisResponse,
     NewsCardAnalysis,
+    NewsSentiment,
     OptionsAnalysisResponse,
     OptionsPerExpirationCommentary,
     OptionsSignal,
     OverallAnalysisResponse,
     OverallScenario,
+    OverallScenarioName,
     ResponseJsonSchema,
 } from '@/domain/types';
 
@@ -62,7 +65,18 @@ const nestedEnumValues = (
 };
 
 // Expected enum value sets, encoded inline from the union definitions.
-const NEWS_SENTIMENT = ['bearish', 'bullish', 'neutral'];
+
+// bullish/neutral/bearish is shared by all three sentiment unions today. Keying a
+// Record by each union forces a compile error here if any union gains/loses a
+// member, so one shared expected-set stays correct (and the schema must follow).
+const SENTIMENT_VALUES = Object.keys({
+    bullish: true,
+    neutral: true,
+    bearish: true,
+} satisfies Record<NewsSentiment, true> &
+    Record<FundamentalSentiment, true> &
+    Record<OverallScenarioName, true>).toSorted();
+
 const NEWS_CATEGORY = [
     'earnings',
     'guidance',
@@ -73,7 +87,6 @@ const NEWS_CATEGORY = [
     'regulation',
 ].toSorted();
 const NEWS_IMPACT = ['high', 'low', 'medium', 'negligible'];
-const FUNDAMENTAL_SENTIMENT = ['bearish', 'bullish', 'neutral'];
 const FUNDAMENTAL_CATEGORY = [
     'futureDirection',
     'growth',
@@ -81,7 +94,6 @@ const FUNDAMENTAL_CATEGORY = [
     'profitability',
     'valuation',
 ].toSorted();
-const OVERALL_SCENARIO_NAME = ['bearish', 'bullish', 'neutral'];
 const OPTIONS_TONE = ['bearish', 'bullish', 'cautious', 'neutral'];
 const OPTIONS_SIGNAL_KIND = ['bearish', 'bullish', 'neutral', 'volatility'];
 
@@ -132,7 +144,7 @@ describe('NEWS_CARD_RESPONSE_SCHEMA drift guard', () => {
 
     it('enum fields match their union value sets', () => {
         expect(enumValues(NEWS_CARD_RESPONSE_SCHEMA, 'sentiment')).toEqual(
-            NEWS_SENTIMENT
+            SENTIMENT_VALUES
         );
         expect(enumValues(NEWS_CARD_RESPONSE_SCHEMA, 'category')).toEqual(
             NEWS_CATEGORY
@@ -167,7 +179,7 @@ describe('NEWS_RESPONSE_SCHEMA drift guard', () => {
 
     it('enum fields match their union value sets', () => {
         expect(enumValues(NEWS_RESPONSE_SCHEMA, 'overallSentiment')).toEqual(
-            NEWS_SENTIMENT
+            SENTIMENT_VALUES
         );
     });
 });
@@ -205,15 +217,13 @@ describe('FUNDAMENTAL_RESPONSE_SCHEMA drift guard', () => {
         expect(nestedEnumValues(item, 'category')).toEqual(
             FUNDAMENTAL_CATEGORY
         );
-        expect(nestedEnumValues(item, 'sentiment')).toEqual(
-            FUNDAMENTAL_SENTIMENT
-        );
+        expect(nestedEnumValues(item, 'sentiment')).toEqual(SENTIMENT_VALUES);
     });
 
     it('top-level enum fields match their union value sets', () => {
         expect(
             enumValues(FUNDAMENTAL_RESPONSE_SCHEMA, 'overallSentiment')
-        ).toEqual(FUNDAMENTAL_SENTIMENT);
+        ).toEqual(SENTIMENT_VALUES);
     });
 });
 
@@ -259,7 +269,7 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         expect(sortedRequired(item)).toEqual(sortedKeys(nestedSample));
         expect(propertyKeys(item)).toEqual(sortedKeys(nestedSample));
         expect(item.additionalProperties).toBe(false);
-        expect(nestedEnumValues(item, 'name')).toEqual(OVERALL_SCENARIO_NAME);
+        expect(nestedEnumValues(item, 'name')).toEqual(SENTIMENT_VALUES);
     });
 });
 

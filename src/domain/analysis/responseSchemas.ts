@@ -12,10 +12,22 @@ import type { ResponseJsonSchema } from '@/domain/types';
  * optional `field?: T` is modelled as nullable for the same reason.
  *
  * The CHART/technical analysis response is intentionally excluded — its shape is
- * deeply nested and deferred to a later change.
+ * deeply nested; added separately when needed.
  *
  * @see ResponseJsonSchema
  */
+
+/**
+ * Shared `string` enum schema for the three sentiment-direction unions
+ * (`NewsSentiment`, `FundamentalSentiment`, `OverallScenarioName`), which
+ * currently share the same `'bullish' | 'neutral' | 'bearish'` values. Reused at
+ * all five sentiment sites; sharing one object reference is safe because JSON
+ * serialization handles shared refs.
+ */
+const SENTIMENT_SCHEMA = {
+    type: 'string',
+    enum: ['bullish', 'neutral', 'bearish'],
+} as const;
 
 /**
  * @internal
@@ -29,7 +41,7 @@ export const NEWS_CARD_RESPONSE_SCHEMA = {
         titleKo: { type: 'string' },
         bodyKo: { type: ['string', 'null'] },
         summaryKo: { type: 'string' },
-        sentiment: { type: 'string', enum: ['bullish', 'neutral', 'bearish'] },
+        sentiment: SENTIMENT_SCHEMA,
         category: {
             type: 'string',
             enum: [
@@ -68,10 +80,7 @@ export const NEWS_RESPONSE_SCHEMA = {
         currentDriverKo: { type: 'string' },
         keyEventsKo: { type: 'array', items: { type: 'string' } },
         upcomingEventsKo: { type: 'array', items: { type: 'string' } },
-        overallSentiment: {
-            type: 'string',
-            enum: ['bullish', 'neutral', 'bearish'],
-        },
+        overallSentiment: SENTIMENT_SCHEMA,
     },
     required: [
         'currentDriverKo',
@@ -107,10 +116,7 @@ export const FUNDAMENTAL_RESPONSE_SCHEMA = {
                             'futureDirection',
                         ],
                     },
-                    sentiment: {
-                        type: 'string',
-                        enum: ['bullish', 'neutral', 'bearish'],
-                    },
+                    sentiment: SENTIMENT_SCHEMA,
                     rationaleKo: { type: 'string' },
                 },
                 required: ['category', 'sentiment', 'rationaleKo'],
@@ -118,10 +124,7 @@ export const FUNDAMENTAL_RESPONSE_SCHEMA = {
             },
         },
         riskFactorsKo: { type: 'array', items: { type: 'string' } },
-        overallSentiment: {
-            type: 'string',
-            enum: ['bullish', 'neutral', 'bearish'],
-        },
+        overallSentiment: SENTIMENT_SCHEMA,
     },
     required: [
         'overallConclusionKo',
@@ -154,10 +157,7 @@ export const OVERALL_RESPONSE_SCHEMA = {
             items: {
                 type: 'object',
                 properties: {
-                    name: {
-                        type: 'string',
-                        enum: ['bullish', 'neutral', 'bearish'],
-                    },
+                    name: SENTIMENT_SCHEMA,
                     triggerConditionKo: { type: 'string' },
                     priceRangeKo: { type: 'string' },
                 },
