@@ -89,8 +89,6 @@ const nearestFirst = (a: LevelCandidate, b: LevelCandidate): number =>
     a.distancePercent - b.distancePercent;
 
 /**
- * @internal Used by buildAnalysisPrompt to inject precomputed S/R candidates.
- *
  * Derive deterministic support/resistance candidates from indicator and SMC data.
  *
  * Gathers price levels that are already computed elsewhere — Volume Profile
