@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     analysisSeed,
     hashAnalysisInput,
+    MAX_INT32,
 } from '@/infrastructure/hash/analysisInput';
 
 describe('hashAnalysisInput', () => {
@@ -47,7 +48,7 @@ describe('analysisSeed', () => {
             const seed = analysisSeed(input);
             expect(Number.isInteger(seed)).toBe(true);
             expect(seed).toBeGreaterThanOrEqual(0);
-            expect(seed).toBeLessThanOrEqual(0x7fffffff);
+            expect(seed).toBeLessThanOrEqual(MAX_INT32);
         }
     });
 
