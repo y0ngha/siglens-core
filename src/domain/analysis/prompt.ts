@@ -586,6 +586,8 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     ].join('\n');
 };
 
+const SR_CANDIDATES_HEADER = '## Support/Resistance Candidates (precomputed)';
+
 const formatCandidateLine = (candidate: LevelCandidate): string =>
     `- ${fmt(candidate.price)} [${candidate.source}] (${candidate.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
 
@@ -594,7 +596,7 @@ const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
 
     if (support.length === 0 && resistance.length === 0) {
         return [
-            '## Support/Resistance Candidates (precomputed)',
+            SR_CANDIDATES_HEADER,
             '- No candidates could be derived from the available data',
         ].join('\n');
     }
@@ -615,7 +617,7 @@ const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
             : [];
 
     return [
-        '## Support/Resistance Candidates (precomputed)',
+        SR_CANDIDATES_HEADER,
         'Deterministically derived from Volume Profile, moving averages, Bollinger bands, and SMC swing points. Nearest-to-price first.',
         ...resistanceLines,
         ...supportLines,

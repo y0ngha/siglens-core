@@ -4,7 +4,8 @@ import {
     MAX_LEVEL_CANDIDATES_PER_SIDE,
 } from '@/domain/analysis/levelCandidates';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
-import type { IndicatorResult, SMCResult, SMCSwingPoint } from '@/domain/types';
+import { makeSwing } from '@/__tests__/domain/analysis/levelCandidatesTestHelpers';
+import type { IndicatorResult, SMCResult } from '@/domain/types';
 
 const CURRENT_PRICE = 100;
 
@@ -37,11 +38,6 @@ const makeIndicators = (
     ...overrides,
     smc: overrides?.smc ?? EMPTY_SMC_RESULT,
 });
-
-const makeSwing = (
-    price: number,
-    type: SMCSwingPoint['type']
-): SMCSwingPoint => ({ index: 0, price, type });
 
 const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
     ...EMPTY_SMC_RESULT,

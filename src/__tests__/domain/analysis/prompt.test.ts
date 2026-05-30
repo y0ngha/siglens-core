@@ -41,13 +41,13 @@ import {
     TEST_BAR_BASE_TIME,
     TEST_BAR_INTERVAL,
 } from '@/__tests__/fixtures/candle';
+import { makeSwing } from '@/__tests__/domain/analysis/levelCandidatesTestHelpers';
 import type {
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
     Skill,
     SMCResult,
-    SMCSwingPoint,
     SqueezeMomentumResult,
 } from '@/domain/types';
 
@@ -4179,10 +4179,6 @@ describe('prompt', () => {
 
     describe('Support/Resistance Candidates section', () => {
         const SR_PRICE = 100;
-        const makeSwing = (
-            price: number,
-            type: SMCSwingPoint['type']
-        ): SMCSwingPoint => ({ index: 0, price, type });
         const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
             ...EMPTY_SMC_RESULT,
             ...overrides,
