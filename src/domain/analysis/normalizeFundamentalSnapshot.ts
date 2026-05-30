@@ -69,6 +69,8 @@ export function normalizeFundamentalSnapshot(
             symbol: p.symbol,
             companyName: p.companyName,
             marketCap: p.marketCap,
+            per: p.per ?? null,
+            psr: p.psr ?? null,
         })),
         profitability: {
             roe: toPercent(input.ratiosTtm?.returnOnEquityTTM),

@@ -32,11 +32,15 @@ const TEST_SNAPSHOT: FundamentalSnapshot = {
             symbol: 'MSFT',
             companyName: 'Microsoft Corp.',
             marketCap: 2_800_000_000_000,
+            per: 34.2,
+            psr: 12.6,
         },
         {
             symbol: 'GOOGL',
             companyName: 'Alphabet Inc.',
             marketCap: 1_900_000_000_000,
+            per: null,
+            psr: null,
         },
     ],
     profitability: {
@@ -156,6 +160,56 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('200'); // 1Y avg
         // Peer
         expect(prompt).toContain('MSFT');
+    });
+
+    it('renders each peer row with market cap, PER, and PSR', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+
+        // (a) peer with both per & psr finite → exact rendering (PER/PSR to 1dp)
+        expect(prompt).toContain(
+            '  - MSFT (Microsoft Corp.): Market Cap 2800B, PER 34.2, PSR 12.6'
+        );
+        // (b) peer with per: null and psr undefined → both N/A; market cap still shown
+        expect(prompt).toContain(
+            '  - GOOGL (Alphabet Inc.): Market Cap 1900B, PER N/A, PSR N/A'
+        );
+    });
+
+    it('renders a non-finite peer metric (NaN / Infinity) as N/A', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                peers: [
+                    {
+                        symbol: 'XYZ',
+                        companyName: 'Xyz Corp',
+                        marketCap: 50_000_000_000,
+                        per: Number.NaN,
+                        psr: Number.POSITIVE_INFINITY,
+                    },
+                ],
+            },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain(
+            '  - XYZ (Xyz Corp): Market Cap 50B, PER N/A, PSR N/A'
+        );
+    });
+
+    it('renders the peer section as None when there are no peers', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            { ...TEST_SNAPSHOT, peers: [] },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain('## Comparable Peers\n  None');
     });
 
     it('explains that N/A means missing data, not zero or a negative value', () => {

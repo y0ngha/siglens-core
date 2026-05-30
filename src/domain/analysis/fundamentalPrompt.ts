@@ -37,6 +37,16 @@ function formatPriceTargetSummary(summary: PriceTargetSummary | null): string {
     return `1M Avg: ${fmt(summary.month1Avg)}, 3M Avg: ${fmt(summary.month3Avg)}, 1Y Avg: ${fmt(summary.year1Avg)}`;
 }
 
+/**
+ * Format an optional peer valuation metric (PER / PSR) for the peer line.
+ *
+ * Renders the value to `dp` decimal places when it is a finite number, else
+ * the literal `'N/A'` — covering `undefined`, `null`, `NaN`, and `Infinity`.
+ */
+function formatPeerMetric(n: number | null | undefined, dp = 1): string {
+    return typeof n === 'number' && Number.isFinite(n) ? n.toFixed(dp) : 'N/A';
+}
+
 /** Render sector direction as a compact inline string. */
 function formatSectorDirection(
     sd: FundamentalSnapshot['sectorDirection']
@@ -101,7 +111,7 @@ export function buildFundamentalAnalysisPrompt(
             ? peers
                   .map(
                       p =>
-                          `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B`
+                          `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B, PER ${formatPeerMetric(p.per)}, PSR ${formatPeerMetric(p.psr)}`
                   )
                   .join('\n')
             : '  None';
