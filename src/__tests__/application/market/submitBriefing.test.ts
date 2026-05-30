@@ -202,9 +202,10 @@ describe('submitBriefing 함수는', () => {
 
             const key = readCacheKey();
             // briefing:market:<dateHour(13)>:<model>:<inputHash(16 hex)>
+            const escapedModel = BRIEFING_MODEL_ID.replace(/\./g, '\\.');
             expect(key).toMatch(
                 new RegExp(
-                    `^briefing:market:.{13}:${BRIEFING_MODEL_ID}:[0-9a-f]{16}$`
+                    `^briefing:market:.{13}:${escapedModel}:[0-9a-f]{16}$`
                 )
             );
         });

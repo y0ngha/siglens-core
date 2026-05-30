@@ -89,12 +89,8 @@ describe('cache key builders', () => {
 
     it('buildBriefingCacheKey includes the date-hour prefix, model, and input hash', () => {
         expect(
-            buildBriefingCacheKey(
-                '2026-04-26T14',
-                'gemini-2.5-flash-lite',
-                'abc123'
-            )
-        ).toBe('briefing:market:2026-04-26T14:gemini-2.5-flash-lite:abc123');
+            buildBriefingCacheKey('2026-04-26T14', 'test-model', 'abc123')
+        ).toBe('briefing:market:2026-04-26T14:test-model:abc123');
     });
 
     it('buildBriefingCacheKey: a different input hash yields a different key', () => {
