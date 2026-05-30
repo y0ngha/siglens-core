@@ -1019,12 +1019,14 @@ function buildAnalysisPrompt(
 4. 거래량 분석 (평균 대비 비율)
 5. 인디케이터 수치 (RSI, MACD, 볼린저, DMI, Stochastic, StochRSI, CCI, Volume Profile POC/VAH/VAL, Ichimoku 전환선/기준선/SpanA/SpanB/후행스팬)
 6. 지지/저항 후보 (사전계산, `## Support/Resistance Candidates (precomputed)`) — `computeLevelCandidates`가 Volume Profile(POC/VAH/VAL)·MA/EMA·Bollinger 경계·SMC 스윙에서 결정론적으로 도출한 후보 레벨. 현재가 기준으로 저항(위)/지지(아래)로 분리, side별 nearest-first 정렬 + 상위 N개(`MAX_LEVEL_CANDIDATES_PER_SIDE`)만 노출. AI는 가격을 직접 계산하지 않고 이 후보 중에서 keyLevels를 **선택**한다(price-arithmetic hallucination 제거). 양측 모두 비면 "No candidates could be derived" note만 렌더링.
-7. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
-8. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
-9. 전략 분석 (type='strategy' skills, confidence >= 0.5)
-10. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
-11. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
-12. 분석 요청 및 JSON 응답 형식 지시
+7. 피벗 & 피보나치 레벨 (사전계산, `## Pivot & Fibonacci Levels (precomputed)`) — `computePivotFibLevels`가 직전 기간 H/L/C에서 도출한 Standard/Fibonacci 피벗(PP/R1-R3/S1-S3)과 최근 스윙 고/저에서 도출한 피보나치 되돌림(23.6~78.6%)·확장(100~261.8%) 목표를 결정론적으로 산출. AI는 피벗/피보 산술을 직접 수행하지 않고 이 레벨들을 **선택·해석**한다(arithmetic hallucination 제거). 도출 불가 시 "No pivot or Fibonacci levels could be derived" note만 렌더링.
+8. 추세선 후보 (사전계산, `## Trendline Candidates (precomputed)`) — `computeTrendlineCandidates`가 감지된 SMC 스윙 포인트를 실제 봉의 시간(`bars[swing.index].time`)·가격으로 연결해 후보 추세선을 결정론적으로 도출. 저항선은 스윙 고점, 지지선은 스윙 저점에서 side별로 구성하고, 각 선을 같은 쪽 스윙이 허용오차 내에서 몇 개나 닿는지(터치 수, 두 끝점은 항상 포함)로 점수화한다. 터치 수 → 종료시간 최신 → 스팬 순으로 랭킹, 근접 중복 제거, side별 상위 N개(`MAX_TRENDLINE_CANDIDATES_PER_SIDE`) + 전체 상한(`MAX_TRENDLINE_CANDIDATES`)만 상위 후보로 노출. AI는 좌표를 지어내지 않고 이 후보의 실제 시간/가격 끝점을 **선택·재사용**한다(time-coordinate hallucination 제거). 피벗 & 피보나치 섹션 바로 뒤에 주입되며, 후보가 없으면 섹션 자체가 생략된다.
+9. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
+10. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
+11. 전략 분석 (type='strategy' skills, confidence >= 0.5)
+12. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
+13. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
+14. 분석 요청 및 JSON 응답 형식 지시
 ```
 
 ### 응답 형식 (JSON)
