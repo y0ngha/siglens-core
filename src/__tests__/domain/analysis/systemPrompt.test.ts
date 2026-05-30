@@ -10,9 +10,9 @@ import {
 
 /**
  * Each per-analysis prompt is composed of a distinct persona first line followed
- * by the shared {@link ANALYSIS_SYSTEM_BASE}. The persona constants are
- * module-internal (not re-exported from the package barrel) but the test imports
- * them directly from the module file.
+ * by the shared base (ANALYSIS_SYSTEM_BASE — module-private). The persona
+ * constants are module-internal (not re-exported from the package barrel) but
+ * the test imports them directly from the module file.
  */
 const PROMPTS: Array<{
     name: string;
@@ -86,9 +86,9 @@ describe('analysis system prompts', () => {
 
     it('each prompt places its persona before the shared base', () => {
         for (const { value } of PROMPTS) {
-            expect(value.indexOf('You are')).toBeLessThan(
-                value.indexOf('CORE PRINCIPLES')
-            );
+            const personaIndex = value.indexOf('You are');
+            expect(personaIndex).toBeGreaterThanOrEqual(0);
+            expect(personaIndex).toBeLessThan(value.indexOf('CORE PRINCIPLES'));
         }
     });
 });

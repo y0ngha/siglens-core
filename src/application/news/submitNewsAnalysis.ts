@@ -22,7 +22,7 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import type { NewsAnalysisResponse, Skill } from '@/domain/types';
+import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the news analysis job. */
 const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
@@ -214,7 +214,7 @@ export async function submitNewsAnalysis(
             prompt,
             model: modelId,
             tier,
-            analysisType: 'news',
+            analysisType: 'news' satisfies AnalysisType,
             system: NEWS_SYSTEM_PROMPT,
         }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),

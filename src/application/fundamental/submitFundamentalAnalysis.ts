@@ -25,6 +25,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
+    AnalysisType,
     FundamentalAnalysisResponse,
     FundamentalSnapshot,
     Skill,
@@ -269,7 +270,7 @@ export async function submitFundamentalAnalysis(
             prompt,
             model: modelId,
             tier,
-            analysisType: 'fundamental',
+            analysisType: 'fundamental' satisfies AnalysisType,
             system: FUNDAMENTAL_SYSTEM_PROMPT,
         }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),

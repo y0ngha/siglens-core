@@ -23,6 +23,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { sanitizeOptionsChain } from '@/domain/options/sanitizeOptionsChain';
 import type {
+    AnalysisType,
     OptionsAnalysisResponse,
     OptionsExpirationFilter,
     OptionsSnapshot,
@@ -273,7 +274,7 @@ export async function submitOptionsAnalysis(
             prompt,
             model: modelId,
             tier,
-            analysisType: 'options',
+            analysisType: 'options' satisfies AnalysisType,
             system: OPTIONS_SYSTEM_PROMPT,
         }),
         signal: AbortSignal.timeout(SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS),

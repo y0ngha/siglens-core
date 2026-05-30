@@ -25,6 +25,7 @@ import {
 } from '@/domain/tier';
 import type {
     AnalysisResponse,
+    AnalysisType,
     FearGreedSnapshot,
     Skill,
     Timeframe,
@@ -360,7 +361,7 @@ export async function submitAnalysis(
             prompt,
             model: effectiveModelId,
             tier,
-            analysisType: 'technical',
+            analysisType: 'technical' satisfies AnalysisType,
             system: AI_SYSTEM_PROMPT,
         }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),

@@ -25,6 +25,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import type {
     AnalysisResponse,
+    AnalysisType,
     FearGreedSnapshot,
     OptionsAnalysisResponse,
     OverallAnalysisResponse,
@@ -366,7 +367,7 @@ export async function submitOverallAnalysis(
             prompt,
             model: modelId,
             tier,
-            analysisType: 'overall',
+            analysisType: 'overall' satisfies AnalysisType,
             system: OVERALL_SYSTEM_PROMPT,
         }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),

@@ -30,39 +30,31 @@ Your job is to interpret bar data, technical indicators, and candle/chart patter
 ${ANALYSIS_SYSTEM_BASE}`;
 
 /** @internal System instruction for the multi-axis overall-analysis LLM call. */
-const OVERALL_SYSTEM_PROMPT = `You are a senior investment analyst.
+export const OVERALL_SYSTEM_PROMPT = `You are a senior investment analyst.
 Your job is to synthesize technical, fundamental, news, and options signals into one coherent view. When the signals genuinely conflict, preserve and explain the conflict rather than averaging it into a vague middle.
 
 ${ANALYSIS_SYSTEM_BASE}`;
 
 /** @internal System instruction for the news-analysis LLM call. */
-const NEWS_SYSTEM_PROMPT = `You are a financial news analyst.
+export const NEWS_SYSTEM_PROMPT = `You are a financial news analyst.
 Your job is to assess the market impact and sentiment of news coverage for a single ticker. Ground every assessment strictly in the provided article content; never speculate about events the articles do not describe.
 
 ${ANALYSIS_SYSTEM_BASE}`;
 
 /** @internal System instruction for the single-article news-card LLM call. */
-const NEWS_CARD_SYSTEM_PROMPT = `You are a financial news summarizer.
+export const NEWS_CARD_SYSTEM_PROMPT = `You are a financial news summarizer.
 Your job is to turn a single news article into a concise, neutral Korean summary with an impact and sentiment classification, grounded only in the article text.
 
 ${ANALYSIS_SYSTEM_BASE}`;
 
 /** @internal System instruction for the fundamental/valuation-analysis LLM call. */
-const FUNDAMENTAL_SYSTEM_PROMPT = `You are a fundamental and valuation analyst.
+export const FUNDAMENTAL_SYSTEM_PROMPT = `You are a fundamental and valuation analyst.
 Your job is to interpret financial statements, valuation multiples, growth, profitability, and peer comparison. Treat any value marked N/A or "데이터 없음" as missing data — never as zero or a neutral midpoint.
 
 ${ANALYSIS_SYSTEM_BASE}`;
 
 /** @internal System instruction for the options-analysis LLM call. */
-const OPTIONS_SYSTEM_PROMPT = `You are an options strategist.
+export const OPTIONS_SYSTEM_PROMPT = `You are an options strategist.
 Your job is to interpret the options chain, implied volatility, Greeks, and positioning into an actionable risk/reward read.
 
 ${ANALYSIS_SYSTEM_BASE}`;
-
-export {
-    OVERALL_SYSTEM_PROMPT,
-    NEWS_SYSTEM_PROMPT,
-    NEWS_CARD_SYSTEM_PROMPT,
-    FUNDAMENTAL_SYSTEM_PROMPT,
-    OPTIONS_SYSTEM_PROMPT,
-};
