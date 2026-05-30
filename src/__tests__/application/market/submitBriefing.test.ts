@@ -288,4 +288,25 @@ describe('submitBriefing 함수는', () => {
             consoleErrorSpy.mockRestore();
         });
     });
+
+    describe('job meta 저장이 실패할 때', () => {
+        it('setJobMeta가 실패해도 submitted를 반환한다', async () => {
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockSetJobMeta.mockRejectedValueOnce(
+                new Error('meta write failed')
+            );
+
+            const result = await submitBriefing(mockData);
+
+            expect(result.status).toBe('submitted');
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '[Briefing/Submit] Failed to store job meta:',
+                expect.any(Error)
+            );
+            expect(mockFetch).toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
+        });
+    });
 });

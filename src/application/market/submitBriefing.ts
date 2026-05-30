@@ -62,8 +62,10 @@ function hashBriefingInput(
 /**
  * Submit a market briefing job from the current dashboard summary.
  *
- * The briefing cache is keyed by the current ISO date+hour, so within a given
- * hour all callers receive the same cached briefing. Resolves to:
+ * The briefing cache is keyed by the current ISO date+hour plus a deterministic
+ * hash of the index/sector quote values, so identical-input callers within the
+ * hour share the cached briefing, while changed underlying data within the same
+ * hour produces a cache miss and a fresh briefing job. Resolves to:
  * - `cached`: the latest briefing for the current hour is reused (already
  *   normalized via {@link normalizeMarketBriefing}).
  * - `submitted`: a new `jobId` was registered and a fire-and-forget HTTP POST
@@ -123,7 +125,11 @@ export async function submitBriefing(
     // under the SAME key the submit path looked up — without this, the poll
     // step (which has no access to the index/sector data) could not
     // reconstruct the input hash and read/write keys would diverge.
-    await setJobMeta(jobId, { symbol: BRIEFING_JOB_SYMBOL, cacheKey });
+    try {
+        await setJobMeta(jobId, { symbol: BRIEFING_JOB_SYMBOL, cacheKey });
+    } catch (error) {
+        console.error('[Briefing/Submit] Failed to store job meta:', error);
+    }
 
     // fire-and-forget: serverless 환경에선 options.waitUntil로 응답 후 promise 종료 보장.
     const dispatch = fetch(`${workerUrl}/briefing`, {
