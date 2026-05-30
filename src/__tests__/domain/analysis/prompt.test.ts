@@ -154,6 +154,9 @@ const makeIndicators = (
     smc: overrides?.smc ?? EMPTY_SMC_RESULT,
 });
 
+const countOccurrences = (haystack: string, needle: string): number =>
+    haystack.split(needle).length - 1;
+
 const makeEngulfingBars = (): [Bar, Bar] => [
     {
         time: TEST_BAR_BASE_TIME,
@@ -3275,18 +3278,16 @@ describe('prompt', () => {
     });
 
     describe('중복 지시문 통합 (SSOT)', () => {
-        const countOccurrences = (haystack: string, needle: string): number =>
-            haystack.split(needle).length - 1;
+        const result = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            [],
+            makeIndicators(),
+            []
+        );
 
         describe('읽기 좋은 텍스트 포맷 규칙', () => {
             it('Readable Text Formatting Rules SSOT 블록이 정확히 한 번만 등장한다', () => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    []
-                );
                 expect(
                     countOccurrences(
                         result,
@@ -3296,32 +3297,15 @@ describe('prompt', () => {
             });
 
             it('Analysis Request 섹션의 중복 readable-text 재진술이 제거되었다', () => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    []
-                );
-                // 이 문구는 buildAnalysisRequest 에만 있던 중복 재진술이었다.
                 expect(result).not.toContain(
                     'Use markdown-friendly readable text'
                 );
             });
 
             it('paragraph 분리(\\n\\n) 지시는 SSOT 블록에만 남아 있다', () => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    []
-                );
-                // SSOT 블록의 정규 문장은 그대로 유지된다.
                 expect(result).toContain(
                     'Use \\n\\n to separate paragraphs when the context changes'
                 );
-                // 중복 블록에 있던 변형 문장은 더 이상 존재하지 않는다.
                 expect(result).not.toContain(
                     'Use \\n\\n to separate context paragraphs in summary and other long-form text fields'
                 );
@@ -3330,18 +3314,9 @@ describe('prompt', () => {
 
         describe('enum 허용값', () => {
             it('Critical Response Rules는 enum 규칙만 남기고 값 목록은 SSOT를 참조한다', () => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    []
-                );
-                // 규칙 자체는 유지된다.
                 expect(result).toContain(
                     'Enum fields must contain exactly one allowed literal, never pipe-separated text (see Allowed Enum Values below).'
                 );
-                // 예전 inline 값 열거(verbose form)는 제거되었다.
                 expect(result).not.toContain(
                     'riskLevel: "low", "medium", or "high"'
                 );
@@ -3351,17 +3326,9 @@ describe('prompt', () => {
             });
 
             it('명시적 enum 값 목록은 Allowed Enum Values 섹션 안에서만 등장한다', () => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    []
-                );
                 const ENUM_HEADING = '### Allowed Enum Values';
                 expect(countOccurrences(result, ENUM_HEADING)).toBe(1);
 
-                // riskLevel 허용값 목록은 SSOT 한 곳에만 존재한다.
                 expect(
                     countOccurrences(
                         result,
