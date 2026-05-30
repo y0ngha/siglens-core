@@ -10,7 +10,6 @@ import type {
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
-/** Decimal places used when rendering peer valuation metrics (PER / PSR). */
 const PEER_METRIC_DECIMAL_PLACES = 1;
 
 /** Filter skills to fundamental category with sufficient confidence weight. */

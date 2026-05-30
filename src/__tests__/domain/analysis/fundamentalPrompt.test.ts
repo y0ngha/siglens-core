@@ -169,11 +169,9 @@ describe('buildFundamentalAnalysisPrompt', () => {
             [FUNDAMENTAL_SKILL_HIGH]
         );
 
-        // (a) peer with both per & psr finite → exact rendering (PER/PSR to 1dp)
         expect(prompt).toContain(
             '  - MSFT (Microsoft Corp.): Market Cap 2800B, PER 34.2, PSR 12.6'
         );
-        // (b) peer with per: null and psr: null → both N/A; market cap still shown
         expect(prompt).toContain(
             '  - GOOGL (Alphabet Inc.): Market Cap 1900B, PER N/A, PSR N/A'
         );
