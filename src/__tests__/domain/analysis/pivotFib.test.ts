@@ -121,6 +121,7 @@ describe('pivotFib', () => {
                     makeIndicators()
                 );
                 expect(result.standardPivot).toBeNull();
+                expect(result.fibonacciPivot).toBeNull();
             });
 
             it('returns null when a prior-bar OHLC value is non-finite', () => {
@@ -129,6 +130,7 @@ describe('pivotFib', () => {
                     makeIndicators()
                 );
                 expect(result.standardPivot).toBeNull();
+                expect(result.fibonacciPivot).toBeNull();
             });
         });
 

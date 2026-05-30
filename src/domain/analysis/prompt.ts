@@ -58,6 +58,7 @@ import type {
     FibonacciProjection,
     FibonacciPivotLevels,
     PivotFibLevels,
+    PivotLevelSet,
     StandardPivotLevels,
     PromptConfig,
     Skill,
@@ -643,19 +644,21 @@ const formatFibRatio = (ratio: number): string => {
 const formatFibLevel = (level: FibonacciLevel): string =>
     `${formatFibRatio(level.ratio)}: ${fmt(level.price)}`;
 
-const formatStandardPivotLines = (pivot: StandardPivotLevels): string[] => [
-    '### Standard Pivot (from prior period H/L/C)',
+const formatPivotSetLines = (
+    header: string,
+    pivot: PivotLevelSet
+): string[] => [
+    header,
     `- PP: ${fmt(pivot.pp)}`,
     `- Resistance: R1 ${fmt(pivot.r1)} / R2 ${fmt(pivot.r2)} / R3 ${fmt(pivot.r3)}`,
     `- Support: S1 ${fmt(pivot.s1)} / S2 ${fmt(pivot.s2)} / S3 ${fmt(pivot.s3)}`,
 ];
 
-const formatFibonacciPivotLines = (pivot: FibonacciPivotLevels): string[] => [
-    '### Fibonacci Pivot (from prior period H/L/C)',
-    `- PP: ${fmt(pivot.pp)}`,
-    `- Resistance: R1 ${fmt(pivot.r1)} / R2 ${fmt(pivot.r2)} / R3 ${fmt(pivot.r3)}`,
-    `- Support: S1 ${fmt(pivot.s1)} / S2 ${fmt(pivot.s2)} / S3 ${fmt(pivot.s3)}`,
-];
+const formatStandardPivotLines = (pivot: StandardPivotLevels): string[] =>
+    formatPivotSetLines('### Standard Pivot (from prior period H/L/C)', pivot);
+
+const formatFibonacciPivotLines = (pivot: FibonacciPivotLevels): string[] =>
+    formatPivotSetLines('### Fibonacci Pivot (from prior period H/L/C)', pivot);
 
 const formatFibonacciProjectionLines = (fib: FibonacciProjection): string[] => [
     `### Fibonacci Levels (most recent swing, ${fib.direction}-leg)`,

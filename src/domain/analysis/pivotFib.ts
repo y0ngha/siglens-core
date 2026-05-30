@@ -12,24 +12,24 @@ import type {
 } from '@/domain/types';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 
-/** @internal Divisor for the central pivot: (high + low + close) / 3. */
+/** Divisor for the central pivot: (high + low + close) / 3. */
 const PIVOT_DIVISOR = 3;
-/** @internal Multiplier for the doubled-pivot terms in standard R1/S1 and R3/S3. */
+/** Multiplier for the doubled-pivot terms in standard R1/S1 and R3/S3. */
 const PIVOT_DOUBLE = 2;
 
-/** @internal Fibonacci pivot fractions of the prior-period range. */
+/** Fibonacci pivot fractions of the prior-period range. */
 const FIB_PIVOT_R1_S1_RATIO = 0.382;
 const FIB_PIVOT_R2_S2_RATIO = 0.618;
 const FIB_PIVOT_R3_S3_RATIO = 1.0;
 
 /**
- * @internal Fibonacci retracement ratios (fractions of the swing high–low range).
+ * Fibonacci retracement ratios (fractions of the swing high–low range).
  * Ordered shallow-to-deep so the rendered levels read top-down on an up-leg.
  */
 const FIB_RETRACEMENT_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786] as const;
 
 /**
- * @internal Fibonacci extension ratios used as projected take-profit targets.
+ * Fibonacci extension ratios used as projected take-profit targets.
  * 1.0 echoes the full measured move; higher ratios project beyond it.
  */
 const FIB_EXTENSION_RATIOS = [1.0, 1.272, 1.618, 2.0, 2.618] as const;
@@ -37,12 +37,17 @@ const FIB_EXTENSION_RATIOS = [1.0, 1.272, 1.618, 2.0, 2.618] as const;
 const isUsablePrice = (price: number): boolean =>
     Number.isFinite(price) && price > 0;
 
+interface PivotBase {
+    pp: number;
+    range: number;
+}
+
 /**
- * @internal Resolve the shared pivot base (central pivot `pp` and `range`) from a
+ * Resolve the shared pivot base (central pivot `pp` and `range`) from a
  * bar's high/low/close. Returns `null` when any of the three prices is unusable,
  * so both pivot variants share one validation and base-arithmetic step.
  */
-const resolvePivotBase = (bar: Bar): { pp: number; range: number } | null => {
+const resolvePivotBase = (bar: Bar): PivotBase | null => {
     const { high, low, close } = bar;
     if (!isUsablePrice(high) || !isUsablePrice(low) || !isUsablePrice(close)) {
         return null;
@@ -153,7 +158,7 @@ const computeFibonacciProjection = (
     };
 };
 
-/** @internal Minimum bar count to expose a prior completed period for pivots. */
+/** Minimum bar count to expose a prior completed period for pivots. */
 const MIN_BARS_FOR_PIVOT = 2;
 
 /**
