@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt,
     PROMPT_CONFIG_BY_TIMEFRAME,
@@ -153,6 +153,9 @@ const makeIndicators = (
     ...overrides,
     smc: overrides?.smc ?? EMPTY_SMC_RESULT,
 });
+
+const countOccurrences = (haystack: string, needle: string): number =>
+    haystack.split(needle).length - 1;
 
 const makeEngulfingBars = (): [Bar, Bar] => [
     {
@@ -2490,10 +2493,10 @@ describe('prompt', () => {
             );
             expect(result).toContain('"trend": "neutral"');
             expect(result).toContain(
-                'trend and signal trend: "bullish", "bearish", or "neutral"'
+                '- trend / signals[].trend / patternSummaries[].trend / strategyResults[].trend / candlePatterns[].trend: "bullish", "bearish", "neutral"'
             );
             expect(result).toContain(
-                'trendlines.direction: "ascending" or "descending"'
+                '- trendlines[].direction: "ascending", "descending"'
             );
             expect(result).toContain('"direction": "ascending"');
             expect(result).not.toContain(
@@ -3270,6 +3273,79 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain('### Critical Response Rules');
+        });
+    });
+
+    describe('중복 지시문 통합 (SSOT)', () => {
+        let result: string;
+
+        beforeAll(() => {
+            result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+        });
+
+        describe('읽기 좋은 텍스트 포맷 규칙', () => {
+            it('Readable Text Formatting Rules SSOT 블록이 정확히 한 번만 등장한다', () => {
+                expect(
+                    countOccurrences(
+                        result,
+                        '### Readable Text Formatting Rules'
+                    )
+                ).toBe(1);
+            });
+
+            it('Analysis Request 섹션의 중복 readable-text 재진술이 제거되었다', () => {
+                expect(result).not.toContain(
+                    'Use markdown-friendly readable text'
+                );
+            });
+
+            it('paragraph 분리(\\n\\n) 지시는 SSOT 블록에만 남아 있다', () => {
+                expect(result).toContain(
+                    'Use \\n\\n to separate paragraphs when the context changes'
+                );
+                expect(result).not.toContain(
+                    'Use \\n\\n to separate context paragraphs in summary and other long-form text fields'
+                );
+            });
+        });
+
+        describe('enum 허용값', () => {
+            it('Critical Response Rules는 enum 규칙만 남기고 값 목록은 SSOT를 참조한다', () => {
+                expect(result).toContain(
+                    'Enum fields must contain exactly one allowed literal, never pipe-separated text (see Allowed Enum Values below).'
+                );
+                expect(result).not.toContain(
+                    'riskLevel: "low", "medium", or "high"'
+                );
+                expect(result).not.toContain(
+                    'signal strength: "strong", "moderate", or "weak"'
+                );
+            });
+
+            it('명시적 enum 값 목록은 Allowed Enum Values 섹션 안에서만 등장한다', () => {
+                const ENUM_HEADING = '### Allowed Enum Values';
+                expect(countOccurrences(result, ENUM_HEADING)).toBe(1);
+
+                expect(
+                    countOccurrences(
+                        result,
+                        'riskLevel: "low", "medium", "high"'
+                    )
+                ).toBe(1);
+
+                // 해당 값 목록이 Allowed Enum Values 섹션 이후에 위치하는지 확인한다.
+                const enumSectionIndex = result.indexOf(ENUM_HEADING);
+                const riskLevelListIndex = result.indexOf(
+                    'riskLevel: "low", "medium", "high"'
+                );
+                expect(riskLevelListIndex).toBeGreaterThan(enumSectionIndex);
+            });
         });
     });
 
