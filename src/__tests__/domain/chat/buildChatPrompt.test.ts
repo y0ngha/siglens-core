@@ -315,6 +315,29 @@ describe('buildChatPrompt 함수는', () => {
                 '이 분석 결과와 관련된 질문만 답변할 수 있어요.'
             );
         });
+
+        it('허용/거절 경계 few-shot 예시를 포함한다', () => {
+            const result = buildChatPrompt(
+                'AAPL',
+                '1Day',
+                MINIMAL_ANALYSIS,
+                [],
+                '질문'
+            );
+            expect(result.systemPrompt).toContain('## Boundary Few-Shot');
+            // ALLOW examples
+            expect(result.systemPrompt).toContain(
+                'ALLOW (a level/indicator/scenario in this analysis)'
+            );
+            expect(result.systemPrompt).toContain(
+                'ALLOW (a concept from your prior answer)'
+            );
+            // REFUSE examples
+            expect(result.systemPrompt).toContain('REFUSE (unrelated stock)');
+            expect(result.systemPrompt).toContain(
+                'REFUSE (unrelated macro / personal portfolio advice)'
+            );
+        });
     });
 
     describe('messages를', () => {

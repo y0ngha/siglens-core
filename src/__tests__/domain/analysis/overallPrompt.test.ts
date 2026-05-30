@@ -112,6 +112,29 @@ describe('buildOverallAnalysisPrompt', () => {
         );
     });
 
+    it('축 출처 라벨 지침과 갈등 보존 few-shot 예시를 포함한다 (C5-3 + C6)', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+
+        // C6 — source-attribution guidance line
+        expect(prompt).toContain('attribute each claim to its source axis');
+        expect(prompt).toContain('기술적 분석에 따르면');
+        expect(prompt).toContain('펀더멘털 분석에서는');
+        expect(prompt).toContain('뉴스 분석에서는');
+        expect(prompt).toContain('옵션 시장에서는');
+        // C5-3 — conflict-preservation few-shot
+        expect(prompt).toContain(
+            '## Few-Shot — conflict preservation + axis attribution'
+        );
+        expect(prompt).toContain('preserve the conflict explicitly');
+    });
+
     it('produces prompt with positional context for 1Day', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,
