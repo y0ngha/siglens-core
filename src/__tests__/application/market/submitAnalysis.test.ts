@@ -23,7 +23,10 @@ vi.mock('@/domain/indicators/fearGreed', () => ({
 }));
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
-import { DEFAULT_ANALYSIS_MODEL_ID } from '@/infrastructure/cache/config';
+import {
+    DEFAULT_ANALYSIS_MODEL_ID,
+    PROMPT_TEMPLATE_VERSION,
+} from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { createSkillsProvider } from '@/infrastructure/skills/loader';
@@ -265,7 +268,7 @@ describe('submitAnalysis 함수는', () => {
             );
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'analysis:AAPL:1Day:gemini-2.5-flash'
+                `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
             );
         });
 
@@ -275,7 +278,7 @@ describe('submitAnalysis 함수는', () => {
             await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}`
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${PROMPT_TEMPLATE_VERSION}`
             );
         });
 
@@ -1259,7 +1262,7 @@ describe('submitAnalysis 함수는', () => {
             expect(result.status).toBe('cached');
             // companyName은 symbol로 폴백(첫 번째 브랜치) → 캐시 키는 symbol 기준.
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:${mockSymbol}:${mockTimeframe}:${DEFAULT_ANALYSIS_MODEL_ID}`
+                `analysis:${mockSymbol}:${mockTimeframe}:${DEFAULT_ANALYSIS_MODEL_ID}:${PROMPT_TEMPLATE_VERSION}`
             );
             expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
         });
@@ -1315,7 +1318,7 @@ describe('submitAnalysis 함수는', () => {
             expect(result.status).toBe('submitted');
             // options.modelId가 정상 해석되었음을 캐시 키로 확인.
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:${mockSymbol}:${mockTimeframe}:gemini-2.5-flash`
+                `analysis:${mockSymbol}:${mockTimeframe}:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
             );
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
                 fakeProvider,
