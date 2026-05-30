@@ -766,50 +766,45 @@ export interface LevelCandidates {
 }
 
 /**
- * Standard pivot point set derived from a prior period's high/low/close.
- *
- * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
- * `s1`–`s3` are support levels below it, following the classic pivot formulas.
+ * Shared shape for a pivot point set: a central pivot with three resistance and
+ * three support levels. The exact offset formulas differ per variant (standard vs
+ * Fibonacci); see the extending interfaces for each level's derivation.
  */
-export interface StandardPivotLevels {
+export interface PivotLevelSet {
     /** Central pivot: (high + low + close) / 3. */
     pp: number;
-    /** First resistance: 2·pp − low. */
+    /** First resistance level. */
     r1: number;
-    /** Second resistance: pp + (high − low). */
+    /** Second resistance level. */
     r2: number;
-    /** Third resistance: high + 2·(pp − low). */
+    /** Third resistance level. */
     r3: number;
-    /** First support: 2·pp − high. */
+    /** First support level. */
     s1: number;
-    /** Second support: pp − (high − low). */
+    /** Second support level. */
     s2: number;
-    /** Third support: low − 2·(high − pp). */
+    /** Third support level. */
     s3: number;
 }
 
 /**
+ * Standard pivot point set derived from a prior period's high/low/close.
+ *
+ * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
+ * `s1`–`s3` are support levels below it, following the classic pivot formulas:
+ * `r1 = 2·pp − low`, `r2 = pp + (high − low)`, `r3 = high + 2·(pp − low)`,
+ * `s1 = 2·pp − high`, `s2 = pp − (high − low)`, `s3 = low − 2·(high − pp)`.
+ */
+export interface StandardPivotLevels extends PivotLevelSet {}
+
+/**
  * Fibonacci pivot point set derived from a prior period's high/low/close.
  *
- * `pp` is the central pivot; resistance/support levels are offset from it by
- * the 0.382 / 0.618 / 1.0 Fibonacci fractions of the prior period's range.
+ * `pp` is the central pivot; resistance/support levels are offset from it by the
+ * 0.382 / 0.618 / 1.0 Fibonacci fractions of the prior period's range:
+ * `r1/s1 = pp ± 0.382·range`, `r2/s2 = pp ± 0.618·range`, `r3/s3 = pp ± 1.0·range`.
  */
-export interface FibonacciPivotLevels {
-    /** Central pivot: (high + low + close) / 3. */
-    pp: number;
-    /** Resistance at pp + 0.382·range. */
-    r1: number;
-    /** Resistance at pp + 0.618·range. */
-    r2: number;
-    /** Resistance at pp + 1.0·range. */
-    r3: number;
-    /** Support at pp − 0.382·range. */
-    s1: number;
-    /** Support at pp − 0.618·range. */
-    s2: number;
-    /** Support at pp − 1.0·range. */
-    s3: number;
-}
+export interface FibonacciPivotLevels extends PivotLevelSet {}
 
 /**
  * One Fibonacci retracement or extension level (ratio + resulting price).

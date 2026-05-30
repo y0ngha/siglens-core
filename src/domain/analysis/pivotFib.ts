@@ -36,14 +36,29 @@ const FIB_EXTENSION_RATIOS = [1.0, 1.272, 1.618, 2.0, 2.618] as const;
 const isUsablePrice = (price: number): boolean =>
     Number.isFinite(price) && price > 0;
 
-const computeStandardPivot = (bar: Bar): StandardPivotLevels | null => {
+/**
+ * @internal Resolve the shared pivot base (central pivot `pp` and `range`) from a
+ * bar's high/low/close. Returns `null` when any of the three prices is unusable,
+ * so both pivot variants share one validation and base-arithmetic step.
+ */
+const resolvePivotBase = (bar: Bar): { pp: number; range: number } | null => {
     const { high, low, close } = bar;
     if (!isUsablePrice(high) || !isUsablePrice(low) || !isUsablePrice(close)) {
         return null;
     }
 
-    const pp = (high + low + close) / PIVOT_DIVISOR;
-    const range = high - low;
+    return {
+        pp: (high + low + close) / PIVOT_DIVISOR,
+        range: high - low,
+    };
+};
+
+const computeStandardPivot = (bar: Bar): StandardPivotLevels | null => {
+    const base = resolvePivotBase(bar);
+    if (base === null) return null;
+
+    const { pp, range } = base;
+    const { high, low } = bar;
     return {
         pp,
         r1: PIVOT_DOUBLE * pp - low,
@@ -56,13 +71,10 @@ const computeStandardPivot = (bar: Bar): StandardPivotLevels | null => {
 };
 
 const computeFibonacciPivot = (bar: Bar): FibonacciPivotLevels | null => {
-    const { high, low, close } = bar;
-    if (!isUsablePrice(high) || !isUsablePrice(low) || !isUsablePrice(close)) {
-        return null;
-    }
+    const base = resolvePivotBase(bar);
+    if (base === null) return null;
 
-    const pp = (high + low + close) / PIVOT_DIVISOR;
-    const range = high - low;
+    const { pp, range } = base;
     return {
         pp,
         r1: pp + FIB_PIVOT_R1_S1_RATIO * range,
@@ -166,10 +178,9 @@ export function computePivotFibLevels(
     bars: Bar[],
     indicators: IndicatorResult
 ): PivotFibLevels {
+    const len = bars.length;
     const priorBar =
-        bars.length >= MIN_BARS_FOR_PIVOT
-            ? bars[bars.length - MIN_BARS_FOR_PIVOT]
-            : null;
+        len >= MIN_BARS_FOR_PIVOT ? bars[len - MIN_BARS_FOR_PIVOT] : null;
 
     return {
         standardPivot: priorBar != null ? computeStandardPivot(priorBar) : null,
