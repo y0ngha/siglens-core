@@ -2284,7 +2284,8 @@ export interface OverallAnalysisResponse {
  * Discriminates which analysis produced a dispatched worker job. Sent on the
  * `/analyze` dispatch body so the worker can apply per-analysis behavior
  * (system prompt, response schema, seed, thinking). Optional on the wire for
- * backward compatibility with older workers.
+ * backward compatibility with older workers. The `/briefing` endpoint is not
+ * yet part of this contract; its variant is added when that endpoint adopts it.
  */
 export type AnalysisType =
     | 'technical'
@@ -2292,8 +2293,7 @@ export type AnalysisType =
     | 'news'
     | 'newsCard'
     | 'fundamental'
-    | 'options'
-    | 'briefing';
+    | 'options';
 
 /**
  * Tagged union representing the analysis result currently in view by the chatbot.
