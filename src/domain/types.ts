@@ -359,8 +359,11 @@ export interface SMCFairValueGap {
  * average price of the swings in the cluster.
  */
 export interface SMCEqualLevel {
+    /** Average price of the swings in the cluster. */
     price: number;
+    /** Index of the first (oldest) swing that touched the level. */
     firstIndex: number;
+    /** Index of the most-recent swing that touched the level. */
     secondIndex: number;
 }
 

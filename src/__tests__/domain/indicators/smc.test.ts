@@ -445,5 +445,50 @@ describe('calculateSmc', () => {
                 priceAt(LEVELS - SMC_MAX_EQUAL_LEVELS_RETAINED)
             );
         });
+
+        it('이미 흡수된 swing을 이후 앵커가 만나면 건너뛴다 (used[j] 분기)', () => {
+            // Interleaved levels in time order [A, B, A, B]: anchor A absorbs the
+            // later A-touch that sits *after* B's anchor, so B's inner scan
+            // re-encounters an already-used swing and takes the `used[j]` skip.
+            const P = SMC_SWING_PERIOD;
+            const LO = 98;
+            const A = 100;
+            const B = 130;
+
+            const bars: Bar[] = [];
+            let t = 0;
+            const pushValley = (count: number) => {
+                for (let i = 0; i < count; i++) {
+                    bars.push(makeBar(LO, LO - 1, LO - 0.5, t++));
+                }
+            };
+            const pushPeak = (price: number) =>
+                bars.push(makeBar(price, LO, (price + LO) / 2, t++));
+
+            pushValley(SMC_ATR_PERIOD + P); // warmup so ATR is non-null
+            pushPeak(A);
+            pushValley(P * 2 + 1);
+            pushPeak(B);
+            pushValley(P * 2 + 1);
+            pushPeak(A);
+            pushValley(P * 2 + 1);
+            pushPeak(B);
+            pushValley(P);
+
+            const result = calculateSmc(bars);
+            const clusterA = result.equalHighs.find(
+                eq => Math.abs(eq.price - A) < 1
+            );
+            const clusterB = result.equalHighs.find(
+                eq => Math.abs(eq.price - B) < 1
+            );
+
+            expect(clusterA).toBeDefined();
+            expect(clusterB).toBeDefined();
+            // A's span straddles B's anchor → A absorbed a touch after B's first
+            // index, reachable only via the `used[j]` skip in B's inner scan.
+            expect(clusterA!.firstIndex).toBeLessThan(clusterB!.firstIndex);
+            expect(clusterB!.firstIndex).toBeLessThan(clusterA!.secondIndex);
+        });
     });
 });
