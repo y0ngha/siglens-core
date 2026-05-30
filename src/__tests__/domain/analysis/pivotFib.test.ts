@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { computePivotFibLevels } from '@/domain/analysis/pivotFib';
 import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
 import type { Bar, IndicatorResult, SMCSwingPoint } from '@/domain/types';
@@ -166,14 +166,20 @@ describe('pivotFib', () => {
 
         describe('fibonacci projection', () => {
             describe('when the most recent low precedes the most recent high (up-leg)', () => {
-                const result = computePivotFibLevels(
-                    [makeBar()],
-                    makeIndicators(
-                        [makeSwing(SWING_HIGH_PRICE, 'high', 20)],
-                        [makeSwing(SWING_LOW_PRICE, 'low', 10)]
-                    )
-                );
-                const fib = result.fibonacci!;
+                let fib: NonNullable<
+                    ReturnType<typeof computePivotFibLevels>['fibonacci']
+                >;
+
+                beforeEach(() => {
+                    const result = computePivotFibLevels(
+                        [makeBar()],
+                        makeIndicators(
+                            [makeSwing(SWING_HIGH_PRICE, 'high', 20)],
+                            [makeSwing(SWING_LOW_PRICE, 'low', 10)]
+                        )
+                    );
+                    fib = result.fibonacci!;
+                });
 
                 it('reports the up-leg direction and anchors', () => {
                     expect(fib.direction).toBe('up');
@@ -198,8 +204,16 @@ describe('pivotFib', () => {
                         SWING_HIGH_PRICE,
                         9
                     );
+                    expect(ratioOf(fib.extensions, 1.272)).toBeCloseTo(
+                        SWING_LOW_PRICE + 1.272 * SWING_RANGE,
+                        9
+                    );
                     expect(ratioOf(fib.extensions, 1.618)).toBeCloseTo(
                         SWING_LOW_PRICE + 1.618 * SWING_RANGE,
+                        9
+                    );
+                    expect(ratioOf(fib.extensions, 2.0)).toBeCloseTo(
+                        SWING_LOW_PRICE + 2.0 * SWING_RANGE,
                         9
                     );
                     expect(ratioOf(fib.extensions, 2.618)).toBeCloseTo(
@@ -215,14 +229,20 @@ describe('pivotFib', () => {
             });
 
             describe('when the most recent high precedes the most recent low (down-leg)', () => {
-                const result = computePivotFibLevels(
-                    [makeBar()],
-                    makeIndicators(
-                        [makeSwing(SWING_HIGH_PRICE, 'high', 10)],
-                        [makeSwing(SWING_LOW_PRICE, 'low', 20)]
-                    )
-                );
-                const fib = result.fibonacci!;
+                let fib: NonNullable<
+                    ReturnType<typeof computePivotFibLevels>['fibonacci']
+                >;
+
+                beforeEach(() => {
+                    const result = computePivotFibLevels(
+                        [makeBar()],
+                        makeIndicators(
+                            [makeSwing(SWING_HIGH_PRICE, 'high', 10)],
+                            [makeSwing(SWING_LOW_PRICE, 'low', 20)]
+                        )
+                    );
+                    fib = result.fibonacci!;
+                });
 
                 it('reports the down-leg direction', () => {
                     expect(fib.direction).toBe('down');

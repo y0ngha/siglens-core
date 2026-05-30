@@ -5,6 +5,7 @@ import type {
     FibonacciProjection,
     IndicatorResult,
     PivotFibLevels,
+    SMCResult,
     SMCSwingPoint,
     StandardPivotLevels,
     SwingLegDirection,
@@ -59,12 +60,13 @@ const computeStandardPivot = (bar: Bar): StandardPivotLevels | null => {
 
     const { pp, range } = base;
     const { high, low } = bar;
+    const twicePp = PIVOT_DOUBLE * pp;
     return {
         pp,
-        r1: PIVOT_DOUBLE * pp - low,
+        r1: twicePp - low,
         r2: pp + range,
         r3: high + PIVOT_DOUBLE * (pp - low),
-        s1: PIVOT_DOUBLE * pp - high,
+        s1: twicePp - high,
         s2: pp - range,
         s3: low - PIVOT_DOUBLE * (high - pp),
     };
@@ -129,7 +131,7 @@ const buildExtensions = (
 };
 
 const computeFibonacciProjection = (
-    smc: IndicatorResult['smc']
+    smc: SMCResult
 ): FibonacciProjection | null => {
     const swingHigh = lastOf(smc.swingHighs);
     const swingLow = lastOf(smc.swingLows);

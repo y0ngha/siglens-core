@@ -434,6 +434,7 @@ export type {
     LevelCandidates,
     LevelCandidateSource,
     PivotFibLevels,
+    PivotLevelSet,
     StandardPivotLevels,
     SwingLegDirection,
     MACDResult,

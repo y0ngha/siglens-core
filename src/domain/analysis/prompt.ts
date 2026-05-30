@@ -635,8 +635,10 @@ const PIVOT_FIB_HEADER = '## Pivot & Fibonacci Levels (precomputed)';
 const FIB_RATIO_PERCENT_FACTOR = 100;
 const FIB_RATIO_DECIMAL_PLACES = 1;
 
-const formatFibRatio = (ratio: number): string =>
-    `${(ratio * FIB_RATIO_PERCENT_FACTOR).toFixed(FIB_RATIO_DECIMAL_PLACES)}%`;
+const formatFibRatio = (ratio: number): string => {
+    const percent = ratio * FIB_RATIO_PERCENT_FACTOR;
+    return `${Number.isInteger(percent) ? percent : percent.toFixed(FIB_RATIO_DECIMAL_PLACES)}%`;
+};
 
 const formatFibLevel = (level: FibonacciLevel): string =>
     `${formatFibRatio(level.ratio)}: ${fmt(level.price)}`;
