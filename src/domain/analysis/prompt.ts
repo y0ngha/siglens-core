@@ -38,6 +38,10 @@ import { MS_PER_SECOND } from '@/domain/constants/time';
 import { detectCandlePattern } from '@/domain/analysis/candle';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
 import {
+    getMultiPatternTrend,
+    getSinglePatternTrend,
+} from '@/domain/analysis/candle-trend';
+import {
     detectCandlePatternEntries,
     getDetectionBars,
     selectLastCandlePatternEntries,
@@ -55,6 +59,7 @@ import type {
     SMCZone,
     SqueezeMomentumResult,
     Timeframe,
+    Trend,
 } from '@/domain/types';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
@@ -178,6 +183,7 @@ interface PromptCandlePatternEntry {
     barsAgo: number;
     patternType: CandlePatternEntry['patternType'];
     patternName: string;
+    trend: Trend;
 }
 
 // Brevity alias used across the prompt-line templates below.
@@ -269,6 +275,10 @@ const buildCandlePatternEntries = (bars: Bar[]): PromptCandlePatternEntry[] => {
                 entry.patternType === 'multi'
                     ? entry.multiPattern
                     : entry.singlePattern,
+            trend:
+                entry.patternType === 'single'
+                    ? getSinglePatternTrend(entry.singlePattern)
+                    : getMultiPatternTrend(entry.multiPattern),
         }))
         .toSorted(
             (a: PromptCandlePatternEntry, b: PromptCandlePatternEntry) =>
@@ -277,7 +287,7 @@ const buildCandlePatternEntries = (bars: Bar[]): PromptCandlePatternEntry[] => {
 };
 
 const formatPatternEntry = (entry: PromptCandlePatternEntry): string =>
-    `- [${entry.barsAgo} bars ago] ${entry.patternType === 'single' ? 'Single candle pattern' : 'Multi-candle pattern'}: ${entry.patternName}`;
+    `- [${entry.barsAgo} bars ago] ${entry.patternType === 'single' ? 'Single candle pattern' : 'Multi-candle pattern'}: ${entry.patternName} [trend: ${entry.trend}]`;
 
 const formatRecentBarsSection = (
     bars: Bar[],
@@ -925,6 +935,7 @@ const buildAnalysisRequest = (
                   '- For each detected candle pattern, evaluate the trend context, confirmation signals, and statistical reliability as described in the matching guide.',
                   '- When a pattern matches a guide, enrich the candlePatterns entry with the guide insights: trend context validity, volume confirmation, and recommended indicator cross-checks.',
                   '- The summary field of each candlePatterns entry must include the guide-informed interpretation, not just pattern name repetition.',
+                  '- The trend field MUST use the value provided in the [trend: ...] label of ## Detected Candle Patterns. Do not re-judge or override it.',
                   '- If a detected pattern appears in a sideways/range-bound market context and the guide warns about reduced reliability, note this explicitly in the summary.',
                   '',
                   'Candlestick pattern guide list to apply:',
