@@ -11,15 +11,13 @@ import type {
     FundamentalCategoryAssessment,
     NewsAnalysisResponse,
     NewsCardAnalysis,
-    OverallAnalysisResponse,
-    OverallScenario,
-} from '@/domain/types';
-import type {
     OptionsAnalysisResponse,
     OptionsPerExpirationCommentary,
     OptionsSignal,
-} from '@/domain/options/types';
-import type { ResponseJsonSchema } from '@/domain/types';
+    OverallAnalysisResponse,
+    OverallScenario,
+    ResponseJsonSchema,
+} from '@/domain/types';
 
 /**
  * Drift guard helpers.
@@ -29,13 +27,13 @@ import type { ResponseJsonSchema } from '@/domain/types';
  * gains or loses a field, the fixture stops compiling — and the key-set
  * assertions below then break until the schema is updated to match.
  */
-const sortedKeys = (obj: object): string[] => Object.keys(obj).sort();
+const sortedKeys = (obj: object): string[] => Object.keys(obj).toSorted();
 
 const sortedRequired = (schema: ResponseJsonSchema): string[] =>
-    [...schema.required].sort();
+    schema.required.toSorted();
 
 const propertyKeys = (schema: ResponseJsonSchema): string[] =>
-    Object.keys(schema.properties).sort();
+    Object.keys(schema.properties).toSorted();
 
 type NestedSchema = {
     type: 'array';
@@ -52,7 +50,7 @@ const nestedItems = (
 
 const enumValues = (schema: ResponseJsonSchema, key: string): string[] => {
     const prop = schema.properties[key] as { enum: readonly string[] };
-    return [...prop.enum].sort();
+    return prop.enum.toSorted();
 };
 
 const nestedEnumValues = (
@@ -60,7 +58,7 @@ const nestedEnumValues = (
     key: string
 ): string[] => {
     const prop = itemSchema.properties[key] as { enum: readonly string[] };
-    return [...prop.enum].sort();
+    return prop.enum.toSorted();
 };
 
 // Expected enum value sets, encoded inline from the union definitions.
@@ -73,7 +71,7 @@ const NEWS_CATEGORY = [
     'other',
     'product',
     'regulation',
-].sort();
+].toSorted();
 const NEWS_IMPACT = ['high', 'low', 'medium', 'negligible'];
 const FUNDAMENTAL_SENTIMENT = ['bearish', 'bullish', 'neutral'];
 const FUNDAMENTAL_CATEGORY = [
@@ -82,23 +80,29 @@ const FUNDAMENTAL_CATEGORY = [
     'health',
     'profitability',
     'valuation',
-].sort();
+].toSorted();
 const OVERALL_SCENARIO_NAME = ['bearish', 'bullish', 'neutral'];
 const OPTIONS_TONE = ['bearish', 'bullish', 'cautious', 'neutral'];
 const OPTIONS_SIGNAL_KIND = ['bearish', 'bullish', 'neutral', 'volatility'];
 
 describe('responseSchemas — strict-mode invariants', () => {
     const all = [
-        NEWS_CARD_RESPONSE_SCHEMA,
-        NEWS_RESPONSE_SCHEMA,
-        FUNDAMENTAL_RESPONSE_SCHEMA,
-        OVERALL_RESPONSE_SCHEMA,
-        OPTIONS_RESPONSE_SCHEMA,
-    ] satisfies ResponseJsonSchema[];
+        {
+            name: 'NEWS_CARD_RESPONSE_SCHEMA',
+            schema: NEWS_CARD_RESPONSE_SCHEMA,
+        },
+        { name: 'NEWS_RESPONSE_SCHEMA', schema: NEWS_RESPONSE_SCHEMA },
+        {
+            name: 'FUNDAMENTAL_RESPONSE_SCHEMA',
+            schema: FUNDAMENTAL_RESPONSE_SCHEMA,
+        },
+        { name: 'OVERALL_RESPONSE_SCHEMA', schema: OVERALL_RESPONSE_SCHEMA },
+        { name: 'OPTIONS_RESPONSE_SCHEMA', schema: OPTIONS_RESPONSE_SCHEMA },
+    ] satisfies { name: string; schema: ResponseJsonSchema }[];
 
     it.each(all)(
-        'lists every property in required and forbids additionalProperties',
-        schema => {
+        '$name: lists every property in required and forbids additionalProperties',
+        ({ schema }) => {
             expect(schema.type).toBe('object');
             expect(schema.additionalProperties).toBe(false);
             // Strict mode: required must enumerate exactly the property keys.
@@ -108,7 +112,7 @@ describe('responseSchemas — strict-mode invariants', () => {
 });
 
 describe('NEWS_CARD_RESPONSE_SCHEMA drift guard', () => {
-    const sample: NewsCardAnalysis = {
+    const sample: Required<NewsCardAnalysis> = {
         titleKo: '제목',
         bodyKo: null,
         summaryKo: '요약',
@@ -142,12 +146,12 @@ describe('NEWS_CARD_RESPONSE_SCHEMA drift guard', () => {
         const prop = NEWS_CARD_RESPONSE_SCHEMA.properties.bodyKo as {
             type: readonly string[];
         };
-        expect([...prop.type].sort()).toEqual(['null', 'string']);
+        expect(prop.type.toSorted()).toEqual(['null', 'string']);
     });
 });
 
 describe('NEWS_RESPONSE_SCHEMA drift guard', () => {
-    const sample: NewsAnalysisResponse = {
+    const sample: Required<NewsAnalysisResponse> = {
         currentDriverKo: '드라이버',
         keyEventsKo: ['이벤트'],
         upcomingEventsKo: ['예정'],
@@ -174,7 +178,7 @@ describe('FUNDAMENTAL_RESPONSE_SCHEMA drift guard', () => {
         sentiment: 'bullish',
         rationaleKo: '근거',
     };
-    const sample: FundamentalAnalysisResponse = {
+    const sample: Required<FundamentalAnalysisResponse> = {
         overallConclusionKo: '결론',
         categoryAssessments: [nestedSample],
         riskFactorsKo: ['리스크'],
@@ -219,9 +223,10 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         triggerConditionKo: '조건',
         priceRangeKo: '범위',
     };
-    // optionsOiStale is an OPTIONAL field; it is set explicitly so the fixture's
-    // key-set includes it, matching the nullable schema property under strict mode.
-    const sample: OverallAnalysisResponse = {
+    // Required<> forces optionsOiStale (an OPTIONAL field) into the fixture, so
+    // its key is part of the key-set comparison and cannot silently drift away
+    // from the nullable schema property under strict mode.
+    const sample: Required<OverallAnalysisResponse> = {
         headlineKo: '헤드라인',
         technicalBulletsKo: ['기술'],
         fundamentalBulletsKo: ['펀더'],
@@ -246,7 +251,7 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         const prop = OVERALL_RESPONSE_SCHEMA.properties.optionsOiStale as {
             type: readonly string[];
         };
-        expect([...prop.type].sort()).toEqual(['boolean', 'null']);
+        expect(prop.type.toSorted()).toEqual(['boolean', 'null']);
     });
 
     it('nested scenarios schema matches the nested interface', () => {
@@ -268,20 +273,27 @@ describe('OPTIONS_RESPONSE_SCHEMA drift guard', () => {
         kind: 'volatility',
         message: '신호',
     };
-    const sample: OptionsAnalysisResponse = {
+    const sample: Required<OptionsAnalysisResponse> = {
         summary: '요약',
         perExpiration: [perExpSample],
         signals: [signalSample],
         analyzedAt: '2026-05-30T00:00:00Z',
     };
 
-    it('schema key-set matches the response interface', () => {
+    // `analyzedAt` is server-set during normalization and intentionally absent
+    // from the schema (the LLM is never asked to produce it), so the expected
+    // LLM-output key-set is the response's keys minus `analyzedAt`. Adding any
+    // NEW non-server field to OptionsAnalysisResponse still fails this test
+    // until the schema adds it.
+    const expectedLlmKeys = Object.keys(sample)
+        .filter(key => key !== 'analyzedAt')
+        .toSorted();
+
+    it('schema key-set matches the response interface (minus server-set analyzedAt)', () => {
         expect(sortedRequired(OPTIONS_RESPONSE_SCHEMA)).toEqual(
-            sortedKeys(sample)
+            expectedLlmKeys
         );
-        expect(propertyKeys(OPTIONS_RESPONSE_SCHEMA)).toEqual(
-            sortedKeys(sample)
-        );
+        expect(propertyKeys(OPTIONS_RESPONSE_SCHEMA)).toEqual(expectedLlmKeys);
     });
 
     it('nested perExpiration schema matches the nested interface', () => {

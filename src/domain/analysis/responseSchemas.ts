@@ -187,6 +187,10 @@ export const OVERALL_RESPONSE_SCHEMA = {
  * Structured-output schema for {@link OptionsAnalysisResponse}
  * (analysisType `options`). `perExpiration` and `signals` are arrays of nested
  * objects.
+ *
+ * `analyzedAt` is intentionally omitted: it is server-set during normalization
+ * (`normalizeOptionsAnalysisResponse`), so any LLM-supplied value is discarded.
+ * Asking the model to produce it would only waste output tokens.
  */
 export const OPTIONS_RESPONSE_SCHEMA = {
     type: 'object',
@@ -223,8 +227,7 @@ export const OPTIONS_RESPONSE_SCHEMA = {
                 additionalProperties: false,
             },
         },
-        analyzedAt: { type: 'string' },
     },
-    required: ['summary', 'perExpiration', 'signals', 'analyzedAt'],
+    required: ['summary', 'perExpiration', 'signals'],
     additionalProperties: false,
 } as const satisfies ResponseJsonSchema;
