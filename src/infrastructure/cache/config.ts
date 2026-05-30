@@ -187,7 +187,7 @@ export function buildAnalysisCacheKey(
  * hash of the index/sector values so changed underlying data within the same
  * hour produces a new key (cache miss) instead of returning a stale briefing.
  *
- * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ * Note: Consumer cannot construct `inputHash` themselves — it is derived
  *   inside `submitBriefing`. Do not depend on this function from outside the
  *   core library.
  * @param dateHour - ISO date+hour prefix.

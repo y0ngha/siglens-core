@@ -166,7 +166,7 @@ describe('pollBriefing 함수는', () => {
             );
         });
 
-        it('job meta에 cacheKey가 없으면 캐시 저장을 건너뛴다 (잘못된 키로 쓰지 않음)', async () => {
+        it('job meta가 없으면(null이면) 캐시 저장을 건너뛴다 (잘못된 키로 쓰지 않음)', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
             mockGetJobMeta.mockResolvedValueOnce(null);
 

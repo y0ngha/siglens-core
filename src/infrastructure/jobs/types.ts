@@ -37,7 +37,8 @@ export interface JobMeta {
     /**
      * Pre-computed cache key stored at job submission time so the poll step
      * can write the result without recomputing the key. Used by fundamental,
-     * news, and overall analysis jobs whose cache keys include an input hash.
+     * news, overall, and market-briefing analysis jobs whose cache keys include
+     * an input hash.
      */
     cacheKey?: string;
     /**
