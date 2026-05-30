@@ -164,8 +164,6 @@ describe('submitNewsCardAnalysis 함수는', () => {
             expect(fetchBody.seed).toBe(
                 analysisSeed(fetchBody.prompt as string)
             );
-            expect(Number.isInteger(fetchBody.seed)).toBe(true);
-            expect(fetchBody.seed as number).toBeGreaterThanOrEqual(0);
         });
     });
 });

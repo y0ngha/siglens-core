@@ -30,6 +30,9 @@ export function hashAnalysisInput(serialized: string): string {
  * Derive a deterministic non-negative 31-bit integer seed from a serialized
  * input. Same input → same seed, giving reproducible generation on providers
  * that accept a seed.
+ *
+ * @param serialized - String to derive the seed from.
+ * @returns Non-negative 31-bit integer seed.
  */
 export function analysisSeed(serialized: string): number {
     return (

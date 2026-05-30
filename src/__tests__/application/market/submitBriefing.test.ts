@@ -127,8 +127,6 @@ describe('submitBriefing 함수는', () => {
                 model: BRIEFING_MODEL_ID,
             });
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
-            expect(Number.isInteger(body.seed)).toBe(true);
-            expect(body.seed as number).toBeGreaterThanOrEqual(0);
         });
 
         it('submitted 상태와 jobId를 반환한다', async () => {

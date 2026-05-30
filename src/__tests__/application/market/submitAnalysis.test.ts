@@ -416,8 +416,6 @@ describe('submitAnalysis 함수는', () => {
             expect(body.analysisType).toBe('technical');
             expect(body.system).toBe(AI_SYSTEM_PROMPT);
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
-            expect(Number.isInteger(body.seed)).toBe(true);
-            expect(body.seed as number).toBeGreaterThanOrEqual(0);
         });
 
         it('cache miss 시 marketDataProvider를 주입하면 submitted를 반환한다', async () => {

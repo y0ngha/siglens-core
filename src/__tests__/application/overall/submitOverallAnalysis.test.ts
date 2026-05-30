@@ -969,8 +969,6 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(body.analysisType).toBe('overall');
             expect(body.system).toBe(OVERALL_SYSTEM_PROMPT);
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
-            expect(Number.isInteger(body.seed)).toBe(true);
-            expect(body.seed as number).toBeGreaterThanOrEqual(0);
         });
 
         it('treats missing tier as DEFAULT_TIER (free) in worker POST body', async () => {

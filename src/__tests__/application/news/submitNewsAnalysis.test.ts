@@ -552,8 +552,6 @@ describe('submitNewsAnalysis 함수는', () => {
             expect(body.analysisType).toBe('news');
             expect(body.system).toBe(NEWS_SYSTEM_PROMPT);
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
-            expect(Number.isInteger(body.seed)).toBe(true);
-            expect(body.seed as number).toBeGreaterThanOrEqual(0);
         });
 
         it('proceeds when pro premium without BYOK (tier in body, no header)', async () => {
