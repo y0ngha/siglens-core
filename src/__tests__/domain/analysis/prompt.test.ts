@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt,
     PROMPT_CONFIG_BY_TIMEFRAME,
@@ -2492,7 +2492,6 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain('"trend": "neutral"');
-            // Enum literals are stated once in the Allowed Enum Values SSOT block.
             expect(result).toContain(
                 '- trend / signals[].trend / patternSummaries[].trend / strategyResults[].trend / candlePatterns[].trend: "bullish", "bearish", "neutral"'
             );
@@ -3278,13 +3277,17 @@ describe('prompt', () => {
     });
 
     describe('중복 지시문 통합 (SSOT)', () => {
-        const result = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
-            [],
-            makeIndicators(),
-            []
-        );
+        let result: string;
+
+        beforeAll(() => {
+            result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+        });
 
         describe('읽기 좋은 텍스트 포맷 규칙', () => {
             it('Readable Text Formatting Rules SSOT 블록이 정확히 한 번만 등장한다', () => {
