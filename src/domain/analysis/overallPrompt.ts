@@ -370,5 +370,6 @@ Rules:
 
 ## Few-Shot — conflict preservation + axis attribution
 For integratedConclusionKo, when the technical axis is bearish but the news axis turns positive, do NOT smooth them into a vague "중립" verdict. Instead, attribute and preserve the tension:
+BAD: "기술적 분석과 뉴스·펀더멘털을 종합하면 방향성이 불확실해 중립적으로 판단됩니다." (smooths away the conflict; no axis attribution)
 GOOD: "기술적 분석에 따르면 200 저항에 막혀 단기 하락 압력이 우세합니다. 다만 뉴스 분석에서는 호재가 유입되며 펀더멘털 분석의 약세 신호와 상충하고 있어, 200 돌파 여부가 확인되기 전까지는 방향이 엇갈린 구간으로 판단합니다."`;
 }
