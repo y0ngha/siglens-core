@@ -700,7 +700,7 @@ null 없음 (첫 봉부터 값 존재 — 첫 봉은 0)
    - firstIndex/secondIndex: 최초 터치 / 최근 터치 인덱스 (firstIndex < secondIndex)
    - 출력 상한: ⌊n/2⌋ 로 bounded + 최근 SMC_MAX_EQUAL_LEVELS_RETAINED(50)개로 hard-cap
      (평탄·페니스톡 등 degenerate 시리즈에서 O(n²) 폭발 방지 → 캐시 비대 차단)
-   - 결과: equalHighs[], equalLows[] (각각 { price, firstIndex, secondIndex, type })
+   - 결과: equalHighs[], equalLows[] (각각 { price, firstIndex, secondIndex })
 
 6. Premium / Equilibrium / Discount Zones
    - 최근 구조 이탈(BOS/CHoCH)을 앵커로 range 를 산출 (resolveZoneRange)

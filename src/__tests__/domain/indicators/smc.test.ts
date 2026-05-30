@@ -340,6 +340,12 @@ describe('calculateSmc', () => {
 
             const result = calculateSmc(bars);
             expect(result.equalHighs.length).toBeGreaterThan(0);
+            expect(result.equalHighs[0]).toEqual({
+                price: expect.any(Number),
+                firstIndex: expect.any(Number),
+                secondIndex: expect.any(Number),
+            });
+            expect(result.equalHighs[0]).not.toHaveProperty('type');
         });
 
         it('같은 가격대의 여러 swing은 쌍 나열이 아니라 클러스터 1개로 묶인다', () => {

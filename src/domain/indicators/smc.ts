@@ -10,7 +10,6 @@ import type {
     SMCStructureBreak,
     SMCStructureDirection,
     SMCSwingPoint,
-    SMCSwingPointType,
 } from '@/domain/types';
 import {
     EMPTY_SMC_RESULT,
@@ -282,8 +281,8 @@ function detectEqualLevels(
     atrValues: (number | null)[]
 ): { equalHighs: SMCEqualLevel[]; equalLows: SMCEqualLevel[] } {
     return {
-        equalHighs: findEqualLevels(swingHighs, atrValues, 'high'),
-        equalLows: findEqualLevels(swingLows, atrValues, 'low'),
+        equalHighs: findEqualLevels(swingHighs, atrValues),
+        equalLows: findEqualLevels(swingLows, atrValues),
     };
 }
 
@@ -295,9 +294,9 @@ function detectEqualLevels(
 // payload limit. So we cluster greedily instead — each unused swing anchors a
 // cluster that absorbs every later swing within its ATR threshold, emitting ONE
 // level per cluster of ≥2 touches. Output is bounded by ⌊n/2⌋ and hard-capped to
-// the most recent SMC_MAX_EQUAL_LEVELS_RETAINED levels. The SMCEqualLevel shape
-// is preserved; firstIndex/secondIndex span the cluster's first-touch →
-// most-recent-touch swing indices.
+// the most recent SMC_MAX_EQUAL_LEVELS_RETAINED levels. firstIndex/secondIndex
+// span the cluster's first-touch → most-recent-touch swing indices (consumers
+// read secondIndex as recency and secondIndex − firstIndex as the level span).
 //
 // Membership is anchor-relative (distance to the anchor price), NOT
 // centroid-relative, by design — a single greedy pass. The emitted price is the
@@ -306,8 +305,7 @@ function detectEqualLevels(
 // an O(n²) reclustering pass).
 function findEqualLevels(
     swings: SMCSwingPoint[],
-    atrValues: (number | null)[],
-    type: SMCSwingPointType
+    atrValues: (number | null)[]
 ): SMCEqualLevel[] {
     const n = swings.length;
     const used = new Array<boolean>(n).fill(false);
@@ -339,7 +337,6 @@ function findEqualLevels(
                 price: priceSum / clusterSize,
                 firstIndex: cluster[0].index,
                 secondIndex: cluster[clusterSize - 1].index,
-                type,
             });
         }
     }
