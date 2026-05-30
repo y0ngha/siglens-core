@@ -2982,6 +2982,19 @@ describe('prompt', () => {
             );
         });
 
+        it('candlestick skill이 없어도 공통 가이드라인에 제공된 trend 사용 지시가 포함된다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain(
+                'For each detected candle pattern, the candlePatterns[].trend field MUST copy the value from the [trend: ...] label in ## Detected Candle Patterns verbatim. Do not re-judge the trend yourself.'
+            );
+        });
+
         it('활성화된 Skills 섹션에는 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'candlestick',

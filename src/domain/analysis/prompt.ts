@@ -720,6 +720,7 @@ const ANALYSIS_GUIDELINES = [
     '### Candle Patterns vs Chart Patterns',
     '- candlePatterns: Only include candle patterns (single/multi candle) detected from bar data. Chart patterns defined in skills/*.md go in patternSummaries.',
     '- patternSummaries: Only include chart patterns defined in skills/*.md. Candle patterns go in candlePatterns.',
+    '- For each detected candle pattern, the candlePatterns[].trend field MUST copy the value from the [trend: ...] label in ## Detected Candle Patterns verbatim. Do not re-judge the trend yourself.',
     '',
     '### keyPrices Rules',
     '- keyPrices must only contain actual price levels (numbers that represent a price, e.g. 150.00). Do NOT include bar indices, counts, or any non-price numeric values.',
