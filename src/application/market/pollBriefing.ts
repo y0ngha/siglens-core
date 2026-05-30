@@ -5,14 +5,11 @@ import type {
     PollBriefingResult,
 } from '@/domain/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
-import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    buildBriefingCacheKey,
-    MARKET_BRIEFING_CACHE_TTL,
-} from '@/infrastructure/cache/config';
+import { MARKET_BRIEFING_CACHE_TTL } from '@/infrastructure/cache/config';
 import {
     getJobError,
+    getJobMeta,
     getJobResult,
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
@@ -25,8 +22,10 @@ import {
  * - `error`: missing or malformed result (`summary` field absent), or the
  *   worker reported a failure.
  * - `done`: normalized briefing plus its `generatedAt` timestamp. The result
- *   is also written to the hourly briefing cache so subsequent
- *   {@link submitBriefing} calls within the same hour return it as cached.
+ *   is written under the same input-hashed cache key recorded in the job meta
+ *   at submit time, so only callers with identical inputs within the same hour
+ *   get a cache hit. If the job meta / `cacheKey` is absent (e.g. TTL expiry),
+ *   the cache write is skipped.
  *
  * On every terminal outcome (`error` or `done`) the job is cleaned up from
  * Redis (best-effort).
@@ -55,7 +54,12 @@ export async function pollBriefing(
     }
 
     // status === 'done'
-    const raw = await getJobResult(jobId);
+    // Both reads are independent and only run on the done path (status check
+    // above early-returns for processing/null), so parallelizing is a pure win.
+    const [raw, meta] = await Promise.all([
+        getJobResult(jobId),
+        getJobMeta(jobId),
+    ]);
     if (!raw) {
         cleanupInBackground(jobId, '[Briefing/Poll]', options);
         return { status: 'error', error: 'Result not found' };
@@ -68,12 +72,16 @@ export async function pollBriefing(
         return { status: 'error', error: 'Invalid briefing result' };
     }
 
-    const now = new Date();
-    const generatedAt = now.toISOString();
-    const dateHour = generatedAt.slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-    const cacheKey = buildBriefingCacheKey(dateHour);
+    const generatedAt = new Date().toISOString();
+
+    // The briefing cache key folds in an input hash of the index/sector data,
+    // which only the submit path can compute. submitBriefing stored that exact
+    // key in the job meta, so we write under the SAME key here (read == write).
+    // If the meta key is missing (e.g. TTL expiry), skip the write rather than
+    // reconstruct a key that would diverge from the submit-side lookup.
+    const cacheKey = meta?.cacheKey;
     const cache = createCacheProvider();
-    if (cache !== null) {
+    if (cacheKey !== undefined && cache !== null) {
         fireAndForget(
             cache
                 .set(

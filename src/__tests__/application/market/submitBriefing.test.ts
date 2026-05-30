@@ -2,16 +2,24 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 vi.mock('@/infrastructure/cache/redis');
+vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
 import { submitBriefing } from '@/application/market/submitBriefing';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
-import type { MarketSummaryData, MarketBriefingResponse } from '@/domain/types';
+import type {
+    MarketSummaryData,
+    MarketBriefingResponse,
+    MarketIndexData,
+    MarketSectorData,
+} from '@/domain/types';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
+const mockSetJobMeta = setJobMeta as Mock;
 const mockNormalizeMarketBriefing = normalizeMarketBriefing as Mock;
 const mockBuildMarketBriefingPrompt = buildMarketBriefingPrompt as Mock;
 
@@ -53,6 +61,7 @@ describe('submitBriefing 함수는', () => {
             WORKER_SECRET: 'test-secret',
         };
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
+        mockSetJobMeta.mockResolvedValue(undefined);
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
@@ -81,6 +90,7 @@ describe('submitBriefing 함수는', () => {
                 expect(result.briefing).toBe(mockBriefing);
             }
             expect(mockFetch).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
         });
     });
 
@@ -149,6 +159,95 @@ describe('submitBriefing 함수는', () => {
         });
     });
 
+    describe('입력 해시 캐시 키', () => {
+        const indexA: MarketIndexData = {
+            symbol: 'SPY',
+            fmpSymbol: '^GSPC',
+            displayName: 'S&P 500',
+            koreanName: 'S&P 500',
+            price: 5000,
+            changesPercentage: 1.2,
+        };
+        const sectorA: MarketSectorData = {
+            symbol: 'XLK',
+            sectorName: 'Technology',
+            koreanName: '기술',
+            price: 200,
+            changesPercentage: 0.5,
+        };
+
+        function readCacheKey(): string {
+            const call = mockCacheGet.mock.calls[0];
+            return call[0] as string;
+        }
+
+        it('캐시 조회 키에 dateHour와 입력 해시가 포함된다', async () => {
+            await submitBriefing({ indices: [indexA], sectors: [sectorA] });
+
+            const key = readCacheKey();
+            // briefing:market:<dateHour(13)>:<inputHash(16 hex)>
+            expect(key).toMatch(/^briefing:market:.{13}:[0-9a-f]{16}$/);
+        });
+
+        it('입력 데이터가 바뀌면 캐시 키가 달라진다', async () => {
+            await submitBriefing({ indices: [indexA], sectors: [sectorA] });
+            const keyA = readCacheKey();
+
+            mockCacheGet.mockClear();
+            await submitBriefing({
+                indices: [{ ...indexA, price: 5100 }],
+                sectors: [sectorA],
+            });
+            const keyB = readCacheKey();
+
+            expect(keyA).not.toBe(keyB);
+        });
+
+        it('입력 배열 순서가 달라도 동일한 해시(키)를 만든다', async () => {
+            const indexB: MarketIndexData = { ...indexA, fmpSymbol: '^IXIC' };
+            const sectorB: MarketSectorData = { ...sectorA, symbol: 'XLF' };
+
+            await submitBriefing({
+                indices: [indexA, indexB],
+                sectors: [sectorA, sectorB],
+            });
+            const keyOrder1 = readCacheKey();
+
+            mockCacheGet.mockClear();
+            await submitBriefing({
+                indices: [indexB, indexA],
+                sectors: [sectorB, sectorA],
+            });
+            const keyOrder2 = readCacheKey();
+
+            expect(keyOrder1).toBe(keyOrder2);
+        });
+
+        it('정적 표시명만 다르면 해시(키)는 동일하다', async () => {
+            await submitBriefing({ indices: [indexA], sectors: [sectorA] });
+            const keyA = readCacheKey();
+
+            mockCacheGet.mockClear();
+            await submitBriefing({
+                indices: [{ ...indexA, displayName: 'Different Label' }],
+                sectors: [{ ...sectorA, sectorName: 'Other' }],
+            });
+            const keyB = readCacheKey();
+
+            expect(keyA).toBe(keyB);
+        });
+
+        it('submit 시 동일한 캐시 키를 job meta에 저장한다 (read==write 보장)', async () => {
+            await submitBriefing({ indices: [indexA], sectors: [sectorA] });
+
+            const readKey = readCacheKey();
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ cacheKey: readKey })
+            );
+        });
+    });
+
     describe('캐시 읽기가 실패할 때', () => {
         it('에러를 로깅하고 worker 제출로 진행한다 (캐시 장애가 제출을 막지 않음)', async () => {
             const consoleErrorSpy = vi
@@ -186,6 +285,27 @@ describe('submitBriefing 함수는', () => {
                 '[Briefing/Submit] Worker request failed:',
                 expect.any(Error)
             );
+            consoleErrorSpy.mockRestore();
+        });
+    });
+
+    describe('job meta 저장이 실패할 때', () => {
+        it('setJobMeta가 실패해도 submitted를 반환한다', async () => {
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockSetJobMeta.mockRejectedValueOnce(
+                new Error('meta write failed')
+            );
+
+            const result = await submitBriefing(mockData);
+
+            expect(result.status).toBe('submitted');
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '[Briefing/Submit] Failed to store job meta:',
+                expect.any(Error)
+            );
+            expect(mockFetch).toHaveBeenCalled();
             consoleErrorSpy.mockRestore();
         });
     });

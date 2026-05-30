@@ -9,6 +9,7 @@ import { pollBriefing } from '@/application/market/pollBriefing';
 import {
     getJobStatus,
     getJobError,
+    getJobMeta,
     getJobResult,
     cleanupJob,
 } from '@/infrastructure/jobs/queue';
@@ -17,6 +18,7 @@ import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefi
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
+const mockGetJobMeta = getJobMeta as Mock;
 const mockGetJobResult = getJobResult as Mock;
 const mockCleanupJob = cleanupJob as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -41,6 +43,10 @@ describe('pollBriefing 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCleanupJob.mockResolvedValue(undefined);
+        mockGetJobMeta.mockResolvedValue({
+            symbol: 'market',
+            cacheKey: 'briefing:market:2025-01-15T12:deadbeefdeadbeef',
+        });
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheSet.mockResolvedValue(undefined);
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
@@ -144,12 +150,40 @@ describe('pollBriefing 함수는', () => {
             }
         });
 
-        it('캐시에 briefing을 저장한다', async () => {
+        it('job meta의 입력 해시 캐시 키로 briefing을 저장한다 (read==write)', async () => {
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'market',
+                cacheKey: 'briefing:market:2025-01-15T12:cafebabecafebabe',
+            });
 
             await pollBriefing('job-cache');
 
-            expect(mockCacheSet).toHaveBeenCalled();
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                'briefing:market:2025-01-15T12:cafebabecafebabe',
+                expect.objectContaining({ briefing: mockBriefing }),
+                expect.any(Number)
+            );
+        });
+
+        it('job meta가 없으면(null이면) 캐시 저장을 건너뛴다 (잘못된 키로 쓰지 않음)', async () => {
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce(null);
+
+            const result = await pollBriefing('job-no-meta');
+
+            expect(result.status).toBe('done');
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('job meta는 있지만 cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce({ symbol: 'market' });
+
+            const result = await pollBriefing('job-meta-no-cachekey');
+
+            expect(result.status).toBe('done');
+            expect(mockCacheSet).not.toHaveBeenCalled();
         });
 
         it('waitUntil이 제공되면 캐시 저장과 cleanup promise를 등록한다', async () => {
@@ -168,6 +202,31 @@ describe('pollBriefing 함수는', () => {
             await pollBriefing('job-cleanup');
 
             expect(mockCleanupJob).toHaveBeenCalledWith('job-cleanup');
+        });
+
+        it('캐시 쓰기가 실패해도 done을 반환하고 에러를 로깅한다', async () => {
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'market',
+                cacheKey: 'briefing:market:2025-01-15T12:deadbeefdeadbeef',
+            });
+            mockCacheSet.mockRejectedValueOnce(new Error('write failed'));
+
+            const result = await pollBriefing('job-cache-fail');
+
+            expect(result.status).toBe('done');
+            // fire-and-forget .catch 는 microtask 로 큐잉되므로, fake timer 환경에서
+            // 한 틱(0ms) 진행시켜 대기 중인 microtask 가 모두 비워진 뒤
+            // .catch 가 실행 완료된 상태를 보장한다.
+            await vi.advanceTimersByTimeAsync(0);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '[Briefing/Poll] Cache write failed:',
+                expect.any(Error)
+            );
+            consoleErrorSpy.mockRestore();
         });
     });
 

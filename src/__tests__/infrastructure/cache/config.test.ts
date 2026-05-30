@@ -87,8 +87,16 @@ describe('cache key builders', () => {
         );
     });
 
-    it('buildBriefingCacheKey', () => {
-        expect(buildBriefingCacheKey('1Hour')).toBe('briefing:market:1Hour');
+    it('buildBriefingCacheKey includes the date-hour prefix and input hash', () => {
+        expect(buildBriefingCacheKey('2026-04-26T14', 'abc123')).toBe(
+            'briefing:market:2026-04-26T14:abc123'
+        );
+    });
+
+    it('buildBriefingCacheKey: a different input hash yields a different key', () => {
+        const a = buildBriefingCacheKey('2026-04-26T14', 'hashA');
+        const b = buildBriefingCacheKey('2026-04-26T14', 'hashB');
+        expect(a).not.toBe(b);
     });
 
     it('buildSectorSignalsCacheKey composes timeframe and bucket', () => {
