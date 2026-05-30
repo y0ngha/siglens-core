@@ -2045,6 +2045,21 @@ describe('prompt', () => {
             expect(result).toMatch(/\[\d+ bars ago] Multi-candle pattern: .+/);
         });
 
+        it('다봉 패턴 라인에 사전 계산된 trend가 포함된다', () => {
+            // bullish_engulfing → getMultiPatternTrend → 'bullish'
+            const bars = makeEngulfingBars();
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                []
+            );
+            expect(result).toMatch(
+                /Multi-candle pattern: bullish_engulfing \[trend: bullish]/
+            );
+        });
+
         it('단봉 패턴은 봉 위치 정보와 함께 패턴 섹션에 포함된다', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
@@ -2055,6 +2070,28 @@ describe('prompt', () => {
                 []
             );
             expect(result).toMatch(/\[\d+ bars ago] Single candle pattern: .+/);
+        });
+
+        it('단봉 패턴 라인에 사전 계산된 trend가 포함된다', () => {
+            // hammer → getSinglePatternTrend → 'bullish'
+            const hammerBar: Bar = {
+                time: TEST_BAR_BASE_TIME,
+                open: TEST_BAR_BASE_PRICE,
+                high: TEST_BAR_BASE_PRICE + HAMMER_HIGH_OFFSET,
+                low: TEST_BAR_BASE_PRICE + HAMMER_LOW_OFFSET,
+                close: TEST_BAR_BASE_PRICE + HAMMER_BODY_OFFSET,
+                volume: TEST_BAR_BASE_VOLUME,
+            };
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [hammerBar],
+                makeIndicators(),
+                []
+            );
+            expect(result).toMatch(
+                /Single candle pattern: hammer \[trend: bullish]/
+            );
         });
 
         it('다봉 패턴이 있으면 해당 다봉 패턴과 관련 봉의 단봉 패턴만 포함된다', () => {
@@ -2926,6 +2963,36 @@ describe('prompt', () => {
                 [skill]
             );
             expect(result).not.toContain('## Pattern Analysis\n');
+        });
+
+        it('candlePatterns 작성 규칙에 제공된 trend를 사용하라는 지시가 포함된다', () => {
+            const skill = makeSkill({
+                type: 'candlestick',
+                name: 'Engulfing Pattern Guide',
+            });
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [skill]
+            );
+            expect(result).toContain(
+                'The trend field MUST use the value provided in the [trend: ...] label of ## Detected Candle Patterns. Do not re-judge or override it.'
+            );
+        });
+
+        it('candlestick skill이 없어도 공통 가이드라인에 제공된 trend 사용 지시가 포함된다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain(
+                'For each detected candle pattern, the candlePatterns[].trend field MUST copy the value from the [trend: ...] label in ## Detected Candle Patterns verbatim. Do not re-judge the trend yourself.'
+            );
         });
 
         it('활성화된 Skills 섹션에는 포함되지 않는다', () => {
