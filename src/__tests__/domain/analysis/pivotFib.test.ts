@@ -25,6 +25,16 @@ const makeBar = (overrides?: Partial<Bar>): Bar => ({
     ...overrides,
 });
 
+/**
+ * Build a bar list whose prior completed period (`bars[len - 2]`) carries the
+ * given overrides; the trailing current-period bar is intentionally distinct so
+ * tests assert the pivots anchor on the prior bar, not the last one.
+ */
+const withPriorBar = (priorOverrides?: Partial<Bar>): Bar[] => [
+    makeBar(priorOverrides),
+    makeBar({ high: 999, low: 1, close: 500 }),
+];
+
 const makeSwing = (
     price: number,
     type: SMCSwingPoint['type'],
@@ -47,9 +57,9 @@ const ratioOf = (
 describe('pivotFib', () => {
     describe('computePivotFibLevels', () => {
         describe('standardPivot', () => {
-            it('computes PP/R/S from the last bar H/L/C', () => {
+            it('computes PP/R/S from the prior-period bar H/L/C', () => {
                 const result = computePivotFibLevels(
-                    [makeBar()],
+                    withPriorBar(),
                     makeIndicators()
                 );
                 const pivot = result.standardPivot!;
@@ -69,10 +79,10 @@ describe('pivotFib', () => {
                 );
             });
 
-            it('uses the most recent bar as the prior period', () => {
+            it('anchors on the prior bar (len - 2), not the last bar', () => {
                 const bars = [
-                    makeBar({ high: 1, low: 1, close: 1 }),
                     makeBar(),
+                    makeBar({ high: 1, low: 1, close: 1 }),
                 ];
                 const result = computePivotFibLevels(bars, makeIndicators());
                 expect(result.standardPivot!.pp).toBeCloseTo(PP, 9);
@@ -80,7 +90,7 @@ describe('pivotFib', () => {
 
             it('orders resistances above and supports below PP', () => {
                 const { pp, r1, r2, r3, s1, s2, s3 } = computePivotFibLevels(
-                    [makeBar()],
+                    withPriorBar(),
                     makeIndicators()
                 ).standardPivot!;
                 expect(r1).toBeGreaterThan(pp);
@@ -96,17 +106,26 @@ describe('pivotFib', () => {
                 expect(result.standardPivot).toBeNull();
             });
 
-            it('returns null when an OHLC value is non-positive', () => {
+            it('returns null when there is no prior period (fewer than 2 bars)', () => {
                 const result = computePivotFibLevels(
-                    [makeBar({ low: 0 })],
+                    [makeBar()],
+                    makeIndicators()
+                );
+                expect(result.standardPivot).toBeNull();
+                expect(result.fibonacciPivot).toBeNull();
+            });
+
+            it('returns null when a prior-bar OHLC value is non-positive', () => {
+                const result = computePivotFibLevels(
+                    withPriorBar({ low: 0 }),
                     makeIndicators()
                 );
                 expect(result.standardPivot).toBeNull();
             });
 
-            it('returns null when an OHLC value is non-finite', () => {
+            it('returns null when a prior-bar OHLC value is non-finite', () => {
                 const result = computePivotFibLevels(
-                    [makeBar({ high: Number.NaN })],
+                    withPriorBar({ high: Number.NaN }),
                     makeIndicators()
                 );
                 expect(result.standardPivot).toBeNull();
@@ -116,7 +135,7 @@ describe('pivotFib', () => {
         describe('fibonacciPivot', () => {
             it('offsets PP by 0.382/0.618/1.0 of the range', () => {
                 const pivot = computePivotFibLevels(
-                    [makeBar()],
+                    withPriorBar(),
                     makeIndicators()
                 ).fibonacciPivot!;
 
@@ -135,10 +154,10 @@ describe('pivotFib', () => {
                 ).toBeNull();
             });
 
-            it('returns null when an OHLC value is non-positive', () => {
+            it('returns null when a prior-bar OHLC value is non-positive', () => {
                 expect(
                     computePivotFibLevels(
-                        [makeBar({ close: -5 })],
+                        withPriorBar({ close: -5 }),
                         makeIndicators()
                     ).fibonacciPivot
                 ).toBeNull();

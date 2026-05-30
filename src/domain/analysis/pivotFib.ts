@@ -139,21 +139,26 @@ const computeFibonacciProjection = (
     };
 };
 
+/** @internal Minimum bar count to expose a prior completed period for pivots. */
+const MIN_BARS_FOR_PIVOT = 2;
+
 /**
  * Compute deterministic pivot points and Fibonacci levels for a symbol.
  *
- * Pivot sets (standard and Fibonacci) are derived from the most recent bar's
- * high/low/close — the prior period whose levels project onto the current one.
- * The Fibonacci projection anchors on the most recent SMC swing high and swing
- * low, deriving 23.6%–78.6% retracements and 100%–261.8% extension targets; its
- * `direction` follows the chronological order of those swings.
+ * Pivot sets (standard and Fibonacci) are derived from the last completed prior
+ * period — `bars[len - 2]` — whose high/low/close project onto the current
+ * (latest) period the snapshot price belongs to. The Fibonacci projection
+ * anchors on the most recent SMC swing high and swing low, deriving 23.6%–78.6%
+ * retracements and 100%–261.8% extension targets; its `direction` follows the
+ * chronological order of those swings.
  *
- * Every component is `null` when its inputs are unavailable (no bars, non-finite
- * or non-positive OHLC, missing swing points, or a non-positive swing range).
+ * Every component is `null` when its inputs are unavailable: the pivots require
+ * at least two bars (a prior period to anchor on) and finite, positive OHLC; the
+ * Fibonacci projection requires swing points and a positive swing range.
  * These levels are injected into the prompt so the AI selects and interprets
  * them instead of performing the arithmetic itself.
  *
- * @param bars - OHLCV bars sorted oldest-first; the last bar anchors the pivots.
+ * @param bars - OHLCV bars sorted oldest-first; the second-to-last bar anchors the pivots.
  * @param indicators - Indicator suite produced by `calculateIndicators` (SMC swings anchor the Fibonacci projection).
  * @returns Standard pivot, Fibonacci pivot, and Fibonacci projection, each nullable.
  */
@@ -161,13 +166,15 @@ export function computePivotFibLevels(
     bars: Bar[],
     indicators: IndicatorResult
 ): PivotFibLevels {
-    const priorBar = lastOf(bars);
+    const priorBar =
+        bars.length >= MIN_BARS_FOR_PIVOT
+            ? bars[bars.length - MIN_BARS_FOR_PIVOT]
+            : null;
 
     return {
-        standardPivot:
-            priorBar !== null ? computeStandardPivot(priorBar) : null,
+        standardPivot: priorBar != null ? computeStandardPivot(priorBar) : null,
         fibonacciPivot:
-            priorBar !== null ? computeFibonacciPivot(priorBar) : null,
+            priorBar != null ? computeFibonacciPivot(priorBar) : null,
         fibonacci: computeFibonacciProjection(indicators.smc),
     };
 }

@@ -4315,11 +4315,11 @@ describe('prompt', () => {
             ...overrides,
         });
 
-        it('renders pivot subsections from the last bar', () => {
+        it('renders pivot subsections from the prior-period bar', () => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
-                [makeBar(0, PF_PRICE)],
+                [makeBar(0), makeBar(1, PF_PRICE)],
                 makeIndicators(),
                 []
             );
