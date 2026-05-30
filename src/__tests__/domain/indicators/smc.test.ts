@@ -399,5 +399,51 @@ describe('calculateSmc', () => {
             expect(result.equalHighs).toHaveLength(1);
             expect(result.equalLows).toHaveLength(1);
         });
+
+        it('클러스터가 상한을 초과하면 가장 최근 SMC_MAX_EQUAL_LEVELS_RETAINED개로 잘린다', () => {
+            // Staircase of (cap + 5) distinct price plateaus, each touched twice
+            // → one cluster per level. More clusters than the cap form, so the
+            // slice(-N) trim path is exercised (not trivially under the cap).
+            const P = SMC_SWING_PERIOD;
+            const STEP = 6;
+            const PEAK_H = 2;
+            const BASE0 = 1000;
+            const LEVELS = SMC_MAX_EQUAL_LEVELS_RETAINED + 5;
+            const priceAt = (k: number) => BASE0 + k * STEP + PEAK_H;
+
+            const bars: Bar[] = [];
+            let t = 0;
+            // Warmup so ATR is non-null at the first counted peaks.
+            for (let i = 0; i < SMC_ATR_PERIOD + P; i++) {
+                bars.push(makeBar(BASE0, BASE0 - 1, BASE0 - 0.5, t++));
+            }
+            for (let k = 0; k < LEVELS; k++) {
+                const base = BASE0 + k * STEP;
+                const peak = priceAt(k);
+                bars.push(makeBar(peak, base, base + PEAK_H / 2, t++)); // touch 1
+                for (let i = 0; i < P * 2 + 1; i++) {
+                    bars.push(makeBar(base, base - 1, base - 0.5, t++)); // bridge
+                }
+                bars.push(makeBar(peak, base, base + PEAK_H / 2, t++)); // touch 2
+                for (let i = 0; i < P; i++) {
+                    bars.push(makeBar(base, base - 1, base - 0.5, t++)); // trail
+                }
+            }
+
+            const result = calculateSmc(bars);
+
+            // Trimmed to exactly the cap, not the (cap + 5) clusters formed.
+            expect(result.equalHighs).toHaveLength(
+                SMC_MAX_EQUAL_LEVELS_RETAINED
+            );
+            // Tail kept: the most recent (highest) level survives the trim ...
+            expect(result.equalHighs.at(-1)!.price).toBeCloseTo(
+                priceAt(LEVELS - 1)
+            );
+            // ... while the oldest levels are dropped from the front.
+            expect(result.equalHighs[0].price).toBeCloseTo(
+                priceAt(LEVELS - SMC_MAX_EQUAL_LEVELS_RETAINED)
+            );
+        });
     });
 });

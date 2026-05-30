@@ -16,6 +16,7 @@ import {
     SMC_ATR_PERIOD,
     SMC_DISCOUNT_RATIO,
     SMC_EQUAL_LEVEL_ATR_MULTIPLIER,
+    SMC_EQUAL_LEVEL_MIN_TOUCHES,
     SMC_MAX_EQUAL_LEVELS_RETAINED,
     SMC_PREMIUM_RATIO,
     SMC_SWING_PERIOD,
@@ -290,8 +291,8 @@ function detectEqualLevels(
 // swings, not the cartesian product of touching pairs. Enumerating every swing
 // pair within an ATR threshold is O(n²) output: on a flat/penny-stock series
 // where nearly every bar is a swing point at one price, that explodes to tens
-// of thousands of entries (~10MB per ticker) and trips Upstash's 10MB cache
-// payload limit. So we cluster greedily instead — each unused swing anchors a
+// of thousands of entries — far more output than downstream consumers can
+// handle efficiently. So we cluster greedily instead — each unused swing anchors a
 // cluster that absorbs every later swing within its ATR threshold, emitting ONE
 // level per cluster of ≥2 touches. Output is bounded by ⌊n/2⌋ and hard-capped to
 // the most recent SMC_MAX_EQUAL_LEVELS_RETAINED levels. firstIndex/secondIndex
@@ -331,7 +332,7 @@ function findEqualLevels(
         }
 
         const clusterSize = cluster.length;
-        if (clusterSize >= 2) {
+        if (clusterSize >= SMC_EQUAL_LEVEL_MIN_TOUCHES) {
             const priceSum = cluster.reduce((sum, p) => sum + p.price, 0);
             levels.push({
                 price: priceSum / clusterSize,
