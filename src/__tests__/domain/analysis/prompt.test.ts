@@ -4400,4 +4400,72 @@ describe('prompt', () => {
             );
         });
     });
+
+    describe('Trendline Candidates section', () => {
+        const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
+            ...EMPTY_SMC_RESULT,
+            ...overrides,
+        });
+
+        it('renders the section with a candidate line when swings produce candidates', () => {
+            const bars = Array.from({ length: 11 }, (_, i) => makeBar(i));
+            // Three collinear descending swing highs at bar indices 0, 5, 10.
+            const indicators = makeIndicators({
+                smc: makeSmc({
+                    swingHighs: [
+                        { index: 0, price: 130, type: 'high' },
+                        { index: 5, price: 120, type: 'high' },
+                        { index: 10, price: 110, type: 'high' },
+                    ],
+                }),
+            });
+
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                []
+            );
+
+            // The section header also appears in the trendline instructions, so
+            // assert on the section's unique description line + a candidate line.
+            expect(prompt).toContain(
+                'Deterministically derived from SMC swing points'
+            );
+            expect(prompt).toContain(
+                `- descending: start { time: ${bars[0].time}, price: 130.00 } -> end { time: ${bars[10].time}, price: 110.00 }`
+            );
+        });
+
+        it('omits the section when no trendline candidates can be derived', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0)],
+                makeIndicators(),
+                []
+            );
+
+            // The instructions reference the header, so check the section-only
+            // description line is absent rather than the (shared) header text.
+            expect(prompt).not.toContain(
+                'Deterministically derived from SMC swing points'
+            );
+        });
+
+        it('instructs the AI to prefer selecting from the precomputed candidates', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0)],
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).toContain(
+                'Prefer SELECTING trendlines from the ## Trendline Candidates (precomputed) section'
+            );
+        });
+    });
 });

@@ -69,9 +69,11 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
     Trend,
+    Trendline,
 } from '@/domain/types';
 import { computeLevelCandidates } from '@/domain/analysis/levelCandidates';
 import { computePivotFibLevels } from '@/domain/analysis/pivotFib';
+import { computeTrendlineCandidates } from '@/domain/analysis/trendlineCandidates';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
@@ -717,6 +719,22 @@ const formatPivotFibSection = (levels: PivotFibLevels): string => {
     ].join('\n');
 };
 
+const TRENDLINE_CANDIDATES_HEADER = '## Trendline Candidates (precomputed)';
+
+const formatTrendlineCandidateLine = (trendline: Trendline): string => {
+    const { direction, start, end } = trendline;
+    return `- ${direction}: start { time: ${start.time}, price: ${fmt(start.price)} } -> end { time: ${end.time}, price: ${fmt(end.price)} }`;
+};
+
+const formatTrendlineCandidatesSection = (
+    candidates: readonly Trendline[]
+): string =>
+    [
+        TRENDLINE_CANDIDATES_HEADER,
+        'Deterministically derived from SMC swing points; each endpoint maps to a real bar. SELECT from these and reuse their exact time/price values verbatim.',
+        ...candidates.map(formatTrendlineCandidateLine),
+    ].join('\n');
+
 const formatIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig
@@ -877,6 +895,7 @@ const ANALYSIS_GUIDELINES = [
     '',
     '### Trendline Detection',
     '- Return 0 to 3 trendlines maximum',
+    '- Prefer SELECTING trendlines from the ## Trendline Candidates (precomputed) section — these are derived from real swing points, so reuse their exact start/end time and price values verbatim. Only construct a non-candidate trendline when you have strong, explicitly-stated justification the candidates do not cover.',
     '- ascending: connect higher lows (at least 2 clear swing low points)',
     '- descending: connect lower highs (at least 2 clear swing high points)',
     '- Use the Unix timestamp values from the provided bar data for the time field. Each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value into the time field. Do not calculate or guess timestamps.',
@@ -1200,6 +1219,10 @@ export function buildAnalysisPrompt(
             ? computeLevelCandidates(currentPrice, indicators)
             : { support: [], resistance: [] };
     const pivotFibLevels = computePivotFibLevels(bars, indicators);
+    const trendlineCandidates = computeTrendlineCandidates(
+        bars,
+        indicators.smc
+    );
 
     const sections = [
         `Symbol: ${symbol}\nCompany: ${companyName}`,
@@ -1214,6 +1237,9 @@ export function buildAnalysisPrompt(
         formatSMCSection(indicators, bars),
         formatLevelCandidatesSection(levelCandidates),
         formatPivotFibSection(pivotFibLevels),
+        ...(trendlineCandidates.length > 0
+            ? [formatTrendlineCandidatesSection(trendlineCandidates)]
+            : []),
         ...(indicatorGuideSkills.length > 0
             ? [
                   `## Indicator Signal Guides\n${indicatorGuideSkills.map(buildSkillBlock).join('\n\n')}`,
