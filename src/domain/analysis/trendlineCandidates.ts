@@ -18,11 +18,10 @@ export const MAX_SWINGS_CONSIDERED = 6;
 
 /**
  * @internal
- * Minimum number of same-side swings that must lie on a line (within tolerance)
- * for it to qualify as a candidate. The two endpoints always count, so this is
- * effectively "endpoints plus zero or more intermediate touches".
+ * Minimum number of same-side swings required to form a candidate line. A line
+ * needs two endpoints, so a side with fewer than this many swings yields none.
  */
-export const MIN_TRENDLINE_TOUCHES = 2;
+export const MIN_SWINGS_FOR_LINE = 2;
 
 /**
  * @internal
@@ -104,8 +103,13 @@ const directionFor = (
 
 /**
  * Score one ordered pair of resolved swings against all same-side swings. Returns
- * `null` when the pair shares a timestamp (degenerate, vertical line) or fails to
- * reach `MIN_TRENDLINE_TOUCHES`.
+ * `null` only when the pair shares a timestamp (degenerate, vertical line).
+ *
+ * Every pair-line touches its own two endpoints by construction (each endpoint is
+ * a same-side swing and {@link extendTrendline} returns exactly that endpoint's
+ * price), so `touches` is always >= 2. No minimum-touch filter is needed:
+ * ranking by touches plus the per-side cap already selects the best-supported
+ * lines.
  */
 const scorePair = (
     earlier: ResolvedSwing,
@@ -127,8 +131,6 @@ const scorePair = (
         const tolerance = TRENDLINE_TOUCH_PRICE_FRACTION * swing.price;
         return Math.abs(swing.price - expected) <= tolerance;
     }).length;
-
-    if (touches < MIN_TRENDLINE_TOUCHES) return null;
 
     const slope = (end.price - start.price) / (end.time - start.time);
     const intercept = start.price - slope * start.time;
@@ -192,7 +194,7 @@ const candidatesForSide = (
     swings: readonly ResolvedSwing[]
 ): ScoredTrendline[] => {
     const recent = swings.slice(-MAX_SWINGS_CONSIDERED);
-    if (recent.length < MIN_TRENDLINE_TOUCHES) return [];
+    if (recent.length < MIN_SWINGS_FOR_LINE) return [];
 
     const scored: ScoredTrendline[] = [];
     for (let i = 0; i < recent.length; i += 1) {
@@ -222,7 +224,7 @@ const candidatesForSide = (
  * {@link MAX_SWINGS_CONSIDERED} swings are paired up; each pair forms a line that
  * is scored by how many same-side swings sit on it within
  * {@link TRENDLINE_TOUCH_PRICE_FRACTION} of the swing price (endpoints always
- * count). Lines with fewer than {@link MIN_TRENDLINE_TOUCHES} touches are dropped.
+ * count, so every line scores at least two touches).
  *
  * Qualifying lines are ranked by touches, then end-time recency, then span;
  * near-identical lines are deduplicated; each side keeps at most
@@ -239,7 +241,7 @@ const candidatesForSide = (
  * @internal
  */
 export function computeTrendlineCandidates(
-    bars: Bar[],
+    bars: readonly Bar[],
     smc: SMCResult
 ): Trendline[] {
     if (bars.length === 0) return [];
