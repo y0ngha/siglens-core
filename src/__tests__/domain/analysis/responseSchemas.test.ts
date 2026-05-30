@@ -8,14 +8,19 @@ import {
 } from '@/domain/analysis/responseSchemas';
 import type {
     FundamentalAnalysisResponse,
+    FundamentalCategory,
     FundamentalCategoryAssessment,
     FundamentalSentiment,
     NewsAnalysisResponse,
     NewsCardAnalysis,
+    NewsCategory,
+    NewsImpact,
     NewsSentiment,
     OptionsAnalysisResponse,
     OptionsPerExpirationCommentary,
     OptionsSignal,
+    OptionsSignalKind,
+    OptionsTone,
     OverallAnalysisResponse,
     OverallScenario,
     OverallScenarioName,
@@ -77,25 +82,40 @@ const SENTIMENT_VALUES = Object.keys({
     Record<FundamentalSentiment, true> &
     Record<OverallScenarioName, true>).toSorted();
 
-const NEWS_CATEGORY = [
-    'earnings',
-    'guidance',
-    'm_and_a',
-    'macro',
-    'other',
-    'product',
-    'regulation',
-].toSorted();
-const NEWS_IMPACT = ['high', 'low', 'medium', 'negligible'];
-const FUNDAMENTAL_CATEGORY = [
-    'futureDirection',
-    'growth',
-    'health',
-    'profitability',
-    'valuation',
-].toSorted();
-const OPTIONS_TONE = ['bearish', 'bullish', 'cautious', 'neutral'];
-const OPTIONS_SIGNAL_KIND = ['bearish', 'bullish', 'neutral', 'volatility'];
+const NEWS_CATEGORY = Object.keys({
+    earnings: true,
+    m_and_a: true,
+    guidance: true,
+    regulation: true,
+    macro: true,
+    product: true,
+    other: true,
+} satisfies Record<NewsCategory, true>).toSorted();
+const NEWS_IMPACT = Object.keys({
+    high: true,
+    medium: true,
+    low: true,
+    negligible: true,
+} satisfies Record<NewsImpact, true>).toSorted();
+const FUNDAMENTAL_CATEGORY = Object.keys({
+    valuation: true,
+    profitability: true,
+    growth: true,
+    health: true,
+    futureDirection: true,
+} satisfies Record<FundamentalCategory, true>).toSorted();
+const OPTIONS_TONE = Object.keys({
+    bullish: true,
+    bearish: true,
+    neutral: true,
+    cautious: true,
+} satisfies Record<OptionsTone, true>).toSorted();
+const OPTIONS_SIGNAL_KIND = Object.keys({
+    bullish: true,
+    bearish: true,
+    neutral: true,
+    volatility: true,
+} satisfies Record<OptionsSignalKind, true>).toSorted();
 
 describe('responseSchemas — strict-mode invariants', () => {
     const all = [

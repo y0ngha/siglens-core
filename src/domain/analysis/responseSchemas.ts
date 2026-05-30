@@ -1,14 +1,11 @@
 import type { ResponseJsonSchema } from '@/domain/types';
 
 /**
- * Canonical JSON Schemas for the structured-output analysis responses dispatched
- * to the worker on the `/analyze` body as `responseSchema`.
+ * Canonical JSON Schemas for the structured-output analysis responses.
  *
- * Each schema is authored to be accepted directly by OpenAI strict `json_schema`
- * mode and is translated by the worker into the provider-specific shape (Gemini
- * `responseSchema`, OpenAI `json_schema` strict). Strict mode requires every
- * property to be listed in `required` and `additionalProperties: false`, so a TS
- * `string | null` field is modelled as `type: ['string', 'null']` and an
+ * Each schema follows OpenAI strict `json_schema` conventions — every key of
+ * `properties` also appears in `required` and `additionalProperties` is `false`.
+ * A TS `string | null` field is modelled as `type: ['string', 'null']`, and an
  * optional `field?: T` is modelled as nullable for the same reason.
  *
  * The CHART/technical analysis response is intentionally excluded — its shape is
