@@ -110,6 +110,10 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export {
+    computeLevelCandidates,
+    MAX_LEVEL_CANDIDATES_PER_SIDE,
+} from './domain/analysis/levelCandidates';
+export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
@@ -346,6 +350,9 @@ export type {
     ClusteredKeyLevel,
     ClusteredKeyLevels,
     KeyPrice,
+    LevelCandidate,
+    LevelCandidates,
+    LevelCandidateSource,
     QuadrantKey,
     PriceTarget,
     PriceScenario,

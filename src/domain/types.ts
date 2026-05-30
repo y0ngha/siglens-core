@@ -721,6 +721,51 @@ export interface ClusteredKeyLevels {
 }
 
 /**
+ * Origin label for a precomputed support/resistance candidate.
+ *
+ * Fixed-category labels (Volume Profile boundaries, Bollinger bounds, SMC swings)
+ * plus dynamically-generated moving-average labels (`MA20`, `EMA9`, …) keyed by
+ * the active MA/EMA periods.
+ */
+export type LevelCandidateSource =
+    | 'POC'
+    | 'VAH'
+    | 'VAL'
+    | 'BB upper'
+    | 'BB lower'
+    | 'swing high'
+    | 'swing low'
+    | `MA${number}`
+    | `EMA${number}`;
+
+/**
+ * A single deterministically-derived support/resistance candidate.
+ *
+ * Computed in the domain from indicator/SMC data so the AI can SELECT a level
+ * and write the rationale, rather than inventing the price itself.
+ */
+export interface LevelCandidate {
+    /** Candidate price level. */
+    price: number;
+    /** Which indicator/structure produced this level. */
+    source: LevelCandidateSource;
+    /** Absolute distance from the current price, in percent. */
+    distancePercent: number;
+}
+
+/**
+ * Precomputed support/resistance candidates split by side relative to the
+ * current price. Each side is sorted nearest-to-price first and capped to a
+ * fixed maximum.
+ */
+export interface LevelCandidates {
+    /** Candidates strictly below the current price (potential support). */
+    support: LevelCandidate[];
+    /** Candidates strictly above the current price (potential resistance). */
+    resistance: LevelCandidate[];
+}
+
+/**
  * A single price target (price + rationale string).
  */
 export interface PriceTarget {
