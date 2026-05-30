@@ -104,6 +104,7 @@ export {
     clusterKeyLevels,
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
+export { computeLevelCandidates } from './domain/analysis/levelCandidates';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
@@ -425,6 +426,9 @@ export type {
     KeyLevel,
     KeyLevels,
     KeyPrice,
+    LevelCandidate,
+    LevelCandidates,
+    LevelCandidateSource,
     MACDResult,
     MarketBriefingResponse,
     NewsAnalysisResponse,

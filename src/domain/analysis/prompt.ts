@@ -52,6 +52,8 @@ import type {
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
+    LevelCandidate,
+    LevelCandidates,
     PromptConfig,
     Skill,
     SkillType,
@@ -61,6 +63,8 @@ import type {
     Timeframe,
     Trend,
 } from '@/domain/types';
+import { computeLevelCandidates } from '@/domain/analysis/levelCandidates';
+import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 
@@ -196,9 +200,6 @@ const formatVolume = (n: number): string =>
 
 const lastNonNull = (arr: (number | null)[]): number | null =>
     arr.findLast((v): v is number => v !== null) ?? null;
-
-const lastOf = <T>(arr: T[]): T | null =>
-    arr.length > 0 ? arr[arr.length - 1] : null;
 
 const formatMarketSection = (bars: Bar[]): string => {
     if (bars.length === 0) {
@@ -585,6 +586,44 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     ].join('\n');
 };
 
+const SR_CANDIDATES_HEADER = '## Support/Resistance Candidates (precomputed)';
+
+const formatCandidateLine = (candidate: LevelCandidate): string =>
+    `- ${fmt(candidate.price)} [${candidate.source}] (${candidate.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
+
+const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
+    const { support, resistance } = candidates;
+
+    if (support.length === 0 && resistance.length === 0) {
+        return [
+            SR_CANDIDATES_HEADER,
+            '- No candidates could be derived from the available data',
+        ].join('\n');
+    }
+
+    const resistanceLines =
+        resistance.length > 0
+            ? [
+                  '### Resistance Candidates (above price)',
+                  ...resistance.map(formatCandidateLine),
+              ]
+            : [];
+    const supportLines =
+        support.length > 0
+            ? [
+                  '### Support Candidates (below price)',
+                  ...support.map(formatCandidateLine),
+              ]
+            : [];
+
+    return [
+        SR_CANDIDATES_HEADER,
+        'Deterministically derived from Volume Profile, moving averages, Bollinger bands, and SMC swing points. Nearest-to-price first.',
+        ...resistanceLines,
+        ...supportLines,
+    ].join('\n');
+};
+
 const formatIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig
@@ -727,6 +766,7 @@ const ANALYSIS_GUIDELINES = [
     '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "목표가", "손절선"). Never use English or snake_case identifiers.',
     '',
     '### Support/Resistance Assessment',
+    '- Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section — these are deterministically derived from the data, so use them verbatim and write the reason. Only introduce a non-candidate level when you have strong, explicitly-stated justification (e.g. a confirmed pattern neckline or pivot the candidates do not cover).',
     `- Check convergence points of moving averages (MA ${MA_DEFAULT_PERIODS.join(',')}, EMA ${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_SHORT_INDEX]}/${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_LONG_INDEX]}) first`,
     '- Use Volume Profile levels: POC is the strongest support/resistance, VAH/VAL mark the boundaries of the value area',
     '- Price returning to POC indicates a high-probability reaction zone; breakouts above VAH or below VAL signal potential trend continuation',
@@ -1060,6 +1100,12 @@ export function buildAnalysisPrompt(
 
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
+    const currentPrice = bars.length > 0 ? bars[bars.length - 1].close : null;
+    const levelCandidates =
+        currentPrice !== null
+            ? computeLevelCandidates(currentPrice, indicators)
+            : { support: [], resistance: [] };
+
     const sections = [
         `Symbol: ${symbol}\nCompany: ${companyName}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
@@ -1071,6 +1117,7 @@ export function buildAnalysisPrompt(
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
+        formatLevelCandidatesSection(levelCandidates),
         ...(indicatorGuideSkills.length > 0
             ? [
                   `## Indicator Signal Guides\n${indicatorGuideSkills.map(buildSkillBlock).join('\n\n')}`,

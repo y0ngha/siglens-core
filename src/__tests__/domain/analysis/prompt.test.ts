@@ -41,6 +41,7 @@ import {
     TEST_BAR_BASE_TIME,
     TEST_BAR_INTERVAL,
 } from '@/__tests__/fixtures/candle';
+import { makeSwing } from '@/__tests__/domain/analysis/levelCandidatesTestHelpers';
 import type {
     Bar,
     FearGreedSnapshot,
@@ -4172,6 +4173,137 @@ describe('prompt', () => {
             );
             expect(prompt).toContain(
                 'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
+            );
+        });
+    });
+
+    describe('Support/Resistance Candidates section', () => {
+        const SR_PRICE = 100;
+        const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
+            ...EMPTY_SMC_RESULT,
+            ...overrides,
+        });
+
+        it('renders candidate lines when candidates exist', () => {
+            const bars = [makeBar(0, SR_PRICE)];
+            const indicators = makeIndicators({
+                volumeProfile: { poc: 95, vah: 110, val: 90, profile: [] },
+            });
+
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                []
+            );
+
+            expect(prompt).toContain(
+                '## Support/Resistance Candidates (precomputed)'
+            );
+            expect(prompt).toContain('### Resistance Candidates (above price)');
+            expect(prompt).toContain('### Support Candidates (below price)');
+            expect(prompt).toContain('[VAH]');
+            expect(prompt).toContain('[POC]');
+        });
+
+        it('renders only the resistance subsection when support has no candidates', () => {
+            const bars = [makeBar(0, SR_PRICE)];
+            const indicators = makeIndicators({
+                smc: makeSmc({
+                    swingHighs: [makeSwing(106, 'high')],
+                }),
+            });
+
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                []
+            );
+
+            expect(prompt).toContain(
+                '## Support/Resistance Candidates (precomputed)'
+            );
+            expect(prompt).toContain('### Resistance Candidates (above price)');
+            expect(prompt).not.toContain(
+                '### Support Candidates (below price)'
+            );
+            expect(prompt).not.toContain(
+                'No candidates could be derived from the available data'
+            );
+        });
+
+        it('renders only the support subsection when resistance has no candidates', () => {
+            const bars = [makeBar(0, SR_PRICE)];
+            const indicators = makeIndicators({
+                smc: makeSmc({
+                    swingLows: [makeSwing(94, 'low')],
+                }),
+            });
+
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                []
+            );
+
+            expect(prompt).toContain(
+                '## Support/Resistance Candidates (precomputed)'
+            );
+            expect(prompt).toContain('### Support Candidates (below price)');
+            expect(prompt).not.toContain(
+                '### Resistance Candidates (above price)'
+            );
+            expect(prompt).not.toContain(
+                'No candidates could be derived from the available data'
+            );
+        });
+
+        it('renders a no-candidates note when none can be derived', () => {
+            const bars = [makeBar(0, SR_PRICE)];
+
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).toContain(
+                'No candidates could be derived from the available data'
+            );
+        });
+
+        it('still renders the section header when there are no bars', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).toContain(
+                '## Support/Resistance Candidates (precomputed)'
+            );
+        });
+
+        it('instructs the AI to prefer selecting from the precomputed candidates', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0, SR_PRICE)],
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).toContain(
+                'Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section'
             );
         });
     });
