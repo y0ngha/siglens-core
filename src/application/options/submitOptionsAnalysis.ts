@@ -14,6 +14,7 @@ import type {
 } from '@/application/options/types';
 import { normalizeOptionsAnalysisResponse } from '@/domain/analysis/normalizeOptions';
 import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
+import { OPTIONS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { OPTIONS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
@@ -276,6 +277,7 @@ export async function submitOptionsAnalysis(
             tier,
             analysisType: 'options' satisfies AnalysisType,
             system: OPTIONS_SYSTEM_PROMPT,
+            responseSchema: OPTIONS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

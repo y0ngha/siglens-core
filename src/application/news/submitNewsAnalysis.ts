@@ -14,6 +14,7 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
+import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { NEWS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
@@ -216,6 +217,7 @@ export async function submitNewsAnalysis(
             tier,
             analysisType: 'news' satisfies AnalysisType,
             system: NEWS_SYSTEM_PROMPT,
+            responseSchema: NEWS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

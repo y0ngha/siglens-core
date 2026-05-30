@@ -1,0 +1,230 @@
+import type { ResponseJsonSchema } from '@/domain/types';
+
+/**
+ * Canonical JSON Schemas for the structured-output analysis responses.
+ *
+ * Each schema follows OpenAI strict `json_schema` conventions — every key of
+ * `properties` also appears in `required` and `additionalProperties` is `false`.
+ * A TS `string | null` field is modelled as `type: ['string', 'null']`, and an
+ * optional `field?: T` is modelled as nullable for the same reason.
+ *
+ * The CHART/technical analysis response is intentionally excluded — its shape is
+ * deeply nested; added separately when needed.
+ *
+ * @see ResponseJsonSchema
+ */
+
+/**
+ * Shared `string` enum schema for the three sentiment-direction unions
+ * (`NewsSentiment`, `FundamentalSentiment`, `OverallScenarioName`), which
+ * currently share the same `'bullish' | 'neutral' | 'bearish'` values. Reused at
+ * all five sentiment sites; sharing one object reference is safe because JSON
+ * serialization handles shared refs.
+ */
+const SENTIMENT_SCHEMA = {
+    type: 'string',
+    enum: ['bullish', 'neutral', 'bearish'],
+} as const;
+
+/**
+ * @internal
+ * Structured-output schema for {@link NewsCardAnalysis} (analysisType `newsCard`).
+ *
+ * `bodyKo` is TS `string | null`, modelled as nullable.
+ */
+export const NEWS_CARD_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        titleKo: { type: 'string' },
+        bodyKo: { type: ['string', 'null'] },
+        summaryKo: { type: 'string' },
+        sentiment: SENTIMENT_SCHEMA,
+        category: {
+            type: 'string',
+            enum: [
+                'earnings',
+                'm_and_a',
+                'guidance',
+                'regulation',
+                'macro',
+                'product',
+                'other',
+            ],
+        },
+        priceImpact: {
+            type: 'string',
+            enum: ['high', 'medium', 'low', 'negligible'],
+        },
+    },
+    required: [
+        'titleKo',
+        'bodyKo',
+        'summaryKo',
+        'sentiment',
+        'category',
+        'priceImpact',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
+ * Structured-output schema for {@link NewsAnalysisResponse} (analysisType `news`).
+ */
+export const NEWS_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        currentDriverKo: { type: 'string' },
+        keyEventsKo: { type: 'array', items: { type: 'string' } },
+        upcomingEventsKo: { type: 'array', items: { type: 'string' } },
+        overallSentiment: SENTIMENT_SCHEMA,
+    },
+    required: [
+        'currentDriverKo',
+        'keyEventsKo',
+        'upcomingEventsKo',
+        'overallSentiment',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
+ * Structured-output schema for {@link FundamentalAnalysisResponse}
+ * (analysisType `fundamental`). `categoryAssessments` is an array of nested
+ * objects, each fully specified with its own `required` / `additionalProperties`.
+ */
+export const FUNDAMENTAL_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        overallConclusionKo: { type: 'string' },
+        categoryAssessments: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    category: {
+                        type: 'string',
+                        enum: [
+                            'valuation',
+                            'profitability',
+                            'growth',
+                            'health',
+                            'futureDirection',
+                        ],
+                    },
+                    sentiment: SENTIMENT_SCHEMA,
+                    rationaleKo: { type: 'string' },
+                },
+                required: ['category', 'sentiment', 'rationaleKo'],
+                additionalProperties: false,
+            },
+        },
+        riskFactorsKo: { type: 'array', items: { type: 'string' } },
+        overallSentiment: SENTIMENT_SCHEMA,
+    },
+    required: [
+        'overallConclusionKo',
+        'categoryAssessments',
+        'riskFactorsKo',
+        'overallSentiment',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
+ * Structured-output schema for {@link OverallAnalysisResponse}
+ * (analysisType `overall`). `scenarios` is an array of nested objects.
+ *
+ * `optionsOiStale` is an optional TS field (`optionsOiStale?: boolean`); under
+ * strict mode it must still be present, so it is modelled as nullable boolean.
+ */
+export const OVERALL_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        headlineKo: { type: 'string' },
+        technicalBulletsKo: { type: 'array', items: { type: 'string' } },
+        fundamentalBulletsKo: { type: 'array', items: { type: 'string' } },
+        newsBulletsKo: { type: 'array', items: { type: 'string' } },
+        optionsBulletsKo: { type: 'array', items: { type: 'string' } },
+        integratedConclusionKo: { type: 'string' },
+        scenarios: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    name: SENTIMENT_SCHEMA,
+                    triggerConditionKo: { type: 'string' },
+                    priceRangeKo: { type: 'string' },
+                },
+                required: ['name', 'triggerConditionKo', 'priceRangeKo'],
+                additionalProperties: false,
+            },
+        },
+        riskFactorsKo: { type: 'array', items: { type: 'string' } },
+        optionsOiStale: { type: ['boolean', 'null'] },
+    },
+    required: [
+        'headlineKo',
+        'technicalBulletsKo',
+        'fundamentalBulletsKo',
+        'newsBulletsKo',
+        'optionsBulletsKo',
+        'integratedConclusionKo',
+        'scenarios',
+        'riskFactorsKo',
+        'optionsOiStale',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
+ * Structured-output schema for {@link OptionsAnalysisResponse}
+ * (analysisType `options`). `perExpiration` and `signals` are arrays of nested
+ * objects.
+ *
+ * `analyzedAt` is intentionally omitted: it is server-set during normalization
+ * (`normalizeOptionsAnalysisResponse`), so any LLM-supplied value is discarded.
+ * Asking the model to produce it would only waste output tokens.
+ */
+export const OPTIONS_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        summary: { type: 'string' },
+        perExpiration: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    expirationDate: { type: 'string' },
+                    commentary: { type: 'string' },
+                    tone: {
+                        type: 'string',
+                        enum: ['bullish', 'bearish', 'neutral', 'cautious'],
+                    },
+                },
+                required: ['expirationDate', 'commentary', 'tone'],
+                additionalProperties: false,
+            },
+        },
+        signals: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    kind: {
+                        type: 'string',
+                        enum: ['bullish', 'bearish', 'neutral', 'volatility'],
+                    },
+                    message: { type: 'string' },
+                },
+                required: ['kind', 'message'],
+                additionalProperties: false,
+            },
+        },
+    },
+    required: ['summary', 'perExpiration', 'signals'],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
