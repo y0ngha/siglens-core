@@ -10,6 +10,7 @@ import {
 } from '@/application/news/submitNewsCardAnalysis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
+import { NEWS_CARD_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import type { NewsItem } from '@/domain/types';
 
 const mockSetJobMeta = setJobMeta as Mock;
@@ -147,6 +148,18 @@ describe('submitNewsCardAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(fetchBody).toHaveProperty('thinkingBudget', 8192);
+        });
+    });
+
+    describe('dispatch contract', () => {
+        it('워커 POST body에 newsCard analysisType과 시스템 프롬프트를 포함한다', async () => {
+            await submitNewsCardAnalysis({ item: testNewsItem });
+
+            const fetchBody = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(fetchBody.analysisType).toBe('newsCard');
+            expect(fetchBody.system).toBe(NEWS_CARD_SYSTEM_PROMPT);
         });
     });
 });

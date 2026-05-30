@@ -14,6 +14,7 @@ import type {
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
+import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
@@ -24,6 +25,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
+    AnalysisType,
     FundamentalAnalysisResponse,
     FundamentalSnapshot,
     Skill,
@@ -263,7 +265,14 @@ export async function submitFundamentalAnalysis(
             'X-Worker-Secret': workerSecret,
             ...userApiKeyHeader,
         },
-        body: JSON.stringify({ jobId, prompt, model: modelId, tier }),
+        body: JSON.stringify({
+            jobId,
+            prompt,
+            model: modelId,
+            tier,
+            analysisType: 'fundamental' satisfies AnalysisType,
+            system: FUNDAMENTAL_SYSTEM_PROMPT,
+        }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
         console.error(

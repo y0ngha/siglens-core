@@ -23,6 +23,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
+import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import type {
@@ -948,6 +949,24 @@ describe('submitOverallAnalysis 함수는', () => {
                     body: expect.stringContaining('"tier":"pro"'),
                 })
             );
+        });
+
+        it('forwards analysisType and overall system prompt in worker POST body', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(makeOptions());
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.analysisType).toBe('overall');
+            expect(body.system).toBe(OVERALL_SYSTEM_PROMPT);
         });
 
         it('treats missing tier as DEFAULT_TIER (free) in worker POST body', async () => {

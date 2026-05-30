@@ -11,6 +11,7 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { NEWS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     EnrichedNewsItem,
@@ -547,6 +548,8 @@ describe('submitNewsAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.tier).toBe('member');
+            expect(body.analysisType).toBe('news');
+            expect(body.system).toBe(NEWS_SYSTEM_PROMPT);
         });
 
         it('proceeds when pro premium without BYOK (tier in body, no header)', async () => {
