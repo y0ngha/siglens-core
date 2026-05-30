@@ -64,6 +64,7 @@ import type {
     Trend,
 } from '@/domain/types';
 import { computeLevelCandidates } from '@/domain/analysis/levelCandidates';
+import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 
@@ -199,9 +200,6 @@ const formatVolume = (n: number): string =>
 
 const lastNonNull = (arr: (number | null)[]): number | null =>
     arr.findLast((v): v is number => v !== null) ?? null;
-
-const lastOf = <T>(arr: T[]): T | null =>
-    arr.length > 0 ? arr[arr.length - 1] : null;
 
 const formatMarketSection = (bars: Bar[]): string => {
     if (bars.length === 0) {

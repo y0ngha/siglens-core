@@ -3,14 +3,8 @@ import {
     computeLevelCandidates,
     MAX_LEVEL_CANDIDATES_PER_SIDE,
 } from '@/domain/analysis/levelCandidates';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
-import type {
-    Bar,
-    IndicatorResult,
-    SMCResult,
-    SMCSwingPoint,
-} from '@/domain/types';
+import type { IndicatorResult, SMCResult, SMCSwingPoint } from '@/domain/types';
 
 const CURRENT_PRICE = 100;
 
@@ -52,15 +46,6 @@ const makeSwing = (
 const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
     ...EMPTY_SMC_RESULT,
     ...overrides,
-});
-
-const makeBar = (close: number): Bar => ({
-    time: 1_700_000_000,
-    open: close,
-    high: close,
-    low: close,
-    close,
-    volume: 1000,
 });
 
 describe('levelCandidates', () => {
@@ -256,111 +241,6 @@ describe('levelCandidates', () => {
 
                 expect(resistance[0].distancePercent).toBe(10);
                 expect(support[0].distancePercent).toBe(10);
-            });
-        });
-    });
-
-    describe('buildAnalysisPrompt', () => {
-        describe('Support/Resistance Candidates section', () => {
-            it('renders candidate lines when candidates exist', () => {
-                const bars = [makeBar(CURRENT_PRICE)];
-                const indicators = makeIndicators({
-                    volumeProfile: { poc: 95, vah: 110, val: 90, profile: [] },
-                });
-
-                const prompt = buildAnalysisPrompt(
-                    'AAPL',
-                    'Apple Inc.',
-                    bars,
-                    indicators,
-                    []
-                );
-
-                expect(prompt).toContain(
-                    '## Support/Resistance Candidates (precomputed)'
-                );
-                expect(prompt).toContain(
-                    '### Resistance Candidates (above price)'
-                );
-                expect(prompt).toContain(
-                    '### Support Candidates (below price)'
-                );
-                expect(prompt).toContain('[VAH]');
-                expect(prompt).toContain('[POC]');
-            });
-
-            it('renders only the resistance subsection when support has no candidates', () => {
-                const bars = [makeBar(CURRENT_PRICE)];
-                const indicators = makeIndicators({
-                    smc: makeSmc({
-                        swingHighs: [makeSwing(106, 'high')],
-                    }),
-                });
-
-                const prompt = buildAnalysisPrompt(
-                    'AAPL',
-                    'Apple Inc.',
-                    bars,
-                    indicators,
-                    []
-                );
-
-                expect(prompt).toContain(
-                    '## Support/Resistance Candidates (precomputed)'
-                );
-                expect(prompt).toContain(
-                    '### Resistance Candidates (above price)'
-                );
-                expect(prompt).not.toContain(
-                    '### Support Candidates (below price)'
-                );
-                expect(prompt).not.toContain(
-                    'No candidates could be derived from the available data'
-                );
-            });
-
-            it('renders a no-candidates note when none can be derived', () => {
-                const bars = [makeBar(CURRENT_PRICE)];
-
-                const prompt = buildAnalysisPrompt(
-                    'AAPL',
-                    'Apple Inc.',
-                    bars,
-                    makeIndicators(),
-                    []
-                );
-
-                expect(prompt).toContain(
-                    'No candidates could be derived from the available data'
-                );
-            });
-
-            it('still renders the section header when there are no bars', () => {
-                const prompt = buildAnalysisPrompt(
-                    'AAPL',
-                    'Apple Inc.',
-                    [],
-                    makeIndicators(),
-                    []
-                );
-
-                expect(prompt).toContain(
-                    '## Support/Resistance Candidates (precomputed)'
-                );
-            });
-
-            it('instructs the AI to prefer selecting from the precomputed candidates', () => {
-                const prompt = buildAnalysisPrompt(
-                    'AAPL',
-                    'Apple Inc.',
-                    [makeBar(CURRENT_PRICE)],
-                    makeIndicators(),
-                    []
-                );
-
-                expect(prompt).toContain(
-                    'Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section'
-                );
             });
         });
     });

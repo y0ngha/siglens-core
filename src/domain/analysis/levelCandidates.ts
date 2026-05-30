@@ -4,8 +4,10 @@ import type {
     LevelCandidates,
     LevelCandidateSource,
 } from '@/domain/types';
+import { lastNonNull } from '@/domain/indicators/utils';
+import { lastOf } from '@/domain/analysis/analysisUtils';
 
-/** Maximum number of candidate levels returned per side (support / resistance). */
+/** @internal Maximum number of candidate levels returned per side (support / resistance). */
 export const MAX_LEVEL_CANDIDATES_PER_SIDE = 5;
 
 const PERCENTAGE_FACTOR = 100;
@@ -15,12 +17,6 @@ interface RawLevel {
     price: number;
     source: LevelCandidateSource;
 }
-
-const lastNonNull = (arr: (number | null)[]): number | null =>
-    arr.findLast((v): v is number => v !== null) ?? null;
-
-const lastOf = <T>(arr: T[]): T | null =>
-    arr.length > 0 ? arr[arr.length - 1]! : null;
 
 const isUsablePrice = (price: number): boolean =>
     Number.isFinite(price) && price > 0;
@@ -49,9 +45,14 @@ const collectRawLevels = (indicators: IndicatorResult): RawLevel[] => {
 
     const lastBollinger = lastOf(indicators.bollinger);
     const bollingerLevels: RawLevel[] = [
+        // `as const` keeps the literal from widening to `string` inside the
+        // conditional spread so it still satisfies `LevelCandidateSource`;
+        // runtime-safe because the value is always the literal 'BB upper'.
         ...(lastBollinger?.upper != null
             ? [{ price: lastBollinger.upper, source: 'BB upper' as const }]
             : []),
+        // Same rationale: pins the literal to `LevelCandidateSource`; the
+        // runtime value is always the literal 'BB lower'.
         ...(lastBollinger?.lower != null
             ? [{ price: lastBollinger.lower, source: 'BB lower' as const }]
             : []),
@@ -98,10 +99,10 @@ const nearestFirst = (a: LevelCandidate, b: LevelCandidate): number =>
  * candidates, levels strictly above become resistance candidates. Levels equal
  * to the current price, non-finite, or non-positive are discarded.
  *
- * Each side is sorted nearest-to-price first and capped to
- * {@link MAX_LEVEL_CANDIDATES_PER_SIDE}. The AI selects from these candidates and
- * writes the rationale, which removes price-arithmetic hallucination while keeping
- * interpretation in the model's hands.
+ * Each side is sorted nearest-to-price first and capped to a fixed maximum.
+ * The AI selects from these candidates and writes the rationale, which removes
+ * price-arithmetic hallucination while keeping interpretation in the model's
+ * hands.
  *
  * @param currentPrice - Latest bar close used as the support/resistance pivot.
  * @param indicators - Indicator suite produced by `calculateIndicators`.
