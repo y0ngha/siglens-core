@@ -766,6 +766,98 @@ export interface LevelCandidates {
 }
 
 /**
+ * Shared shape for a pivot point set: a central pivot with three resistance and
+ * three support levels. The exact offset formulas differ per variant (standard vs
+ * Fibonacci); see the extending interfaces for each level's derivation.
+ */
+export interface PivotLevelSet {
+    /** Central pivot: (high + low + close) / 3. */
+    pp: number;
+    /** First resistance level. */
+    r1: number;
+    /** Second resistance level. */
+    r2: number;
+    /** Third resistance level. */
+    r3: number;
+    /** First support level. */
+    s1: number;
+    /** Second support level. */
+    s2: number;
+    /** Third support level. */
+    s3: number;
+}
+
+/**
+ * Standard pivot point set derived from a prior period's high/low/close.
+ *
+ * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
+ * `s1`–`s3` are support levels below it, following the classic pivot formulas:
+ * `r1 = 2·pp − low`, `r2 = pp + (high − low)`, `r3 = high + 2·(pp − low)`,
+ * `s1 = 2·pp − high`, `s2 = pp − (high − low)`, `s3 = low − 2·(high − pp)`.
+ */
+export interface StandardPivotLevels extends PivotLevelSet {}
+
+/**
+ * Fibonacci pivot point set derived from a prior period's high/low/close.
+ *
+ * `pp` is the central pivot; resistance/support levels are offset from it by the
+ * 0.382 / 0.618 / 1.0 Fibonacci fractions of the prior period's range:
+ * `r1/s1 = pp ± 0.382·range`, `r2/s2 = pp ± 0.618·range`, `r3/s3 = pp ± 1.0·range`.
+ */
+export interface FibonacciPivotLevels extends PivotLevelSet {}
+
+/**
+ * One Fibonacci retracement or extension level (ratio + resulting price).
+ */
+export interface FibonacciLevel {
+    /** Fibonacci ratio as a fraction (e.g. 0.382 for 38.2%). */
+    ratio: number;
+    /** Price at this ratio between (or beyond) the swing high and low. */
+    price: number;
+}
+
+/**
+ * Fibonacci retracement/extension levels anchored on a swing high and low.
+ *
+ * `direction` reflects the swing the projection is based on: `up` when the most
+ * recent swing low precedes the swing high (an up-leg), `down` otherwise. The
+ * anchor `high`/`low` are echoed back so the consumer can show the source leg.
+ */
+export interface FibonacciProjection {
+    /** Swing high price used as the upper anchor. */
+    high: number;
+    /** Swing low price used as the lower anchor. */
+    low: number;
+    /** Whether the most recent leg is an up-leg (`up`) or down-leg (`down`). */
+    direction: SwingLegDirection;
+    /** Retracement levels (23.6%–78.6%) within the high–low range. */
+    retracements: FibonacciLevel[];
+    /** Extension levels (100%–261.8%) projected beyond the range as targets. */
+    extensions: FibonacciLevel[];
+}
+
+/**
+ * Direction of the most recent swing leg used for Fibonacci projection.
+ */
+export type SwingLegDirection = 'up' | 'down';
+
+/**
+ * Deterministically precomputed pivot points and Fibonacci levels for a symbol.
+ *
+ * Computed in the domain so the AI selects and interprets these levels rather
+ * than performing the arithmetic itself. Any component is `null` when its inputs
+ * are unavailable (e.g. no prior bar for pivots, missing swing points for fib).
+ */
+export interface PivotFibLevels {
+    /** Standard pivot set from the prior period, or `null` when unavailable. */
+    standardPivot: StandardPivotLevels | null;
+    /** Fibonacci pivot set from the prior period, or `null` when unavailable. */
+    fibonacciPivot: FibonacciPivotLevels | null;
+    /** Fibonacci retracement/extension projection, or `null` when unavailable. */
+    fibonacci: FibonacciProjection | null;
+}
+
+/**
  * A single price target (price + rationale string).
  */
 export interface PriceTarget {

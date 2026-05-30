@@ -54,6 +54,12 @@ import type {
     IndicatorResult,
     LevelCandidate,
     LevelCandidates,
+    FibonacciLevel,
+    FibonacciProjection,
+    FibonacciPivotLevels,
+    PivotFibLevels,
+    PivotLevelSet,
+    StandardPivotLevels,
     PromptConfig,
     Skill,
     SkillType,
@@ -64,6 +70,7 @@ import type {
     Trend,
 } from '@/domain/types';
 import { computeLevelCandidates } from '@/domain/analysis/levelCandidates';
+import { computePivotFibLevels } from '@/domain/analysis/pivotFib';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
@@ -624,6 +631,71 @@ const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
     ].join('\n');
 };
 
+const PIVOT_FIB_HEADER = '## Pivot & Fibonacci Levels (precomputed)';
+
+const FIB_RATIO_PERCENT_FACTOR = 100;
+const FIB_RATIO_DECIMAL_PLACES = 1;
+
+const formatFibRatio = (ratio: number): string => {
+    const percent = ratio * FIB_RATIO_PERCENT_FACTOR;
+    return `${Number.isInteger(percent) ? percent : percent.toFixed(FIB_RATIO_DECIMAL_PLACES)}%`;
+};
+
+const formatFibLevel = (level: FibonacciLevel): string =>
+    `${formatFibRatio(level.ratio)}: ${fmt(level.price)}`;
+
+const formatPivotSetLines = (
+    header: string,
+    pivot: PivotLevelSet
+): string[] => [
+    header,
+    `- PP: ${fmt(pivot.pp)}`,
+    `- Resistance: R1 ${fmt(pivot.r1)} / R2 ${fmt(pivot.r2)} / R3 ${fmt(pivot.r3)}`,
+    `- Support: S1 ${fmt(pivot.s1)} / S2 ${fmt(pivot.s2)} / S3 ${fmt(pivot.s3)}`,
+];
+
+const formatStandardPivotLines = (pivot: StandardPivotLevels): string[] =>
+    formatPivotSetLines('### Standard Pivot (from prior period H/L/C)', pivot);
+
+const formatFibonacciPivotLines = (pivot: FibonacciPivotLevels): string[] =>
+    formatPivotSetLines('### Fibonacci Pivot (from prior period H/L/C)', pivot);
+
+const formatFibonacciProjectionLines = (fib: FibonacciProjection): string[] => [
+    `### Fibonacci Levels (most recent swing, ${fib.direction}-leg)`,
+    `- Swing High: ${fmt(fib.high)} / Swing Low: ${fmt(fib.low)}`,
+    `- Retracements: ${fib.retracements.map(formatFibLevel).join(' / ')}`,
+    `- Extensions (targets): ${fib.extensions.map(formatFibLevel).join(' / ')}`,
+];
+
+const formatPivotFibSection = (levels: PivotFibLevels): string => {
+    const { standardPivot, fibonacciPivot, fibonacci } = levels;
+
+    if (
+        standardPivot === null &&
+        fibonacciPivot === null &&
+        fibonacci === null
+    ) {
+        return [
+            PIVOT_FIB_HEADER,
+            '- No pivot or Fibonacci levels could be derived from the available data',
+        ].join('\n');
+    }
+
+    return [
+        PIVOT_FIB_HEADER,
+        'Deterministically computed from prior-period H/L/C (pivots) and the most recent swing high/low (Fibonacci). SELECT and interpret these levels — do not recompute them.',
+        ...(standardPivot !== null
+            ? formatStandardPivotLines(standardPivot)
+            : []),
+        ...(fibonacciPivot !== null
+            ? formatFibonacciPivotLines(fibonacciPivot)
+            : []),
+        ...(fibonacci !== null
+            ? formatFibonacciProjectionLines(fibonacci)
+            : []),
+    ].join('\n');
+};
+
 const formatIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig
@@ -989,11 +1061,12 @@ const buildAnalysisRequest = (
             ? [
                   '',
                   '### keyLevels Writing Rules for Support/Resistance Tools',
-                  '- Use the Support/Resistance Tool Guides above to calculate and identify key support and resistance levels.',
-                  '- For Pivot Points: prioritize Standard and Fibonacci pivot calculations using the previous bar data. Woodie, Camarilla, and DeMark are secondary — include them only when the market context favors their use (e.g., Camarilla for scalping setups, Woodie when close-weighted analysis is relevant). Assess which levels the current price is nearest to.',
-                  '- For Fibonacci Retracement: identify the most recent significant swing high and swing low, apply retracement levels (23.6%, 38.2%, 50%, 61.8%, 78.6%), and note which levels are acting as support or resistance.',
-                  '- For Fibonacci Extension: if a retracement has completed, calculate extension targets (100%, 127.2%, 161.8%, 200%, 261.8%) for take-profit level assessment.',
-                  '- Integrate calculated levels into the keyLevels field of the response — add pivot points and Fibonacci levels as additional support/resistance entries with their calculation basis as the reason.',
+                  '- Use the Support/Resistance Tool Guides above to INTERPRET the precomputed levels — do NOT perform the pivot or Fibonacci arithmetic yourself.',
+                  '- Standard and Fibonacci pivot points (PP/R1-R3/S1-S3) are already provided in the ## Pivot & Fibonacci Levels (precomputed) section. SELECT the relevant pivot values verbatim and assess which levels the current price is nearest to.',
+                  '- For Fibonacci Retracement: use the precomputed retracement levels (23.6%, 38.2%, 50%, 61.8%, 78.6%) from the ## Pivot & Fibonacci Levels (precomputed) section, and note which levels are acting as support or resistance.',
+                  '- For Fibonacci Extension: use the precomputed extension targets (100%, 127.2%, 161.8%, 200%, 261.8%) from the same section for take-profit level assessment.',
+                  '- If a level the guide calls for is absent from the precomputed section (e.g. Woodie, Camarilla, or DeMark pivots), you may reference it only with explicit justification; otherwise rely on the precomputed Standard/Fibonacci values.',
+                  '- Integrate the selected levels into the keyLevels field of the response — add pivot points and Fibonacci levels as additional support/resistance entries with their basis (e.g. "Standard pivot R1", "Fib 61.8% retracement") as the reason.',
                   '- When a Fibonacci level or pivot point converges with an existing indicator-based support/resistance level, note the confluence in the reason field to indicate higher reliability.',
                   '- Include support/resistance tool findings in the summary field, explaining their practical meaning for the investor.',
                   '',
@@ -1105,6 +1178,7 @@ export function buildAnalysisPrompt(
         currentPrice !== null
             ? computeLevelCandidates(currentPrice, indicators)
             : { support: [], resistance: [] };
+    const pivotFibLevels = computePivotFibLevels(bars, indicators);
 
     const sections = [
         `Symbol: ${symbol}\nCompany: ${companyName}`,
@@ -1118,6 +1192,7 @@ export function buildAnalysisPrompt(
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
         formatLevelCandidatesSection(levelCandidates),
+        formatPivotFibSection(pivotFibLevels),
         ...(indicatorGuideSkills.length > 0
             ? [
                   `## Indicator Signal Guides\n${indicatorGuideSkills.map(buildSkillBlock).join('\n\n')}`,
