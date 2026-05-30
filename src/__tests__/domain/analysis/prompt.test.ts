@@ -2005,7 +2005,7 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            const koreanInstructionIndex = result.indexOf('Korean');
+            const koreanInstructionIndex = result.indexOf('Respond in Korean.');
             // '- summary:'는 실제 Field Content Guidance 본문에만 존재(Intent 블록의
             // 섹션 참조 텍스트가 아님)하므로 본문 위치의 안정적 마커로 사용한다.
             const guidanceBodyIndex = result.indexOf('- summary:');
@@ -3470,7 +3470,7 @@ describe('prompt', () => {
             expect(indicatorIndex).toBeGreaterThan(intentIndex);
         });
 
-        it('스키마에 예시 값 복사 금지 안내가 포함된다', () => {
+        it('실제 데이터로 값을 계산하라는 안내가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3479,7 +3479,9 @@ describe('prompt', () => {
                 []
             );
 
-            expect(result).toContain('DO NOT copy example numbers');
+            expect(result).toContain(
+                'Compute every value from the actual data above'
+            );
         });
     });
 

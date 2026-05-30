@@ -838,8 +838,8 @@ const ANALYSIS_INTENT_BLOCK = [
     '- Respond with a single JSON object. Its structure (field names, types, enums, nesting) is enforced by the response schema, so you do not need to restate it. For the fields listed under ## Field Content Guidance, follow the guidance there.',
 ].join('\n');
 
-const SCHEMA_PREFACE =
-    'The response structure is enforced by the schema — DO NOT copy example numbers; compute every value from the actual data above. Follow the content guidance below for the fields that need it:';
+const FIELD_GUIDANCE_PREFACE =
+    'Compute every value from the actual data above — never invent numbers. Follow the content guidance below for the fields that need it:';
 
 const buildFieldGuidanceBody = (): string =>
     [
@@ -1115,7 +1115,7 @@ const buildAnalysisRequest = (
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
         'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
-        SCHEMA_PREFACE,
+        FIELD_GUIDANCE_PREFACE,
         buildFieldGuidanceBody(),
         indicatorGuideInstruction,
         patternListInstruction,
