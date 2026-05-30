@@ -171,28 +171,6 @@ describe('PROMPT_TEMPLATE_VERSION in technical & fundamental keys', () => {
         const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
         expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
     });
-
-    it('bumping the prompt-template version changes both keys', () => {
-        const BUMPED = `${PROMPT_TEMPLATE_VERSION}-next`;
-
-        const technical = buildAnalysisCacheKey(
-            'AAPL',
-            '1Day',
-            'gemini-2.5-pro'
-        );
-        const technicalBumped = technical.replace(
-            new RegExp(`:${PROMPT_TEMPLATE_VERSION}$`),
-            `:${BUMPED}`
-        );
-        expect(technicalBumped).not.toBe(technical);
-
-        const fundamental = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
-        const fundamentalBumped = fundamental.replace(
-            new RegExp(`:${PROMPT_TEMPLATE_VERSION}$`),
-            `:${BUMPED}`
-        );
-        expect(fundamentalBumped).not.toBe(fundamental);
-    });
 });
 
 describe('computeBarsEffectiveTtl', () => {

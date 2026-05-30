@@ -131,6 +131,25 @@ export function computeBarsEffectiveTtl(
 export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
+ * Prompt-template version folded into the technical and fundamental analysis
+ * cache keys.
+ *
+ * This is a **separate invalidation axis** from {@link CACHE_KEY_SCHEMA_VERSION}:
+ * the schema version tracks the cached *response shape*, while this tracks the
+ * *prompt template* fed to the LLM. The technical/fundamental keys carry no
+ * input/prompt hash (unlike news/overall, which fold a skill fingerprint into
+ * their input hash), so without this lever editing a prompt template would not
+ * invalidate already-cached analyses until the TTL elapsed.
+ *
+ * Bump this string whenever a technical or fundamental prompt template changes
+ * in a way that would make previously cached results stale. Old keys (e.g.
+ * `p1`) are simply never looked up after a bump and naturally expire via TTL.
+ *
+ * @internal
+ */
+export const PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
  *
  * Format: `analysis:<symbol>:<timeframe>:<modelId>:<promptVersion>`. Symbol is
@@ -197,25 +216,6 @@ export function buildSectorSignalsCacheKey(
  * @internal
  */
 export const CACHE_KEY_SCHEMA_VERSION = 'v1' as const;
-
-/**
- * Prompt-template version folded into the technical and fundamental analysis
- * cache keys.
- *
- * This is a **separate invalidation axis** from {@link CACHE_KEY_SCHEMA_VERSION}:
- * the schema version tracks the cached *response shape*, while this tracks the
- * *prompt template* fed to the LLM. The technical/fundamental keys carry no
- * input/prompt hash (unlike news/overall, which fold a skill fingerprint into
- * their input hash), so without this lever editing a prompt template would not
- * invalidate already-cached analyses until the TTL elapsed.
- *
- * Bump this string whenever a technical or fundamental prompt template changes
- * in a way that would make previously cached results stale. Old keys (e.g.
- * `p1`) are simply never looked up after a bump and naturally expire via TTL.
- *
- * @internal
- */
-export const PROMPT_TEMPLATE_VERSION = 'p1' as const;
 
 /** @internal TTL for fundamental analysis cache results. Default: 24 hours. */
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
