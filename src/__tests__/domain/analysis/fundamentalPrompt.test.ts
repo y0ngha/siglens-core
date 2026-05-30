@@ -158,6 +158,18 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('MSFT');
     });
 
+    it('explains that N/A means missing data, not zero or a negative value', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain(
+            'A metric value of `N/A` means the data is unavailable (missing). Do NOT treat `N/A` as zero, as a negative value, or as a low/bad metric; exclude it from scoring rather than penalizing it.'
+        );
+    });
+
     it('includes the qualifying fundamental skill and omits skills below weight threshold', () => {
         const prompt = buildFundamentalAnalysisPrompt(
             TEST_SYMBOL,
