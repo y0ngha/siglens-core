@@ -10,6 +10,8 @@ import type {
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
+const PEER_METRIC_DECIMAL_PLACES = 1;
+
 /** Filter skills to fundamental category with sufficient confidence weight. */
 function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
     return skills.filter(
@@ -35,6 +37,14 @@ function formatPriceTarget(consensus: PriceTargetConsensus | null): string {
 function formatPriceTargetSummary(summary: PriceTargetSummary | null): string {
     if (!summary) return 'N/A';
     return `1M Avg: ${fmt(summary.month1Avg)}, 3M Avg: ${fmt(summary.month3Avg)}, 1Y Avg: ${fmt(summary.year1Avg)}`;
+}
+
+/** Format a peer valuation metric as a fixed-decimal string, or 'N/A' for non-finite / null / undefined values. */
+function formatPeerMetric(
+    n: number | null | undefined,
+    dp = PEER_METRIC_DECIMAL_PLACES
+): string {
+    return typeof n === 'number' && Number.isFinite(n) ? n.toFixed(dp) : 'N/A';
 }
 
 /** Render sector direction as a compact inline string. */
@@ -101,7 +111,7 @@ export function buildFundamentalAnalysisPrompt(
             ? peers
                   .map(
                       p =>
-                          `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B`
+                          `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B, PER ${formatPeerMetric(p.per)}, PSR ${formatPeerMetric(p.psr)}`
                   )
                   .join('\n')
             : '  None';

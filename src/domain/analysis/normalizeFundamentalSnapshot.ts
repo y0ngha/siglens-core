@@ -65,10 +65,10 @@ export function normalizeFundamentalSnapshot(
                 input.keyMetricsTtm?.enterpriseValueOverEBITDATTM ?? null,
             eps: input.keyMetricsTtm?.epsTTM ?? null,
         },
-        peers: input.peers.map(p => ({
-            symbol: p.symbol,
-            companyName: p.companyName,
-            marketCap: p.marketCap,
+        peers: input.peers.map(({ per = null, psr = null, ...rest }) => ({
+            ...rest,
+            per,
+            psr,
         })),
         profitability: {
             roe: toPercent(input.ratiosTtm?.returnOnEquityTTM),

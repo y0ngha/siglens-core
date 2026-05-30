@@ -62,7 +62,13 @@ const financialScores: FundamentalFinancialScoresInput = {
 };
 
 const peers: FundamentalPeerInput[] = [
-    { symbol: 'MSFT', companyName: 'Microsoft', marketCap: 2_800_000_000_000 },
+    {
+        symbol: 'MSFT',
+        companyName: 'Microsoft',
+        marketCap: 2_800_000_000_000,
+        per: 34.2,
+        psr: 12.6,
+    },
     { symbol: 'GOOGL', companyName: 'Alphabet', marketCap: 1_900_000_000_000 },
 ];
 
@@ -168,6 +174,12 @@ describe('normalizeFundamentalSnapshot — happy path (all fields populated)', (
         expect(result.peers[0].symbol).toBe('MSFT');
         expect(result.peers[0].companyName).toBe('Microsoft');
         expect(result.peers[0].marketCap).toBe(2_800_000_000_000);
+        // per/psr present on the input are carried through verbatim
+        expect(result.peers[0].per).toBe(34.2);
+        expect(result.peers[0].psr).toBe(12.6);
+        // per/psr omitted on the input default to null
+        expect(result.peers[1].per).toBeNull();
+        expect(result.peers[1].psr).toBeNull();
     });
 
     it('futureDirection.analystEstimate가 올바르게 매핑된다', () => {
