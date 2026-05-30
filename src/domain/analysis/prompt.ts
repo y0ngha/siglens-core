@@ -820,7 +820,7 @@ const CRITICAL_RESPONSE_RULES = [
     '- Array elements must be valid objects. Never include null or undefined inside arrays.',
     '- All numeric price values must be plain numbers (e.g., 150.25), not strings.',
     '- All Unix timestamp values must be integers copied verbatim from the [ts:<number>] markers in the bar data.',
-    '- Enum fields must contain exactly one allowed literal, never pipe-separated text. trend and signal trend: "bullish", "bearish", or "neutral"; riskLevel: "low", "medium", or "high"; signal strength: "strong", "moderate", or "weak"; entryRecommendation: "enter", "wait", or "avoid"; trendlines.direction: "ascending" or "descending".',
+    '- Enum fields must contain exactly one allowed literal, never pipe-separated text (see Allowed Enum Values below).',
     '',
     '### Allowed Enum Values',
     '- trend / signals[].trend / patternSummaries[].trend / strategyResults[].trend / candlePatterns[].trend: "bullish", "bearish", "neutral"',
@@ -967,7 +967,6 @@ const buildAnalysisRequest = (
     return [
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
-        'Use markdown-friendly readable text. Use \\n\\n to separate context paragraphs in summary and other long-form text fields; use single \\n only inside compact lists or adjacent label lines.',
         'Based on the data above, perform technical analysis and respond in the following JSON format:',
         SCHEMA_PREFACE,
         buildSchemaBody(),
