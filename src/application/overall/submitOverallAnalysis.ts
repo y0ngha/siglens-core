@@ -15,6 +15,7 @@ import {
 } from '@/application/usage';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
+import { OVERALL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
@@ -369,6 +370,7 @@ export async function submitOverallAnalysis(
             tier,
             analysisType: 'overall' satisfies AnalysisType,
             system: OVERALL_SYSTEM_PROMPT,
+            responseSchema: OVERALL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

@@ -4,6 +4,7 @@ import type {
     SubmitNewsCardAnalysisResult,
 } from '@/application/news/types';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
+import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { NEWS_CARD_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import type { AnalysisType } from '@/domain/types';
@@ -79,6 +80,7 @@ export async function submitNewsCardAnalysis(
             ...(thinkingBudget !== undefined && { thinkingBudget }),
             analysisType: 'newsCard' satisfies AnalysisType,
             system: NEWS_CARD_SYSTEM_PROMPT,
+            responseSchema: NEWS_CARD_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

@@ -2296,6 +2296,22 @@ export type AnalysisType =
     | 'options';
 
 /**
+ * @internal
+ * Minimal JSON-Schema object shape for dispatched structured-output schemas.
+ *
+ * Authored to be accepted directly by OpenAI strict `json_schema` mode: every
+ * key of `properties` must also appear in `required`, and `additionalProperties`
+ * must be `false`. The worker translates this canonical form into the
+ * provider-specific shape (Gemini `responseSchema`, OpenAI `json_schema`).
+ */
+export type ResponseJsonSchema = {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required: readonly string[];
+    additionalProperties: false;
+};
+
+/**
  * Tagged union representing the analysis result currently in view by the chatbot.
  * Injected as context into the chat system prompt so the assistant can reference
  * live numbers from the user's current page.

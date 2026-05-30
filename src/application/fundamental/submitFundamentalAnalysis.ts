@@ -14,6 +14,7 @@ import type {
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
+import { FUNDAMENTAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
@@ -272,6 +273,7 @@ export async function submitFundamentalAnalysis(
             tier,
             analysisType: 'fundamental' satisfies AnalysisType,
             system: FUNDAMENTAL_SYSTEM_PROMPT,
+            responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {
