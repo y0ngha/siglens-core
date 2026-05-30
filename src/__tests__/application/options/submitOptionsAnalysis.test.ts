@@ -7,6 +7,7 @@ vi.mock('@/application/background');
 
 import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { OPTIONS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
@@ -514,6 +515,9 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(body.tier).toBe('free');
             expect(body.analysisType).toBe('options');
             expect(body.system).toBe(OPTIONS_SYSTEM_PROMPT);
+            expect(body.seed).toBe(analysisSeed(body.prompt as string));
+            expect(Number.isInteger(body.seed)).toBe(true);
+            expect(body.seed as number).toBeGreaterThanOrEqual(0);
         });
 
         it('setJobMeta가 실패해도 submitted를 반환한다 (fail-open)', async () => {

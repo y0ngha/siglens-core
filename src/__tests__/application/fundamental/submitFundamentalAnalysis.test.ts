@@ -13,6 +13,7 @@ vi.mock('@/infrastructure/skills/loader');
 
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
@@ -645,6 +646,9 @@ describe('submitFundamentalAnalysis 함수는', () => {
             expect(body.tier).toBe('member');
             expect(body.analysisType).toBe('fundamental');
             expect(body.system).toBe(FUNDAMENTAL_SYSTEM_PROMPT);
+            expect(body.seed).toBe(analysisSeed(body.prompt as string));
+            expect(Number.isInteger(body.seed)).toBe(true);
+            expect(body.seed as number).toBeGreaterThanOrEqual(0);
         });
 
         it('proceeds when pro premium without BYOK (tier in body, no header)', async () => {

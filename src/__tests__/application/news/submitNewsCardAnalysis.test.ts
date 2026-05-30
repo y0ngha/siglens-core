@@ -9,6 +9,7 @@ import {
     NEWS_CARD_MODEL_ID,
 } from '@/application/news/submitNewsCardAnalysis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { fireAndForget } from '@/application/background';
 import { NEWS_CARD_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import type { NewsItem } from '@/domain/types';
@@ -160,6 +161,11 @@ describe('submitNewsCardAnalysis 함수는', () => {
             ) as Record<string, unknown>;
             expect(fetchBody.analysisType).toBe('newsCard');
             expect(fetchBody.system).toBe(NEWS_CARD_SYSTEM_PROMPT);
+            expect(fetchBody.seed).toBe(
+                analysisSeed(fetchBody.prompt as string)
+            );
+            expect(Number.isInteger(fetchBody.seed)).toBe(true);
+            expect(fetchBody.seed as number).toBeGreaterThanOrEqual(0);
         });
     });
 });

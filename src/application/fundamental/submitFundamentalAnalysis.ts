@@ -21,6 +21,7 @@ import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
@@ -269,6 +270,7 @@ export async function submitFundamentalAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            seed: analysisSeed(prompt),
             model: modelId,
             tier,
             analysisType: 'fundamental' satisfies AnalysisType,

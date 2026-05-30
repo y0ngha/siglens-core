@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashAnalysisInput,
+} from '@/infrastructure/hash/analysisInput';
 
 describe('hashAnalysisInput', () => {
     it('동일한 입력은 항상 동일한 해시를 반환한다 (deterministic)', () => {
@@ -30,5 +33,30 @@ describe('hashAnalysisInput', () => {
         const hash = hashAnalysisInput('');
         expect(hash).toHaveLength(16);
         expect(hash).toMatch(/^[a-f0-9]{16}$/);
+    });
+});
+
+describe('analysisSeed', () => {
+    it('동일한 입력은 항상 동일한 seed를 반환한다 (deterministic)', () => {
+        const input = JSON.stringify({ symbol: 'AAPL', timeframe: '1Day' });
+        expect(analysisSeed(input)).toBe(analysisSeed(input));
+    });
+
+    it('seed는 음수가 아니고 0x7fffffff 이하인 정수다', () => {
+        for (const input of ['', 'AAPL', 'a much longer prompt string', '{}']) {
+            const seed = analysisSeed(input);
+            expect(Number.isInteger(seed)).toBe(true);
+            expect(seed).toBeGreaterThanOrEqual(0);
+            expect(seed).toBeLessThanOrEqual(0x7fffffff);
+        }
+    });
+
+    it('서로 다른 입력은 (일반적으로) 서로 다른 seed를 반환한다', () => {
+        expect(analysisSeed('prompt A')).not.toBe(analysisSeed('prompt B'));
+    });
+
+    it('알려진 입력은 안정적인 기대값을 반환한다', () => {
+        // Locked snapshot: sha256('AAPL|1Day')[0..8] parsed as int & 0x7fffffff.
+        expect(analysisSeed('AAPL|1Day')).toBe(415931526);
     });
 });

@@ -35,6 +35,7 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { createSkillsProvider } from '@/infrastructure/skills/loader';
@@ -359,6 +360,7 @@ export async function submitAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            seed: analysisSeed(prompt),
             model: effectiveModelId,
             tier,
             analysisType: 'technical' satisfies AnalysisType,
