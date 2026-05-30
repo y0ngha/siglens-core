@@ -7,6 +7,7 @@ vi.mock('@/domain/analysis/normalizeMarketBriefing');
 vi.mock('@/domain/analysis/marketBriefingPrompt');
 
 import { submitBriefing } from '@/application/market/submitBriefing';
+import { BRIEFING_MODEL_ID } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
@@ -111,6 +112,21 @@ describe('submitBriefing 함수는', () => {
             );
         });
 
+        it('dispatch 본문에 model: BRIEFING_MODEL_ID를 포함한다', async () => {
+            await submitBriefing(mockData);
+
+            const [, init] = mockFetch.mock.calls[0] as [
+                string,
+                { body: string },
+            ];
+            const body = JSON.parse(init.body) as Record<string, unknown>;
+            expect(body).toMatchObject({
+                jobId: expect.any(String),
+                prompt: 'mock prompt',
+                model: BRIEFING_MODEL_ID,
+            });
+        });
+
         it('submitted 상태와 jobId를 반환한다', async () => {
             const result = await submitBriefing(mockData);
 
@@ -181,12 +197,17 @@ describe('submitBriefing 함수는', () => {
             return call[0] as string;
         }
 
-        it('캐시 조회 키에 dateHour와 입력 해시가 포함된다', async () => {
+        it('캐시 조회 키에 dateHour, model, 입력 해시가 포함된다', async () => {
             await submitBriefing({ indices: [indexA], sectors: [sectorA] });
 
             const key = readCacheKey();
-            // briefing:market:<dateHour(13)>:<inputHash(16 hex)>
-            expect(key).toMatch(/^briefing:market:.{13}:[0-9a-f]{16}$/);
+            // briefing:market:<dateHour(13)>:<model>:<inputHash(16 hex)>
+            const escapedModel = BRIEFING_MODEL_ID.replace(/\./g, '\\.');
+            expect(key).toMatch(
+                new RegExp(
+                    `^briefing:market:.{13}:${escapedModel}:[0-9a-f]{16}$`
+                )
+            );
         });
 
         it('입력 데이터가 바뀌면 캐시 키가 달라진다', async () => {

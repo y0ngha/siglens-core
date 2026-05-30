@@ -9,7 +9,10 @@ import type {
     MarketSummaryData,
     SubmitBriefingResult,
 } from '@/domain/types';
-import { buildBriefingCacheKey } from '@/infrastructure/cache/config';
+import {
+    BRIEFING_MODEL_ID,
+    buildBriefingCacheKey,
+} from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
@@ -62,10 +65,11 @@ function hashBriefingInput(
 /**
  * Submit a market briefing job from the current dashboard summary.
  *
- * The briefing cache is keyed by the current ISO date+hour plus a deterministic
- * hash of the index/sector quote values, so identical-input callers within the
- * hour share the cached briefing, while changed underlying data within the same
- * hour produces a cache miss and a fresh briefing job. Resolves to:
+ * The briefing cache is keyed by the current ISO date+hour, the briefing model
+ * identifier, and a deterministic hash of the index/sector quote values, so
+ * identical-input callers within the hour share the cached briefing, while a
+ * model change or changed underlying data within the same hour produces a cache
+ * miss and a fresh briefing job. Resolves to:
  * - `cached`: the latest briefing for the current hour is reused (already
  *   normalized via {@link normalizeMarketBriefing}).
  * - `submitted`: a new `jobId` was registered and a fire-and-forget HTTP POST
@@ -98,7 +102,11 @@ export async function submitBriefing(
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
     const inputHash = hashBriefingInput(data.indices, data.sectors);
-    const cacheKey = buildBriefingCacheKey(dateHour, inputHash);
+    const cacheKey = buildBriefingCacheKey(
+        dateHour,
+        BRIEFING_MODEL_ID,
+        inputHash
+    );
 
     const cache = createCacheProvider();
     if (cache !== null) {
@@ -143,7 +151,7 @@ export async function submitBriefing(
             'Content-Type': 'application/json',
             'X-Worker-Secret': workerSecret,
         },
-        body: JSON.stringify({ jobId, prompt }),
+        body: JSON.stringify({ jobId, prompt, model: BRIEFING_MODEL_ID }),
         signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
     }).catch(error => {
         console.error('[Briefing/Submit] Worker request failed:', error);
