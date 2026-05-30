@@ -105,6 +105,7 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export { computeLevelCandidates } from './domain/analysis/levelCandidates';
+export { computePivotFibLevels } from './domain/analysis/pivotFib';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
@@ -426,9 +427,15 @@ export type {
     KeyLevel,
     KeyLevels,
     KeyPrice,
+    FibonacciLevel,
+    FibonacciPivotLevels,
+    FibonacciProjection,
     LevelCandidate,
     LevelCandidates,
     LevelCandidateSource,
+    PivotFibLevels,
+    StandardPivotLevels,
+    SwingLegDirection,
     MACDResult,
     MarketBriefingResponse,
     NewsAnalysisResponse,

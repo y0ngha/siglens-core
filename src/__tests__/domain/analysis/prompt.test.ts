@@ -4307,4 +4307,99 @@ describe('prompt', () => {
             );
         });
     });
+
+    describe('Pivot & Fibonacci Levels section', () => {
+        const PF_PRICE = 100;
+        const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
+            ...EMPTY_SMC_RESULT,
+            ...overrides,
+        });
+
+        it('renders pivot subsections from the last bar', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0, PF_PRICE)],
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).toContain(
+                '## Pivot & Fibonacci Levels (precomputed)'
+            );
+            expect(prompt).toContain(
+                '### Standard Pivot (from prior period H/L/C)'
+            );
+            expect(prompt).toContain(
+                '### Fibonacci Pivot (from prior period H/L/C)'
+            );
+        });
+
+        it('renders the Fibonacci projection when swing points exist', () => {
+            const indicators = makeIndicators({
+                smc: makeSmc({
+                    swingHighs: [{ index: 20, price: 130, type: 'high' }],
+                    swingLows: [{ index: 10, price: 95, type: 'low' }],
+                }),
+            });
+
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0, PF_PRICE)],
+                indicators,
+                []
+            );
+
+            expect(prompt).toContain('### Fibonacci Levels (most recent swing');
+            expect(prompt).toContain('Retracements:');
+            expect(prompt).toContain('Extensions (targets):');
+        });
+
+        it('omits the Fibonacci projection subsection when swing points are missing', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0, PF_PRICE)],
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).not.toContain(
+                '### Fibonacci Levels (most recent swing'
+            );
+        });
+
+        it('renders a no-levels note when no bars and no swings exist', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+
+            expect(prompt).toContain(
+                'No pivot or Fibonacci levels could be derived from the available data'
+            );
+        });
+
+        it('instructs the AI to interpret rather than recompute the levels', () => {
+            const skill: Skill = makeSkill({ type: 'support_resistance' });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0, PF_PRICE)],
+                makeIndicators(),
+                [skill]
+            );
+
+            expect(prompt).toContain(
+                'do NOT perform the pivot or Fibonacci arithmetic yourself'
+            );
+            expect(prompt).toContain(
+                'already provided in the ## Pivot & Fibonacci Levels (precomputed) section'
+            );
+        });
+    });
 });
