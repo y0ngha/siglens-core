@@ -54,7 +54,12 @@ export async function pollBriefing(
     }
 
     // status === 'done'
-    const raw = await getJobResult(jobId);
+    // Both reads are independent and only run on the done path (status check
+    // above early-returns for processing/null), so parallelizing is a pure win.
+    const [raw, meta] = await Promise.all([
+        getJobResult(jobId),
+        getJobMeta(jobId),
+    ]);
     if (!raw) {
         cleanupInBackground(jobId, '[Briefing/Poll]', options);
         return { status: 'error', error: 'Result not found' };
@@ -74,7 +79,6 @@ export async function pollBriefing(
     // key in the job meta, so we write under the SAME key here (read == write).
     // If the meta key is missing (e.g. TTL expiry), skip the write rather than
     // reconstruct a key that would diverge from the submit-side lookup.
-    const meta = await getJobMeta(jobId);
     const cacheKey = meta?.cacheKey;
     const cache = createCacheProvider();
     if (cacheKey !== undefined && cache !== null) {
