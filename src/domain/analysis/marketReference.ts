@@ -28,6 +28,7 @@ import {
     makeReferenceLevel,
     lastFiniteNumber,
 } from '@/domain/analysis/referenceLevels';
+import { anchoredVwap } from '@/domain/analysis/anchoredVwap';
 import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
 import {
     computeStandardPivot,
@@ -185,6 +186,42 @@ function buildHorizon(
         ),
     ];
 
+    // Anchor AVWAP to the window's most significant (price-extreme) swings:
+    // the highest-priced swing high and the lowest-priced swing low.
+    const anchorHigh =
+        windowSwingHighs.length > 0
+            ? windowSwingHighs.reduce((a, b) => (b.price > a.price ? b : a))
+            : null;
+    const anchorLow =
+        windowSwingLows.length > 0
+            ? windowSwingLows.reduce((a, b) => (b.price < a.price ? b : a))
+            : null;
+    const avwapLevels: ReferenceLevel[] = [];
+    if (anchorHigh) {
+        const v = anchoredVwap(bars, anchorHigh.index);
+        if (v != null)
+            avwapLevels.push(
+                makeReferenceLevel(
+                    v,
+                    'AVWAP (swing high)',
+                    'avwap',
+                    currentPrice
+                )
+            );
+    }
+    if (anchorLow) {
+        const v = anchoredVwap(bars, anchorLow.index);
+        if (v != null)
+            avwapLevels.push(
+                makeReferenceLevel(
+                    v,
+                    'AVWAP (swing low)',
+                    'avwap',
+                    currentPrice
+                )
+            );
+    }
+
     const levels: ReferenceLevel[] = [
         ...collectIndicatorLevels(currentPrice, indicators, {
             volumeProfile: windowVp,
@@ -196,6 +233,7 @@ function buildHorizon(
         ...standardPivotLevels,
         ...camarillaLevels,
         ...swingLevels,
+        ...avwapLevels,
     ];
 
     return {
