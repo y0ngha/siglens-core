@@ -1378,7 +1378,16 @@ export type ConfirmedSignalType =
     | 'cmf_bullish_flip'
     | 'mfi_oversold_bounce'
     | 'keltner_upper_breakout'
-    | 'squeeze_momentum_bullish';
+    | 'squeeze_momentum_bullish'
+    | 'keltner_lower_breakout'
+    | 'supertrend_bearish_flip'
+    | 'ichimoku_cloud_breakdown'
+    | 'cci_bearish_cross'
+    | 'dmi_bearish_cross'
+    | 'cmf_bearish_flip'
+    | 'mfi_overbought_reversal'
+    | 'parabolic_sar_bearish_flip'
+    | 'squeeze_momentum_bearish';
 
 /**
  * Anticipation signals — early warnings that may or may not develop.
