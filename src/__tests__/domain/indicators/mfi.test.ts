@@ -66,6 +66,19 @@ describe('calculateMFI', () => {
             expect(lastValid).toBeCloseTo(100, 5);
         });
 
+        it('상승/하락 혼합 봉의 up/down 분류와 MFR 공식이 핀 고정된다', () => {
+            // high=low=close=tp → TP === tp. 동일 거래량(V).
+            // TPs: [10, 12, 11, 13], period 3, 인덱스 3 평가(유일한 유효값).
+            //   비교 쌍(현재 vs 직전): 12>10(up, +12V), 11<12(down, +11V), 13>11(up, +13V)
+            //   positive = (12+13)V = 25V, negative = 11V
+            //   mfRatio = 25/11
+            //   MFI = 100 - 100/(1 + 25/11) = 100 - 1100/36 = 69.4444…
+            const tps = [10, 12, 11, 13];
+            const bars = tps.map((tp, i) => makeBar(tp, tp, tp, 1000, i));
+            const result = calculateMFI(bars, 3);
+            expect(result[3]).toBeCloseTo(69.4444, 4);
+        });
+
         it('반환 배열 길이는 입력과 같다', () => {
             const bars = Array.from(
                 { length: MFI_DEFAULT_PERIOD + 5 },

@@ -66,6 +66,53 @@ describe('calculateVolumeProfile', () => {
             }
         });
 
+        it('비대칭 분포에서 POC와 70% 값영역 확장 경로가 핀 고정된다', () => {
+            // high=low=close=price → barRange 0 → 각 봉 거래량이 한 버킷에 전부 들어간다.
+            // lowMin=0, highMax=5, rowSize=5 → bucketSize=1.
+            // 버킷 [0,1)[1,2)[2,3)[3,4)[4,5], center 0.5/1.5/2.5/3.5/4.5.
+            // 가격→버킷: 0→b0, 1→b1, 2→b2, 3→b3, 5→b4(마지막 버킷 경계 포함).
+            // 버킷 거래량 = [10, 40, 100, 30, 5], total=185, POC=b2(center 2.5).
+            //   target = 0.7 × 185 = 129.5
+            //   start: vah=val=2, acc=100
+            //   step: nextAbove=b3=30, nextBelow=b1=40 → 30 >= 40 거짓 → 아래로 확장
+            //         val=1, acc=140 ≥ 129.5 → 종료
+            //   ⇒ POC center 2.5, VAH center 2.5(b2), VAL center 1.5(b1)
+            const makeVolBar = (
+                price: number,
+                volume: number,
+                time: number
+            ): Bar => ({
+                time,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+                volume,
+            });
+            const groups: ReadonlyArray<{
+                price: number;
+                volume: number;
+                count: number;
+            }> = [
+                { price: 2, volume: 10, count: 10 }, // b2 total 100 (POC)
+                { price: 1, volume: 5, count: 8 }, // b1 total 40
+                { price: 3, volume: 5, count: 6 }, // b3 total 30
+                { price: 0, volume: 2, count: 5 }, // b0 total 10
+                { price: 5, volume: 5, count: 1 }, // b4 total 5
+            ];
+            const bars = groups.flatMap(({ price, volume, count }) =>
+                Array.from({ length: count }, () => ({ price, volume }))
+            );
+            expect(bars).toHaveLength(30); // ≥ VP_MIN_BARS
+            const result = calculateVolumeProfile(
+                bars.map((b, i) => makeVolBar(b.price, b.volume, i)),
+                5
+            );
+            expect(result?.poc).toBeCloseTo(2.5, 10);
+            expect(result?.vah).toBeCloseTo(2.5, 10);
+            expect(result?.val).toBeCloseTo(1.5, 10);
+        });
+
         it('profile 각 row에 price와 volume이 있다', () => {
             const bars = Array.from({ length: VP_MIN_BARS + 5 }, (_, i) =>
                 makeBar(100 + i, 90 + i, 95 + i, i)
