@@ -2,20 +2,29 @@ import type { Bar, IndicatorResult, Signal } from '@/domain/types';
 import {
     detectBollingerLowerBounce,
     detectBollingerUpperBreakout,
+    detectCciBearishCross,
     detectCciBullishCross,
+    detectCmfBearishFlip,
     detectCmfBullishFlip,
     detectDeathCross,
+    detectDmiBearishCross,
     detectDmiBullishCross,
     detectGoldenCross,
+    detectIchimokuCloudBreakdown,
     detectIchimokuCloudBreakout,
+    detectKeltnerLowerBreakout,
     detectKeltnerUpperBreakout,
     detectMacdBearishCross,
     detectMacdBullishCross,
+    detectMfiOverboughtReversal,
     detectMfiOversoldBounce,
+    detectParabolicSarBearishFlip,
     detectParabolicSarFlip,
     detectRsiOverbought,
     detectRsiOversold,
+    detectSqueezeMomentumBearish,
     detectSqueezeMomentumBullish,
+    detectSupertrendBearishFlip,
     detectSupertrendBullishFlip,
 } from '@/domain/signals/confirmed';
 import {
@@ -43,14 +52,23 @@ const DETECTORS: readonly Detector[] = [
     detectBollingerLowerBounce,
     detectBollingerUpperBreakout,
     detectSupertrendBullishFlip,
+    detectSupertrendBearishFlip,
     detectIchimokuCloudBreakout,
+    detectIchimokuCloudBreakdown,
     detectCciBullishCross,
+    detectCciBearishCross,
     detectDmiBullishCross,
+    detectDmiBearishCross,
     detectCmfBullishFlip,
+    detectCmfBearishFlip,
     detectMfiOversoldBounce,
+    detectMfiOverboughtReversal,
     detectParabolicSarFlip,
+    detectParabolicSarBearishFlip,
     detectKeltnerUpperBreakout,
+    detectKeltnerLowerBreakout,
     detectSqueezeMomentumBullish,
+    detectSqueezeMomentumBearish,
     detectRsiBullishDivergence,
     detectRsiBearishDivergence,
     detectMacdHistogramBullishConvergence,
@@ -65,9 +83,11 @@ const DETECTORS: readonly Detector[] = [
  * Run every bundled signal detector against bars + indicators and collect
  * the non-null results.
  *
- * Combines 17 confirmed-signal detectors (RSI overbought / oversold,
- * golden / death cross, MACD cross, Bollinger band touches, Supertrend flip,
- * Ichimoku breakout, etc.) with 8 anticipation-signal detectors (RSI / MACD
+ * Combines 26 confirmed-signal detectors — bullish/bearish mirror pairs for
+ * RSI overbought / oversold, golden / death cross, MACD cross, Bollinger band
+ * touches, Supertrend / Parabolic SAR flips, Ichimoku breakout / breakdown,
+ * CCI / DMI / CMF crosses, MFI bounce / reversal, Keltner breakouts, and
+ * squeeze momentum — with 8 anticipation-signal detectors (RSI / MACD
  * histogram divergences, Bollinger squeeze, support / resistance proximity,
  * etc.).
  *
