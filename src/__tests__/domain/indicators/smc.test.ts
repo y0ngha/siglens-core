@@ -277,14 +277,14 @@ describe('calculateSmc', () => {
             ]);
             // 첫 break: bearish BOS (active swing low 90에서 close 5로 돌파).
             expect(result.structureBreaks[0]).toEqual({
-                index: 11,
+                index: 2 * P + 1,
                 price: 90,
                 type: 'bearish',
                 breakType: 'bos',
             });
             // 둘째 break: bullish CHoCH (swing high 300을 close 310으로 돌파).
             expect(result.structureBreaks[1]).toEqual({
-                index: 23,
+                index: 4 * P + 3,
                 price: 300,
                 type: 'bullish',
                 breakType: 'choch',

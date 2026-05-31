@@ -52,8 +52,8 @@ const priceVs = (price: number, level: number | null): PriceVsLevel =>
     level == null ? 'unknown' : price >= level ? 'above' : 'below';
 
 /**
- * @internal Anchored-VWAP reference level for one anchor swing (0 or 1 levels):
- * empty when there is no anchor or the AVWAP is undefined for the anchored range.
+ * Anchored-VWAP reference level for one anchor swing (0 or 1 levels): empty when
+ * there is no anchor or the AVWAP is undefined for the anchored range.
  */
 function resolveAvwapLevel(
     bars: Bar[],
