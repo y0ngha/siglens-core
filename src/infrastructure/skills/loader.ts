@@ -188,9 +188,17 @@ const SKILL_STATE_PREDICATE_KINDS: readonly SkillStatePredicateKind[] = [
 /** Parse a state predicate; returns undefined when any required field is invalid. */
 const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
     if (typeof raw !== 'object' || raw === null) return undefined;
-    // typeof raw === 'object' && raw !== null guard passed; cast is safe
+    // (a) Guard above confirmed typeof === 'object' && !== null.
+    // (b) Cast is safe because any non-null object is structurally compatible with
+    // Record<string, unknown> (the most permissive key-value shape), which TS cannot
+    // narrow from `unknown` on its own.
     const obj = raw as YamlNode;
     const { feature, predicate, hi, lo } = obj;
+    // (a) Widen the readonly literal tuples to `readonly string[]` so `.includes`
+    // accepts an arbitrary string argument (a tuple's `.includes` is typed to its
+    // own members). (b) Safe at runtime: every tuple member is already a string, so
+    // widening to `readonly string[]` is a pure structural up-cast that discards no
+    // value — it only relaxes the parameter type TS would otherwise reject.
     if (
         typeof feature !== 'string' ||
         !(SKILL_STATE_FEATURES as readonly string[]).includes(feature) ||
@@ -231,9 +239,17 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
  */
 const parseGating = (raw: unknown): SkillGating | undefined => {
     if (typeof raw !== 'object' || raw === null) return undefined;
-    // typeof raw === 'object' && raw !== null guard passed; cast is safe
+    // (a) Guard above confirmed typeof === 'object' && !== null.
+    // (b) Cast is safe because any non-null object is structurally compatible with
+    // Record<string, unknown> (the most permissive key-value shape), which TS cannot
+    // narrow from `unknown` on its own.
     const obj = raw as YamlNode;
     const tier = obj.tier;
+    // (a) Widen the readonly literal tuple to `readonly string[]` so `.includes`
+    // accepts an arbitrary string argument (a tuple's `.includes` is typed to its
+    // own members). (b) Safe at runtime: every tuple member is already a string, so
+    // widening is a pure structural up-cast that discards no value — it only relaxes
+    // the parameter type TS would otherwise reject. (Same idiom for `SIGNAL_KINDS`.)
     if (
         typeof tier !== 'string' ||
         !(SKILL_GATING_TIERS as readonly string[]).includes(tier)
@@ -317,13 +333,11 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
  */
 const dedupeByName = (skills: Skill[]): Skill[] => {
     const seen = new Set<string>();
-    const result: Skill[] = [];
-    for (const skill of skills) {
-        if (seen.has(skill.name)) continue;
+    return skills.filter(skill => {
+        if (seen.has(skill.name)) return false;
         seen.add(skill.name);
-        result.push(skill);
-    }
-    return result;
+        return true;
+    });
 };
 
 const collectMdFiles = async (dir: string): Promise<string[]> => {

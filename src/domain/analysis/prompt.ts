@@ -1199,15 +1199,14 @@ const ATR_EXTREME_SIZING_NOTE = [
  * the prompt) so a guide gates on its candle's presence anywhere in the window.
  */
 const collectDetectedCandleNames = (bars: Bar[]): string[] => {
-    const names = new Set<string>();
-    for (const entry of detectCandlePatternEntries(bars)) {
-        const name =
+    const names = detectCandlePatternEntries(bars)
+        .map(entry =>
             entry.patternType === 'multi'
                 ? entry.multiPattern
-                : entry.singlePattern;
-        if (name !== null) names.add(name);
-    }
-    return [...names];
+                : entry.singlePattern
+        )
+        .filter((name): name is NonNullable<typeof name> => name !== null);
+    return [...new Set<string>(names)];
 };
 
 /** Build the pure, read-only selection context from data already in scope. */
