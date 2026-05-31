@@ -51,16 +51,12 @@ import type {
     AnalysisResponse,
     Bar,
     FearGreedSnapshot,
+    HorizonKey,
+    HorizonReference,
     IndicatorResult,
-    LevelCandidate,
-    LevelCandidates,
-    FibonacciLevel,
-    FibonacciProjection,
-    FibonacciPivotLevels,
-    PivotFibLevels,
-    PivotLevelSet,
-    StandardPivotLevels,
+    MarketReference,
     PromptConfig,
+    ReferenceLevel,
     Skill,
     SkillType,
     SMCEqualLevel,
@@ -69,11 +65,8 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
     Trend,
-    Trendline,
 } from '@/domain/types';
-import { computeLevelCandidates } from '@/domain/analysis/levelCandidates';
-import { computePivotFibLevels } from '@/domain/analysis/pivotFib';
-import { computeTrendlineCandidates } from '@/domain/analysis/trendlineCandidates';
+import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
@@ -616,123 +609,60 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     ].join('\n');
 };
 
-const SR_CANDIDATES_HEADER = '## Support/Resistance Candidates (precomputed)';
+const MARKET_REFERENCE_HEADER =
+    '## Market Reference (deterministic · advisory)';
 
-const formatCandidateLine = (candidate: LevelCandidate): string =>
-    `- ${fmt(candidate.price)} (${candidate.sources.join(', ')}; tested ${candidate.touchCount}×, ${candidate.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
+const MARKET_REFERENCE_FRAMING =
+    'The values below are a deterministic computation of reference levels and structure that market participants commonly watch. They are NOT validated forward predictors — backtesting shows precise level/trend prediction is near-random. Use them as context to weigh alongside detected patterns, skills, and your own reasoning; never treat them as guarantees. You may identify additional or better support/resistance from patterns, SMC, and volume that these references do not cover.';
 
-const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
-    const { support, resistance } = candidates;
+const EFFICIENCY_DECIMAL_PLACES = 2;
 
-    if (support.length === 0 && resistance.length === 0) {
-        return [
-            SR_CANDIDATES_HEADER,
-            '- No candidates could be derived from the available data',
-        ].join('\n');
-    }
+const formatReferenceLevelLine = (level: ReferenceLevel): string =>
+    `- ${fmt(level.price)} (${level.label}; ${level.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
 
-    const resistanceLines =
-        resistance.length > 0
+const HORIZON_LABEL: Record<HorizonKey, string> = {
+    short: 'Short-term',
+    medium: 'Medium-term',
+    long: 'Long-term',
+};
+
+const formatHorizonBlock = (
+    key: HorizonKey,
+    horizon: HorizonReference
+): string => {
+    const s = horizon.structure;
+    const structureLine =
+        `Structure: price ${s.priceVsMA50} MA50 / ${s.priceVsMA200} MA200; EMA ${s.emaStack}; swings ${s.swingStructure}; ` +
+        `ADX ${s.adx != null ? s.adx.toFixed(INDICATOR_DECIMAL_PLACES) : 'n/a'}; efficiency ${s.efficiencyRatio != null ? s.efficiencyRatio.toFixed(EFFICIENCY_DECIMAL_PLACES) : 'n/a'}; regime ${s.regime}.`;
+    const resistance =
+        horizon.levels.resistance.length > 0
             ? [
-                  '### Resistance Candidates (above price)',
-                  ...resistance.map(formatCandidateLine),
+                  'Resistance (above):',
+                  ...horizon.levels.resistance.map(formatReferenceLevelLine),
               ]
             : [];
-    const supportLines =
-        support.length > 0
+    const support =
+        horizon.levels.support.length > 0
             ? [
-                  '### Support Candidates (below price)',
-                  ...support.map(formatCandidateLine),
+                  'Support (below):',
+                  ...horizon.levels.support.map(formatReferenceLevelLine),
               ]
             : [];
-
     return [
-        SR_CANDIDATES_HEADER,
-        'Deterministically derived from Volume Profile, moving averages, Bollinger bands, and SMC swing points. Ranked by strength (confluence of sources + how often price tested the level), strongest first.',
-        ...resistanceLines,
-        ...supportLines,
+        `### ${HORIZON_LABEL[key]} (${horizon.window.bars} bars)`,
+        structureLine,
+        ...resistance,
+        ...support,
     ].join('\n');
 };
 
-const PIVOT_FIB_HEADER = '## Pivot & Fibonacci Levels (precomputed)';
-
-const FIB_RATIO_PERCENT_FACTOR = 100;
-const FIB_RATIO_DECIMAL_PLACES = 1;
-
-const formatFibRatio = (ratio: number): string => {
-    const percent = ratio * FIB_RATIO_PERCENT_FACTOR;
-    return `${Number.isInteger(percent) ? percent : percent.toFixed(FIB_RATIO_DECIMAL_PLACES)}%`;
-};
-
-const formatFibLevel = (level: FibonacciLevel): string =>
-    `${formatFibRatio(level.ratio)}: ${fmt(level.price)}`;
-
-const formatPivotSetLines = (
-    header: string,
-    pivot: PivotLevelSet
-): string[] => [
-    header,
-    `- PP: ${fmt(pivot.pp)}`,
-    `- Resistance: R1 ${fmt(pivot.r1)} / R2 ${fmt(pivot.r2)} / R3 ${fmt(pivot.r3)}`,
-    `- Support: S1 ${fmt(pivot.s1)} / S2 ${fmt(pivot.s2)} / S3 ${fmt(pivot.s3)}`,
-];
-
-const formatStandardPivotLines = (pivot: StandardPivotLevels): string[] =>
-    formatPivotSetLines('### Standard Pivot (from prior period H/L/C)', pivot);
-
-const formatFibonacciPivotLines = (pivot: FibonacciPivotLevels): string[] =>
-    formatPivotSetLines('### Fibonacci Pivot (from prior period H/L/C)', pivot);
-
-const formatFibonacciProjectionLines = (fib: FibonacciProjection): string[] => [
-    `### Fibonacci Levels (most recent swing, ${fib.direction}-leg)`,
-    `- Swing High: ${fmt(fib.high)} / Swing Low: ${fmt(fib.low)}`,
-    `- Retracements: ${fib.retracements.map(formatFibLevel).join(' / ')}`,
-    `- Extensions (targets): ${fib.extensions.map(formatFibLevel).join(' / ')}`,
-];
-
-const formatPivotFibSection = (levels: PivotFibLevels): string => {
-    const { standardPivot, fibonacciPivot, fibonacci } = levels;
-
-    if (
-        standardPivot === null &&
-        fibonacciPivot === null &&
-        fibonacci === null
-    ) {
-        return [
-            PIVOT_FIB_HEADER,
-            '- No pivot or Fibonacci levels could be derived from the available data',
-        ].join('\n');
-    }
-
-    return [
-        PIVOT_FIB_HEADER,
-        'Deterministically computed from prior-period H/L/C (pivots) and the most recent swing high/low (Fibonacci). SELECT and interpret these levels — do not recompute them.',
-        ...(standardPivot !== null
-            ? formatStandardPivotLines(standardPivot)
-            : []),
-        ...(fibonacciPivot !== null
-            ? formatFibonacciPivotLines(fibonacciPivot)
-            : []),
-        ...(fibonacci !== null
-            ? formatFibonacciProjectionLines(fibonacci)
-            : []),
-    ].join('\n');
-};
-
-const TRENDLINE_CANDIDATES_HEADER = '## Trendline Candidates (precomputed)';
-
-const formatTrendlineCandidateLine = (trendline: Trendline): string => {
-    const { direction, start, end } = trendline;
-    return `- ${direction}: start { time: ${start.time}, price: ${fmt(start.price)} } -> end { time: ${end.time}, price: ${fmt(end.price)} }`;
-};
-
-const formatTrendlineCandidatesSection = (
-    candidates: readonly Trendline[]
-): string =>
+const formatMarketReferenceSection = (reference: MarketReference): string =>
     [
-        TRENDLINE_CANDIDATES_HEADER,
-        'Deterministically derived from SMC swing points; each endpoint maps to a real bar. SELECT from these and reuse their exact time/price values verbatim.',
-        ...candidates.map(formatTrendlineCandidateLine),
+        MARKET_REFERENCE_HEADER,
+        MARKET_REFERENCE_FRAMING,
+        formatHorizonBlock('short', reference.short),
+        formatHorizonBlock('medium', reference.medium),
+        formatHorizonBlock('long', reference.long),
     ].join('\n');
 
 const formatIndicatorSection = (
@@ -839,7 +769,7 @@ const ANALYSIS_INTENT_BLOCK = [
 ].join('\n');
 
 const FIELD_GUIDANCE_PREFACE =
-    'Compute every value from the actual data above — never invent numbers. Follow the content guidance below for the fields that need it:';
+    'Use the exact numbers provided above rather than recomputing arithmetic, but treat the Market Reference as advisory context — not a mandate. Follow the content guidance below for the fields that need it:';
 
 const buildFieldGuidanceBody = (): string =>
     [
@@ -870,7 +800,7 @@ const ANALYSIS_GUIDELINES = [
     '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "목표가", "손절선"). Never use English or snake_case identifiers.',
     '',
     '### Support/Resistance Assessment',
-    '- Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section — these are deterministically derived from the data, so use them verbatim and write the reason. Candidates with more confluent sources and more tests are higher-conviction; prefer them when choosing. Only introduce a non-candidate level when you have strong, explicitly-stated justification (e.g. a confirmed pattern neckline or pivot the candidates do not cover).',
+    '- For keyLevels, you may reuse exact prices from the ## Market Reference section (to avoid arithmetic error) OR derive your own from patterns, SMC, and volume — neither is mandatory. State a brief reason for each level. Do NOT treat reference levels as carrying more conviction merely because they were precomputed; weigh them like any other evidence.',
     `- Check convergence points of moving averages (MA ${MA_DEFAULT_PERIODS.join(',')}, EMA ${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_SHORT_INDEX]}/${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_LONG_INDEX]}) first`,
     '- Use Volume Profile levels: POC is the strongest support/resistance, VAH/VAL mark the boundaries of the value area',
     '- Price returning to POC indicates a high-probability reaction zone; breakouts above VAH or below VAL signal potential trend continuation',
@@ -888,7 +818,7 @@ const ANALYSIS_GUIDELINES = [
     '',
     '### Trendline Detection',
     '- Return 0 to 3 trendlines maximum',
-    `- Prefer SELECTING trendlines from the ${TRENDLINE_CANDIDATES_HEADER} section — these are derived from real swing points, so reuse their exact start/end time and price values verbatim. Only construct a non-candidate trendline when you have strong, explicitly-stated justification the candidates do not cover.`,
+    '- Derive trendlines from the swing points in ## Smart Money Concepts (SMC) and the bar data, reusing their exact time/price values verbatim. Use real swing points as endpoints rather than inventing levels.',
     '- ascending: connect higher lows (at least 2 clear swing low points)',
     '- descending: connect lower highs (at least 2 clear swing high points)',
     '- Use the Unix timestamp values from the provided bar data for the time field. Each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value into the time field. Do not calculate or guess timestamps.',
@@ -1083,14 +1013,12 @@ const buildAnalysisRequest = (
             ? [
                   '',
                   '### keyLevels Writing Rules for Support/Resistance Tools',
-                  '- Use the Support/Resistance Tool Guides above to INTERPRET the precomputed levels — do NOT perform the pivot or Fibonacci arithmetic yourself.',
-                  '- Standard and Fibonacci pivot points (PP/R1-R3/S1-S3) are already provided in the ## Pivot & Fibonacci Levels (precomputed) section. SELECT the relevant pivot values verbatim and assess which levels the current price is nearest to.',
-                  '- For Fibonacci Retracement: use the precomputed retracement levels (23.6%, 38.2%, 50%, 61.8%, 78.6%) from the ## Pivot & Fibonacci Levels (precomputed) section, and note which levels are acting as support or resistance.',
-                  '- For Fibonacci Extension: use the precomputed extension targets (100%, 127.2%, 161.8%, 200%, 261.8%) from the same section for take-profit level assessment.',
-                  '- If a level the guide calls for is absent from the precomputed section (e.g. Woodie, Camarilla, or DeMark pivots), you may reference it only with explicit justification; otherwise rely on the precomputed Standard/Fibonacci values.',
-                  '- Integrate the selected levels into the keyLevels field of the response — add pivot points and Fibonacci levels as additional support/resistance entries with their basis (e.g. "Standard pivot R1", "Fib 61.8% retracement") as the reason.',
-                  '- When a Fibonacci level or pivot point converges with an existing indicator-based support/resistance level, note the confluence in the reason field to indicate higher reliability.',
-                  '- Include support/resistance tool findings in the summary field, explaining their practical meaning for the investor.',
+                  '- Use the Support/Resistance Tool Guides above to INTERPRET the levels in the ## Market Reference section — use the exact provided numbers; do not recompute the pivot/Fibonacci arithmetic yourself.',
+                  '- The reference pivot and Fibonacci levels are advisory context, not a mandate. When relevant, assess which levels the current price is nearest to and which are acting as support or resistance.',
+                  '- For Fibonacci Extension levels, consider them for take-profit assessment when they fit your read of the chart.',
+                  '- You may add reference pivot/Fibonacci levels to the keyLevels field as support/resistance entries with their basis (e.g. "Standard pivot R1", "Fib 61.8% retracement") as the reason — or derive your own from patterns, SMC, and volume.',
+                  '- When a Fibonacci level or pivot point converges with an existing indicator-based support/resistance level, note the confluence in the reason field as one piece of supporting evidence.',
+                  '- Include relevant support/resistance tool findings in the summary field, explaining their practical meaning for the investor.',
                   '',
                   'Support/Resistance tool list to apply:',
                   ...supportResistanceSkills.map(s => `- ${s.name}`),
@@ -1195,16 +1123,7 @@ export function buildAnalysisPrompt(
 
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
-    const currentPrice = bars.length > 0 ? bars[bars.length - 1].close : null;
-    const levelCandidates =
-        currentPrice !== null
-            ? computeLevelCandidates(currentPrice, indicators, bars)
-            : { support: [], resistance: [] };
-    const pivotFibLevels = computePivotFibLevels(bars, indicators);
-    const trendlineCandidates = computeTrendlineCandidates(
-        bars,
-        indicators.smc
-    );
+    const marketReference = computeMarketReference(bars, indicators, timeframe);
 
     const sections = [
         `Symbol: ${symbol}\nCompany: ${companyName}`,
@@ -1217,11 +1136,7 @@ export function buildAnalysisPrompt(
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
-        formatLevelCandidatesSection(levelCandidates),
-        formatPivotFibSection(pivotFibLevels),
-        ...(trendlineCandidates.length > 0
-            ? [formatTrendlineCandidatesSection(trendlineCandidates)]
-            : []),
+        formatMarketReferenceSection(marketReference),
         ...(indicatorGuideSkills.length > 0
             ? [
                   `## Indicator Signal Guides\n${indicatorGuideSkills.map(buildSkillBlock).join('\n\n')}`,
