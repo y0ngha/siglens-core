@@ -75,18 +75,30 @@ describe('FileSkillsLoader', () => {
         });
 
         it('하위 디렉토리의 파일도 재귀적으로 읽는다', async () => {
+            // Distinct names so dedup-by-name keeps both — the point of this
+            // test is recursion reaching the nested file, not dedup behavior.
+            const nestedFrontmatter = validFrontmatter.replace(
+                'name: Test Skill',
+                'name: Nested Skill'
+            );
             mockReaddir
                 .mockResolvedValueOnce([
                     makeDirent('subdir', true),
                     makeDirent('root.md'),
                 ])
                 .mockResolvedValueOnce([makeDirent('nested.md')]);
-            mockReadFile.mockResolvedValue(validFrontmatter);
+            mockReadFile
+                .mockResolvedValueOnce(validFrontmatter)
+                .mockResolvedValueOnce(nestedFrontmatter);
 
             const loader = new FileSkillsLoader();
             const skills = await loader.loadSkills();
 
             expect(skills).toHaveLength(2);
+            expect(skills.map(s => s.name).sort()).toEqual([
+                'Nested Skill',
+                'Test Skill',
+            ]);
         });
 
         it('indicators가 배열로 파싱된다', async () => {

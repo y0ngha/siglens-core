@@ -6,7 +6,12 @@ import type {
     SkillCategory,
     SkillCounts,
     SkillDisplay,
+    SkillGating,
+    SkillStateFeature,
+    SkillStatePredicate,
+    SkillStatePredicateKind,
     SkillType,
+    SignalKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
 import type { LoadSkillsCachedResult } from './types';
@@ -156,6 +161,107 @@ const isSkillType = (value: unknown): value is SkillType =>
     typeof value === 'string' &&
     (SKILL_TYPES as readonly string[]).includes(value);
 
+const SKILL_GATING_TIERS: readonly SkillGating['tier'][] = [
+    'always_on',
+    'gated',
+];
+const SIGNAL_KINDS: readonly SignalKind[] = ['event', 'state'];
+const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = [
+    'bollinger',
+    'keltner',
+    'williamsR',
+    'stochastic',
+    'stochRsi',
+    'donchian',
+    'vwap',
+    'buySellVolume',
+];
+const SKILL_STATE_PREDICATE_KINDS: readonly SkillStatePredicateKind[] = [
+    'pctB',
+    'bandDistAtr',
+    'level',
+    'ratio',
+    'channelProximity',
+];
+
+/** Parse a state predicate; returns undefined when any required field is invalid. */
+const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
+    if (typeof raw !== 'object' || raw === null) return undefined;
+    const obj = raw as YamlNode;
+    const { feature, predicate, hi, lo } = obj;
+    if (
+        typeof feature !== 'string' ||
+        !(SKILL_STATE_FEATURES as readonly string[]).includes(feature) ||
+        typeof predicate !== 'string' ||
+        !(SKILL_STATE_PREDICATE_KINDS as readonly string[]).includes(predicate)
+    ) {
+        return undefined;
+    }
+    return {
+        feature: feature as SkillStateFeature,
+        predicate: predicate as SkillStatePredicateKind,
+        ...(typeof hi === 'number' ? { hi } : {}),
+        ...(typeof lo === 'number' ? { lo } : {}),
+    };
+};
+
+/**
+ * Validate and normalize a `gating` frontmatter block.
+ *
+ * Returns `undefined` (the loader's safe default — the skill is then treated as
+ * untagged and {@link selectSkills} includes it fail-open) when the block is
+ * malformed or unreachable:
+ * - `tier` not in {@link SKILL_GATING_TIERS};
+ * - `tier: gated` with a missing/invalid `signalKind`;
+ * - `signalKind: event` with no non-empty `triggers`;
+ * - `signalKind: state` with no valid `state` predicate.
+ *
+ * The downstream PR3 validation CI rejects unreachable gated skills at build
+ * time; here we simply fail safe so a bad block never crashes the loader.
+ */
+const parseGating = (raw: unknown): SkillGating | undefined => {
+    if (typeof raw !== 'object' || raw === null) return undefined;
+    const obj = raw as YamlNode;
+    const tier = obj.tier;
+    if (
+        typeof tier !== 'string' ||
+        !(SKILL_GATING_TIERS as readonly string[]).includes(tier)
+    ) {
+        return undefined;
+    }
+    if (tier === 'always_on') return { tier: 'always_on' };
+
+    // tier === 'gated' → a signalKind path is required.
+    const signalKind = obj.signalKind;
+    if (
+        typeof signalKind !== 'string' ||
+        !(SIGNAL_KINDS as readonly string[]).includes(signalKind)
+    ) {
+        return undefined;
+    }
+
+    if (signalKind === 'event') {
+        const triggers = obj.triggers;
+        if (
+            !Array.isArray(triggers) ||
+            triggers.length === 0 ||
+            !triggers.every((t): t is string => typeof t === 'string')
+        ) {
+            return undefined;
+        }
+        return {
+            tier: 'gated',
+            signalKind: 'event',
+            triggers: triggers as string[],
+        };
+    }
+
+    // signalKind === 'state'
+    const state = parseStatePredicate(obj.state);
+    if (state === undefined) return undefined;
+    return { tier: 'gated', signalKind: 'state', state };
+};
+
 const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     name: String(data.name ?? ''),
     description: String(data.description ?? ''),
@@ -169,7 +275,28 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
         typeof data.confidence_weight === 'number' ? data.confidence_weight : 0,
     content,
     display: parseSkillDisplay(data.display),
+    gating: parseGating(data.gating),
+    tokenCost: typeof data.tokenCost === 'number' ? data.tokenCost : undefined,
 });
+
+/**
+ * Drop duplicate skills by `name`, keeping the first occurrence.
+ *
+ * Two `.md` files declaring the same `name` would otherwise both reach the
+ * prompt and the cache fingerprint. The loader's file walk is deterministic
+ * (stable `readdir` order), so "first wins" yields a stable, reproducible
+ * catalog. The relative order of the surviving skills is preserved.
+ */
+const dedupeByName = (skills: Skill[]): Skill[] => {
+    const seen = new Set<string>();
+    const result: Skill[] = [];
+    for (const skill of skills) {
+        if (seen.has(skill.name)) continue;
+        seen.add(skill.name);
+        result.push(skill);
+    }
+    return result;
+};
 
 const collectMdFiles = async (dir: string): Promise<string[]> => {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -311,7 +438,7 @@ export class FileSkillsLoader implements SkillsProvider {
             })
         );
 
-        return skills.filter((s): s is Skill => s !== null);
+        return dedupeByName(skills.filter((s): s is Skill => s !== null));
     }
 }
 
