@@ -5,10 +5,12 @@ import type { Skill, SkillGating, SkillSelectionContext } from '@/domain/types';
  * Whether a gated skill should be injected, given the chart context.
  *
  * - `always_on` → always.
- * - `event` → any `triggers` entry is a currently-detected signal or candle.
- * - `state` → the textbook `state` predicate is notable.
- * - any other / malformed `gated` shape → excluded (the validation CI in
- *   PR3 rejects unreachable skills; here we simply fail closed for gated).
+ * - gated `event` → any `triggers` entry is a currently-detected signal or candle.
+ * - gated `state` → the textbook `state` predicate is notable.
+ *
+ * `SkillGating` is a discriminated union (the loader only ever produces a valid
+ * variant or `undefined`), so narrowing on `tier` then `signalKind` is
+ * exhaustive — there is no malformed `gated` shape to fall through.
  */
 const isGatedSkillActive = (
     gating: SkillGating,
@@ -17,8 +19,8 @@ const isGatedSkillActive = (
     if (gating.tier === 'always_on') return true;
 
     if (gating.signalKind === 'event') {
-        const triggers = gating.triggers;
-        if (triggers === undefined || triggers.length === 0) return false;
+        const { triggers } = gating;
+        if (triggers.length === 0) return false;
         // Event triggers match detected signal events OR detected candle
         // patterns — candle guides are gated on their appearance in the
         // detection list, which is the candle equivalent of a signal event.
@@ -29,14 +31,12 @@ const isGatedSkillActive = (
         );
     }
 
-    if (gating.signalKind === 'state') {
-        return gating.state !== undefined && isStateNotable(gating.state, ctx);
-    }
-
-    return false;
+    // The only remaining gated variant is `signalKind: 'state'`.
+    return isStateNotable(gating.state, ctx);
 };
 
 /**
+ * @internal
  * Select which skills to inject into the chart prompt for the given context.
  *
  * Pure and deterministic: the result depends only on the inputs. Untagged
@@ -57,5 +57,7 @@ export function selectSkills(
         if (skill.gating === undefined) return true;
         return isGatedSkillActive(skill.gating, ctx);
     });
-    return selected.toSorted((a, b) => a.name.localeCompare(b.name));
+    // Pin the locale: a locale-free `localeCompare` is environment-dependent,
+    // which would break this function's pure-and-deterministic contract.
+    return selected.toSorted((a, b) => a.name.localeCompare(b.name, 'en'));
 }

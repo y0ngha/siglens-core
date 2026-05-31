@@ -35,13 +35,13 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashSkillCatalog,
+} from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import {
-    getSkillCatalogFingerprint,
-    loadSkillsCached,
-} from '@/infrastructure/skills/loader';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const TIMEFRAMES: readonly Timeframe[] = [
@@ -253,11 +253,11 @@ export async function submitAnalysis(
 
     // Load the skill catalog up front: `skills` feeds the prompt builder and
     // `skillsDegraded` is recorded on the job meta. The cache-key fingerprint is
-    // derived through the shared getSkillCatalogFingerprint helper so the
-    // write key here matches what the poll/peek read paths reproduce. Both calls
-    // hit the memoized loader, so the catalog is read once.
+    // hashed directly from the `skills` already in hand (same hashSkillCatalog the
+    // shared helper uses), so the write key here matches what the poll/peek read
+    // paths reproduce without re-invoking the loader.
     const { skills, skillsDegraded } = await loadSkillsCached();
-    const skillFingerprint = await getSkillCatalogFingerprint();
+    const skillFingerprint = hashSkillCatalog(skills);
 
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(

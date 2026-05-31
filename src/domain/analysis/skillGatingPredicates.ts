@@ -81,11 +81,8 @@ const bollingerPctBNotable = (
     ctx: SkillSelectionContext
 ): boolean => {
     const band = lastOf(ctx.indicators.bollinger);
-    if (
-        band === null ||
-        !isFiniteNumber(band.upper) ||
-        !isFiniteNumber(band.lower)
-    ) {
+    // `!band` covers both null and the undefined returned for an empty series.
+    if (!band || !isFiniteNumber(band.upper) || !isFiniteNumber(band.lower)) {
         return false;
     }
     const width = band.upper - band.lower;
@@ -102,7 +99,8 @@ const bollingerPctBNotable = (
 const keltnerBandDistNotable = (ctx: SkillSelectionContext): boolean => {
     if (ctx.price <= 0) return false;
     const kc = lastOf(ctx.indicators.keltnerChannel);
-    if (kc === null || !isFiniteNumber(kc.upper) || !isFiniteNumber(kc.lower)) {
+    // `!kc` covers both null and the undefined returned for an empty series.
+    if (!kc || !isFiniteNumber(kc.upper) || !isFiniteNumber(kc.lower)) {
         return false;
     }
     const atr = lastNumber(ctx.indicators.atr);
@@ -122,7 +120,8 @@ const williamsRLevelNotable = (ctx: SkillSelectionContext): boolean => {
 
 const stochasticLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const st = lastOf(ctx.indicators.stochastic);
-    if (st === null || !isFiniteNumber(st.percentK)) return false;
+    // `!st` covers both null and the undefined returned for an empty series.
+    if (!st || !isFiniteNumber(st.percentK)) return false;
     return isOutsideBounds(
         st.percentK,
         STOCHASTIC_OVERBOUGHT,
@@ -132,14 +131,16 @@ const stochasticLevelNotable = (ctx: SkillSelectionContext): boolean => {
 
 const stochRsiLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const sr = lastOf(ctx.indicators.stochRsi);
-    if (sr === null || !isFiniteNumber(sr.k)) return false;
+    // `!sr` covers both null and the undefined returned for an empty series.
+    if (!sr || !isFiniteNumber(sr.k)) return false;
     return isOutsideBounds(sr.k, STOCH_RSI_OVERBOUGHT, STOCH_RSI_OVERSOLD);
 };
 
 const donchianProximityNotable = (ctx: SkillSelectionContext): boolean => {
     if (ctx.price <= 0) return false;
     const dc = lastOf(ctx.indicators.donchianChannel);
-    if (dc === null || !isFiniteNumber(dc.upper) || !isFiniteNumber(dc.lower)) {
+    // `!dc` covers both null and the undefined returned for an empty series.
+    if (!dc || !isFiniteNumber(dc.upper) || !isFiniteNumber(dc.lower)) {
         return false;
     }
     const range = dc.upper - dc.lower;
@@ -163,7 +164,8 @@ const vwapDistNotable = (ctx: SkillSelectionContext): boolean => {
 
 const buySellRatioNotable = (ctx: SkillSelectionContext): boolean => {
     const bsv = lastOf(ctx.indicators.buySellVolume);
-    if (bsv === null) return false;
+    // `!bsv` covers both null and the undefined returned for an empty series.
+    if (!bsv) return false;
     const total = bsv.buyVolume + bsv.sellVolume;
     if (total <= 0) return false;
     const ratio = bsv.buyVolume / total;
@@ -171,6 +173,7 @@ const buySellRatioNotable = (ctx: SkillSelectionContext): boolean => {
 };
 
 /**
+ * @internal
  * Decide whether a textbook *state* predicate is currently notable for the
  * analyzed chart.
  *

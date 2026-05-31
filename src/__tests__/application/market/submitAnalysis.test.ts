@@ -35,7 +35,6 @@ import {
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import {
     createSkillsProvider,
-    getSkillCatalogFingerprint,
     loadSkillsCached,
 } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
@@ -165,13 +164,13 @@ describe('submitAnalysis 함수는', () => {
         (createSkillsProvider as Mock).mockReturnValue({
             loadSkills: mockLoadSkills,
         });
+        // submitAnalysis now fingerprints the `skills` it already loaded via
+        // hashSkillCatalog (no separate getSkillCatalogFingerprint call), so the
+        // empty-catalog mock here drives the expected EMPTY_CATALOG_FP key suffix.
         (loadSkillsCached as Mock).mockResolvedValue({
             skills: [],
             skillsDegraded: false,
         });
-        (getSkillCatalogFingerprint as Mock).mockResolvedValue(
-            EMPTY_CATALOG_FP
-        );
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockLoadSkills.mockResolvedValue([]);
         mockSetJobMeta.mockResolvedValue(undefined);

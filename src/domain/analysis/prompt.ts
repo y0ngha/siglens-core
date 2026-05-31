@@ -611,7 +611,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     ].join('\n');
 };
 
-// ── SMC handling (Task 2.6) ─────────────────────────────────────────────────
+// ── SMC handling ─────────────────────────────────────────────────────────────
 // The full SMC skill guide (~13KB of ICT prose with placeholder example prices)
 // is a prime fabrication source for floor models — they copy the example levels
 // as if real. It is NEVER injected. The deterministic computed SMC section
@@ -622,6 +622,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
 const SMC_STRUCTURE_BREAK_RECENCY_BARS = 10;
 
 /**
+ * @internal
  * One-line notice marking that the full SMC guide was deliberately withheld and
  * pointing the model at the computed SMC data section as the only valid source.
  */
@@ -629,6 +630,7 @@ export const SMC_GUIDE_BLOCKED_NOTICE =
     'SMC note: the full Smart Money Concepts guide is intentionally omitted; use ONLY the levels in the computed ## Smart Money Concepts (SMC) section below — do not infer or invent SMC levels from memory.';
 
 /**
+ * @internal
  * Anti-fabrication guardrail propagated to every level-citing section
  * (Fibonacci / support-resistance / pivot). Floor models otherwise invent or
  * recopy plausible-looking price levels; this line forbids it explicitly.
@@ -642,8 +644,8 @@ export const ANTI_FABRICATION_GUARDRAIL =
  *
  * Prefers the explicit `smcFullGuide` frontmatter flag (`smc_full_guide: true`)
  * so the routing survives a display-name rename. Falls back to name matching for
- * skills authored before the flag existed; PR3 must set `smc_full_guide: true` on
- * the SMC guide so the stable flag path is taken.
+ * skills authored before the flag existed; the SMC guide should set
+ * `smc_full_guide: true` so the stable flag path is taken.
  */
 const isSmcGuideSkill = (skill: Skill): boolean => {
     if (skill.smcFullGuide === true) return true;

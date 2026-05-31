@@ -554,12 +554,12 @@ export interface Skill {
 }
 
 /**
- * Which gating path a {@link SkillGating} entry uses.
+ * Which gating path a gated {@link SkillGating} entry uses.
  *
  * - `'event'` — gate on transient `detectSignals` events (cross / flip /
- *   breakout) via {@link SkillGating.triggers}.
+ *   breakout) via the variant's `triggers` list.
  * - `'state'` — gate on a persistent textbook condition (overbought, band
- *   proximity, …) via {@link SkillGating.state}.
+ *   proximity, …) via the variant's `state` predicate.
  */
 export type SignalKind = 'event' | 'state';
 
@@ -615,26 +615,34 @@ export interface SkillStatePredicate {
 
 /**
  * Frontmatter gating metadata controlling whether a skill is injected into the
- * chart prompt.
+ * chart prompt. A discriminated union on `tier` (then `signalKind` for the gated
+ * arm) so each variant carries exactly the fields its path needs — there is no
+ * optional `triggers` / `state` that could be present on the wrong tier.
  *
  * - `tier: 'always_on'` — injected unconditionally (Tier-0).
- * - `tier: 'gated'` — injected only when its `signalKind` path fires:
- *   `'event'` requires one of `triggers` to be present in the detected signals;
- *   `'state'` requires `state` to evaluate notable for the current chart.
+ * - `tier: 'gated'`, `signalKind: 'event'` — injected when one of `triggers` is
+ *   present in the detected signals/candles.
+ * - `tier: 'gated'`, `signalKind: 'state'` — injected when `state` evaluates
+ *   notable for the current chart.
  */
-export interface SkillGating {
-    /** `'always_on'` injects unconditionally; `'gated'` defers to the path below. */
-    tier: 'always_on' | 'gated';
-    /** Gating path selector — required when `tier === 'gated'`. */
-    signalKind?: SignalKind;
-    /** Event path: `detectSignals` signal names that load this skill. */
-    triggers?: readonly string[];
-    /** State path: textbook predicate that loads this skill when notable. */
-    state?: SkillStatePredicate;
-}
+export type SkillGating =
+    | { readonly tier: 'always_on' }
+    | {
+          readonly tier: 'gated';
+          readonly signalKind: 'event';
+          /** Event path: `detectSignals` signal names that load this skill. */
+          readonly triggers: readonly string[];
+      }
+    | {
+          readonly tier: 'gated';
+          readonly signalKind: 'state';
+          /** State path: textbook predicate that loads this skill when notable. */
+          readonly state: SkillStatePredicate;
+      };
 
 /**
- * Read-only chart context consumed by {@link selectSkills} and the state
+ * @internal
+ * Read-only chart context consumed by the skill selector and the state
  * predicates. Every field is already in scope inside `buildAnalysisPrompt`, so
  * the selector stays a pure function of already-computed data (no I/O).
  */

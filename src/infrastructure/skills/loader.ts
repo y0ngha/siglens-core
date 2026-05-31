@@ -213,15 +213,15 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
  * `signal_kind` maps to the camelCase {@link SkillGating} `signalKind` field.
  *
  * Returns `undefined` (the loader's safe default — the skill is then treated as
- * untagged and {@link selectSkills} includes it fail-open) when the block is
- * malformed or unreachable:
+ * untagged and the selector includes it fail-open) when the block is malformed
+ * or unreachable:
  * - `tier` not in {@link SKILL_GATING_TIERS};
  * - `tier: gated` with a missing/invalid `signal_kind`;
  * - `signal_kind: event` with no non-empty `triggers`;
  * - `signal_kind: state` with no valid `state` predicate.
  *
- * The downstream PR3 validation CI rejects unreachable gated skills at build
- * time; here we simply fail safe so a bad block never crashes the loader.
+ * A downstream validation step rejects unreachable gated skills at build time;
+ * here we simply fail safe so a bad block never crashes the loader.
  */
 const parseGating = (raw: unknown): SkillGating | undefined => {
     if (typeof raw !== 'object' || raw === null) return undefined;
@@ -257,6 +257,10 @@ const parseGating = (raw: unknown): SkillGating | undefined => {
         return {
             tier: 'gated',
             signalKind: 'event',
+            // The `Array.isArray(triggers) && triggers.every(t => typeof t === 'string')`
+            // guard above proved every element is a string at runtime, so the cast is
+            // sound. TS cannot narrow `unknown[]` → `string[]` through an `every`
+            // type-guard callback on its own, hence the explicit cast.
             triggers: triggers as string[],
         };
     }
@@ -290,7 +294,7 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     display: parseSkillDisplay(data.display),
     gating: parseGating(data.gating),
     // Frontmatter is snake_case by repo convention (matching `confidence_weight`);
-    // map snake → camel here. PR3 authors `token_cost` / `signal_kind` in `skills/*.md`.
+    // map snake → camel here (`token_cost` → `tokenCost`, `signal_kind` → `signalKind`).
     tokenCost:
         typeof data.token_cost === 'number' ? data.token_cost : undefined,
     smcFullGuide: isYamlTrue(data.smc_full_guide),

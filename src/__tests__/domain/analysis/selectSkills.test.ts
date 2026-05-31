@@ -138,16 +138,6 @@ describe('selectSkills — event-gated', () => {
             ).length
         ).toBe(1);
     });
-    it('drops an event skill with no triggers array', () => {
-        const broken = baseSkill('broken', {
-            tier: 'gated',
-            signalKind: 'event',
-        });
-        expect(
-            selectSkills([broken], makeCtx({ signalTypes: ['rsi_oversold'] }))
-                .length
-        ).toBe(0);
-    });
     it('drops an event skill whose triggers array is empty', () => {
         const empty = eventSkill('empty', []);
         expect(
@@ -166,15 +156,6 @@ describe('selectSkills — state-gated', () => {
         expect(selectSkills([bb], overboughtBollingerCtx(0.99)).length).toBe(1);
         expect(selectSkills([bb], overboughtBollingerCtx(0.5)).length).toBe(0);
     });
-    it('drops a state skill with no state predicate', () => {
-        const broken = baseSkill('broken-state', {
-            tier: 'gated',
-            signalKind: 'state',
-        });
-        expect(
-            selectSkills([broken], overboughtBollingerCtx(0.99)).length
-        ).toBe(0);
-    });
 });
 
 describe('selectSkills — candle-gated', () => {
@@ -188,15 +169,6 @@ describe('selectSkills — candle-gated', () => {
             selectSkills([hammer], makeCtx({ detectedCandles: ['doji'] }))
                 .length
         ).toBe(0);
-    });
-});
-
-describe('selectSkills — gated with an unknown signalKind', () => {
-    it('drops a gated skill whose signalKind is neither event nor state', () => {
-        const weird = baseSkill('weird', {
-            tier: 'gated',
-        });
-        expect(selectSkills([weird], makeCtx()).length).toBe(0);
     });
 });
 

@@ -406,6 +406,37 @@ describe('isStateNotable — buySellVolume ratio', () => {
     });
 });
 
+describe('isStateNotable — empty indicator series (no throw)', () => {
+    // Regression: predicates dereference the LAST element of an indicator
+    // series. For an empty array that last element is undefined, so a guard
+    // that only checks `=== null` would let undefined slip through to a
+    // property access (TypeError). Every (feature, predicate) pair must return
+    // false — not throw — when its backing series is empty.
+    const pairs: ReadonlyArray<
+        [SkillStatePredicate['feature'], SkillStatePredicate['predicate']]
+    > = [
+        ['bollinger', 'pctB'],
+        ['keltner', 'bandDistAtr'],
+        ['williamsR', 'level'],
+        ['stochastic', 'level'],
+        ['stochRsi', 'level'],
+        ['donchian', 'channelProximity'],
+        ['vwap', 'bandDistAtr'],
+        ['buySellVolume', 'ratio'],
+    ];
+    it.each(pairs)(
+        'returns false (no throw) for feature=%s predicate=%s on an empty suite',
+        (feature, predicate) => {
+            // timeframe 15Min so the intraday-only vwap path is actually exercised.
+            const ctx = makeCtx({ empty: true, timeframe: '15Min' });
+            expect(() =>
+                isStateNotable(P(feature, predicate), ctx)
+            ).not.toThrow();
+            expect(isStateNotable(P(feature, predicate), ctx)).toBe(false);
+        }
+    );
+});
+
 describe('isStateNotable — mismatched feature/predicate pairs', () => {
     // Every feature carries exactly one valid predicate kind; supplying any
     // other kind must take the safe `false` arm rather than throwing.

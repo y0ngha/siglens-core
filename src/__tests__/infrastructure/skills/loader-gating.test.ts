@@ -85,7 +85,7 @@ describe('FileSkillsLoader gating frontmatter', () => {
 
         expect(skills).toHaveLength(1);
         // Frontmatter authored `signal_kind` / `token_cost` (snake_case, the
-        // repo + PR3 convention); the loader exposes them camelCased.
+        // repo convention); the loader exposes them camelCased.
         expect(skills[0].gating).toEqual({
             tier: 'gated',
             signalKind: 'event',
