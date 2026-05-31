@@ -729,7 +729,9 @@ export interface ClusteredKeyLevels {
 
 /** @internal Round-number increment by price tier (ascending ceiling). */
 export interface RoundNumberTier {
+    /** Inclusive upper price bound this tier applies to. */
     maxPrice: number;
+    /** Round-number spacing used for prices at or below `maxPrice`. */
     increment: number;
 }
 
@@ -759,9 +761,11 @@ export type ReferenceLevelKind =
 
 /** A single commonly-watched reference price. Advisory context, not a prediction. */
 export interface ReferenceLevel {
+    /** The reference price level. */
     price: number;
     /** Human-readable label, e.g. "Fib 61.8%", "POC", "MA200", "Camarilla R3". */
     label: string;
+    /** Origin category of the level (descriptive label, not a conviction rank). */
     kind: ReferenceLevelKind;
     /** Signed percent distance from current price (negative = below). */
     distancePercent: number;
@@ -769,7 +773,9 @@ export interface ReferenceLevel {
 
 /** Reference levels split by side relative to current price, nearest-first. */
 export interface ReferenceLevels {
+    /** Levels below the current price, ordered nearest-first. */
     support: ReferenceLevel[];
+    /** Levels above the current price, ordered nearest-first. */
     resistance: ReferenceLevel[];
 }
 
@@ -783,42 +789,65 @@ export interface IndicatorLevelOptions {
     emaPeriods?: readonly number[];
 }
 
+/** Whether the current price sits above or below a reference level (`unknown` when undecidable). */
 export type PriceVsLevel = 'above' | 'below' | 'unknown';
+/** Ordering of the fast/slow EMAs: stacked bullishly, bearishly, or interleaved. */
 export type EmaStackState = 'aligned_up' | 'aligned_down' | 'mixed';
+/** Swing sequence shape: higher-highs/higher-lows, lower-highs/lower-lows, or neither. */
 export type SwingStructureState = 'HH_HL' | 'LH_LL' | 'mixed';
+/** Whether the window is directionally trending or range-bound. */
 export type MarketRegime = 'trending' | 'ranging';
 
 /** Descriptive trend structure for a horizon — facts, NOT a directional prediction. */
 export interface TrendStructure {
+    /** Current price relative to the 60-period moving average. */
     priceVsMA60: PriceVsLevel;
+    /** Current price relative to the 200-period moving average. */
     priceVsMA200: PriceVsLevel;
+    /** Stacking order of the fast/slow EMAs. */
     emaStack: EmaStackState;
+    /** Shape of the recent swing-high/swing-low sequence. */
     swingStructure: SwingStructureState;
+    /** Latest ADX reading; `null` during the warm-up window. */
     adx: number | null;
+    /** Kaufman efficiency ratio over the window; `null` when not computable. */
     efficiencyRatio: number | null;
+    /** Trending vs ranging classification derived from ADX and efficiency ratio. */
     regime: MarketRegime;
 }
 
+/** Lookback window backing a single horizon's reference levels and structure. */
 export interface HorizonWindow {
+    /** Number of bars included in the window. */
     bars: number;
+    /** Unix timestamp (seconds) of the window's first bar; `null` when empty. */
     fromTime: number | null;
+    /** Unix timestamp (seconds) of the window's last bar; `null` when empty. */
     toTime: number | null;
 }
 
+/** Reference levels plus trend structure for a single horizon. */
 export interface HorizonReference {
+    /** Lookback window the levels and structure were computed over. */
     window: HorizonWindow;
+    /** Support/resistance reference levels for the window. */
     levels: ReferenceLevels;
+    /** Descriptive trend structure for the window. */
     structure: TrendStructure;
 }
 
 /** Deterministic, multi-horizon advisory reference for the chart prompt. */
 export interface MarketReference {
+    /** Short-lookback horizon reference. */
     short: HorizonReference;
+    /** Medium-lookback horizon reference. */
     medium: HorizonReference;
+    /** Long-lookback horizon reference. */
     long: HorizonReference;
 }
 
 /**
+ * @internal
  * Standard pivot point set derived from a prior period's high/low/close.
  *
  * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
@@ -843,16 +872,22 @@ export interface StandardPivotLevels {
     s3: number;
 }
 
-/** Camarilla pivot levels (the four most-watched). */
+/** @internal Camarilla pivot levels (the four most-watched). */
 export interface CamarillaPivotLevels {
+    /** Central pivot: (high + low + close) / 3. */
     pp: number;
+    /** Third Camarilla resistance level. */
     r3: number;
+    /** Fourth (outermost) Camarilla resistance level. */
     r4: number;
+    /** Third Camarilla support level. */
     s3: number;
+    /** Fourth (outermost) Camarilla support level. */
     s4: number;
 }
 
 /**
+ * @internal
  * One Fibonacci retracement or extension level (ratio + resulting price).
  */
 export interface FibonacciLevel {
@@ -863,6 +898,7 @@ export interface FibonacciLevel {
 }
 
 /**
+ * @internal
  * Fibonacci retracement/extension levels anchored on a swing high and low.
  *
  * `direction` reflects the swing the projection is based on: `up` when the most
@@ -883,6 +919,7 @@ export interface FibonacciProjection {
 }
 
 /**
+ * @internal
  * Direction of the most recent swing leg used for Fibonacci projection.
  */
 export type SwingLegDirection = 'up' | 'down';

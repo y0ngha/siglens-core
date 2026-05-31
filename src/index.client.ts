@@ -359,7 +359,6 @@ export type {
     EmaStackState,
     SwingStructureState,
     MarketRegime,
-    CamarillaPivotLevels,
     QuadrantKey,
     PriceTarget,
     PriceScenario,

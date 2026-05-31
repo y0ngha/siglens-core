@@ -200,8 +200,9 @@ export function splitBySide(
     const dedupe = (sorted: readonly ReferenceLevel[]): ReferenceLevel[] => {
         const kept: ReferenceLevel[] = [];
         for (const l of sorted) {
+            const tolerance = DEDUPE_FRACTION * l.price;
             const isDuplicate = kept.some(
-                k => Math.abs(k.price - l.price) <= DEDUPE_FRACTION * l.price
+                k => Math.abs(k.price - l.price) <= tolerance
             );
             if (isDuplicate) continue;
             kept.push(l);
