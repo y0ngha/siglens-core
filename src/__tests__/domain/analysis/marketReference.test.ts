@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
+import { HORIZON_WINDOWS_BY_TIMEFRAME } from '@/domain/analysis/marketReferenceConstants';
 import type { Bar, IndicatorResult, SMCSwingPoint } from '@/domain/types';
+
+const DAY_WINDOWS = HORIZON_WINDOWS_BY_TIMEFRAME['1Day'];
 
 function makeBars(n: number): Bar[] {
     return Array.from({ length: n }, (_, i) => ({
@@ -73,10 +76,19 @@ const makeInd = (o: IndOverrides = {}): IndicatorResult =>
 
 describe('computeMarketReference', () => {
     it('returns three horizons with windows capped at bars.length', () => {
-        const ref = computeMarketReference(makeBars(30), makeInd(), '1Day');
-        expect(ref.short.window.bars).toBe(20);
-        expect(ref.medium.window.bars).toBe(30); // capped (only 30 bars < 60)
-        expect(ref.long.window.bars).toBe(30);
+        const barCount = 30;
+        const ref = computeMarketReference(
+            makeBars(barCount),
+            makeInd(),
+            '1Day'
+        );
+        expect(ref.short.window.bars).toBe(
+            Math.min(DAY_WINDOWS.short, barCount)
+        );
+        expect(ref.medium.window.bars).toBe(
+            Math.min(DAY_WINDOWS.medium, barCount)
+        );
+        expect(ref.long.window.bars).toBe(Math.min(DAY_WINDOWS.long, barCount));
     });
 
     it('produces a regime descriptor for every horizon', () => {

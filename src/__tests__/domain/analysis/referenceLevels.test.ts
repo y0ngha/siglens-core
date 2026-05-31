@@ -4,6 +4,7 @@ import {
     splitBySide,
     collectIndicatorLevels,
 } from '@/domain/analysis/referenceLevels';
+import { MAX_REFERENCE_LEVELS_PER_SIDE } from '@/domain/analysis/marketReferenceConstants';
 import type { IndicatorResult, ReferenceLevel } from '@/domain/types';
 
 const lvl = (price: number): ReferenceLevel => ({
@@ -60,11 +61,14 @@ describe('splitBySide', () => {
         expect(out.support).toHaveLength(1);
     });
     it('caps each side at MAX_REFERENCE_LEVELS_PER_SIDE', () => {
-        const support = Array.from({ length: 10 }, (_, i) => lvl(90 - i));
-        const resistance = Array.from({ length: 10 }, (_, i) => lvl(110 + i));
+        const count = MAX_REFERENCE_LEVELS_PER_SIDE + 4;
+        const support = Array.from({ length: count }, (_, i) => lvl(90 - i));
+        const resistance = Array.from({ length: count }, (_, i) =>
+            lvl(110 + i)
+        );
         const out = splitBySide([...support, ...resistance], 100);
-        expect(out.support).toHaveLength(6);
-        expect(out.resistance).toHaveLength(6);
+        expect(out.support).toHaveLength(MAX_REFERENCE_LEVELS_PER_SIDE);
+        expect(out.resistance).toHaveLength(MAX_REFERENCE_LEVELS_PER_SIDE);
     });
 });
 

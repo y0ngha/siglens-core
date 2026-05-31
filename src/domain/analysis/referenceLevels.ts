@@ -1,8 +1,8 @@
 import type {
+    IndicatorLevelOptions,
     IndicatorResult,
     ReferenceLevel,
     ReferenceLevels,
-    VolumeProfileResult,
 } from '@/domain/types';
 import {
     MAX_REFERENCE_LEVELS_PER_SIDE,
@@ -92,15 +92,23 @@ export const makeReferenceLevel = (
     distancePercent: ((price - currentPrice) / currentPrice) * RATIO_TO_PERCENT,
 });
 
-/** @internal Optional per-horizon overrides for indicator level collection. */
-export interface IndicatorLevelOptions {
-    /** Volume profile to use (e.g. a window-local recompute). Defaults to indicators.volumeProfile. */
-    volumeProfile?: VolumeProfileResult | null;
-    /** MA periods to include (defaults to all present). */
-    maPeriods?: readonly number[];
-    /** EMA periods to include (defaults to all present). */
-    emaPeriods?: readonly number[];
-}
+/** @internal A finite, positive reference level, or null to drop it. */
+const toLevel = (
+    price: number | null,
+    label: string,
+    kind: ReferenceLevel['kind'],
+    currentPrice: number
+): ReferenceLevel | null =>
+    price != null && Number.isFinite(price) && price > 0
+        ? makeReferenceLevel(price, label, kind, currentPrice)
+        : null;
+
+/** A candidate level before validation: its raw price, label, and kind. */
+type LevelCandidate = readonly [
+    price: number | null,
+    label: string,
+    kind: ReferenceLevel['kind'],
+];
 
 /** @internal Latest-value reference levels from the indicator suite. */
 export function collectIndicatorLevels(
@@ -108,85 +116,80 @@ export function collectIndicatorLevels(
     indicators: IndicatorResult,
     options?: IndicatorLevelOptions
 ): ReferenceLevel[] {
-    const out: ReferenceLevel[] = [];
-    const push = (
-        price: number | null,
-        label: string,
-        kind: ReferenceLevel['kind']
-    ): void => {
-        if (price != null && Number.isFinite(price) && price > 0) {
-            out.push(makeReferenceLevel(price, label, kind, currentPrice));
-        }
-    };
-
     const vp =
         options?.volumeProfile !== undefined
             ? options.volumeProfile
             : indicators.volumeProfile;
-    if (vp) {
-        push(vp.poc, 'POC', 'vp_poc');
-        push(vp.vah, 'VAH', 'vp_vah');
-        push(vp.val, 'VAL', 'vp_val');
-    }
     const maPeriods =
         options?.maPeriods ?? Object.keys(indicators.ma).map(Number);
-    for (const period of maPeriods) {
-        const series = indicators.ma[period];
-        if (series) push(lastFiniteNumber(series), `MA${period}`, 'ma');
-    }
     const emaPeriods =
         options?.emaPeriods ?? Object.keys(indicators.ema).map(Number);
-    for (const period of emaPeriods) {
-        const series = indicators.ema[period];
-        if (series) push(lastFiniteNumber(series), `EMA${period}`, 'ema');
-    }
-    push(
-        lastField(indicators.bollinger, b => b.upper),
-        'BB upper',
-        'bollinger'
-    );
-    push(
-        lastField(indicators.bollinger, b => b.lower),
-        'BB lower',
-        'bollinger'
-    );
-    push(
-        lastField(indicators.keltnerChannel, k => k.upper),
-        'Keltner upper',
-        'keltner'
-    );
-    push(
-        lastField(indicators.keltnerChannel, k => k.lower),
-        'Keltner lower',
-        'keltner'
-    );
-    push(
-        lastField(indicators.donchianChannel, d => d.upper),
-        'Donchian high',
-        'donchian'
-    );
-    push(
-        lastField(indicators.donchianChannel, d => d.lower),
-        'Donchian low',
-        'donchian'
-    );
-    push(
-        lastField(indicators.ichimoku, i => i.senkouA),
-        'Kumo A',
-        'ichimoku'
-    );
-    push(
-        lastField(indicators.ichimoku, i => i.senkouB),
-        'Kumo B',
-        'ichimoku'
-    );
-    push(
-        lastField(indicators.supertrend, s => s.supertrend),
-        'Supertrend',
-        'supertrend'
-    );
-    push(lastFiniteNumber(indicators.vwap), 'VWAP', 'vwap');
-    return out;
+
+    const candidates: Array<LevelCandidate> = [
+        ...(vp
+            ? ([
+                  [vp.poc, 'POC', 'vp_poc'],
+                  [vp.vah, 'VAH', 'vp_vah'],
+                  [vp.val, 'VAL', 'vp_val'],
+              ] as const)
+            : []),
+        ...maPeriods.flatMap((period): Array<LevelCandidate> => {
+            const series = indicators.ma[period];
+            return series
+                ? [[lastFiniteNumber(series), `MA${period}`, 'ma']]
+                : [];
+        }),
+        ...emaPeriods.flatMap((period): Array<LevelCandidate> => {
+            const series = indicators.ema[period];
+            return series
+                ? [[lastFiniteNumber(series), `EMA${period}`, 'ema']]
+                : [];
+        }),
+        [
+            lastField(indicators.bollinger, b => b.upper),
+            'BB upper',
+            'bollinger',
+        ],
+        [
+            lastField(indicators.bollinger, b => b.lower),
+            'BB lower',
+            'bollinger',
+        ],
+        [
+            lastField(indicators.keltnerChannel, k => k.upper),
+            'Keltner upper',
+            'keltner',
+        ],
+        [
+            lastField(indicators.keltnerChannel, k => k.lower),
+            'Keltner lower',
+            'keltner',
+        ],
+        [
+            lastField(indicators.donchianChannel, d => d.upper),
+            'Donchian high',
+            'donchian',
+        ],
+        [
+            lastField(indicators.donchianChannel, d => d.lower),
+            'Donchian low',
+            'donchian',
+        ],
+        [lastField(indicators.ichimoku, i => i.senkouA), 'Kumo A', 'ichimoku'],
+        [lastField(indicators.ichimoku, i => i.senkouB), 'Kumo B', 'ichimoku'],
+        [
+            lastField(indicators.supertrend, s => s.supertrend),
+            'Supertrend',
+            'supertrend',
+        ],
+        [lastFiniteNumber(indicators.vwap), 'VWAP', 'vwap'],
+    ];
+
+    return candidates
+        .map(([price, label, kind]) =>
+            toLevel(price, label, kind, currentPrice)
+        )
+        .filter((l): l is ReferenceLevel => l !== null);
 }
 
 /** @internal Split levels by side relative to price, dedupe near-equal, cap per side. */

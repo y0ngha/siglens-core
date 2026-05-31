@@ -773,6 +773,16 @@ export interface ReferenceLevels {
     resistance: ReferenceLevel[];
 }
 
+/** @internal Optional per-horizon overrides for indicator level collection. */
+export interface IndicatorLevelOptions {
+    /** Volume profile to use (e.g. a window-local recompute). Defaults to indicators.volumeProfile. */
+    volumeProfile?: VolumeProfileResult | null;
+    /** MA periods to include (defaults to all present). */
+    maPeriods?: readonly number[];
+    /** EMA periods to include (defaults to all present). */
+    emaPeriods?: readonly number[];
+}
+
 export type PriceVsLevel = 'above' | 'below' | 'unknown';
 export type EmaStackState = 'aligned_up' | 'aligned_down' | 'mixed';
 export type SwingStructureState = 'HH_HL' | 'LH_LL' | 'mixed';

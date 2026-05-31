@@ -4,6 +4,7 @@ import type {
     HorizonReference,
     IndicatorResult,
     MarketReference,
+    PriceVsLevel,
     ReferenceLevel,
     SMCSwingPoint,
     Timeframe,
@@ -41,10 +42,7 @@ const EFFICIENCY_PERIOD = 20;
 const MIN_EFFICIENCY_PERIOD = 2;
 const FIB_RATIO_DECIMAL_PLACES = 1;
 
-const priceVs = (
-    price: number,
-    level: number | null
-): 'above' | 'below' | 'unknown' =>
+const priceVs = (price: number, level: number | null): PriceVsLevel =>
     level == null ? 'unknown' : price >= level ? 'above' : 'below';
 
 function buildStructure(
