@@ -807,54 +807,47 @@ const buildSkillBlock = (skill: Skill): string =>
     `### ${skill.name} ${confidenceLabel(skill.confidenceWeight)}\n${skill.content}`;
 
 /**
- * Defines the JSON schema example for all LLM-generated keys of AnalysisResponse.
- * The Record type enforces compile-time synchronization with AnalysisResponse —
- * changes to the interface will produce a compile error here.
- * analyzedAt is excluded because it is injected by infrastructure after LLM response.
+ * Per-field content guidance for the few AnalysisResponse fields whose unique
+ * semantic instruction lives ONLY here. The response schema enforces the
+ * structure of every field (names, types, enums, nesting), so a JSON skeleton
+ * for the remaining fields is redundant; each of those fields instead has a
+ * dedicated `### ... Writing Rules` section (or is pure structure the schema
+ * already enforces).
+ *
+ * The Pick type keeps these entries compile-time synchronized with
+ * AnalysisResponse — renaming one of these fields produces a compile error here.
  */
-const ANALYSIS_RESPONSE_SCHEMA: Record<
-    keyof Omit<AnalysisResponse, 'analyzedAt'>,
+const ANALYSIS_FIELD_GUIDANCE: Record<
+    keyof Pick<
+        AnalysisResponse,
+        'summary' | 'strategyResults' | 'actionRecommendation'
+    >,
     string
 > = {
     summary:
-        '"A comprehensive, accessible Korean markdown summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock and what does it mean for the investor? Use \\n\\n between paragraphs, and use short bullet lists only when they improve readability."',
-    trend: '"neutral"',
-    indicatorResults:
-        '[{ "indicatorName": "RSI Signal Guide", "signals": [{ "type": "skill", "description": "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능", "strength": "moderate", "trend": "neutral" }] }]',
-    riskLevel: '"medium"',
-    keyLevels:
-        '{ "support": [{ "price": 150.00, "reason": "..." }], "resistance": [{ "price": 160.00, "reason": "..." }], "poc": { "price": 155.00, "reason": "..." } }',
-    priceTargets:
-        '{ "bullish": { "targets": [{ "price": 165.00, "basis": "..." }], "condition": "..." }, "bearish": { "targets": [{ "price": 145.00, "basis": "..." }], "condition": "..." } }',
-    patternSummaries:
-        // Only chart patterns defined in skills/*.md. Candle patterns go in candlePatterns.
-        '[{ "patternName": "...", "skillName": "...", "detected": true, "trend": "neutral", "summary": "...", "keyPrices": [{ "label": "넥라인", "price": 150.00 }], "patternLines": [{ "label": "상단 추세선", "start": { "time": 1700000000, "price": 155.00 }, "end": { "time": 1700100000, "price": 152.00 } }, { "label": "하단 추세선", "start": { "time": 1700000000, "price": 148.00 }, "end": { "time": 1700100000, "price": 146.00 } }], "timeRange": { "start": 1700000000, "end": 1700100000 } }]',
+        'A comprehensive, accessible Korean markdown summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock and what does it mean for the investor? Use \\n\\n between paragraphs, and use short bullet lists only when they improve readability.',
     strategyResults:
-        '[{ "strategyName": "...", "trend": "neutral", "summary": "Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes" }]',
-    candlePatterns:
-        // Only candle patterns detected from bar data. Skills patterns go in patternSummaries.
-        '[{ "patternName": "three_outside_down", "detected": true, "trend": "bearish", "summary": "..." }]',
-    trendlines:
-        '[{ "direction": "ascending", "start": { "time": 1700000000, "price": 150.00 }, "end": { "time": 1700100000, "price": 155.00 } }]',
+        "Each entry's summary is Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes.",
     actionRecommendation:
-        '{ "positionAnalysis": "Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n", "entry": "Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n", "exit": "Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n", "riskReward": "Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence", "entryRecommendation": "wait", "entryPrices": [165.00, 167.00], "stopLoss": 160.00, "takeProfitPrices": [180.00, 195.00] }',
+        'positionAnalysis: Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n. entry: Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n. exit: Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n. riskReward: Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence.',
 };
 
 const ANALYSIS_INTENT_BLOCK = [
     '## Analysis Intent',
     '- Analyze the symbol below using ONLY the provided data. Do not fabricate prices, indicators, or patterns.',
-    '- Output a single JSON object matching the schema at the bottom.',
+    '- Respond with a single JSON object. Its structure (field names, types, enums, nesting) is enforced by the response schema, so you do not need to restate it. For the fields listed under ## Field Content Guidance, follow the guidance there.',
 ].join('\n');
 
-const SCHEMA_PREFACE =
-    'Schema (field types and example shapes — DO NOT copy example numbers; compute every value from the actual data above):';
+const FIELD_GUIDANCE_PREFACE =
+    'Compute every value from the actual data above — never invent numbers. Follow the content guidance below for the fields that need it:';
 
-const buildSchemaBody = (): string => {
-    const entries = Object.entries(ANALYSIS_RESPONSE_SCHEMA)
-        .map(([key, value]) => `  "${key}": ${value}`)
-        .join(',\n');
-    return `{\n${entries}\n}`;
-};
+const buildFieldGuidanceBody = (): string =>
+    [
+        '## Field Content Guidance',
+        ...Object.entries(ANALYSIS_FIELD_GUIDANCE).map(
+            ([key, value]) => `- ${key}: ${value}`
+        ),
+    ].join('\n');
 
 const ANALYSIS_GUIDELINES = [
     '## Analysis Guidelines',
@@ -978,19 +971,8 @@ const ANALYSIS_GUIDELINES = [
 const CRITICAL_RESPONSE_RULES = [
     '',
     '### Critical Response Rules',
-    '- For array fields that have no results, return an empty array []. Never return null or omit the field.',
     '- For optional object fields (poc in keyLevels, actionRecommendation), provide an object that follows the field rules or omit the field entirely. Never set the object itself to null.',
-    '- Array elements must be valid objects. Never include null or undefined inside arrays.',
-    '- All numeric price values must be plain numbers (e.g., 150.25), not strings.',
-    '- All Unix timestamp values must be integers copied verbatim from the [ts:<number>] markers in the bar data.',
-    '- Enum fields must contain exactly one allowed literal, never pipe-separated text (see Allowed Enum Values below).',
-    '',
-    '### Allowed Enum Values',
-    '- trend / signals[].trend / patternSummaries[].trend / strategyResults[].trend / candlePatterns[].trend: "bullish", "bearish", "neutral"',
-    '- riskLevel: "low", "medium", "high"',
-    '- indicatorResults[].signals[].strength: "strong", "moderate", "weak"',
-    '- actionRecommendation.entryRecommendation: "enter", "wait", "avoid"',
-    '- trendlines[].direction: "ascending", "descending"',
+    '- Unix timestamp values must be copied verbatim from the [ts:<number>] markers in the bar data.',
 ].join('\n');
 
 const buildAnalysisRequest = (
@@ -1132,9 +1114,9 @@ const buildAnalysisRequest = (
     return [
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
-        'Based on the data above, perform technical analysis and respond in the following JSON format:',
-        SCHEMA_PREFACE,
-        buildSchemaBody(),
+        'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
+        FIELD_GUIDANCE_PREFACE,
+        buildFieldGuidanceBody(),
         indicatorGuideInstruction,
         patternListInstruction,
         strategyInstruction,

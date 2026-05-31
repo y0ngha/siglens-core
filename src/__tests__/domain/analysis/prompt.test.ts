@@ -1668,7 +1668,7 @@ describe('prompt', () => {
             expect(result).toContain('strategyResults');
         });
 
-        it('riskLevel 필드가 요청에 포함된다', () => {
+        it('riskLevel의 구조 스켈레톤은 제거되었다 (스키마가 enum을 강제)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1676,10 +1676,11 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('riskLevel');
+            // riskLevel은 schema가 enum을 강제하므로 프롬프트의 placeholder 스켈레톤은 중복.
+            expect(result).not.toContain('riskLevel');
         });
 
-        it('patternSummaries 스키마에 detected 필드가 포함된다', () => {
+        it('patternSummaries 구조 스켈레톤(keyPrices/patternLines/timeRange)은 제거되었다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1687,10 +1688,17 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('detected');
+            // patternSummaries는 ### patternSummaries Writing Rules가 별도로 다루므로
+            // JSON 스켈레톤 예시는 중복 → 제거.
+            expect(result).not.toContain('"keyPrices"');
+            expect(result).not.toContain('"label": "넥라인"');
+            expect(result).not.toContain('"patternLines"');
+            expect(result).not.toContain('"label": "상단 추세선"');
+            expect(result).not.toContain('"label": "하단 추세선"');
+            expect(result).not.toContain('timeRange');
         });
 
-        it('patternSummaries 스키마에 keyPrices 필드가 포함된다', () => {
+        it('keyLevels 구조 스켈레톤(reason/poc 예시)은 제거되었다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1698,11 +1706,14 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"keyPrices"');
-            expect(result).toContain('"label": "넥라인"');
+            // keyLevels는 ### keyLevels Writing Rules가 별도로 다루므로 JSON 스켈레톤 제거.
+            expect(result).not.toContain(
+                '{ "support": [{ "price": 150.00, "reason": "..." }]'
+            );
+            expect(result).not.toContain('"poc": { "price": 155.00');
         });
 
-        it('patternSummaries 스키마에 patternLines 필드가 포함된다', () => {
+        it('priceTargets 구조 스켈레톤(bullish/bearish 예시 객체)은 제거되었다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1710,12 +1721,16 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"patternLines"');
-            expect(result).toContain('"label": "상단 추세선"');
-            expect(result).toContain('"label": "하단 추세선"');
+            // priceTargets 구조는 스키마가 강제 → JSON 스켈레톤 예시 제거.
+            expect(result).not.toContain(
+                '{ "bullish": { "targets": [{ "price": 165.00'
+            );
+            expect(result).not.toContain(
+                '"bearish": { "targets": [{ "price": 145.00'
+            );
         });
 
-        it('patternSummaries 스키마의 keyPrices가 label/price 구조를 포함한다', () => {
+        it('indicatorResults 구조 스켈레톤(예시 배열)은 제거되었다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1723,63 +1738,56 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"label": "넥라인"');
+            // indicatorResults는 ### indicatorResults Writing Rules가 별도로 다룸.
+            expect(result).not.toContain(
+                '[{ "indicatorName": "RSI Signal Guide", "signals":'
+            );
+        });
+    });
+
+    describe('Field Content Guidance 섹션', () => {
+        const buildEmpty = (): string =>
+            buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+
+        it('## Field Content Guidance 섹션이 포함된다', () => {
+            expect(buildEmpty()).toContain('## Field Content Guidance');
         });
 
-        it('patternSummaries 스키마에 timeRange 필드가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
+        it('summary의 의미적 가이던스가 그대로 유지된다', () => {
+            const result = buildEmpty();
+            expect(result).toContain('- summary:');
+            expect(result).toContain(
+                'A comprehensive, accessible Korean markdown summary'
             );
-            expect(result).toContain('timeRange');
+            expect(result).toContain(
+                'What is happening with this stock and what does it mean for the investor?'
+            );
         });
 
-        it('keyLevels 스키마에 reason 필드가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).toContain('"reason"');
+        it('strategyResults의 **label**: value 포맷 가이던스가 유지된다', () => {
+            const result = buildEmpty();
+            expect(result).toContain('- strategyResults:');
+            expect(result).toContain('each **label**: value on its own line');
         });
 
-        it('keyLevels 스키마에 poc 필드가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).toContain('"poc"');
+        it('actionRecommendation의 하위 필드 가이던스가 유지된다', () => {
+            const result = buildEmpty();
+            expect(result).toContain('- actionRecommendation:');
+            expect(result).toContain('positionAnalysis:');
+            expect(result).toContain('riskReward:');
         });
 
-        it('priceTargets 필드가 요청에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).toContain('priceTargets');
-        });
-
-        it('priceTargets 스키마에 bullish와 bearish 시나리오가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).toContain('"bullish"');
-            expect(result).toContain('"bearish"');
+        it('전체 JSON 스켈레톤 객체는 더 이상 렌더링되지 않는다', () => {
+            const result = buildEmpty();
+            // 이전의 "Schema (field types and example shapes ...)" 전체 스켈레톤 제거.
+            expect(result).not.toContain('"trend": "neutral"');
+            expect(result).not.toContain('"direction": "ascending", "start":');
         });
     });
 
@@ -1810,7 +1818,7 @@ describe('prompt', () => {
     });
 
     describe('trendlines 스키마', () => {
-        it('trendlines 스키마 키가 프롬프트에 포함된다', () => {
+        it('trendlines JSON 스켈레톤 예시는 제거되었다 (스키마가 구조를 강제)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1818,13 +1826,9 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"direction": "ascending"');
-            expect(result).toContain(
-                '- trendlines[].direction: "ascending", "descending"'
-            );
-            expect(result).not.toContain(
-                '"direction": "ascending | descending"'
-            );
+            // trendlines 구조는 스키마가 강제하고 ## Trendline Candidates 섹션이 안내하므로
+            // JSON 스켈레톤 예시는 중복 → 제거.
+            expect(result).not.toContain('"direction": "ascending"');
         });
 
         it('가이드라인에 추세선 감지 지침이 포함된다', () => {
@@ -1993,7 +1997,7 @@ describe('prompt', () => {
             expect(result).toContain('Korean');
         });
 
-        it('한국어 응답 지시는 JSON 스키마보다 앞에 위치한다', () => {
+        it('한국어 응답 지시는 Field Content Guidance 본문보다 앞에 위치한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -2001,9 +2005,12 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            const koreanInstructionIndex = result.indexOf('Korean');
-            const schemaIndex = result.indexOf('"summary"');
-            expect(koreanInstructionIndex).toBeLessThan(schemaIndex);
+            const koreanInstructionIndex = result.indexOf('Respond in Korean.');
+            // '- summary:'는 실제 Field Content Guidance 본문에만 존재(Intent 블록의
+            // 섹션 참조 텍스트가 아님)하므로 본문 위치의 안정적 마커로 사용한다.
+            const guidanceBodyIndex = result.indexOf('- summary:');
+            expect(koreanInstructionIndex).toBeGreaterThanOrEqual(0);
+            expect(guidanceBodyIndex).toBeGreaterThan(koreanInstructionIndex);
         });
     });
 
@@ -2521,7 +2528,7 @@ describe('prompt', () => {
             expect(result).toContain('neutral: the indicator is in');
         });
 
-        it('indicatorResults 스키마에 trend 필드가 포함된다', () => {
+        it('indicatorResults/trendlines의 enum placeholder 스켈레톤은 제거되었다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -2529,17 +2536,9 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('"trend": "neutral"');
-            expect(result).toContain(
-                '- trend / signals[].trend / patternSummaries[].trend / strategyResults[].trend / candlePatterns[].trend: "bullish", "bearish", "neutral"'
-            );
-            expect(result).toContain(
-                '- trendlines[].direction: "ascending", "descending"'
-            );
-            expect(result).toContain('"direction": "ascending"');
-            expect(result).not.toContain(
-                '"direction": "ascending | descending"'
-            );
+            // 스키마가 trend/direction enum을 강제하므로 placeholder 예시는 중복 → 제거.
+            expect(result).not.toContain('"trend": "neutral"');
+            expect(result).not.toContain('"direction": "ascending"');
         });
     });
 
@@ -2749,36 +2748,34 @@ describe('prompt', () => {
             );
         });
 
-        it('actionRecommendation 필드가 스키마에 포함된다', () => {
-            expect(result).toContain('"actionRecommendation"');
+        it('actionRecommendation 필드 가이던스가 포함된다', () => {
+            expect(result).toContain('- actionRecommendation:');
         });
 
-        it('actionRecommendation 스키마에 positionAnalysis 필드가 포함된다', () => {
-            expect(result).toContain('positionAnalysis');
+        it('actionRecommendation 가이던스에 positionAnalysis 하위 필드가 포함된다', () => {
+            expect(result).toContain('positionAnalysis:');
         });
 
-        it('actionRecommendation 스키마에 entry 필드가 포함된다', () => {
-            expect(result).toContain('"entry"');
+        it('actionRecommendation 가이던스에 entry 하위 필드가 포함된다', () => {
+            expect(result).toContain('entry:');
         });
 
-        it('actionRecommendation 스키마에 exit 필드가 포함된다', () => {
-            expect(result).toContain('"exit"');
+        it('actionRecommendation 가이던스에 exit 하위 필드가 포함된다', () => {
+            expect(result).toContain('exit:');
         });
 
-        it('actionRecommendation 스키마에 riskReward 필드가 포함된다', () => {
-            expect(result).toContain('riskReward');
+        it('actionRecommendation 가이던스에 riskReward 하위 필드가 포함된다', () => {
+            expect(result).toContain('riskReward:');
         });
 
-        it('actionRecommendation 스키마에 entryPrices 필드가 포함된다', () => {
-            expect(result).toContain('entryPrices');
-        });
-
-        it('actionRecommendation 스키마에 stopLoss 필드가 포함된다', () => {
-            expect(result).toContain('stopLoss');
-        });
-
-        it('actionRecommendation 스키마에 takeProfitPrices 필드가 포함된다', () => {
-            expect(result).toContain('takeProfitPrices');
+        it('entryPrices/stopLoss/takeProfitPrices 구조 placeholder는 제거되었다', () => {
+            // 이 구조 필드들은 스키마가 강제하고 ### Action Recommendation Decision Tree가
+            // 의미를 안내하므로 JSON placeholder 예시는 중복 → 제거.
+            expect(result).not.toContain('"entryPrices": [165.00, 167.00]');
+            expect(result).not.toContain('"stopLoss": 160.00');
+            expect(result).not.toContain(
+                '"takeProfitPrices": [180.00, 195.00]'
+            );
         });
     });
 
@@ -3306,32 +3303,6 @@ describe('prompt', () => {
     });
 
     describe('Critical Response Rules', () => {
-        it('분석 요청에 빈 배열 + null 방지 규칙이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).toContain('return an empty array []');
-            expect(result).toContain(
-                'Never include null or undefined inside arrays'
-            );
-        });
-
-        it('분석 요청에 null 금지 + 빈 배열 사용 규칙이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).toContain('return an empty array []');
-            expect(result).toContain('Never return null');
-        });
-
         it('분석 요청에 Critical Response Rules 섹션이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -3341,6 +3312,42 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain('### Critical Response Rules');
+        });
+
+        it('스키마가 강제하는 타입/구조 재진술 규칙은 제거되었다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            // responseSchema(필수/타입/items)가 강제하므로 프롬프트에서 제거됨.
+            expect(result).not.toContain('return an empty array []');
+            expect(result).not.toContain(
+                'Never include null or undefined inside arrays'
+            );
+            expect(result).not.toContain(
+                'must be plain numbers (e.g., 150.25), not strings'
+            );
+        });
+
+        it('의미적 안티-할루시네이션 규칙은 유지된다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            // 타임스탬프 verbatim 복사(어떤 값을 쓸지) — 스키마가 강제하지 못함.
+            expect(result).toContain(
+                'copied verbatim from the [ts:<number>] markers in the bar data'
+            );
+            // 옵셔널 객체 필드를 채울지/생략할지 — 모델 판단 가이드.
+            expect(result).toContain(
+                'For optional object fields (poc in keyLevels, actionRecommendation), provide an object that follows the field rules or omit the field entirely. Never set the object itself to null.'
+            );
         });
     });
 
@@ -3384,35 +3391,24 @@ describe('prompt', () => {
         });
 
         describe('enum 허용값', () => {
-            it('Critical Response Rules는 enum 규칙만 남기고 값 목록은 SSOT를 참조한다', () => {
-                expect(result).toContain(
-                    'Enum fields must contain exactly one allowed literal, never pipe-separated text (see Allowed Enum Values below).'
-                );
-                expect(result).not.toContain(
-                    'riskLevel: "low", "medium", or "high"'
-                );
-                expect(result).not.toContain(
-                    'signal strength: "strong", "moderate", or "weak"'
-                );
+            it('Allowed Enum Values 섹션은 제거되었다 (responseSchema enum이 강제)', () => {
+                // 스키마의 enum이 모든 허용값을 강제하므로 프롬프트의 값 목록은 중복.
+                expect(result).not.toContain('### Allowed Enum Values');
             });
 
-            it('명시적 enum 값 목록은 Allowed Enum Values 섹션 안에서만 등장한다', () => {
-                const ENUM_HEADING = '### Allowed Enum Values';
-                expect(countOccurrences(result, ENUM_HEADING)).toBe(1);
-
-                expect(
-                    countOccurrences(
-                        result,
-                        'riskLevel: "low", "medium", "high"'
-                    )
-                ).toBe(1);
-
-                // 해당 값 목록이 Allowed Enum Values 섹션 이후에 위치하는지 확인한다.
-                const enumSectionIndex = result.indexOf(ENUM_HEADING);
-                const riskLevelListIndex = result.indexOf(
+            it('enum 값 목록 및 enum 재진술 규칙은 프롬프트에 더 이상 등장하지 않는다', () => {
+                expect(result).not.toContain(
                     'riskLevel: "low", "medium", "high"'
                 );
-                expect(riskLevelListIndex).toBeGreaterThan(enumSectionIndex);
+                expect(result).not.toContain(
+                    'indicatorResults[].signals[].strength: "strong", "moderate", "weak"'
+                );
+                expect(result).not.toContain(
+                    'trendlines[].direction: "ascending", "descending"'
+                );
+                expect(result).not.toContain(
+                    'Enum fields must contain exactly one allowed literal, never pipe-separated text (see Allowed Enum Values below).'
+                );
             });
         });
     });
@@ -3474,7 +3470,7 @@ describe('prompt', () => {
             expect(indicatorIndex).toBeGreaterThan(intentIndex);
         });
 
-        it('스키마에 예시 값 복사 금지 안내가 포함된다', () => {
+        it('실제 데이터로 값을 계산하라는 안내가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3483,7 +3479,9 @@ describe('prompt', () => {
                 []
             );
 
-            expect(result).toContain('DO NOT copy example numbers');
+            expect(result).toContain(
+                'Compute every value from the actual data above'
+            );
         });
     });
 
