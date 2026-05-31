@@ -194,9 +194,12 @@ describe('computeMarketReference', () => {
             ...ref.short.levels.resistance,
         ];
         const avwap = shortLevels.filter(l => l.kind === 'avwap');
-        expect(avwap.length).toBeGreaterThan(0);
-        expect(avwap.some(l => l.label === 'AVWAP (swing high)')).toBe(true);
-        expect(avwap.some(l => l.label === 'AVWAP (swing low)')).toBe(true);
+        const highAvwap = avwap.find(l => l.label === 'AVWAP (swing high)');
+        const lowAvwap = avwap.find(l => l.label === 'AVWAP (swing low)');
+        // anchored at the spike bar 45 (TP=133.33) over bars 45-59 -> ~100.89;
+        // anchored at the dip bar 50 (TP=80) over bars 50-59 -> 98.00.
+        expect(highAvwap?.price).toBeCloseTo(100.89, 1);
+        expect(lowAvwap?.price).toBeCloseTo(98.0, 2);
     });
 
     it('excludes swings older than the window from the horizon structure', () => {

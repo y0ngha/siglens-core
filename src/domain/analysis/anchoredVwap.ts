@@ -12,10 +12,11 @@ export function anchoredVwap(
     bars: readonly Bar[],
     anchorIndex: number
 ): number | null {
-    if (anchorIndex < 0 || anchorIndex >= bars.length) return null;
+    const length = bars.length;
+    if (anchorIndex < 0 || anchorIndex >= length) return null;
     let priceVolume = 0;
     let volume = 0;
-    for (let i = anchorIndex; i < bars.length; i++) {
+    for (let i = anchorIndex; i < length; i++) {
         const b = bars[i];
         const typical = (b.high + b.low + b.close) / TYPICAL_PRICE_DIVISOR;
         priceVolume += typical * b.volume;

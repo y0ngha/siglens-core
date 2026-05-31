@@ -51,6 +51,23 @@ const FIB_RATIO_DECIMAL_PLACES = 1;
 const priceVs = (price: number, level: number | null): PriceVsLevel =>
     level == null ? 'unknown' : price >= level ? 'above' : 'below';
 
+/**
+ * @internal Anchored-VWAP reference level for one anchor swing (0 or 1 levels):
+ * empty when there is no anchor or the AVWAP is undefined for the anchored range.
+ */
+function resolveAvwapLevel(
+    bars: Bar[],
+    swing: SMCSwingPoint | null,
+    label: string,
+    currentPrice: number
+): ReferenceLevel[] {
+    if (swing === null) return [];
+    const value = anchoredVwap(bars, swing.index);
+    return value != null
+        ? [makeReferenceLevel(value, label, 'avwap', currentPrice)]
+        : [];
+}
+
 // ema/ma/adx read their latest value from the GLOBAL `indicators` (full-history
 // series — e.g. MA200 needs the full lookback, so a per-window recompute would be
 // wrong), so priceVsMA60/priceVsMA200/emaStack/adx are identical across horizons.
@@ -196,22 +213,20 @@ function buildHorizon(
         windowSwingLows.length > 0
             ? windowSwingLows.reduce((a, b) => (b.price < a.price ? b : a))
             : null;
-    const avwapAnchors: ReadonlyArray<{
-        swing: SMCSwingPoint | null;
-        label: string;
-    }> = [
-        { swing: anchorHigh, label: 'AVWAP (swing high)' },
-        { swing: anchorLow, label: 'AVWAP (swing low)' },
+    const avwapLevels: ReferenceLevel[] = [
+        ...resolveAvwapLevel(
+            bars,
+            anchorHigh,
+            'AVWAP (swing high)',
+            currentPrice
+        ),
+        ...resolveAvwapLevel(
+            bars,
+            anchorLow,
+            'AVWAP (swing low)',
+            currentPrice
+        ),
     ];
-    const avwapLevels: ReferenceLevel[] = avwapAnchors.flatMap(
-        ({ swing, label }) => {
-            if (swing === null) return [];
-            const value = anchoredVwap(bars, swing.index);
-            return value != null
-                ? [makeReferenceLevel(value, label, 'avwap', currentPrice)]
-                : [];
-        }
-    );
 
     const levels: ReferenceLevel[] = [
         ...collectIndicatorLevels(currentPrice, indicators, {
