@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     computeLevelCandidates,
     MAX_LEVEL_CANDIDATES_PER_SIDE,
+    CONFLUENCE_TOLERANCE_FRACTION,
+    TOUCH_TOLERANCE_FRACTION,
 } from '@/domain/analysis/levelCandidates';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import { makeSwing } from '@/__tests__/domain/analysis/levelCandidatesTestHelpers';
@@ -225,10 +227,15 @@ describe('levelCandidates', () => {
 
         describe('confluence clustering', () => {
             it('merges two sources within tolerance into one candidate', () => {
-                // 95.0 and 95.3 are 0.32% apart (< 0.5% tolerance) → one cluster.
+                // Anchor plus a second level offset by 65% of the confluence
+                // tolerance → within tolerance → one cluster. Derived so the
+                // relationship holds even if CONFLUENCE_TOLERANCE_FRACTION moves.
+                const anchor = 95.0;
+                const within =
+                    anchor * (1 + CONFLUENCE_TOLERANCE_FRACTION * 0.65);
                 const indicators = makeIndicators({
-                    ma: { 20: [95.0] },
-                    ema: { 9: [95.3] },
+                    ma: { 20: [anchor] },
+                    ema: { 9: [within] },
                 });
 
                 const { support } = computeLevelCandidates(
@@ -241,14 +248,19 @@ describe('levelCandidates', () => {
                 expect(support[0].sources.sort()).toEqual(['EMA9', 'MA20']);
                 expect(support[0].sources).toHaveLength(2);
                 // Mean of the two member prices.
-                expect(support[0].price).toBeCloseTo(95.15, 10);
+                expect(support[0].price).toBeCloseTo((anchor + within) / 2, 10);
             });
 
             it('keeps sources outside tolerance as separate candidates', () => {
-                // 95.0 and 96.0 are ~1.05% apart (> 0.5% tolerance) → two clusters.
+                // Second level offset by 150% of the confluence tolerance →
+                // outside tolerance → two clusters. Derived from the constant
+                // so the relationship survives a tolerance change.
+                const anchor = 95.0;
+                const outside =
+                    anchor * (1 + CONFLUENCE_TOLERANCE_FRACTION * 1.5);
                 const indicators = makeIndicators({
-                    ma: { 20: [95.0] },
-                    ema: { 9: [96.0] },
+                    ma: { 20: [anchor] },
+                    ema: { 9: [outside] },
                 });
 
                 const { support } = computeLevelCandidates(
@@ -282,14 +294,26 @@ describe('levelCandidates', () => {
 
         describe('tested-history touch count', () => {
             it('counts each bar that trades through the level band', () => {
-                // Level at 95; band is 95 ± 0.25% = [94.7625, 95.2375].
-                const indicators = makeIndicators({ ma: { 20: [95] } });
+                // Level at 95; band is 95 ± TOUCH_TOLERANCE_FRACTION. Bar prices
+                // are derived from the band half-width so the in-band / out-of-band
+                // classification survives a TOUCH_TOLERANCE_FRACTION change.
+                const level = 95;
+                const halfWidth = TOUCH_TOLERANCE_FRACTION * level;
+                const indicators = makeIndicators({ ma: { 20: [level] } });
                 const bars: Bar[] = [
-                    makeBar(94, 96, 0), // spans 95 → touch
-                    makeBar(95, 95, 1), // sits on 95 → touch
-                    makeBar(90, 92, 2), // entirely below band → miss
-                    makeBar(98, 99, 3), // entirely above band → miss
-                    makeBar(94.8, 95.1, 4), // inside band → touch
+                    // spans the whole band → touch
+                    makeBar(level - halfWidth * 4, level + halfWidth * 4, 0),
+                    makeBar(level, level, 1), // sits on the level → touch
+                    // entirely below the band → miss
+                    makeBar(level - halfWidth * 5, level - halfWidth * 3, 2),
+                    // entirely above the band → miss
+                    makeBar(level + halfWidth * 3, level + halfWidth * 5, 3),
+                    // fully inside the band → touch
+                    makeBar(
+                        level - halfWidth * 0.5,
+                        level + halfWidth * 0.5,
+                        4
+                    ),
                 ];
 
                 const { support } = computeLevelCandidates(

@@ -4199,10 +4199,18 @@ describe('prompt', () => {
             );
             expect(prompt).toContain('### Resistance Candidates (above price)');
             expect(prompt).toContain('### Support Candidates (below price)');
-            // New confluence + tested-history line format.
-            expect(prompt).toContain('(VAH; tested');
-            expect(prompt).toContain('(POC; tested');
-            expect(prompt).toMatch(/\(POC; tested \d+×, [\d.]+% away\)/);
+            // New confluence + tested-history line format. Allow other
+            // confluent sources around the named one in case VAH/POC cluster
+            // with another level (e.g. "(VAH, MA50; tested ...)").
+            expect(prompt).toMatch(
+                /\((?:[^)]*,\s*)?VAH(?:,\s*[^)]*)?;\s*tested/
+            );
+            expect(prompt).toMatch(
+                /\((?:[^)]*,\s*)?POC(?:,\s*[^)]*)?;\s*tested/
+            );
+            expect(prompt).toMatch(
+                /\((?:[^)]*,\s*)?POC(?:,\s*[^)]*)?;\s*tested \d+×, [\d.]+% away\)/
+            );
         });
 
         it('renders only the resistance subsection when support has no candidates', () => {

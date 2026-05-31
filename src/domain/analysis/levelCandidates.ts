@@ -212,18 +212,18 @@ const byStrengthThenDistance = (
  * Gathers price levels already computed elsewhere — Volume Profile POC/VAH/VAL,
  * the latest value of every moving average (MA/EMA), the latest Bollinger Band
  * upper/lower bounds, and SMC swing highs/lows. Raw levels whose prices coincide
- * within {@link CONFLUENCE_TOLERANCE_FRACTION} are merged into a single
- * confluence cluster (mean price, union of distinct sources). For each cluster a
- * touch count is derived from how many `bars` traded through a band of
- * {@link TOUCH_TOLERANCE_FRACTION} around the level, a deterministic proxy for
- * how often the level was tested.
+ * within 0.5% of the cluster anchor (`CONFLUENCE_TOLERANCE_FRACTION`) are merged
+ * into a single confluence cluster (mean price, union of distinct sources). For
+ * each cluster a touch count is derived from how many `bars` traded through a
+ * ±0.25% band (`TOUCH_TOLERANCE_FRACTION`) around the level, a deterministic
+ * proxy for how often the level was tested.
  *
  * Clusters are split by side relative to `currentPrice`: strictly below becomes
  * support, strictly above becomes resistance; levels equal to the current price,
  * non-finite, or non-positive are discarded. Each side is ranked by strength
- * (confluence of distinct sources plus tested history — see
- * {@link CONFLUENCE_WEIGHT}) descending, breaking ties by nearest-to-price, then
- * capped to {@link MAX_LEVEL_CANDIDATES_PER_SIDE}. The AI selects from these
+ * (confluence score = sources × 2 + touchCount (`CONFLUENCE_WEIGHT`)) descending,
+ * breaking ties by nearest-to-price, then capped to a fixed maximum per side
+ * (`MAX_LEVEL_CANDIDATES_PER_SIDE`). The AI selects from these
  * candidates and writes the rationale, which removes price-arithmetic
  * hallucination while keeping interpretation in the model's hands.
  *
