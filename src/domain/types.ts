@@ -749,21 +749,35 @@ export type LevelCandidateSource =
  * A single deterministically-derived support/resistance candidate.
  *
  * Computed in the domain from indicator/SMC data so the AI can SELECT a level
- * and write the rationale, rather than inventing the price itself.
+ * and write the rationale, rather than inventing the price itself. Raw levels
+ * that agree on a price are merged into one candidate, so a candidate carries a
+ * confluence set of `sources` and a count of how many bars tested it. Stronger
+ * candidates (more sources, more tests) are higher-conviction.
  */
 export interface LevelCandidate {
-    /** Candidate price level. */
+    /** Candidate price level (mean of the confluence cluster members). */
     price: number;
-    /** Which indicator/structure produced this level. */
+    /**
+     * @deprecated Use {@link LevelCandidate.sources} — a candidate is now a
+     * confluence cluster that can carry multiple agreeing sources. This is the
+     * primary (first) source, kept for backward compatibility.
+     */
     source: LevelCandidateSource;
+    /**
+     * Distinct indicator/structure labels that agree on this level. Length is
+     * the confluence count; a lone level keeps a single-element array.
+     */
+    sources: LevelCandidateSource[];
+    /** Number of bars whose [low, high] range traded through this level. */
+    touchCount: number;
     /** Absolute distance from the current price, in percent. */
     distancePercent: number;
 }
 
 /**
  * Precomputed support/resistance candidates split by side relative to the
- * current price. Each side is sorted nearest-to-price first and capped to a
- * fixed maximum.
+ * current price. Each side is ranked by strength (confluence of sources plus
+ * how often price tested the level) and capped to a fixed maximum.
  */
 export interface LevelCandidates {
     /** Candidates strictly below the current price (potential support). */

@@ -4199,8 +4199,10 @@ describe('prompt', () => {
             );
             expect(prompt).toContain('### Resistance Candidates (above price)');
             expect(prompt).toContain('### Support Candidates (below price)');
-            expect(prompt).toContain('[VAH]');
-            expect(prompt).toContain('[POC]');
+            // New confluence + tested-history line format.
+            expect(prompt).toContain('(VAH; tested');
+            expect(prompt).toContain('(POC; tested');
+            expect(prompt).toMatch(/\(POC; tested \d+×, [\d.]+% away\)/);
         });
 
         it('renders only the resistance subsection when support has no candidates', () => {
