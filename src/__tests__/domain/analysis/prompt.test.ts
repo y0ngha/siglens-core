@@ -41,7 +41,6 @@ import {
     TEST_BAR_BASE_TIME,
     TEST_BAR_INTERVAL,
 } from '@/__tests__/fixtures/candle';
-import { makeSwing } from '@/__tests__/domain/analysis/levelCandidatesTestHelpers';
 import type {
     Bar,
     FearGreedSnapshot,
@@ -3470,7 +3469,7 @@ describe('prompt', () => {
             expect(indicatorIndex).toBeGreaterThan(intentIndex);
         });
 
-        it('실제 데이터로 값을 계산하라는 안내가 포함된다', () => {
+        it('제공된 숫자를 사용하되 Market Reference를 권고 맥락으로 다루라는 안내가 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3480,7 +3479,7 @@ describe('prompt', () => {
             );
 
             expect(result).toContain(
-                'Compute every value from the actual data above'
+                'treat the Market Reference as advisory context'
             );
         });
     });
@@ -4173,307 +4172,94 @@ describe('prompt', () => {
         });
     });
 
-    describe('Support/Resistance Candidates section', () => {
-        const SR_PRICE = 100;
-        const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
-            ...EMPTY_SMC_RESULT,
-            ...overrides,
-        });
+    describe('Market Reference section', () => {
+        const MR_PRICE = 100;
+        const makeMarketReferenceBars = (): Bar[] =>
+            Array.from({ length: 30 }, (_, i) => makeBar(i, MR_PRICE + i));
 
-        it('renders candidate lines when candidates exist', () => {
-            const bars = [makeBar(0, SR_PRICE)];
-            const indicators = makeIndicators({
-                volumeProfile: { poc: 95, vah: 110, val: 90, profile: [] },
-            });
-
+        it('renders the advisory market-reference section with honest framing', () => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
-                bars,
-                indicators,
-                []
-            );
-
-            expect(prompt).toContain(
-                '## Support/Resistance Candidates (precomputed)'
-            );
-            expect(prompt).toContain('### Resistance Candidates (above price)');
-            expect(prompt).toContain('### Support Candidates (below price)');
-            // New confluence + tested-history line format. Allow other
-            // confluent sources around the named one in case VAH/POC cluster
-            // with another level (e.g. "(VAH, MA50; tested ...)").
-            expect(prompt).toMatch(
-                /\((?:[^)]*,\s*)?VAH(?:,\s*[^)]*)?;\s*tested/
-            );
-            expect(prompt).toMatch(
-                /\((?:[^)]*,\s*)?POC(?:,\s*[^)]*)?;\s*tested/
-            );
-            expect(prompt).toMatch(
-                /\((?:[^)]*,\s*)?POC(?:,\s*[^)]*)?;\s*tested \d+×, [\d.]+% away\)/
-            );
-        });
-
-        it('renders only the resistance subsection when support has no candidates', () => {
-            const bars = [makeBar(0, SR_PRICE)];
-            const indicators = makeIndicators({
-                smc: makeSmc({
-                    swingHighs: [makeSwing(106, 'high')],
-                }),
-            });
-
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                indicators,
-                []
-            );
-
-            expect(prompt).toContain(
-                '## Support/Resistance Candidates (precomputed)'
-            );
-            expect(prompt).toContain('### Resistance Candidates (above price)');
-            expect(prompt).not.toContain(
-                '### Support Candidates (below price)'
-            );
-            expect(prompt).not.toContain(
-                'No candidates could be derived from the available data'
-            );
-        });
-
-        it('renders only the support subsection when resistance has no candidates', () => {
-            const bars = [makeBar(0, SR_PRICE)];
-            const indicators = makeIndicators({
-                smc: makeSmc({
-                    swingLows: [makeSwing(94, 'low')],
-                }),
-            });
-
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                indicators,
-                []
-            );
-
-            expect(prompt).toContain(
-                '## Support/Resistance Candidates (precomputed)'
-            );
-            expect(prompt).toContain('### Support Candidates (below price)');
-            expect(prompt).not.toContain(
-                '### Resistance Candidates (above price)'
-            );
-            expect(prompt).not.toContain(
-                'No candidates could be derived from the available data'
-            );
-        });
-
-        it('renders a no-candidates note when none can be derived', () => {
-            const bars = [makeBar(0, SR_PRICE)];
-
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
+                makeMarketReferenceBars(),
                 makeIndicators(),
-                []
-            );
-
-            expect(prompt).toContain(
-                'No candidates could be derived from the available data'
-            );
-        });
-
-        it('still renders the section header when there are no bars', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
                 [],
-                makeIndicators(),
-                []
+                '1Day'
             );
-
             expect(prompt).toContain(
+                '## Market Reference (deterministic · advisory)'
+            );
+            expect(prompt).toContain('NOT validated forward predictors');
+            expect(prompt).not.toContain(
                 '## Support/Resistance Candidates (precomputed)'
             );
-        });
-
-        it('instructs the AI to prefer selecting from the precomputed candidates', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0, SR_PRICE)],
-                makeIndicators(),
-                []
-            );
-
-            expect(prompt).toContain(
-                'Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section'
-            );
-        });
-    });
-
-    describe('Pivot & Fibonacci Levels section', () => {
-        const PF_PRICE = 100;
-        const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
-            ...EMPTY_SMC_RESULT,
-            ...overrides,
-        });
-
-        it('renders pivot subsections from the prior-period bar', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0), makeBar(1, PF_PRICE)],
-                makeIndicators(),
-                []
-            );
-
-            expect(prompt).toContain(
+            expect(prompt).not.toContain(
                 '## Pivot & Fibonacci Levels (precomputed)'
             );
-            expect(prompt).toContain(
-                '### Standard Pivot (from prior period H/L/C)'
-            );
-            expect(prompt).toContain(
-                '### Fibonacci Pivot (from prior period H/L/C)'
-            );
-        });
-
-        it('renders the Fibonacci projection when swing points exist', () => {
-            const indicators = makeIndicators({
-                smc: makeSmc({
-                    swingHighs: [{ index: 20, price: 130, type: 'high' }],
-                    swingLows: [{ index: 10, price: 95, type: 'low' }],
-                }),
-            });
-
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0, PF_PRICE)],
-                indicators,
-                []
-            );
-
-            expect(prompt).toContain('### Fibonacci Levels (most recent swing');
-            expect(prompt).toContain('Retracements:');
-            expect(prompt).toContain('Extensions (targets):');
-        });
-
-        it('omits the Fibonacci projection subsection when swing points are missing', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0, PF_PRICE)],
-                makeIndicators(),
-                []
-            );
-
             expect(prompt).not.toContain(
-                '### Fibonacci Levels (most recent swing'
+                '## Trendline Candidates (precomputed)'
             );
         });
 
-        it('renders a no-levels note when no bars and no swings exist', () => {
+        it('no longer claims more-tested levels are higher conviction', () => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
                 [],
-                makeIndicators(),
-                []
+                '1Day'
             );
-
-            expect(prompt).toContain(
-                'No pivot or Fibonacci levels could be derived from the available data'
-            );
+            expect(prompt).not.toContain('higher-conviction');
         });
 
-        it('instructs the AI to interpret rather than recompute the levels', () => {
-            const skill: Skill = makeSkill({ type: 'support_resistance' });
+        it('labels each horizon with a timeframe-relative calendar span', () => {
+            const daily = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            const intraday = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '5Min'
+            );
+            // Same "Long-term" horizon reads as months on a daily chart but only
+            // a few sessions on a 5-minute chart, so the model calibrates vocabulary.
+            expect(daily).toContain('Long-term — ~9-12 months');
+            expect(intraday).toContain('Long-term — ~2-3 trading days');
+            expect(daily).not.toContain('Long-term — ~2-3 trading days');
+        });
+
+        // Guards the hand-authored HORIZON_SPAN_BY_TIMEFRAME strings for every
+        // timeframe×horizon, so a typo in a span label fails a test rather than
+        // shipping silently.
+        it.each([
+            ['1Day', ['~1 month', '~1 quarter', '~9-12 months']],
+            ['4Hour', ['~2-3 weeks', '~2 months', '~5 months']],
+            ['1Hour', ['~4 trading days', '~2 weeks', '~6 weeks']],
+            ['30Min', ['~2 trading days', '~1 week', '~3 weeks']],
+            ['15Min', ['~1 trading day', '~3 trading days', '~1-2 weeks']],
+            [
+                '5Min',
+                ['~2 trading hours', '~1 trading day', '~2-3 trading days'],
+            ],
+        ] as const)('renders all horizon spans for %s', (tf, spans) => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
-                [makeBar(0, PF_PRICE)],
+                makeMarketReferenceBars(),
                 makeIndicators(),
-                [skill]
+                [],
+                tf
             );
-
-            expect(prompt).toContain(
-                'do NOT perform the pivot or Fibonacci arithmetic yourself'
-            );
-            expect(prompt).toContain(
-                'already provided in the ## Pivot & Fibonacci Levels (precomputed) section'
-            );
-        });
-    });
-
-    describe('Trendline Candidates section', () => {
-        const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
-            ...EMPTY_SMC_RESULT,
-            ...overrides,
-        });
-
-        it('renders the section with a candidate line when swings produce candidates', () => {
-            const bars = Array.from({ length: 11 }, (_, i) => makeBar(i));
-            // Three collinear descending swing highs at bar indices 0, 5, 10.
-            const indicators = makeIndicators({
-                smc: makeSmc({
-                    swingHighs: [
-                        { index: 0, price: 130, type: 'high' },
-                        { index: 5, price: 120, type: 'high' },
-                        { index: 10, price: 110, type: 'high' },
-                    ],
-                }),
-            });
-
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                indicators,
-                []
-            );
-
-            // The section header also appears in the trendline instructions, so
-            // assert on the section's unique description line + a candidate line.
-            expect(prompt).toContain(
-                'Deterministically derived from SMC swing points'
-            );
-            expect(prompt).toContain(
-                `- descending: start { time: ${bars[0].time}, price: 130.00 } -> end { time: ${bars[10].time}, price: 110.00 }`
-            );
-        });
-
-        it('omits the section when no trendline candidates can be derived', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0)],
-                makeIndicators(),
-                []
-            );
-
-            // The instructions reference the header, so check the section-only
-            // description line is absent rather than the (shared) header text.
-            expect(prompt).not.toContain(
-                'Deterministically derived from SMC swing points'
-            );
-        });
-
-        it('instructs the AI to prefer selecting from the precomputed candidates', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0)],
-                makeIndicators(),
-                []
-            );
-
-            expect(prompt).toContain(
-                'Prefer SELECTING trendlines from the ## Trendline Candidates (precomputed) section'
-            );
+            for (const span of spans) expect(prompt).toContain(span);
         });
     });
 });

@@ -1024,16 +1024,27 @@ function buildAnalysisPrompt(
 3. 최근 봉 데이터 (최근 30봉) — 각 봉에 캔들 패턴 태깅 + 다봉 패턴 감지
 4. 거래량 분석 (평균 대비 비율)
 5. 인디케이터 수치 (RSI, MACD, 볼린저, DMI, Stochastic, StochRSI, CCI, Volume Profile POC/VAH/VAL, Ichimoku 전환선/기준선/SpanA/SpanB/후행스팬)
-6. 지지/저항 후보 (사전계산, `## Support/Resistance Candidates (precomputed)`) — `computeLevelCandidates(currentPrice, indicators, bars)`가 Volume Profile(POC/VAH/VAL)·MA/EMA·Bollinger 경계·SMC 스윙에서 raw 레벨을 모은 뒤, **confluence clustering + tested-history**로 강도를 평가한다. (a) 가격이 `CONFLUENCE_TOLERANCE_FRACTION`(0.5%) 이내로 일치하는 raw 레벨들을 하나의 클러스터로 병합 — 클러스터 price = 멤버 평균, `sources` = 중복 제거한 source 라벨 집합(`sources.length` = confluence 수). (b) 각 클러스터에 대해 `level ± TOUCH_TOLERANCE_FRACTION`(0.25%) 밴드를 [low, high]가 통과한 bar 수를 세어 `touchCount`(가격이 레벨을 테스트한 횟수의 결정론적 proxy)를 구한다. (c) strength = `sources.length * CONFLUENCE_WEIGHT(2) + touchCount` — 독립 지표들의 일치(confluence)와 반복 테스트가 모두 강도를 높인다. 현재가 기준으로 저항(위)/지지(아래)로 분리, side별 **strength DESC + 동점 시 거리 ASC**로 정렬 후 상위 N개(`MAX_LEVEL_CANDIDATES_PER_SIDE`)만 노출. 렌더 형식은 `- 152.30 (POC, MA200, swing low; tested 5×, 1.2% away)`. AI는 가격을 직접 계산하지 않고 이 후보 중에서 keyLevels를 **선택**하며, source/test가 많은 후보일수록 고확신이다(price-arithmetic hallucination 제거). 양측 모두 비면 "No candidates could be derived" note만 렌더링.
-7. 피벗 & 피보나치 레벨 (사전계산, `## Pivot & Fibonacci Levels (precomputed)`) — `computePivotFibLevels`가 직전 기간 H/L/C에서 도출한 Standard/Fibonacci 피벗(PP/R1-R3/S1-S3)과 최근 스윙 고/저에서 도출한 피보나치 되돌림(23.6~78.6%)·확장(100~261.8%) 목표를 결정론적으로 산출. AI는 피벗/피보 산술을 직접 수행하지 않고 이 레벨들을 **선택·해석**한다(arithmetic hallucination 제거). 도출 불가 시 "No pivot or Fibonacci levels could be derived" note만 렌더링.
-8. 추세선 후보 (사전계산, `## Trendline Candidates (precomputed)`) — `computeTrendlineCandidates`가 감지된 SMC 스윙 포인트를 실제 봉의 시간(`bars[swing.index].time`)·가격으로 연결해 후보 추세선을 결정론적으로 도출. 저항선은 스윙 고점, 지지선은 스윙 저점에서 side별로 구성하고, 각 선을 같은 쪽 스윙이 허용오차 내에서 몇 개나 닿는지(터치 수, 두 끝점은 항상 포함)로 점수화한다. 터치 수 → 종료시간 최신 → 스팬 순으로 랭킹, 근접 중복 제거, side별 상위 N개(`MAX_TRENDLINE_CANDIDATES_PER_SIDE`) + 전체 상한(`MAX_TRENDLINE_CANDIDATES`)만 상위 후보로 노출. AI는 좌표를 지어내지 않고 이 후보의 실제 시간/가격 끝점을 **선택·재사용**한다(time-coordinate hallucination 제거). 피벗 & 피보나치 섹션 바로 뒤에 주입되며, 후보가 없으면 섹션 자체가 생략된다.
-9. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
-10. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
-11. 전략 분석 (type='strategy' skills, confidence >= 0.5)
-12. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
-13. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
-14. 분석 요청 및 JSON 응답 형식 지시
+6. 마켓 레퍼런스 (결정론적·어드바이저리, `## Market Reference (deterministic · advisory)`) — `computeMarketReference(bars, indicators, timeframe)`가 시장 참여자들이 흔히 주시하는 **레퍼런스 레벨 + 추세 구조**를 결정론적으로 산출. 자세한 정의는 아래 **마켓 레퍼런스 레이어** 절 참조. **예측이 아니라 어드바이저리** — 백테스트 결과 정밀한 레벨/추세 예측은 distance-matched random 대비 forward edge가 ~0이라(fib 되돌림/확장만 유효), 프롬프트는 명시적으로 "NOT validated forward predictors … 다른 증거와 함께 가늠하는 컨텍스트"로 프레이밍한다. AI는 레벨을 직접 계산하지 않고(arithmetic hallucination 제거) keyLevels에 정확한 레퍼런스 가격을 **재사용해도 되고** 패턴·SMC·볼륨에서 직접 도출해도 된다 — 둘 다 강제는 아니며, **사전계산되었다는 이유만으로 더 높은 컨빅션을 부여하지 않는다.**
+7. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
+8. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
+9. 전략 분석 (type='strategy' skills, confidence >= 0.5)
+10. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
+11. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
+12. 분석 요청 및 JSON 응답 형식 지시
 ```
+
+### 마켓 레퍼런스 레이어
+
+`computeMarketReference(bars, indicators, timeframe)` (`domain/analysis/marketReference.ts`)는 차트 프롬프트에 주입되는 **결정론적·다호라이즌 어드바이저리 레퍼런스**를 산출한다. 레거시 `computeLevelCandidates`(S/R 후보)·`computePivotFibLevels`(피벗/피보)·`computeTrendlineCandidates`(추세선) 사전계산을 대체한다.
+
+- **어드바이저리, 예측 아님.** 백테스트 결과 정밀한 지지/저항·추세·피벗 예측은 distance-matched random 대비 forward edge가 사실상 0이다(되돌림/확장 fib만 의미 있는 신호). 따라서 레벨은 "참여자들이 흔히 주시하는 컨텍스트"로만 노출하며, 프롬프트 프레이밍은 명시적으로 검증된 예측자가 아님(NOT validated forward predictors)을 적시한다. **사전계산되었다는 이유만으로 더 높은 컨빅션을 부여하지 않는다.**
+- **다호라이즌.** short/medium/long 세 lookback 윈도우(타임프레임별 크기, `bars.length`로 캡)에서 각각 레벨·추세 구조를 자체 윈도우 기준으로 재계산한다(`MarketReference = { short, medium, long }`, 각 `HorizonReference = { window, levels, structure }`).
+- **세 버킷.**
+  1. 검증된 레벨 (validated) — fib 되돌림/확장, Volume Profile(POC/VAH/VAL), 스윙 고/저, MA/EMA, 라운드 넘버.
+  2. 널리 주시되는 지표 레벨 (widely-watched) — Supertrend, Ichimoku, Donchian, Bollinger, Keltner, VWAP, 표준 피벗, Camarilla 피벗.
+  3. 서술적 추세 구조 (descriptive) — 가격 vs MA60/MA200, EMA 정렬, 스윙 구조(HH_HL/LH_LL/mixed), ADX, 효율비, 레짐(trending/ranging). **방향 예측이 아니라 사실 기술이다.**
+- **side 분리.** 레벨은 현재가 기준 support(아래)/resistance(위)로 나눠 nearest-first로 노출하며, AI는 정확한 레퍼런스 가격을 keyLevels에 **재사용**(arithmetic hallucination 제거)하거나 패턴·SMC·볼륨에서 직접 도출한다 — 둘 다 강제가 아니다.
+- **`classifyTrend`는 별개.** 시그널/대시보드용 `classifyTrend`(`domain/signals/`)는 이 레이어와 무관한 독립 관심사로 변경 없이 유지된다.
 
 ### 응답 형식 (JSON)
 

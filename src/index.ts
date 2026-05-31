@@ -104,8 +104,7 @@ export {
     clusterKeyLevels,
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
-export { computeLevelCandidates } from './domain/analysis/levelCandidates';
-export { computePivotFibLevels } from './domain/analysis/pivotFib';
+export { computeMarketReference } from './domain/analysis/marketReference';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
@@ -428,16 +427,18 @@ export type {
     KeyLevel,
     KeyLevels,
     KeyPrice,
-    FibonacciLevel,
-    FibonacciPivotLevels,
-    FibonacciProjection,
-    LevelCandidate,
-    LevelCandidates,
-    LevelCandidateSource,
-    PivotFibLevels,
-    PivotLevelSet,
-    StandardPivotLevels,
-    SwingLegDirection,
+    MarketReference,
+    HorizonReference,
+    HorizonWindow,
+    HorizonKey,
+    TrendStructure,
+    ReferenceLevel,
+    ReferenceLevels,
+    ReferenceLevelKind,
+    PriceVsLevel,
+    EmaStackState,
+    SwingStructureState,
+    MarketRegime,
     MACDResult,
     MarketBriefingResponse,
     NewsAnalysisResponse,
