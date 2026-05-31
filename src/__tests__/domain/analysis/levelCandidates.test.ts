@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
     computeLevelCandidates,
     MAX_LEVEL_CANDIDATES_PER_SIDE,
+    CONFLUENCE_TOLERANCE_FRACTION,
+    TOUCH_TOLERANCE_FRACTION,
 } from '@/domain/analysis/levelCandidates';
 import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
 import { makeSwing } from '@/__tests__/domain/analysis/levelCandidatesTestHelpers';
-import type { IndicatorResult, SMCResult } from '@/domain/types';
+import type { Bar, IndicatorResult, SMCResult } from '@/domain/types';
 
 const CURRENT_PRICE = 100;
 
@@ -44,18 +46,29 @@ const makeSmc = (overrides: Partial<SMCResult>): SMCResult => ({
     ...overrides,
 });
 
+/** A bar that spans `[low, high]`; other OHLCV fields are filler. */
+const makeBar = (low: number, high: number, time = 0): Bar => ({
+    time,
+    open: low,
+    high,
+    low,
+    close: high,
+    volume: 1,
+});
+
 describe('levelCandidates', () => {
     describe('computeLevelCandidates', () => {
         describe('when the current price is not usable', () => {
             it('returns empty sides for a zero price', () => {
-                const result = computeLevelCandidates(0, makeIndicators());
+                const result = computeLevelCandidates(0, makeIndicators(), []);
                 expect(result).toEqual({ support: [], resistance: [] });
             });
 
             it('returns empty sides for a non-finite price', () => {
                 const result = computeLevelCandidates(
                     Number.NaN,
-                    makeIndicators()
+                    makeIndicators(),
+                    []
                 );
                 expect(result).toEqual({ support: [], resistance: [] });
             });
@@ -74,11 +87,16 @@ describe('levelCandidates', () => {
 
                 const { support, resistance } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
-                expect(support.map(c => c.source)).toEqual(['POC', 'VAL']);
-                expect(resistance.map(c => c.source)).toEqual(['VAH']);
+                // 95 and 90 are >0.5% apart, so they stay as separate clusters.
+                expect(support.flatMap(c => c.sources).sort()).toEqual([
+                    'POC',
+                    'VAL',
+                ]);
+                expect(resistance.flatMap(c => c.sources)).toEqual(['VAH']);
                 expect(support.every(c => c.price < CURRENT_PRICE)).toBe(true);
                 expect(resistance.every(c => c.price > CURRENT_PRICE)).toBe(
                     true
@@ -97,10 +115,13 @@ describe('levelCandidates', () => {
 
                 const { support, resistance } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
-                const sources = [...support, ...resistance].map(c => c.source);
+                const sources = [...support, ...resistance].flatMap(
+                    c => c.sources
+                );
                 expect(sources).not.toContain('POC');
             });
         });
@@ -119,11 +140,12 @@ describe('levelCandidates', () => {
 
                 const { support, resistance } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
-                const supportSources = support.map(c => c.source);
-                const resistanceSources = resistance.map(c => c.source);
+                const supportSources = support.flatMap(c => c.sources);
+                const resistanceSources = resistance.flatMap(c => c.sources);
 
                 expect(supportSources).toContain('MA20');
                 expect(supportSources).toContain('EMA9');
@@ -141,11 +163,18 @@ describe('levelCandidates', () => {
 
                 const { support } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
                 expect(support).toEqual([
-                    { price: 96, source: 'MA20', distancePercent: 4 },
+                    {
+                        price: 96,
+                        source: 'MA20',
+                        sources: ['MA20'],
+                        touchCount: 0,
+                        distancePercent: 4,
+                    },
                 ]);
             });
 
@@ -156,7 +185,8 @@ describe('levelCandidates', () => {
 
                 const { support, resistance } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
                 expect(support).toEqual([]);
@@ -170,11 +200,12 @@ describe('levelCandidates', () => {
 
                 const { support, resistance } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
                 expect(resistance).toEqual([]);
-                expect(support.map(c => c.source)).toEqual(['BB lower']);
+                expect(support.flatMap(c => c.sources)).toEqual(['BB lower']);
             });
         });
 
@@ -186,29 +217,253 @@ describe('levelCandidates', () => {
 
                 const { support } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
-                expect(support.map(c => c.source)).toEqual(['MA60']);
+                expect(support.flatMap(c => c.sources)).toEqual(['MA60']);
             });
         });
 
-        describe('ordering and capping', () => {
-            it('sorts each side nearest-to-price first', () => {
+        describe('confluence clustering', () => {
+            it('merges two sources within tolerance into one candidate', () => {
+                // Anchor plus a second level offset by 65% of the confluence
+                // tolerance → within tolerance → one cluster. Derived so the
+                // relationship holds even if CONFLUENCE_TOLERANCE_FRACTION moves.
+                const anchor = 95.0;
+                const within =
+                    anchor * (1 + CONFLUENCE_TOLERANCE_FRACTION * 0.65);
                 const indicators = makeIndicators({
-                    ma: { 20: [90], 50: [80], 60: [99] },
+                    ma: { 20: [anchor] },
+                    ema: { 9: [within] },
                 });
 
                 const { support } = computeLevelCandidates(
                     CURRENT_PRICE,
+                    indicators,
+                    []
+                );
+
+                expect(support).toHaveLength(1);
+                expect(support[0].sources.sort()).toEqual(['EMA9', 'MA20']);
+                expect(support[0].sources).toHaveLength(2);
+                // Mean of the two member prices.
+                expect(support[0].price).toBeCloseTo((anchor + within) / 2, 10);
+            });
+
+            it('keeps sources outside tolerance as separate candidates', () => {
+                // Second level offset by 150% of the confluence tolerance →
+                // outside tolerance → two clusters. Derived from the constant
+                // so the relationship survives a tolerance change.
+                const anchor = 95.0;
+                const outside =
+                    anchor * (1 + CONFLUENCE_TOLERANCE_FRACTION * 1.5);
+                const indicators = makeIndicators({
+                    ma: { 20: [anchor] },
+                    ema: { 9: [outside] },
+                });
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    []
+                );
+
+                expect(support).toHaveLength(2);
+                expect(support.every(c => c.sources.length === 1)).toBe(true);
+            });
+
+            it('de-duplicates identical source labels in a cluster', () => {
+                // Two swing lows at the same price collapse to one 'swing low'.
+                const indicators = makeIndicators({
+                    smc: makeSmc({
+                        swingLows: [makeSwing(95, 'low'), makeSwing(95, 'low')],
+                    }),
+                });
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    []
+                );
+
+                expect(support).toHaveLength(1);
+                expect(support[0].sources).toEqual(['swing low']);
+            });
+        });
+
+        describe('tested-history touch count', () => {
+            it('counts each bar that trades through the level band', () => {
+                // Level at 95; band is 95 ± TOUCH_TOLERANCE_FRACTION. Bar prices
+                // are derived from the band half-width so the in-band / out-of-band
+                // classification survives a TOUCH_TOLERANCE_FRACTION change.
+                const level = 95;
+                const halfWidth = TOUCH_TOLERANCE_FRACTION * level;
+                const indicators = makeIndicators({ ma: { 20: [level] } });
+                const bars: Bar[] = [
+                    // spans the whole band → touch
+                    makeBar(level - halfWidth * 4, level + halfWidth * 4, 0),
+                    makeBar(level, level, 1), // sits on the level → touch
+                    // entirely below the band → miss
+                    makeBar(level - halfWidth * 5, level - halfWidth * 3, 2),
+                    // entirely above the band → miss
+                    makeBar(level + halfWidth * 3, level + halfWidth * 5, 3),
+                    // fully inside the band → touch
+                    makeBar(
+                        level - halfWidth * 0.5,
+                        level + halfWidth * 0.5,
+                        4
+                    ),
+                ];
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    bars
+                );
+
+                expect(support[0].touchCount).toBe(3);
+            });
+
+            it('reports zero touches for a level price never traded', () => {
+                const indicators = makeIndicators({ ma: { 20: [95] } });
+                const bars: Bar[] = [makeBar(80, 85, 0), makeBar(70, 75, 1)];
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    bars
+                );
+
+                expect(support[0].touchCount).toBe(0);
+            });
+
+            it('ignores bars with non-finite low/high', () => {
+                const indicators = makeIndicators({ ma: { 20: [95] } });
+                const bars: Bar[] = [
+                    makeBar(94, 96, 0), // valid touch
+                    { ...makeBar(94, 96, 1), low: Number.NaN },
+                    { ...makeBar(94, 96, 2), high: Number.POSITIVE_INFINITY },
+                ];
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    bars
+                );
+
+                expect(support[0].touchCount).toBe(1);
+            });
+
+            it('reports zero touches when there are no bars', () => {
+                const indicators = makeIndicators({ ma: { 20: [95] } });
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    []
+                );
+
+                expect(support[0].touchCount).toBe(0);
+            });
+        });
+
+        describe('deprecated `source` alias', () => {
+            it('populates `source` with the primary (first) cluster source', () => {
+                const indicators = makeIndicators({
+                    volumeProfile: {
+                        poc: 95,
+                        vah: 110,
+                        val: 90,
+                        profile: [],
+                    },
+                    ma: { 20: [98], 50: [102] },
+                    ema: { 9: [99] },
+                    bollinger: [{ upper: 108, middle: 100, lower: 92 }],
+                    smc: makeSmc({
+                        swingHighs: [makeSwing(106, 'high')],
+                        swingLows: [makeSwing(94, 'low')],
+                    }),
+                });
+
+                const { support, resistance } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    []
+                );
+
+                for (const candidate of [...support, ...resistance]) {
+                    expect(candidate.source).toBe(candidate.sources[0]);
+                }
+            });
+        });
+
+        describe('optional bars argument', () => {
+            it('compiles and works when called without bars', () => {
+                const indicators = makeIndicators({
+                    volumeProfile: { poc: 95, vah: 110, val: 90, profile: [] },
+                    ma: { 20: [98] },
+                });
+
+                // Two-arg call (no `bars`) must compile and behave like an
+                // empty-bars call: every touchCount is 0.
+                const { support, resistance } = computeLevelCandidates(
+                    CURRENT_PRICE,
                     indicators
                 );
 
-                expect(support.map(c => c.price)).toEqual([99, 90, 80]);
+                const all = [...support, ...resistance];
+                expect(all.length).toBeGreaterThan(0);
+                expect(all.every(c => c.touchCount === 0)).toBe(true);
+            });
+        });
+
+        describe('strength ranking', () => {
+            it('ranks a far-but-strong level above a near-but-weak one', () => {
+                // Near, weak: single source at 99, never tested.
+                // Far, strong: 90/90.2 confluence (2 sources) tested repeatedly.
+                const indicators = makeIndicators({
+                    ma: { 20: [99], 50: [90.0] },
+                    ema: { 9: [90.2] },
+                });
+                const bars: Bar[] = [
+                    makeBar(89.9, 90.3, 0),
+                    makeBar(89.9, 90.3, 1),
+                    makeBar(89.9, 90.3, 2),
+                ];
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    bars
+                );
+
+                expect(support[0].sources).toHaveLength(2);
+                expect(support[0].price).toBeCloseTo(90.1, 10);
+                expect(support[1].sources).toEqual(['MA20']);
+                expect(support[1].price).toBe(99);
             });
 
+            it('breaks equal-strength ties by nearest-to-price', () => {
+                // Two lone, untested levels (equal strength) → nearest wins.
+                const indicators = makeIndicators({
+                    ma: { 20: [98], 50: [80] },
+                });
+
+                const { support } = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    indicators,
+                    []
+                );
+
+                expect(support.map(c => c.price)).toEqual([98, 80]);
+            });
+        });
+
+        describe('capping', () => {
             it('caps each side to the maximum candidate count', () => {
                 const ma: Record<number, (number | null)[]> = {};
+                // Spread levels >0.5% apart so none cluster together.
                 for (let i = 1; i <= MAX_LEVEL_CANDIDATES_PER_SIDE + 3; i++) {
                     ma[i] = [CURRENT_PRICE - i];
                 }
@@ -216,10 +471,12 @@ describe('levelCandidates', () => {
 
                 const { support } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
                 expect(support).toHaveLength(MAX_LEVEL_CANDIDATES_PER_SIDE);
+                // All equal strength (lone, untested) → nearest five survive.
                 expect(support[0].price).toBe(CURRENT_PRICE - 1);
             });
         });
@@ -232,11 +489,24 @@ describe('levelCandidates', () => {
 
                 const { support, resistance } = computeLevelCandidates(
                     CURRENT_PRICE,
-                    indicators
+                    indicators,
+                    []
                 );
 
                 expect(resistance[0].distancePercent).toBe(10);
                 expect(support[0].distancePercent).toBe(10);
+            });
+        });
+
+        describe('empty inputs', () => {
+            it('returns empty sides when no indicators produce levels', () => {
+                const result = computeLevelCandidates(
+                    CURRENT_PRICE,
+                    makeIndicators(),
+                    []
+                );
+
+                expect(result).toEqual({ support: [], resistance: [] });
             });
         });
     });

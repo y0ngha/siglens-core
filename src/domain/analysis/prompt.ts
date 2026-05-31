@@ -619,7 +619,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
 const SR_CANDIDATES_HEADER = '## Support/Resistance Candidates (precomputed)';
 
 const formatCandidateLine = (candidate: LevelCandidate): string =>
-    `- ${fmt(candidate.price)} [${candidate.source}] (${candidate.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
+    `- ${fmt(candidate.price)} (${candidate.sources.join(', ')}; tested ${candidate.touchCount}×, ${candidate.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
 
 const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
     const { support, resistance } = candidates;
@@ -648,7 +648,7 @@ const formatLevelCandidatesSection = (candidates: LevelCandidates): string => {
 
     return [
         SR_CANDIDATES_HEADER,
-        'Deterministically derived from Volume Profile, moving averages, Bollinger bands, and SMC swing points. Nearest-to-price first.',
+        'Deterministically derived from Volume Profile, moving averages, Bollinger bands, and SMC swing points. Ranked by strength (confluence of sources + how often price tested the level), strongest first.',
         ...resistanceLines,
         ...supportLines,
     ].join('\n');
@@ -870,7 +870,7 @@ const ANALYSIS_GUIDELINES = [
     '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "목표가", "손절선"). Never use English or snake_case identifiers.',
     '',
     '### Support/Resistance Assessment',
-    '- Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section — these are deterministically derived from the data, so use them verbatim and write the reason. Only introduce a non-candidate level when you have strong, explicitly-stated justification (e.g. a confirmed pattern neckline or pivot the candidates do not cover).',
+    '- Prefer SELECTING keyLevels prices from the ## Support/Resistance Candidates (precomputed) section — these are deterministically derived from the data, so use them verbatim and write the reason. Candidates with more confluent sources and more tests are higher-conviction; prefer them when choosing. Only introduce a non-candidate level when you have strong, explicitly-stated justification (e.g. a confirmed pattern neckline or pivot the candidates do not cover).',
     `- Check convergence points of moving averages (MA ${MA_DEFAULT_PERIODS.join(',')}, EMA ${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_SHORT_INDEX]}/${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_LONG_INDEX]}) first`,
     '- Use Volume Profile levels: POC is the strongest support/resistance, VAH/VAL mark the boundaries of the value area',
     '- Price returning to POC indicates a high-probability reaction zone; breakouts above VAH or below VAL signal potential trend continuation',
@@ -1198,7 +1198,7 @@ export function buildAnalysisPrompt(
     const currentPrice = bars.length > 0 ? bars[bars.length - 1].close : null;
     const levelCandidates =
         currentPrice !== null
-            ? computeLevelCandidates(currentPrice, indicators)
+            ? computeLevelCandidates(currentPrice, indicators, bars)
             : { support: [], resistance: [] };
     const pivotFibLevels = computePivotFibLevels(bars, indicators);
     const trendlineCandidates = computeTrendlineCandidates(
