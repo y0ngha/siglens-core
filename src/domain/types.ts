@@ -531,6 +531,121 @@ export interface Skill {
     confidenceWeight: number;
     content: string;
     display?: SkillDisplay;
+    /**
+     * Dynamic-gating metadata parsed from the skill's frontmatter. When absent,
+     * the skill is treated as untagged and {@link selectSkills} includes it
+     * fail-open (never silently dropped).
+     */
+    gating?: SkillGating;
+    /**
+     * Build-time precomputed token count of the skill body. Tokenizers are I/O
+     * and therefore forbidden in the domain layer, so this value is baked into
+     * the frontmatter by a build script and read here as plain metadata.
+     */
+    tokenCost?: number;
+}
+
+/**
+ * Which gating path a {@link SkillGating} entry uses.
+ *
+ * - `'event'` — gate on transient `detectSignals` events (cross / flip /
+ *   breakout) via {@link SkillGating.triggers}.
+ * - `'state'` — gate on a persistent textbook condition (overbought, band
+ *   proximity, …) via {@link SkillGating.state}.
+ */
+export type SignalKind = 'event' | 'state';
+
+/**
+ * Indicator feature a state predicate inspects. Each maps to a field of
+ * {@link IndicatorResult} that the `detectSignals` catalog under-covers, so it
+ * is gated on a textbook *state* threshold rather than a discrete event.
+ */
+export type SkillStateFeature =
+    | 'bollinger'
+    | 'keltner'
+    | 'williamsR'
+    | 'stochastic'
+    | 'stochRsi'
+    | 'donchian'
+    | 'vwap'
+    | 'buySellVolume';
+
+/**
+ * Predicate key selecting how a feature's current value is compared against a
+ * textbook threshold.
+ *
+ * - `'pctB'` — Bollinger %B vs timeframe-aware hi/lo bounds.
+ * - `'bandDistAtr'` — distance to a channel band measured in ATR multiples.
+ * - `'level'` — raw oscillator value vs overbought/oversold bounds.
+ * - `'ratio'` — a 0–1 ratio (e.g. buy/(buy+sell)) vs hi/lo bounds.
+ * - `'channelProximity'` — proximity to (or breach of) a channel high/low.
+ */
+export type SkillStatePredicateKind =
+    | 'pctB'
+    | 'bandDistAtr'
+    | 'level'
+    | 'ratio'
+    | 'channelProximity';
+
+/**
+ * A textbook *state* predicate: "this indicator feature is currently notable".
+ *
+ * The thresholds backing each `(feature, predicate)` pair live as named
+ * constants inside `skillGatingPredicates.ts`; `hi`/`lo` are optional manual
+ * overrides for the rare skill that needs a non-default bound.
+ */
+export interface SkillStatePredicate {
+    /** Indicator feature inspected. */
+    feature: SkillStateFeature;
+    /** How the feature's value is compared (percent-B, band distance, …). */
+    predicate: SkillStatePredicateKind;
+    /** Upper / overbought threshold override (optional). */
+    hi?: number;
+    /** Lower / oversold threshold override (optional). */
+    lo?: number;
+}
+
+/**
+ * Frontmatter gating metadata controlling whether a skill is injected into the
+ * chart prompt.
+ *
+ * - `tier: 'always_on'` — injected unconditionally (Tier-0).
+ * - `tier: 'gated'` — injected only when its `signalKind` path fires:
+ *   `'event'` requires one of `triggers` to be present in the detected signals;
+ *   `'state'` requires `state` to evaluate notable for the current chart.
+ */
+export interface SkillGating {
+    /** `'always_on'` injects unconditionally; `'gated'` defers to the path below. */
+    tier: 'always_on' | 'gated';
+    /** Gating path selector — required when `tier === 'gated'`. */
+    signalKind?: SignalKind;
+    /** Event path: `detectSignals` signal names that load this skill. */
+    triggers?: readonly string[];
+    /** State path: textbook predicate that loads this skill when notable. */
+    state?: SkillStatePredicate;
+}
+
+/**
+ * Read-only chart context consumed by {@link selectSkills} and the state
+ * predicates. Every field is already in scope inside `buildAnalysisPrompt`, so
+ * the selector stays a pure function of already-computed data (no I/O).
+ */
+export interface SkillSelectionContext {
+    /** Indicator suite for the analyzed bars (state predicates read its last values). */
+    indicators: IndicatorResult;
+    /** Result of {@link detectSignals} — drives the event gating path. */
+    signals: readonly Signal[];
+    /** Timeframe of the analyzed bars; drives TF-aware thresholds. */
+    timeframe: Timeframe;
+    /** Candle pattern names detected on the analyzed bars. */
+    detectedCandles: readonly string[];
+    /**
+     * Last close of the analyzed bars. Channel/band/VWAP state predicates need
+     * the spot price, which `IndicatorResult` does not carry on its own.
+     */
+    price: number;
+    /** ATR as a percent of price (`ATR / price * 100`) for ATR-extreme promotion. */
+    atrPercent: number;
 }
 
 /** Lightweight skill summary used for showcase / listing UIs. */
