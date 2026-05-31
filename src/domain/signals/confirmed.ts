@@ -11,13 +11,17 @@ import {
 } from '@/domain/indicators/constants';
 import { calculateMA } from '@/domain/indicators/ma';
 import {
+    CCI_BEARISH_CROSS_LEVEL,
     CCI_BULLISH_CROSS_LEVEL,
+    CCI_OVERBOUGHT_CROSS_LEVEL,
     CCI_OVERSOLD_CROSS_LEVEL,
+    CMF_BEARISH_CROSS_LEVEL,
     CMF_BULLISH_CROSS_LEVEL,
     CROSS_LOOKBACK_BARS,
     DMI_ADX_TREND_THRESHOLD,
     GOLDEN_CROSS_FAST_PERIOD,
     GOLDEN_CROSS_SLOW_PERIOD,
+    MFI_OVERBOUGHT_LEVEL,
     MFI_OVERSOLD_LEVEL,
     SQUEEZE_MOMENTUM_ZERO_CROSS,
 } from '@/domain/signals/constants';
@@ -384,6 +388,26 @@ export function detectMfiOversoldBounce(
     };
 }
 
+/** @internal Detects MFI crossing down out of overbought within the lookback window (bearish confirmed signal). */
+export function detectMfiOverboughtReversal(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const idx = findThresholdCross(
+        indicators.mfi,
+        MFI_OVERBOUGHT_LEVEL,
+        CROSS_LOOKBACK_BARS,
+        'down'
+    );
+    if (idx === null) return null;
+    return {
+        type: 'mfi_overbought_reversal',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: idx,
+    };
+}
+
 /** @internal Detects a Parabolic SAR flip from down to up (bullish confirmed signal). */
 export function detectParabolicSarFlip(
     _bars: Bar[],
@@ -450,6 +474,236 @@ export function detectSqueezeMomentumBullish(
     return {
         type: 'squeeze_momentum_bullish',
         direction: 'bullish',
+        phase: 'confirmed',
+        detectedAt: idx,
+    };
+}
+
+// ─── Bearish mirror detectors ─────────────────────────────────────────────────
+// Each function below mirrors its bullish pair above with the inequality /
+// direction inverted; behaviour is otherwise identical.
+
+/**
+ * @internal Detects a close breaking below the lower Keltner channel
+ * (bearish confirmed signal). Mirror of {@link detectKeltnerUpperBreakout}.
+ */
+export function detectKeltnerLowerBreakout(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const keltner = indicators.keltnerChannel;
+    const barsLength = bars.length;
+    if (barsLength < 2 || keltner.length < 2) return null;
+    const lastIdx = barsLength - 1;
+    const prevKc = keltner[lastIdx - 1];
+    const curKc = keltner[lastIdx];
+    if (prevKc.lower === null || curKc.lower === null) return null;
+    const prevClose = bars[lastIdx - 1].close;
+    const curClose = bars[lastIdx].close;
+    if (prevClose < prevKc.lower) return null; // 이미 아래면 신규 아님
+    if (curClose >= curKc.lower) return null; // 아직 안 깨면 null
+    return {
+        type: 'keltner_lower_breakout',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: lastIdx,
+    };
+}
+
+/**
+ * @internal Detects a Supertrend flip from up to down (bearish confirmed
+ * signal). Mirror of {@link detectSupertrendBullishFlip}.
+ */
+export function detectSupertrendBearishFlip(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const st = indicators.supertrend;
+    if (st.length < 2) return null;
+    const lastIdx = st.length - 1;
+    const start = Math.max(1, lastIdx - CROSS_LOOKBACK_BARS + 1);
+    for (let i = start; i <= lastIdx; i++) {
+        const prev = st[i - 1].trend;
+        const cur = st[i].trend;
+        if (prev === 'up' && cur === 'down') {
+            return {
+                type: 'supertrend_bearish_flip',
+                direction: 'bearish',
+                phase: 'confirmed',
+                detectedAt: i,
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * @internal Detects a Parabolic SAR flip from up to down (bearish confirmed
+ * signal). Mirror of {@link detectParabolicSarFlip}.
+ */
+export function detectParabolicSarBearishFlip(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const sar = indicators.parabolicSar;
+    if (sar.length < 2) return null;
+    const lastIdx = sar.length - 1;
+    const start = Math.max(1, lastIdx - CROSS_LOOKBACK_BARS + 1);
+    for (let i = start; i <= lastIdx; i++) {
+        const prev = sar[i - 1].trend;
+        const cur = sar[i].trend;
+        if (prev === 'up' && cur === 'down') {
+            return {
+                type: 'parabolic_sar_bearish_flip',
+                direction: 'bearish',
+                phase: 'confirmed',
+                detectedAt: i,
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * @internal Detects a close breaking below the Ichimoku cloud (bearish
+ * confirmed signal). Mirror of {@link detectIchimokuCloudBreakout} — uses the
+ * kumo lower edge (min of senkouA/B) and an opposite breach direction.
+ */
+export function detectIchimokuCloudBreakdown(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const ichimoku = indicators.ichimoku;
+    const barsLength = bars.length;
+    if (barsLength < 2 || ichimoku.length < 2) return null;
+    const lastIdx = barsLength - 1;
+
+    const prevIchi = ichimoku[lastIdx - 1];
+    const curIchi = ichimoku[lastIdx];
+    if (
+        prevIchi.senkouA === null ||
+        prevIchi.senkouB === null ||
+        curIchi.senkouA === null ||
+        curIchi.senkouB === null
+    ) {
+        return null;
+    }
+    const prevKumoLower = Math.min(prevIchi.senkouA, prevIchi.senkouB);
+    const curKumoLower = Math.min(curIchi.senkouA, curIchi.senkouB);
+    const prevClose = bars[lastIdx - 1].close;
+    const curClose = bars[lastIdx].close;
+    if (prevClose < prevKumoLower) return null; // 이미 구름 아래면 신규 아님
+    if (curClose >= curKumoLower) return null; // 아직 하향 이탈 안 하면 null
+
+    return {
+        type: 'ichimoku_cloud_breakdown',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: lastIdx,
+    };
+}
+
+/**
+ * @internal Detects CCI crossing down through an overbought/momentum level
+ * (bearish confirmed signal). Mirror of {@link detectCciBullishCross}.
+ */
+export function detectCciBearishCross(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const cci = indicators.cci;
+    if (cci.length < 2) return null;
+    const thresholds = [CCI_OVERBOUGHT_CROSS_LEVEL, CCI_BEARISH_CROSS_LEVEL];
+    for (const threshold of thresholds) {
+        const idx = findThresholdCross(
+            cci,
+            threshold,
+            CROSS_LOOKBACK_BARS,
+            'down'
+        );
+        if (idx !== null) {
+            return {
+                type: 'cci_bearish_cross',
+                direction: 'bearish',
+                phase: 'confirmed',
+                detectedAt: idx,
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * @internal Detects -DI crossing above +DI with strong ADX (bearish confirmed
+ * signal). Mirror of {@link detectDmiBullishCross}.
+ */
+export function detectDmiBearishCross(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const dmi = indicators.dmi;
+    if (dmi.length < 2) return null;
+    const diPlus = dmi.map(d => d.diPlus);
+    const diMinus = dmi.map(d => d.diMinus);
+    const idx = findCross(diMinus, diPlus, CROSS_LOOKBACK_BARS, 'up');
+    if (idx === null) return null;
+    const adxAtCross = dmi[idx].adx;
+    if (adxAtCross === null || adxAtCross < DMI_ADX_TREND_THRESHOLD)
+        return null;
+    return {
+        type: 'dmi_bearish_cross',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: idx,
+    };
+}
+
+/**
+ * @internal Detects CMF crossing below zero into distribution (bearish
+ * confirmed signal). Mirror of {@link detectCmfBullishFlip}.
+ */
+export function detectCmfBearishFlip(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const cmf = indicators.cmf;
+    if (cmf.length < 2) return null;
+    const idx = findThresholdCross(
+        cmf,
+        CMF_BEARISH_CROSS_LEVEL,
+        CROSS_LOOKBACK_BARS,
+        'down'
+    );
+    if (idx === null) return null;
+    return {
+        type: 'cmf_bearish_flip',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: idx,
+    };
+}
+
+/**
+ * @internal Detects squeeze momentum crossing below zero (bearish confirmed
+ * signal). Mirror of {@link detectSqueezeMomentumBullish}.
+ */
+export function detectSqueezeMomentumBearish(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const sqz = indicators.squeezeMomentum;
+    if (sqz.length < 2) return null;
+    const momentum = sqz.map(s => s.momentum);
+    const idx = findThresholdCross(
+        momentum,
+        SQUEEZE_MOMENTUM_ZERO_CROSS,
+        CROSS_LOOKBACK_BARS,
+        'down'
+    );
+    if (idx === null) return null;
+    return {
+        type: 'squeeze_momentum_bearish',
+        direction: 'bearish',
         phase: 'confirmed',
         detectedAt: idx,
     };
