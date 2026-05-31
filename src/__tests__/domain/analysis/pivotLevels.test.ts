@@ -34,4 +34,19 @@ describe('pivotLevels', () => {
     it('returns null on non-finite OHLC', () => {
         expect(computeCamarillaPivot({ ...bar, high: NaN })).toBeNull();
     });
+
+    it('computeStandardPivot returns null on non-positive OHLC', () => {
+        expect(computeStandardPivot({ ...bar, low: 0 })).toBeNull();
+    });
+
+    it('computeStandardPivot derives r1/s1 around the pivot', () => {
+        const sp = computeStandardPivot(bar);
+        const pp = (110 + 90 + 105) / 3;
+        expect(sp?.r1).toBeCloseTo(2 * pp - 90, 6);
+        expect(sp?.s1).toBeCloseTo(2 * pp - 110, 6);
+    });
+
+    it('computeCamarillaPivot returns null on non-positive close', () => {
+        expect(computeCamarillaPivot({ ...bar, close: -1 })).toBeNull();
+    });
 });

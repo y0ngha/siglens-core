@@ -21,4 +21,31 @@ describe('trendStructure helpers', () => {
     it('classifies LH_LL from descending swings', () => {
         expect(classifySwingStructure([110, 100], [95, 90])).toBe('LH_LL');
     });
+
+    it('efficiencyRatio returns null when closes are shorter than period+1', () => {
+        expect(efficiencyRatio([1, 2], 5)).toBeNull();
+    });
+
+    it('efficiencyRatio returns null for a flat (zero-volatility) path', () => {
+        expect(efficiencyRatio([3, 3, 3, 3], 3)).toBeNull();
+    });
+
+    it('classifies aligned-down EMA stack', () => {
+        // price<ema9<ema20
+        expect(classifyEmaStack(10, 15, 20)).toBe('aligned_down');
+    });
+
+    it('classifies a mixed EMA stack when alignment is broken', () => {
+        // price above short EMA but short below long EMA -> neither aligned
+        expect(classifyEmaStack(30, 25, 28)).toBe('mixed');
+    });
+
+    it('classifies mixed swing structure with too few swings', () => {
+        expect(classifySwingStructure([100], [90])).toBe('mixed');
+    });
+
+    it('classifies mixed swing structure when highs and lows disagree', () => {
+        // higher high but lower low -> neither HH_HL nor LH_LL
+        expect(classifySwingStructure([100, 110], [95, 90])).toBe('mixed');
+    });
 });
