@@ -786,6 +786,12 @@ export interface LevelCandidates {
     resistance: LevelCandidate[];
 }
 
+/** Round-number increment by price tier (ascending ceiling). */
+export interface RoundNumberTier {
+    maxPrice: number;
+    increment: number;
+}
+
 /** Horizon buckets for multi-timeframe reference (short/medium/long lookback). */
 export type HorizonKey = 'short' | 'medium' | 'long';
 

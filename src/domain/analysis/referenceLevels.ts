@@ -2,6 +2,7 @@ import type {
     IndicatorResult,
     ReferenceLevel,
     ReferenceLevels,
+    VolumeProfileResult,
 } from '@/domain/types';
 import {
     MAX_REFERENCE_LEVELS_PER_SIDE,
@@ -23,7 +24,7 @@ const incrementFor = (price: number): number =>
 
 const roundLabel = (price: number): string => `Round ${price}`;
 
-/** Nearest round-number levels above and below the price (advisory psychology). */
+/** @internal Nearest round-number levels above and below the price (advisory psychology). */
 export function roundNumberLevels(currentPrice: number): ReferenceLevel[] {
     if (!(Number.isFinite(currentPrice) && currentPrice > 0)) return [];
     const inc = incrementFor(currentPrice);
@@ -76,10 +77,21 @@ const ref = (
     distancePercent: ((price - currentPrice) / currentPrice) * 100,
 });
 
-/** Latest-value reference levels from the indicator suite. */
+/** @internal Optional per-horizon overrides for indicator level collection. */
+export interface IndicatorLevelOptions {
+    /** Volume profile to use (e.g. a window-local recompute). Defaults to indicators.volumeProfile. */
+    volumeProfile?: VolumeProfileResult | null;
+    /** MA periods to include (defaults to all present). */
+    maPeriods?: readonly number[];
+    /** EMA periods to include (defaults to all present). */
+    emaPeriods?: readonly number[];
+}
+
+/** @internal Latest-value reference levels from the indicator suite. */
 export function collectIndicatorLevels(
     currentPrice: number,
-    indicators: IndicatorResult
+    indicators: IndicatorResult,
+    options?: IndicatorLevelOptions
 ): ReferenceLevel[] {
     const out: ReferenceLevel[] = [];
     const push = (
@@ -92,17 +104,26 @@ export function collectIndicatorLevels(
         }
     };
 
-    const vp = indicators.volumeProfile;
+    const vp =
+        options?.volumeProfile !== undefined
+            ? options.volumeProfile
+            : indicators.volumeProfile;
     if (vp) {
         push(vp.poc, 'POC', 'vp_poc');
         push(vp.vah, 'VAH', 'vp_vah');
         push(vp.val, 'VAL', 'vp_val');
     }
-    for (const [period, series] of Object.entries(indicators.ma)) {
-        push(lastNum(series), `MA${period}`, 'ma');
+    const maPeriods =
+        options?.maPeriods ?? Object.keys(indicators.ma).map(Number);
+    for (const period of maPeriods) {
+        const series = indicators.ma[period];
+        if (series) push(lastNum(series), `MA${period}`, 'ma');
     }
-    for (const [period, series] of Object.entries(indicators.ema)) {
-        push(lastNum(series), `EMA${period}`, 'ema');
+    const emaPeriods =
+        options?.emaPeriods ?? Object.keys(indicators.ema).map(Number);
+    for (const period of emaPeriods) {
+        const series = indicators.ema[period];
+        if (series) push(lastNum(series), `EMA${period}`, 'ema');
     }
     push(
         lastField(indicators.bollinger, b => b.upper),
@@ -153,7 +174,7 @@ export function collectIndicatorLevels(
     return out;
 }
 
-/** Split levels by side relative to price, dedupe near-equal, cap per side. */
+/** @internal Split levels by side relative to price, dedupe near-equal, cap per side. */
 export function splitBySide(
     levels: readonly ReferenceLevel[],
     currentPrice: number

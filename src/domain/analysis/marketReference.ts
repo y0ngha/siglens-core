@@ -5,11 +5,13 @@ import type {
     IndicatorResult,
     MarketReference,
     ReferenceLevel,
+    SMCSwingPoint,
     Timeframe,
     TrendStructure,
 } from '@/domain/types';
 import {
     HORIZON_WINDOWS_BY_TIMEFRAME,
+    HORIZON_MA_PERIODS,
     ADX_TRENDING_THRESHOLD,
     EFFICIENCY_RATIO_TRENDING_THRESHOLD,
 } from '@/domain/analysis/marketReferenceConstants';
@@ -28,6 +30,7 @@ import {
     classifyEmaStack,
     classifySwingStructure,
 } from '@/domain/analysis/trendStructure';
+import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 
 const EFFICIENCY_PERIOD = 20;
 const MIN_EFFICIENCY_PERIOD = 2;
@@ -62,7 +65,9 @@ const priceVs = (
 function buildStructure(
     window: Bar[],
     indicators: IndicatorResult,
-    currentPrice: number
+    currentPrice: number,
+    windowSwingHighs: readonly SMCSwingPoint[],
+    windowSwingLows: readonly SMCSwingPoint[]
 ): TrendStructure {
     const closes = window.map(b => b.close);
     const er = efficiencyRatio(
@@ -77,8 +82,6 @@ function buildStructure(
     const ma50 = lastFiniteNum(indicators.ma[50] ?? indicators.ma[60] ?? []);
     const ma200 = lastFiniteNum(indicators.ma[200] ?? indicators.ma[120] ?? []);
     const adx = lastFiniteNum(indicators.dmi.map(d => d.adx));
-    const highs = indicators.smc.swingHighs.map(s => s.price);
-    const lows = indicators.smc.swingLows.map(s => s.price);
     const trending =
         (adx != null && adx >= ADX_TRENDING_THRESHOLD) ||
         (er != null && er >= EFFICIENCY_RATIO_TRENDING_THRESHOLD);
@@ -89,7 +92,10 @@ function buildStructure(
             ema9 != null && ema20 != null
                 ? classifyEmaStack(currentPrice, ema9, ema20)
                 : 'mixed',
-        swingStructure: classifySwingStructure(highs, lows),
+        swingStructure: classifySwingStructure(
+            windowSwingHighs.map(s => s.price),
+            windowSwingLows.map(s => s.price)
+        ),
         adx,
         efficiencyRatio: er,
         regime: trending ? 'trending' : 'ranging',
@@ -99,17 +105,39 @@ function buildStructure(
 function buildHorizon(
     bars: Bar[],
     indicators: IndicatorResult,
+    key: HorizonKey,
     windowBars: number
 ): HorizonReference {
-    const window = bars.slice(-Math.min(windowBars, bars.length));
+    const windowLen = Math.min(windowBars, bars.length);
+    const window = windowLen > 0 ? bars.slice(bars.length - windowLen) : [];
+    const startIndex = bars.length - windowLen;
     const currentPrice =
         window.length > 0 ? window[window.length - 1].close : 0;
+
+    const windowSwingHighs = indicators.smc.swingHighs.filter(
+        s => s.index >= startIndex
+    );
+    const windowSwingLows = indicators.smc.swingLows.filter(
+        s => s.index >= startIndex
+    );
+    const windowVp = window.length > 0 ? calculateVolumeProfile(window) : null;
+    const periods = HORIZON_MA_PERIODS[key];
+
     const levels: ReferenceLevel[] = [
-        ...collectIndicatorLevels(currentPrice, indicators),
+        ...collectIndicatorLevels(currentPrice, indicators, {
+            volumeProfile: windowVp,
+            maPeriods: periods.ma,
+            emaPeriods: periods.ema,
+        }),
         ...roundNumberLevels(currentPrice),
     ];
 
-    const fib = computeFibonacciProjection(indicators.smc);
+    const windowSmc = {
+        ...indicators.smc,
+        swingHighs: windowSwingHighs,
+        swingLows: windowSwingLows,
+    };
+    const fib = computeFibonacciProjection(windowSmc);
     if (fib) {
         for (const r of fib.retracements)
             levels.push(
@@ -155,11 +183,11 @@ function buildHorizon(
                     )
                 );
     }
-    for (const s of indicators.smc.swingHighs)
+    for (const s of windowSwingHighs)
         levels.push(
             refLevel(s.price, 'Swing high', 'swing_high', currentPrice)
         );
-    for (const s of indicators.smc.swingLows)
+    for (const s of windowSwingLows)
         levels.push(refLevel(s.price, 'Swing low', 'swing_low', currentPrice));
 
     return {
@@ -172,16 +200,23 @@ function buildHorizon(
             currentPrice > 0
                 ? splitBySide(levels, currentPrice)
                 : { support: [], resistance: [] },
-        structure: buildStructure(window, indicators, currentPrice),
+        structure: buildStructure(
+            window,
+            indicators,
+            currentPrice,
+            windowSwingHighs,
+            windowSwingLows
+        ),
     };
 }
 
 /**
  * Assemble a deterministic multi-horizon advisory reference from precomputed
  * indicators and bars. Each horizon (short / medium / long) uses a trailing
- * window sized by {@link HORIZON_WINDOWS_BY_TIMEFRAME} (capped at `bars.length`),
- * collecting commonly-watched reference levels and a descriptive trend
- * structure. Advisory context only — never a directional prediction.
+ * window sized per timeframe (capped at `bars.length`) and surfaces a
+ * horizon-specific set of moving averages, recomputing levels and trend
+ * structure over its own lookback window. Advisory context only — never a
+ * directional prediction.
  *
  * @param bars - OHLCV bars, oldest-first.
  * @param indicators - Precomputed indicator suite aligned with `bars`.
@@ -195,7 +230,7 @@ export function computeMarketReference(
 ): MarketReference {
     const w = HORIZON_WINDOWS_BY_TIMEFRAME[timeframe];
     const horizon = (key: HorizonKey): HorizonReference =>
-        buildHorizon(bars, indicators, w[key]);
+        buildHorizon(bars, indicators, key, w[key]);
     return {
         short: horizon('short'),
         medium: horizon('medium'),

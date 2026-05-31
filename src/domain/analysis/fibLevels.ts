@@ -19,6 +19,7 @@ const FIB_RETRACEMENT_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786] as const;
  */
 const FIB_EXTENSION_RATIOS = [1.0, 1.272, 1.618, 2.0, 2.618] as const;
 
+/** @internal Whether a price is finite and strictly positive. */
 export const isUsablePrice = (price: number): boolean =>
     Number.isFinite(price) && price > 0;
 
@@ -65,6 +66,7 @@ const buildExtensions = (
 };
 
 /**
+ * @internal
  * Compute Fibonacci retracement and extension levels anchored on the most recent
  * SMC swing high and swing low.
  *

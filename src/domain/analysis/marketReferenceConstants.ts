@@ -1,6 +1,6 @@
-import type { HorizonKey, Timeframe } from '@/domain/types';
+import type { HorizonKey, RoundNumberTier, Timeframe } from '@/domain/types';
 
-/** Trailing-bar lookback window per horizon, per timeframe (capped at bars.length). */
+/** @internal Trailing-bar lookback window per horizon, per timeframe (capped at bars.length). */
 export const HORIZON_WINDOWS_BY_TIMEFRAME: Record<
     Timeframe,
     Record<HorizonKey, number>
@@ -13,11 +13,17 @@ export const HORIZON_WINDOWS_BY_TIMEFRAME: Record<
     '1Day': { short: 20, medium: 60, long: 200 },
 };
 
-/** Round-number increment by price tier (ascending ceiling). */
-export interface RoundNumberTier {
-    maxPrice: number;
-    increment: number;
-}
+/** @internal Which MA/EMA periods each horizon surfaces as levels. */
+export const HORIZON_MA_PERIODS: Record<
+    HorizonKey,
+    { ma: readonly number[]; ema: readonly number[] }
+> = {
+    short: { ma: [20], ema: [9, 20] },
+    medium: { ma: [50, 60], ema: [60] },
+    long: { ma: [120, 200], ema: [] },
+};
+
+/** @internal Round-number increments by price tier (ascending ceiling). */
 export const ROUND_NUMBER_TIERS: readonly RoundNumberTier[] = [
     { maxPrice: 5, increment: 0.5 },
     { maxPrice: 50, increment: 1 },
@@ -25,14 +31,17 @@ export const ROUND_NUMBER_TIERS: readonly RoundNumberTier[] = [
     { maxPrice: Number.POSITIVE_INFINITY, increment: 10 },
 ];
 
-/** Regime descriptor thresholds. */
+/** @internal ADX threshold above which a horizon is labelled trending. */
 export const ADX_TRENDING_THRESHOLD = 25;
+/** @internal Efficiency-ratio threshold above which a horizon is labelled trending. */
 export const EFFICIENCY_RATIO_TRENDING_THRESHOLD = 0.3;
 
-/** Camarilla pivot constants: level = C ± (H−L)·1.1/divisor. */
+/** @internal Camarilla pivot factor: level = C ± (H−L)·1.1/divisor. */
 export const CAMARILLA_FACTOR = 1.1;
+/** @internal Camarilla R3/S3 divisor. */
 export const CAMARILLA_R3_S3_DIVISOR = 4;
+/** @internal Camarilla R4/S4 divisor. */
 export const CAMARILLA_R4_S4_DIVISOR = 2;
 
-/** Max reference levels surfaced per side, per horizon (prompt-size control). */
+/** @internal Max reference levels surfaced per side, per horizon (prompt-size control). */
 export const MAX_REFERENCE_LEVELS_PER_SIDE = 6;

@@ -3,7 +3,7 @@ import type { EmaStackState, SwingStructureState } from '@/domain/types';
 /** Number of trailing swing points compared to classify Dow structure. */
 const SWING_COMPARISON_COUNT = 2;
 
-/** Kaufman efficiency ratio over the last `period` closes: |net| / Σ|step|. */
+/** @internal Kaufman efficiency ratio over the last `period` closes: |net| / Σ|step|. */
 export function efficiencyRatio(
     closes: readonly number[],
     period: number
@@ -19,7 +19,7 @@ export function efficiencyRatio(
     return net / volatility;
 }
 
-/** EMA-stack alignment from price + two EMAs (short, long). */
+/** @internal EMA-stack alignment from price + two EMAs (short, long). */
 export function classifyEmaStack(
     price: number,
     emaShort: number,
@@ -30,7 +30,7 @@ export function classifyEmaStack(
     return 'mixed';
 }
 
-/** Dow structure from the last two swing highs and lows. */
+/** @internal Dow structure from the last two swing highs and lows. */
 export function classifySwingStructure(
     swingHighs: readonly number[],
     swingLows: readonly number[]

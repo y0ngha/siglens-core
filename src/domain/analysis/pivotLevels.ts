@@ -28,6 +28,7 @@ const resolvePivotBase = (bar: Bar): PivotBase | null => {
     return { pp: (high + low + close) / PIVOT_DIVISOR, range: high - low };
 };
 
+/** @internal Standard pivot set from a prior bar, or null on bad OHLC. */
 export function computeStandardPivot(bar: Bar): StandardPivotLevels | null {
     const base = resolvePivotBase(bar);
     if (base === null) return null;
@@ -45,6 +46,7 @@ export function computeStandardPivot(bar: Bar): StandardPivotLevels | null {
     };
 }
 
+/** @internal Camarilla R3/R4/S3/S4 pivot set from a prior bar, or null on bad OHLC. */
 export function computeCamarillaPivot(bar: Bar): CamarillaPivotLevels | null {
     const base = resolvePivotBase(bar);
     if (base === null) return null;
