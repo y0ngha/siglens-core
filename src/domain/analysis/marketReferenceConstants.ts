@@ -45,3 +45,6 @@ export const CAMARILLA_R4_S4_DIVISOR = 2;
 
 /** @internal Max reference levels surfaced per side, per horizon (prompt-size control). */
 export const MAX_REFERENCE_LEVELS_PER_SIDE = 6;
+
+/** @internal Factor converting a fraction to a percentage (distance %, fib ratio labels). */
+export const RATIO_TO_PERCENT = 100;

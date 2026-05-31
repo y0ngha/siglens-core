@@ -14,11 +14,14 @@ import {
     HORIZON_MA_PERIODS,
     ADX_TRENDING_THRESHOLD,
     EFFICIENCY_RATIO_TRENDING_THRESHOLD,
+    RATIO_TO_PERCENT,
 } from '@/domain/analysis/marketReferenceConstants';
 import {
     collectIndicatorLevels,
     splitBySide,
     roundNumberLevels,
+    makeReferenceLevel,
+    lastFiniteNumber,
 } from '@/domain/analysis/referenceLevels';
 import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
 import {
@@ -34,27 +37,6 @@ import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 
 const EFFICIENCY_PERIOD = 20;
 const MIN_EFFICIENCY_PERIOD = 2;
-const RATIO_TO_PERCENT = 100;
-
-const refLevel = (
-    price: number,
-    label: string,
-    kind: ReferenceLevel['kind'],
-    currentPrice: number
-): ReferenceLevel => ({
-    price,
-    label,
-    kind,
-    distancePercent: ((price - currentPrice) / currentPrice) * RATIO_TO_PERCENT,
-});
-
-const lastFiniteNum = (arr: readonly (number | null)[]): number | null => {
-    for (let i = arr.length - 1; i >= 0; i--) {
-        if (arr[i] != null && Number.isFinite(arr[i] as number))
-            return arr[i] as number;
-    }
-    return null;
-};
 
 const priceVs = (
     price: number,
@@ -77,11 +59,11 @@ function buildStructure(
             Math.max(MIN_EFFICIENCY_PERIOD, closes.length - 1)
         )
     );
-    const ema9 = lastFiniteNum(indicators.ema[9] ?? []);
-    const ema20 = lastFiniteNum(indicators.ema[20] ?? []);
-    const ma60 = lastFiniteNum(indicators.ma[60] ?? []);
-    const ma200 = lastFiniteNum(indicators.ma[200] ?? []);
-    const adx = lastFiniteNum(indicators.dmi.map(d => d.adx));
+    const ema9 = lastFiniteNumber(indicators.ema[9] ?? []);
+    const ema20 = lastFiniteNumber(indicators.ema[20] ?? []);
+    const ma60 = lastFiniteNumber(indicators.ma[60] ?? []);
+    const ma200 = lastFiniteNumber(indicators.ma[200] ?? []);
+    const adx = lastFiniteNumber(indicators.dmi.map(d => d.adx));
     const trending =
         (adx != null && adx >= ADX_TRENDING_THRESHOLD) ||
         (er != null && er >= EFFICIENCY_RATIO_TRENDING_THRESHOLD);
@@ -141,7 +123,7 @@ function buildHorizon(
     if (fib) {
         for (const r of fib.retracements)
             levels.push(
-                refLevel(
+                makeReferenceLevel(
                     r.price,
                     `Fib ${(r.ratio * RATIO_TO_PERCENT).toFixed(1)}%`,
                     'fib_retracement',
@@ -150,7 +132,7 @@ function buildHorizon(
             );
         for (const e of fib.extensions)
             levels.push(
-                refLevel(
+                makeReferenceLevel(
                     e.price,
                     `Fib ext ${(e.ratio * RATIO_TO_PERCENT).toFixed(1)}%`,
                     'fib_extension',
@@ -164,7 +146,7 @@ function buildHorizon(
         if (sp)
             for (const [k, v] of Object.entries(sp))
                 levels.push(
-                    refLevel(
+                    makeReferenceLevel(
                         v,
                         `Pivot ${k.toUpperCase()}`,
                         'pivot_standard',
@@ -175,7 +157,7 @@ function buildHorizon(
         if (cam)
             for (const k of ['r4', 'r3', 's3', 's4'] as const)
                 levels.push(
-                    refLevel(
+                    makeReferenceLevel(
                         cam[k],
                         `Camarilla ${k.toUpperCase()}`,
                         'pivot_camarilla',
@@ -185,10 +167,17 @@ function buildHorizon(
     }
     for (const s of windowSwingHighs)
         levels.push(
-            refLevel(s.price, 'Swing high', 'swing_high', currentPrice)
+            makeReferenceLevel(
+                s.price,
+                'Swing high',
+                'swing_high',
+                currentPrice
+            )
         );
     for (const s of windowSwingLows)
-        levels.push(refLevel(s.price, 'Swing low', 'swing_low', currentPrice));
+        levels.push(
+            makeReferenceLevel(s.price, 'Swing low', 'swing_low', currentPrice)
+        );
 
     return {
         window: {

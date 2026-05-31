@@ -188,6 +188,19 @@ describe('computeMarketReference', () => {
         );
     });
 
+    it('reports priceVsMA as below when price sits under the moving averages', () => {
+        const ref = computeMarketReference(
+            makeBars(40),
+            makeInd({
+                // current price (~139) below both MAs
+                ma: { 60: [500, 500], 200: [600, 600] },
+            }),
+            '1Day'
+        );
+        expect(ref.short.structure.priceVsMA60).toBe('below');
+        expect(ref.short.structure.priceVsMA200).toBe('below');
+    });
+
     it('differs between short and long horizons when recent swings differ from older ones', () => {
         // older swing (index 5) only in long window; newer swing (index 50) in both
         const swingHighs = [swing(5, 200), swing(50, 130)];

@@ -6,6 +6,7 @@ import type {
 } from '@/domain/types';
 import {
     MAX_REFERENCE_LEVELS_PER_SIDE,
+    RATIO_TO_PERCENT,
     ROUND_NUMBER_TIERS,
 } from '@/domain/analysis/marketReferenceConstants';
 
@@ -39,7 +40,8 @@ export function roundNumberLevels(currentPrice: number): ReferenceLevel[] {
             price,
             label: roundLabel(price),
             kind: 'round',
-            distancePercent: ((price - currentPrice) / currentPrice) * 100,
+            distancePercent:
+                ((price - currentPrice) / currentPrice) * RATIO_TO_PERCENT,
         });
     }
     return levels;
@@ -48,7 +50,10 @@ export function roundNumberLevels(currentPrice: number): ReferenceLevel[] {
 /** Fraction of price within which two levels are treated as duplicates (0.1%). */
 const DEDUPE_FRACTION = 0.001;
 
-const lastNum = (arr: readonly (number | null)[]): number | null => {
+/** @internal Last finite, non-null value in a numeric series (or null). */
+export const lastFiniteNumber = (
+    arr: readonly (number | null)[]
+): number | null => {
     for (let i = arr.length - 1; i >= 0; i--) {
         const v = arr[i];
         if (v != null && Number.isFinite(v)) return v;
@@ -67,7 +72,8 @@ const lastField = <T>(
     return null;
 };
 
-const ref = (
+/** @internal Build a ReferenceLevel with its signed percent distance from price. */
+export const makeReferenceLevel = (
     price: number,
     label: string,
     kind: ReferenceLevel['kind'],
@@ -76,7 +82,7 @@ const ref = (
     price,
     label,
     kind,
-    distancePercent: ((price - currentPrice) / currentPrice) * 100,
+    distancePercent: ((price - currentPrice) / currentPrice) * RATIO_TO_PERCENT,
 });
 
 /** @internal Optional per-horizon overrides for indicator level collection. */
@@ -102,7 +108,7 @@ export function collectIndicatorLevels(
         kind: ReferenceLevel['kind']
     ): void => {
         if (price != null && Number.isFinite(price) && price > 0) {
-            out.push(ref(price, label, kind, currentPrice));
+            out.push(makeReferenceLevel(price, label, kind, currentPrice));
         }
     };
 
@@ -119,13 +125,13 @@ export function collectIndicatorLevels(
         options?.maPeriods ?? Object.keys(indicators.ma).map(Number);
     for (const period of maPeriods) {
         const series = indicators.ma[period];
-        if (series) push(lastNum(series), `MA${period}`, 'ma');
+        if (series) push(lastFiniteNumber(series), `MA${period}`, 'ma');
     }
     const emaPeriods =
         options?.emaPeriods ?? Object.keys(indicators.ema).map(Number);
     for (const period of emaPeriods) {
         const series = indicators.ema[period];
-        if (series) push(lastNum(series), `EMA${period}`, 'ema');
+        if (series) push(lastFiniteNumber(series), `EMA${period}`, 'ema');
     }
     push(
         lastField(indicators.bollinger, b => b.upper),
@@ -172,7 +178,7 @@ export function collectIndicatorLevels(
         'Supertrend',
         'supertrend'
     );
-    push(lastNum(indicators.vwap), 'VWAP', 'vwap');
+    push(lastFiniteNumber(indicators.vwap), 'VWAP', 'vwap');
     return out;
 }
 
