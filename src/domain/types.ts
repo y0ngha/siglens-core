@@ -786,6 +786,81 @@ export interface LevelCandidates {
     resistance: LevelCandidate[];
 }
 
+/** Horizon buckets for multi-timeframe reference (short/medium/long lookback). */
+export type HorizonKey = 'short' | 'medium' | 'long';
+
+/** Source of a reference level (descriptive label only — not a conviction rank). */
+export type ReferenceLevelKind =
+    | 'fib_retracement'
+    | 'fib_extension'
+    | 'vp_poc'
+    | 'vp_vah'
+    | 'vp_val'
+    | 'swing_high'
+    | 'swing_low'
+    | 'ma'
+    | 'ema'
+    | 'round'
+    | 'pivot_standard'
+    | 'pivot_camarilla'
+    | 'ichimoku'
+    | 'donchian'
+    | 'bollinger'
+    | 'keltner'
+    | 'supertrend'
+    | 'vwap';
+
+/** A single commonly-watched reference price. Advisory context, not a prediction. */
+export interface ReferenceLevel {
+    price: number;
+    /** Human-readable label, e.g. "Fib 61.8%", "POC", "MA200", "Camarilla R3". */
+    label: string;
+    kind: ReferenceLevelKind;
+    /** Signed percent distance from current price (negative = below). */
+    distancePercent: number;
+}
+
+/** Reference levels split by side relative to current price, nearest-first. */
+export interface ReferenceLevels {
+    support: ReferenceLevel[];
+    resistance: ReferenceLevel[];
+}
+
+export type PriceVsLevel = 'above' | 'below' | 'unknown';
+export type EmaStackState = 'aligned_up' | 'aligned_down' | 'mixed';
+export type SwingStructureState = 'HH_HL' | 'LH_LL' | 'mixed';
+export type MarketRegime = 'trending' | 'ranging';
+
+/** Descriptive trend structure for a horizon — facts, NOT a directional prediction. */
+export interface TrendStructure {
+    priceVsMA50: PriceVsLevel;
+    priceVsMA200: PriceVsLevel;
+    emaStack: EmaStackState;
+    swingStructure: SwingStructureState;
+    adx: number | null;
+    efficiencyRatio: number | null;
+    regime: MarketRegime;
+}
+
+export interface HorizonWindow {
+    bars: number;
+    fromTime: number | null;
+    toTime: number | null;
+}
+
+export interface HorizonReference {
+    window: HorizonWindow;
+    levels: ReferenceLevels;
+    structure: TrendStructure;
+}
+
+/** Deterministic, multi-horizon advisory reference for the chart prompt. */
+export interface MarketReference {
+    short: HorizonReference;
+    medium: HorizonReference;
+    long: HorizonReference;
+}
+
 /**
  * Shared shape for a pivot point set: a central pivot with three resistance and
  * three support levels. The exact offset formulas differ per variant (standard vs
