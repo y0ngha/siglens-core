@@ -757,7 +757,8 @@ export type ReferenceLevelKind =
     | 'bollinger'
     | 'keltner'
     | 'supertrend'
-    | 'vwap';
+    | 'vwap'
+    | 'avwap';
 
 /** A single commonly-watched reference price. Advisory context, not a prediction. */
 export interface ReferenceLevel {

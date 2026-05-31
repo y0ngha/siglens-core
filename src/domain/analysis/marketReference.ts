@@ -28,6 +28,7 @@ import {
     makeReferenceLevel,
     lastFiniteNumber,
 } from '@/domain/analysis/referenceLevels';
+import { anchoredVwap } from '@/domain/analysis/anchoredVwap';
 import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
 import {
     computeStandardPivot,
@@ -49,6 +50,23 @@ const FIB_RATIO_DECIMAL_PLACES = 1;
 // `price === level` resolves to 'above' (tie-breaking — PriceVsLevel has no 'at').
 const priceVs = (price: number, level: number | null): PriceVsLevel =>
     level == null ? 'unknown' : price >= level ? 'above' : 'below';
+
+/**
+ * Anchored-VWAP reference level for one anchor swing (0 or 1 levels): empty when
+ * there is no anchor or the AVWAP is undefined for the anchored range.
+ */
+function resolveAvwapLevel(
+    bars: Bar[],
+    swing: SMCSwingPoint | null,
+    label: string,
+    currentPrice: number
+): ReferenceLevel[] {
+    if (swing === null) return [];
+    const value = anchoredVwap(bars, swing.index);
+    return value != null
+        ? [makeReferenceLevel(value, label, 'avwap', currentPrice)]
+        : [];
+}
 
 // ema/ma/adx read their latest value from the GLOBAL `indicators` (full-history
 // series — e.g. MA200 needs the full lookback, so a per-window recompute would be
@@ -185,6 +203,31 @@ function buildHorizon(
         ),
     ];
 
+    // Anchor AVWAP to the window's most significant (price-extreme) swings:
+    // the highest-priced swing high and the lowest-priced swing low.
+    const anchorHigh =
+        windowSwingHighs.length > 0
+            ? windowSwingHighs.reduce((a, b) => (b.price > a.price ? b : a))
+            : null;
+    const anchorLow =
+        windowSwingLows.length > 0
+            ? windowSwingLows.reduce((a, b) => (b.price < a.price ? b : a))
+            : null;
+    const avwapLevels: ReferenceLevel[] = [
+        ...resolveAvwapLevel(
+            bars,
+            anchorHigh,
+            'AVWAP (swing high)',
+            currentPrice
+        ),
+        ...resolveAvwapLevel(
+            bars,
+            anchorLow,
+            'AVWAP (swing low)',
+            currentPrice
+        ),
+    ];
+
     const levels: ReferenceLevel[] = [
         ...collectIndicatorLevels(currentPrice, indicators, {
             volumeProfile: windowVp,
@@ -196,6 +239,7 @@ function buildHorizon(
         ...standardPivotLevels,
         ...camarillaLevels,
         ...swingLevels,
+        ...avwapLevels,
     ];
 
     return {

@@ -42,6 +42,20 @@ describe('calculateCCI', () => {
             expect(result[3]).toBeCloseTo(0, 5);
         });
 
+        it('상승 윈도우에서 0.015 정규화 상수와 평균편차가 핀 고정된다', () => {
+            // high=close+1, low=close-1 → TP === close.
+            // closes(=TPs): [9, 10, 11, 12], period 3, 인덱스 3 평가.
+            // 윈도우 TP = [10, 11, 12]
+            //   SMA = (10+11+12)/3 = 11
+            //   meanDev = (|10-11| + |11-11| + |12-11|)/3 = (1+0+1)/3 = 2/3
+            //   currentTP = 12
+            //   CCI = (12 - 11) / (0.015 × 2/3) = 1 / 0.01 = 100
+            const closes = [9, 10, 11, 12];
+            const bars = closes.map((c, i) => makeBar(c + 1, c - 1, c, i));
+            const result = calculateCCI(bars, 3);
+            expect(result[3]).toBeCloseTo(100, 6);
+        });
+
         it('반환 배열 길이는 입력과 같다', () => {
             const bars = Array.from(
                 { length: CCI_DEFAULT_PERIOD + 5 },

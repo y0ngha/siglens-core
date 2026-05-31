@@ -245,7 +245,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 **마켓 레퍼런스 (Market Reference) (1)**
 | Symbol | Source |
 |---|---|
-| `computeMarketReference(bars, indicators, timeframe)` — 결정론적·다호라이즌(short/medium/long lookback) 어드바이저리 레퍼런스를 산출. 호라이즌별 윈도우 크기는 `timeframe`(bar resolution)으로 결정한다. 호라이즌별로 (a) 검증된 레벨(fib 되돌림/확장·Volume Profile POC/VAH/VAL·스윙 고/저·MA/EMA·라운드 넘버), (b) 널리 주시되는 지표 레벨(Supertrend/Ichimoku/Donchian/Bollinger/Keltner/VWAP/표준·Camarilla 피봇), (c) 서술적 추세 구조(가격 vs MA60/MA200·EMA 정렬·스윙 구조·ADX·효율비·레짐)를 모은다. **예측이 아니라 어드바이저리** — 정밀한 S/R·추세 예측은 distance-matched random 대비 forward edge가 ~0이라는 백테스트 결과에 따라 레벨은 참고용 컨텍스트로만 노출한다. AI는 이 레벨을 직접 계산하지 않고 선택·해석한다(price-arithmetic hallucination 제거). Returns `MarketReference`. | `domain/analysis/marketReference.ts` |
+| `computeMarketReference(bars, indicators, timeframe)` — 결정론적·다호라이즌(short/medium/long lookback) 어드바이저리 레퍼런스를 산출. 호라이즌별 윈도우 크기는 `timeframe`(bar resolution)으로 결정한다. 호라이즌별로 (a) 검증된 레벨(fib 되돌림/확장·Volume Profile POC/VAH/VAL·스윙 고/저·MA/EMA·라운드 넘버), (b) 널리 주시되는 지표 레벨(Supertrend/Ichimoku/Donchian/Bollinger/Keltner/VWAP/표준·Camarilla 피봇·호라이즌 윈도우의 극단 스윙에 앵커링된 Anchored VWAP), (c) 서술적 추세 구조(가격 vs MA60/MA200·EMA 정렬·스윙 구조·ADX·효율비·레짐)를 모은다. **예측이 아니라 어드바이저리** — 정밀한 S/R·추세 예측은 distance-matched random 대비 forward edge가 ~0이라는 백테스트 결과에 따라 레벨은 참고용 컨텍스트로만 노출한다. AI는 이 레벨을 직접 계산하지 않고 선택·해석한다(price-arithmetic hallucination 제거). Returns `MarketReference`. | `domain/analysis/marketReference.ts` |
 
 **대시보드 헬퍼 (3)**
 | Symbol | Source |
@@ -350,7 +350,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
     - `ComputeFearGreedOptions`
 - 마켓 레퍼런스 (`computeMarketReference`의 반환/요소 타입, `domain/types.ts`):
     - `MarketReference` (`{ short, medium, long }` — 각 `HorizonReference`), `HorizonReference` (`{ window, levels, structure }`), `HorizonWindow` (`bars`/`fromTime`/`toTime` — 호라이즌 lookback 윈도우), `HorizonKey` (`'short'` | `'medium'` | `'long'`).
-    - `ReferenceLevels` (`{ support, resistance }` — 현재가 기준 side 분리, nearest-first), `ReferenceLevel` (price/label/kind/distancePercent), `ReferenceLevelKind` (레벨 출처 union — fib/VP/swing/MA/EMA/round/pivot/ichimoku/donchian/bollinger/keltner/supertrend/vwap; 컨빅션 랭크가 아닌 서술 라벨).
+    - `ReferenceLevels` (`{ support, resistance }` — 현재가 기준 side 분리, nearest-first), `ReferenceLevel` (price/label/kind/distancePercent), `ReferenceLevelKind` (레벨 출처 union — fib/VP/swing/MA/EMA/round/pivot/ichimoku/donchian/bollinger/keltner/supertrend/vwap/avwap; 컨빅션 랭크가 아닌 서술 라벨). `'avwap'`는 호라이즌 윈도우의 극단 스윙(최고가 스윙 고/최저가 스윙 저)에 앵커링한 Anchored VWAP 레벨. 앵커 계산 헬퍼 `anchoredVwap`는 `@internal`로 **public 미노출**.
     - `TrendStructure` (priceVsMA60/priceVsMA200/emaStack/swingStructure/adx/efficiencyRatio/regime — 서술적 추세 구조, 방향 예측 아님), `PriceVsLevel` (`'above'` | `'below'` | `'unknown'`), `EmaStackState` (`'aligned_up'` | `'aligned_down'` | `'mixed'`), `SwingStructureState` (`'HH_HL'` | `'LH_LL'` | `'mixed'`), `MarketRegime` (`'trending'` | `'ranging'`).
 - 피봇/피보나치 레벨 (`StandardPivotLevels`/`CamarillaPivotLevels`/`FibonacciProjection`/`FibonacciLevel`/`SwingLegDirection`)은 **public 미노출** — `@internal` 헬퍼(`computeStandardPivot`/`computeCamarillaPivot`/`computeFibonacciProjection`)의 반환/요소 타입일 뿐 `computeMarketReference` 반환 closure에서 도달 불가하며 consumer(siglens/siglens-worker/siglens-trader) 미사용이므로 index 재export에서 제거. `domain/types.ts`에는 도메인 내부 공유용으로 `@internal` 태그를 달고 유지한다.
 

@@ -162,6 +162,71 @@ describe('computeMarketReference', () => {
         ).toBe(true);
     });
 
+    it('surfaces anchored-VWAP levels anchored to the window extreme swings', () => {
+        // Flat bars at close 100 keep pivots/MAs at price (filtered out), leaving
+        // room for AVWAP. A single high spike at index 45 and low dip at index 50
+        // sit inside the short window (indices 40-59), so AVWAP anchored at those
+        // extremes lands just off price: anchor 45 (high spike) -> ~100.89
+        // (resistance), anchor 50 (low dip) -> ~98 (support).
+        const makeFlatBars = (
+            n: number,
+            spikeIndex: number,
+            dipIndex: number
+        ): Bar[] =>
+            Array.from({ length: n }, (_, i) => ({
+                time: i,
+                open: 100,
+                high: i === spikeIndex ? 200 : 100,
+                low: i === dipIndex ? 40 : 100,
+                close: 100,
+                volume: 1000,
+            }));
+        const ref = computeMarketReference(
+            makeFlatBars(60, 45, 50),
+            makeInd({
+                swingHighs: [swing(45, 200)],
+                swingLows: [swing(50, 40)],
+            }),
+            '1Day'
+        );
+        const shortLevels = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        const avwap = shortLevels.filter(l => l.kind === 'avwap');
+        const highAvwap = avwap.find(l => l.label === 'AVWAP (swing high)');
+        const lowAvwap = avwap.find(l => l.label === 'AVWAP (swing low)');
+        // anchored at the spike bar 45 (TP=133.33) over bars 45-59 -> ~100.89;
+        // anchored at the dip bar 50 (TP=80) over bars 50-59 -> 98.00.
+        expect(highAvwap?.price).toBeCloseTo(100.89, 1);
+        expect(lowAvwap?.price).toBeCloseTo(98.0, 2);
+    });
+
+    it('앵커 이후 누적 거래량이 0이면 AVWAP 레벨을 제외한다', () => {
+        // zero-volume bars -> anchoredVwap returns null -> resolveAvwapLevel drops it.
+        const zeroBars: Bar[] = Array.from({ length: 60 }, (_, i) => ({
+            time: i,
+            open: 100,
+            high: 100,
+            low: 100,
+            close: 100,
+            volume: 0,
+        }));
+        const ref = computeMarketReference(
+            zeroBars,
+            makeInd({
+                swingHighs: [swing(50, 110)],
+                swingLows: [swing(45, 90)],
+            }),
+            '1Day'
+        );
+        const allLevels = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        expect(allLevels.filter(l => l.kind === 'avwap')).toHaveLength(0);
+    });
+
     it('excludes swings older than the window from the horizon structure', () => {
         // older swings (index 5/7) fall outside the short window (startIndex 40)
         // so the short horizon swingStructure is 'mixed' (too few window swings),

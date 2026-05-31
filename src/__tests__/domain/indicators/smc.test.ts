@@ -250,6 +250,46 @@ describe('calculateSmc', () => {
             );
             expect(choch.length).toBeGreaterThan(0);
         });
+
+        it('BOS→CHoCH 경계가 breakType 시퀀스와 break price/type로 핀 고정된다', () => {
+            const P = SMC_SWING_PERIOD;
+            const bars: Bar[] = [];
+            let t = 0;
+
+            // Phase 1: 첫 돌파(추세 없음) → bearish BOS
+            for (let i = 0; i < P; i++) bars.push(makeBar(100, 90, 95, t++));
+            bars.push(makeBar(100, 10, 55, t++)); // swing low 시드
+            for (let i = 0; i < P; i++) bars.push(makeBar(100, 90, 95, t++));
+            bars.push(makeBar(100, 90, 5, t++)); // close 5 < active low → bearish BOS
+
+            // Phase 2: 기존 bearish 추세에서 상방 돌파 → bullish CHoCH
+            for (let i = 0; i < P; i++) bars.push(makeBar(100, 90, 95, t++));
+            bars.push(makeBar(300, 90, 195, t++)); // swing high 300
+            for (let i = 0; i < P; i++) bars.push(makeBar(100, 90, 95, t++));
+            bars.push(makeBar(350, 90, 310, t++)); // close 310 > 300 → bullish CHoCH
+
+            const result = calculateSmc(bars);
+
+            // 정확히 2개의 break: 최초 돌파는 BOS, 추세 반전은 CHoCH.
+            expect(result.structureBreaks.map(b => b.breakType)).toEqual([
+                'bos',
+                'choch',
+            ]);
+            // 첫 break: bearish BOS (active swing low 90에서 close 5로 돌파).
+            expect(result.structureBreaks[0]).toEqual({
+                index: 2 * P + 1,
+                price: 90,
+                type: 'bearish',
+                breakType: 'bos',
+            });
+            // 둘째 break: bullish CHoCH (swing high 300을 close 310으로 돌파).
+            expect(result.structureBreaks[1]).toEqual({
+                index: 4 * P + 3,
+                price: 300,
+                type: 'bullish',
+                breakType: 'choch',
+            });
+        });
     });
 
     describe('Order Block 감지', () => {
