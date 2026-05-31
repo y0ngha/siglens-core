@@ -4212,5 +4212,29 @@ describe('prompt', () => {
             );
             expect(prompt).not.toContain('higher-conviction');
         });
+
+        it('labels each horizon with a timeframe-relative calendar span', () => {
+            const daily = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            const intraday = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '5Min'
+            );
+            // Same "Long-term" horizon reads as months on a daily chart but only
+            // a few sessions on a 5-minute chart, so the model calibrates vocabulary.
+            expect(daily).toContain('Long-term — ~9-12 months');
+            expect(intraday).toContain('Long-term — ~2-3 trading days');
+            expect(daily).not.toContain('Long-term — ~2-3 trading days');
+        });
     });
 });

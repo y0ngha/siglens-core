@@ -626,9 +626,35 @@ const HORIZON_LABEL: Record<HorizonKey, string> = {
     long: 'Long-term',
 };
 
+// Approximate calendar span each horizon's bar window covers, by timeframe, so
+// the model calibrates its vocabulary: "long-term" on a daily chart spans
+// quarters, while "long-term" on a 5-minute chart spans only a few sessions.
+// Derived from the horizon bar counts (HORIZON_WINDOWS_BY_TIMEFRAME) at ~390
+// trading minutes per session.
+const HORIZON_SPAN_BY_TIMEFRAME: Record<
+    Timeframe,
+    Record<HorizonKey, string>
+> = {
+    '5Min': {
+        short: '~2 trading hours',
+        medium: '~1 trading day',
+        long: '~2-3 trading days',
+    },
+    '15Min': {
+        short: '~1 trading day',
+        medium: '~3 trading days',
+        long: '~1-2 weeks',
+    },
+    '30Min': { short: '~2 trading days', medium: '~1 week', long: '~3 weeks' },
+    '1Hour': { short: '~4 trading days', medium: '~2 weeks', long: '~6 weeks' },
+    '4Hour': { short: '~2-3 weeks', medium: '~2 months', long: '~5 months' },
+    '1Day': { short: '~1 month', medium: '~1 quarter', long: '~9-12 months' },
+};
+
 const formatHorizonBlock = (
     key: HorizonKey,
-    horizon: HorizonReference
+    horizon: HorizonReference,
+    timeframe: Timeframe
 ): string => {
     const s = horizon.structure;
     const structureLine =
@@ -649,20 +675,23 @@ const formatHorizonBlock = (
               ]
             : [];
     return [
-        `### ${HORIZON_LABEL[key]} (${horizon.window.bars} bars)`,
+        `### ${HORIZON_LABEL[key]} — ${HORIZON_SPAN_BY_TIMEFRAME[timeframe][key]} (${horizon.window.bars} bars)`,
         structureLine,
         ...resistance,
         ...support,
     ].join('\n');
 };
 
-const formatMarketReferenceSection = (reference: MarketReference): string =>
+const formatMarketReferenceSection = (
+    reference: MarketReference,
+    timeframe: Timeframe
+): string =>
     [
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
-        formatHorizonBlock('short', reference.short),
-        formatHorizonBlock('medium', reference.medium),
-        formatHorizonBlock('long', reference.long),
+        formatHorizonBlock('short', reference.short, timeframe),
+        formatHorizonBlock('medium', reference.medium, timeframe),
+        formatHorizonBlock('long', reference.long, timeframe),
     ].join('\n');
 
 const formatIndicatorSection = (
@@ -1136,7 +1165,7 @@ export function buildAnalysisPrompt(
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
-        formatMarketReferenceSection(marketReference),
+        formatMarketReferenceSection(marketReference, timeframe),
         ...(indicatorGuideSkills.length > 0
             ? [
                   `## Indicator Signal Guides\n${indicatorGuideSkills.map(buildSkillBlock).join('\n\n')}`,
