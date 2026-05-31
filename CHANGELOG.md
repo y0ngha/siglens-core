@@ -1,5 +1,60 @@
 # Changelog
 
+# [0.18.0](https://github.com/y0ngha/siglens-core/compare/v0.17.0...v0.18.0) (2026-05-31)
+
+
+### Bug Fixes
+
+* B3 리뷰 반영 - 피봇 anchor len-2·PUBLIC_API 등재 ([df350d3](https://github.com/y0ngha/siglens-core/commit/df350d3a696e0f282a35e02c16608efe9978fc42))
+* include null in nullable enum values (strength, entryRecommendation) ([8e94822](https://github.com/y0ngha/siglens-core/commit/8e948221794545ccd9855368f962985d17174c8a))
+* SMC equal-level 클러스터링으로 캐시 10MB 초과 차단 ([d459c98](https://github.com/y0ngha/siglens-core/commit/d459c9807662fc6c8d98c037e846af96cfaf80d0))
+
+
+### Code Refactoring
+
+* **smc:** finalize SMCEqualLevel.type removal ([12b71ca](https://github.com/y0ngha/siglens-core/commit/12b71ca0af0c1366abf57f4df7eae6aea9c1c760))
+
+
+### Features
+
+* 브리핑 캐시키에 입력 해시 추가 ([#123](https://github.com/y0ngha/siglens-core/issues/123)) ([768c9c6](https://github.com/y0ngha/siglens-core/commit/768c9c686a0df980a19082c421e0651389eb07ad))
+* 지지/저항 후보 사전계산 주입 ([#124](https://github.com/y0ngha/siglens-core/issues/124)) ([76cd366](https://github.com/y0ngha/siglens-core/commit/76cd3662a5f262b3fbf504837fbd6596969403a2))
+* 챗봇·브리핑 Data Boundary 추가 ([#122](https://github.com/y0ngha/siglens-core/issues/122)) ([93712ac](https://github.com/y0ngha/siglens-core/commit/93712ac1affd697460a23733caa305074bc88722))
+* 캐시키에 프롬프트 템플릿 버전 반영 ([#121](https://github.com/y0ngha/siglens-core/issues/121)) ([7157b78](https://github.com/y0ngha/siglens-core/commit/7157b7835647ac616c97acc2ae3f1f24f904e7e0))
+* 캔들 패턴 trend 사전 주입 ([#120](https://github.com/y0ngha/siglens-core/issues/120)) ([0dd5a83](https://github.com/y0ngha/siglens-core/commit/0dd5a83a6c38d2b734e77723f94880b706f35931))
+* 펀더멘털 프롬프트 결측치 의미 명시 ([#119](https://github.com/y0ngha/siglens-core/issues/119)) ([526173a](https://github.com/y0ngha/siglens-core/commit/526173aa1cca876fc9919aba361356d98e4eb0e6))
+* 피봇·피보나치 레벨 사전계산 주입 ([72c11f8](https://github.com/y0ngha/siglens-core/commit/72c11f8610aa416b72a71d4228ef1af126f8d70f))
+* add anchored VWAP helper ([18d81a9](https://github.com/y0ngha/siglens-core/commit/18d81a95dbefa3e7e222a405f7b3be187c2a448b))
+* add computeMarketReference multi-horizon layer ([2082076](https://github.com/y0ngha/siglens-core/commit/20820760c942597425286bf48dad8cdeef68558b))
+* add market-reference constants ([9e0551e](https://github.com/y0ngha/siglens-core/commit/9e0551e0c0e817bc771c799f3993ad496e5130cc))
+* add MarketReference domain types ([7812903](https://github.com/y0ngha/siglens-core/commit/78129033601407addadc66b53ba26f62712fede6))
+* add round-number reference levels ([2baa4f2](https://github.com/y0ngha/siglens-core/commit/2baa4f2cc90a13e6df609590f8687a189cf14d62))
+* add standard + camarilla pivot levels ([a65cb8b](https://github.com/y0ngha/siglens-core/commit/a65cb8b88ce25f19019d51503b0a5e154b40ddb3))
+* add trend-structure descriptive helpers ([9d0005f](https://github.com/y0ngha/siglens-core/commit/9d0005ffd93cfd099eec0a47a34d4dbca96d87b3))
+* **briefing:** send model on dispatch and fold it into the cache key ([60308b9](https://github.com/y0ngha/siglens-core/commit/60308b9447653711ae587549f4552e3f80b2d1a1))
+* collect + split indicator reference levels ([9f0a993](https://github.com/y0ngha/siglens-core/commit/9f0a993ddbfccd2ac2068fc51ce20c908b1c179a))
+* **dispatch:** add analysisType + per-analysis system prompt to /analyze contract ([bfe6dba](https://github.com/y0ngha/siglens-core/commit/bfe6dbafeff06c477b7ecb8f827f68186ac133e9))
+* **dispatch:** send canonical response JSON schemas for structured output ([d159f12](https://github.com/y0ngha/siglens-core/commit/d159f12196e506ff9d059dd52b5961b89dcbd469))
+* **dispatch:** send deterministic seed for reproducible generation ([4548f80](https://github.com/y0ngha/siglens-core/commit/4548f80b70b97caf7f16a2a7e355fbebdc52fe4a))
+* **dispatch:** structured-output schema for chart/technical analysis ([dbeb962](https://github.com/y0ngha/siglens-core/commit/dbeb962551c05e53bd286a67525bd023eb35c0bd))
+* few-shot 예시·종합 출처 라벨 추가 ([#125](https://github.com/y0ngha/siglens-core/issues/125)) ([9d5e5ac](https://github.com/y0ngha/siglens-core/commit/9d5e5acdbabf6b77a38015685390a1fddea83205))
+* **fundamental:** add peer PER/PSR to comparable-peers prompt rows ([28bd859](https://github.com/y0ngha/siglens-core/commit/28bd859060985f301e6822d89192b5eea21776cc))
+* **prompt:** inject precomputed trendline candidates from swing points ([495345c](https://github.com/y0ngha/siglens-core/commit/495345c5840fe44e123ac0924050b3ae33883667))
+* **prompt:** label horizons with timeframe-relative calendar spans ([64ddfb8](https://github.com/y0ngha/siglens-core/commit/64ddfb8c8f842b9c123a36e5eb5a6c04b5baf843))
+* **prompt:** swap precomputed sections for advisory Market Reference ([468d623](https://github.com/y0ngha/siglens-core/commit/468d62398c4266799028a6facf264ded1ea8b246))
+* **smc:** add recency + span to liquidity pools, drop dead type field ([a2aa430](https://github.com/y0ngha/siglens-core/commit/a2aa430e944f8926f2276b9eedfe1d9b2182287f))
+* **sr:** rank support/resistance candidates by confluence + tested history ([40e0e82](https://github.com/y0ngha/siglens-core/commit/40e0e82d00d65125d56405150ddad10ab6b7bba9))
+* surface anchored VWAP levels per horizon ([d4d21f4](https://github.com/y0ngha/siglens-core/commit/d4d21f41be1efaf1cfd36c0aed052dd6066a2849))
+
+
+### BREAKING CHANGES
+
+* **smc:** SMCEqualLevel.type field removed. It was redundant because
+equalHighs and equalLows are already separate arrays that encode the high/low
+context. Read the array an element came from instead of its former `type`.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
 # [0.17.0](https://github.com/y0ngha/siglens-core/compare/v0.15.0...v0.17.0) (2026-05-29)
 
 
