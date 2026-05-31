@@ -1098,6 +1098,7 @@ function byName(a: Skill, b: Skill): number {
  * produce an `AnalysisResponse`. Sections include analysis snapshot,
  * long-term context, recent bars with detected candle patterns, buy / sell
  * volume split, every indicator value with timeframe-aware trend labels,
+ * market reference (deterministic advisory levels and structure per horizon),
  * SMC structure, and per-skill writing rules.
  *
  * Skills with `confidenceWeight < MIN_CONFIDENCE_WEIGHT` are excluded.

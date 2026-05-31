@@ -94,7 +94,8 @@ describe('computeMarketReference', () => {
     it('produces a regime descriptor for every horizon', () => {
         const ref = computeMarketReference(makeBars(250), makeInd(), '1Day');
         for (const h of [ref.short, ref.medium, ref.long]) {
-            expect(['trending', 'ranging']).toContain(h.structure.regime);
+            // monotonically rising closes -> efficiency ratio ~1 -> trending
+            expect(h.structure.regime).toBe('trending');
         }
     });
 
@@ -205,10 +206,8 @@ describe('computeMarketReference', () => {
         // current price (~139) above both MAs
         expect(ref.short.structure.priceVsMA60).toBe('above');
         expect(ref.short.structure.priceVsMA200).toBe('above');
-        // ema9(200) < ema20(210) and price below ema9 -> aligned_down? price>ema9 -> mixed
-        expect(['aligned_up', 'aligned_down', 'mixed']).toContain(
-            ref.short.structure.emaStack
-        );
+        // price(139) < ema9(200) and ema9(200) < ema20(210) -> aligned_down
+        expect(ref.short.structure.emaStack).toBe('aligned_down');
     });
 
     it('reports priceVsMA as below when price sits under the moving averages', () => {

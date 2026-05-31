@@ -16,6 +16,10 @@ import {
     ADX_TRENDING_THRESHOLD,
     EFFICIENCY_RATIO_TRENDING_THRESHOLD,
     RATIO_TO_PERCENT,
+    EMA_STACK_SHORT_PERIOD,
+    EMA_STACK_LONG_PERIOD,
+    TREND_STRUCTURE_MA_MEDIUM_PERIOD,
+    TREND_STRUCTURE_MA_LONG_PERIOD,
 } from '@/domain/analysis/marketReferenceConstants';
 import {
     collectIndicatorLevels,
@@ -65,10 +69,14 @@ function buildStructure(
             Math.max(MIN_EFFICIENCY_PERIOD, closes.length - 1)
         )
     );
-    const ema9 = lastFiniteNumber(indicators.ema[9] ?? []);
-    const ema20 = lastFiniteNumber(indicators.ema[20] ?? []);
-    const ma60 = lastFiniteNumber(indicators.ma[60] ?? []);
-    const ma200 = lastFiniteNumber(indicators.ma[200] ?? []);
+    const ema9 = lastFiniteNumber(indicators.ema[EMA_STACK_SHORT_PERIOD] ?? []);
+    const ema20 = lastFiniteNumber(indicators.ema[EMA_STACK_LONG_PERIOD] ?? []);
+    const ma60 = lastFiniteNumber(
+        indicators.ma[TREND_STRUCTURE_MA_MEDIUM_PERIOD] ?? []
+    );
+    const ma200 = lastFiniteNumber(
+        indicators.ma[TREND_STRUCTURE_MA_LONG_PERIOD] ?? []
+    );
     const adx = lastFiniteNumber(indicators.dmi.map(d => d.adx));
     const trending =
         (adx != null && adx >= ADX_TRENDING_THRESHOLD) ||

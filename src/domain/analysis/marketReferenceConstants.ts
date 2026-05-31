@@ -48,3 +48,12 @@ export const MAX_REFERENCE_LEVELS_PER_SIDE = 6;
 
 /** @internal Factor converting a fraction to a percentage (distance %, fib ratio labels). */
 export const RATIO_TO_PERCENT = 100;
+
+/** @internal Short EMA period for the trend-structure EMA stack. */
+export const EMA_STACK_SHORT_PERIOD = 9;
+/** @internal Long EMA period for the trend-structure EMA stack. */
+export const EMA_STACK_LONG_PERIOD = 20;
+/** @internal MA period used as the medium trend reference (priceVsMA60). */
+export const TREND_STRUCTURE_MA_MEDIUM_PERIOD = 60;
+/** @internal MA period used as the long trend reference (priceVsMA200). */
+export const TREND_STRUCTURE_MA_LONG_PERIOD = 200;
