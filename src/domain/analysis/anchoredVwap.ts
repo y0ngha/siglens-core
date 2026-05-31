@@ -1,6 +1,5 @@
 import type { Bar } from '@/domain/types';
 
-/** Divisor for the typical price (high + low + close) / 3. */
 const TYPICAL_PRICE_DIVISOR = 3;
 
 /**

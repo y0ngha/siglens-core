@@ -202,6 +202,31 @@ describe('computeMarketReference', () => {
         expect(lowAvwap?.price).toBeCloseTo(98.0, 2);
     });
 
+    it('앵커 이후 누적 거래량이 0이면 AVWAP 레벨을 제외한다', () => {
+        // zero-volume bars -> anchoredVwap returns null -> resolveAvwapLevel drops it.
+        const zeroBars: Bar[] = Array.from({ length: 60 }, (_, i) => ({
+            time: i,
+            open: 100,
+            high: 100,
+            low: 100,
+            close: 100,
+            volume: 0,
+        }));
+        const ref = computeMarketReference(
+            zeroBars,
+            makeInd({
+                swingHighs: [swing(50, 110)],
+                swingLows: [swing(45, 90)],
+            }),
+            '1Day'
+        );
+        const allLevels = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        expect(allLevels.filter(l => l.kind === 'avwap')).toHaveLength(0);
+    });
+
     it('excludes swings older than the window from the horizon structure', () => {
         // older swings (index 5/7) fall outside the short window (startIndex 40)
         // so the short horizon swingStructure is 'mixed' (too few window swings),

@@ -10,6 +10,10 @@ function makeBar(high: number, low: number, close: number, time: number): Bar {
     return { time, open: close, high, low, close, volume: 1000 };
 }
 
+function makeVolBar(price: number, volume: number, time: number): Bar {
+    return { time, open: price, high: price, low: price, close: price, volume };
+}
+
 describe('calculateVolumeProfile', () => {
     describe('bars가 VP_MIN_BARS 미만일 때', () => {
         it('null을 반환한다', () => {
@@ -77,18 +81,6 @@ describe('calculateVolumeProfile', () => {
             //   step: nextAbove=b3=30, nextBelow=b1=40 → 30 >= 40 거짓 → 아래로 확장
             //         val=1, acc=140 ≥ 129.5 → 종료
             //   ⇒ POC center 2.5, VAH center 2.5(b2), VAL center 1.5(b1)
-            const makeVolBar = (
-                price: number,
-                volume: number,
-                time: number
-            ): Bar => ({
-                time,
-                open: price,
-                high: price,
-                low: price,
-                close: price,
-                volume,
-            });
             const groups: ReadonlyArray<{
                 price: number;
                 volume: number;
