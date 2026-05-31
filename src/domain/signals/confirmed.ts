@@ -367,24 +367,23 @@ export function detectCmfBullishFlip(
     };
 }
 
-/** @internal Detects MFI crossing up out of oversold (bullish confirmed signal). */
+/** @internal Detects MFI crossing up out of oversold within the lookback window (bullish confirmed signal). */
 export function detectMfiOversoldBounce(
     _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
-    const mfi = indicators.mfi;
-    if (mfi.length < 2) return null;
-    const lastIdx = mfi.length - 1;
-    const prev = mfi[lastIdx - 1];
-    const cur = mfi[lastIdx];
-    if (prev === null || cur === null) return null;
-    if (prev >= MFI_OVERSOLD_LEVEL) return null;
-    if (cur < MFI_OVERSOLD_LEVEL) return null;
+    const idx = findThresholdCross(
+        indicators.mfi,
+        MFI_OVERSOLD_LEVEL,
+        CROSS_LOOKBACK_BARS,
+        'up'
+    );
+    if (idx === null) return null;
     return {
         type: 'mfi_oversold_bounce',
         direction: 'bullish',
         phase: 'confirmed',
-        detectedAt: lastIdx,
+        detectedAt: idx,
     };
 }
 

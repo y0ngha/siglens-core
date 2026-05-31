@@ -6,6 +6,7 @@ import {
     detectIchimokuCloudBreakdown,
     detectKeltnerLowerBreakout,
     detectMfiOverboughtReversal,
+    detectMfiOversoldBounce,
     detectParabolicSarBearishFlip,
     detectSqueezeMomentumBearish,
     detectSupertrendBearishFlip,
@@ -587,5 +588,46 @@ describe('detectMfiOverboughtReversal', () => {
                 )
             ).toBeNull();
         });
+    });
+});
+
+// ─── detectMfiOversoldBounce — lookback-cross rewrite (Task 1.4) ───────────────
+
+describe('detectMfiOversoldBounce (lookback cross)', () => {
+    it('직전 bar가 아니라 lookback 내 cross에서도 발화한다', () => {
+        // oversold 상향 통과가 2봉 전(index 7)에 발생, 그 이후엔 cross 없음.
+        const bars = buildBars(10);
+        const mfi = [...Array(7).fill(15), 25, 28, 30]; // 20 상향 돌파 at index 7
+        const result = detectMfiOversoldBounce(bars, withMfi(mfi));
+        expect(result?.type).toBe('mfi_oversold_bounce');
+        expect(result?.direction).toBe('bullish');
+        expect(result?.detectedAt).toBe(7);
+    });
+
+    it('직전 bar에서 막 상향 돌파해도 발화한다 (기존 거동 회귀 없음)', () => {
+        const bars = buildBars(10);
+        const mfi = [...Array(9).fill(15), 22];
+        const result = detectMfiOversoldBounce(bars, withMfi(mfi));
+        expect(result?.type).toBe('mfi_oversold_bounce');
+        expect(result?.detectedAt).toBe(9);
+    });
+
+    it('lookback 밖의 cross는 무시한다', () => {
+        const bars = buildBars(10);
+        // cross at index 3, lookback=3 covers the last 3 indices only.
+        const mfi = [...Array(3).fill(15), ...Array(7).fill(25)];
+        expect(detectMfiOversoldBounce(bars, withMfi(mfi))).toBeNull();
+    });
+
+    it('cross가 전혀 없으면 null을 반환한다', () => {
+        const bars = buildBars(10);
+        const mfi = Array(10).fill(15);
+        expect(detectMfiOversoldBounce(bars, withMfi(mfi))).toBeNull();
+    });
+
+    it('MFI 데이터가 없을 때 null을 반환한다', () => {
+        expect(
+            detectMfiOversoldBounce(buildBars(5), EMPTY_INDICATOR_RESULT)
+        ).toBeNull();
     });
 });
