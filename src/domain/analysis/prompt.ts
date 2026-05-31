@@ -611,6 +611,75 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     ].join('\n');
 };
 
+// ── SMC handling (Task 2.6) ─────────────────────────────────────────────────
+// The full SMC skill guide (~13KB of ICT prose with placeholder example prices)
+// is a prime fabrication source for floor models — they copy the example levels
+// as if real. It is NEVER injected. The deterministic computed SMC section
+// (formatSMCSection) stays as the data anchor; a compressed concept note is
+// added only when a structure break is recent enough to be actionable.
+
+/** Recency window (in bars) within which a BOS/CHoCH justifies the SMC note. */
+const SMC_STRUCTURE_BREAK_RECENCY_BARS = 10;
+
+/**
+ * One-line notice marking that the full SMC guide was deliberately withheld and
+ * pointing the model at the computed SMC data section as the only valid source.
+ */
+export const SMC_GUIDE_BLOCKED_NOTICE =
+    'SMC note: the full Smart Money Concepts guide is intentionally omitted; use ONLY the levels in the computed ## Smart Money Concepts (SMC) section below — do not infer or invent SMC levels from memory.';
+
+/**
+ * Anti-fabrication guardrail propagated to every level-citing section
+ * (Fibonacci / support-resistance / pivot). Floor models otherwise invent or
+ * recopy plausible-looking price levels; this line forbids it explicitly.
+ */
+export const ANTI_FABRICATION_GUARDRAIL =
+    'Anti-fabrication: cite ONLY price levels that appear verbatim in the data above (computed references, SMC section, bar data). Never invent, round, or recall a level from outside this prompt; if a level is not present, say so rather than fabricating one.';
+
+/** Matches the SMC full-guide skill by name, regardless of its gating tier. */
+const isSmcGuideSkill = (skill: Skill): boolean => {
+    const name = skill.name.toLowerCase();
+    return name.includes('smart money') || name === 'smc';
+};
+
+/**
+ * Latest structure break's distance in bars, or null when there is none.
+ * Uses the maximum index (most recent break) against the bar count.
+ */
+const latestStructureBreakBarsAgo = (
+    smc: SMCResult,
+    totalBars: number
+): number | null => {
+    if (smc.structureBreaks.length === 0 || totalBars === 0) return null;
+    const latestIndex = smc.structureBreaks.reduce(
+        (max, b) => Math.max(max, b.index),
+        smc.structureBreaks[0].index
+    );
+    return totalBars - 1 - latestIndex;
+};
+
+/**
+ * Compressed ~5-line SMC concept note, emitted only when the latest BOS/CHoCH
+ * occurred within {@link SMC_STRUCTURE_BREAK_RECENCY_BARS} bars. Returns null
+ * otherwise (no recent structural shift → no note, to avoid distraction).
+ */
+const formatSmcConceptNote = (
+    indicators: IndicatorResult,
+    bars: Bar[]
+): string | null => {
+    const barsAgo = latestStructureBreakBarsAgo(indicators.smc, bars.length);
+    if (barsAgo === null || barsAgo > SMC_STRUCTURE_BREAK_RECENCY_BARS) {
+        return null;
+    }
+    return [
+        '## Smart Money Concepts — Concept Note',
+        SMC_GUIDE_BLOCKED_NOTICE,
+        `- A market-structure break (BOS/CHoCH) printed ${barsAgo} bar(s) ago — structure may be shifting.`,
+        '- BOS (break of structure) = trend continuation; CHoCH (change of character) = potential reversal.',
+        '- Read the computed SMC levels above as zones to react to, not as guarantees.',
+    ].join('\n');
+};
+
 const MARKET_REFERENCE_HEADER =
     '## Market Reference (deterministic · advisory)';
 
@@ -691,6 +760,7 @@ const formatMarketReferenceSection = (
     [
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
+        ANTI_FABRICATION_GUARDRAIL,
         formatHorizonBlock('short', reference.short, timeframe),
         formatHorizonBlock('medium', reference.medium, timeframe),
         formatHorizonBlock('long', reference.long, timeframe),
@@ -1195,7 +1265,12 @@ export function buildAnalysisPrompt(
         indicators,
         timeframe
     );
-    const activeSkills = selectSkills(skills, selectionContext);
+    // The SMC full guide is never injected (fabrication source); it is replaced
+    // by the deterministic SMC data section + a compressed concept note. Drop it
+    // regardless of its gating tier before bucketing.
+    const activeSkills = selectSkills(skills, selectionContext).filter(
+        skill => !isSmcGuideSkill(skill)
+    );
 
     const skillGroups: Record<SkillGroupKey, Skill[]> = {
         pattern: [],
@@ -1219,6 +1294,7 @@ export function buildAnalysisPrompt(
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
     const marketReference = computeMarketReference(bars, indicators, timeframe);
+    const smcConceptNote = formatSmcConceptNote(indicators, bars);
 
     const sections = [
         `Symbol: ${symbol}\nCompany: ${companyName}`,
@@ -1231,6 +1307,7 @@ export function buildAnalysisPrompt(
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
+        ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(marketReference, timeframe),
         ...(indicatorGuideSkills.length > 0
             ? [
