@@ -42,9 +42,14 @@ const EFFICIENCY_PERIOD = 20;
 const MIN_EFFICIENCY_PERIOD = 2;
 const FIB_RATIO_DECIMAL_PLACES = 1;
 
+// `price === level` resolves to 'above' (tie-breaking — PriceVsLevel has no 'at').
 const priceVs = (price: number, level: number | null): PriceVsLevel =>
     level == null ? 'unknown' : price >= level ? 'above' : 'below';
 
+// ema/ma/adx read their latest value from the GLOBAL `indicators` (full-history
+// series — e.g. MA200 needs the full lookback, so a per-window recompute would be
+// wrong), so priceVsMA60/priceVsMA200/emaStack/adx are identical across horizons.
+// Only swingStructure (window-filtered swings) and efficiencyRatio differ per horizon.
 function buildStructure(
     window: Bar[],
     indicators: IndicatorResult,

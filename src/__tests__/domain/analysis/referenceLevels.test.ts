@@ -3,6 +3,7 @@ import {
     roundNumberLevels,
     splitBySide,
     collectIndicatorLevels,
+    lastFiniteNumber,
 } from '@/domain/analysis/referenceLevels';
 import { MAX_REFERENCE_LEVELS_PER_SIDE } from '@/domain/analysis/marketReferenceConstants';
 import type { IndicatorResult, ReferenceLevel } from '@/domain/types';
@@ -152,4 +153,17 @@ describe('collectIndicatorLevels', () => {
         expect(labels).toContain('MA50');
         expect(labels).toContain('EMA60');
     });
+});
+
+describe('lastFiniteNumber', () => {
+    it('returns the last finite number', () =>
+        expect(lastFiniteNumber([1, 2, 3])).toBe(3));
+    it('skips null values', () =>
+        expect(lastFiniteNumber([1, null, 3])).toBe(3));
+    it('skips non-finite values', () =>
+        expect(lastFiniteNumber([1, Infinity, NaN, 2])).toBe(2));
+    it('returns null for an empty array', () =>
+        expect(lastFiniteNumber([])).toBeNull());
+    it('returns null when all values are null/non-finite', () =>
+        expect(lastFiniteNumber([null, Infinity])).toBeNull());
 });
