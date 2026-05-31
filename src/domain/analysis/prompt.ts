@@ -17,7 +17,6 @@ import {
     KELTNER_MULTIPLIER,
     MA_DEFAULT_PERIODS,
     MFI_DEFAULT_PERIOD,
-    MIN_CONFIDENCE_WEIGHT,
     RSI_DEFAULT_PERIOD,
     SMC_SWING_PERIOD,
     SQUEEZE_MOMENTUM_BB_LENGTH,
@@ -46,6 +45,8 @@ import {
     getDetectionBars,
     selectLastCandlePatternEntries,
 } from '@/domain/analysis/candle-detection';
+import { selectSkills } from '@/domain/analysis/selectSkills';
+import { detectSignals } from '@/domain/signals';
 import type {
     CandlePatternEntry,
     AnalysisResponse,
@@ -58,6 +59,7 @@ import type {
     PromptConfig,
     ReferenceLevel,
     Skill,
+    SkillSelectionContext,
     SkillType,
     SMCEqualLevel,
     SMCResult,
@@ -1085,9 +1087,62 @@ const buildAnalysisRequest = (
         .join('\n');
 };
 
-function byName(a: Skill, b: Skill): number {
-    return a.name.localeCompare(b.name, 'en');
-}
+// ── ATR-extreme sizing note (Tier-0 conditional promotion) ──────────────────
+// When realized volatility is extreme, position-sizing context must never be
+// dropped — even if the gated sizing guide did not fire. The threshold is
+// timeframe-aware: a 6% daily ATR is extreme, but intraday bars routinely show
+// 2%+ ATR, so the intraday bar is lower.
+const ATR_EXTREME_PERCENT_DAILY = 6;
+const ATR_EXTREME_PERCENT_INTRADAY = 2;
+const DAILY_TIMEFRAME: Timeframe = '1Day';
+
+const atrExtremeThreshold = (timeframe: Timeframe): number =>
+    timeframe === DAILY_TIMEFRAME
+        ? ATR_EXTREME_PERCENT_DAILY
+        : ATR_EXTREME_PERCENT_INTRADAY;
+
+const ATR_EXTREME_SIZING_NOTE = [
+    '## Extreme Volatility — Position Sizing',
+    '- Realized volatility (ATR) is extreme for this timeframe. Size positions conservatively: widen stops to the ATR range, reduce position size so a single ATR move stays within risk tolerance, and avoid market entries into the volatility spike.',
+].join('\n');
+
+/**
+ * Pattern names of every candle formation detected in the recent window — the
+ * candle equivalent of a signal event, used by {@link selectSkills} to gate
+ * candle guides. Includes all detected entries (not just the last two shown in
+ * the prompt) so a guide gates on its candle's presence anywhere in the window.
+ */
+const collectDetectedCandleNames = (bars: Bar[]): string[] => {
+    const names = new Set<string>();
+    for (const entry of detectCandlePatternEntries(bars)) {
+        const name =
+            entry.patternType === 'multi'
+                ? entry.multiPattern
+                : entry.singlePattern;
+        if (name !== null) names.add(name);
+    }
+    return [...names];
+};
+
+/** Build the pure, read-only selection context from data already in scope. */
+const buildSkillSelectionContext = (
+    bars: Bar[],
+    indicators: IndicatorResult,
+    timeframe: Timeframe
+): SkillSelectionContext => {
+    const price = bars.length > 0 ? bars[bars.length - 1].close : 0;
+    const atr = lastNonNull(indicators.atr);
+    const atrPercent =
+        price > 0 && atr !== null ? (atr / price) * PERCENTAGE_FACTOR : 0;
+    return {
+        indicators,
+        signals: detectSignals(bars, indicators),
+        timeframe,
+        detectedCandles: collectDetectedCandleNames(bars),
+        price,
+        atrPercent,
+    };
+};
 
 /**
  * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
@@ -1101,11 +1156,14 @@ function byName(a: Skill, b: Skill): number {
  * market reference (deterministic advisory levels and structure per horizon),
  * SMC structure, and per-skill writing rules.
  *
- * Skills with `confidenceWeight < MIN_CONFIDENCE_WEIGHT` are excluded.
- * Active skills are sorted by name and grouped by `type` (pattern, strategy,
- * indicator_guide, candlestick, support_resistance, regular). The number of
- * trend samples and recent bars varies per `timeframe` via
- * `PROMPT_CONFIG_BY_TIMEFRAME`.
+ * Skills are dynamically gated by {@link selectSkills}: only those whose
+ * frontmatter `gating` fires for this chart's state (detected signals, textbook
+ * indicator states, detected candles) are injected; untagged skills fail open
+ * (always included). Selected skills are name-sorted and grouped by `type`
+ * (pattern, strategy, indicator_guide, candlestick, support_resistance,
+ * regular). When ATR% is extreme for the timeframe, an always-on position-sizing
+ * note is appended. The number of trend samples and recent bars varies per
+ * `timeframe` via `PROMPT_CONFIG_BY_TIMEFRAME`.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
  * @param companyName - Full English company name (e.g. `"Apple Inc."`).
@@ -1128,9 +1186,16 @@ export function buildAnalysisPrompt(
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot
 ): string {
-    const activeSkills = skills
-        .filter(s => s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT)
-        .toSorted(byName);
+    // Dynamic gating (chart only): inject only the skills whose frontmatter
+    // gating fires for this chart's state. Untagged skills fail open (included).
+    // selectSkills already returns a name-sorted copy, so the static byName
+    // sort is no longer needed here.
+    const selectionContext = buildSkillSelectionContext(
+        bars,
+        indicators,
+        timeframe
+    );
+    const activeSkills = selectSkills(skills, selectionContext);
 
     const skillGroups: Record<SkillGroupKey, Skill[]> = {
         pattern: [],
@@ -1196,6 +1261,9 @@ export function buildAnalysisPrompt(
             ? [
                   `## Active Skills\n${regularSkills.map(buildSkillBlock).join('\n\n')}`,
               ]
+            : []),
+        ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)
+            ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
         buildAnalysisRequest(
