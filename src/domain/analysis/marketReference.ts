@@ -196,31 +196,22 @@ function buildHorizon(
         windowSwingLows.length > 0
             ? windowSwingLows.reduce((a, b) => (b.price < a.price ? b : a))
             : null;
-    const avwapLevels: ReferenceLevel[] = [];
-    if (anchorHigh) {
-        const v = anchoredVwap(bars, anchorHigh.index);
-        if (v != null)
-            avwapLevels.push(
-                makeReferenceLevel(
-                    v,
-                    'AVWAP (swing high)',
-                    'avwap',
-                    currentPrice
-                )
-            );
-    }
-    if (anchorLow) {
-        const v = anchoredVwap(bars, anchorLow.index);
-        if (v != null)
-            avwapLevels.push(
-                makeReferenceLevel(
-                    v,
-                    'AVWAP (swing low)',
-                    'avwap',
-                    currentPrice
-                )
-            );
-    }
+    const avwapAnchors: ReadonlyArray<{
+        swing: SMCSwingPoint | null;
+        label: string;
+    }> = [
+        { swing: anchorHigh, label: 'AVWAP (swing high)' },
+        { swing: anchorLow, label: 'AVWAP (swing low)' },
+    ];
+    const avwapLevels: ReferenceLevel[] = avwapAnchors.flatMap(
+        ({ swing, label }) => {
+            if (swing === null) return [];
+            const value = anchoredVwap(bars, swing.index);
+            return value != null
+                ? [makeReferenceLevel(value, label, 'avwap', currentPrice)]
+                : [];
+        }
+    );
 
     const levels: ReferenceLevel[] = [
         ...collectIndicatorLevels(currentPrice, indicators, {
