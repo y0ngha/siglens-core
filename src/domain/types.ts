@@ -893,6 +893,15 @@ export interface PivotLevelSet {
  */
 export interface StandardPivotLevels extends PivotLevelSet {}
 
+/** Camarilla pivot levels (the four most-watched). */
+export interface CamarillaPivotLevels {
+    pp: number;
+    r3: number;
+    r4: number;
+    s3: number;
+    s4: number;
+}
+
 /**
  * Fibonacci pivot point set derived from a prior period's high/low/close.
  *
