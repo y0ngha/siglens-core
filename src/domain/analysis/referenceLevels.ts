@@ -13,6 +13,9 @@ import {
 /** Number of round levels to emit on each side of price. */
 const ROUND_LEVELS_PER_SIDE = 2;
 
+/** Extra candidate above base so the resistance side keeps >= ROUND_LEVELS_PER_SIDE levels. */
+const ROUND_LEVELS_UPPER_EXTRA = 1;
+
 /** Decimal places used to normalize emitted round-number prices. */
 const ROUND_PRICE_PRECISION = 4;
 
@@ -33,7 +36,11 @@ export function roundNumberLevels(currentPrice: number): ReferenceLevel[] {
     const inc = incrementFor(currentPrice);
     const base = Math.floor(currentPrice / inc) * inc;
     const levels: ReferenceLevel[] = [];
-    for (let i = -ROUND_LEVELS_PER_SIDE; i <= ROUND_LEVELS_PER_SIDE + 1; i++) {
+    for (
+        let i = -ROUND_LEVELS_PER_SIDE;
+        i <= ROUND_LEVELS_PER_SIDE + ROUND_LEVELS_UPPER_EXTRA;
+        i++
+    ) {
         const price = Number((base + i * inc).toFixed(ROUND_PRICE_PRECISION));
         if (price <= 0) continue;
         levels.push({

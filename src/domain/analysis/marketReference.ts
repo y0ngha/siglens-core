@@ -27,6 +27,8 @@ import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
 import {
     computeStandardPivot,
     computeCamarillaPivot,
+    STANDARD_PIVOT_KEYS,
+    CAMARILLA_LEVEL_KEYS,
 } from '@/domain/analysis/pivotLevels';
 import {
     efficiencyRatio,
@@ -37,6 +39,7 @@ import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 
 const EFFICIENCY_PERIOD = 20;
 const MIN_EFFICIENCY_PERIOD = 2;
+const FIB_RATIO_DECIMAL_PLACES = 1;
 
 const priceVs = (
     price: number,
@@ -90,11 +93,11 @@ function buildHorizon(
     key: HorizonKey,
     windowBars: number
 ): HorizonReference {
-    const windowLen = Math.min(windowBars, bars.length);
-    const window = windowLen > 0 ? bars.slice(bars.length - windowLen) : [];
-    const startIndex = bars.length - windowLen;
-    const currentPrice =
-        window.length > 0 ? window[window.length - 1].close : 0;
+    const barsLen = bars.length;
+    const windowLen = Math.min(windowBars, barsLen);
+    const window = windowLen > 0 ? bars.slice(barsLen - windowLen) : [];
+    const startIndex = barsLen - windowLen;
+    const currentPrice = windowLen > 0 ? window[windowLen - 1].close : 0;
 
     const windowSwingHighs = indicators.smc.swingHighs.filter(
         s => s.index >= startIndex
@@ -102,8 +105,73 @@ function buildHorizon(
     const windowSwingLows = indicators.smc.swingLows.filter(
         s => s.index >= startIndex
     );
-    const windowVp = window.length > 0 ? calculateVolumeProfile(window) : null;
+    const windowVp = windowLen > 0 ? calculateVolumeProfile(window) : null;
     const periods = HORIZON_MA_PERIODS[key];
+
+    const windowSmc = {
+        ...indicators.smc,
+        swingHighs: windowSwingHighs,
+        swingLows: windowSwingLows,
+    };
+    const fib = computeFibonacciProjection(windowSmc);
+    const fibLevels: ReferenceLevel[] = fib
+        ? [
+              ...fib.retracements.map(r =>
+                  makeReferenceLevel(
+                      r.price,
+                      `Fib ${(r.ratio * RATIO_TO_PERCENT).toFixed(FIB_RATIO_DECIMAL_PLACES)}%`,
+                      'fib_retracement',
+                      currentPrice
+                  )
+              ),
+              ...fib.extensions.map(e =>
+                  makeReferenceLevel(
+                      e.price,
+                      `Fib ext ${(e.ratio * RATIO_TO_PERCENT).toFixed(FIB_RATIO_DECIMAL_PLACES)}%`,
+                      'fib_extension',
+                      currentPrice
+                  )
+              ),
+          ]
+        : [];
+
+    const priorBar = windowLen >= 2 ? window[windowLen - 2] : null;
+    const sp = priorBar ? computeStandardPivot(priorBar) : null;
+    const standardPivotLevels: ReferenceLevel[] = sp
+        ? STANDARD_PIVOT_KEYS.map(k =>
+              makeReferenceLevel(
+                  sp[k],
+                  `Pivot ${k.toUpperCase()}`,
+                  'pivot_standard',
+                  currentPrice
+              )
+          )
+        : [];
+    const cam = priorBar ? computeCamarillaPivot(priorBar) : null;
+    const camarillaLevels: ReferenceLevel[] = cam
+        ? CAMARILLA_LEVEL_KEYS.map(k =>
+              makeReferenceLevel(
+                  cam[k],
+                  `Camarilla ${k.toUpperCase()}`,
+                  'pivot_camarilla',
+                  currentPrice
+              )
+          )
+        : [];
+
+    const swingLevels: ReferenceLevel[] = [
+        ...windowSwingHighs.map(s =>
+            makeReferenceLevel(
+                s.price,
+                'Swing high',
+                'swing_high',
+                currentPrice
+            )
+        ),
+        ...windowSwingLows.map(s =>
+            makeReferenceLevel(s.price, 'Swing low', 'swing_low', currentPrice)
+        ),
+    ];
 
     const levels: ReferenceLevel[] = [
         ...collectIndicatorLevels(currentPrice, indicators, {
@@ -112,78 +180,17 @@ function buildHorizon(
             emaPeriods: periods.ema,
         }),
         ...roundNumberLevels(currentPrice),
+        ...fibLevels,
+        ...standardPivotLevels,
+        ...camarillaLevels,
+        ...swingLevels,
     ];
-
-    const windowSmc = {
-        ...indicators.smc,
-        swingHighs: windowSwingHighs,
-        swingLows: windowSwingLows,
-    };
-    const fib = computeFibonacciProjection(windowSmc);
-    if (fib) {
-        for (const r of fib.retracements)
-            levels.push(
-                makeReferenceLevel(
-                    r.price,
-                    `Fib ${(r.ratio * RATIO_TO_PERCENT).toFixed(1)}%`,
-                    'fib_retracement',
-                    currentPrice
-                )
-            );
-        for (const e of fib.extensions)
-            levels.push(
-                makeReferenceLevel(
-                    e.price,
-                    `Fib ext ${(e.ratio * RATIO_TO_PERCENT).toFixed(1)}%`,
-                    'fib_extension',
-                    currentPrice
-                )
-            );
-    }
-    const priorBar = window.length >= 2 ? window[window.length - 2] : null;
-    if (priorBar) {
-        const sp = computeStandardPivot(priorBar);
-        if (sp)
-            for (const [k, v] of Object.entries(sp))
-                levels.push(
-                    makeReferenceLevel(
-                        v,
-                        `Pivot ${k.toUpperCase()}`,
-                        'pivot_standard',
-                        currentPrice
-                    )
-                );
-        const cam = computeCamarillaPivot(priorBar);
-        if (cam)
-            for (const k of ['r4', 'r3', 's3', 's4'] as const)
-                levels.push(
-                    makeReferenceLevel(
-                        cam[k],
-                        `Camarilla ${k.toUpperCase()}`,
-                        'pivot_camarilla',
-                        currentPrice
-                    )
-                );
-    }
-    for (const s of windowSwingHighs)
-        levels.push(
-            makeReferenceLevel(
-                s.price,
-                'Swing high',
-                'swing_high',
-                currentPrice
-            )
-        );
-    for (const s of windowSwingLows)
-        levels.push(
-            makeReferenceLevel(s.price, 'Swing low', 'swing_low', currentPrice)
-        );
 
     return {
         window: {
-            bars: window.length,
+            bars: windowLen,
             fromTime: window[0]?.time ?? null,
-            toTime: window[window.length - 1]?.time ?? null,
+            toTime: window[windowLen - 1]?.time ?? null,
         },
         levels:
             currentPrice > 0

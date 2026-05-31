@@ -727,7 +727,7 @@ export interface ClusteredKeyLevels {
     poc?: KeyLevel;
 }
 
-/** Round-number increment by price tier (ascending ceiling). */
+/** @internal Round-number increment by price tier (ascending ceiling). */
 export interface RoundNumberTier {
     maxPrice: number;
     increment: number;

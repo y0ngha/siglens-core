@@ -12,6 +12,19 @@ import {
 const PIVOT_DIVISOR = 3;
 const PIVOT_DOUBLE = 2;
 
+/** @internal Standard-pivot field keys, typed so indexing yields `number` (avoids Object.entries `any`). */
+export const STANDARD_PIVOT_KEYS = [
+    'pp',
+    'r1',
+    'r2',
+    'r3',
+    's1',
+    's2',
+    's3',
+] as const;
+/** @internal Camarilla field keys surfaced as reference levels (the four most-watched). */
+export const CAMARILLA_LEVEL_KEYS = ['r4', 'r3', 's3', 's4'] as const;
+
 const isUsablePrice = (price: number): boolean =>
     Number.isFinite(price) && price > 0;
 

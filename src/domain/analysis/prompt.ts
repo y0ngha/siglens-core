@@ -618,7 +618,7 @@ const MARKET_REFERENCE_FRAMING =
 const EFFICIENCY_DECIMAL_PLACES = 2;
 
 const formatReferenceLevelLine = (level: ReferenceLevel): string =>
-    `- ${fmt(level.price)} (${level.label}; ${level.distancePercent.toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
+    `- ${fmt(level.price)} (${level.label}; ${Math.abs(level.distancePercent).toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
 
 const HORIZON_LABEL: Record<HorizonKey, string> = {
     short: 'Short-term',
