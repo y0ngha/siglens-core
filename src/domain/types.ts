@@ -727,65 +727,6 @@ export interface ClusteredKeyLevels {
     poc?: KeyLevel;
 }
 
-/**
- * Origin label for a precomputed support/resistance candidate.
- *
- * Fixed-category labels (Volume Profile boundaries, Bollinger bounds, SMC swings)
- * plus dynamically-generated moving-average labels (`MA20`, `EMA9`, …) keyed by
- * the active MA/EMA periods.
- */
-export type LevelCandidateSource =
-    | 'POC'
-    | 'VAH'
-    | 'VAL'
-    | 'BB upper'
-    | 'BB lower'
-    | 'swing high'
-    | 'swing low'
-    | `MA${number}`
-    | `EMA${number}`;
-
-/**
- * A single deterministically-derived support/resistance candidate.
- *
- * Computed in the domain from indicator/SMC data so the AI can SELECT a level
- * and write the rationale, rather than inventing the price itself. Raw levels
- * that agree on a price are merged into one candidate, so a candidate carries a
- * confluence set of `sources` and a count of how many bars tested it. Stronger
- * candidates (more sources, more tests) are higher-conviction.
- */
-export interface LevelCandidate {
-    /** Candidate price level (mean of the confluence cluster members). */
-    price: number;
-    /**
-     * @deprecated Use {@link LevelCandidate.sources} — a candidate is now a
-     * confluence cluster that can carry multiple agreeing sources. This is the
-     * primary (first) source, kept for backward compatibility.
-     */
-    source: LevelCandidateSource;
-    /**
-     * Distinct indicator/structure labels that agree on this level. Length is
-     * the confluence count; a lone level keeps a single-element array.
-     */
-    sources: LevelCandidateSource[];
-    /** Number of bars whose [low, high] range traded through this level. */
-    touchCount: number;
-    /** Absolute distance from the current price, in percent. */
-    distancePercent: number;
-}
-
-/**
- * Precomputed support/resistance candidates split by side relative to the
- * current price. Each side is ranked by strength (confluence of sources plus
- * how often price tested the level) and capped to a fixed maximum.
- */
-export interface LevelCandidates {
-    /** Candidates strictly below the current price (potential support). */
-    support: LevelCandidate[];
-    /** Candidates strictly above the current price (potential resistance). */
-    resistance: LevelCandidate[];
-}
-
 /** Round-number increment by price tier (ascending ceiling). */
 export interface RoundNumberTier {
     maxPrice: number;
@@ -868,11 +809,14 @@ export interface MarketReference {
 }
 
 /**
- * Shared shape for a pivot point set: a central pivot with three resistance and
- * three support levels. The exact offset formulas differ per variant (standard vs
- * Fibonacci); see the extending interfaces for each level's derivation.
+ * Standard pivot point set derived from a prior period's high/low/close.
+ *
+ * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
+ * `s1`–`s3` are support levels below it, following the classic pivot formulas:
+ * `r1 = 2·pp − low`, `r2 = pp + (high − low)`, `r3 = high + 2·(pp − low)`,
+ * `s1 = 2·pp − high`, `s2 = pp − (high − low)`, `s3 = low − 2·(high − pp)`.
  */
-export interface PivotLevelSet {
+export interface StandardPivotLevels {
     /** Central pivot: (high + low + close) / 3. */
     pp: number;
     /** First resistance level. */
@@ -889,16 +833,6 @@ export interface PivotLevelSet {
     s3: number;
 }
 
-/**
- * Standard pivot point set derived from a prior period's high/low/close.
- *
- * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
- * `s1`–`s3` are support levels below it, following the classic pivot formulas:
- * `r1 = 2·pp − low`, `r2 = pp + (high − low)`, `r3 = high + 2·(pp − low)`,
- * `s1 = 2·pp − high`, `s2 = pp − (high − low)`, `s3 = low − 2·(high − pp)`.
- */
-export interface StandardPivotLevels extends PivotLevelSet {}
-
 /** Camarilla pivot levels (the four most-watched). */
 export interface CamarillaPivotLevels {
     pp: number;
@@ -907,15 +841,6 @@ export interface CamarillaPivotLevels {
     s3: number;
     s4: number;
 }
-
-/**
- * Fibonacci pivot point set derived from a prior period's high/low/close.
- *
- * `pp` is the central pivot; resistance/support levels are offset from it by the
- * 0.382 / 0.618 / 1.0 Fibonacci fractions of the prior period's range:
- * `r1/s1 = pp ± 0.382·range`, `r2/s2 = pp ± 0.618·range`, `r3/s3 = pp ± 1.0·range`.
- */
-export interface FibonacciPivotLevels extends PivotLevelSet {}
 
 /**
  * One Fibonacci retracement or extension level (ratio + resulting price).
@@ -951,22 +876,6 @@ export interface FibonacciProjection {
  * Direction of the most recent swing leg used for Fibonacci projection.
  */
 export type SwingLegDirection = 'up' | 'down';
-
-/**
- * Deterministically precomputed pivot points and Fibonacci levels for a symbol.
- *
- * Computed in the domain so the AI selects and interprets these levels rather
- * than performing the arithmetic itself. Any component is `null` when its inputs
- * are unavailable (e.g. no prior bar for pivots, missing swing points for fib).
- */
-export interface PivotFibLevels {
-    /** Standard pivot set from the prior period, or `null` when unavailable. */
-    standardPivot: StandardPivotLevels | null;
-    /** Fibonacci pivot set from the prior period, or `null` when unavailable. */
-    fibonacciPivot: FibonacciPivotLevels | null;
-    /** Fibonacci retracement/extension projection, or `null` when unavailable. */
-    fibonacci: FibonacciProjection | null;
-}
 
 /**
  * A single price target (price + rationale string).

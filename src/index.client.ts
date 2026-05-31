@@ -109,7 +109,6 @@ export {
     clusterKeyLevels,
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
-export { computeLevelCandidates } from './domain/analysis/levelCandidates';
 export { computeMarketReference } from './domain/analysis/marketReference';
 export {
     extractReconciledActionLines,
@@ -348,9 +347,6 @@ export type {
     ClusteredKeyLevel,
     ClusteredKeyLevels,
     KeyPrice,
-    LevelCandidate,
-    LevelCandidates,
-    LevelCandidateSource,
     MarketReference,
     HorizonReference,
     HorizonWindow,
