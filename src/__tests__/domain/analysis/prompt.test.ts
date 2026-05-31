@@ -4236,5 +4236,30 @@ describe('prompt', () => {
             expect(intraday).toContain('Long-term — ~2-3 trading days');
             expect(daily).not.toContain('Long-term — ~2-3 trading days');
         });
+
+        // Guards the hand-authored HORIZON_SPAN_BY_TIMEFRAME strings for every
+        // timeframe×horizon, so a typo in a span label fails a test rather than
+        // shipping silently.
+        it.each([
+            ['1Day', ['~1 month', '~1 quarter', '~9-12 months']],
+            ['4Hour', ['~2-3 weeks', '~2 months', '~5 months']],
+            ['1Hour', ['~4 trading days', '~2 weeks', '~6 weeks']],
+            ['30Min', ['~2 trading days', '~1 week', '~3 weeks']],
+            ['15Min', ['~1 trading day', '~3 trading days', '~1-2 weeks']],
+            [
+                '5Min',
+                ['~2 trading hours', '~1 trading day', '~2-3 trading days'],
+            ],
+        ] as const)('renders all horizon spans for %s', (tf, spans) => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                tf
+            );
+            for (const span of spans) expect(prompt).toContain(span);
+        });
     });
 });
