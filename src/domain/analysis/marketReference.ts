@@ -108,7 +108,8 @@ function buildHorizon(
     const windowLen = Math.min(windowBars, barsLen);
     const barWindow = windowLen > 0 ? bars.slice(barsLen - windowLen) : [];
     const startIndex = barsLen - windowLen;
-    const currentPrice = windowLen > 0 ? barWindow[windowLen - 1].close : 0;
+    const lastBar = windowLen > 0 ? barWindow[windowLen - 1] : null;
+    const currentPrice = lastBar?.close ?? 0;
 
     const windowSwingHighs = indicators.smc.swingHighs.filter(
         s => s.index >= startIndex
@@ -201,7 +202,7 @@ function buildHorizon(
         window: {
             bars: windowLen,
             fromTime: barWindow[0]?.time ?? null,
-            toTime: barWindow[windowLen - 1]?.time ?? null,
+            toTime: lastBar?.time ?? null,
         },
         levels:
             currentPrice > 0

@@ -42,9 +42,9 @@ export function classifySwingStructure(
         return 'mixed';
     }
     const lastHigh = swingHighs[swingHighs.length - 1];
-    const prevHigh = swingHighs[swingHighs.length - 2];
+    const prevHigh = swingHighs[swingHighs.length - SWING_COMPARISON_COUNT];
     const lastLow = swingLows[swingLows.length - 1];
-    const prevLow = swingLows[swingLows.length - 2];
+    const prevLow = swingLows[swingLows.length - SWING_COMPARISON_COUNT];
     const hh = lastHigh > prevHigh;
     const hl = lastLow > prevLow;
     const lh = lastHigh < prevHigh;
