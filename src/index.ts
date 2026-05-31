@@ -106,6 +106,7 @@ export {
 } from './domain/analysis/keyLevels';
 export { computeLevelCandidates } from './domain/analysis/levelCandidates';
 export { computePivotFibLevels } from './domain/analysis/pivotFib';
+export { computeMarketReference } from './domain/analysis/marketReference';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';

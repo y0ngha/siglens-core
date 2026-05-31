@@ -110,6 +110,7 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export { computeLevelCandidates } from './domain/analysis/levelCandidates';
+export { computeMarketReference } from './domain/analysis/marketReference';
 export {
     extractReconciledActionLines,
     validateActionPrices,
