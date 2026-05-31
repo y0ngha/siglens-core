@@ -1,5 +1,12 @@
-import type { ReferenceLevel } from '@/domain/types';
-import { ROUND_NUMBER_TIERS } from '@/domain/analysis/marketReferenceConstants';
+import type {
+    IndicatorResult,
+    ReferenceLevel,
+    ReferenceLevels,
+} from '@/domain/types';
+import {
+    MAX_REFERENCE_LEVELS_PER_SIDE,
+    ROUND_NUMBER_TIERS,
+} from '@/domain/analysis/marketReferenceConstants';
 
 /** Number of round levels to emit on each side of price. */
 const ROUND_LEVELS_PER_SIDE = 2;
@@ -33,4 +40,140 @@ export function roundNumberLevels(currentPrice: number): ReferenceLevel[] {
         });
     }
     return levels;
+}
+
+/** Fraction of price within which two levels are treated as duplicates (0.1%). */
+const DEDUPE_FRACTION = 0.001;
+
+const lastNum = (arr: readonly (number | null)[]): number | null => {
+    for (let i = arr.length - 1; i >= 0; i--) {
+        const v = arr[i];
+        if (v != null && Number.isFinite(v)) return v;
+    }
+    return null;
+};
+
+const lastField = <T>(
+    arr: readonly T[],
+    pick: (t: T) => number | null | undefined
+): number | null => {
+    for (let i = arr.length - 1; i >= 0; i--) {
+        const v = pick(arr[i]);
+        if (v != null && Number.isFinite(v)) return v;
+    }
+    return null;
+};
+
+const ref = (
+    price: number,
+    label: string,
+    kind: ReferenceLevel['kind'],
+    currentPrice: number
+): ReferenceLevel => ({
+    price,
+    label,
+    kind,
+    distancePercent: ((price - currentPrice) / currentPrice) * 100,
+});
+
+/** Latest-value reference levels from the indicator suite. */
+export function collectIndicatorLevels(
+    currentPrice: number,
+    indicators: IndicatorResult
+): ReferenceLevel[] {
+    const out: ReferenceLevel[] = [];
+    const push = (
+        price: number | null,
+        label: string,
+        kind: ReferenceLevel['kind']
+    ): void => {
+        if (price != null && Number.isFinite(price) && price > 0) {
+            out.push(ref(price, label, kind, currentPrice));
+        }
+    };
+
+    const vp = indicators.volumeProfile;
+    if (vp) {
+        push(vp.poc, 'POC', 'vp_poc');
+        push(vp.vah, 'VAH', 'vp_vah');
+        push(vp.val, 'VAL', 'vp_val');
+    }
+    for (const [period, series] of Object.entries(indicators.ma)) {
+        push(lastNum(series), `MA${period}`, 'ma');
+    }
+    for (const [period, series] of Object.entries(indicators.ema)) {
+        push(lastNum(series), `EMA${period}`, 'ema');
+    }
+    push(
+        lastField(indicators.bollinger, b => b.upper),
+        'BB upper',
+        'bollinger'
+    );
+    push(
+        lastField(indicators.bollinger, b => b.lower),
+        'BB lower',
+        'bollinger'
+    );
+    push(
+        lastField(indicators.keltnerChannel, k => k.upper),
+        'Keltner upper',
+        'keltner'
+    );
+    push(
+        lastField(indicators.keltnerChannel, k => k.lower),
+        'Keltner lower',
+        'keltner'
+    );
+    push(
+        lastField(indicators.donchianChannel, d => d.upper),
+        'Donchian high',
+        'donchian'
+    );
+    push(
+        lastField(indicators.donchianChannel, d => d.lower),
+        'Donchian low',
+        'donchian'
+    );
+    push(
+        lastField(indicators.ichimoku, i => i.senkouA),
+        'Kumo A',
+        'ichimoku'
+    );
+    push(
+        lastField(indicators.ichimoku, i => i.senkouB),
+        'Kumo B',
+        'ichimoku'
+    );
+    push(
+        lastField(indicators.supertrend, s => s.supertrend),
+        'Supertrend',
+        'supertrend'
+    );
+    push(lastNum(indicators.vwap), 'VWAP', 'vwap');
+    return out;
+}
+
+/** Split levels by side relative to price, dedupe near-equal, cap per side. */
+export function splitBySide(
+    levels: readonly ReferenceLevel[],
+    currentPrice: number
+): ReferenceLevels {
+    const dedupe = (sorted: readonly ReferenceLevel[]): ReferenceLevel[] => {
+        const kept: ReferenceLevel[] = [];
+        for (const l of sorted) {
+            const isDuplicate = kept.some(
+                k => Math.abs(k.price - l.price) <= DEDUPE_FRACTION * l.price
+            );
+            if (isDuplicate) continue;
+            kept.push(l);
+        }
+        return kept.slice(0, MAX_REFERENCE_LEVELS_PER_SIDE);
+    };
+    const support = levels
+        .filter(l => l.price < currentPrice)
+        .toSorted((a, b) => b.price - a.price);
+    const resistance = levels
+        .filter(l => l.price > currentPrice)
+        .toSorted((a, b) => a.price - b.price);
+    return { support: dedupe(support), resistance: dedupe(resistance) };
 }
