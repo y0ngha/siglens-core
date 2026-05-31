@@ -55,13 +55,13 @@ const priceVs = (price: number, level: number | null): PriceVsLevel =>
 // wrong), so priceVsMA60/priceVsMA200/emaStack/adx are identical across horizons.
 // Only swingStructure (window-filtered swings) and efficiencyRatio differ per horizon.
 function buildStructure(
-    window: Bar[],
+    barWindow: Bar[],
     indicators: IndicatorResult,
     currentPrice: number,
     windowSwingHighs: readonly SMCSwingPoint[],
     windowSwingLows: readonly SMCSwingPoint[]
 ): TrendStructure {
-    const closes = window.map(b => b.close);
+    const closes = barWindow.map(b => b.close);
     const er = efficiencyRatio(
         closes,
         Math.min(
@@ -106,9 +106,9 @@ function buildHorizon(
 ): HorizonReference {
     const barsLen = bars.length;
     const windowLen = Math.min(windowBars, barsLen);
-    const window = windowLen > 0 ? bars.slice(barsLen - windowLen) : [];
+    const barWindow = windowLen > 0 ? bars.slice(barsLen - windowLen) : [];
     const startIndex = barsLen - windowLen;
-    const currentPrice = windowLen > 0 ? window[windowLen - 1].close : 0;
+    const currentPrice = windowLen > 0 ? barWindow[windowLen - 1].close : 0;
 
     const windowSwingHighs = indicators.smc.swingHighs.filter(
         s => s.index >= startIndex
@@ -116,7 +116,7 @@ function buildHorizon(
     const windowSwingLows = indicators.smc.swingLows.filter(
         s => s.index >= startIndex
     );
-    const windowVp = windowLen > 0 ? calculateVolumeProfile(window) : null;
+    const windowVp = windowLen > 0 ? calculateVolumeProfile(barWindow) : null;
     const periods = HORIZON_MA_PERIODS[key];
 
     const windowSmc = {
@@ -146,7 +146,7 @@ function buildHorizon(
           ]
         : [];
 
-    const priorBar = windowLen >= 2 ? window[windowLen - 2] : null;
+    const priorBar = windowLen >= 2 ? barWindow[windowLen - 2] : null;
     const sp = priorBar ? computeStandardPivot(priorBar) : null;
     const standardPivotLevels: ReferenceLevel[] = sp
         ? STANDARD_PIVOT_KEYS.map(k =>
@@ -200,15 +200,15 @@ function buildHorizon(
     return {
         window: {
             bars: windowLen,
-            fromTime: window[0]?.time ?? null,
-            toTime: window[windowLen - 1]?.time ?? null,
+            fromTime: barWindow[0]?.time ?? null,
+            toTime: barWindow[windowLen - 1]?.time ?? null,
         },
         levels:
             currentPrice > 0
                 ? splitBySide(levels, currentPrice)
                 : { support: [], resistance: [] },
         structure: buildStructure(
-            window,
+            barWindow,
             indicators,
             currentPrice,
             windowSwingHighs,

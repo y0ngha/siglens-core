@@ -126,9 +126,9 @@ export function collectIndicatorLevels(
         options?.emaPeriods ?? Object.keys(indicators.ema).map(Number);
 
     const candidates: Array<LevelCandidate> = [
-        // `as const` widens these literals to the readonly `LevelCandidate` tuple
-        // shape (so the `kind` strings keep their `ReferenceLevelKind` literal type
-        // instead of `string`); runtime-safe — the values are plain literals.
+        // `as const` keeps each `kind` string at its `ReferenceLevelKind` literal
+        // type (instead of widening to `string`) so the tuples match `LevelCandidate`;
+        // runtime-safe — the values are plain literals.
         ...(vp
             ? ([
                   [vp.poc, 'POC', 'vp_poc'],
