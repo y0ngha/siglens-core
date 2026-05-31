@@ -15,12 +15,14 @@ const ROUND_LEVELS_PER_SIDE = 2;
 /** Decimal places used to normalize emitted round-number prices. */
 const ROUND_PRICE_PRECISION = 4;
 
-/** Fallback increment when price exceeds every configured tier ceiling. */
-const FALLBACK_INCREMENT = 10;
-
+// The final tier's ceiling is +Infinity, so find() always matches; the `??`
+// only satisfies the type checker and reuses that tier's increment (no second
+// source of truth for the top-tier value).
 const incrementFor = (price: number): number =>
-    ROUND_NUMBER_TIERS.find(t => price <= t.maxPrice)?.increment ??
-    FALLBACK_INCREMENT;
+    (
+        ROUND_NUMBER_TIERS.find(t => price <= t.maxPrice) ??
+        ROUND_NUMBER_TIERS[ROUND_NUMBER_TIERS.length - 1]
+    ).increment;
 
 const roundLabel = (price: number): string => `Round ${price}`;
 

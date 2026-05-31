@@ -632,7 +632,7 @@ const formatHorizonBlock = (
 ): string => {
     const s = horizon.structure;
     const structureLine =
-        `Structure: price ${s.priceVsMA50} MA50 / ${s.priceVsMA200} MA200; EMA ${s.emaStack}; swings ${s.swingStructure}; ` +
+        `Structure: price ${s.priceVsMA60} MA60 / ${s.priceVsMA200} MA200; EMA ${s.emaStack}; swings ${s.swingStructure}; ` +
         `ADX ${s.adx != null ? s.adx.toFixed(INDICATOR_DECIMAL_PLACES) : 'n/a'}; efficiency ${s.efficiencyRatio != null ? s.efficiencyRatio.toFixed(EFFICIENCY_DECIMAL_PLACES) : 'n/a'}; regime ${s.regime}.`;
     const resistance =
         horizon.levels.resistance.length > 0

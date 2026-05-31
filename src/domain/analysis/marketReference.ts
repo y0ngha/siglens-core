@@ -79,14 +79,14 @@ function buildStructure(
     );
     const ema9 = lastFiniteNum(indicators.ema[9] ?? []);
     const ema20 = lastFiniteNum(indicators.ema[20] ?? []);
-    const ma50 = lastFiniteNum(indicators.ma[50] ?? indicators.ma[60] ?? []);
-    const ma200 = lastFiniteNum(indicators.ma[200] ?? indicators.ma[120] ?? []);
+    const ma60 = lastFiniteNum(indicators.ma[60] ?? []);
+    const ma200 = lastFiniteNum(indicators.ma[200] ?? []);
     const adx = lastFiniteNum(indicators.dmi.map(d => d.adx));
     const trending =
         (adx != null && adx >= ADX_TRENDING_THRESHOLD) ||
         (er != null && er >= EFFICIENCY_RATIO_TRENDING_THRESHOLD);
     return {
-        priceVsMA50: priceVs(currentPrice, ma50),
+        priceVsMA60: priceVs(currentPrice, ma60),
         priceVsMA200: priceVs(currentPrice, ma200),
         emaStack:
             ema9 != null && ema20 != null

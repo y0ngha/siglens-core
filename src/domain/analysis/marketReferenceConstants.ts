@@ -19,7 +19,7 @@ export const HORIZON_MA_PERIODS: Record<
     { ma: readonly number[]; ema: readonly number[] }
 > = {
     short: { ma: [20], ema: [9, 20] },
-    medium: { ma: [50, 60], ema: [60] },
+    medium: { ma: [60], ema: [60] },
     long: { ma: [120, 200], ema: [] },
 };
 

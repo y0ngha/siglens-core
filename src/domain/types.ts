@@ -780,7 +780,7 @@ export type MarketRegime = 'trending' | 'ranging';
 
 /** Descriptive trend structure for a horizon — facts, NOT a directional prediction. */
 export interface TrendStructure {
-    priceVsMA50: PriceVsLevel;
+    priceVsMA60: PriceVsLevel;
     priceVsMA200: PriceVsLevel;
     emaStack: EmaStackState;
     swingStructure: SwingStructureState;

@@ -174,13 +174,13 @@ describe('computeMarketReference', () => {
         const ref = computeMarketReference(
             makeBars(40),
             makeInd({
-                ma: { 50: [10, 10], 200: [5, 5] },
+                ma: { 60: [10, 10], 200: [5, 5] },
                 ema: { 9: [200, 200], 20: [210, 210] },
             }),
             '1Day'
         );
         // current price (~139) above both MAs
-        expect(ref.short.structure.priceVsMA50).toBe('above');
+        expect(ref.short.structure.priceVsMA60).toBe('above');
         expect(ref.short.structure.priceVsMA200).toBe('above');
         // ema9(200) < ema20(210) and price below ema9 -> aligned_down? price>ema9 -> mixed
         expect(['aligned_up', 'aligned_down', 'mixed']).toContain(
