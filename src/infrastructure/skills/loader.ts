@@ -188,6 +188,7 @@ const SKILL_STATE_PREDICATE_KINDS: readonly SkillStatePredicateKind[] = [
 /** Parse a state predicate; returns undefined when any required field is invalid. */
 const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
     if (typeof raw !== 'object' || raw === null) return undefined;
+    // typeof raw === 'object' && raw !== null guard passed; cast is safe
     const obj = raw as YamlNode;
     const { feature, predicate, hi, lo } = obj;
     if (
@@ -199,6 +200,11 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
         return undefined;
     }
     return {
+        // The `SKILL_STATE_FEATURES.includes(feature)` /
+        // `SKILL_STATE_PREDICATE_KINDS.includes(predicate)` guards above proved
+        // membership in the literal unions at runtime, so the casts are sound.
+        // TS cannot narrow `string` → the literal union through an `.includes()`
+        // type-guard callback on its own, hence the explicit casts.
         feature: feature as SkillStateFeature,
         predicate: predicate as SkillStatePredicateKind,
         ...(typeof hi === 'number' ? { hi } : {}),
@@ -225,6 +231,7 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
  */
 const parseGating = (raw: unknown): SkillGating | undefined => {
     if (typeof raw !== 'object' || raw === null) return undefined;
+    // typeof raw === 'object' && raw !== null guard passed; cast is safe
     const obj = raw as YamlNode;
     const tier = obj.tier;
     if (

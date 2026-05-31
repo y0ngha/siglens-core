@@ -533,7 +533,7 @@ export interface Skill {
     display?: SkillDisplay;
     /**
      * Dynamic-gating metadata parsed from the skill's frontmatter. When absent,
-     * the skill is treated as untagged and {@link selectSkills} includes it
+     * the skill is treated as untagged and the skill selector includes it
      * fail-open (never silently dropped).
      */
     gating?: SkillGating;
