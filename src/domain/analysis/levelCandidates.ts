@@ -246,9 +246,7 @@ export function computeLevelCandidates(
 
     const candidates = clusterRawLevels(
         collectRawLevels(indicators).filter(raw => isUsablePrice(raw.price))
-    )
-        .filter(cluster => isUsablePrice(cluster.price))
-        .map(cluster => toCandidate(cluster, currentPrice, bars));
+    ).map(cluster => toCandidate(cluster, currentPrice, bars));
 
     const support = candidates
         .filter(c => c.price < currentPrice)
