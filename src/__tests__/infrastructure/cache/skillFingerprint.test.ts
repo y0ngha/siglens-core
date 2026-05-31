@@ -80,6 +80,21 @@ describe('hashSkillCatalog', () => {
         expect(fp).toMatch(/^[0-9a-f]+$/);
         expect(fp.length).toBeGreaterThan(0);
     });
+
+    it('handles untagged skills (gating/tokenCost default to null)', () => {
+        const untagged = [skill({ name: 'Untagged' })];
+        const tagged = [
+            skill({ name: 'Untagged', gating: { tier: 'always_on' } }),
+        ];
+        // An untagged skill hashes deterministically and differs from the same
+        // name carrying a gating tag — proving the null fallbacks participate.
+        expect(hashSkillCatalog(untagged)).toMatch(/^[0-9a-f]+$/);
+        expect(hashSkillCatalog(untagged)).not.toBe(hashSkillCatalog(tagged));
+    });
+
+    it('returns a stable hash for an empty catalog', () => {
+        expect(hashSkillCatalog([])).toBe(hashSkillCatalog([]));
+    });
 });
 
 describe('chart cache key folds the skill fingerprint', () => {
