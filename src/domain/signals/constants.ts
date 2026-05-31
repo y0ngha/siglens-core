@@ -66,7 +66,12 @@ export const SQUEEZE_MOMENTUM_ZERO_CROSS = 0; // 히스토그램 0 상향 돌파
 export const CCI_OVERBOUGHT_CROSS_LEVEL = 100; // CCI +100 하향 돌파 (과매수 이탈)
 /** @internal CCI level whose downward cross triggers a bearish-momentum signal. */
 export const CCI_BEARISH_CROSS_LEVEL = 0; // CCI 0 하향 돌파
-/** @internal CMF level whose downward cross marks a distribution flip. */
+/**
+ * @internal CMF level whose downward cross marks a distribution flip.
+ * Shares the same numeric value (0) as {@link CMF_BULLISH_CROSS_LEVEL}; only the
+ * cross DIRECTION (down vs. up) differs, decided by `findThresholdCross`'s
+ * direction argument.
+ */
 export const CMF_BEARISH_CROSS_LEVEL = 0; // CMF 0 하향 (분산 전환)
 /** @internal MFI level whose downward cross marks an overbought reversal. */
 export const MFI_OVERBOUGHT_LEVEL = 80; // MFI 80 하향 돌파 (과매수 반전)

@@ -161,6 +161,31 @@ describe('detectKeltnerLowerBreakout', () => {
             ).toBeNull();
         });
     });
+
+    describe('bars는 충분하나 keltnerChannel이 2 미만일 때', () => {
+        it('null을 반환한다 (keltner.length < 2 가드, OR 두 번째 분기)', () => {
+            const bars = buildBarsWithCloses([92, 90, 85]);
+            const keltner: KeltnerChannelResult[] = [
+                { upper: 100, middle: 95, lower: 90 },
+            ];
+            expect(
+                detectKeltnerLowerBreakout(bars, withKeltner(keltner))
+            ).toBeNull();
+        });
+    });
+
+    describe('keltnerChannel 길이는 충분하나 lastIdx 위치 원소가 없을 때', () => {
+        it('null을 반환한다 (!curKc undefined 분기)', () => {
+            const bars = buildBarsWithCloses([92, 90, 85]); // lastIdx=2
+            const keltner: KeltnerChannelResult[] = [
+                { upper: 100, middle: 95, lower: 90 },
+                { upper: 98, middle: 93, lower: 88 },
+            ]; // length=2 → 길이 가드 통과, keltner[2]는 undefined
+            expect(
+                detectKeltnerLowerBreakout(bars, withKeltner(keltner))
+            ).toBeNull();
+        });
+    });
 });
 
 // ─── detectSupertrendBearishFlip (mirror of detectSupertrendBullishFlip) ───────
@@ -334,6 +359,31 @@ describe('detectIchimokuCloudBreakdown', () => {
                     buildBarsWithCloses([100]),
                     EMPTY_INDICATOR_RESULT
                 )
+            ).toBeNull();
+        });
+    });
+
+    describe('bars는 충분하나 ichimoku가 2 미만일 때', () => {
+        it('null을 반환한다 (ichimoku.length < 2 가드, OR 두 번째 분기)', () => {
+            const bars = buildBarsWithCloses([105, 104, 95]);
+            const ichimoku: IchimokuResult[] = [
+                { ...nullCloud, senkouA: 100, senkouB: 101 },
+            ];
+            expect(
+                detectIchimokuCloudBreakdown(bars, withIchimoku(ichimoku))
+            ).toBeNull();
+        });
+    });
+
+    describe('ichimoku 길이는 충분하나 lastIdx 위치 원소가 없을 때', () => {
+        it('null을 반환한다 (!curIchi undefined 분기)', () => {
+            const bars = buildBarsWithCloses([105, 104, 95]); // lastIdx=2
+            const ichimoku: IchimokuResult[] = [
+                { ...nullCloud, senkouA: 100, senkouB: 101 },
+                { ...nullCloud, senkouA: 98, senkouB: 100 },
+            ]; // length=2 → 길이 가드 통과, ichimoku[2]는 undefined
+            expect(
+                detectIchimokuCloudBreakdown(bars, withIchimoku(ichimoku))
             ).toBeNull();
         });
     });

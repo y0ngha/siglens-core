@@ -496,7 +496,8 @@ export function detectKeltnerLowerBreakout(
     const lastIdx = barsLength - 1;
     const prevKc = keltner[lastIdx - 1];
     const curKc = keltner[lastIdx];
-    if (prevKc.lower === null || curKc.lower === null) return null;
+    if (!prevKc || !curKc || prevKc.lower === null || curKc.lower === null)
+        return null;
     const prevClose = bars[lastIdx - 1].close;
     const curClose = bars[lastIdx].close;
     if (prevClose < prevKc.lower) return null; // 이미 아래면 신규 아님
@@ -580,6 +581,8 @@ export function detectIchimokuCloudBreakdown(
     const prevIchi = ichimoku[lastIdx - 1];
     const curIchi = ichimoku[lastIdx];
     if (
+        !prevIchi ||
+        !curIchi ||
         prevIchi.senkouA === null ||
         prevIchi.senkouB === null ||
         curIchi.senkouA === null ||
