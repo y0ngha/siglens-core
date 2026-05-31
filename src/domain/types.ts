@@ -554,12 +554,17 @@ export interface Skill {
 }
 
 /**
+ * @internal
  * Which gating path a gated {@link SkillGating} entry uses.
  *
  * - `'event'` — gate on transient `detectSignals` events (cross / flip /
  *   breakout) via the variant's `triggers` list.
  * - `'state'` — gate on a persistent textbook condition (overbought, band
  *   proximity, …) via the variant's `state` predicate.
+ *
+ * Not part of the public API: `SkillGating` discriminates on inline
+ * `signalKind` literals, so this type is referenced only by the loader's
+ * frontmatter validation, never by the public transitive closure.
  */
 export type SignalKind = 'event' | 'state';
 

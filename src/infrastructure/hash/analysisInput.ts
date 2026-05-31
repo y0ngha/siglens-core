@@ -52,7 +52,10 @@ export function hashSkillCatalog(skills: readonly Skill[]): string {
                 gating: s.gating ?? null,
                 tokenCost: s.tokenCost ?? null,
             }))
-            .toSorted((a, b) => a.name.localeCompare(b.name))
+            // Pin the locale: a locale-free `localeCompare` is
+            // environment-dependent, so the same catalog would hash
+            // differently per server locale and break the cache key.
+            .toSorted((a, b) => a.name.localeCompare(b.name, 'en'))
     );
     return hashAnalysisInput(serialized);
 }

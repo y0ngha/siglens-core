@@ -480,7 +480,6 @@ export type {
     SectorStock,
     Signal,
     SignalDirection,
-    SignalKind,
     SignalPhase,
     SignalStrength,
     SignalType,
