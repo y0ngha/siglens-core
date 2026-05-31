@@ -28,7 +28,6 @@ import type {
     AnalysisResponse,
     AnalysisType,
     FearGreedSnapshot,
-    Skill,
     Timeframe,
 } from '@/domain/types';
 import {
@@ -36,10 +35,13 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashSkillCatalog,
+} from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import { createSkillsProvider } from '@/infrastructure/skills/loader';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const TIMEFRAMES: readonly Timeframe[] = [
@@ -249,8 +251,20 @@ export async function submitAnalysis(
         }
     }
 
+    // Load the skill catalog up front so its fingerprint folds into the cache
+    // key: a gating/frontmatter change must bust the cache, not serve a stale
+    // analysis for the full TTL. loadSkillsCached is memoized, so the same
+    // fingerprint is reproduced by the poll/peek read paths.
+    const { skills, skillsDegraded } = await loadSkillsCached();
+    const skillFingerprint = hashSkillCatalog(skills);
+
     const cache = createCacheProvider();
-    const cacheKey = buildAnalysisCacheKey(symbol, timeframe, effectiveModelId);
+    const cacheKey = buildAnalysisCacheKey(
+        symbol,
+        timeframe,
+        effectiveModelId,
+        skillFingerprint
+    );
 
     if (!force && cache !== null) {
         try {
@@ -288,18 +302,6 @@ export async function submitAnalysis(
         timeframe,
         fmpSymbol
     );
-
-    const skillsLoader = createSkillsProvider();
-    const [skills, skillsDegraded] = await skillsLoader
-        .loadSkills()
-        .then(s => [s, false] as const)
-        .catch(error => {
-            console.error(
-                '[Submit] Skills loading failed, proceeding without skills:',
-                error
-            );
-            return [[] as Skill[], true] as const;
-        });
 
     // Daily fearGreed snapshot — injected as the sentiment context for the analysis prompt.
     // When timeframe is '1Day', reuse the already-fetched bars; otherwise fetch daily separately.

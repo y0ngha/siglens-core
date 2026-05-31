@@ -28,9 +28,20 @@ import {
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashSkillCatalog,
+} from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
-import { createSkillsProvider } from '@/infrastructure/skills/loader';
+import {
+    createSkillsProvider,
+    loadSkillsCached,
+} from '@/infrastructure/skills/loader';
+
+/** Fingerprint of the empty skill catalog the loader stub returns by default. */
+const EMPTY_CATALOG_FP = hashSkillCatalog([]);
+/** Cache-key suffix every chart key now carries (prompt version + fingerprint). */
+const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:${EMPTY_CATALOG_FP}`;
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
@@ -153,6 +164,10 @@ describe('submitAnalysis 함수는', () => {
         (createSkillsProvider as Mock).mockReturnValue({
             loadSkills: mockLoadSkills,
         });
+        (loadSkillsCached as Mock).mockResolvedValue({
+            skills: [],
+            skillsDegraded: false,
+        });
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockLoadSkills.mockResolvedValue([]);
         mockSetJobMeta.mockResolvedValue(undefined);
@@ -270,7 +285,7 @@ describe('submitAnalysis 함수는', () => {
             );
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`
             );
         });
 
@@ -280,7 +295,7 @@ describe('submitAnalysis 함수는', () => {
             await submitAnalysis(mockSymbol, mockCompanyName, mockTimeframe);
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${PROMPT_TEMPLATE_VERSION}`
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`
             );
         });
 
@@ -687,11 +702,13 @@ describe('submitAnalysis 함수는', () => {
             ).rejects.toThrow('marketDataProvider');
         });
 
-        it('Skills 로딩 실패 시에도 Worker에 요청을 보낸다', async () => {
-            const consoleSpy = vi
-                .spyOn(console, 'error')
-                .mockImplementation(() => {});
-            mockLoadSkills.mockRejectedValueOnce(new Error('load failed'));
+        it('Skills 로딩이 degraded여도 Worker에 요청을 보낸다', async () => {
+            // loadSkillsCached catches its own failures and reports
+            // skillsDegraded: true; submission must still proceed.
+            (loadSkillsCached as Mock).mockResolvedValueOnce({
+                skills: [],
+                skillsDegraded: true,
+            });
 
             const result = await submitAnalysis(
                 mockSymbol,
@@ -704,7 +721,10 @@ describe('submitAnalysis 함수는', () => {
 
             expect(result.status).toBe('submitted');
             expect(mockFetch).toHaveBeenCalled();
-            consoleSpy.mockRestore();
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ skillsDegraded: true })
+            );
         });
 
         it('Worker body에 model을 포함한다', async () => {
@@ -1267,7 +1287,7 @@ describe('submitAnalysis 함수는', () => {
             expect(result.status).toBe('cached');
             // companyName은 symbol로 폴백(첫 번째 브랜치) → 캐시 키는 symbol 기준.
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:${mockSymbol}:${mockTimeframe}:${DEFAULT_ANALYSIS_MODEL_ID}:${PROMPT_TEMPLATE_VERSION}`
+                `analysis:${mockSymbol}:${mockTimeframe}:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`
             );
             expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
         });
@@ -1323,7 +1343,7 @@ describe('submitAnalysis 함수는', () => {
             expect(result.status).toBe('submitted');
             // options.modelId가 정상 해석되었음을 캐시 키로 확인.
             expect(mockCacheGet).toHaveBeenCalledWith(
-                `analysis:${mockSymbol}:${mockTimeframe}:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
+                `analysis:${mockSymbol}:${mockTimeframe}:gemini-2.5-flash:${KEY_SUFFIX}`
             );
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
                 fakeProvider,
