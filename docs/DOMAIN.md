@@ -768,7 +768,10 @@ null 없음 (첫 봉부터 값 존재 — 첫 봉은 0)
    momentum < prevMomentum: false (모멘텀 약화)
    첫 번째 유효 momentum: null
 
-초기 max(bbLength, kcLength) - 1개 구간 = null
+초기 2·kcLength - 1개 구간 = null
+   (각 momentum 값은 delta를 만들기 위해 kcLength개 봉이 필요하고,
+    linreg는 다시 kcLength개 delta가 필요하므로 warm-up = 2·kcLength - 1.
+    기본 kc=20 기준 선행 null 39개, 첫 유효 인덱스 38)
 ```
 
 ### calculateIndicators 통합 함수
