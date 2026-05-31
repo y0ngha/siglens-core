@@ -135,6 +135,11 @@ export async function pollAnalysis(
             if (cache !== null) {
                 // Fold the same skill-catalog fingerprint the submit path used
                 // so this write lands under the exact key that path will read.
+                // Intentionally fingerprints this path's own provider-loaded
+                // `skills` (the load that fed enrichAnalysisWithConfidence above)
+                // rather than calling the shared getSkillCatalogFingerprint
+                // helper, so the cached fingerprint always matches the catalog
+                // actually used to produce this result.
                 const cacheKey = buildAnalysisCacheKey(
                     meta.symbol,
                     meta.timeframe,

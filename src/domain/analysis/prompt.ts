@@ -636,8 +636,17 @@ export const SMC_GUIDE_BLOCKED_NOTICE =
 export const ANTI_FABRICATION_GUARDRAIL =
     'Anti-fabrication: cite ONLY price levels that appear verbatim in the data above (computed references, SMC section, bar data). Never invent, round, or recall a level from outside this prompt; if a level is not present, say so rather than fabricating one.';
 
-/** Matches the SMC full-guide skill by name, regardless of its gating tier. */
+/**
+ * Identifies the SMC full-guide skill (replaced by a compressed concept note),
+ * regardless of its gating tier.
+ *
+ * Prefers the explicit `smcFullGuide` frontmatter flag (`smc_full_guide: true`)
+ * so the routing survives a display-name rename. Falls back to name matching for
+ * skills authored before the flag existed; PR3 must set `smc_full_guide: true` on
+ * the SMC guide so the stable flag path is taken.
+ */
 const isSmcGuideSkill = (skill: Skill): boolean => {
+    if (skill.smcFullGuide === true) return true;
     const name = skill.name.toLowerCase();
     return name.includes('smart money') || name === 'smc';
 };
@@ -655,7 +664,11 @@ const latestStructureBreakBarsAgo = (
         (max, b) => Math.max(max, b.index),
         smc.structureBreaks[0].index
     );
-    return totalBars - 1 - latestIndex;
+    const barsAgo = totalBars - 1 - latestIndex;
+    // Defensive: an out-of-range index (e.g. a break index >= totalBars) would
+    // yield a negative "bars ago"; treat that as no usable recency signal.
+    if (barsAgo < 0) return null;
+    return barsAgo;
 };
 
 /**
@@ -933,9 +946,10 @@ const ANALYSIS_GUIDELINES = [
     '',
     // NOTE: Individual indicator interpretation guidelines (ATR, OBV, Parabolic SAR, Supertrend,
     // MFI, Williams %R, Keltner, CMF, Donchian, SMC, Squeeze Momentum) are intentionally omitted here
-    // because they are already covered in detail by the corresponding indicator_guide skills
-    // (all have confidence_weight >= 0.75 and are always injected into the prompt).
-    // If any indicator guide skill drops below MIN_CONFIDENCE_WEIGHT, restore its guideline here.
+    // because they are covered by the corresponding indicator_guide skills, which are now injected
+    // dynamically via frontmatter gating (selectSkills). When a guide's gating does not fire for the
+    // current chart state, its detailed interpretation is simply not in this prompt — that is the
+    // intended behavior, not a regression.
     '',
     '### Confluence Assessment',
     '- Confluence = 2+ independent signals pointing the same direction at the same price zone.',

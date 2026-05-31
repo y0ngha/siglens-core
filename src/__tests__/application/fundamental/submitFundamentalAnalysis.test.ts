@@ -16,12 +16,19 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
-import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import {
+    getSkillCatalogFingerprint,
+    loadSkillsCached,
+} from '@/infrastructure/skills/loader';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
 const mockFireAndForget = fireAndForget as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
+
+/** Empty-catalog fingerprint the loader stub returns for the cache key. */
+const EMPTY_CATALOG_FP = hashSkillCatalog([]);
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -89,6 +96,9 @@ describe('submitFundamentalAnalysis 함수는', () => {
             skills: [],
             skillsDegraded: false,
         });
+        (getSkillCatalogFingerprint as Mock).mockResolvedValue(
+            EMPTY_CATALOG_FP
+        );
 
         // Reset provider mocks
         mockDataProvider.getProfile.mockResolvedValue(validProfile);

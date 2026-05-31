@@ -543,6 +543,14 @@ export interface Skill {
      * the frontmatter by a build script and read here as plain metadata.
      */
     tokenCost?: number;
+    /**
+     * Marks the single Smart Money Concepts full-guide skill. Set from the
+     * `smc_full_guide: true` frontmatter flag (snake_case, repo convention).
+     * The prompt builder buckets this skill specially (replaced by a compressed
+     * concept note), so identifying it by an explicit flag rather than by
+     * display name keeps the routing stable if the skill is renamed.
+     */
+    smcFullGuide?: boolean;
 }
 
 /**

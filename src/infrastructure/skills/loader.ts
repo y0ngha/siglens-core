@@ -14,6 +14,7 @@ import type {
     SignalKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import type { LoadSkillsCachedResult } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
@@ -208,13 +209,16 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
 /**
  * Validate and normalize a `gating` frontmatter block.
  *
+ * Frontmatter keys are snake_case (repo convention, matching `confidence_weight`):
+ * `signal_kind` maps to the camelCase {@link SkillGating} `signalKind` field.
+ *
  * Returns `undefined` (the loader's safe default — the skill is then treated as
  * untagged and {@link selectSkills} includes it fail-open) when the block is
  * malformed or unreachable:
  * - `tier` not in {@link SKILL_GATING_TIERS};
- * - `tier: gated` with a missing/invalid `signalKind`;
- * - `signalKind: event` with no non-empty `triggers`;
- * - `signalKind: state` with no valid `state` predicate.
+ * - `tier: gated` with a missing/invalid `signal_kind`;
+ * - `signal_kind: event` with no non-empty `triggers`;
+ * - `signal_kind: state` with no valid `state` predicate.
  *
  * The downstream PR3 validation CI rejects unreachable gated skills at build
  * time; here we simply fail safe so a bad block never crashes the loader.
@@ -231,8 +235,9 @@ const parseGating = (raw: unknown): SkillGating | undefined => {
     }
     if (tier === 'always_on') return { tier: 'always_on' };
 
-    // tier === 'gated' → a signalKind path is required.
-    const signalKind = obj.signalKind;
+    // tier === 'gated' → a signal_kind path is required.
+    // Frontmatter key is snake_case (`signal_kind`); map → camelCase `signalKind`.
+    const signalKind = obj.signal_kind;
     if (
         typeof signalKind !== 'string' ||
         !(SIGNAL_KINDS as readonly string[]).includes(signalKind)
@@ -262,6 +267,14 @@ const parseGating = (raw: unknown): SkillGating | undefined => {
     return { tier: 'gated', signalKind: 'state', state };
 };
 
+/**
+ * Coerce a frontmatter boolean. The minimal YAML parser keeps an unquoted
+ * `true` as the string `'true'` (it only special-cases arrays/numbers), so a
+ * flag must accept both the boolean and the string form.
+ */
+const isYamlTrue = (value: unknown): boolean =>
+    value === true || value === 'true';
+
 const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     name: String(data.name ?? ''),
     description: String(data.description ?? ''),
@@ -276,7 +289,11 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     content,
     display: parseSkillDisplay(data.display),
     gating: parseGating(data.gating),
-    tokenCost: typeof data.tokenCost === 'number' ? data.tokenCost : undefined,
+    // Frontmatter is snake_case by repo convention (matching `confidence_weight`);
+    // map snake → camel here. PR3 authors `token_cost` / `signal_kind` in `skills/*.md`.
+    tokenCost:
+        typeof data.token_cost === 'number' ? data.token_cost : undefined,
+    smcFullGuide: isYamlTrue(data.smc_full_guide),
 });
 
 /**
@@ -351,6 +368,27 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
         _cachedSkillsDegraded = true;
     }
     return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
+}
+
+/**
+ * Deterministic fingerprint of the cached skill catalog's selection metadata,
+ * folded into the chart and fundamental cache keys.
+ *
+ * This is the single named source of the read/write key contract: every app
+ * site that builds an analysis cache key derives the fingerprint through this
+ * helper, so the submit (write) and peek (read) paths cannot drift. Because
+ * {@link loadSkillsCached} is memoized, repeated calls reuse the loaded catalog.
+ *
+ * `pollAnalysis` is the intentional exception — it fingerprints its own
+ * provider-loaded `skills` (the load that fed `enrichAnalysisWithConfidence`),
+ * so the cached label always matches the data actually used by that path.
+ *
+ * @returns 16-character lowercase hex prefix of the SHA-256 digest.
+ * @internal
+ */
+export async function getSkillCatalogFingerprint(): Promise<string> {
+    const { skills } = await loadSkillsCached();
+    return hashSkillCatalog(skills);
 }
 
 /**

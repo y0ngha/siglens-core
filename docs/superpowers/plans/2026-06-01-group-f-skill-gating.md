@@ -457,9 +457,9 @@ PR1·PR2 머지 + core를 siglens가 참조(사용자가 core 릴리스). siglen
 ```yaml
 gating:
   tier: gated
-  signalKind: event
+  signal_kind: event
   triggers: [rsi_oversold, rsi_overbought, rsi_bullish_divergence, rsi_bearish_divergence]
-tokenCost: 0   # Task 3.4에서 baking
+token_cost: 0   # Task 3.4에서 baking
 ```
 
 - [ ] **Step 2: §태깅 매핑표대로 나머지 66개 태깅**
@@ -509,7 +509,7 @@ tokenCost: 0   # Task 3.4에서 baking
 - Create: `scripts/bake-skill-tokens.ts`
 - Modify: `src/entities/skill/api.ts` (core 로더 재사용 또는 신규 필드 파싱 일치)
 
-- [ ] **Step 1:** `bake-skill-tokens.ts` — tiktoken으로 각 스킬 본문 토큰 수 계산 → frontmatter `tokenCost` 갱신(빌드 스크립트, domain 아님).
+- [ ] **Step 1:** `bake-skill-tokens.ts` — tiktoken으로 각 스킬 본문 토큰 수 계산 → frontmatter `token_cost` 갱신(빌드 스크립트, domain 아님).
 - [ ] **Step 2:** `entities/skill/api.ts`의 frontmatter 파서를 core와 동일 필드 집합으로 통일(gating/tokenCost 인식).
 - [ ] **Step 3: 테스트 + Commit** `chore(skills): bake token_cost + unify frontmatter parser`.
 

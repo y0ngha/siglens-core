@@ -26,9 +26,9 @@ indicators: [RSI]
 confidence_weight: 0.8
 gating:
   tier: gated
-  signalKind: event
+  signal_kind: event
   triggers: [rsi_oversold, rsi_overbought]
-tokenCost: 850
+token_cost: 850
 ---
 RSI body content`;
 
@@ -41,7 +41,7 @@ indicators: [Bollinger]
 confidence_weight: 0.8
 gating:
   tier: gated
-  signalKind: state
+  signal_kind: state
   state:
     feature: bollinger
     predicate: pctB
@@ -77,13 +77,15 @@ describe('FileSkillsLoader gating frontmatter', () => {
         vi.clearAllMocks();
     });
 
-    it('parses an event gating block + tokenCost', async () => {
+    it('maps snake_case signal_kind/token_cost frontmatter to camelCase Skill fields', async () => {
         mockReaddir.mockResolvedValue([makeDirent('rsi.md')]);
         mockReadFile.mockResolvedValue(eventGatedFrontmatter);
 
         const skills = await new FileSkillsLoader().loadSkills();
 
         expect(skills).toHaveLength(1);
+        // Frontmatter authored `signal_kind` / `token_cost` (snake_case, the
+        // repo + PR3 convention); the loader exposes them camelCased.
         expect(skills[0].gating).toEqual({
             tier: 'gated',
             signalKind: 'event',
@@ -110,7 +112,7 @@ describe('FileSkillsLoader gating frontmatter', () => {
         });
     });
 
-    it('parses an always_on gating block (no signalKind required)', async () => {
+    it('parses an always_on gating block (no signal_kind required)', async () => {
         mockReaddir.mockResolvedValue([makeDirent('hns.md')]);
         mockReadFile.mockResolvedValue(alwaysOnFrontmatter);
 
@@ -127,6 +129,28 @@ describe('FileSkillsLoader gating frontmatter', () => {
 
         expect(skills[0].gating).toBeUndefined();
         expect(skills[0].tokenCost).toBeUndefined();
+        expect(skills[0].smcFullGuide).toBe(false);
+    });
+
+    it('maps the snake_case smc_full_guide flag to smcFullGuide', async () => {
+        const smcGuide = `---
+name: Renamed SMC Skill
+description: SMC full guide identified by flag, not name
+type: indicator_guide
+category: neutral
+indicators: []
+confidence_weight: 0.8
+smc_full_guide: true
+gating:
+  tier: always_on
+---
+SMC body content`;
+        mockReaddir.mockResolvedValue([makeDirent('smc.md')]);
+        mockReadFile.mockResolvedValue(smcGuide);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].smcFullGuide).toBe(true);
     });
 
     it('drops an invalid gating block to undefined (safe default)', async () => {
@@ -160,7 +184,7 @@ indicators: []
 confidence_weight: 0.7
 gating:
   tier: gated
-  signalKind: event
+  signal_kind: event
 ---
 Body`;
         mockReaddir.mockResolvedValue([makeDirent('unreachable.md')]);
@@ -171,15 +195,15 @@ Body`;
         expect(skills[0].gating).toBeUndefined();
     });
 
-    it('ignores a non-numeric tokenCost', async () => {
+    it('ignores a non-numeric token_cost', async () => {
         const badToken = `---
 name: Bad Token
-description: tokenCost is a string
+description: token_cost is a string
 type: pattern
 category: neutral
 indicators: []
 confidence_weight: 0.7
-tokenCost: lots
+token_cost: lots
 ---
 Body`;
         mockReaddir.mockResolvedValue([makeDirent('badtoken.md')]);

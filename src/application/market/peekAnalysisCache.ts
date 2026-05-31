@@ -8,8 +8,7 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
-import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { getSkillCatalogFingerprint } from '@/infrastructure/skills/loader';
 
 /**
  * `true` when a normalized analysis carries no analytical content — i.e. an
@@ -96,13 +95,12 @@ export async function peekAnalysisCache(
     if (cache === null) return null;
 
     // Match the submit/poll write key by folding the same skill-catalog
-    // fingerprint (loadSkillsCached is memoized, so this is a cheap read).
-    const { skills } = await loadSkillsCached();
+    // fingerprint (getSkillCatalogFingerprint is memoized, so this is a cheap read).
     const cacheKey = buildAnalysisCacheKey(
         symbol,
         timeframe,
         modelId ?? DEFAULT_ANALYSIS_MODEL_ID,
-        hashSkillCatalog(skills)
+        await getSkillCatalogFingerprint()
     );
 
     const cached = await cache

@@ -12,7 +12,7 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
-import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { getSkillCatalogFingerprint } from '@/infrastructure/skills/loader';
 import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -54,10 +54,9 @@ describe('peekAnalysisCache 함수는', () => {
         vi.clearAllMocks();
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(null);
-        (loadSkillsCached as Mock).mockResolvedValue({
-            skills: [],
-            skillsDegraded: false,
-        });
+        (getSkillCatalogFingerprint as Mock).mockResolvedValue(
+            EMPTY_CATALOG_FP
+        );
     });
 
     it('캐시 HIT이면 정규화된 분석 결과를 반환한다', async () => {

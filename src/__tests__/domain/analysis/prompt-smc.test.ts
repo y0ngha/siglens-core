@@ -98,6 +98,30 @@ describe('SMC full-guide blocking', () => {
         expect(out).not.toContain('$183.00–$184.20');
     });
 
+    it('identifies the SMC guide by the smcFullGuide flag even when renamed', () => {
+        const renamedGuide: Skill = {
+            name: 'Institutional Footprint Playbook',
+            description: 'SMC guide whose display name no longer matches "smc"',
+            type: 'strategy',
+            indicators: [],
+            confidenceWeight: 0.9,
+            content: SMC_GUIDE_BODY,
+            smcFullGuide: true,
+            gating: { tier: 'always_on' },
+        };
+        const out = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            bars,
+            makeIndicators(EMPTY_SMC_RESULT),
+            [renamedGuide],
+            '1Day'
+        );
+        // The flag, not the name, drives the block — body still never appears.
+        expect(out).not.toContain('Full SMC Methodology');
+        expect(out).not.toContain('$183.00–$184.20');
+    });
+
     it('blocks the SMC guide body content but not the computed SMC data section', () => {
         const smc: SMCResult = {
             ...EMPTY_SMC_RESULT,

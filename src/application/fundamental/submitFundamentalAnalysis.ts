@@ -21,14 +21,14 @@ import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    analysisSeed,
-    hashSkillCatalog,
-} from '@/infrastructure/hash/analysisInput';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
-import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import {
+    getSkillCatalogFingerprint,
+    loadSkillsCached,
+} from '@/infrastructure/skills/loader';
 import type {
     AnalysisType,
     FundamentalAnalysisResponse,
@@ -212,13 +212,12 @@ export async function submitFundamentalAnalysis(
     }
 
     // Fold the skill-catalog fingerprint into the key so a gating/frontmatter
-    // change busts the cache. loadSkillsCached is memoized, so this matches the
-    // catalog fetchProviderData loads on a miss.
-    const { skills: catalogForKey } = await loadSkillsCached();
+    // change busts the cache. getSkillCatalogFingerprint is memoized, so this
+    // matches the catalog fetchProviderData loads on a miss.
     const cacheKey = buildFundamentalCacheKey(
         symbol,
         modelId,
-        hashSkillCatalog(catalogForKey)
+        await getSkillCatalogFingerprint()
     );
     const cache = createCacheProvider();
 

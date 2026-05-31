@@ -35,18 +35,19 @@ import {
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import {
     createSkillsProvider,
+    getSkillCatalogFingerprint,
     loadSkillsCached,
 } from '@/infrastructure/skills/loader';
-
-/** Fingerprint of the empty skill catalog the loader stub returns by default. */
-const EMPTY_CATALOG_FP = hashSkillCatalog([]);
-/** Cache-key suffix every chart key now carries (prompt version + fingerprint). */
-const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:${EMPTY_CATALOG_FP}`;
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
+
+/** Fingerprint of the empty skill catalog the loader stub returns by default. */
+const EMPTY_CATALOG_FP = hashSkillCatalog([]);
+/** Cache-key suffix every chart key now carries (prompt version + fingerprint). */
+const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:${EMPTY_CATALOG_FP}`;
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -168,6 +169,9 @@ describe('submitAnalysis 함수는', () => {
             skills: [],
             skillsDegraded: false,
         });
+        (getSkillCatalogFingerprint as Mock).mockResolvedValue(
+            EMPTY_CATALOG_FP
+        );
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockLoadSkills.mockResolvedValue([]);
         mockSetJobMeta.mockResolvedValue(undefined);

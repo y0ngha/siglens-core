@@ -11,7 +11,9 @@ import {
     createSkillsProvider,
     loadSkillsCached,
     clearSkillsCache,
+    getSkillCatalogFingerprint,
 } from '@/infrastructure/skills/loader';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import type { SkillCounts } from '@/domain/types';
 
 const mockReaddir = readdir as Mock;
@@ -387,6 +389,62 @@ describe('loadSkillsCached', () => {
 
         expect(loadSkillsSpy).toHaveBeenCalledTimes(2);
         loadSkillsSpy.mockRestore();
+    });
+});
+
+// ─────────────────────────────────────────
+// getSkillCatalogFingerprint — shared cache-key fingerprint helper
+// ─────────────────────────────────────────
+
+describe('getSkillCatalogFingerprint', () => {
+    beforeEach(() => {
+        clearSkillsCache();
+    });
+    afterEach(() => {
+        clearSkillsCache();
+    });
+
+    it('fingerprints the cached catalog identically to hashSkillCatalog', async () => {
+        const loaded = [
+            {
+                name: 'RSI Guide',
+                description: 'desc',
+                indicators: [],
+                confidenceWeight: 0.8,
+                content: 'body',
+                gating: {
+                    tier: 'gated' as const,
+                    signalKind: 'event' as const,
+                    triggers: ['rsi_oversold'],
+                },
+                tokenCost: 850,
+            },
+        ];
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockResolvedValue(loaded);
+
+        const fingerprint = await getSkillCatalogFingerprint();
+
+        // The helper is the single named source of the read/write key contract,
+        // so it must equal hashing the same loaded catalog directly.
+        expect(fingerprint).toBe(hashSkillCatalog(loaded));
+        loadSkillsSpy.mockRestore();
+    });
+
+    it('returns the empty-catalog fingerprint when the load degrades', async () => {
+        const loadSkillsSpy = vi
+            .spyOn(FileSkillsLoader.prototype, 'loadSkills')
+            .mockRejectedValue(new Error('fs down'));
+        const consoleErrorSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        const fingerprint = await getSkillCatalogFingerprint();
+
+        expect(fingerprint).toBe(hashSkillCatalog([]));
+        loadSkillsSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
     });
 });
 

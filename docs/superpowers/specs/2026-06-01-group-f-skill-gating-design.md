@@ -106,7 +106,9 @@ gating:
   state: { feature: bollinger, predicate: pctB, hi: 0.98, lo: 0.02 }  # textbook (state형)
   signal_kind: event | state        # 게이팅 경로 선택
 token_cost: 850                     # 빌드타임 precompute (tokenizer는 domain 금지)
+smc_full_guide: true                # SMC 풀가이드 스킬에만 true (압축 노트로 대체 식별)
 ```
+모든 frontmatter 키는 snake_case(`signal_kind`/`token_cost`/`smc_full_guide`); 로더가 camelCase Skill 필드로 매핑.
 - 새 전략 추가 = frontmatter `triggers`에 카탈로그 신호명 추가(기존 신호면 코드 0). 새 신호 종류가 필요할 때만 `detectSignals`에 코드 추가.
 
 ---
