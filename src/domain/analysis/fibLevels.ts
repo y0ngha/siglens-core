@@ -5,7 +5,7 @@ import type {
     SMCSwingPoint,
     SwingLegDirection,
 } from '@/domain/types';
-import { lastOf } from '@/domain/analysis/analysisUtils';
+import { isUsablePrice, lastOf } from '@/domain/analysis/analysisUtils';
 
 /**
  * Fibonacci retracement ratios (fractions of the swing high–low range).
@@ -18,10 +18,6 @@ const FIB_RETRACEMENT_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786] as const;
  * 1.0 echoes the full measured move; higher ratios project beyond it.
  */
 const FIB_EXTENSION_RATIOS = [1.0, 1.272, 1.618, 2.0, 2.618] as const;
-
-/** @internal Whether a price is finite and strictly positive. */
-export const isUsablePrice = (price: number): boolean =>
-    Number.isFinite(price) && price > 0;
 
 /**
  * Resolve the swing leg direction from the chronological order of the two most

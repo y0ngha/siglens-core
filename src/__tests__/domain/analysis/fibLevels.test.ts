@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    computeFibonacciProjection,
-    isUsablePrice,
-} from '@/domain/analysis/fibLevels';
+import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
 import type { SMCResult } from '@/domain/types';
 
 function smc(
@@ -49,17 +46,5 @@ describe('computeFibonacciProjection', () => {
 
     it('returns null when an anchor price is not usable (non-finite)', () => {
         expect(computeFibonacciProjection(smc(10, NaN, 5, 100))).toBeNull();
-    });
-});
-
-describe('isUsablePrice', () => {
-    it('accepts finite positive prices', () => {
-        expect(isUsablePrice(10)).toBe(true);
-    });
-    it('rejects zero, negatives and non-finite prices', () => {
-        expect(isUsablePrice(0)).toBe(false);
-        expect(isUsablePrice(-1)).toBe(false);
-        expect(isUsablePrice(Number.NaN)).toBe(false);
-        expect(isUsablePrice(Number.POSITIVE_INFINITY)).toBe(false);
     });
 });

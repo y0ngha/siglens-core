@@ -106,6 +106,17 @@ describe('computeMarketReference', () => {
         expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
     });
 
+    it('emits no pivot levels when the window has a single bar', () => {
+        // windowLen === 1 -> priorBar is null -> no standard/camarilla pivots.
+        const ref = computeMarketReference(makeBars(1), makeInd(), '1Day');
+        const all = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        expect(all.some(l => l.kind === 'pivot_standard')).toBe(false);
+        expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(false);
+    });
+
     it('emits fib levels and a window-local swing level from window swings', () => {
         // 60 bars, short window = 20 (indices 40-59), current price = close(59) = 159.
         // One isolated swing low placed just under price so it is the nearest support
@@ -215,13 +226,13 @@ describe('computeMarketReference', () => {
             ...ref.short.levels.resistance,
         ]
             .map(l => l.price)
-            .sort((a, b) => a - b);
+            .toSorted((a, b) => a - b);
         const longPrices = [
             ...ref.long.levels.support,
             ...ref.long.levels.resistance,
         ]
             .map(l => l.price)
-            .sort((a, b) => a - b);
+            .toSorted((a, b) => a - b);
         expect(shortPrices).not.toEqual(longPrices);
     });
 });

@@ -17,7 +17,7 @@ describe('roundNumberLevels', () => {
     it('uses $5 increments in the 50–200 tier', () => {
         const prices = roundNumberLevels(123)
             .map(l => l.price)
-            .sort((a, b) => a - b);
+            .toSorted((a, b) => a - b);
         expect(prices).toContain(120);
         expect(prices).toContain(125);
     });
@@ -29,7 +29,7 @@ describe('roundNumberLevels', () => {
     it('uses $10 increments above $200', () => {
         const prices = roundNumberLevels(523)
             .map(l => l.price)
-            .sort((a, b) => a - b);
+            .toSorted((a, b) => a - b);
         expect(prices).toContain(520);
         expect(prices).toContain(530);
     });
