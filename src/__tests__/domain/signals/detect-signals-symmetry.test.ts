@@ -11,17 +11,7 @@ import type {
     SqueezeMomentumResult,
     SupertrendResult,
 } from '@/domain/types';
-
-function buildBars(n: number): Bar[] {
-    return Array.from({ length: n }, (_, i) => ({
-        time: 1700000000 + i * 86400,
-        open: 100,
-        high: 100,
-        low: 100,
-        close: 100,
-        volume: 1000,
-    }));
-}
+import { buildBars, sqz } from './testUtils';
 
 /**
  * Builds an indicator suite whose every bearish-mirror trigger fires on the
@@ -126,16 +116,6 @@ function buildBearishIndicators(): {
         mfi,
     };
     return { bars, indicators };
-}
-
-function sqz(momentum: number | null): SqueezeMomentumResult {
-    return {
-        momentum,
-        sqzOn: null,
-        sqzOff: null,
-        noSqz: null,
-        increasing: null,
-    };
 }
 
 describe('detectSignals 양방향 대칭성', () => {

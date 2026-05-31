@@ -22,17 +22,7 @@ import type {
     SqueezeMomentumResult,
     SupertrendResult,
 } from '@/domain/types';
-
-function buildBars(n: number): Bar[] {
-    return Array.from({ length: n }, (_, i) => ({
-        time: 1700000000 + i * 86400,
-        open: 100,
-        high: 100,
-        low: 100,
-        close: 100,
-        volume: 1000,
-    }));
-}
+import { buildBars, sqz } from './testUtils';
 
 function buildBarsWithCloses(closes: number[]): Bar[] {
     return closes.map((c, i) => ({
@@ -79,16 +69,6 @@ function withKeltner(values: KeltnerChannelResult[]): IndicatorResult {
 
 function withSqueezeMomentum(values: SqueezeMomentumResult[]): IndicatorResult {
     return { ...EMPTY_INDICATOR_RESULT, squeezeMomentum: values };
-}
-
-function sqz(momentum: number | null): SqueezeMomentumResult {
-    return {
-        momentum,
-        sqzOn: null,
-        sqzOff: null,
-        noSqz: null,
-        increasing: null,
-    };
 }
 
 // ─── detectKeltnerLowerBreakout (mirror of detectKeltnerUpperBreakout) ─────────

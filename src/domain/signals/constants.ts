@@ -62,7 +62,11 @@ export const SQUEEZE_MOMENTUM_ZERO_CROSS = 0; // 히스토그램 0 상향 돌파
 // DMI bearish reuses DMI_ADX_TREND_THRESHOLD; squeeze bearish reuses
 // SQUEEZE_MOMENTUM_ZERO_CROSS (only the cross direction differs).
 
-/** @internal CCI level whose downward cross triggers an overbought-exit signal. */
+/**
+ * @internal CCI level whose downward cross triggers an overbought-exit signal.
+ * Shares the same numeric value (100) as {@link CCI_BULLISH_CROSS_LEVEL}; the
+ * difference is the cross direction (down vs. up).
+ */
 export const CCI_OVERBOUGHT_CROSS_LEVEL = 100; // CCI +100 하향 돌파 (과매수 이탈)
 /** @internal CCI level whose downward cross triggers a bearish-momentum signal. */
 export const CCI_BEARISH_CROSS_LEVEL = 0; // CCI 0 하향 돌파
