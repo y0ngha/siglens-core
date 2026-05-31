@@ -55,3 +55,18 @@ export const CMF_BULLISH_CROSS_LEVEL = 0; // CMF 0 상향 (매집 전환)
 export const MFI_OVERSOLD_LEVEL = 20; // MFI 20 상향 돌파 (과매도 반등)
 /** @internal Squeeze-momentum zero line whose upward cross marks a bullish flip. */
 export const SQUEEZE_MOMENTUM_ZERO_CROSS = 0; // 히스토그램 0 상향 돌파
+
+// ─── Bearish detector thresholds (mirror of the bullish set) ─────────────────
+// keltner / ichimoku / supertrend / parabolic-sar bearish detectors need no
+// threshold constant — they are judged by channel breach or trend flip.
+// DMI bearish reuses DMI_ADX_TREND_THRESHOLD; squeeze bearish reuses
+// SQUEEZE_MOMENTUM_ZERO_CROSS (only the cross direction differs).
+
+/** @internal CCI level whose downward cross triggers an overbought-exit signal. */
+export const CCI_OVERBOUGHT_CROSS_LEVEL = 100; // CCI +100 하향 돌파 (과매수 이탈)
+/** @internal CCI level whose downward cross triggers a bearish-momentum signal. */
+export const CCI_BEARISH_CROSS_LEVEL = 0; // CCI 0 하향 돌파
+/** @internal CMF level whose downward cross marks a distribution flip. */
+export const CMF_BEARISH_CROSS_LEVEL = 0; // CMF 0 하향 (분산 전환)
+/** @internal MFI level whose downward cross marks an overbought reversal. */
+export const MFI_OVERBOUGHT_LEVEL = 80; // MFI 80 하향 돌파 (과매수 반전)
