@@ -77,8 +77,10 @@ describe('hashSkillCatalog', () => {
 
     it('returns a short stable hex string', () => {
         const fp = hashSkillCatalog(CATALOG_A);
-        expect(fp).toMatch(/^[0-9a-f]+$/);
-        expect(fp.length).toBeGreaterThan(0);
+        // Documented contract: a fixed-length 16-char lowercase hex prefix,
+        // stable across repeated calls on the same catalog.
+        expect(fp).toMatch(/^[0-9a-f]{16}$/);
+        expect(hashSkillCatalog(CATALOG_A)).toBe(fp);
     });
 
     it('handles untagged skills (gating/tokenCost default to null)', () => {

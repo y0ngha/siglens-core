@@ -64,6 +64,8 @@ const INTRADAY_VWAP_DISABLED_TIMEFRAME: Timeframe = '1Day';
 /** Latest finite value of a per-bar oscillator series, or null. */
 const lastNumber = (series: (number | null)[]): number | null => {
     const v = lastOf(series);
+    // lastOf returns null for an empty array; `?? null` also folds a trailing
+    // null element into null, so the result matches the number | null contract.
     return v ?? null;
 };
 

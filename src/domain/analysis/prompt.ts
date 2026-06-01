@@ -267,8 +267,10 @@ const formatBarRow = (bar: Bar): string => {
     return `[ts:${bar.time}] ${datetime} | O:${fmt(bar.open)} H:${fmt(bar.high)} L:${fmt(bar.low)} C:${fmt(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
 };
 
-const buildCandlePatternEntries = (bars: Bar[]): PromptCandlePatternEntry[] => {
-    const entries = detectCandlePatternEntries(bars);
+const buildCandlePatternEntries = (
+    bars: Bar[],
+    entries: CandlePatternEntry[]
+): PromptCandlePatternEntry[] => {
     const detectionBars = getDetectionBars(bars);
     const totalBars = detectionBars.length;
     const lastEntries = selectLastCandlePatternEntries(entries);
@@ -297,7 +299,8 @@ const formatPatternEntry = (entry: PromptCandlePatternEntry): string =>
 
 const formatRecentBarsSection = (
     bars: Bar[],
-    recentBarsCount: number
+    recentBarsCount: number,
+    candleEntries: CandlePatternEntry[]
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -305,7 +308,7 @@ const formatRecentBarsSection = (
         return ['## Recent Bar Data', '- No data available'].join('\n');
     }
 
-    const patternEntries = buildCandlePatternEntries(bars);
+    const patternEntries = buildCandlePatternEntries(bars, candleEntries);
 
     return [
         `## Recent Bar Data (Last ${recentBars.length} bars)`,
@@ -1198,8 +1201,10 @@ const ATR_EXTREME_SIZING_NOTE = [
  * candle guides. Includes all detected entries (not just the last two shown in
  * the prompt) so a guide gates on its candle's presence anywhere in the window.
  */
-const collectDetectedCandleNames = (bars: Bar[]): string[] => {
-    const names = detectCandlePatternEntries(bars)
+const collectDetectedCandleNames = (
+    entries: CandlePatternEntry[]
+): string[] => {
+    const names = entries
         .map(entry =>
             entry.patternType === 'multi'
                 ? entry.multiPattern
@@ -1213,7 +1218,8 @@ const collectDetectedCandleNames = (bars: Bar[]): string[] => {
 const buildSkillSelectionContext = (
     bars: Bar[],
     indicators: IndicatorResult,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    candleEntries: CandlePatternEntry[]
 ): SkillSelectionContext => {
     const price = bars.length > 0 ? bars[bars.length - 1].close : 0;
     const atr = lastNonNull(indicators.atr);
@@ -1223,7 +1229,7 @@ const buildSkillSelectionContext = (
         indicators,
         signals: detectSignals(bars, indicators),
         timeframe,
-        detectedCandles: collectDetectedCandleNames(bars),
+        detectedCandles: collectDetectedCandleNames(candleEntries),
         price,
         atrPercent,
     };
@@ -1271,6 +1277,11 @@ export function buildAnalysisPrompt(
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot
 ): string {
+    // Detect candle patterns once and thread the result to every consumer
+    // (skill-selection gating + the recent-bars section) so the expensive
+    // detection pass runs a single time per prompt build.
+    const candleEntries = detectCandlePatternEntries(bars);
+
     // Dynamic gating (chart only): inject only the skills whose frontmatter
     // gating fires for this chart's state. Untagged skills fail open (included).
     // selectSkills already returns a name-sorted copy, so the static byName
@@ -1278,7 +1289,8 @@ export function buildAnalysisPrompt(
     const selectionContext = buildSkillSelectionContext(
         bars,
         indicators,
-        timeframe
+        timeframe,
+        candleEntries
     );
     // The SMC full guide is never injected (fabrication source); it is replaced
     // by the deterministic SMC data section + a compressed concept note. Drop it
@@ -1318,7 +1330,7 @@ export function buildAnalysisPrompt(
         ANALYSIS_GUIDELINES,
         formatMarketSection(bars),
         formatLongTermContext(bars),
-        formatRecentBarsSection(bars, config.recentBarsCount),
+        formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),

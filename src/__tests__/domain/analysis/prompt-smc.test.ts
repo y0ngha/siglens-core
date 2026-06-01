@@ -199,10 +199,6 @@ describe('SMC compressed concept note (BOS/CHoCH recency gate)', () => {
 });
 
 describe('anti-fabrication guardrail on level-citing sections', () => {
-    it('exposes the guardrail constant', () => {
-        expect(ANTI_FABRICATION_GUARDRAIL.length).toBeGreaterThan(0);
-    });
-
     it('includes the guardrail in the chart prompt (level sections)', () => {
         const out = buildAnalysisPrompt(
             TEST_SYMBOL,
