@@ -1,5 +1,34 @@
 # Changelog
 
+# [0.19.0](https://github.com/y0ngha/siglens-core/compare/v0.18.0...v0.19.0) (2026-06-01)
+
+
+### Bug Fixes
+
+* address PR2 review — public API exports, [@internal](https://github.com/internal), discriminated SkillGating, deterministic sort, undefined guards ([18125cf](https://github.com/y0ngha/siglens-core/commit/18125cf902c42c0f456962f7d8af043a3ad0f840))
+* address PR2 review — snake_case frontmatter parsing, fingerprint helper, SMC id, guards ([0bd9c05](https://github.com/y0ngha/siglens-core/commit/0bd9c0557343b835391759299f7f6307b9dc16db))
+* address PR2 review round 2 — hashSkillCatalog locale, PUBLIC_API.md, drop public SignalKind ([684d053](https://github.com/y0ngha/siglens-core/commit/684d053e0fad267c7fde8123e4a37a3224dcfaab))
+* address PR2 review round 3 — as-cast safety comments + internal [@link](https://github.com/link) prose (swept) ([2e4120e](https://github.com/y0ngha/siglens-core/commit/2e4120eadbdd67d98c4dc6e3fabc3cc9ce238893))
+* address PR2 review round 4 — declarative dedupe, as-cast (b) comments, [@internal](https://github.com/internal) consistency (swept) ([cb13c3d](https://github.com/y0ngha/siglens-core/commit/cb13c3dd39103476a90863b1ebec0b2365ff70f0))
+* address PR2 review round 5 — single candle-entry computation, drop vacuous test, direct fingerprint ([1b0974c](https://github.com/y0ngha/siglens-core/commit/1b0974c73984bb1acb6a822d13ef77c3e74f9a86))
+* **signals:** address PR1 review — symmetry test coverage, defensive guards, CMF doc ([733f65d](https://github.com/y0ngha/siglens-core/commit/733f65dfc9713fc11a47c6349cba7e59067c7d36))
+* **signals:** mfi_oversold_bounce uses lookback cross, not 1-bar check ([44c48f0](https://github.com/y0ngha/siglens-core/commit/44c48f03669153aebd3da45ebbc4d051c2bc4902))
+
+
+### Features
+
+* **analysis:** pure selectSkills gating function ([b425c84](https://github.com/y0ngha/siglens-core/commit/b425c84a5fd92b2b26791498ad97fb8d5e522772))
+* **analysis:** SMC compressed note + anti-fabrication guardrail ([4e967e4](https://github.com/y0ngha/siglens-core/commit/4e967e4ca5a85b5aac031e75d10659ccb31747d1))
+* **analysis:** textbook state predicates for skill gating (TF-aware) ([797710b](https://github.com/y0ngha/siglens-core/commit/797710b835282c6682891141d37a5f71f1341664))
+* **analysis:** wire selectSkills into buildAnalysisPrompt (chart only) ([f9c1d4a](https://github.com/y0ngha/siglens-core/commit/f9c1d4ab7f59a00a6ee359b052b6d304aa7127ea))
+* **cache:** fold skill fingerprint into chart cache key ([133c4a3](https://github.com/y0ngha/siglens-core/commit/133c4a3a32dc7b6271ad1663ea03feb59d190ea4))
+* **signals:** add 9 bearish mirror detectors ([7ca173f](https://github.com/y0ngha/siglens-core/commit/7ca173f5142905fc314f7e8745d0c26d810d4544))
+* **signals:** add bearish signal kinds to Signal union ([4194884](https://github.com/y0ngha/siglens-core/commit/4194884c0ae500bf2b87961d5f5c6991f966905b))
+* **signals:** add bearish threshold constants ([b0be1db](https://github.com/y0ngha/siglens-core/commit/b0be1dba859b55ac3ec34c556829d8cdc4aa816b))
+* **signals:** register bearish detectors in detectSignals ([a527055](https://github.com/y0ngha/siglens-core/commit/a5270550e87c4b850a16f594729a455d0d341e3e))
+* **skills:** parse gating frontmatter + dedup by name ([0d37666](https://github.com/y0ngha/siglens-core/commit/0d37666506de5d8877742375922ed0e878fc845b))
+* **types:** add SkillGating + SkillSelectionContext ([e2deccd](https://github.com/y0ngha/siglens-core/commit/e2deccdd8627e303d20acd57a638663dd9362421))
+
 # [0.18.0](https://github.com/y0ngha/siglens-core/compare/v0.17.0...v0.18.0) (2026-05-31)
 
 
