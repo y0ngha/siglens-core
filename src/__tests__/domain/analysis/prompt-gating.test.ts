@@ -232,6 +232,72 @@ describe('ATR-extreme sizing note', () => {
         );
         expect(out).not.toMatch(/Extreme Volatility/i);
     });
+    // Boundary-equality: ATR% exactly at the daily threshold (6%) must append the
+    // note (the gate uses >=). Inject atr directly so atrPercent = (6/100)*100 = 6.0.
+    it('appends the sizing note exactly at the 6% daily threshold (>=)', () => {
+        const bars: Bar[] = Array.from({ length: 60 }, (_, i) => ({
+            time: 1_700_000_000 + i * 86_400,
+            open: 100,
+            high: 100,
+            low: 100,
+            close: 100,
+            volume: 1_000_000,
+        }));
+        const out = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            bars,
+            { ...emptyIndicators(), atr: [...new Array(59).fill(null), 6] },
+            [],
+            '1Day'
+        );
+        expect(out).toMatch(/Extreme Volatility/i);
+    });
+});
+
+describe('SMC concept-note recency boundary', () => {
+    // formatSmcConceptNote skips only when barsAgo > SMC_STRUCTURE_BREAK_RECENCY_BARS (10),
+    // so a structure break exactly 10 bars ago still emits the note; 11 bars ago does not.
+    it('emits the concept note exactly at the 10-bar boundary (barsAgo === 10)', () => {
+        const bars = makeBars(30, 100); // latest bar index = 29
+        const indicators: IndicatorResult = {
+            ...emptyIndicators(),
+            smc: {
+                ...EMPTY_SMC_RESULT,
+                // barsAgo = (30 - 1) - 19 = 10
+                structureBreaks: [
+                    {
+                        index: 19,
+                        price: 100,
+                        type: 'bullish',
+                        breakType: 'bos',
+                    },
+                ],
+            },
+        };
+        const out = build([], bars, indicators);
+        expect(out).toContain('Smart Money Concepts — Concept Note');
+    });
+    it('omits the concept note one bar past the boundary (barsAgo === 11)', () => {
+        const bars = makeBars(30, 100);
+        const indicators: IndicatorResult = {
+            ...emptyIndicators(),
+            smc: {
+                ...EMPTY_SMC_RESULT,
+                // barsAgo = (30 - 1) - 18 = 11 > 10
+                structureBreaks: [
+                    {
+                        index: 18,
+                        price: 100,
+                        type: 'bullish',
+                        breakType: 'bos',
+                    },
+                ],
+            },
+        };
+        const out = build([], bars, indicators);
+        expect(out).not.toContain('Smart Money Concepts — Concept Note');
+    });
 });
 
 describe('news / fundamental prompt builders are unaffected by gating', () => {

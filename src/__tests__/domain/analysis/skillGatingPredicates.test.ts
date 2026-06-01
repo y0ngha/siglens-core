@@ -170,6 +170,33 @@ describe('isStateNotable — bollinger pctB (TF-aware)', () => {
         });
         expect(isStateNotable(P('bollinger', 'pctB'), ctx)).toBe(false);
     });
+    // Boundary-equality: %B exactly at each TF's hi threshold must fire (isOutsideBounds uses >=).
+    // An integer band [0,100] makes %B = price/100 an exact ratio (e.g. 98/100 === 0.98),
+    // sidestepping the float round-trip in bollForPctB that could land just under the bound.
+    it('fires exactly at the 0.98 hi boundary on 1Day', () => {
+        const ctx = makeCtx({
+            timeframe: '1Day',
+            price: 98,
+            bollinger: { lower: 0, middle: 50, upper: 100 },
+        });
+        expect(isStateNotable(P('bollinger', 'pctB'), ctx)).toBe(true);
+    });
+    it('fires exactly at the 0.95 hi boundary on 1Hour', () => {
+        const ctx = makeCtx({
+            timeframe: '1Hour',
+            price: 95,
+            bollinger: { lower: 0, middle: 50, upper: 100 },
+        });
+        expect(isStateNotable(P('bollinger', 'pctB'), ctx)).toBe(true);
+    });
+    it('fires exactly at the 0.92 hi boundary on 15Min', () => {
+        const ctx = makeCtx({
+            timeframe: '15Min',
+            price: 92,
+            bollinger: { lower: 0, middle: 50, upper: 100 },
+        });
+        expect(isStateNotable(P('bollinger', 'pctB'), ctx)).toBe(true);
+    });
 });
 
 describe('isStateNotable — keltner bandDistAtr', () => {
