@@ -36,9 +36,13 @@ import {
     cleanupJob,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import { createSkillsProvider } from '@/infrastructure/skills/loader';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
+
+/** Suffix every chart cache key carries: prompt version + empty-catalog hash. */
+const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:${hashSkillCatalog([])}`;
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
@@ -182,7 +186,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`,
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),
@@ -202,7 +206,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache-no-model');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${PROMPT_TEMPLATE_VERSION}`,
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),
@@ -250,7 +254,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-poll-skills-fail');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`,
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
                 expect.objectContaining({ skillsDegraded: true }),
                 3600
             );
@@ -270,7 +274,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-poll-skills-ok');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`,
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
                 expect.objectContaining({ skillsDegraded: false }),
                 3600
             );
@@ -381,7 +385,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-real-analysis');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`,
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),

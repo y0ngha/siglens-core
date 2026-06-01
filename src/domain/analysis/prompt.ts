@@ -17,7 +17,6 @@ import {
     KELTNER_MULTIPLIER,
     MA_DEFAULT_PERIODS,
     MFI_DEFAULT_PERIOD,
-    MIN_CONFIDENCE_WEIGHT,
     RSI_DEFAULT_PERIOD,
     SMC_SWING_PERIOD,
     SQUEEZE_MOMENTUM_BB_LENGTH,
@@ -46,6 +45,8 @@ import {
     getDetectionBars,
     selectLastCandlePatternEntries,
 } from '@/domain/analysis/candle-detection';
+import { selectSkills } from '@/domain/analysis/selectSkills';
+import { detectSignals } from '@/domain/signals';
 import type {
     CandlePatternEntry,
     AnalysisResponse,
@@ -58,6 +59,7 @@ import type {
     PromptConfig,
     ReferenceLevel,
     Skill,
+    SkillSelectionContext,
     SkillType,
     SMCEqualLevel,
     SMCResult,
@@ -265,8 +267,10 @@ const formatBarRow = (bar: Bar): string => {
     return `[ts:${bar.time}] ${datetime} | O:${fmt(bar.open)} H:${fmt(bar.high)} L:${fmt(bar.low)} C:${fmt(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
 };
 
-const buildCandlePatternEntries = (bars: Bar[]): PromptCandlePatternEntry[] => {
-    const entries = detectCandlePatternEntries(bars);
+const buildCandlePatternEntries = (
+    bars: Bar[],
+    entries: CandlePatternEntry[]
+): PromptCandlePatternEntry[] => {
     const detectionBars = getDetectionBars(bars);
     const totalBars = detectionBars.length;
     const lastEntries = selectLastCandlePatternEntries(entries);
@@ -295,7 +299,8 @@ const formatPatternEntry = (entry: PromptCandlePatternEntry): string =>
 
 const formatRecentBarsSection = (
     bars: Bar[],
-    recentBarsCount: number
+    recentBarsCount: number,
+    candleEntries: CandlePatternEntry[]
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -303,7 +308,7 @@ const formatRecentBarsSection = (
         return ['## Recent Bar Data', '- No data available'].join('\n');
     }
 
-    const patternEntries = buildCandlePatternEntries(bars);
+    const patternEntries = buildCandlePatternEntries(bars, candleEntries);
 
     return [
         `## Recent Bar Data (Last ${recentBars.length} bars)`,
@@ -609,6 +614,90 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
     ].join('\n');
 };
 
+// ── SMC handling ─────────────────────────────────────────────────────────────
+// The full SMC skill guide (~13KB of ICT prose with placeholder example prices)
+// is a prime fabrication source for floor models — they copy the example levels
+// as if real. It is NEVER injected. The deterministic computed SMC section
+// (formatSMCSection) stays as the data anchor; a compressed concept note is
+// added only when a structure break is recent enough to be actionable.
+
+/** Recency window (in bars) within which a BOS/CHoCH justifies the SMC note. */
+const SMC_STRUCTURE_BREAK_RECENCY_BARS = 10;
+
+/**
+ * @internal
+ * One-line notice marking that the full SMC guide was deliberately withheld and
+ * pointing the model at the computed SMC data section as the only valid source.
+ */
+export const SMC_GUIDE_BLOCKED_NOTICE =
+    'SMC note: the full Smart Money Concepts guide is intentionally omitted; use ONLY the levels in the computed ## Smart Money Concepts (SMC) section below — do not infer or invent SMC levels from memory.';
+
+/**
+ * @internal
+ * Anti-fabrication guardrail propagated to every level-citing section
+ * (Fibonacci / support-resistance / pivot). Floor models otherwise invent or
+ * recopy plausible-looking price levels; this line forbids it explicitly.
+ */
+export const ANTI_FABRICATION_GUARDRAIL =
+    'Anti-fabrication: cite ONLY price levels that appear verbatim in the data above (computed references, SMC section, bar data). Never invent, round, or recall a level from outside this prompt; if a level is not present, say so rather than fabricating one.';
+
+/**
+ * Identifies the SMC full-guide skill (replaced by a compressed concept note),
+ * regardless of its gating tier.
+ *
+ * Prefers the explicit `smcFullGuide` frontmatter flag (`smc_full_guide: true`)
+ * so the routing survives a display-name rename. Falls back to name matching for
+ * skills authored before the flag existed; the SMC guide should set
+ * `smc_full_guide: true` so the stable flag path is taken.
+ */
+const isSmcGuideSkill = (skill: Skill): boolean => {
+    if (skill.smcFullGuide === true) return true;
+    const name = skill.name.toLowerCase();
+    return name.includes('smart money') || name === 'smc';
+};
+
+/**
+ * Latest structure break's distance in bars, or null when there is none.
+ * Uses the maximum index (most recent break) against the bar count.
+ */
+const latestStructureBreakBarsAgo = (
+    smc: SMCResult,
+    totalBars: number
+): number | null => {
+    if (smc.structureBreaks.length === 0 || totalBars === 0) return null;
+    const latestIndex = smc.structureBreaks.reduce(
+        (max, b) => Math.max(max, b.index),
+        smc.structureBreaks[0].index
+    );
+    const barsAgo = totalBars - 1 - latestIndex;
+    // Defensive: an out-of-range index (e.g. a break index >= totalBars) would
+    // yield a negative "bars ago"; treat that as no usable recency signal.
+    if (barsAgo < 0) return null;
+    return barsAgo;
+};
+
+/**
+ * Compressed ~5-line SMC concept note, emitted only when the latest BOS/CHoCH
+ * occurred within {@link SMC_STRUCTURE_BREAK_RECENCY_BARS} bars. Returns null
+ * otherwise (no recent structural shift → no note, to avoid distraction).
+ */
+const formatSmcConceptNote = (
+    indicators: IndicatorResult,
+    bars: Bar[]
+): string | null => {
+    const barsAgo = latestStructureBreakBarsAgo(indicators.smc, bars.length);
+    if (barsAgo === null || barsAgo > SMC_STRUCTURE_BREAK_RECENCY_BARS) {
+        return null;
+    }
+    return [
+        '## Smart Money Concepts — Concept Note',
+        SMC_GUIDE_BLOCKED_NOTICE,
+        `- A market-structure break (BOS/CHoCH) printed ${barsAgo} bar(s) ago — structure may be shifting.`,
+        '- BOS (break of structure) = trend continuation; CHoCH (change of character) = potential reversal.',
+        '- Read the computed SMC levels above as zones to react to, not as guarantees.',
+    ].join('\n');
+};
+
 const MARKET_REFERENCE_HEADER =
     '## Market Reference (deterministic · advisory)';
 
@@ -689,6 +778,7 @@ const formatMarketReferenceSection = (
     [
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
+        ANTI_FABRICATION_GUARDRAIL,
         formatHorizonBlock('short', reference.short, timeframe),
         formatHorizonBlock('medium', reference.medium, timeframe),
         formatHorizonBlock('long', reference.long, timeframe),
@@ -861,9 +951,10 @@ const ANALYSIS_GUIDELINES = [
     '',
     // NOTE: Individual indicator interpretation guidelines (ATR, OBV, Parabolic SAR, Supertrend,
     // MFI, Williams %R, Keltner, CMF, Donchian, SMC, Squeeze Momentum) are intentionally omitted here
-    // because they are already covered in detail by the corresponding indicator_guide skills
-    // (all have confidence_weight >= 0.75 and are always injected into the prompt).
-    // If any indicator guide skill drops below MIN_CONFIDENCE_WEIGHT, restore its guideline here.
+    // because they are covered by the corresponding indicator_guide skills, which are now injected
+    // dynamically via frontmatter gating (selectSkills). When a guide's gating does not fire for the
+    // current chart state, its detailed interpretation is simply not in this prompt — that is the
+    // intended behavior, not a regression.
     '',
     '### Confluence Assessment',
     '- Confluence = 2+ independent signals pointing the same direction at the same price zone.',
@@ -1085,9 +1176,64 @@ const buildAnalysisRequest = (
         .join('\n');
 };
 
-function byName(a: Skill, b: Skill): number {
-    return a.name.localeCompare(b.name, 'en');
-}
+// ── ATR-extreme sizing note (Tier-0 conditional promotion) ──────────────────
+// When realized volatility is extreme, position-sizing context must never be
+// dropped — even if the gated sizing guide did not fire. The threshold is
+// timeframe-aware: a 6% daily ATR is extreme, but intraday bars routinely show
+// 2%+ ATR, so the intraday bar is lower.
+const ATR_EXTREME_PERCENT_DAILY = 6;
+const ATR_EXTREME_PERCENT_INTRADAY = 2;
+const DAILY_TIMEFRAME: Timeframe = '1Day';
+
+const atrExtremeThreshold = (timeframe: Timeframe): number =>
+    timeframe === DAILY_TIMEFRAME
+        ? ATR_EXTREME_PERCENT_DAILY
+        : ATR_EXTREME_PERCENT_INTRADAY;
+
+const ATR_EXTREME_SIZING_NOTE = [
+    '## Extreme Volatility — Position Sizing',
+    '- Realized volatility (ATR) is extreme for this timeframe. Size positions conservatively: widen stops to the ATR range, reduce position size so a single ATR move stays within risk tolerance, and avoid market entries into the volatility spike.',
+].join('\n');
+
+/**
+ * Pattern names of every candle formation detected in the recent window — the
+ * candle equivalent of a signal event, used by {@link selectSkills} to gate
+ * candle guides. Includes all detected entries (not just the last two shown in
+ * the prompt) so a guide gates on its candle's presence anywhere in the window.
+ */
+const collectDetectedCandleNames = (
+    entries: CandlePatternEntry[]
+): string[] => {
+    const names = entries
+        .map(entry =>
+            entry.patternType === 'multi'
+                ? entry.multiPattern
+                : entry.singlePattern
+        )
+        .filter((name): name is NonNullable<typeof name> => name !== null);
+    return [...new Set<string>(names)];
+};
+
+/** Build the pure, read-only selection context from data already in scope. */
+const buildSkillSelectionContext = (
+    bars: Bar[],
+    indicators: IndicatorResult,
+    timeframe: Timeframe,
+    candleEntries: CandlePatternEntry[]
+): SkillSelectionContext => {
+    const price = bars.length > 0 ? bars[bars.length - 1].close : 0;
+    const atr = lastNonNull(indicators.atr);
+    const atrPercent =
+        price > 0 && atr !== null ? (atr / price) * PERCENTAGE_FACTOR : 0;
+    return {
+        indicators,
+        signals: detectSignals(bars, indicators),
+        timeframe,
+        detectedCandles: collectDetectedCandleNames(candleEntries),
+        price,
+        atrPercent,
+    };
+};
 
 /**
  * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
@@ -1101,11 +1247,14 @@ function byName(a: Skill, b: Skill): number {
  * market reference (deterministic advisory levels and structure per horizon),
  * SMC structure, and per-skill writing rules.
  *
- * Skills with `confidenceWeight < MIN_CONFIDENCE_WEIGHT` are excluded.
- * Active skills are sorted by name and grouped by `type` (pattern, strategy,
- * indicator_guide, candlestick, support_resistance, regular). The number of
- * trend samples and recent bars varies per `timeframe` via
- * `PROMPT_CONFIG_BY_TIMEFRAME`.
+ * Skills are dynamically gated by {@link selectSkills}: only those whose
+ * frontmatter `gating` fires for this chart's state (detected signals, textbook
+ * indicator states, detected candles) are injected; untagged skills fail open
+ * (always included). Selected skills are name-sorted and grouped by `type`
+ * (pattern, strategy, indicator_guide, candlestick, support_resistance,
+ * regular). When ATR% is extreme for the timeframe, an always-on position-sizing
+ * note is appended. The number of trend samples and recent bars varies per
+ * `timeframe` via `PROMPT_CONFIG_BY_TIMEFRAME`.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
  * @param companyName - Full English company name (e.g. `"Apple Inc."`).
@@ -1128,9 +1277,27 @@ export function buildAnalysisPrompt(
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot
 ): string {
-    const activeSkills = skills
-        .filter(s => s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT)
-        .toSorted(byName);
+    // Detect candle patterns once and thread the result to every consumer
+    // (skill-selection gating + the recent-bars section) so the expensive
+    // detection pass runs a single time per prompt build.
+    const candleEntries = detectCandlePatternEntries(bars);
+
+    // Dynamic gating (chart only): inject only the skills whose frontmatter
+    // gating fires for this chart's state. Untagged skills fail open (included).
+    // selectSkills already returns a name-sorted copy, so the static byName
+    // sort is no longer needed here.
+    const selectionContext = buildSkillSelectionContext(
+        bars,
+        indicators,
+        timeframe,
+        candleEntries
+    );
+    // The SMC full guide is never injected (fabrication source); it is replaced
+    // by the deterministic SMC data section + a compressed concept note. Drop it
+    // regardless of its gating tier before bucketing.
+    const activeSkills = selectSkills(skills, selectionContext).filter(
+        skill => !isSmcGuideSkill(skill)
+    );
 
     const skillGroups: Record<SkillGroupKey, Skill[]> = {
         pattern: [],
@@ -1154,6 +1321,7 @@ export function buildAnalysisPrompt(
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
     const marketReference = computeMarketReference(bars, indicators, timeframe);
+    const smcConceptNote = formatSmcConceptNote(indicators, bars);
 
     const sections = [
         `Symbol: ${symbol}\nCompany: ${companyName}`,
@@ -1162,10 +1330,11 @@ export function buildAnalysisPrompt(
         ANALYSIS_GUIDELINES,
         formatMarketSection(bars),
         formatLongTermContext(bars),
-        formatRecentBarsSection(bars, config.recentBarsCount),
+        formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
+        ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(marketReference, timeframe),
         ...(indicatorGuideSkills.length > 0
             ? [
@@ -1196,6 +1365,9 @@ export function buildAnalysisPrompt(
             ? [
                   `## Active Skills\n${regularSkills.map(buildSkillBlock).join('\n\n')}`,
               ]
+            : []),
+        ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)
+            ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
         buildAnalysisRequest(

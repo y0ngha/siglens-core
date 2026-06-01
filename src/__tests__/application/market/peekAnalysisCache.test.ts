@@ -3,6 +3,7 @@ import type { Mock } from 'vitest';
 import type { AnalysisResponse, Timeframe } from '@/domain/types';
 
 vi.mock('@/infrastructure/cache/redis');
+vi.mock('@/infrastructure/skills/loader');
 
 import { peekAnalysisCache } from '@/application/market/peekAnalysisCache';
 import {
@@ -10,9 +11,14 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
+import { getSkillCatalogFingerprint } from '@/infrastructure/skills/loader';
 import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
+
+/** Empty-catalog fingerprint folded into the peek key. */
+const EMPTY_CATALOG_FP = hashSkillCatalog([]);
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -48,6 +54,9 @@ describe('peekAnalysisCache 함수는', () => {
         vi.clearAllMocks();
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(null);
+        (getSkillCatalogFingerprint as Mock).mockResolvedValue(
+            EMPTY_CATALOG_FP
+        );
     });
 
     it('캐시 HIT이면 정규화된 분석 결과를 반환한다', async () => {
@@ -72,7 +81,12 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(SYMBOL, TIMEFRAME, 'gemini-2.5-flash')
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-2.5-flash',
+                EMPTY_CATALOG_FP
+            )
         );
     });
 
@@ -82,7 +96,12 @@ describe('peekAnalysisCache 함수는', () => {
         await peekAnalysisCache(SYMBOL, TIMEFRAME);
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(SYMBOL, TIMEFRAME, DEFAULT_ANALYSIS_MODEL_ID)
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                DEFAULT_ANALYSIS_MODEL_ID,
+                EMPTY_CATALOG_FP
+            )
         );
     });
 

@@ -166,24 +166,39 @@ export const PROMPT_TEMPLATE_VERSION = 'p1' as const;
  * the trailing {@link PROMPT_TEMPLATE_VERSION} segment invalidates the cache
  * when the technical prompt template changes.
  *
+ * The optional `skillFingerprint` segment (a hash of the skill catalog's
+ * selection metadata, see `hashSkillCatalog`) folds the active skill catalog
+ * into the key: changing the gating frontmatter or the set of injected skills
+ * busts the cache instead of serving a stale analysis for the full TTL. It is
+ * appended only when supplied, so callers that do not load skills keep the
+ * legacy key shape.
+ *
  * @param symbol - U.S. equity ticker.
  * @param timeframe - Bar resolution.
  * @param modelId - LLM model identifier. Defaults to {@link DEFAULT_ANALYSIS_MODEL_ID}
  *   so existing callers that do not pass a model remain backward-compatible.
+ * @param skillFingerprint - Optional hash of the skill catalog's selection
+ *   metadata. When provided, appended as the final key segment.
  * @returns The cache key.
  *
  * @example
  * ```ts
  * const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash');
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1'
+ * const keyed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2');
+ * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2'
  * ```
  */
 export function buildAnalysisCacheKey(
     symbol: string,
     timeframe: Timeframe,
-    modelId = DEFAULT_ANALYSIS_MODEL_ID
+    modelId = DEFAULT_ANALYSIS_MODEL_ID,
+    skillFingerprint?: string
 ): string {
-    return `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
+    const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
+    return skillFingerprint !== undefined
+        ? `${base}:${skillFingerprint}`
+        : base;
 }
 
 /**
@@ -261,16 +276,26 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * prompt-template changes: bump the relevant axis whenever a change would make
  * old cached results incorrect.
  *
+ * The optional `skillFingerprint` segment folds the active skill catalog into
+ * the key (see {@link buildAnalysisCacheKey}); appended only when supplied so
+ * callers that do not load skills keep the legacy key shape.
+ *
  * @internal
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
+ * @param skillFingerprint - Optional hash of the skill catalog's selection
+ *   metadata. When provided, appended as the final key segment.
  * @returns The cache key.
  */
 export function buildFundamentalCacheKey(
     symbol: string,
-    modelId: string
+    modelId: string,
+    skillFingerprint?: string
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
+    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
+    return skillFingerprint !== undefined
+        ? `${base}:${skillFingerprint}`
+        : base;
 }
 
 /**

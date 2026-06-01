@@ -295,7 +295,9 @@ describe('submitFundamentalAnalysis 함수는', () => {
         });
 
         it('loadSkillsCached 실패 시 skillsDegraded: true 를 setJobMeta에 전달한다', async () => {
-            mockLoadSkillsCached.mockResolvedValueOnce({
+            // Memoized loader → both the cache-key fingerprint call and the
+            // provider-fetch call observe the same degraded result.
+            mockLoadSkillsCached.mockResolvedValue({
                 skills: [],
                 skillsDegraded: true,
             });

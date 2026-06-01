@@ -20,7 +20,6 @@ import {
     KELTNER_MULTIPLIER,
     MA_DEFAULT_PERIODS,
     MFI_DEFAULT_PERIOD,
-    MIN_CONFIDENCE_WEIGHT,
     RSI_DEFAULT_PERIOD,
     STOCH_RSI_D_PERIOD,
     STOCH_RSI_K_PERIOD,
@@ -84,10 +83,8 @@ const TEST_ICHIMOKU_CHIKOU = 151.0;
 const TEST_HIGH_CONFIDENCE = HIGH_CONFIDENCE_WEIGHT;
 const TEST_ABOVE_HIGH_CONFIDENCE = 0.9;
 const TEST_MEDIUM_CONFIDENCE = 0.7;
-const TEST_MIN_CONFIDENCE_WEIGHT = MIN_CONFIDENCE_WEIGHT;
 const TEST_ABOVE_MIN_CONFIDENCE = 0.6;
 const TEST_BELOW_MIN_CONFIDENCE = 0.4;
-const TEST_LOW_CONFIDENCE = 0.3;
 // expected value: ((110 - 100) / 100) * 100 = 10.00%
 const TEST_CHANGE_RATE_FORMATTED = `${(((TEST_NEXT_CLOSE - TEST_PREV_CLOSE) / TEST_PREV_CLOSE) * 100).toFixed(2)}%`;
 
@@ -1138,10 +1135,13 @@ describe('prompt', () => {
         });
     });
 
-    describe('Skills 섹션 - confidenceWeight 필터링', () => {
-        it('confidenceWeight가 0.5 미만인 skill은 포함되지 않는다', () => {
+    describe('Skills 섹션 - gating (fail-open replaces confidence filter)', () => {
+        // selectSkills replaced the static confidenceWeight filter: untagged
+        // skills now fail open (always included, regardless of confidence), and
+        // exclusion happens only via frontmatter gating.
+        it('untagged low-confidence skill is included (fail-open)', () => {
             const skill = makeSkill({
-                name: 'Excluded Skill',
+                name: 'Untagged Low',
                 confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
             });
             const result = buildAnalysisPrompt(
@@ -1151,25 +1151,10 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            expect(result).not.toContain('Excluded Skill');
+            expect(result).toContain('Untagged Low');
         });
 
-        it('confidenceWeight가 정확히 0.5일 때 포함된다', () => {
-            const skill = makeSkill({
-                name: 'Boundary Skill',
-                confidenceWeight: TEST_MIN_CONFIDENCE_WEIGHT,
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain('Boundary Skill');
-        });
-
-        it('confidenceWeight가 0.5 이상인 skill은 포함된다', () => {
+        it('untagged high-confidence skill is included', () => {
             const skill = makeSkill({
                 name: 'Included Skill',
                 confidenceWeight: TEST_ABOVE_MIN_CONFIDENCE,
@@ -1184,10 +1169,46 @@ describe('prompt', () => {
             expect(result).toContain('Included Skill');
         });
 
-        it('낮은 신뢰도 skill만 있을 때 skill 섹션이 포함되지 않는다', () => {
+        it('gated skill whose trigger is absent is excluded', () => {
+            const skill = makeSkill({
+                name: 'Excluded Skill',
+                type: 'indicator_guide',
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
+            });
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [skill]
+            );
+            expect(result).not.toContain('Excluded Skill');
+        });
+
+        it('only-gated-inactive skills → no skill sections rendered', () => {
             const skills = [
-                makeSkill({ confidenceWeight: TEST_LOW_CONFIDENCE }),
-                makeSkill({ confidenceWeight: TEST_BELOW_MIN_CONFIDENCE }),
+                makeSkill({
+                    name: 'Inactive A',
+                    type: 'pattern',
+                    gating: {
+                        tier: 'gated',
+                        signalKind: 'event',
+                        triggers: ['rsi_oversold'],
+                    },
+                }),
+                makeSkill({
+                    name: 'Inactive B',
+                    type: undefined,
+                    gating: {
+                        tier: 'gated',
+                        signalKind: 'event',
+                        triggers: ['macd_bullish_cross'],
+                    },
+                }),
             ];
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -1396,7 +1417,7 @@ describe('prompt', () => {
             expect(result).toContain('Double Bottom');
         });
 
-        it('높은 신뢰도와 낮은 신뢰도 skill이 섞여있을 때 낮은 것은 제외된다', () => {
+        it('untagged skill kept, gated-inactive skill dropped when mixed', () => {
             const skills = [
                 makeSkill({
                     name: 'Included Skill',
@@ -1404,7 +1425,12 @@ describe('prompt', () => {
                 }),
                 makeSkill({
                     name: 'Excluded Skill',
-                    confidenceWeight: TEST_LOW_CONFIDENCE,
+                    type: 'indicator_guide',
+                    gating: {
+                        tier: 'gated',
+                        signalKind: 'event',
+                        triggers: ['rsi_oversold'],
+                    },
                 }),
             ];
             const result = buildAnalysisPrompt(
@@ -1948,11 +1974,15 @@ describe('prompt', () => {
             expect(result).not.toContain('patternSummaries Writing Rules');
         });
 
-        it('confidenceWeight 미달 패턴 skill은 목록에 포함되지 않는다', () => {
+        it('gated-inactive 패턴 skill은 목록에 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'pattern',
                 name: 'Excluded Pattern',
-                confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -2308,11 +2338,15 @@ describe('prompt', () => {
             expect(result).toContain('Wyckoff Theory');
         });
 
-        it('confidenceWeight가 0.5 미만인 indicator_guide skill은 포함되지 않는다', () => {
+        it('gated-inactive indicator_guide skill은 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'indicator_guide',
                 name: 'Low Confidence Guide',
-                confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -2441,11 +2475,15 @@ describe('prompt', () => {
             expect(indicatorGuideIndex).toBeLessThan(patternWritingRulesIndex);
         });
 
-        it('confidenceWeight가 0.5 미만인 indicator_guide skill은 Writing Rules 목록에 포함되지 않는다', () => {
+        it('gated-inactive indicator_guide skill은 Writing Rules 목록에 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'indicator_guide',
                 name: 'Low Confidence Guide',
-                confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -2861,11 +2899,15 @@ describe('prompt', () => {
             );
         });
 
-        it('confidenceWeight가 0.5 미만인 strategy skill은 포함되지 않는다', () => {
+        it('gated-inactive strategy skill은 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'strategy',
                 name: '낮은신뢰도전략',
-                confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -3087,11 +3129,15 @@ describe('prompt', () => {
             expect(result).toContain('Wyckoff Theory');
         });
 
-        it('confidenceWeight가 0.5 미만인 candlestick skill은 포함되지 않는다', () => {
+        it('gated-inactive candlestick skill은 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'candlestick',
                 name: 'Low Confidence Guide',
-                confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['bullish_engulfing'],
+                },
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -3228,11 +3274,15 @@ describe('prompt', () => {
             expect(result).toContain('피보나치 되돌림');
         });
 
-        it('confidenceWeight가 0.5 미만인 support_resistance skill은 포함되지 않는다', () => {
+        it('gated-inactive support_resistance skill은 포함되지 않는다', () => {
             const skill = makeSkill({
                 type: 'support_resistance',
                 name: 'Low Confidence SR',
-                confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,

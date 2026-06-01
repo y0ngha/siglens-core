@@ -6,9 +6,15 @@ import type {
     SkillCategory,
     SkillCounts,
     SkillDisplay,
+    SkillGating,
+    SkillStateFeature,
+    SkillStatePredicate,
+    SkillStatePredicateKind,
     SkillType,
+    SignalKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import type { LoadSkillsCachedResult } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
@@ -156,6 +162,146 @@ const isSkillType = (value: unknown): value is SkillType =>
     typeof value === 'string' &&
     (SKILL_TYPES as readonly string[]).includes(value);
 
+const SKILL_GATING_TIERS: readonly SkillGating['tier'][] = [
+    'always_on',
+    'gated',
+];
+const SIGNAL_KINDS: readonly SignalKind[] = ['event', 'state'];
+const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = [
+    'bollinger',
+    'keltner',
+    'williamsR',
+    'stochastic',
+    'stochRsi',
+    'donchian',
+    'vwap',
+    'buySellVolume',
+];
+const SKILL_STATE_PREDICATE_KINDS: readonly SkillStatePredicateKind[] = [
+    'pctB',
+    'bandDistAtr',
+    'level',
+    'ratio',
+    'channelProximity',
+];
+
+/** Parse a state predicate; returns undefined when any required field is invalid. */
+const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
+    if (typeof raw !== 'object' || raw === null) return undefined;
+    // (a) Guard above confirmed typeof === 'object' && !== null.
+    // (b) Cast is safe because any non-null object is structurally compatible with
+    // Record<string, unknown> (the most permissive key-value shape), which TS cannot
+    // narrow from `unknown` on its own.
+    const obj = raw as YamlNode;
+    const { feature, predicate, hi, lo } = obj;
+    // (a) Widen the readonly literal tuples to `readonly string[]` so `.includes`
+    // accepts an arbitrary string argument (a tuple's `.includes` is typed to its
+    // own members). (b) Safe at runtime: every tuple member is already a string, so
+    // widening to `readonly string[]` is a pure structural up-cast that discards no
+    // value — it only relaxes the parameter type TS would otherwise reject.
+    if (
+        typeof feature !== 'string' ||
+        !(SKILL_STATE_FEATURES as readonly string[]).includes(feature) ||
+        typeof predicate !== 'string' ||
+        !(SKILL_STATE_PREDICATE_KINDS as readonly string[]).includes(predicate)
+    ) {
+        return undefined;
+    }
+    return {
+        // The `SKILL_STATE_FEATURES.includes(feature)` /
+        // `SKILL_STATE_PREDICATE_KINDS.includes(predicate)` guards above proved
+        // membership in the literal unions at runtime, so the casts are sound.
+        // TS cannot narrow `string` → the literal union through an `.includes()`
+        // type-guard callback on its own, hence the explicit casts.
+        feature: feature as SkillStateFeature,
+        predicate: predicate as SkillStatePredicateKind,
+        ...(typeof hi === 'number' ? { hi } : {}),
+        ...(typeof lo === 'number' ? { lo } : {}),
+    };
+};
+
+/**
+ * Validate and normalize a `gating` frontmatter block.
+ *
+ * Frontmatter keys are snake_case (repo convention, matching `confidence_weight`):
+ * `signal_kind` maps to the camelCase {@link SkillGating} `signalKind` field.
+ *
+ * Returns `undefined` (the loader's safe default — the skill is then treated as
+ * untagged and the selector includes it fail-open) when the block is malformed
+ * or unreachable:
+ * - `tier` not in {@link SKILL_GATING_TIERS};
+ * - `tier: gated` with a missing/invalid `signal_kind`;
+ * - `signal_kind: event` with no non-empty `triggers`;
+ * - `signal_kind: state` with no valid `state` predicate.
+ *
+ * A downstream validation step rejects unreachable gated skills at build time;
+ * here we simply fail safe so a bad block never crashes the loader.
+ */
+const parseGating = (raw: unknown): SkillGating | undefined => {
+    if (typeof raw !== 'object' || raw === null) return undefined;
+    // (a) Guard above confirmed typeof === 'object' && !== null.
+    // (b) Cast is safe because any non-null object is structurally compatible with
+    // Record<string, unknown> (the most permissive key-value shape), which TS cannot
+    // narrow from `unknown` on its own.
+    const obj = raw as YamlNode;
+    const tier = obj.tier;
+    // (a) Widen the readonly literal tuple to `readonly string[]` so `.includes`
+    // accepts an arbitrary string argument (a tuple's `.includes` is typed to its
+    // own members). (b) Safe at runtime: every tuple member is already a string, so
+    // widening is a pure structural up-cast that discards no value — it only relaxes
+    // the parameter type TS would otherwise reject. (Same idiom for `SIGNAL_KINDS`.)
+    if (
+        typeof tier !== 'string' ||
+        !(SKILL_GATING_TIERS as readonly string[]).includes(tier)
+    ) {
+        return undefined;
+    }
+    if (tier === 'always_on') return { tier: 'always_on' };
+
+    // tier === 'gated' → a signal_kind path is required.
+    // Frontmatter key is snake_case (`signal_kind`); map → camelCase `signalKind`.
+    const signalKind = obj.signal_kind;
+    if (
+        typeof signalKind !== 'string' ||
+        !(SIGNAL_KINDS as readonly string[]).includes(signalKind)
+    ) {
+        return undefined;
+    }
+
+    if (signalKind === 'event') {
+        const triggers = obj.triggers;
+        if (
+            !Array.isArray(triggers) ||
+            triggers.length === 0 ||
+            !triggers.every((t): t is string => typeof t === 'string')
+        ) {
+            return undefined;
+        }
+        return {
+            tier: 'gated',
+            signalKind: 'event',
+            // The `Array.isArray(triggers) && triggers.every(t => typeof t === 'string')`
+            // guard above proved every element is a string at runtime, so the cast is
+            // sound. TS cannot narrow `unknown[]` → `string[]` through an `every`
+            // type-guard callback on its own, hence the explicit cast.
+            triggers: triggers as string[],
+        };
+    }
+
+    // signalKind === 'state'
+    const state = parseStatePredicate(obj.state);
+    if (state === undefined) return undefined;
+    return { tier: 'gated', signalKind: 'state', state };
+};
+
+/**
+ * Coerce a frontmatter boolean. The minimal YAML parser keeps an unquoted
+ * `true` as the string `'true'` (it only special-cases arrays/numbers), so a
+ * flag must accept both the boolean and the string form.
+ */
+const isYamlTrue = (value: unknown): boolean =>
+    value === true || value === 'true';
+
 const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     name: String(data.name ?? ''),
     description: String(data.description ?? ''),
@@ -169,7 +315,30 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
         typeof data.confidence_weight === 'number' ? data.confidence_weight : 0,
     content,
     display: parseSkillDisplay(data.display),
+    gating: parseGating(data.gating),
+    // Frontmatter is snake_case by repo convention (matching `confidence_weight`);
+    // map snake → camel here (`token_cost` → `tokenCost`, `signal_kind` → `signalKind`).
+    tokenCost:
+        typeof data.token_cost === 'number' ? data.token_cost : undefined,
+    smcFullGuide: isYamlTrue(data.smc_full_guide),
 });
+
+/**
+ * Drop duplicate skills by `name`, keeping the first occurrence.
+ *
+ * Two `.md` files declaring the same `name` would otherwise both reach the
+ * prompt and the cache fingerprint. The loader's file walk is deterministic
+ * (stable `readdir` order), so "first wins" yields a stable, reproducible
+ * catalog. The relative order of the surviving skills is preserved.
+ */
+const dedupeByName = (skills: Skill[]): Skill[] => {
+    const seen = new Set<string>();
+    return skills.filter(skill => {
+        if (seen.has(skill.name)) return false;
+        seen.add(skill.name);
+        return true;
+    });
+};
 
 const collectMdFiles = async (dir: string): Promise<string[]> => {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -224,6 +393,27 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
         _cachedSkillsDegraded = true;
     }
     return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
+}
+
+/**
+ * Deterministic fingerprint of the cached skill catalog's selection metadata,
+ * folded into the chart and fundamental cache keys.
+ *
+ * This is the single named source of the read/write key contract: every app
+ * site that builds an analysis cache key derives the fingerprint through this
+ * helper, so the submit (write) and peek (read) paths cannot drift. Because
+ * {@link loadSkillsCached} is memoized, repeated calls reuse the loaded catalog.
+ *
+ * `pollAnalysis` is the intentional exception — it fingerprints its own
+ * provider-loaded `skills` (the load that fed `enrichAnalysisWithConfidence`),
+ * so the cached label always matches the data actually used by that path.
+ *
+ * @returns 16-character lowercase hex prefix of the SHA-256 digest.
+ * @internal
+ */
+export async function getSkillCatalogFingerprint(): Promise<string> {
+    const { skills } = await loadSkillsCached();
+    return hashSkillCatalog(skills);
 }
 
 /**
@@ -311,7 +501,7 @@ export class FileSkillsLoader implements SkillsProvider {
             })
         );
 
-        return skills.filter((s): s is Skill => s !== null);
+        return dedupeByName(skills.filter((s): s is Skill => s !== null));
     }
 }
 

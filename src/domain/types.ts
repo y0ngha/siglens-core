@@ -531,6 +531,142 @@ export interface Skill {
     confidenceWeight: number;
     content: string;
     display?: SkillDisplay;
+    /**
+     * Dynamic-gating metadata parsed from the skill's frontmatter. When absent,
+     * the skill is treated as untagged and the skill selector includes it
+     * fail-open (never silently dropped).
+     */
+    gating?: SkillGating;
+    /**
+     * Build-time precomputed token count of the skill body. Tokenizers are I/O
+     * and therefore forbidden in the domain layer, so this value is baked into
+     * the frontmatter by a build script and read here as plain metadata.
+     */
+    tokenCost?: number;
+    /**
+     * Marks the single Smart Money Concepts full-guide skill. Set from the
+     * `smc_full_guide: true` frontmatter flag (snake_case, repo convention).
+     * The prompt builder buckets this skill specially (replaced by a compressed
+     * concept note), so identifying it by an explicit flag rather than by
+     * display name keeps the routing stable if the skill is renamed.
+     */
+    smcFullGuide?: boolean;
+}
+
+/**
+ * @internal
+ * Which gating path a gated {@link SkillGating} entry uses.
+ *
+ * - `'event'` — gate on transient `detectSignals` events (cross / flip /
+ *   breakout) via the variant's `triggers` list.
+ * - `'state'` — gate on a persistent textbook condition (overbought, band
+ *   proximity, …) via the variant's `state` predicate.
+ *
+ * Not part of the public API: `SkillGating` discriminates on inline
+ * `signalKind` literals, so this type is referenced only by the loader's
+ * frontmatter validation, never by the public transitive closure.
+ */
+export type SignalKind = 'event' | 'state';
+
+/**
+ * Indicator feature a state predicate inspects. Each maps to a field of
+ * {@link IndicatorResult} that the `detectSignals` catalog under-covers, so it
+ * is gated on a textbook *state* threshold rather than a discrete event.
+ */
+export type SkillStateFeature =
+    | 'bollinger'
+    | 'keltner'
+    | 'williamsR'
+    | 'stochastic'
+    | 'stochRsi'
+    | 'donchian'
+    | 'vwap'
+    | 'buySellVolume';
+
+/**
+ * Predicate key selecting how a feature's current value is compared against a
+ * textbook threshold.
+ *
+ * - `'pctB'` — Bollinger %B vs timeframe-aware hi/lo bounds.
+ * - `'bandDistAtr'` — distance to a channel band measured in ATR multiples.
+ * - `'level'` — raw oscillator value vs overbought/oversold bounds.
+ * - `'ratio'` — a 0–1 ratio (e.g. buy/(buy+sell)) vs hi/lo bounds.
+ * - `'channelProximity'` — proximity to (or breach of) a channel high/low.
+ */
+export type SkillStatePredicateKind =
+    | 'pctB'
+    | 'bandDistAtr'
+    | 'level'
+    | 'ratio'
+    | 'channelProximity';
+
+/**
+ * A textbook *state* predicate: "this indicator feature is currently notable".
+ *
+ * The thresholds backing each `(feature, predicate)` pair live as named
+ * constants inside `skillGatingPredicates.ts`; `hi`/`lo` are optional manual
+ * overrides for the rare skill that needs a non-default bound.
+ */
+export interface SkillStatePredicate {
+    /** Indicator feature inspected. */
+    feature: SkillStateFeature;
+    /** How the feature's value is compared (percent-B, band distance, …). */
+    predicate: SkillStatePredicateKind;
+    /** Upper / overbought threshold override (optional). */
+    hi?: number;
+    /** Lower / oversold threshold override (optional). */
+    lo?: number;
+}
+
+/**
+ * Frontmatter gating metadata controlling whether a skill is injected into the
+ * chart prompt. A discriminated union on `tier` (then `signalKind` for the gated
+ * arm) so each variant carries exactly the fields its path needs — there is no
+ * optional `triggers` / `state` that could be present on the wrong tier.
+ *
+ * - `tier: 'always_on'` — injected unconditionally (Tier-0).
+ * - `tier: 'gated'`, `signalKind: 'event'` — injected when one of `triggers` is
+ *   present in the detected signals/candles.
+ * - `tier: 'gated'`, `signalKind: 'state'` — injected when `state` evaluates
+ *   notable for the current chart.
+ */
+export type SkillGating =
+    | { readonly tier: 'always_on' }
+    | {
+          readonly tier: 'gated';
+          readonly signalKind: 'event';
+          /** Event path: `detectSignals` signal names that load this skill. */
+          readonly triggers: readonly string[];
+      }
+    | {
+          readonly tier: 'gated';
+          readonly signalKind: 'state';
+          /** State path: textbook predicate that loads this skill when notable. */
+          readonly state: SkillStatePredicate;
+      };
+
+/**
+ * @internal
+ * Read-only chart context consumed by the skill selector and the state
+ * predicates. Every field is already in scope inside `buildAnalysisPrompt`, so
+ * the selector stays a pure function of already-computed data (no I/O).
+ */
+export interface SkillSelectionContext {
+    /** Indicator suite for the analyzed bars (state predicates read its last values). */
+    indicators: IndicatorResult;
+    /** Result of {@link detectSignals} — drives the event gating path. */
+    signals: readonly Signal[];
+    /** Timeframe of the analyzed bars; drives TF-aware thresholds. */
+    timeframe: Timeframe;
+    /** Candle pattern names detected on the analyzed bars. */
+    detectedCandles: readonly string[];
+    /**
+     * Last close of the analyzed bars. Channel/band/VWAP state predicates need
+     * the spot price, which `IndicatorResult` does not carry on its own.
+     */
+    price: number;
+    /** ATR as a percent of price (`ATR / price * 100`) for ATR-extreme promotion. */
+    atrPercent: number;
 }
 
 /** Lightweight skill summary used for showcase / listing UIs. */
