@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import {
+    buildAnalysisPrompt,
+    ATR_EXTREME_PERCENT_DAILY,
+    SMC_STRUCTURE_BREAK_RECENCY_BARS,
+} from '@/domain/analysis/prompt';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { calculateIndicators } from '@/domain/indicators';
@@ -232,9 +236,11 @@ describe('ATR-extreme sizing note', () => {
         );
         expect(out).not.toMatch(/Extreme Volatility/i);
     });
-    // Boundary-equality: ATR% exactly at the daily threshold (6%) must append the
-    // note (the gate uses >=). Inject atr directly so atrPercent = (6/100)*100 = 6.0.
-    it('appends the sizing note exactly at the 6% daily threshold (>=)', () => {
+    // Boundary-equality: ATR% exactly at the daily threshold must append the note
+    // (the gate uses >=). With price=100, atr=ATR_EXTREME_PERCENT_DAILY gives
+    // atrPercent = (threshold/100)*100 = threshold. The threshold is read from the
+    // source constant so a change surfaces here rather than passing on a stale literal.
+    it('appends the sizing note exactly at the daily ATR% threshold (>=)', () => {
         const bars: Bar[] = Array.from({ length: 60 }, (_, i) => ({
             time: 1_700_000_000 + i * 86_400,
             open: 100,
@@ -247,7 +253,10 @@ describe('ATR-extreme sizing note', () => {
             TEST_SYMBOL,
             TEST_COMPANY,
             bars,
-            { ...emptyIndicators(), atr: [...new Array(59).fill(null), 6] },
+            {
+                ...emptyIndicators(),
+                atr: [...new Array(59).fill(null), ATR_EXTREME_PERCENT_DAILY],
+            },
             [],
             '1Day'
         );
@@ -256,45 +265,42 @@ describe('ATR-extreme sizing note', () => {
 });
 
 describe('SMC concept-note recency boundary', () => {
-    // formatSmcConceptNote skips only when barsAgo > SMC_STRUCTURE_BREAK_RECENCY_BARS (10),
-    // so a structure break exactly 10 bars ago still emits the note; 11 bars ago does not.
-    it('emits the concept note exactly at the 10-bar boundary (barsAgo === 10)', () => {
-        const bars = makeBars(30, 100); // latest bar index = 29
-        const indicators: IndicatorResult = {
-            ...emptyIndicators(),
-            smc: {
-                ...EMPTY_SMC_RESULT,
-                // barsAgo = (30 - 1) - 19 = 10
-                structureBreaks: [
-                    {
-                        index: 19,
-                        price: 100,
-                        type: 'bullish',
-                        breakType: 'bos',
-                    },
-                ],
-            },
-        };
+    // formatSmcConceptNote skips only when barsAgo > SMC_STRUCTURE_BREAK_RECENCY_BARS,
+    // so a break exactly `window` bars ago still emits the note; window+1 does not.
+    // The break index is derived from the source constant (barsAgo = totalBars-1-index),
+    // so a window change surfaces here rather than passing on a stale literal.
+    const indicatorsWithBreakBarsAgo = (
+        totalBars: number,
+        barsAgo: number
+    ): IndicatorResult => ({
+        ...emptyIndicators(),
+        smc: {
+            ...EMPTY_SMC_RESULT,
+            structureBreaks: [
+                {
+                    index: totalBars - 1 - barsAgo,
+                    price: 100,
+                    type: 'bullish',
+                    breakType: 'bos',
+                },
+            ],
+        },
+    });
+    it('emits the concept note exactly at the recency boundary (barsAgo === window)', () => {
+        const bars = makeBars(30, 100);
+        const indicators = indicatorsWithBreakBarsAgo(
+            bars.length,
+            SMC_STRUCTURE_BREAK_RECENCY_BARS
+        );
         const out = build([], bars, indicators);
         expect(out).toContain('Smart Money Concepts — Concept Note');
     });
-    it('omits the concept note one bar past the boundary (barsAgo === 11)', () => {
+    it('omits the concept note one bar past the recency boundary (window + 1)', () => {
         const bars = makeBars(30, 100);
-        const indicators: IndicatorResult = {
-            ...emptyIndicators(),
-            smc: {
-                ...EMPTY_SMC_RESULT,
-                // barsAgo = (30 - 1) - 18 = 11 > 10
-                structureBreaks: [
-                    {
-                        index: 18,
-                        price: 100,
-                        type: 'bullish',
-                        breakType: 'bos',
-                    },
-                ],
-            },
-        };
+        const indicators = indicatorsWithBreakBarsAgo(
+            bars.length,
+            SMC_STRUCTURE_BREAK_RECENCY_BARS + 1
+        );
         const out = build([], bars, indicators);
         expect(out).not.toContain('Smart Money Concepts — Concept Note');
     });
