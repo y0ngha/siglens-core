@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import {
+    buildAnalysisPrompt,
+    ATR_EXTREME_PERCENT_DAILY,
+    SMC_STRUCTURE_BREAK_RECENCY_BARS,
+} from '@/domain/analysis/prompt';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { calculateIndicators } from '@/domain/indicators';
@@ -231,6 +235,74 @@ describe('ATR-extreme sizing note', () => {
             '1Day'
         );
         expect(out).not.toMatch(/Extreme Volatility/i);
+    });
+    // Boundary-equality: ATR% exactly at the daily threshold must append the note
+    // (the gate uses >=). With price=100, atr=ATR_EXTREME_PERCENT_DAILY gives
+    // atrPercent = (threshold/100)*100 = threshold. The threshold is read from the
+    // source constant so a change surfaces here rather than passing on a stale literal.
+    it('appends the sizing note exactly at the daily ATR% threshold (>=)', () => {
+        const bars: Bar[] = Array.from({ length: 60 }, (_, i) => ({
+            time: 1_700_000_000 + i * 86_400,
+            open: 100,
+            high: 100,
+            low: 100,
+            close: 100,
+            volume: 1_000_000,
+        }));
+        const out = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            bars,
+            {
+                ...emptyIndicators(),
+                atr: [...new Array(59).fill(null), ATR_EXTREME_PERCENT_DAILY],
+            },
+            [],
+            '1Day'
+        );
+        expect(out).toMatch(/Extreme Volatility/i);
+    });
+});
+
+describe('SMC concept-note recency boundary', () => {
+    // formatSmcConceptNote skips only when barsAgo > SMC_STRUCTURE_BREAK_RECENCY_BARS,
+    // so a break exactly `window` bars ago still emits the note; window+1 does not.
+    // The break index is derived from the source constant (barsAgo = totalBars-1-index),
+    // so a window change surfaces here rather than passing on a stale literal.
+    const indicatorsWithBreakBarsAgo = (
+        totalBars: number,
+        barsAgo: number
+    ): IndicatorResult => ({
+        ...emptyIndicators(),
+        smc: {
+            ...EMPTY_SMC_RESULT,
+            structureBreaks: [
+                {
+                    index: totalBars - 1 - barsAgo,
+                    price: 100,
+                    type: 'bullish',
+                    breakType: 'bos',
+                },
+            ],
+        },
+    });
+    it('emits the concept note exactly at the recency boundary (barsAgo === window)', () => {
+        const bars = makeBars(30, 100);
+        const indicators = indicatorsWithBreakBarsAgo(
+            bars.length,
+            SMC_STRUCTURE_BREAK_RECENCY_BARS
+        );
+        const out = build([], bars, indicators);
+        expect(out).toContain('Smart Money Concepts — Concept Note');
+    });
+    it('omits the concept note one bar past the recency boundary (window + 1)', () => {
+        const bars = makeBars(30, 100);
+        const indicators = indicatorsWithBreakBarsAgo(
+            bars.length,
+            SMC_STRUCTURE_BREAK_RECENCY_BARS + 1
+        );
+        const out = build([], bars, indicators);
+        expect(out).not.toContain('Smart Money Concepts — Concept Note');
     });
 });
 

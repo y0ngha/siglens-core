@@ -621,8 +621,11 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
 // (formatSMCSection) stays as the data anchor; a compressed concept note is
 // added only when a structure break is recent enough to be actionable.
 
-/** Recency window (in bars) within which a BOS/CHoCH justifies the SMC note. */
-const SMC_STRUCTURE_BREAK_RECENCY_BARS = 10;
+/**
+ * @internal Recency window (in bars) within which a BOS/CHoCH justifies the SMC
+ * note. Exported only so the boundary test reads this exact value.
+ */
+export const SMC_STRUCTURE_BREAK_RECENCY_BARS = 10;
 
 /**
  * @internal
@@ -1181,7 +1184,8 @@ const buildAnalysisRequest = (
 // dropped — even if the gated sizing guide did not fire. The threshold is
 // timeframe-aware: a 6% daily ATR is extreme, but intraday bars routinely show
 // 2%+ ATR, so the intraday bar is lower.
-const ATR_EXTREME_PERCENT_DAILY = 6;
+/** @internal Exported only so the boundary test reads this exact threshold. */
+export const ATR_EXTREME_PERCENT_DAILY = 6;
 const ATR_EXTREME_PERCENT_INTRADAY = 2;
 const DAILY_TIMEFRAME: Timeframe = '1Day';
 

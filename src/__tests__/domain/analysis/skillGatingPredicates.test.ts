@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { isStateNotable } from '@/domain/analysis/skillGatingPredicates';
+import {
+    isStateNotable,
+    BOLLINGER_PCTB_BY_TF,
+} from '@/domain/analysis/skillGatingPredicates';
 import type {
     BollingerResult,
     BuySellVolumeResult,
@@ -169,6 +172,32 @@ describe('isStateNotable — bollinger pctB (TF-aware)', () => {
             bollinger: { lower: 100, middle: 100, upper: 100 },
         });
         expect(isStateNotable(P('bollinger', 'pctB'), ctx)).toBe(false);
+    });
+    // Boundary-equality: %B exactly at each TF's hi bound must fire (isOutsideBounds uses >=).
+    // The bound is read from the source constant (not a literal) so a threshold change
+    // surfaces here. A band [0,1] makes %B = (price-0)/(1-0) = price = hi exactly.
+    const hiBound = (tf: Timeframe): number => {
+        const bounds = BOLLINGER_PCTB_BY_TF[tf];
+        if (!bounds) throw new Error(`no %B bound configured for ${tf}`);
+        return bounds.hi;
+    };
+    const firesAtHiBoundary = (tf: Timeframe): boolean => {
+        const hi = hiBound(tf);
+        const ctx = makeCtx({
+            timeframe: tf,
+            price: hi,
+            bollinger: { lower: 0, middle: hi / 2, upper: 1 },
+        });
+        return isStateNotable(P('bollinger', 'pctB'), ctx);
+    };
+    it('fires exactly at the 1Day hi boundary (pctB === hi)', () => {
+        expect(firesAtHiBoundary('1Day')).toBe(true);
+    });
+    it('fires exactly at the 1Hour hi boundary (pctB === hi)', () => {
+        expect(firesAtHiBoundary('1Hour')).toBe(true);
+    });
+    it('fires exactly at the 15Min hi boundary (pctB === hi)', () => {
+        expect(firesAtHiBoundary('15Min')).toBe(true);
     });
 });
 

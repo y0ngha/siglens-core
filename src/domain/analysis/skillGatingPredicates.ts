@@ -17,10 +17,13 @@ interface PctBBounds {
 }
 
 /**
+ * @internal Exported only so boundary tests read each timeframe's exact %B bound
+ * instead of re-hardcoding the literal (a false-positive guard if it changes).
+ *
  * Bollinger %B is stricter on higher timeframes: an extreme reading on a daily
  * chart is more meaningful, so it demands a tighter bound than a 15-minute one.
  */
-const BOLLINGER_PCTB_BY_TF: Partial<Record<Timeframe, PctBBounds>> = {
+export const BOLLINGER_PCTB_BY_TF: Partial<Record<Timeframe, PctBBounds>> = {
     '1Day': { hi: 0.98, lo: 0.02 },
     '1Hour': { hi: 0.95, lo: 0.05 },
     '15Min': { hi: 0.92, lo: 0.08 },
