@@ -195,6 +195,125 @@ Body`;
         expect(skills[0].gating).toBeUndefined();
     });
 
+    it('drops a gated block whose signal_kind is an unknown literal (parseGating reject)', async () => {
+        // `signal_kind: momentum` is not in SIGNAL_KINDS (event | state). These
+        // .md files are untrusted authored input, so the rejection path must
+        // fail safe to `undefined` rather than produce a malformed gating shape.
+        const badSignalKind = `---
+name: Bad Signal Kind
+description: signal_kind is not event or state
+type: pattern
+category: neutral
+indicators: []
+confidence_weight: 0.7
+gating:
+  tier: gated
+  signal_kind: momentum
+  triggers: [rsi_oversold]
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('bad-signal-kind.md')]);
+        mockReadFile.mockResolvedValue(badSignalKind);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills).toHaveLength(1);
+        expect(skills[0].gating).toBeUndefined();
+    });
+
+    it('drops a state block whose feature is unknown (parseStatePredicate reject)', async () => {
+        // `feature: momentum` is not in SKILL_STATE_FEATURES — parseStatePredicate
+        // returns undefined, which bubbles up to drop the whole gating block.
+        const badFeature = `---
+name: Bad State Feature
+description: state.feature is not a known feature
+type: indicator_guide
+category: neutral
+indicators: []
+confidence_weight: 0.8
+gating:
+  tier: gated
+  signal_kind: state
+  state:
+    feature: momentum
+    predicate: pctB
+    hi: 0.98
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('bad-feature.md')]);
+        mockReadFile.mockResolvedValue(badFeature);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].gating).toBeUndefined();
+    });
+
+    it('drops a state block whose predicate is unknown (parseStatePredicate reject)', async () => {
+        // `predicate: slope` is not in SKILL_STATE_PREDICATE_KINDS — the
+        // predicate is rejected and the gating block falls back to undefined.
+        const badPredicate = `---
+name: Bad State Predicate
+description: state.predicate is not a known predicate kind
+type: indicator_guide
+category: neutral
+indicators: []
+confidence_weight: 0.8
+gating:
+  tier: gated
+  signal_kind: state
+  state:
+    feature: bollinger
+    predicate: slope
+    hi: 0.98
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('bad-predicate.md')]);
+        mockReadFile.mockResolvedValue(badPredicate);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].gating).toBeUndefined();
+    });
+
+    it('parses a state predicate with neither hi nor lo (both optional bounds omitted)', async () => {
+        // A `level`/`channelProximity`-style predicate may carry no numeric
+        // bound. Both conditional spreads in parseStatePredicate fall to their
+        // empty-object branch, so the predicate is valid but has no hi/lo keys.
+        const noBounds = `---
+name: Bound-free State
+description: state predicate with no hi and no lo
+type: indicator_guide
+category: neutral
+indicators: []
+confidence_weight: 0.8
+gating:
+  tier: gated
+  signal_kind: state
+  state:
+    feature: vwap
+    predicate: level
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('no-bounds.md')]);
+        mockReadFile.mockResolvedValue(noBounds);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].gating).toEqual({
+            tier: 'gated',
+            signalKind: 'state',
+            state: { feature: 'vwap', predicate: 'level' },
+        });
+        // Both optional bounds were omitted, not set to undefined.
+        if (
+            skills[0].gating?.tier === 'gated' &&
+            skills[0].gating.signalKind === 'state'
+        ) {
+            expect('hi' in skills[0].gating.state).toBe(false);
+            expect('lo' in skills[0].gating.state).toBe(false);
+        }
+    });
+
     it('ignores a non-numeric token_cost', async () => {
         const badToken = `---
 name: Bad Token

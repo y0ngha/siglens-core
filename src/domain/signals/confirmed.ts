@@ -372,6 +372,10 @@ export function detectMfiOversoldBounce(
     _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
+    // Consistency guard: every sibling cross detector (CCI/CMF/squeeze) bails on
+    // fewer than 2 samples before calling findThresholdCross. Safe at runtime
+    // either way, but kept uniform so the detectors read identically.
+    if (indicators.mfi.length < 2) return null;
     const idx = findThresholdCross(
         indicators.mfi,
         MFI_OVERSOLD_LEVEL,
@@ -392,6 +396,10 @@ export function detectMfiOverboughtReversal(
     _bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
+    // Consistency guard: every sibling cross detector (CCI/CMF/squeeze) bails on
+    // fewer than 2 samples before calling findThresholdCross. Safe at runtime
+    // either way, but kept uniform so the detectors read identically.
+    if (indicators.mfi.length < 2) return null;
     const idx = findThresholdCross(
         indicators.mfi,
         MFI_OVERBOUGHT_LEVEL,
