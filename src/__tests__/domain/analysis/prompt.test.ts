@@ -3806,6 +3806,28 @@ describe('prompt', () => {
             expect(result).toContain('is in premium zone');
         });
 
+        it('classifies the snapshot price as "discount" when at/below the discount high and no premium match', () => {
+            // classifyPriceZone else-arm coverage: with premium null the first
+            // branch is skipped, and price (last close ≈ 145) <= discountZone.high
+            // (150) selects the 'discount' arm. The premium-zone test above only
+            // exercises the 'premium' branch.
+            const discountBars = Array.from({ length: 5 }, (_, i) =>
+                makeBar(i, 145)
+            );
+            const smc: SMCResult = {
+                ...EMPTY_SMC_RESULT,
+                discountZone: { high: 150.0, low: 140.0, type: 'discount' },
+            };
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                discountBars,
+                makeIndicators({ smc })
+            );
+            expect(result).toContain('is in discount zone');
+            expect(result).not.toContain('is in premium zone');
+        });
+
         it('labels SMC price-zone line as "Snapshot Price" (not "Current price")', () => {
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,
@@ -4028,6 +4050,44 @@ describe('prompt', () => {
                 makeIndicators({ squeezeMomentum: data })
             );
             expect(result).toMatch(/Squeeze Momentum.*\[rising]/);
+        });
+
+        it('labels the squeeze state "squeeze OFF" when sqzOff is set (not ON)', () => {
+            // sqzStateLabel: sqzOn false + sqzOff true → the first else-arm
+            // ('squeeze OFF'). Without this case only the 'squeeze ON' arm is
+            // exercised by the duration tests above.
+            const data: SqueezeMomentumResult[] = [
+                makeSqz({ momentum: 1.0, sqzOff: true }),
+                makeSqz({ momentum: 1.5, sqzOff: true }),
+            ];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({ squeezeMomentum: data })
+            );
+            expect(result).toContain('squeeze OFF');
+            expect(result).not.toContain('squeeze ON');
+            expect(result).not.toContain('no squeeze');
+        });
+
+        it('labels the squeeze state "no squeeze" when neither sqzOn nor sqzOff is set', () => {
+            // sqzStateLabel: both flags falsy → the final fallthrough arm
+            // ('no squeeze'). momentum must be non-null so the line is not the
+            // N/A early-return.
+            const data: SqueezeMomentumResult[] = [
+                makeSqz({ momentum: 1.0 }),
+                makeSqz({ momentum: 1.5 }),
+            ];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({ squeezeMomentum: data })
+            );
+            expect(result).toContain('no squeeze');
+            expect(result).not.toContain('squeeze ON');
+            expect(result).not.toContain('squeeze OFF');
         });
     });
 

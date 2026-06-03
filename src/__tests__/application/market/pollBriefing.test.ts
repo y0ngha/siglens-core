@@ -166,7 +166,10 @@ describe('pollBriefing 함수는', () => {
             );
         });
 
-        it('job meta가 없으면(null이면) 캐시 저장을 건너뛴다 (잘못된 키로 쓰지 않음)', async () => {
+        it('job meta가 없으면(null이면) 캐시 저장을 건너뛰고 cacheKey 누락 경고를 남긴다', async () => {
+            const consoleWarnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
             mockGetJobMeta.mockResolvedValueOnce(null);
 
@@ -174,9 +177,17 @@ describe('pollBriefing 함수는', () => {
 
             expect(result.status).toBe('done');
             expect(mockCacheSet).not.toHaveBeenCalled();
+            // C2: the silent cache-miss must now be observable.
+            expect(consoleWarnSpy).toHaveBeenCalledWith(
+                '[Briefing/Poll] meta cacheKey missing — skipping cache write'
+            );
+            consoleWarnSpy.mockRestore();
         });
 
-        it('job meta는 있지만 cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
+        it('job meta는 있지만 cacheKey가 없으면 캐시 저장을 건너뛰고 cacheKey 누락 경고를 남긴다', async () => {
+            const consoleWarnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
             mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
             mockGetJobMeta.mockResolvedValueOnce({ symbol: 'market' });
 
@@ -184,6 +195,30 @@ describe('pollBriefing 함수는', () => {
 
             expect(result.status).toBe('done');
             expect(mockCacheSet).not.toHaveBeenCalled();
+            // C2: distinct warning makes the silent-miss rate measurable in logs.
+            expect(consoleWarnSpy).toHaveBeenCalledWith(
+                '[Briefing/Poll] meta cacheKey missing — skipping cache write'
+            );
+            consoleWarnSpy.mockRestore();
+        });
+
+        it('cacheKey가 있으면 cacheKey 누락 경고를 남기지 않는다', async () => {
+            const consoleWarnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+            mockGetJobResult.mockResolvedValueOnce({ raw: 'data' });
+            mockGetJobMeta.mockResolvedValueOnce({
+                symbol: 'market',
+                cacheKey: 'briefing:market:2025-01-15T12:deadbeefdeadbeef',
+            });
+
+            await pollBriefing('job-has-cachekey');
+
+            expect(mockCacheSet).toHaveBeenCalled();
+            expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+                '[Briefing/Poll] meta cacheKey missing — skipping cache write'
+            );
+            consoleWarnSpy.mockRestore();
         });
 
         it('waitUntil이 제공되면 캐시 저장과 cleanup promise를 등록한다', async () => {

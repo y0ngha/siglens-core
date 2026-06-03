@@ -56,11 +56,19 @@ export const MFI_OVERSOLD_LEVEL = 20; // MFI 20 상향 돌파 (과매도 반등)
 /** @internal Squeeze-momentum zero line whose upward cross marks a bullish flip. */
 export const SQUEEZE_MOMENTUM_ZERO_CROSS = 0; // 히스토그램 0 상향 돌파
 
-// ─── Bearish detector thresholds (mirror of the bullish set) ─────────────────
+// ─── Bearish detector thresholds (mostly mirror the bullish set, with one
+// deliberate asymmetry) ──────────────────────────────────────────────────────
 // keltner / ichimoku / supertrend / parabolic-sar bearish detectors need no
 // threshold constant — they are judged by channel breach or trend flip.
 // DMI bearish reuses DMI_ADX_TREND_THRESHOLD; squeeze bearish reuses
 // SQUEEZE_MOMENTUM_ZERO_CROSS (only the cross direction differs).
+//
+// NOT a strict mirror: CCI_BEARISH_CROSS_LEVEL is intentionally 0, NOT the
+// symmetric -100. The bearish-momentum trigger is a downward cross of the CCI
+// zero line (matching CMF_BEARISH_CROSS_LEVEL = 0), not a plunge through the
+// oversold floor. Do NOT "fix" it to -100 to make it look symmetric with
+// CCI_BULLISH_CROSS_LEVEL (+100) — that would change the detector's meaning and
+// regress the signal.
 
 /**
  * @internal CCI level whose downward cross triggers an overbought-exit signal.

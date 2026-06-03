@@ -623,6 +623,36 @@ Body`;
         expect(skills[0].indicators).toEqual([]);
     });
 
+    it('블록 중간에서 들여쓰기가 얕아지면(mid-block dedent) 블록을 비우고 후속 키는 계속 파싱한다', async () => {
+        // The `gating` block opens at indent 0, so its child lines are sliced by
+        // `childIndent > 0` and parsed at baseIndent 2. The child here is indented
+        // by ONE space (indent 1 < 2), so the recursive parseYamlBlock hits its
+        // `break` branch immediately — leaving `gating` an empty object. Parsing
+        // then resumes at the top level, so `description` after the dedent is still
+        // read. Untrusted authored `.md` files can be mis-indented like this, so the
+        // loader must degrade (drop the malformed block) rather than throw or
+        // swallow the rest of the frontmatter.
+        const fm = `---
+name: Mid Block Dedent
+gating:
+ tier: gated
+description: parsed after the dedent
+---
+Body`;
+        mockReaddir.mockResolvedValue([makeDirent('mid-dedent.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills).toHaveLength(1);
+        expect(skills[0].name).toBe('Mid Block Dedent');
+        // The dedented `gating` block parsed to an empty object → parseGating
+        // sees no valid `tier` → gating is undefined (fail-open).
+        expect(skills[0].gating).toBeUndefined();
+        // Frontmatter parsing recovered and read the key after the dedent.
+        expect(skills[0].description).toBe('parsed after the dedent');
+    });
+
     it('최상위에서 더 깊게 들여쓴 줄(deeper)과 빈 줄(skip)은 건너뛴다', async () => {
         // The leading indented line hits the `deeper` branch and the blank
         // line hits the `skip` branch of parseYamlBlock's classify loop.

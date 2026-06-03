@@ -81,7 +81,17 @@ export async function pollBriefing(
     // reconstruct a key that would diverge from the submit-side lookup.
     const cacheKey = meta?.cacheKey;
     const cache = createCacheProvider();
-    if (cacheKey !== undefined && cache !== null) {
+    if (cacheKey === undefined) {
+        // Observability: the meta cacheKey is the ONLY way this path can write
+        // under the submit-side lookup key (the input hash cannot be
+        // reconstructed here). When it is absent — e.g. the job meta TTL expired
+        // before the poll landed — the briefing is silently NOT cached, so every
+        // subsequent identical request regenerates it. Emit a distinct warning so
+        // the silent-miss rate is measurable in logs rather than invisible.
+        console.warn(
+            '[Briefing/Poll] meta cacheKey missing — skipping cache write'
+        );
+    } else if (cache !== null) {
         fireAndForget(
             cache
                 .set(

@@ -153,6 +153,20 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * in a way that would make previously cached results stale. Old keys (e.g.
  * `p1`) are simply never looked up after a bump and naturally expire via TTL.
  *
+ * @remarks
+ * **Distinct from the skill-catalog fingerprint axis.** The chart and
+ * fundamental keys also carry an optional `skillFingerprint` segment (see
+ * {@link buildAnalysisCacheKey} / `hashSkillCatalog`). That fingerprint folds the
+ * *entire loaded catalog's* selection metadata (every skill's
+ * `name`/`gating`/`tokenCost`), so editing the frontmatter of ANY single skill
+ * changes the fingerprint and therefore busts the chart + fundamental cache for
+ * EVERY symbol and timeframe at once — opening a cold-cache window (a burst of
+ * regeneration / LLM cost) after any skill edit until the cache re-warms. This is
+ * a separate invalidation axis from this `PROMPT_TEMPLATE_VERSION` string: bump
+ * this lever for prompt-template wording changes; the skill-fingerprint axis
+ * moves automatically on any skill-frontmatter edit. Stage skill edits with that
+ * fleet-wide cold-cache cost in mind.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p1' as const;

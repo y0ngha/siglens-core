@@ -609,6 +609,16 @@ describe('detectMfiOverboughtReversal', () => {
         });
     });
 
+    describe('MFI 데이터가 1개뿐일 때', () => {
+        it('null을 반환한다 (length < 2 가드 — 형제 디텍터와 일관)', () => {
+            // C4b: detectMfiOverboughtReversal now carries the same
+            // `indicators.mfi.length < 2` early-return that CCI/CMF/squeeze
+            // siblings have. A single sample cannot form a cross.
+            const bars = buildBars(5);
+            expect(detectMfiOverboughtReversal(bars, withMfi([85]))).toBeNull();
+        });
+    });
+
     describe('MFI 데이터가 없을 때', () => {
         it('null을 반환한다', () => {
             expect(
