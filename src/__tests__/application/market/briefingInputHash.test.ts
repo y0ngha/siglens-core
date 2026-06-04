@@ -39,6 +39,11 @@ describe('hashBriefingInput', () => {
         const b = hashBriefingInput([], [sec('XLK', 9, 0)]);
         expect(a).not.toBe(b);
     });
+    it('(Worst) changesPercentage 변동 시 해시 변경', () => {
+        const a = hashBriefingInput([], [sec('XLK', 1, 0)]);
+        const b = hashBriefingInput([], [sec('XLK', 1, 5.5)]);
+        expect(a).not.toBe(b);
+    });
     it('(Worst) 빈 입력도 결정적 해시', () => {
         expect(hashBriefingInput([], [])).toBe(hashBriefingInput([], []));
     });
