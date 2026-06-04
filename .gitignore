@@ -45,7 +45,6 @@ yarn-error.log*
 /.claude/projects/
 /.claude/worktrees/
 /.superpowers/
-/docs/superpowers/
 /.claire/
 
 # local-only TODO file
