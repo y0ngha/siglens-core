@@ -49,6 +49,21 @@ export * from './donchianChannel';
 export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
+// Pro-indicators Phase 1 — calculation functions only.
+// IndicatorResult / calculateIndicators / prompt wiring is deferred to Phase 3
+// (after the Phase 2 validation gate decides which indicators survive).
+export * from './macdV';
+export * from './connorsRsi';
+export * from './forceIndex';
+export * from './elderRay';
+export * from './elderImpulse';
+export * from './bollingerDerived';
+export * from './chandelierExit';
+export * from './ewmaVolatility';
+export * from './yangZhang';
+export * from './hurst';
+export * from './varianceRatio';
+export * from './regression';
 export {
     computeFearGreedIndex,
     computeFearGreedHistory,

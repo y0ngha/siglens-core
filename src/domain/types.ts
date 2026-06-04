@@ -484,6 +484,69 @@ export interface IndicatorResult {
     squeezeMomentum: SqueezeMomentumResult[];
 }
 
+// ─── Pro Indicators Phase 1 ──────────────────────────────────────────────────
+
+/**
+ * @internal Bull Power / Bear Power output from Elder-Ray.
+ * `null` during the EMA warm-up window.
+ */
+export interface ElderRayResult {
+    bullPower: number | null;
+    bearPower: number | null;
+}
+
+/**
+ * @internal Elder Impulse System bar color.
+ * `green` = EMA rising AND MACD histogram rising (bullish momentum).
+ * `red`   = EMA falling AND MACD histogram falling (bearish momentum).
+ * `blue`  = mixed signals (neutral / transitional).
+ */
+export type ImpulseColor = 'green' | 'red' | 'blue';
+
+/**
+ * @internal Chandelier Exit position side: holding a long or short position.
+ */
+export type ChandelierTrend = 'long' | 'short';
+
+/**
+ * @internal Per-bar Bollinger %B and BandWidth derived values.
+ * `null` during the Bollinger warm-up window or when the band is degenerate
+ * (zero-width → pctB undefined; zero middle → bandwidth undefined).
+ */
+export interface BollingerDerivedResult {
+    /** (close − lower) / (upper − lower); null when band width = 0. */
+    pctB: number | null;
+    /** (upper − lower) / middle; null when middle = 0 or band is null. */
+    bandwidth: number | null;
+}
+
+/**
+ * @internal Chandelier Exit stop levels and trend direction.
+ * `null` during the ATR / sliding-window warm-up window.
+ */
+export interface ChandelierResult {
+    /** Trailing stop for a long position: highest-high − ATR × multiplier. */
+    longStop: number | null;
+    /** Trailing stop for a short position: lowest-low + ATR × multiplier. */
+    shortStop: number | null;
+    /** Current trend side determined by the Chandelier state machine. */
+    trend: ChandelierTrend | null;
+}
+
+/**
+ * @internal Per-bar linear-regression (OLS) fit over the trailing window.
+ * `null` during the warm-up window; `r2` is `null` when the series is flat
+ * (SS_tot = 0 → coefficient of determination undefined).
+ */
+export interface RegressionResult {
+    /** OLS slope of close vs bar index [0..period-1]. */
+    slope: number | null;
+    /** Coefficient of determination (1 − SS_res/SS_tot); null when SS_tot = 0. */
+    r2: number | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * How a chart-display directive should render (line / marker / region).
  */

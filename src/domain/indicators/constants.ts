@@ -169,3 +169,66 @@ export const MEDIUM_CONFIDENCE_WEIGHT = 0.7;
 export const MIN_CONFIDENCE_WEIGHT = 0.5;
 /** @internal Confidence weight applied when no skill matches a signal. */
 export const UNMATCHED_SKILL_CONFIDENCE_WEIGHT = 0;
+
+// ─── Pro Indicators Phase 1 ──────────────────────────────────────────────────
+
+/** @internal MACD-V ATR normalization period (same as MACD slow period). */
+export const MACD_V_ATR_PERIOD = 26;
+/** @internal MACD-V scale factor (express as percentage). */
+export const MACD_V_SCALE = 100;
+
+/** @internal Connors RSI — close RSI period. */
+export const CRSI_RSI_PERIOD = 3;
+/** @internal Connors RSI — streak RSI period. */
+export const CRSI_STREAK_PERIOD = 2;
+/** @internal Connors RSI — percent-rank lookback period. */
+export const CRSI_PCTRANK_PERIOD = 100;
+/** @internal Connors RSI — number of components averaged. */
+export const CRSI_COMPONENT_COUNT = 3;
+
+/** @internal Force Index EMA smoothing period. */
+export const FORCE_INDEX_PERIOD = 13;
+
+/** @internal Elder-Ray EMA period. */
+export const ELDER_RAY_PERIOD = 13;
+
+/** @internal Elder Impulse EMA period. */
+export const ELDER_IMPULSE_EMA_PERIOD = 13;
+
+/** @internal Chandelier Exit ATR lookback period. */
+export const CHANDELIER_PERIOD = 22;
+/** @internal Chandelier Exit ATR band multiplier. */
+export const CHANDELIER_ATR_MULT = 3;
+
+/** @internal EWMA volatility decay factor (RiskMetrics standard). */
+export const EWMA_LAMBDA = 0.94;
+
+/** @internal Yang-Zhang volatility rolling window (bars; needs 1 prior close). */
+export const YANG_ZHANG_PERIOD = 20;
+/** @internal Yang-Zhang k-weight numerator (Yang & Zhang 2000). */
+export const YANG_ZHANG_K_NUM = 0.34;
+/** @internal Yang-Zhang k-weight denominator base (Yang & Zhang 2000). */
+export const YANG_ZHANG_K_DEN_BASE = 1.34;
+
+/** @internal Hurst exponent rolling window of log-returns. */
+export const HURST_WINDOW = 100;
+/** @internal Hurst R/S sub-window divisor — quarter of the window. */
+export const HURST_SUBWINDOW_DIVISOR_QUARTER = 4;
+/** @internal Hurst R/S sub-window divisor — half of the window. */
+export const HURST_SUBWINDOW_DIVISOR_HALF = 2;
+/** @internal Hurst R/S sub-window divisor — the full window. */
+export const HURST_SUBWINDOW_DIVISOR_FULL = 1;
+/** @internal Minimum distinct sub-window lengths required to fit the R/S slope. */
+export const HURST_MIN_SUBWINDOWS = 2;
+/** @internal Hurst exponent clamp lower bound. */
+export const HURST_MIN = 0;
+/** @internal Hurst exponent clamp upper bound. */
+export const HURST_MAX = 1;
+
+/** @internal Variance Ratio aggregation horizon (q-period returns). */
+export const VR_Q = 2;
+/** @internal Variance Ratio rolling window of 1-period returns. */
+export const VR_WINDOW = 60;
+
+/** @internal Linear-regression trailing window (bars). */
+export const REGRESSION_PERIOD = 20;

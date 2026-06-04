@@ -26,7 +26,9 @@ const HORIZONS: Record<Timeframe, number[]> = {
     '30Min': [],
     '4Hour': [],
 };
-const FROM = '2025-05-01';
+// ~2 years of history: the 50/200 golden cross (and slow indicators) need a long
+// warmup, so a wider window yields enough signals for a meaningful forward-edge n.
+const FROM = '2024-06-05';
 const TO = '2026-06-04';
 const GC_FAST = 50;
 const GC_SLOW = 200;
