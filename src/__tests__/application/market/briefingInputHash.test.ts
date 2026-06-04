@@ -34,6 +34,17 @@ describe('hashBriefingInput', () => {
         const b = hashBriefingInput([], [sec('XLF', 2, 0), sec('XLK', 1, 0)]);
         expect(a).toBe(b);
     });
+    it('(Happy) indices 배열 순서 무관 — 정렬로 동일 해시', () => {
+        const a = hashBriefingInput(
+            [idx('^GSPC', 1, 0), idx('^DJI', 2, 0)],
+            []
+        );
+        const b = hashBriefingInput(
+            [idx('^DJI', 2, 0), idx('^GSPC', 1, 0)],
+            []
+        );
+        expect(a).toBe(b);
+    });
     it('(Worst) price 변동 시 해시 변경', () => {
         const a = hashBriefingInput([], [sec('XLK', 1, 0)]);
         const b = hashBriefingInput([], [sec('XLK', 9, 0)]);
