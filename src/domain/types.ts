@@ -2592,7 +2592,7 @@ export interface ForwardReturnStats {
  */
 export interface ForwardEdgeResult {
     horizon: number;
-    direction: 'up' | 'down';
+    direction: ForwardDirection;
     triggerCount: number;
     signal: ForwardReturnStats;
     baseline: ForwardReturnStats;
@@ -2610,3 +2610,12 @@ export interface SanityResult {
     pass: boolean;
     issues: string[];
 }
+
+/**
+ * @internal
+ * Direction a forward-edge signal predicts: `'up'` (price expected to rise) or
+ * `'down'` (price expected to fall). Used across the validation harness in
+ * place of an inline `'up' | 'down'` union. Distinct from {@link SignalDirection}
+ * (`'bullish' | 'bearish'`), which labels a detected signal's bias.
+ */
+export type ForwardDirection = 'up' | 'down';

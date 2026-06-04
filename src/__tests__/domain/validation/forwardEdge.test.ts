@@ -39,5 +39,9 @@ describe('computeForwardEdge', () => {
         const res = computeForwardEdge(closes, [0, 2, 4], 1, 'up');
         expect(Number.isFinite(res.tStat)).toBe(true);
         expect(res.tStat).toBeGreaterThan(0);
+        // Hand-derived: signal returns [0.08, 0.12, 0.16] (mean 0.12, sd 0.04,
+        // n 3); baseline mean ≈ 0.006809 →
+        // tStat = (0.12 − 0.006809) / (0.04 / √3) ≈ 4.90.
+        expect(res.tStat).toBeCloseTo(4.9, 1);
     });
 });

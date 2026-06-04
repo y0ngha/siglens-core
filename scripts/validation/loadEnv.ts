@@ -1,26 +1,22 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 /** Parse `KEY=VALUE` env text into a record. Pure (no I/O). */
 export function parseEnv(text: string): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const rawLine of text.split('\n')) {
+    return text.split('\n').reduce<Record<string, string>>((acc, rawLine) => {
         const line = rawLine.trim();
-        if (line === '' || line.startsWith('#')) continue;
+        if (line === '' || line.startsWith('#')) return acc;
         const eq = line.indexOf('=');
-        if (eq === -1) continue;
+        if (eq === -1) return acc;
         const key = line.slice(0, eq).trim();
-        let value = line.slice(eq + 1).trim();
-        if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-        ) {
-            value = value.slice(1, -1);
-        }
-        if (key !== '') out[key] = value;
-    }
-    return out;
+        if (key === '') return acc;
+        const rawValue = line.slice(eq + 1).trim();
+        const isQuoted =
+            (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+            (rawValue.startsWith("'") && rawValue.endsWith("'"));
+        acc[key] = isQuoted ? rawValue.slice(1, -1) : rawValue;
+        return acc;
+    }, {});
 }
 
 /** Read and parse an `.env` file; returns an empty record when absent. */
@@ -36,9 +32,8 @@ export function loadEnvFile(path: string): Record<string, string> {
 export function requireFmpApiKey(): string {
     const fromProcess = process.env.FMP_API_KEY;
     if (fromProcess) return fromProcess;
-    // Resolve relative to this file's location: scripts/validation/ → Project/siglens/.env.local
-    const thisDir = dirname(fileURLToPath(import.meta.url));
-    const envPath = join(thisDir, '../../../siglens/.env.local');
+    // Resolve relative to this file: scripts/validation/ → Project/siglens/.env.local
+    const envPath = join(import.meta.dirname, '../../../siglens/.env.local');
     const env = loadEnvFile(envPath);
     const key = env.FMP_API_KEY;
     if (!key) {

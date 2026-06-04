@@ -1,4 +1,4 @@
-import type { ForwardReturnStats } from '@/domain/types';
+import type { ForwardDirection, ForwardReturnStats } from '@/domain/types';
 
 /**
  * @internal Directional forward return at index `i` over `horizon` bars.
@@ -10,7 +10,7 @@ export function forwardReturn(
     closes: readonly number[],
     i: number,
     horizon: number,
-    direction: 'up' | 'down'
+    direction: ForwardDirection
 ): number | null {
     const j = i + horizon;
     if (i < 0 || j >= closes.length) return null;
@@ -20,18 +20,30 @@ export function forwardReturn(
     return direction === 'up' ? r : -r;
 }
 
+/**
+ * @internal Directional forward returns over `indices`, dropping out-of-range
+ * or degenerate samples. Shared by {@link aggregateForwardReturns} and the
+ * forward-edge t-stat so `forwardReturn` runs exactly once per index.
+ */
+export function collectValidReturns(
+    closes: readonly number[],
+    indices: readonly number[],
+    horizon: number,
+    direction: ForwardDirection
+): number[] {
+    return indices
+        .map(i => forwardReturn(closes, i, horizon, direction))
+        .filter((r): r is number => r !== null);
+}
+
 /** @internal Aggregate directional forward returns over the given indices. */
 export function aggregateForwardReturns(
     closes: readonly number[],
     indices: readonly number[],
     horizon: number,
-    direction: 'up' | 'down'
+    direction: ForwardDirection
 ): ForwardReturnStats {
-    const returns: number[] = [];
-    for (const i of indices) {
-        const r = forwardReturn(closes, i, horizon, direction);
-        if (r !== null) returns.push(r);
-    }
+    const returns = collectValidReturns(closes, indices, horizon, direction);
     const count = returns.length;
     if (count === 0) return { count: 0, hitRate: 0, meanReturn: 0 };
     const hits = returns.filter(r => r > 0).length;
@@ -43,9 +55,11 @@ export function aggregateForwardReturns(
 export function computeBaseline(
     closes: readonly number[],
     horizon: number,
-    direction: 'up' | 'down'
+    direction: ForwardDirection
 ): ForwardReturnStats {
-    const eligible: number[] = [];
-    for (let i = 0; i + horizon < closes.length; i++) eligible.push(i);
+    const eligible = Array.from(
+        { length: Math.max(0, closes.length - horizon) },
+        (_, i) => i
+    );
     return aggregateForwardReturns(closes, eligible, horizon, direction);
 }

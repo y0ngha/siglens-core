@@ -67,6 +67,7 @@ describe('computeBaseline', () => {
         const base = computeBaseline(closes, 1, 'up');
         expect(base.count).toBe(3);
         expect(base.hitRate).toBeCloseTo(1, 10);
+        expect(base.meanReturn).toBeCloseTo(0.1, 5); // every step is +10%
     });
 
     it('returns zeroed stats when series shorter than horizon (worst case)', () => {

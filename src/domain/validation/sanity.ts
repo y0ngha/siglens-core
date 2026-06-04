@@ -1,6 +1,6 @@
 import type { SanityResult } from '@/domain/types';
 
-interface SanityOptions {
+export interface SanityOptions {
     min?: number;
     max?: number;
     /** Expected number of leading `null` warmup entries. */
@@ -17,36 +17,33 @@ export function checkSanity(
     series: readonly (number | null)[],
     opts: SanityOptions = {}
 ): SanityResult {
-    const issues: string[] = [];
     const label = opts.label ?? 'series';
 
-    let leadingNulls = 0;
-    while (leadingNulls < series.length && series[leadingNulls] === null) {
-        leadingNulls++;
-    }
-    if (
+    const firstNonNull = series.findIndex(v => v !== null);
+    const leadingNulls = firstNonNull === -1 ? series.length : firstNonNull;
+    const warmupIssues =
         opts.expectedWarmup !== undefined &&
         leadingNulls !== opts.expectedWarmup
-    ) {
-        issues.push(
-            `${label}: warmup nulls ${leadingNulls} != expected ${opts.expectedWarmup}`
-        );
-    }
+            ? [
+                  `${label}: warmup nulls ${leadingNulls} != expected ${opts.expectedWarmup}`,
+              ]
+            : [];
 
-    for (let i = 0; i < series.length; i++) {
-        const v = series[i];
-        if (v === null) continue;
+    const valueIssues = series.flatMap((v, i): string[] => {
+        if (v === null) return [];
         if (!Number.isFinite(v)) {
-            issues.push(`${label}: non-finite value at index ${i} (${v})`);
-            continue;
+            return [`${label}: non-finite value at index ${i} (${v})`];
         }
-        if (opts.min !== undefined && v < opts.min) {
-            issues.push(`${label}: value ${v} at ${i} below min ${opts.min}`);
-        }
-        if (opts.max !== undefined && v > opts.max) {
-            issues.push(`${label}: value ${v} at ${i} above max ${opts.max}`);
-        }
-    }
+        return [
+            ...(opts.min !== undefined && v < opts.min
+                ? [`${label}: value ${v} at ${i} below min ${opts.min}`]
+                : []),
+            ...(opts.max !== undefined && v > opts.max
+                ? [`${label}: value ${v} at ${i} above max ${opts.max}`]
+                : []),
+        ];
+    });
 
+    const issues = [...warmupIssues, ...valueIssues];
     return { pass: issues.length === 0, issues };
 }
