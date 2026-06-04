@@ -16,20 +16,24 @@ export function hashBriefingInput(
     indices: readonly MarketIndexData[],
     sectors: readonly MarketSectorData[]
 ): string {
+    // Pin the locale: a locale-free `localeCompare` is environment-dependent and
+    // would produce a different sort order — and therefore a different hash — per
+    // server (e.g. LANG=ko_KR vs en_US), making the write key and the read key
+    // diverge so the peek would always miss.
     const sortedIndices = indices
         .map(i => ({
             fmpSymbol: i.fmpSymbol,
             price: i.price,
             changesPercentage: i.changesPercentage,
         }))
-        .toSorted((a, b) => a.fmpSymbol.localeCompare(b.fmpSymbol));
+        .toSorted((a, b) => a.fmpSymbol.localeCompare(b.fmpSymbol, 'en'));
     const sortedSectors = sectors
         .map(s => ({
             symbol: s.symbol,
             price: s.price,
             changesPercentage: s.changesPercentage,
         }))
-        .toSorted((a, b) => a.symbol.localeCompare(b.symbol));
+        .toSorted((a, b) => a.symbol.localeCompare(b.symbol, 'en'));
     return hashAnalysisInput(
         JSON.stringify({ indices: sortedIndices, sectors: sortedSectors })
     );
