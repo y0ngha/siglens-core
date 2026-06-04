@@ -68,6 +68,9 @@ function intradayToBar(r: FmpRow): Bar {
 async function fetchOnce(url: string): Promise<FmpRow[]> {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // res.json() is typed `unknown`; the FMP success path returns a JSON array.
+    // The Array.isArray() guard on the next line validates the top-level shape;
+    // per-field FmpRow types are assumed from the FMP API contract (dev tooling).
     const json = (await res.json()) as FmpRow[];
     if (!Array.isArray(json)) throw new Error('non-array response');
     return json;
@@ -131,6 +134,9 @@ export async function fetchBarsCached(
     mkdirSync(CACHE_DIR, { recursive: true });
     const path = cachePath(symbol, tf);
     if (!refresh && existsSync(path)) {
+        // JSON.parse returns `any`; this cache file is written only by the
+        // writeFileSync below from already-normalized Bar[] data, so its shape
+        // is guaranteed to match Bar[].
         return JSON.parse(readFileSync(path, 'utf-8')) as Bar[];
     }
 
