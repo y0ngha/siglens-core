@@ -1,12 +1,4 @@
-import type { SanityResult } from '@/domain/types';
-
-export interface SanityOptions {
-    min?: number;
-    max?: number;
-    /** Expected number of leading `null` warmup entries. */
-    expectedWarmup?: number;
-    label?: string;
-}
+import type { SanityOptions, SanityResult } from '@/domain/types';
 
 /**
  * @internal Validate an indicator series for implementation correctness:

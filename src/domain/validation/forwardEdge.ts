@@ -1,9 +1,9 @@
 import type { ForwardDirection, ForwardEdgeResult } from '@/domain/types';
 import {
-    aggregateForwardReturns,
     collectValidReturns,
     computeBaseline,
-} from '@/domain/validation/baseline';
+    statsFromReturns,
+} from './baseline';
 
 const MIN_SAMPLES_FOR_TSTAT = 2;
 /**
@@ -26,8 +26,10 @@ function sampleStd(xs: readonly number[], mean: number): number {
 
 /**
  * @internal Forward-edge of a signal's trigger indices vs the unconditional
- * baseline. `tStat` is a one-sample t of the signal's directional returns
- * against the baseline mean; guarded to 0 when n < 2 or variance is ~0.
+ * baseline. The signal's returns are collected once and reused for both the
+ * aggregate stats and the t-stat. `tStat` is a one-sample t of the signal's
+ * directional returns against the baseline mean; guarded to 0 when n < 2 or
+ * variance is ~0.
  */
 export function computeForwardEdge(
     closes: readonly number[],
@@ -36,12 +38,6 @@ export function computeForwardEdge(
     direction: ForwardDirection
 ): ForwardEdgeResult {
     const baseline = computeBaseline(closes, horizon, direction);
-    const signal = aggregateForwardReturns(
-        closes,
-        triggerIndices,
-        horizon,
-        direction
-    );
 
     const sigReturns = collectValidReturns(
         closes,
@@ -49,6 +45,8 @@ export function computeForwardEdge(
         horizon,
         direction
     );
+    const signal = statsFromReturns(sigReturns);
+
     const sd = sampleStd(sigReturns, signal.meanReturn);
     const n = sigReturns.length;
     const tStat =

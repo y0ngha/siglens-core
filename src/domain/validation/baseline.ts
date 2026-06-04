@@ -22,8 +22,8 @@ export function forwardReturn(
 
 /**
  * @internal Directional forward returns over `indices`, dropping out-of-range
- * or degenerate samples. Shared by {@link aggregateForwardReturns} and the
- * forward-edge t-stat so `forwardReturn` runs exactly once per index.
+ * or degenerate samples. The single source of forward-return collection, so
+ * `forwardReturn` runs exactly once per index across the whole harness.
  */
 export function collectValidReturns(
     closes: readonly number[],
@@ -36,19 +36,27 @@ export function collectValidReturns(
         .filter((r): r is number => r !== null);
 }
 
-/** @internal Aggregate directional forward returns over the given indices. */
+/** @internal Aggregate already-collected directional returns into hit-rate / mean. */
+export function statsFromReturns(
+    returns: readonly number[]
+): ForwardReturnStats {
+    const count = returns.length;
+    if (count === 0) return { count: 0, hitRate: 0, meanReturn: 0 };
+    const hits = returns.filter(r => r > 0).length;
+    const meanReturn = returns.reduce((sum, r) => sum + r, 0) / count;
+    return { count, hitRate: hits / count, meanReturn };
+}
+
+/** @internal Collect + aggregate directional forward returns over the given indices. */
 export function aggregateForwardReturns(
     closes: readonly number[],
     indices: readonly number[],
     horizon: number,
     direction: ForwardDirection
 ): ForwardReturnStats {
-    const returns = collectValidReturns(closes, indices, horizon, direction);
-    const count = returns.length;
-    if (count === 0) return { count: 0, hitRate: 0, meanReturn: 0 };
-    const hits = returns.filter(r => r > 0).length;
-    const meanReturn = returns.reduce((sum, r) => sum + r, 0) / count;
-    return { count, hitRate: hits / count, meanReturn };
+    return statsFromReturns(
+        collectValidReturns(closes, indices, horizon, direction)
+    );
 }
 
 /** @internal Unconditional baseline over every eligible index `[0, n - horizon)`. */

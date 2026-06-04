@@ -2613,6 +2613,19 @@ export interface SanityResult {
 
 /**
  * @internal
+ * Options for {@link checkSanity}: optional `[min,max]` value bounds, an
+ * expected leading-null warmup count, and a `label` used in issue messages.
+ */
+export interface SanityOptions {
+    min?: number;
+    max?: number;
+    /** Expected number of leading `null` warmup entries. */
+    expectedWarmup?: number;
+    label?: string;
+}
+
+/**
+ * @internal
  * Direction a forward-edge signal predicts: `'up'` (price expected to rise) or
  * `'down'` (price expected to fall). Used across the validation harness in
  * place of an inline `'up' | 'down'` union. Distinct from {@link SignalDirection}
