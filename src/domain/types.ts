@@ -2570,3 +2570,65 @@ export type {
     SlotMapping,
     OptionsExpirationFilter,
 } from './options/types';
+
+/**
+ * @internal
+ * Aggregate of directional forward returns over a set of bar indices.
+ * `meanReturn` is a fraction (0.012 = +1.2%); `hitRate` is the fraction of
+ * samples whose directional return was positive (moved as the signal predicts).
+ */
+export interface ForwardReturnStats {
+    count: number;
+    hitRate: number;
+    meanReturn: number;
+}
+
+/**
+ * @internal
+ * Forward-edge of a signal's trigger set vs the unconditional baseline.
+ * `excess*` fields are signal − baseline; `tStat` tests whether the signal's
+ * mean directional return exceeds the baseline mean (one-sample t over the
+ * signal's returns). Positive excess + |tStat| ≥ 2 ⇒ provisional "signal".
+ */
+export interface ForwardEdgeResult {
+    horizon: number;
+    direction: ForwardDirection;
+    triggerCount: number;
+    signal: ForwardReturnStats;
+    baseline: ForwardReturnStats;
+    excessHitRate: number;
+    excessMeanReturn: number;
+    tStat: number;
+}
+
+/**
+ * @internal
+ * Implementation-correctness check for an indicator series: finite non-null
+ * values, values within optional [min,max], and a leading-null warmup count.
+ */
+export interface SanityResult {
+    pass: boolean;
+    issues: string[];
+}
+
+/**
+ * @internal
+ * Options for {@link checkSanity}: optional `[min,max]` value bounds, an
+ * expected leading-null warmup count, and a `label` used in issue messages.
+ */
+export interface SanityOptions {
+    min?: number;
+    max?: number;
+    /** Expected number of leading `null` warmup entries. */
+    expectedWarmup?: number;
+    label?: string;
+}
+
+/**
+ * @internal
+ * Direction a forward-edge signal predicts: `'up'` (price expected to rise) or
+ * `'down'` (price expected to fall). Used across the validation harness in
+ * place of an inline `'up' | 'down'` union. Distinct from {@link SignalDirection}
+ * (`'bullish' | 'bearish'`), which labels a detected signal's bias.
+ */
+export type ForwardDirection = 'up' | 'down';

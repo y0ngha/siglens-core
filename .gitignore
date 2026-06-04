@@ -50,4 +50,8 @@ yarn-error.log*
 # local-only TODO file
 /TODO.md
 
+# validation harness local artifacts
+/scripts/validation/.cache/
+/scripts/validation/reports/
+
 **node_modules**
