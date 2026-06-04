@@ -223,6 +223,18 @@ describe('peekBriefingCache 함수는', () => {
         expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
     });
 
+    it('(Worst/G1) indices는 배열이지만 sectors가 없는 경우 null을 반환하고 캐시 프로바이더를 호출하지 않는다', async () => {
+        const result = await peekBriefingCache({
+            indices: [],
+            sectors: undefined,
+        } as unknown as typeof mockData);
+
+        expect(result).toBeNull();
+        expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+        expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
+    });
+
     it('(Worst/G2) 캐시가 briefing이 null인 객체를 반환하면 null을 반환하고 normalizeMarketBriefing을 호출하지 않는다', async () => {
         mockCacheGet.mockResolvedValueOnce({
             briefing: null,
@@ -246,10 +258,15 @@ describe('peekBriefingCache 함수는', () => {
         expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
     });
 
-    it('어떤 경로에서도 set/delete 부작용이 없다 (read-only)', async () => {
+    it('캐시 HIT 경로에서 set/delete 부작용이 없다 (read-only)', async () => {
         mockCacheGet.mockResolvedValueOnce(mockCachedData);
         await peekBriefingCache(mockData);
 
+        expect(mockCacheSet).not.toHaveBeenCalled();
+        expect(mockCacheDelete).not.toHaveBeenCalled();
+    });
+
+    it('캐시 MISS 경로에서 set/delete 부작용이 없다 (read-only)', async () => {
         mockCacheGet.mockResolvedValueOnce(null);
         await peekBriefingCache(mockData);
 
