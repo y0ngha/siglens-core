@@ -1,0 +1,206 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
+
+vi.mock('@/infrastructure/cache/redis');
+vi.mock('@/domain/analysis/normalizeMarketBriefing');
+
+import { peekBriefingCache } from '@/application/market/peekBriefingCache';
+import {
+    BRIEFING_MODEL_ID,
+    buildBriefingCacheKey,
+} from '@/infrastructure/cache/config';
+import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
+import type { MarketBriefingResponse, MarketSummaryData } from '@/domain/types';
+import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
+
+const mockCreateCacheProvider = createCacheProvider as Mock;
+const mockNormalizeMarketBriefing = normalizeMarketBriefing as Mock;
+
+const mockCacheGet = vi.fn();
+const mockCacheSet = vi.fn();
+const mockCacheDelete = vi.fn();
+const mockCacheProvider = {
+    get: mockCacheGet,
+    set: mockCacheSet,
+    delete: mockCacheDelete,
+};
+
+const mockData: MarketSummaryData = {
+    indices: [],
+    sectors: [],
+};
+
+const mockBriefing: MarketBriefingResponse = {
+    summary: '시장 요약',
+    dominantThemes: [],
+    sectorAnalysis: {
+        leadingSectors: [],
+        laggingSectors: [],
+        performanceDescription: '',
+    },
+    volatilityAnalysis: { description: '' },
+    riskSentiment: 'neutral',
+};
+
+const mockCachedData = {
+    briefing: { raw: 'payload' },
+    generatedAt: '2026-06-04T10:00:00.000Z',
+};
+
+describe('peekBriefingCache 함수는', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
+        mockCacheGet.mockResolvedValue(null);
+        mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
+    });
+
+    it('(Happy) 캐시 HIT이면 normalizeMarketBriefing 결과를 반환한다', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+
+        const result = await peekBriefingCache(mockData);
+
+        expect(result).toBe(mockBriefing);
+        expect(mockNormalizeMarketBriefing).toHaveBeenCalledWith(
+            mockCachedData.briefing
+        );
+    });
+
+    it('writer와 동일한 캐시 키로 읽는다 (dateHour + model + inputHash)', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+
+        await peekBriefingCache(mockData);
+
+        const calledKey = mockCacheGet.mock.calls[0][0] as string;
+        const dateHour = new Date()
+            .toISOString()
+            .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+        // key format: briefing:market:<dateHour>:<model>:<inputHash(16 hex)>
+        expect(calledKey).toMatch(
+            new RegExp(
+                `^briefing:market:${dateHour}:${BRIEFING_MODEL_ID.replace(/\./g, '\\.')}:[0-9a-f]{16}$`
+            )
+        );
+    });
+
+    it('modelId 미지정 시 BRIEFING_MODEL_ID 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+
+        await peekBriefingCache(mockData);
+
+        const calledKey = mockCacheGet.mock.calls[0][0] as string;
+        expect(calledKey).toContain(BRIEFING_MODEL_ID);
+    });
+
+    it('커스텀 modelId 지정 시 해당 모델 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+        const customModel = 'gemini-2.5-pro';
+
+        await peekBriefingCache(mockData, customModel);
+
+        const calledKey = mockCacheGet.mock.calls[0][0] as string;
+        const dateHour = new Date()
+            .toISOString()
+            .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+        expect(calledKey).toContain(
+            buildBriefingCacheKey(dateHour, customModel, '')
+                .replace(/:$/, '')
+                .split(':')
+                .slice(0, 4)
+                .join(':')
+        );
+        expect(calledKey).toContain(customModel);
+    });
+
+    it('(Worst) 캐시 MISS이면 null을 반환한다', async () => {
+        mockCacheGet.mockResolvedValueOnce(null);
+
+        const result = await peekBriefingCache(mockData);
+
+        expect(result).toBeNull();
+        expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
+    });
+
+    it('(Worst) 캐시 프로바이더가 null이면 null을 반환하고 get을 호출하지 않는다', async () => {
+        mockCreateCacheProvider.mockReturnValueOnce(null);
+
+        const result = await peekBriefingCache(mockData);
+
+        expect(result).toBeNull();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+    });
+
+    it('(Worst) get이 reject하면 null을 반환한다 (degraded)', async () => {
+        mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+        const consoleSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        const result = await peekBriefingCache(mockData);
+
+        consoleSpy.mockRestore();
+        expect(result).toBeNull();
+    });
+
+    it('(Worst) get reject 시 오류를 로깅한다', async () => {
+        const redisError = new Error('redis down');
+        mockCacheGet.mockRejectedValueOnce(redisError);
+        const consoleSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        await peekBriefingCache(mockData);
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[Peek] Briefing cache read failed:',
+            redisError
+        );
+        consoleSpy.mockRestore();
+    });
+
+    it('(Worst) normalizeMarketBriefing이 throw하면 null을 반환한다', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+        mockNormalizeMarketBriefing.mockImplementationOnce(() => {
+            throw new Error('parse error');
+        });
+        const consoleSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        const result = await peekBriefingCache(mockData);
+
+        consoleSpy.mockRestore();
+        expect(result).toBeNull();
+    });
+
+    it('(Worst) normalizeMarketBriefing throw 시 오류를 로깅한다', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+        const parseError = new Error('parse error');
+        mockNormalizeMarketBriefing.mockImplementationOnce(() => {
+            throw parseError;
+        });
+        const consoleSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
+
+        await peekBriefingCache(mockData);
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[Peek] Briefing cache payload invalid:',
+            parseError
+        );
+        consoleSpy.mockRestore();
+    });
+
+    it('어떤 경로에서도 set/delete 부작용이 없다 (read-only)', async () => {
+        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+        await peekBriefingCache(mockData);
+
+        mockCacheGet.mockResolvedValueOnce(null);
+        await peekBriefingCache(mockData);
+
+        expect(mockCacheSet).not.toHaveBeenCalled();
+        expect(mockCacheDelete).not.toHaveBeenCalled();
+    });
+});
