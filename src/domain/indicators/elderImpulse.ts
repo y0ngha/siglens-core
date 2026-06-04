@@ -17,7 +17,9 @@ export function calculateElderImpulse(
     bars: Bar[],
     emaPeriod = ELDER_IMPULSE_EMA_PERIOD
 ): (ImpulseColor | null)[] {
-    if (bars.length === 0) return [];
+    const n = bars.length;
+    if (n === 0) return [];
+    if (emaPeriod <= 0) return new Array(n).fill(null);
 
     const emaValues = calculateEMA(bars, emaPeriod);
     const macdResults = calculateMACD(bars);

@@ -145,6 +145,18 @@ describe('calculateVarianceRatio', () => {
             result.forEach(v => expect(v).toBeNull());
         });
 
+        it('유효하지 않은 파라미터 (q≤1 또는 window≤1) → 입력 길이만큼 null 배열 반환', () => {
+            const closes = [100, 102, 101, 104, 103];
+            // q=1 is invalid
+            const r1 = calculateVarianceRatio(closes, 1, 10);
+            expect(r1).toHaveLength(5);
+            r1.forEach(v => expect(v).toBeNull());
+            // window=1 is invalid
+            const r2 = calculateVarianceRatio(closes, 2, 1);
+            expect(r2).toHaveLength(5);
+            r2.forEach(v => expect(v).toBeNull());
+        });
+
         it('q가 window 수익률 개수보다 크면 → null', () => {
             // window=2 returns but q=3 → cannot form a q-period sum → null.
             const closes = [100, 102, 101, 104, 103, 106];

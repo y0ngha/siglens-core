@@ -139,5 +139,21 @@ describe('calculateEwmaVolatility', () => {
             const valid = result.filter(v => v !== null) as number[];
             valid.forEach(v => expect(v).toBeGreaterThanOrEqual(0));
         });
+
+        it('유효하지 않은 lambda (≤0 또는 ≥1) → 입력 길이만큼 null 배열 반환', () => {
+            const closes = [100, 101, 102, 103, 104];
+            // lambda = 0 is invalid
+            const r1 = calculateEwmaVolatility(closes, 0);
+            expect(r1).toHaveLength(5);
+            r1.forEach(v => expect(v).toBeNull());
+            // lambda = 1 is invalid
+            const r2 = calculateEwmaVolatility(closes, 1);
+            expect(r2).toHaveLength(5);
+            r2.forEach(v => expect(v).toBeNull());
+            // lambda = -0.5 is invalid
+            const r3 = calculateEwmaVolatility(closes, -0.5);
+            expect(r3).toHaveLength(5);
+            r3.forEach(v => expect(v).toBeNull());
+        });
     });
 });

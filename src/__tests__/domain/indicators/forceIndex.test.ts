@@ -134,5 +134,12 @@ describe('calculateForceIndex', () => {
             expect(result[2]).toBeCloseTo(1000, 5);
             expect(result[3]).toBeCloseTo(1000, 5);
         });
+
+        it('유효하지 않은 period (≤0) → 입력 길이만큼 null 배열 반환', () => {
+            const bars = makeBars(Array.from({ length: 5 }, (_, i) => 100 + i));
+            const result = calculateForceIndex(bars, 0);
+            expect(result).toHaveLength(5);
+            result.forEach(v => expect(v).toBeNull());
+        });
     });
 });

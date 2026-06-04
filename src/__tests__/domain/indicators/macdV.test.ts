@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { calculateMacdV } from '@/domain/indicators/macdV';
+import { calculateMACD } from '@/domain/indicators/macd';
+import { calculateATR } from '@/domain/indicators/atr';
 import {
+    MACD_FAST_PERIOD,
     MACD_SLOW_PERIOD,
     MACD_V_ATR_PERIOD,
 } from '@/domain/indicators/constants';
@@ -98,23 +101,83 @@ describe('calculateMacdV', () => {
             });
         });
 
-        it('수동 계산된 첫 번째 비-null 값이 근사하게 맞다', () => {
-            // Simple case: linear increasing prices with fixed spread
-            // Fast(12) SMA seed lag = (12-1)/2 = 5.5, slow(26) = 12.5 → MACD ≈ 7.0
-            // ATR for flat-spread bars of +/-1 should converge near 2.0
-            // MACD-V ≈ (7.0 / 2.0) * 100 = 350
+        it('수동 계산된 첫 번째 비-null 값이 정밀하게 맞다', () => {
+            // Precisely verify MACD-V composition: macdV[i] = (macd[i] / atr[i]) * 100
             const n = WARMUP + 5;
             const closes = Array.from({ length: n }, (_, i) => 100 + i);
             const highs = closes.map(c => c + 1);
             const lows = closes.map(c => c - 1);
             const bars = makeBars(closes, highs, lows);
-            const result = calculateMacdV(bars);
-            const firstNonNull = result.find(v => v !== null);
-            expect(firstNonNull).not.toBeUndefined();
-            // MACD-V should be positive and in a reasonable range for this linear series
-            expect(firstNonNull!).toBeGreaterThan(0);
-            // For linear bars with ±1 spread, rough estimate: MACD≈7, ATR≈2, MACD-V≈350
-            expect(firstNonNull!).toBeCloseTo(350, 0);
+
+            const macdResults = calculateMACD(
+                bars,
+                MACD_FAST_PERIOD,
+                MACD_SLOW_PERIOD
+            );
+            const atrValues = calculateATR(bars, MACD_V_ATR_PERIOD);
+
+            // Find first index i where both macd and atr are non-null and atr > 0
+            let targetIndex = -1;
+            for (let i = 0; i < n; i++) {
+                if (
+                    macdResults[i].macd !== null &&
+                    atrValues[i] !== null &&
+                    atrValues[i]! > 0
+                ) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+            expect(targetIndex).toBeGreaterThan(-1);
+
+            const expected =
+                (macdResults[targetIndex].macd! / atrValues[targetIndex]!) *
+                100;
+            const result = calculateMacdV(
+                bars,
+                MACD_FAST_PERIOD,
+                MACD_SLOW_PERIOD,
+                MACD_V_ATR_PERIOD
+            );
+            expect(result[targetIndex]).toBeCloseTo(expected, 10);
+        });
+    });
+
+    describe('유효하지 않은 파라미터 가드', () => {
+        it('fastPeriod ≤0 → 입력 길이만큼 null 배열 반환', () => {
+            const bars = makeBars(Array.from({ length: 5 }, (_, i) => 100 + i));
+            const result = calculateMacdV(
+                bars,
+                0,
+                MACD_SLOW_PERIOD,
+                MACD_V_ATR_PERIOD
+            );
+            expect(result).toHaveLength(5);
+            result.forEach(v => expect(v).toBeNull());
+        });
+
+        it('slowPeriod ≤0 → 입력 길이만큼 null 배열 반환', () => {
+            const bars = makeBars(Array.from({ length: 5 }, (_, i) => 100 + i));
+            const result = calculateMacdV(
+                bars,
+                MACD_FAST_PERIOD,
+                0,
+                MACD_V_ATR_PERIOD
+            );
+            expect(result).toHaveLength(5);
+            result.forEach(v => expect(v).toBeNull());
+        });
+
+        it('atrPeriod ≤0 → 입력 길이만큼 null 배열 반환', () => {
+            const bars = makeBars(Array.from({ length: 5 }, (_, i) => 100 + i));
+            const result = calculateMacdV(
+                bars,
+                MACD_FAST_PERIOD,
+                MACD_SLOW_PERIOD,
+                0
+            );
+            expect(result).toHaveLength(5);
+            result.forEach(v => expect(v).toBeNull());
         });
     });
 

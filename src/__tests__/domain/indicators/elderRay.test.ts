@@ -134,5 +134,17 @@ describe('calculateElderRay', () => {
                 expect(r.bearPower!).toBeCloseTo(-1, 5);
             });
         });
+
+        it('유효하지 않은 period (≤0) → 입력 길이만큼 null 객체 배열 반환', () => {
+            const n = 5;
+            const closes = Array.from({ length: n }, (_, i) => 100 + i);
+            const bars = makeBars(closes);
+            const result = calculateElderRay(bars, 0);
+            expect(result).toHaveLength(n);
+            result.forEach(r => {
+                expect(r.bullPower).toBeNull();
+                expect(r.bearPower).toBeNull();
+            });
+        });
     });
 });

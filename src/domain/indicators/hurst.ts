@@ -71,10 +71,15 @@ function meanRescaledRange(returns: number[], n: number): number | null {
  */
 function rsSlope(points: RescaledRangePoint[]): number {
     const k = points.length;
-    const sumX = points.reduce((sum, p) => sum + p.logN, 0);
-    const sumY = points.reduce((sum, p) => sum + p.logRs, 0);
-    const sumXY = points.reduce((sum, p) => sum + p.logN * p.logRs, 0);
-    const sumX2 = points.reduce((sum, p) => sum + p.logN * p.logN, 0);
+    const { sumX, sumY, sumXY, sumX2 } = points.reduce(
+        (acc, p) => ({
+            sumX: acc.sumX + p.logN,
+            sumY: acc.sumY + p.logRs,
+            sumXY: acc.sumXY + p.logN * p.logRs,
+            sumX2: acc.sumX2 + p.logN * p.logN,
+        }),
+        { sumX: 0, sumY: 0, sumXY: 0, sumX2: 0 }
+    );
     return (k * sumXY - sumX * sumY) / (k * sumX2 - sumX * sumX);
 }
 
@@ -104,6 +109,7 @@ export function calculateHurst(
 ): (number | null)[] {
     const n = closes.length;
     if (n === 0) return [];
+    if (window < 2) return new Array(n).fill(null);
 
     // Log-returns between consecutive closes; returns[i] derives from closes[i],closes[i+1].
     // returns.length = n - 1. A window of `window` returns needs `window + 1` closes.
@@ -130,6 +136,8 @@ export function calculateHurst(
 
         const windowReturns = returns.slice(i - window + 1, i + 1);
         if (windowReturns.some(r => r === null)) return null;
+        // The .some(r => r === null) guard above proves no null elements remain;
+        // TS cannot narrow (number|null)[] to number[] through .some(), so this cast is the documented workaround.
         const valid = windowReturns as number[];
 
         const points: RescaledRangePoint[] = subLengths

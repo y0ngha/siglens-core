@@ -24,6 +24,7 @@ export function calculateVarianceRatio(
 ): (number | null)[] {
     const n = closes.length;
     if (n === 0) return [];
+    if (q <= 1 || window <= 1) return new Array(n).fill(null);
 
     // One-period log-returns; returns[0] is null (no prior close).
     // A window of `window` returns needs `window + 1` closes → first valid output
@@ -41,6 +42,8 @@ export function calculateVarianceRatio(
         // Trailing window of `window` returns: indices [i-window+1 .. i].
         const windowReturns = returns.slice(i - window + 1, i + 1);
         if (windowReturns.some(r => r === null)) return null;
+        // The .some(r => r === null) guard above proves no null elements remain;
+        // TS cannot narrow (number|null)[] to number[] through .some(), so this cast is the documented workaround.
         const r = windowReturns as number[];
 
         const var1 = sampleVariance(r);

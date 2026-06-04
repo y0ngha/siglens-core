@@ -53,19 +53,28 @@ function buildRocSeries(closes: number[]): number[] {
  * percentRank[i] = 100 * count(roc[j] < roc[i], j in [i-period, i-1]) / period.
  * Null until `i >= period + 1` (need period prior values starting from i=1).
  * First valid pctRank index: period + 1 (index `period` has only `period` prior ROC entries).
+ *
+ * Implemented as a `for` loop (CONVENTIONS.md: sliding windows prefer for-loops) to avoid
+ * per-bar O(period) slice allocation that the `.slice().map()` approach would incur.
  */
 function buildPctRankSeries(roc: number[], period: number): (number | null)[] {
-    return roc.map((currentRoc, i) => {
+    const len = roc.length;
+    const result: (number | null)[] = new Array(len);
+    for (let i = 0; i < len; i++) {
         // Need indices [i-period .. i-1] to all exist; i-period >= 0 → i >= period
         // Also i must be >= 1 (roc[0] = 0 is sentinel, not a real return)
-        if (i < period + 1) return null;
-        const window = roc.slice(i - period, i);
-        const countBelow = window.reduce(
-            (acc, v) => acc + (v < currentRoc ? 1 : 0),
-            0
-        );
-        return (countBelow / period) * 100;
-    });
+        if (i < period + 1) {
+            result[i] = null;
+            continue;
+        }
+        const currentRoc = roc[i];
+        let countBelow = 0;
+        for (let j = i - period; j < i; j++) {
+            if (roc[j] < currentRoc) countBelow++;
+        }
+        result[i] = (countBelow / period) * 100;
+    }
+    return result;
 }
 
 /**
@@ -82,7 +91,10 @@ export function calculateConnorsRsi(
     streakRsiPeriod = CRSI_STREAK_PERIOD,
     pctRankPeriod = CRSI_PCTRANK_PERIOD
 ): (number | null)[] {
-    if (closes.length === 0) return [];
+    const n = closes.length;
+    if (n === 0) return [];
+    if (rsiPeriod <= 0 || streakRsiPeriod <= 0 || pctRankPeriod <= 0)
+        return new Array(n).fill(null);
 
     const rsiClose = calculateRSI(closes, rsiPeriod);
     const streaks = buildStreakSeries(closes);

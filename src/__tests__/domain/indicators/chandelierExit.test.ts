@@ -317,5 +317,16 @@ describe('calculateChandelierExit', () => {
             expect(result[0].shortStop).toBeNull();
             expect(result[0].trend).toBeNull();
         });
+
+        it('유효하지 않은 period (≤0) → 입력 길이만큼 null 객체 배열 반환', () => {
+            const bars = makeTestBars(3);
+            const result = calculateChandelierExit(bars, 0);
+            expect(result).toHaveLength(bars.length);
+            result.forEach(r => {
+                expect(r.longStop).toBeNull();
+                expect(r.shortStop).toBeNull();
+                expect(r.trend).toBeNull();
+            });
+        });
     });
 });

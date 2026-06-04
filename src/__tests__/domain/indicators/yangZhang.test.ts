@@ -169,6 +169,15 @@ describe('calculateYangZhang', () => {
             result.forEach(v => expect(v).toBeNull());
         });
 
+        it('유효하지 않은 period (≤1) → 입력 길이만큼 null 배열 반환', () => {
+            const bars = Array.from({ length: 5 }, (_, i) =>
+                makeBar(100 + i, 103 + i, 98 + i, 101 + i)
+            );
+            const result = calculateYangZhang(bars, 0);
+            expect(result).toHaveLength(5);
+            result.forEach(v => expect(v).toBeNull());
+        });
+
         it('변동성 값은 항상 non-negative이다', () => {
             const bars = Array.from({ length: 30 }, (_, i) =>
                 makeBar(

@@ -184,5 +184,19 @@ describe('calculateBollingerDerived', () => {
                 expect(r.pctB).toBeNull();
             });
         });
+
+        it('유효하지 않은 period (≤0) → 입력 길이만큼 null 객체 배열 반환', () => {
+            const bars = makeBars(Array.from({ length: 5 }, (_, i) => 100 + i));
+            const result = calculateBollingerDerived(
+                bars,
+                0,
+                BOLLINGER_DEFAULT_STD_DEV
+            );
+            expect(result).toHaveLength(5);
+            result.forEach(r => {
+                expect(r.pctB).toBeNull();
+                expect(r.bandwidth).toBeNull();
+            });
+        });
     });
 });

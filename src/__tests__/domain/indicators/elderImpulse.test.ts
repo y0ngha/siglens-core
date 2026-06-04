@@ -174,4 +174,14 @@ describe('calculateElderImpulse', () => {
             expect(calculateElderImpulse(bars)).toHaveLength(n);
         });
     });
+
+    describe('유효하지 않은 파라미터 가드', () => {
+        it('emaPeriod ≤0 → 입력 길이만큼 null 배열 반환', () => {
+            const n = 5;
+            const bars = makeBars(Array.from({ length: n }, (_, i) => 100 + i));
+            const result = calculateElderImpulse(bars, 0);
+            expect(result).toHaveLength(n);
+            result.forEach(v => expect(v).toBeNull());
+        });
+    });
 });

@@ -20,7 +20,10 @@ export function calculateMacdV(
     slowPeriod = MACD_SLOW_PERIOD,
     atrPeriod = MACD_V_ATR_PERIOD
 ): (number | null)[] {
-    if (bars.length === 0) return [];
+    const n = bars.length;
+    if (n === 0) return [];
+    if (fastPeriod <= 0 || slowPeriod <= 0 || atrPeriod <= 0)
+        return new Array(n).fill(null);
 
     const macdResults = calculateMACD(bars, fastPeriod, slowPeriod);
     const atrValues = calculateATR(bars, atrPeriod);

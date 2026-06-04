@@ -113,5 +113,12 @@ describe('calculateHurst', () => {
             });
             expect(result[HURST_WINDOW]).toBeDefined();
         });
+
+        it('유효하지 않은 window (<2) → 입력 길이만큼 null 배열 반환', () => {
+            const closes = Array.from({ length: 10 }, (_, i) => 100 + i);
+            const result = calculateHurst(closes, 1);
+            expect(result).toHaveLength(10);
+            result.forEach(v => expect(v).toBeNull());
+        });
     });
 });

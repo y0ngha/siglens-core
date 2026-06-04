@@ -67,6 +67,7 @@ export function calculateYangZhang(
 ): (number | null)[] {
     const n = bars.length;
     if (n === 0) return [];
+    if (period <= 1) return new Array(n).fill(null);
 
     // k weight depends only on `period` (Yang & Zhang minimum-variance weight).
     const k =
@@ -87,7 +88,8 @@ export function calculateYangZhang(
         const windowTerms = terms.slice(i - period + 1, i + 1);
         // Any non-positive price inside the window invalidates the estimate.
         if (windowTerms.some(t => t === null)) return null;
-
+        // The .some(t => t === null) guard above proves no null elements remain;
+        // TS cannot narrow (YangZhangTerms|null)[] to YangZhangTerms[] through .some(), so this cast is the documented workaround.
         const valid = windowTerms as YangZhangTerms[];
         const overnight = valid.map(t => t.overnight);
         const openClose = valid.map(t => t.openClose);

@@ -110,6 +110,16 @@ describe('calculateRegression', () => {
             });
         });
 
+        it('유효하지 않은 period (<2) → 입력 길이만큼 null 객체 배열 반환', () => {
+            const closes = [100, 101, 102, 103];
+            const result = calculateRegression(closes, 0);
+            expect(result).toHaveLength(4);
+            result.forEach(r => {
+                expect(r.slope).toBeNull();
+                expect(r.r2).toBeNull();
+            });
+        });
+
         it('NaN/Infinity가 없다 (slope/r2 모두)', () => {
             const closes = Array.from(
                 { length: 40 },

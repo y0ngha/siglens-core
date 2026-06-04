@@ -128,5 +128,21 @@ describe('calculateConnorsRsi', () => {
                 if (v !== null) expect(Number.isFinite(v)).toBe(true);
             });
         });
+
+        it('유효하지 않은 파라미터 (어느 period든 ≤0) → 입력 길이만큼 null 배열 반환', () => {
+            const closes = Array.from({ length: 10 }, (_, i) => 100 + i);
+            // rsiPeriod = 0 is invalid
+            const r1 = calculateConnorsRsi(closes, 0, 2, 5);
+            expect(r1).toHaveLength(10);
+            r1.forEach(v => expect(v).toBeNull());
+            // streakRsiPeriod = 0 is invalid
+            const r2 = calculateConnorsRsi(closes, 3, 0, 5);
+            expect(r2).toHaveLength(10);
+            r2.forEach(v => expect(v).toBeNull());
+            // pctRankPeriod = 0 is invalid
+            const r3 = calculateConnorsRsi(closes, 3, 2, 0);
+            expect(r3).toHaveLength(10);
+            r3.forEach(v => expect(v).toBeNull());
+        });
     });
 });

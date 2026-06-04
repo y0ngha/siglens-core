@@ -21,6 +21,7 @@ export function calculateEwmaVolatility(
 ): (number | null)[] {
     const n = closes.length;
     if (n === 0) return [];
+    if (lambda <= 0 || lambda >= 1) return new Array(n).fill(null);
     if (n === 1) return [null];
 
     const oneMinusLambda = 1 - lambda;

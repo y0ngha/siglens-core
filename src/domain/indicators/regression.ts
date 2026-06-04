@@ -7,6 +7,8 @@ import { REGRESSION_PERIOD } from './constants';
  * slope = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²)
  * r²    = 1 − SS_res / SS_tot, where SS_tot = Σ(y−ȳ)², SS_res = Σ(y − ŷ)².
  * `r2` is `null` when SS_tot = 0 (flat → coefficient of determination undefined).
+ *
+ * Precondition: y.length >= 2 (callers guarantee period >= 2 before calling ols).
  */
 function ols(y: number[]): RegressionResult {
     const n = y.length;
@@ -16,10 +18,10 @@ function ols(y: number[]): RegressionResult {
     const sumY = y.reduce((sum, v) => sum + v, 0);
     const sumXY = y.reduce((sum, v, i) => sum + i * v, 0);
 
+    // denom > 0 when n >= 2 (x-variance is non-zero for at least 2 distinct points).
+    // The period < 2 guard in calculateRegression guarantees n >= 2 here.
     const denom = n * sumX2 - sumX * sumX;
-    // denom = 0 only when n < 2 (single point); callers guard n >= period >= 2.
-    const slope = denom === 0 ? null : (n * sumXY - sumX * sumY) / denom;
-    if (slope === null) return { slope: null, r2: null };
+    const slope = (n * sumXY - sumX * sumY) / denom;
 
     const intercept = (sumY - slope * sumX) / n;
     const meanY = sumY / n;
@@ -48,6 +50,7 @@ export function calculateRegression(
 ): RegressionResult[] {
     const n = closes.length;
     if (n === 0) return [];
+    if (period < 2) return new Array(n).fill({ slope: null, r2: null });
 
     return closes.map((_, i) => {
         // Trailing window of `period` closes ending at bar i: requires i >= period-1.
