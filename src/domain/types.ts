@@ -2570,3 +2570,43 @@ export type {
     SlotMapping,
     OptionsExpirationFilter,
 } from './options/types';
+
+/**
+ * @internal
+ * Aggregate of directional forward returns over a set of bar indices.
+ * `meanReturn` is a fraction (0.012 = +1.2%); `hitRate` is the fraction of
+ * samples whose directional return was positive (moved as the signal predicts).
+ */
+export interface ForwardReturnStats {
+    count: number;
+    hitRate: number;
+    meanReturn: number;
+}
+
+/**
+ * @internal
+ * Forward-edge of a signal's trigger set vs the unconditional baseline.
+ * `excess*` fields are signal − baseline; `tStat` tests whether the signal's
+ * mean directional return exceeds the baseline mean (one-sample t over the
+ * signal's returns). Positive excess + |tStat| ≥ 2 ⇒ provisional "signal".
+ */
+export interface ForwardEdgeResult {
+    horizon: number;
+    direction: 'up' | 'down';
+    triggerCount: number;
+    signal: ForwardReturnStats;
+    baseline: ForwardReturnStats;
+    excessHitRate: number;
+    excessMeanReturn: number;
+    tStat: number;
+}
+
+/**
+ * @internal
+ * Implementation-correctness check for an indicator series: finite non-null
+ * values, values within optional [min,max], and a leading-null warmup count.
+ */
+export interface SanityResult {
+    pass: boolean;
+    issues: string[];
+}
