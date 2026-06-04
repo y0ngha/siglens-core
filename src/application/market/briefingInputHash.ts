@@ -2,11 +2,11 @@ import type { MarketIndexData, MarketSectorData } from '@/domain/types';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 
 /**
+ * @internal
  * Derive a short deterministic hash of the index/sector values driving the
  * briefing prompt. Identity + quote values (`price`, `changesPercentage`) only —
- * the fields that change intra-hour. Order-independent (sorted by identifier).
- * Shared by submitBriefing (write key) and peekBriefingCache (read key) so both
- * resolve to the SAME cache entry.
+ * the fields that change intra-hour. Order-independent (sorted by identifier),
+ * so the same data in a different array order yields the same hash.
  *
  * @param indices - Quoted market indices.
  * @param sectors - Quoted sector ETFs.

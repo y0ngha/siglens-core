@@ -68,20 +68,26 @@ describe('peekBriefingCache 함수는', () => {
     });
 
     it('writer와 동일한 캐시 키로 읽는다 (dateHour + model + inputHash)', async () => {
-        mockCacheGet.mockResolvedValueOnce(mockCachedData);
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-04T10:30:00.000Z'));
+        try {
+            mockCacheGet.mockResolvedValueOnce(mockCachedData);
 
-        await peekBriefingCache(mockData);
+            await peekBriefingCache(mockData);
 
-        const calledKey = mockCacheGet.mock.calls[0][0] as string;
-        const dateHour = new Date()
-            .toISOString()
-            .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-        // key format: briefing:market:<dateHour>:<model>:<inputHash(16 hex)>
-        expect(calledKey).toMatch(
-            new RegExp(
-                `^briefing:market:${dateHour}:${BRIEFING_MODEL_ID.replace(/\./g, '\\.')}:[0-9a-f]{16}$`
-            )
-        );
+            const calledKey = mockCacheGet.mock.calls[0][0] as string;
+            const dateHour = new Date()
+                .toISOString()
+                .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+            // key format: briefing:market:<dateHour>:<model>:<inputHash(16 hex)>
+            expect(calledKey).toMatch(
+                new RegExp(
+                    `^briefing:market:${dateHour}:${BRIEFING_MODEL_ID.replace(/\./g, '\\.')}:[0-9a-f]{16}$`
+                )
+            );
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('modelId 미지정 시 BRIEFING_MODEL_ID 키로 읽는다', async () => {
@@ -94,23 +100,29 @@ describe('peekBriefingCache 함수는', () => {
     });
 
     it('커스텀 modelId 지정 시 해당 모델 키로 읽는다', async () => {
-        mockCacheGet.mockResolvedValueOnce(mockCachedData);
-        const customModel = 'gemini-2.5-pro';
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-04T10:30:00.000Z'));
+        try {
+            mockCacheGet.mockResolvedValueOnce(mockCachedData);
+            const customModel = 'gemini-2.5-pro';
 
-        await peekBriefingCache(mockData, customModel);
+            await peekBriefingCache(mockData, customModel);
 
-        const calledKey = mockCacheGet.mock.calls[0][0] as string;
-        const dateHour = new Date()
-            .toISOString()
-            .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-        expect(calledKey).toContain(
-            buildBriefingCacheKey(dateHour, customModel, '')
-                .replace(/:$/, '')
-                .split(':')
-                .slice(0, 4)
-                .join(':')
-        );
-        expect(calledKey).toContain(customModel);
+            const calledKey = mockCacheGet.mock.calls[0][0] as string;
+            const dateHour = new Date()
+                .toISOString()
+                .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+            expect(calledKey).toContain(
+                buildBriefingCacheKey(dateHour, customModel, '')
+                    .replace(/:$/, '')
+                    .split(':')
+                    .slice(0, 4)
+                    .join(':')
+            );
+            expect(calledKey).toContain(customModel);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('(Worst) 캐시 MISS이면 null을 반환한다', async () => {
@@ -191,6 +203,47 @@ describe('peekBriefingCache 함수는', () => {
             parseError
         );
         consoleSpy.mockRestore();
+    });
+
+    it('(Worst/G1) null 데이터 전달 시 null을 반환하고 캐시 프로바이더를 호출하지 않는다', async () => {
+        const result = await peekBriefingCache(
+            null as unknown as typeof mockData
+        );
+
+        expect(result).toBeNull();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+        expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
+    });
+
+    it('(Worst/G1) indices/sectors 없는 객체 전달 시 null을 반환하고 캐시 프로바이더를 호출하지 않는다', async () => {
+        const result = await peekBriefingCache({} as typeof mockData);
+
+        expect(result).toBeNull();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+        expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
+    });
+
+    it('(Worst/G2) 캐시가 briefing이 null인 객체를 반환하면 null을 반환하고 normalizeMarketBriefing을 호출하지 않는다', async () => {
+        mockCacheGet.mockResolvedValueOnce({
+            briefing: null,
+            generatedAt: '2026-06-04T10:00:00.000Z',
+        });
+
+        const result = await peekBriefingCache(mockData);
+
+        expect(result).toBeNull();
+        expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
+    });
+
+    it('(Worst/G2) 캐시가 briefing이 undefined인 객체를 반환하면 null을 반환하고 normalizeMarketBriefing을 호출하지 않는다', async () => {
+        mockCacheGet.mockResolvedValueOnce({
+            generatedAt: '2026-06-04T10:00:00.000Z',
+        });
+
+        const result = await peekBriefingCache(mockData);
+
+        expect(result).toBeNull();
+        expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
     });
 
     it('어떤 경로에서도 set/delete 부작용이 없다 (read-only)', async () => {

@@ -23,11 +23,23 @@ import { hashBriefingInput } from './briefingInputHash';
  * @param modelId - Briefing model id; defaults to BRIEFING_MODEL_ID (the same
  *   default submitBriefing writes under) so an un-modelled peek reads the same key.
  * @returns Normalized briefing on a hit, or `null` on miss/cold/error.
+ *
+ * @example
+ * ```ts
+ * const cached = await peekBriefingCache(summaryData);
+ * if (cached) return cached; // serve from cache in SSR; else client submitBriefing()
+ * ```
+ *
+ * @see submitBriefing
+ * @see peekAnalysisCache
  */
 export async function peekBriefingCache(
     data: MarketSummaryData,
     modelId: string = BRIEFING_MODEL_ID
 ): Promise<MarketBriefingResponse | null> {
+    if (!data || !Array.isArray(data.indices) || !Array.isArray(data.sectors)) {
+        return null;
+    }
     const cache = createCacheProvider();
     if (cache === null) return null;
 
@@ -42,7 +54,7 @@ export async function peekBriefingCache(
             console.error('[Peek] Briefing cache read failed:', error);
             return null;
         });
-    if (cached == null) return null;
+    if (cached == null || cached.briefing == null) return null;
 
     try {
         return normalizeMarketBriefing(cached.briefing);
