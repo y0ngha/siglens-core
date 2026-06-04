@@ -3,67 +3,21 @@ import type { BackgroundTaskOptions } from '@/application/types';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import type {
-    MarketIndexData,
-    MarketSectorData,
-    MarketSummaryData,
-    SubmitBriefingResult,
-} from '@/domain/types';
+import type { MarketSummaryData, SubmitBriefingResult } from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
     buildBriefingCacheKey,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
-import {
-    analysisSeed,
-    hashAnalysisInput,
-} from '@/infrastructure/hash/analysisInput';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { FETCH_DEFAULT_TIME_OUT } from '@/infrastructure/market/constants';
+import { hashBriefingInput } from './briefingInputHash';
 
 /** Stable job-meta `symbol` marker for market-briefing jobs (not symbol-bound). */
 const BRIEFING_JOB_SYMBOL = 'market';
-
-/**
- * Derive a short deterministic hash of the index/sector values driving the
- * briefing prompt.
- *
- * Each index/sector is reduced to its identity plus its quote values
- * (`price`, `changesPercentage`) — the only fields that change intra-hour and
- * therefore the only ones that should invalidate the cache. Display names are
- * excluded as they are static labels, not input data. Both lists are sorted by
- * their stable identifier so the hash is order-independent (the same data in a
- * different array order yields the same hash), then delegated to
- * {@link hashAnalysisInput}.
- *
- * @param indices - Quoted market indices.
- * @param sectors - Quoted sector ETFs.
- * @returns 16-character lowercase hex string.
- */
-function hashBriefingInput(
-    indices: readonly MarketIndexData[],
-    sectors: readonly MarketSectorData[]
-): string {
-    const sortedIndices = indices
-        .map(i => ({
-            fmpSymbol: i.fmpSymbol,
-            price: i.price,
-            changesPercentage: i.changesPercentage,
-        }))
-        .toSorted((a, b) => a.fmpSymbol.localeCompare(b.fmpSymbol));
-    const sortedSectors = sectors
-        .map(s => ({
-            symbol: s.symbol,
-            price: s.price,
-            changesPercentage: s.changesPercentage,
-        }))
-        .toSorted((a, b) => a.symbol.localeCompare(b.symbol));
-    return hashAnalysisInput(
-        JSON.stringify({ indices: sortedIndices, sectors: sortedSectors })
-    );
-}
 
 /**
  * Submit a market briefing job from the current dashboard summary.
