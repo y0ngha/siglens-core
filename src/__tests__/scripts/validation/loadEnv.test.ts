@@ -1,5 +1,23 @@
-import { describe, it, expect } from 'vitest';
-import { parseEnv } from '../../../../scripts/validation/loadEnv';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+    parseEnv,
+    loadEnvFile,
+    requireFmpApiKey,
+} from '../../../../scripts/validation/loadEnv';
+import { existsSync, readFileSync } from 'node:fs';
+
+vi.mock('node:fs', () => ({
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+}));
+
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+
+afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+});
 
 describe('parseEnv', () => {
     it('parses KEY=VALUE lines into a record', () => {
@@ -28,5 +46,41 @@ describe('parseEnv', () => {
 
     it('returns an empty record for empty input (worst case)', () => {
         expect(parseEnv('')).toEqual({});
+    });
+});
+
+describe('loadEnvFile', () => {
+    it('returns an empty record when the file is absent', () => {
+        mockExistsSync.mockReturnValue(false);
+        expect(loadEnvFile('/nope/.env.local')).toEqual({});
+        expect(mockReadFileSync).not.toHaveBeenCalled();
+    });
+
+    it('parses the file contents when present', () => {
+        mockExistsSync.mockReturnValue(true);
+        mockReadFileSync.mockReturnValue('FMP_API_KEY=xyz\n# comment');
+        expect(loadEnvFile('/some/.env.local')).toEqual({ FMP_API_KEY: 'xyz' });
+    });
+});
+
+describe('requireFmpApiKey', () => {
+    it('returns the key from process.env when set (early return)', () => {
+        vi.stubEnv('FMP_API_KEY', 'from-env');
+        expect(requireFmpApiKey()).toBe('from-env');
+        // Early return: the .env.local fallback file is never consulted.
+        expect(mockExistsSync).not.toHaveBeenCalled();
+    });
+
+    it('throws a descriptive error when the key is absent everywhere', () => {
+        vi.stubEnv('FMP_API_KEY', '');
+        mockExistsSync.mockReturnValue(false);
+        expect(() => requireFmpApiKey()).toThrow('FMP_API_KEY not found');
+    });
+
+    it('falls back to the .env.local file when process.env is empty', () => {
+        vi.stubEnv('FMP_API_KEY', '');
+        mockExistsSync.mockReturnValue(true);
+        mockReadFileSync.mockReturnValue('FMP_API_KEY=from-file');
+        expect(requireFmpApiKey()).toBe('from-file');
     });
 });
