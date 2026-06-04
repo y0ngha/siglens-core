@@ -21,9 +21,9 @@ export function checkSanity(
               ]
             : [];
 
-    // Per MISTAKES.md #14.5: conditional multi-push (min/max each add 0–1 issues)
-    // reads more clearly as a loop than flatMap + inner spreads, and avoids the
-    // throwaway temp arrays. O(N) either way.
+    // Conditional multi-push (min/max each add 0–1 issues) reads more clearly as
+    // a loop than flatMap + inner spreads, and avoids throwaway temp arrays.
+    // O(N) either way.
     const valueIssues: string[] = [];
     const n = series.length;
     for (let i = 0; i < n; i++) {
