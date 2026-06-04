@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
     forwardReturn,
+    collectValidReturns,
+    statsFromReturns,
     aggregateForwardReturns,
     computeBaseline,
 } from '@/domain/validation/baseline';
@@ -81,5 +83,34 @@ describe('computeBaseline', () => {
             hitRate: 0,
             meanReturn: 0,
         });
+    });
+});
+
+describe('collectValidReturns', () => {
+    it('filters null returns from out-of-range indices', () => {
+        const result = collectValidReturns([100, 110], [0, 1, 5], 1, 'up');
+        expect(result).toHaveLength(1); // only index 0 has an in-range horizon
+        expect(result[0]).toBeCloseTo(0.1, 10);
+    });
+
+    it('returns an empty array for an empty index set (worst case)', () => {
+        expect(collectValidReturns([100, 110], [], 1, 'up')).toEqual([]);
+    });
+});
+
+describe('statsFromReturns', () => {
+    it('returns zeroed stats for empty input (worst case)', () => {
+        expect(statsFromReturns([])).toEqual({
+            count: 0,
+            hitRate: 0,
+            meanReturn: 0,
+        });
+    });
+
+    it('computes count, hit-rate, and mean for mixed returns', () => {
+        const stats = statsFromReturns([0.1, -0.1]);
+        expect(stats.count).toBe(2);
+        expect(stats.hitRate).toBeCloseTo(0.5, 10);
+        expect(stats.meanReturn).toBeCloseTo(0, 10);
     });
 });

@@ -21,20 +21,28 @@ export function checkSanity(
               ]
             : [];
 
-    const valueIssues = series.flatMap((v, i): string[] => {
-        if (v === null) return [];
+    // Per MISTAKES.md #14.5: conditional multi-push (min/max each add 0–1 issues)
+    // reads more clearly as a loop than flatMap + inner spreads, and avoids the
+    // throwaway temp arrays. O(N) either way.
+    const valueIssues: string[] = [];
+    for (let i = 0; i < series.length; i++) {
+        const v = series[i];
+        if (v === null) continue;
         if (!Number.isFinite(v)) {
-            return [`${label}: non-finite value at index ${i} (${v})`];
+            valueIssues.push(`${label}: non-finite value at index ${i} (${v})`);
+            continue;
         }
-        return [
-            ...(opts.min !== undefined && v < opts.min
-                ? [`${label}: value ${v} at ${i} below min ${opts.min}`]
-                : []),
-            ...(opts.max !== undefined && v > opts.max
-                ? [`${label}: value ${v} at ${i} above max ${opts.max}`]
-                : []),
-        ];
-    });
+        if (opts.min !== undefined && v < opts.min) {
+            valueIssues.push(
+                `${label}: value ${v} at ${i} below min ${opts.min}`
+            );
+        }
+        if (opts.max !== undefined && v > opts.max) {
+            valueIssues.push(
+                `${label}: value ${v} at ${i} above max ${opts.max}`
+            );
+        }
+    }
 
     const issues = [...warmupIssues, ...valueIssues];
     return { pass: issues.length === 0, issues };
