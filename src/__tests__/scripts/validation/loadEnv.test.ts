@@ -76,4 +76,11 @@ describe('requireFmpApiKey', () => {
         mockExistsSync.mockReturnValue(false);
         expect(() => requireFmpApiKey()).toThrow('FMP_API_KEY not found');
     });
+
+    it('falls back to the .env.local file when process.env is empty', () => {
+        vi.stubEnv('FMP_API_KEY', '');
+        mockExistsSync.mockReturnValue(true);
+        mockReadFileSync.mockReturnValue('FMP_API_KEY=from-file');
+        expect(requireFmpApiKey()).toBe('from-file');
+    });
 });

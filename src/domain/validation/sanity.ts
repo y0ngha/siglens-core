@@ -25,7 +25,8 @@ export function checkSanity(
     // reads more clearly as a loop than flatMap + inner spreads, and avoids the
     // throwaway temp arrays. O(N) either way.
     const valueIssues: string[] = [];
-    for (let i = 0; i < series.length; i++) {
+    const n = series.length;
+    for (let i = 0; i < n; i++) {
         const v = series[i];
         if (v === null) continue;
         if (!Number.isFinite(v)) {
