@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeForwardEdge } from '@/domain/validation/forwardEdge';
+import { computeForwardEdge, sampleStd } from '@/domain/validation/forwardEdge';
 
 describe('computeForwardEdge', () => {
     it('reports positive excess when triggers beat the baseline', () => {
@@ -43,5 +43,29 @@ describe('computeForwardEdge', () => {
         // n 3); baseline mean ≈ 0.006809 →
         // tStat = (0.12 − 0.006809) / (0.04 / √3) ≈ 4.90.
         expect(res.tStat).toBeCloseTo(4.9, 1);
+    });
+});
+
+describe('sampleStd', () => {
+    it('returns 0 for an empty array (worst case)', () => {
+        expect(sampleStd([], 0)).toBe(0);
+    });
+
+    it('returns 0 for a single point — no (n−1) spread (worst case)', () => {
+        expect(sampleStd([42], 42)).toBe(0);
+    });
+
+    it('returns 0 when every value is identical (zero variance)', () => {
+        expect(sampleStd([5, 5, 5], 5)).toBe(0);
+    });
+
+    it('computes the (n−1) sample std about the given mean', () => {
+        // [1,2,3] about mean 2 → variance ((−1)²+0+1²)/(3−1)=1 → std 1.
+        expect(sampleStd([1, 2, 3], 2)).toBeCloseTo(1, 12);
+    });
+
+    it('uses the supplied mean, not the array mean (parameter contract)', () => {
+        // About mean 0: sqrt((1²+2²+3²)/(3−1)) = sqrt(7) ≈ 2.6457513.
+        expect(sampleStd([1, 2, 3], 0)).toBeCloseTo(Math.sqrt(7), 12);
     });
 });
