@@ -1,5 +1,28 @@
 # Changelog
 
+# [0.20.0](https://github.com/y0ngha/siglens-core/compare/v0.19.1...v0.20.0) (2026-06-05)
+
+
+### Bug Fixes
+
+* **dashboard:** skip caching empty sector-signals to prevent transient-outage poison ([10d60a6](https://github.com/y0ngha/siglens-core/commit/10d60a6587ba883feb5a72fcc08ff0a4c5956a54))
+* **indicators:** apply PR [#148](https://github.com/y0ngha/siglens-core/issues/148) review — as-cast comments, param guards, test/style fixes ([0e1ad69](https://github.com/y0ngha/siglens-core/commit/0e1ad69244f6ffd3d5984a32eb991c1498964c0f)), closes [TS#7](https://github.com/TS/issues/7)
+* PR [#146](https://github.com/y0ngha/siglens-core/issues/146) 리뷰 반영 — 함수형 스타일, DRY 헬퍼, 타입안전성 ([cfcec04](https://github.com/y0ngha/siglens-core/commit/cfcec0473dec00ffd40c6d4836cebc66e9788b7e))
+* **review:** address PR [#145](https://github.com/y0ngha/siglens-core/issues/145) — [@internal](https://github.com/internal) tag, timeless JSDoc, fake timers, peek guards ([cbc9ef7](https://github.com/y0ngha/siglens-core/commit/cbc9ef73443740c0b46d2074f7f0f614d4c34b37))
+* **review:** pin localeCompare locale to 'en' for stable cache key (PR [#145](https://github.com/y0ngha/siglens-core/issues/145)) ([751c891](https://github.com/y0ngha/siglens-core/commit/751c89150aa92bfe5f4d7138a547674535202e1e))
+* **validation:** apply PR [#146](https://github.com/y0ngha/siglens-core/issues/146) approved-review suggestions ([2af7115](https://github.com/y0ngha/siglens-core/commit/2af71155c3e3fe2a07b80a50775ce885d14a7d24))
+* **validation:** apply PR [#146](https://github.com/y0ngha/siglens-core/issues/146) round-2 review — dedupe forward-return collection, relocate SanityOptions ([161520c](https://github.com/y0ngha/siglens-core/commit/161520cc547919fdd3fdb0f03a8618bc415fe36f))
+* **validation:** cache series.length + cover requireFmpApiKey file fallback ([384d948](https://github.com/y0ngha/siglens-core/commit/384d948b160343ee6db30984fe0ab59cb509586c)), closes [#2](https://github.com/y0ngha/siglens-core/issues/2)
+
+
+### Features
+
+* **briefing:** add read-only peekBriefingCache for SSR seed ([f6e12cc](https://github.com/y0ngha/siglens-core/commit/f6e12cc29d570f6af4142644a21be190f7ad2d7b))
+* **indicators:** Phase 1 — 12 pro-indicator calculation functions ([52b73e3](https://github.com/y0ngha/siglens-core/commit/52b73e394d903578eb09b15ae1f8991d291eea9b))
+* **indicators:** pro-indicators Phase 3 Part A — pipeline integration ([#150](https://github.com/y0ngha/siglens-core/issues/150)) ([c779322](https://github.com/y0ngha/siglens-core/commit/c779322e85dca50e779eec310a609cdc8e83dad0))
+* pro-indicators Phase 0 — forward-edge validation harness ([86ac1e7](https://github.com/y0ngha/siglens-core/commit/86ac1e74d5b4cf0439bb570e8254e3585d96f8b2))
+* **validation:** pro-indicators Phase 2 forward-edge harness + empirical report ([#149](https://github.com/y0ngha/siglens-core/issues/149)) ([9fa39b8](https://github.com/y0ngha/siglens-core/commit/9fa39b8c34bb946c81c52b3e8de356051c9dcbb3))
+
 ## [0.19.1](https://github.com/y0ngha/siglens-core/compare/v0.19.0...v0.19.1) (2026-06-03)
 
 # [0.19.0](https://github.com/y0ngha/siglens-core/compare/v0.18.0...v0.19.0) (2026-06-01)
