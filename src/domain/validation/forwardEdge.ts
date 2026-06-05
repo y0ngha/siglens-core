@@ -17,7 +17,7 @@ const MIN_SAMPLES_FOR_TSTAT = 2;
 const MIN_STD_FOR_TSTAT = 1e-10;
 
 /** @internal Sample (n−1) standard deviation. Returns 0 for fewer than 2 points. */
-function sampleStd(xs: readonly number[], mean: number): number {
+export function sampleStd(xs: readonly number[], mean: number): number {
     if (xs.length < MIN_SAMPLES_FOR_TSTAT) return 0;
     const variance =
         xs.reduce((sum, x) => sum + (x - mean) ** 2, 0) / (xs.length - 1);

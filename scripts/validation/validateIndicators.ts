@@ -1,6 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Bar, ImpulseColor, Timeframe } from '@/domain/types';
+import type {
+    Bar,
+    ForwardDirection,
+    ImpulseColor,
+    Timeframe,
+} from '@/domain/types';
 import {
     calculateBollingerDerived,
     calculateChandelierExit,
@@ -22,6 +27,7 @@ import {
     collectValidReturns,
     findFlipIndices,
     findThresholdCrossIndices,
+    sampleStd,
     statsFromReturns,
 } from '@/domain/validation';
 import { fetchBarsCached } from './fetchData';
@@ -63,8 +69,6 @@ const MIN_STD_FOR_TSTAT = 1e-10; // below this, treat the spread as zero-varianc
 const MIN_T_FOR_SIGNAL = 2;
 const MIN_N_FOR_SIGNAL = 30;
 const REPORTS_DIR = join(import.meta.dirname, 'reports');
-
-type Direction = 'up' | 'down';
 
 interface DirectionalTriggers {
     bullish: number[];
@@ -183,7 +187,7 @@ const INDICATORS: IndicatorSpec[] = [
 
 interface EdgeRow {
     indicator: string;
-    direction: Direction;
+    direction: ForwardDirection;
     tf: Timeframe;
     horizon: number;
     triggers: number;
@@ -246,7 +250,7 @@ function poolEdge(
     barsList: Bar[][],
     spec: IndicatorSpec,
     tf: Timeframe,
-    direction: Direction,
+    direction: ForwardDirection,
     horizon: number
 ): EdgeRow {
     const signalReturns: number[] = [];
@@ -273,20 +277,12 @@ function poolEdge(
     const excessHitRate = sig.hitRate - base.hitRate;
     const excessMeanReturn = sig.meanReturn - base.meanReturn;
 
-    const n = signalReturns.length;
-    const sd =
-        n >= MIN_SAMPLES_FOR_TSTAT
-            ? Math.sqrt(
-                  signalReturns.reduce(
-                      (s, r) => s + (r - sig.meanReturn) ** 2,
-                      0
-                  ) /
-                      (n - 1)
-              )
-            : 0;
+    // sig.count === signalReturns.length (statsFromReturns sets count = length),
+    // so use the single source for both the t-stat guard and its denominator.
+    const sd = sampleStd(signalReturns, sig.meanReturn);
     const tStat =
-        n >= MIN_SAMPLES_FOR_TSTAT && sd >= MIN_STD_FOR_TSTAT
-            ? (sig.meanReturn - base.meanReturn) / (sd / Math.sqrt(n))
+        sig.count >= MIN_SAMPLES_FOR_TSTAT && sd >= MIN_STD_FOR_TSTAT
+            ? (sig.meanReturn - base.meanReturn) / (sd / Math.sqrt(sig.count))
             : 0;
 
     const flag =
