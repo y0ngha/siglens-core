@@ -165,3 +165,8 @@
   - Sub-principle: Consumer-instantiated config types — a type can be unused inside core yet consumers type their own constants/config exports with it (SectorGroupDef in consumer's SECTOR_GROUPS).
 - Promoted: YES — extend MISTAKES.md §9 with mandatory consumer cross-check procedure before removal/demotion of any public export.
 
+## [Phase 2 | worktree-feat+pro-indicators-phase2 | 2026-06-05] — Indicator validation framework & trigger helpers
+- Violation: `poolEdge` function in `scripts/validation/validateIndicators.ts` re-derived `tf` parameter from `horizon` via `TIMEFRAMES.find(...) ?? '1Day'` instead of using the authoritative `tf` already in scope at the call site
+- Rule: FF Predictability / FF Coupling — do not discard a known value and reconstruct it from a derived index; if `tf` is available in the call context, thread it as a parameter to the callee
+- Context: Round 1 recommended finding — `poolEdge(timeframe, horizon, edges, labelSymbol)` internally computed `tf` from `horizon` even though the caller (`doAccumulate`) already had `tf` available. Fixed by threading `tf` as a parameter: `poolEdge(timeframe, tf, horizon, edges, labelSymbol)` and removing the internal re-derivation.
+

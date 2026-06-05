@@ -232,3 +232,24 @@ export const VR_WINDOW = 60;
 
 /** @internal Linear-regression trailing window (bars). */
 export const REGRESSION_PERIOD = 20;
+
+/** @internal MACD-V oversold reset threshold (volatility-normalised MACD). */
+export const MACDV_OVERSOLD = -150;
+/** @internal MACD-V overbought reset threshold (volatility-normalised MACD). */
+export const MACDV_OVERBOUGHT = 150;
+
+/** @internal Connors RSI oversold threshold. */
+export const CRSI_OVERSOLD = 10;
+/** @internal Connors RSI overbought threshold. */
+export const CRSI_OVERBOUGHT = 90;
+
+/** @internal Bollinger %B oversold threshold (lower-band proximity). */
+export const PCTB_OVERSOLD = 0.05;
+/** @internal Bollinger %B overbought threshold (upper-band proximity). */
+export const PCTB_OVERBOUGHT = 0.95;
+
+/** @internal Force Index zero line (bull/bear pressure pivot). */
+export const FORCE_INDEX_ZERO = 0;
+
+/** @internal Elder-Ray bull/bear power zero line. */
+export const ELDER_POWER_ZERO = 0;
