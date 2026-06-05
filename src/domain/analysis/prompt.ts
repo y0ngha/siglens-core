@@ -895,6 +895,13 @@ const combineRegimeVerdict = (
     return 'random';
 };
 
+/** @internal Section header — exported so tests reference the exact string (MISTAKES.md Tests #4). */
+export const REGIME_CONTEXT_SECTION_HEADER = '## Market Regime & Risk Context';
+/** @internal Section header — exported so tests reference the exact string. */
+export const INDICATOR_VALUES_SECTION_HEADER = '## Indicator Values';
+/** @internal Section header — exported so tests reference the exact string. */
+export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Confluence';
+
 const REGIME_INSUFFICIENT_DATA_LINE =
     '- Regime: insufficient data (regime indicators still in warm-up)';
 
@@ -946,7 +953,7 @@ const formatRegimeContextSection = (
     const lastYangZhang = lastNonNull(indicators.yangZhang);
     const lastEwma = lastNonNull(indicators.ewmaVolatility);
 
-    const header = '## Market Regime & Risk Context';
+    const header = REGIME_CONTEXT_SECTION_HEADER;
 
     // Only Hurst + VR vote on the verdict; slope/R² merely annotate it. So when
     // both voters are null, the verdict is undefined regardless of slope — render
@@ -1093,7 +1100,7 @@ const formatProIndicatorSection = (
     config: PromptConfig
 ): string =>
     [
-        '## Pro-Indicator Confluence',
+        PRO_INDICATOR_SECTION_HEADER,
         formatBollingerPercentBLine(indicators),
         formatMacdVLine(indicators, config),
         formatConnorsRsiLine(indicators),
@@ -1140,7 +1147,7 @@ const formatIndicatorSection = (
     const cmfTrend = detectTrend(indicators.cmf, sampleCount);
 
     return [
-        '## Indicator Values',
+        INDICATOR_VALUES_SECTION_HEADER,
         `- RSI(${RSI_DEFAULT_PERIOD}): ${fmt(lastRSI)}${trendLabel(rsiTrend)}`,
         `- MACD: ${fmt(lastMACD?.macd ?? null)} / Signal ${fmt(lastMACD?.signal ?? null)} / Histogram ${fmt(lastMACD?.histogram ?? null)}${trendLabel(macdTrend)}`,
         `- Bollinger Bands: Upper ${fmt(lastBollinger?.upper ?? null)} / Middle ${fmt(lastBollinger?.middle ?? null)} / Lower ${fmt(lastBollinger?.lower ?? null)}`,

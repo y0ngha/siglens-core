@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt,
+    INDICATOR_VALUES_SECTION_HEADER,
+    PRO_INDICATOR_SECTION_HEADER,
     PRO_RELIABILITY_NOTE,
     PROMPT_CONFIG_BY_TIMEFRAME,
+    REGIME_CONTEXT_SECTION_HEADER,
 } from '@/domain/analysis/prompt';
 import { calculateIndicators } from '@/domain/indicators/index';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
@@ -4358,9 +4361,9 @@ describe('prompt', () => {
         // Longest pro-indicator warm-up (Hurst window 100, Connors RSI
         // percent-rank 100) needs ~260 bars to guarantee non-null tails.
         const PRO_ENOUGH_BARS = 260;
-        const REGIME_HEADER = '## Market Regime & Risk Context';
-        const INDICATOR_HEADER = '## Indicator Values';
-        const PRO_HEADER = '## Pro-Indicator Confluence';
+        const REGIME_HEADER = REGIME_CONTEXT_SECTION_HEADER;
+        const INDICATOR_HEADER = INDICATOR_VALUES_SECTION_HEADER;
+        const PRO_HEADER = PRO_INDICATOR_SECTION_HEADER;
 
         // Deterministic, non-degenerate uptrend + bounded oscillation so every
         // rolling window has real variance (no flat sub-windows nulling out
@@ -4529,6 +4532,34 @@ describe('prompt', () => {
             expect(regimeLine).toBeDefined();
             expect(regimeLine).toContain('insufficient data');
             expect(regimeLine).not.toContain('near-random');
+        });
+
+        it('한쪽 voter만 유효하면(Hurst trending, VR null) 그 voter의 verdict를 따른다', () => {
+            // combineRegimeVerdict ignores null votes; with only Hurst voting
+            // 'trending' (0.65 − 0.5 = 0.15 ≥ 0.05) and VR null, the agreed side
+            // is 'trending' — a single decisive voter is not collapsed to random.
+            const indicators = makeIndicators({
+                hurst: [0.65],
+                varianceRatio: [null],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain(
+                'trending (favour trend-following; do not fade)'
+            );
         });
 
         it('Elder Impulse가 null을 건너뛰고 직전 유색 봉과 비교해 flip note를 렌더한다', () => {

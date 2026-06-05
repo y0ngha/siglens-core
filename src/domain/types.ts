@@ -515,7 +515,9 @@ export interface IndicatorResult {
  * `null` during the EMA warm-up window.
  */
 export interface ElderRayResult {
+    /** Maximum buyer strength: High − EMA(13); positive when buyers dominate. */
     bullPower: number | null;
+    /** Maximum seller strength: Low − EMA(13); negative when sellers dominate. */
     bearPower: number | null;
 }
 
