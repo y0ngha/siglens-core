@@ -6,6 +6,8 @@ import type {
     Signal,
 } from '@/domain/types';
 import {
+    PCTB_OVERBOUGHT,
+    PCTB_OVERSOLD,
     RSI_OVERBOUGHT_LEVEL,
     RSI_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
@@ -235,6 +237,50 @@ export function detectBollingerUpperBreakout(
         phase: 'confirmed',
         detectedAt: lastIdx,
     };
+}
+
+/** @internal Detects Bollinger %B crossing up through PCTB_OVERSOLD on the last bar (bullish mean-reversion confirmed signal). */
+export function detectBollingerPercentBOversold(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const d = indicators.bollingerDerived;
+    if (d.length < 2) return null;
+    const i = d.length - 1;
+    const prev = d[i - 1].pctB;
+    const cur = d[i].pctB;
+    if (prev === null || cur === null) return null;
+    if (prev <= PCTB_OVERSOLD && cur > PCTB_OVERSOLD) {
+        return {
+            type: 'bollinger_percentb_oversold',
+            direction: 'bullish',
+            phase: 'confirmed',
+            detectedAt: i,
+        };
+    }
+    return null;
+}
+
+/** @internal Detects Bollinger %B crossing down through PCTB_OVERBOUGHT on the last bar (bearish mean-reversion confirmed signal — the validated daily-short edge). */
+export function detectBollingerPercentBOverbought(
+    _bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    const d = indicators.bollingerDerived;
+    if (d.length < 2) return null;
+    const i = d.length - 1;
+    const prev = d[i - 1].pctB;
+    const cur = d[i].pctB;
+    if (prev === null || cur === null) return null;
+    if (prev >= PCTB_OVERBOUGHT && cur < PCTB_OVERBOUGHT) {
+        return {
+            type: 'bollinger_percentb_overbought',
+            direction: 'bearish',
+            phase: 'confirmed',
+            detectedAt: i,
+        };
+    }
+    return null;
 }
 
 /** @internal Detects a Supertrend flip from down to up (bullish confirmed signal). */

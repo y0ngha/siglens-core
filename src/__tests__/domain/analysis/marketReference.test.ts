@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { HORIZON_WINDOWS_BY_TIMEFRAME } from '@/domain/analysis/marketReferenceConstants';
+import {
+    EMPTY_INDICATOR_RESULT,
+    EMPTY_SMC_RESULT,
+} from '@/domain/indicators/constants';
 import type { Bar, IndicatorResult, SMCSwingPoint } from '@/domain/types';
 
 const DAY_WINDOWS = HORIZON_WINDOWS_BY_TIMEFRAME['1Day'];
@@ -42,37 +46,17 @@ interface IndOverrides {
     ema?: Record<number, (number | null)[]>;
 }
 
-const makeInd = (o: IndOverrides = {}): IndicatorResult =>
-    ({
-        macd: [],
-        bollinger: [],
-        dmi: [{ diPlus: 20, diMinus: 10, adx: o.adx ?? null }],
-        stochastic: [],
-        stochRsi: [],
-        rsi: [],
-        cci: [],
-        vwap: [],
-        ma: o.ma ?? {},
-        ema: o.ema ?? {},
-        volumeProfile: null,
-        ichimoku: [],
-        atr: [],
-        obv: [],
-        parabolicSar: [],
-        williamsR: [],
-        supertrend: [],
-        mfi: [],
-        keltnerChannel: [],
-        cmf: [],
-        donchianChannel: [],
-        buySellVolume: [],
-        smc: {
-            swingHighs: o.swingHighs ?? [],
-            swingLows: o.swingLows ?? [],
-            structureBreaks: [],
-        },
-        squeezeMomentum: [],
-    }) as unknown as IndicatorResult;
+const makeInd = (o: IndOverrides = {}): IndicatorResult => ({
+    ...EMPTY_INDICATOR_RESULT,
+    dmi: [{ diPlus: 20, diMinus: 10, adx: o.adx ?? null }],
+    ma: o.ma ?? {},
+    ema: o.ema ?? {},
+    smc: {
+        ...EMPTY_SMC_RESULT,
+        swingHighs: o.swingHighs ?? [],
+        swingLows: o.swingLows ?? [],
+    },
+});
 
 describe('computeMarketReference', () => {
     it('returns three horizons with windows capped at bars.length', () => {

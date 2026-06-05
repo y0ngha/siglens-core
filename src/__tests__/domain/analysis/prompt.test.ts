@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt,
+    INDICATOR_VALUES_SECTION_HEADER,
+    PRO_INDICATOR_SECTION_HEADER,
+    PRO_RELIABILITY_NOTE,
     PROMPT_CONFIG_BY_TIMEFRAME,
+    REGIME_CONTEXT_SECTION_HEADER,
 } from '@/domain/analysis/prompt';
+import { calculateIndicators } from '@/domain/indicators/index';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
 import {
     ATR_DEFAULT_PERIOD,
@@ -10,6 +15,7 @@ import {
     CMF_DEFAULT_PERIOD,
     DONCHIAN_DEFAULT_PERIOD,
     EMA_DEFAULT_PERIODS,
+    EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
     HIGH_CONFIDENCE_WEIGHT,
     ICHIMOKU_BASE_PERIOD,
@@ -124,29 +130,7 @@ const makeBar = (i: number, close?: number): Bar => ({
 const makeIndicators = (
     overrides?: Partial<IndicatorResult>
 ): IndicatorResult => ({
-    rsi: [],
-    cci: [],
-    vwap: [],
-    macd: [],
-    bollinger: [],
-    dmi: [],
-    stochastic: [],
-    stochRsi: [],
-    ma: {},
-    ema: {},
-    volumeProfile: null,
-    ichimoku: [],
-    atr: [],
-    obv: [],
-    parabolicSar: [],
-    williamsR: [],
-    supertrend: [],
-    mfi: [],
-    keltnerChannel: [],
-    cmf: [],
-    donchianChannel: [],
-    buySellVolume: [],
-    squeezeMomentum: [],
+    ...EMPTY_INDICATOR_RESULT,
     ...overrides,
     smc: overrides?.smc ?? EMPTY_SMC_RESULT,
 });
@@ -4370,6 +4354,271 @@ describe('prompt', () => {
                 tf
             );
             for (const span of spans) expect(prompt).toContain(span);
+        });
+    });
+
+    describe('프로 지표 섹션 (regime lens + confluence panel)', () => {
+        // Longest pro-indicator warm-up (Hurst window 100, Connors RSI
+        // percent-rank 100) needs ~260 bars to guarantee non-null tails.
+        const PRO_ENOUGH_BARS = 260;
+        const REGIME_HEADER = REGIME_CONTEXT_SECTION_HEADER;
+        const INDICATOR_HEADER = INDICATOR_VALUES_SECTION_HEADER;
+        const PRO_HEADER = PRO_INDICATOR_SECTION_HEADER;
+
+        // Deterministic, non-degenerate uptrend + bounded oscillation so every
+        // rolling window has real variance (no flat sub-windows nulling out
+        // Hurst / regression r²). Mirrors index.test.ts buildBars.
+        const buildRealisticBars = (count: number): Bar[] =>
+            Array.from({ length: count }, (_, i) => {
+                const close = 100 + i * 0.5 + Math.sin(i / 5) * 4;
+                return {
+                    time: TEST_BAR_BASE_TIME + i * TEST_BAR_INTERVAL,
+                    open: close - 1,
+                    high: close + 2 + (i % 3),
+                    low: close - 2 - (i % 4),
+                    close,
+                    volume: TEST_BAR_BASE_VOLUME + (i % 7) * 50,
+                };
+            });
+
+        const buildRealisticPrompt = (): string => {
+            const bars = buildRealisticBars(PRO_ENOUGH_BARS);
+            const indicators = calculateIndicators(bars);
+            return buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                []
+            );
+        };
+
+        it('두 신규 섹션 헤더가 모두 존재한다', () => {
+            const prompt = buildRealisticPrompt();
+            expect(prompt).toContain(REGIME_HEADER);
+            expect(prompt).toContain(PRO_HEADER);
+        });
+
+        it('regime lens는 지표 값 앞에, confluence 패널은 뒤에 배치된다', () => {
+            const prompt = buildRealisticPrompt();
+            const regimeIdx = prompt.indexOf(REGIME_HEADER);
+            const indicatorIdx = prompt.indexOf(INDICATOR_HEADER);
+            const proIdx = prompt.indexOf(PRO_HEADER);
+            expect(regimeIdx).toBeGreaterThanOrEqual(0);
+            expect(indicatorIdx).toBeGreaterThanOrEqual(0);
+            expect(proIdx).toBeGreaterThanOrEqual(0);
+            expect(regimeIdx).toBeLessThan(indicatorIdx);
+            expect(indicatorIdx).toBeLessThan(proIdx);
+        });
+
+        it('Bollinger %B 라인이 measured-edge signal 주석을 포함한다', () => {
+            const prompt = buildRealisticPrompt();
+            const proSection = prompt.slice(prompt.indexOf(PRO_HEADER));
+            const pctbLine = proSection
+                .split('\n')
+                .find(l => l.startsWith('- Bollinger %B:'));
+            expect(pctbLine).toBeDefined();
+            expect(pctbLine).toContain(PRO_RELIABILITY_NOTE.bollingerPctB);
+        });
+
+        it('advisory 지표 라인이 advisory 주석을 포함한다', () => {
+            const prompt = buildRealisticPrompt();
+            const macdvLine = prompt
+                .split('\n')
+                .find(l => l.startsWith('- MACD-V:'));
+            expect(macdvLine).toBeDefined();
+            expect(macdvLine).toContain(PRO_RELIABILITY_NOTE.advisory);
+        });
+
+        it('Elder Impulse 라인이 색상과 permission gate 주석을 반영한다', () => {
+            const prompt = buildRealisticPrompt();
+            const impulseLine = prompt
+                .split('\n')
+                .find(l => l.startsWith('- Elder Impulse:'));
+            expect(impulseLine).toBeDefined();
+            expect(impulseLine).toContain(PRO_RELIABILITY_NOTE.impulse);
+            // The fixture is a sustained uptrend → latest color is decisive.
+            expect(impulseLine).toMatch(/green|red|blue/);
+        });
+
+        it('regime lens가 weighting guidance를 포함한다', () => {
+            const prompt = buildRealisticPrompt();
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            expect(regimeSection).toContain(PRO_RELIABILITY_NOTE.regime);
+            expect(regimeSection).toContain(PRO_RELIABILITY_NOTE.volatility);
+        });
+
+        it('Hurst와 Variance Ratio가 결정적으로 충돌하면 random verdict를 렌더한다', () => {
+            // Hurst 0.65 → trending (0.65 - 0.5 = 0.15 ≥ prompt margin 0.05),
+            // Variance Ratio 0.75 → mean-reverting (1 - 0.75 = 0.25 ≥ margin 0.1).
+            // Decisive disagreement collapses to the 'random' (low-conviction) verdict.
+            const indicators = makeIndicators({
+                hurst: [0.65],
+                varianceRatio: [0.75],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain(
+                'near-random (low directional conviction; demand stronger confluence)'
+            );
+        });
+
+        it('Hurst와 Variance Ratio가 모두 mean-reverting이면 mean-reverting verdict를 렌더한다', () => {
+            // Hurst 0.35 → mean-reverting (0.5 - 0.35 = 0.15 ≥ prompt margin 0.05),
+            // Variance Ratio 0.75 → mean-reverting (1 - 0.75 = 0.25 ≥ margin 0.1).
+            // Both voters agree → 'mean-reverting' verdict.
+            const indicators = makeIndicators({
+                hurst: [0.35],
+                varianceRatio: [0.75],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain(
+                'mean-reverting (favour fade/reversion; be wary of breakouts)'
+            );
+        });
+
+        it('Hurst/VR는 null이고 slope만 있으면 near-random이 아닌 insufficient data를 렌더한다', () => {
+            // Only Hurst + VR vote on the verdict; slope merely annotates it. With
+            // both voters null, slope alone must not force a near-random verdict.
+            const indicators = makeIndicators({
+                hurst: [null],
+                varianceRatio: [null],
+                regression: [{ slope: 1.5, r2: 0.8 }],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain('insufficient data');
+            expect(regimeLine).not.toContain('near-random');
+        });
+
+        it('한쪽 voter만 유효하면(Hurst trending, VR null) 그 voter의 verdict를 따른다', () => {
+            // combineRegimeVerdict ignores null votes; with only Hurst voting
+            // 'trending' (0.65 − 0.5 = 0.15 ≥ 0.05) and VR null, the agreed side
+            // is 'trending' — a single decisive voter is not collapsed to random.
+            const indicators = makeIndicators({
+                hurst: [0.65],
+                varianceRatio: [null],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain(
+                'trending (favour trend-following; do not fade)'
+            );
+        });
+
+        it('Elder Impulse가 null을 건너뛰고 직전 유색 봉과 비교해 flip note를 렌더한다', () => {
+            // ['green', null, 'red'] → latest 'red' flipped from the previous
+            // *coloured* bar 'green' (the interspersed null is skipped), matching
+            // the gating layer's "previous coloured bar" semantics.
+            const indicators = makeIndicators({
+                elderImpulse: ['green', null, 'red'],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const impulseLine = prompt
+                .split('\n')
+                .find(l => l.startsWith('- Elder Impulse:'));
+            expect(impulseLine).toBeDefined();
+            expect(impulseLine).toContain('(flipped from green)');
+        });
+
+        it('빈 bars에서도 throw 없이 insufficient data / N/A를 렌더한다', () => {
+            let prompt = '';
+            expect(() => {
+                prompt = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    [],
+                    makeIndicators(),
+                    []
+                );
+            }).not.toThrow();
+            expect(prompt).toContain(REGIME_HEADER);
+            expect(prompt).toContain(PRO_HEADER);
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            expect(regimeSection).toContain('insufficient data');
+            // Pro-indicator lines fall back to N/A while preserving the notes.
+            const proSection = prompt.slice(prompt.indexOf(PRO_HEADER));
+            expect(proSection).toContain('Bollinger %B: N/A');
+            expect(proSection).toContain(PRO_RELIABILITY_NOTE.bollingerPctB);
+        });
+
+        it('짧은 bars(warm-up 미만)에서도 throw하지 않는다', () => {
+            const shortBars = buildRealisticBars(10);
+            const indicators = calculateIndicators(shortBars);
+            expect(() => {
+                buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    shortBars,
+                    indicators,
+                    []
+                );
+            }).not.toThrow();
         });
     });
 });

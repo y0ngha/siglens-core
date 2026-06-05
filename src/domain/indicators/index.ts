@@ -23,6 +23,18 @@ import { calculateDonchianChannel } from './donchianChannel';
 import { calculateBuySellVolume } from './buySellVolume';
 import { calculateSmc } from './smc';
 import { calculateSqueezeMomentum } from './squeezeMomentum';
+import { calculateMacdV } from './macdV';
+import { calculateConnorsRsi } from './connorsRsi';
+import { calculateForceIndex } from './forceIndex';
+import { calculateElderRay } from './elderRay';
+import { calculateElderImpulse } from './elderImpulse';
+import { calculateBollingerDerived } from './bollingerDerived';
+import { calculateChandelierExit } from './chandelierExit';
+import { calculateYangZhang } from './yangZhang';
+import { calculateEwmaVolatility } from './ewmaVolatility';
+import { calculateHurst } from './hurst';
+import { calculateVarianceRatio } from './varianceRatio';
+import { calculateRegression } from './regression';
 import { EMA_DEFAULT_PERIODS, MA_DEFAULT_PERIODS } from './constants';
 
 export * from './rsi';
@@ -49,9 +61,8 @@ export * from './donchianChannel';
 export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
-// Pro-indicator calculation functions. Intentionally NOT wired into
-// calculateIndicators / IndicatorResult / the prompt yet — they are surfaced
-// only after their forward-edge is validated.
+// Pro-indicator (Phase 1) calculation functions — wired into
+// calculateIndicators / IndicatorResult below.
 export * from './bollingerDerived';
 export * from './chandelierExit';
 export * from './connorsRsi';
@@ -81,8 +92,11 @@ export * from './utils';
  * supports — RSI, MACD, Bollinger Bands, DMI, Stochastic, StochRSI, CCI,
  * VWAP, several MA / EMA periods, Volume Profile, Ichimoku, ATR, OBV,
  * Parabolic SAR, Williams %R, Supertrend, MFI, Keltner Channel, CMF,
- * Donchian Channel, buy / sell volume split, SMC structure, and Squeeze
- * Momentum.
+ * Donchian Channel, buy / sell volume split, SMC structure, Squeeze
+ * Momentum, plus the Phase 1 pro-indicators (MACD-V, Connors RSI, Force
+ * Index, Elder-Ray, Elder Impulse, Bollinger %B / BandWidth, Chandelier
+ * Exit, Yang-Zhang volatility, EWMA volatility, Hurst exponent, Variance
+ * Ratio, and rolling linear regression).
  *
  * Bars must be in chronological order (oldest first). The function is pure
  * and does not mutate `bars`. Each indicator's warm-up period is filled
@@ -136,5 +150,17 @@ export function calculateIndicators(bars: Bar[]): IndicatorResult {
         buySellVolume: calculateBuySellVolume(bars),
         smc: calculateSmc(bars),
         squeezeMomentum: calculateSqueezeMomentum(bars),
+        macdV: calculateMacdV(bars),
+        connorsRsi: calculateConnorsRsi(closes),
+        forceIndex: calculateForceIndex(bars),
+        elderRay: calculateElderRay(bars),
+        elderImpulse: calculateElderImpulse(bars),
+        bollingerDerived: calculateBollingerDerived(bars),
+        chandelierExit: calculateChandelierExit(bars),
+        yangZhang: calculateYangZhang(bars),
+        ewmaVolatility: calculateEwmaVolatility(closes),
+        hurst: calculateHurst(closes),
+        varianceRatio: calculateVarianceRatio(closes),
+        regression: calculateRegression(closes),
     };
 }

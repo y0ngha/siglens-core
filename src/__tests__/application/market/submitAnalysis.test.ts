@@ -6,7 +6,10 @@ import type {
     TierConfig,
     Timeframe,
 } from '@/domain/types';
-import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
+import {
+    EMPTY_INDICATOR_RESULT,
+    EMPTY_SMC_RESULT,
+} from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
@@ -92,29 +95,7 @@ const mockBarsData = {
         },
     ],
     indicators: {
-        macd: [],
-        bollinger: [],
-        dmi: [],
-        stochastic: [],
-        stochRsi: [],
-        rsi: [],
-        cci: [],
-        vwap: [],
-        ma: {},
-        ema: {},
-        volumeProfile: null,
-        ichimoku: [],
-        atr: [],
-        obv: [],
-        parabolicSar: [],
-        williamsR: [],
-        supertrend: [],
-        mfi: [],
-        keltnerChannel: [],
-        cmf: [],
-        donchianChannel: [],
-        buySellVolume: [],
-        squeezeMomentum: [],
+        ...EMPTY_INDICATOR_RESULT,
         smc: EMPTY_SMC_RESULT,
     },
 };

@@ -4,7 +4,10 @@ import {
     buildAnalysisPrompt,
     SMC_GUIDE_BLOCKED_NOTICE,
 } from '@/domain/analysis/prompt';
-import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
+import {
+    EMPTY_INDICATOR_RESULT,
+    EMPTY_SMC_RESULT,
+} from '@/domain/indicators/constants';
 import type {
     Bar,
     IndicatorResult,
@@ -28,29 +31,7 @@ const makeBar = (i: number): Bar => ({
 const bars: Bar[] = Array.from({ length: 100 }, (_, i) => makeBar(i));
 
 const makeIndicators = (smc: SMCResult): IndicatorResult => ({
-    rsi: [],
-    cci: [],
-    vwap: [],
-    macd: [],
-    bollinger: [],
-    dmi: [],
-    stochastic: [],
-    stochRsi: [],
-    ma: {},
-    ema: {},
-    volumeProfile: null,
-    ichimoku: [],
-    atr: [],
-    obv: [],
-    parabolicSar: [],
-    williamsR: [],
-    supertrend: [],
-    mfi: [],
-    keltnerChannel: [],
-    cmf: [],
-    donchianChannel: [],
-    buySellVolume: [],
-    squeezeMomentum: [],
+    ...EMPTY_INDICATOR_RESULT,
     smc,
 });
 

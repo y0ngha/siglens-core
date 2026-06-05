@@ -2,13 +2,28 @@ import { describe, it, expect } from 'vitest';
 import {
     isStateNotable,
     BOLLINGER_PCTB_BY_TF,
+    HURST_DECISIVE_MARGIN,
+    VR_DECISIVE_MARGIN,
 } from '@/domain/analysis/skillGatingPredicates';
+import {
+    CRSI_OVERBOUGHT,
+    CRSI_OVERSOLD,
+    EMPTY_INDICATOR_RESULT,
+    HURST_RANDOM_WALK,
+    MACDV_OVERBOUGHT,
+    REGRESSION_R2_SIGNIFICANT,
+    VR_RANDOM_WALK,
+} from '@/domain/indicators/constants';
 import type {
     BollingerResult,
     BuySellVolumeResult,
+    ChandelierResult,
     DonchianChannelResult,
+    ElderRayResult,
+    ImpulseColor,
     IndicatorResult,
     KeltnerChannelResult,
+    RegressionResult,
     SkillSelectionContext,
     SkillStatePredicate,
     StochasticResult,
@@ -38,41 +53,7 @@ interface CtxOverrides {
 }
 
 const emptyIndicators = (): IndicatorResult => ({
-    macd: [],
-    bollinger: [],
-    dmi: [],
-    stochastic: [],
-    stochRsi: [],
-    rsi: [],
-    cci: [],
-    vwap: [],
-    ma: {},
-    ema: {},
-    volumeProfile: null,
-    ichimoku: [],
-    atr: [],
-    obv: [],
-    parabolicSar: [],
-    williamsR: [],
-    supertrend: [],
-    mfi: [],
-    keltnerChannel: [],
-    cmf: [],
-    donchianChannel: [],
-    buySellVolume: [],
-    smc: {
-        swingHighs: [],
-        swingLows: [],
-        orderBlocks: [],
-        fairValueGaps: [],
-        equalHighs: [],
-        equalLows: [],
-        premiumZone: null,
-        discountZone: null,
-        equilibriumZone: null,
-        structureBreaks: [],
-    },
-    squeezeMomentum: [],
+    ...EMPTY_INDICATOR_RESULT,
 });
 
 const makeCtx = (o: CtxOverrides = {}): SkillSelectionContext => {
@@ -107,6 +88,36 @@ const P = (
     predicate: SkillStatePredicate['predicate'],
     extra: Partial<SkillStatePredicate> = {}
 ): SkillStatePredicate => ({ feature, predicate, ...extra });
+
+// Pro-indicator predicates read directly from `ctx.indicators.<field>`, so build
+// the context by spreading the empty suite and overriding only the field under
+// test. `price`/`timeframe` are irrelevant to these features but kept valid.
+const ctxWithIndicators = (
+    indicators: Partial<IndicatorResult>
+): SkillSelectionContext => ({
+    indicators: { ...EMPTY_INDICATOR_RESULT, ...indicators },
+    signals: [],
+    timeframe: '1Day',
+    detectedCandles: [],
+    price: 100,
+    atrPercent: 1,
+});
+
+const elderRay = (
+    bullPower: number | null,
+    bearPower: number | null
+): ElderRayResult => ({ bullPower, bearPower });
+
+const chandelier = (trend: ChandelierResult['trend']): ChandelierResult => ({
+    longStop: trend === 'long' ? 90 : null,
+    shortStop: trend === 'short' ? 110 : null,
+    trend,
+});
+
+const regression = (r2: number | null): RegressionResult => ({
+    slope: 1,
+    r2,
+});
 
 // Bollinger band that yields a given %B at a given price: %B = (price-lower)/(upper-lower).
 const bollForPctB = (
@@ -502,4 +513,361 @@ describe('isStateNotable — mismatched feature/predicate pairs', () => {
         });
         expect(isStateNotable(P('keltner', 'bandDistAtr'), ctx)).toBe(false);
     });
+});
+
+// ── Pro-indicators Phase 3 (advisory / regime / volatility) ───────────────────
+
+describe('isStateNotable — macdV level', () => {
+    it('fires in the +150 overbought risk zone', () => {
+        const ctx = ctxWithIndicators({ macdV: [MACDV_OVERBOUGHT + 5] });
+        expect(isStateNotable(P('macdV', 'level'), ctx)).toBe(true);
+    });
+    it('fires in the -150 oversold risk zone', () => {
+        const ctx = ctxWithIndicators({ macdV: [-(MACDV_OVERBOUGHT + 5)] });
+        expect(isStateNotable(P('macdV', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire inside the ±150 band', () => {
+        const ctx = ctxWithIndicators({ macdV: [50] });
+        expect(isStateNotable(P('macdV', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when latest is null', () => {
+        const ctx = ctxWithIndicators({ macdV: [100, null] });
+        expect(isStateNotable(P('macdV', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ macdV: [] });
+        expect(isStateNotable(P('macdV', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — connorsRsi level', () => {
+    it('fires at/below the oversold threshold', () => {
+        const ctx = ctxWithIndicators({ connorsRsi: [CRSI_OVERSOLD - 1] });
+        expect(isStateNotable(P('connorsRsi', 'level'), ctx)).toBe(true);
+    });
+    it('fires at/above the overbought threshold', () => {
+        const ctx = ctxWithIndicators({ connorsRsi: [CRSI_OVERBOUGHT + 1] });
+        expect(isStateNotable(P('connorsRsi', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire mid-range', () => {
+        const ctx = ctxWithIndicators({ connorsRsi: [50] });
+        expect(isStateNotable(P('connorsRsi', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when latest is null', () => {
+        const ctx = ctxWithIndicators({ connorsRsi: [5, null] });
+        expect(isStateNotable(P('connorsRsi', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ connorsRsi: [] });
+        expect(isStateNotable(P('connorsRsi', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — forceIndex level (sign flip)', () => {
+    it('fires when the sign flips negative → positive vs the previous finite read', () => {
+        const ctx = ctxWithIndicators({ forceIndex: [-200, 150] });
+        expect(isStateNotable(P('forceIndex', 'level'), ctx)).toBe(true);
+    });
+    it('fires when the sign flips positive → negative', () => {
+        const ctx = ctxWithIndicators({ forceIndex: [200, -150] });
+        expect(isStateNotable(P('forceIndex', 'level'), ctx)).toBe(true);
+    });
+    it('skips trailing nulls and compares the last two finite reads', () => {
+        const ctx = ctxWithIndicators({ forceIndex: [-200, 150, null] });
+        expect(isStateNotable(P('forceIndex', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire without a sign flip', () => {
+        const ctx = ctxWithIndicators({ forceIndex: [100, 200] });
+        expect(isStateNotable(P('forceIndex', 'level'), ctx)).toBe(false);
+    });
+    it('returns false with fewer than two finite reads', () => {
+        const ctx = ctxWithIndicators({ forceIndex: [null, 150] });
+        expect(isStateNotable(P('forceIndex', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ forceIndex: [] });
+        expect(isStateNotable(P('forceIndex', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — elderRay level (turn vs previous bar)', () => {
+    it('fires when bear power is negative but rising (best-buy setup)', () => {
+        const ctx = ctxWithIndicators({
+            elderRay: [elderRay(2, -5), elderRay(2, -3)],
+        });
+        expect(isStateNotable(P('elderRay', 'level'), ctx)).toBe(true);
+    });
+    it('fires when bull power is positive but falling', () => {
+        const ctx = ctxWithIndicators({
+            elderRay: [elderRay(8, -2), elderRay(5, -2)],
+        });
+        expect(isStateNotable(P('elderRay', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire when neither power is turning', () => {
+        const ctx = ctxWithIndicators({
+            elderRay: [elderRay(5, -3), elderRay(5, -5)],
+        });
+        expect(isStateNotable(P('elderRay', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when a power is null', () => {
+        const ctx = ctxWithIndicators({
+            elderRay: [elderRay(2, null), elderRay(2, null)],
+        });
+        expect(isStateNotable(P('elderRay', 'level'), ctx)).toBe(false);
+    });
+    it('returns false with fewer than two bars', () => {
+        const ctx = ctxWithIndicators({ elderRay: [elderRay(2, -3)] });
+        expect(isStateNotable(P('elderRay', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ elderRay: [] });
+        expect(isStateNotable(P('elderRay', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — elderImpulse level (permission)', () => {
+    const C = (c: ImpulseColor | null): ImpulseColor | null => c;
+    it('fires when the latest non-blue colour flips vs the previous coloured bar', () => {
+        const ctx = ctxWithIndicators({ elderImpulse: [C('green'), C('red')] });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(true);
+    });
+    it('fires when the latest colour is non-blue even without a flip', () => {
+        const ctx = ctxWithIndicators({
+            elderImpulse: [C('green'), C('green')],
+        });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(true);
+    });
+    it('fires when blue flips to a coloured bar', () => {
+        const ctx = ctxWithIndicators({ elderImpulse: [C('blue'), C('red')] });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire when blue persists (no flip, blue)', () => {
+        const ctx = ctxWithIndicators({
+            elderImpulse: [C('blue'), C('blue')],
+        });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(false);
+    });
+    it('fires when a coloured bar flips to blue (permission opens)', () => {
+        const ctx = ctxWithIndicators({ elderImpulse: [C('red'), C('blue')] });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(true);
+    });
+    it('returns false when the latest colour is null', () => {
+        const ctx = ctxWithIndicators({
+            elderImpulse: [C('green'), C(null)],
+        });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ elderImpulse: [] });
+        expect(isStateNotable(P('elderImpulse', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — chandelier level (trend flip)', () => {
+    it('fires when the trend flipped within the lookback window', () => {
+        const ctx = ctxWithIndicators({
+            chandelierExit: [chandelier('long'), chandelier('short')],
+        });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(true);
+    });
+    it('skips a null trend bar inside the window to find the prior side', () => {
+        const ctx = ctxWithIndicators({
+            chandelierExit: [
+                chandelier('long'),
+                chandelier(null),
+                chandelier('short'),
+            ],
+        });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire when the trend held steady', () => {
+        const ctx = ctxWithIndicators({
+            chandelierExit: [
+                chandelier('long'),
+                chandelier('long'),
+                chandelier('long'),
+            ],
+        });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(false);
+    });
+    it('does NOT fire when the flip is older than the lookback window', () => {
+        const ctx = ctxWithIndicators({
+            chandelierExit: [
+                chandelier('short'),
+                chandelier('long'),
+                chandelier('long'),
+                chandelier('long'),
+                chandelier('long'),
+            ],
+        });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when the latest trend is null', () => {
+        const ctx = ctxWithIndicators({
+            chandelierExit: [chandelier('long'), chandelier(null)],
+        });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(false);
+    });
+    it('returns false with fewer than two bars', () => {
+        const ctx = ctxWithIndicators({
+            chandelierExit: [chandelier('long')],
+        });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ chandelierExit: [] });
+        expect(isStateNotable(P('chandelier', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — hurst level', () => {
+    it('fires when H is decisively trending (past centre + margin)', () => {
+        const ctx = ctxWithIndicators({
+            hurst: [HURST_RANDOM_WALK + HURST_DECISIVE_MARGIN * 1.5],
+        });
+        expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(true);
+    });
+    it('fires when H is decisively mean-reverting (past centre - margin)', () => {
+        const ctx = ctxWithIndicators({
+            hurst: [HURST_RANDOM_WALK - HURST_DECISIVE_MARGIN * 1.5],
+        });
+        expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire just inside the decisive margin', () => {
+        const ctx = ctxWithIndicators({
+            hurst: [HURST_RANDOM_WALK + HURST_DECISIVE_MARGIN / 2],
+        });
+        expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when latest is null', () => {
+        const ctx = ctxWithIndicators({ hurst: [0.65, null] });
+        expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ hurst: [] });
+        expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — varianceRatio level', () => {
+    it('fires when VR is decisively trending (past centre + margin)', () => {
+        const ctx = ctxWithIndicators({
+            varianceRatio: [VR_RANDOM_WALK + VR_DECISIVE_MARGIN * 1.5],
+        });
+        expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(true);
+    });
+    it('fires when VR is decisively mean-reverting (past centre - margin)', () => {
+        const ctx = ctxWithIndicators({
+            varianceRatio: [VR_RANDOM_WALK - VR_DECISIVE_MARGIN * 1.5],
+        });
+        expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire just inside the decisive margin', () => {
+        const ctx = ctxWithIndicators({
+            varianceRatio: [VR_RANDOM_WALK + VR_DECISIVE_MARGIN / 2],
+        });
+        expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when latest is null', () => {
+        const ctx = ctxWithIndicators({ varianceRatio: [1.25, null] });
+        expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ varianceRatio: [] });
+        expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — regression level (r²)', () => {
+    it('fires exactly at the significance cutoff', () => {
+        const ctx = ctxWithIndicators({
+            regression: [regression(REGRESSION_R2_SIGNIFICANT)],
+        });
+        expect(isStateNotable(P('regression', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire just below the cutoff (choppy)', () => {
+        const ctx = ctxWithIndicators({
+            regression: [regression(REGRESSION_R2_SIGNIFICANT - 0.1)],
+        });
+        expect(isStateNotable(P('regression', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when r² is null (flat series)', () => {
+        const ctx = ctxWithIndicators({ regression: [regression(null)] });
+        expect(isStateNotable(P('regression', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ regression: [] });
+        expect(isStateNotable(P('regression', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — yangZhang level (vol regime)', () => {
+    it('fires when the latest read is a high-vol expansion vs the window mean', () => {
+        const ctx = ctxWithIndicators({ yangZhang: [10, 10, 10, 30] });
+        expect(isStateNotable(P('yangZhang', 'level'), ctx)).toBe(true);
+    });
+    it('fires when the latest read is a low-vol compression', () => {
+        const ctx = ctxWithIndicators({ yangZhang: [20, 20, 20, 4] });
+        expect(isStateNotable(P('yangZhang', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire for a steady vol regime', () => {
+        const ctx = ctxWithIndicators({ yangZhang: [20, 21, 19, 20] });
+        expect(isStateNotable(P('yangZhang', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when latest is null', () => {
+        const ctx = ctxWithIndicators({ yangZhang: [10, 10, null] });
+        expect(isStateNotable(P('yangZhang', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ yangZhang: [] });
+        expect(isStateNotable(P('yangZhang', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — ewma level (vol regime)', () => {
+    it('fires when reactive vol expands vs the window mean', () => {
+        const ctx = ctxWithIndicators({ ewmaVolatility: [10, 10, 10, 30] });
+        expect(isStateNotable(P('ewma', 'level'), ctx)).toBe(true);
+    });
+    it('fires when reactive vol contracts vs the window mean', () => {
+        const ctx = ctxWithIndicators({ ewmaVolatility: [20, 20, 20, 4] });
+        expect(isStateNotable(P('ewma', 'level'), ctx)).toBe(true);
+    });
+    it('does NOT fire for a steady vol regime', () => {
+        const ctx = ctxWithIndicators({ ewmaVolatility: [20, 21, 19, 20] });
+        expect(isStateNotable(P('ewma', 'level'), ctx)).toBe(false);
+    });
+    it('returns false when latest is null', () => {
+        const ctx = ctxWithIndicators({ ewmaVolatility: [10, 10, null] });
+        expect(isStateNotable(P('ewma', 'level'), ctx)).toBe(false);
+    });
+    it('returns false on an empty series', () => {
+        const ctx = ctxWithIndicators({ ewmaVolatility: [] });
+        expect(isStateNotable(P('ewma', 'level'), ctx)).toBe(false);
+    });
+});
+
+describe('isStateNotable — pro-indicator mismatched predicate kinds', () => {
+    // Every pro-indicator feature is gated on 'level'; any other kind must take
+    // the safe `false` arm rather than throwing.
+    const proFeatures: ReadonlyArray<SkillStatePredicate['feature']> = [
+        'macdV',
+        'connorsRsi',
+        'forceIndex',
+        'elderRay',
+        'elderImpulse',
+        'chandelier',
+        'hurst',
+        'varianceRatio',
+        'regression',
+        'yangZhang',
+        'ewma',
+    ];
+    it.each(proFeatures)(
+        'returns false for feature=%s with a non-level predicate',
+        feature => {
+            const ctx = ctxWithIndicators({});
+            expect(isStateNotable(P(feature, 'pctB'), ctx)).toBe(false);
+        }
+    );
 });

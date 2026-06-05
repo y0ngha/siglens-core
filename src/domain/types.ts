@@ -482,21 +482,47 @@ export interface IndicatorResult {
     smc: SMCResult;
     /** Squeeze Momentum indicator per bar. */
     squeezeMomentum: SqueezeMomentumResult[];
+    /** MACD-V (volatility-normalized MACD) per bar. */
+    macdV: (number | null)[];
+    /** Connors RSI composite per bar. */
+    connorsRsi: (number | null)[];
+    /** Elder Force Index (EMA-smoothed) per bar. */
+    forceIndex: (number | null)[];
+    /** Elder-Ray bull/bear power per bar. */
+    elderRay: ElderRayResult[];
+    /** Elder Impulse System color per bar. */
+    elderImpulse: (ImpulseColor | null)[];
+    /** Bollinger %B + BandWidth per bar. */
+    bollingerDerived: BollingerDerivedResult[];
+    /** Chandelier Exit stops + trend per bar. */
+    chandelierExit: ChandelierResult[];
+    /** Yang-Zhang volatility per bar. */
+    yangZhang: (number | null)[];
+    /** EWMA (RiskMetrics) volatility per bar. */
+    ewmaVolatility: (number | null)[];
+    /** Hurst exponent (rolling R/S) per bar. */
+    hurst: (number | null)[];
+    /** Variance ratio (rolling) per bar. */
+    varianceRatio: (number | null)[];
+    /** Rolling linear-regression result (slope/r²) per bar. */
+    regression: RegressionResult[];
 }
 
 // ─── Pro Indicators Phase 1 ──────────────────────────────────────────────────
 
 /**
- * @internal Bull Power / Bear Power output from Elder-Ray.
+ * Bull Power / Bear Power output from Elder-Ray.
  * `null` during the EMA warm-up window.
  */
 export interface ElderRayResult {
+    /** Maximum buyer strength: High − EMA(13); positive when buyers dominate. */
     bullPower: number | null;
+    /** Maximum seller strength: Low − EMA(13); negative when sellers dominate. */
     bearPower: number | null;
 }
 
 /**
- * @internal Elder Impulse System bar color.
+ * Elder Impulse System bar color.
  * `green` = EMA rising AND MACD histogram rising (bullish momentum).
  * `red`   = EMA falling AND MACD histogram falling (bearish momentum).
  * `blue`  = mixed signals (neutral / transitional).
@@ -504,12 +530,12 @@ export interface ElderRayResult {
 export type ImpulseColor = 'green' | 'red' | 'blue';
 
 /**
- * @internal Chandelier Exit position side: holding a long or short position.
+ * Chandelier Exit position side: holding a long or short position.
  */
 export type ChandelierTrend = 'long' | 'short';
 
 /**
- * @internal Per-bar Bollinger %B and BandWidth derived values.
+ * Per-bar Bollinger %B and BandWidth derived values.
  * `null` during the Bollinger warm-up window or when the band is degenerate
  * (zero-width → pctB undefined; zero middle → bandwidth undefined).
  */
@@ -521,7 +547,7 @@ export interface BollingerDerivedResult {
 }
 
 /**
- * @internal Chandelier Exit stop levels and trend direction.
+ * Chandelier Exit stop levels and trend direction.
  * `null` during the ATR / sliding-window warm-up window.
  */
 export interface ChandelierResult {
@@ -534,7 +560,7 @@ export interface ChandelierResult {
 }
 
 /**
- * @internal Per-bar linear-regression (OLS) fit over the trailing window.
+ * Per-bar linear-regression (OLS) fit over the trailing window.
  * `null` during the warm-up window; `r2` is `null` when the series is flat
  * (SS_tot = 0 → coefficient of determination undefined).
  */
@@ -644,7 +670,23 @@ export type SkillStateFeature =
     | 'stochRsi'
     | 'donchian'
     | 'vwap'
-    | 'buySellVolume';
+    | 'buySellVolume'
+    // ── Pro-indicators Phase 3 (advisory / regime / volatility) ──────────────
+    // All gated on `predicate: 'level'`. "Level" here is generalized beyond a
+    // raw oscillator bound: each feature's evaluator decides what "notable" means
+    // (extreme reading, sign/colour/trend flip, or a vol-regime extreme) — see
+    // `skillGatingPredicates.ts`. Bollinger %B is event-gated separately, not here.
+    | 'macdV'
+    | 'connorsRsi'
+    | 'forceIndex'
+    | 'elderRay'
+    | 'elderImpulse'
+    | 'chandelier'
+    | 'hurst'
+    | 'varianceRatio'
+    | 'regression'
+    | 'yangZhang'
+    | 'ewma';
 
 /**
  * Predicate key selecting how a feature's current value is compared against a
@@ -652,7 +694,10 @@ export type SkillStateFeature =
  *
  * - `'pctB'` — Bollinger %B vs timeframe-aware hi/lo bounds.
  * - `'bandDistAtr'` — distance to a channel band measured in ATR multiples.
- * - `'level'` — raw oscillator value vs overbought/oversold bounds.
+ * - `'level'` — feature-defined "notable level". For the simple oscillators this
+ *   is a raw value vs overbought/oversold bounds; for the pro-indicators it is
+ *   generalized per feature (an extreme reading, a sign/colour/trend flip, or a
+ *   volatility-regime extreme) — the backing evaluator owns the exact meaning.
  * - `'ratio'` — a 0–1 ratio (e.g. buy/(buy+sell)) vs hi/lo bounds.
  * - `'channelProximity'` — proximity to (or breach of) a channel high/low.
  */
@@ -1569,6 +1614,8 @@ export type ConfirmedSignalType =
     | 'macd_bearish_cross'
     | 'bollinger_lower_bounce'
     | 'bollinger_upper_breakout'
+    | 'bollinger_percentb_oversold'
+    | 'bollinger_percentb_overbought'
     | 'supertrend_bullish_flip'
     | 'parabolic_sar_flip'
     | 'ichimoku_cloud_breakout'

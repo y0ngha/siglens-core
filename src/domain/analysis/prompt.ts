@@ -4,11 +4,15 @@ import {
     ATR_DEFAULT_PERIOD,
     CCI_DEFAULT_PERIOD,
     CMF_DEFAULT_PERIOD,
+    CRSI_OVERBOUGHT,
+    CRSI_OVERSOLD,
     DONCHIAN_DEFAULT_PERIOD,
     EMA_DEFAULT_PERIODS,
     EMA_SUPPORT_RESISTANCE_LONG_INDEX,
     EMA_SUPPORT_RESISTANCE_SHORT_INDEX,
+    FORCE_INDEX_ZERO,
     HIGH_CONFIDENCE_WEIGHT,
+    HURST_RANDOM_WALK,
     ICHIMOKU_BASE_PERIOD,
     ICHIMOKU_CONVERSION_PERIOD,
     ICHIMOKU_SPAN_B_PERIOD,
@@ -16,7 +20,12 @@ import {
     KELTNER_EMA_PERIOD,
     KELTNER_MULTIPLIER,
     MA_DEFAULT_PERIODS,
+    MACDV_OVERBOUGHT,
+    MACDV_OVERSOLD,
     MFI_DEFAULT_PERIOD,
+    PCTB_OVERBOUGHT,
+    PCTB_OVERSOLD,
+    REGRESSION_R2_SIGNIFICANT,
     RSI_DEFAULT_PERIOD,
     SMC_SWING_PERIOD,
     SQUEEZE_MOMENTUM_BB_LENGTH,
@@ -31,6 +40,7 @@ import {
     STOCHASTIC_SMOOTHING,
     SUPERTREND_ATR_PERIOD,
     SUPERTREND_MULTIPLIER,
+    VR_RANDOM_WALK,
     WILLIAMS_R_DEFAULT_PERIOD,
 } from '@/domain/indicators/constants';
 import { MS_PER_SECOND } from '@/domain/constants/time';
@@ -54,6 +64,7 @@ import type {
     FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
+    ImpulseColor,
     IndicatorResult,
     MarketReference,
     PromptConfig,
@@ -78,6 +89,12 @@ type SkillGroupKey = SkillType | 'regular';
 const INDICATOR_DECIMAL_PLACES = 2;
 const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
+
+// MACD-V "momentum lifecycle" inner band: research §1 places the weak/strong
+// transition at ±50, which is the ±150 OB/OS bound divided by 3. Deriving it
+// from the shared MACDV_OVERBOUGHT keeps the two bands in lockstep if retuned.
+/** @internal Divisor from the ±150 MACD-V OB/OS bound to the ±50 transition band. */
+const MACDV_ZONE_INNER_DIVISOR = 3;
 
 /**
  * @internal Per-timeframe prompt configuration (trend sample counts, decimal places 등).
@@ -787,6 +804,313 @@ const formatMarketReferenceSection = (
         formatHorizonBlock('long', reference.long, timeframe),
     ].join('\n');
 
+// ── Pro-indicator measured-reliability annotations ─────────────────────────
+// Inline "신뢰도 가중치": each pro-indicator line carries one of these notes so the
+// model weights the read by our Phase 2 forward-edge study, NOT textbook
+// enthusiasm. The study (2y, look-ahead-safe, 10 large-caps pooled) found
+// standalone directional edges ≈ 0 for the advisory layer; Bollinger %B (daily,
+// short, with confirmation) is the single modest measured edge; the regime trio
+// conditions the directional reads; the volatility pair is risk/measurement.
+/**
+ * @internal Measured-reliability annotation strings appended to each
+ * pro-indicator / regime / volatility line. Exported so tests assert the exact
+ * substring rendered (MISTAKES.md Tests #4/#13).
+ */
+export const PRO_RELIABILITY_NOTE = {
+    bollingerPctB:
+        '{signal: daily short mean-reversion — modest measured edge; require confirmation}',
+    advisory:
+        '{advisory: no standalone forward-edge measured — use as confluence/context only}',
+    impulse:
+        '{permission gate: green = longs only, red = shorts only, blue = both allowed}',
+    chandelier: '{risk context: trailing stop / trend regime — not an entry}',
+    regime: '{regime lens: weight directional reads by this — trend-follow if trending, fade if mean-reverting}',
+    volatility:
+        '{risk context: position sizing / stop distance / breakout follow-through}',
+} as const;
+
+// Regime classification cut-points. Hurst and Variance Ratio pivot on their
+// random-walk centres (HURST_RANDOM_WALK / VR_RANDOM_WALK, shared with the
+// gating layer); a symmetric "decisive margin" keeps a read near the centre
+// labelled inconclusive instead of forcing a trend/revert call.
+/**
+ * @internal |H − centre| below this → too close to random to classify.
+ * Intentionally looser than `skillGatingPredicates.ts`'s `HURST_DECISIVE_MARGIN`
+ * (0.1): prompt classification labels are more permissive than the skill-gating
+ * threshold.
+ */
+const HURST_REGIME_VERDICT_MARGIN = 0.05;
+/**
+ * @internal |VR − 1| below this → too close to random to classify.
+ * Intentionally looser than `skillGatingPredicates.ts`'s `VR_DECISIVE_MARGIN`
+ * (0.2): prompt classification labels are more permissive than the skill-gating
+ * threshold.
+ */
+const VR_REGIME_VERDICT_MARGIN = 0.1;
+// Direction-blind R²: high → clean trend. The "visibly trending" floor uses the
+// shared REGRESSION_R2_SIGNIFICANT (domain/indicators/constants.ts) so the prompt
+// narrative and the skill gate never drift apart; see its JSDoc for the
+// window-scaled critical-R² rationale (research §10).
+
+type RegimeVerdict = 'trending' | 'mean-reverting' | 'random';
+
+const VERDICT_LABEL: Record<RegimeVerdict, string> = {
+    trending: 'trending (favour trend-following; do not fade)',
+    'mean-reverting':
+        'mean-reverting (favour fade/reversion; be wary of breakouts)',
+    random: 'near-random (low directional conviction; demand stronger confluence)',
+};
+
+// Classify each regime tool into a vote, then combine: any decisive disagreement
+// or all-inconclusive → random; otherwise the agreed side. Direction-blind R²
+// does not vote on a side — high R² only reinforces an existing trend vote.
+const hurstVote = (h: number | null): RegimeVerdict | null => {
+    if (h === null) return null;
+    if (h - HURST_RANDOM_WALK >= HURST_REGIME_VERDICT_MARGIN) return 'trending';
+    if (HURST_RANDOM_WALK - h >= HURST_REGIME_VERDICT_MARGIN)
+        return 'mean-reverting';
+    return 'random';
+};
+
+const varianceRatioVote = (vr: number | null): RegimeVerdict | null => {
+    if (vr === null) return null;
+    if (vr - VR_RANDOM_WALK >= VR_REGIME_VERDICT_MARGIN) return 'trending';
+    if (VR_RANDOM_WALK - vr >= VR_REGIME_VERDICT_MARGIN)
+        return 'mean-reverting';
+    return 'random';
+};
+
+const combineRegimeVerdict = (
+    votes: (RegimeVerdict | null)[]
+): RegimeVerdict => {
+    const decided = votes.filter(
+        (v): v is RegimeVerdict => v !== null && v !== 'random'
+    );
+    if (decided.length === 0) return 'random';
+    const allTrending = decided.every(v => v === 'trending');
+    const allReverting = decided.every(v => v === 'mean-reverting');
+    if (allTrending) return 'trending';
+    if (allReverting) return 'mean-reverting';
+    // Decisive votes disagree → no coherent regime.
+    return 'random';
+};
+
+/** @internal Section header — exported so tests reference the exact string (MISTAKES.md Tests #4). */
+export const REGIME_CONTEXT_SECTION_HEADER = '## Market Regime & Risk Context';
+/** @internal Section header — exported so tests reference the exact string. */
+export const INDICATOR_VALUES_SECTION_HEADER = '## Indicator Values';
+/** @internal Section header — exported so tests reference the exact string. */
+export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Confluence';
+
+const REGIME_INSUFFICIENT_DATA_LINE =
+    '- Regime: insufficient data (regime indicators still in warm-up)';
+
+/**
+ * @internal Build the `- Regime: …` line from the latest regime reads. Pulled
+ * out of {@link formatRegimeContextSection} (was an inline IIFE) so the
+ * trend/mean-revert classification + R² narrative live in one named place.
+ * Called only when at least one of Hurst / VR (the verdict voters) is non-null.
+ */
+/** @internal Directional suffix for the R² narrative from a regression slope. */
+const slopeDirLabel = (slope: number | null): string => {
+    if (slope === null) return '';
+    if (slope > 0) return ', slope up';
+    if (slope < 0) return ', slope down';
+    return ', slope flat';
+};
+
+const computeRegimeLine = (
+    lastHurst: number | null,
+    lastVR: number | null,
+    lastSlope: number | null,
+    lastR2: number | null
+): string => {
+    const verdict = combineRegimeVerdict([
+        hurstVote(lastHurst),
+        varianceRatioVote(lastVR),
+    ]);
+    const cleanTrend = lastR2 !== null && lastR2 >= REGRESSION_R2_SIGNIFICANT;
+    const slopeDir = slopeDirLabel(lastSlope);
+    const r2Note =
+        lastR2 === null
+            ? ''
+            : cleanTrend
+              ? ` — R² ${fmt(lastR2)} high (clean directional fit${slopeDir}; significance scales with window)`
+              : ` — R² ${fmt(lastR2)} low (choppy / weak linear fit${slopeDir}; significance scales with window)`;
+    return `- Regime: Hurst ${fmt(lastHurst)} / Variance Ratio ${fmt(lastVR)}${r2Note} → ${VERDICT_LABEL[verdict]} ${PRO_RELIABILITY_NOTE.regime}`;
+};
+
+const formatRegimeContextSection = (
+    indicators: IndicatorResult,
+    config: PromptConfig
+): string => {
+    const lastHurst = lastNonNull(indicators.hurst);
+    const lastVR = lastNonNull(indicators.varianceRatio);
+    const lastRegression = indicators.regression.findLast(
+        r => r.slope !== null
+    );
+    const lastSlope = lastRegression?.slope ?? null;
+    const lastR2 = lastRegression?.r2 ?? null;
+    const lastYangZhang = lastNonNull(indicators.yangZhang);
+    const lastEwma = lastNonNull(indicators.ewmaVolatility);
+
+    const header = REGIME_CONTEXT_SECTION_HEADER;
+
+    // Only Hurst + VR vote on the verdict; slope/R² merely annotate it. So when
+    // both voters are null, the verdict is undefined regardless of slope — render
+    // "insufficient data" instead of a spurious near-random call from slope alone.
+    const regimeAllNull = lastHurst === null && lastVR === null;
+
+    const regimeLine = regimeAllNull
+        ? REGIME_INSUFFICIENT_DATA_LINE
+        : computeRegimeLine(lastHurst, lastVR, lastSlope, lastR2);
+
+    const volAllNull = lastYangZhang === null && lastEwma === null;
+    const yzTrend = detectTrend(indicators.yangZhang, config.trendSampleCount);
+    const ewmaTrend = detectTrend(
+        indicators.ewmaVolatility,
+        config.trendSampleCount
+    );
+    const volLine = volAllNull
+        ? '- Volatility: N/A (volatility estimators still in warm-up)'
+        : `- Volatility: Yang-Zhang ${fmt(lastYangZhang)}${trendLabel(yzTrend)} / EWMA ${fmt(lastEwma)}${trendLabel(ewmaTrend)} ${PRO_RELIABILITY_NOTE.volatility}`;
+
+    return [header, regimeLine, volLine].join('\n');
+};
+
+// ── Pro-indicator confluence panel ─────────────────────────────────────────
+const pctBLabel = (pctB: number | null): string => {
+    if (pctB === null) return '';
+    if (pctB <= PCTB_OVERSOLD) return ' [oversold — lower-band tag]';
+    if (pctB >= PCTB_OVERBOUGHT) return ' [overbought — upper-band tag]';
+    return '';
+};
+
+const macdVZoneLabel = (value: number | null): string => {
+    if (value === null) return '';
+    if (value <= MACDV_OVERSOLD) return ' [oversold reset zone]';
+    if (value >= MACDV_OVERBOUGHT) return ' [overbought rollover zone]';
+    if (value < MACDV_OVERSOLD / MACDV_ZONE_INNER_DIVISOR)
+        return ' [strong negative momentum]';
+    if (value > MACDV_OVERBOUGHT / MACDV_ZONE_INNER_DIVISOR)
+        return ' [strong positive momentum]';
+    return value >= 0 ? ' [positive regime]' : ' [negative regime]';
+};
+
+const crsiLabel = (value: number | null): string => {
+    if (value === null) return '';
+    if (value <= CRSI_OVERSOLD) return ' [oversold]';
+    if (value >= CRSI_OVERBOUGHT) return ' [overbought]';
+    return '';
+};
+
+const forceIndexSignLabel = (value: number | null): string => {
+    if (value === null) return '';
+    if (value > FORCE_INDEX_ZERO) return ' [buying pressure]';
+    if (value < FORCE_INDEX_ZERO) return ' [selling pressure]';
+    return ' [neutral]';
+};
+
+// "Just flipped" = latest color differs from the previous *coloured* bar (nulls
+// skipped), i.e. a permission change printed on the last bar. Skipping nulls
+// mirrors the gating layer's `elderImpulseLevelNotable`, so both layers compare
+// against the same "previous coloured bar".
+const impulseFlipNote = (colors: (ImpulseColor | null)[]): string => {
+    const lastIdx = colors.length - 1;
+    if (lastIdx < 1) return '';
+    const cur = colors[lastIdx];
+    if (cur === null) return '';
+    const prev = colors.findLast((c, i) => c !== null && i < lastIdx) ?? null;
+    if (prev === null) return '';
+    return cur !== prev ? ` (flipped from ${prev})` : ' (no flip)';
+};
+
+const formatBollingerPercentBLine = (indicators: IndicatorResult): string => {
+    const last = lastOf(indicators.bollingerDerived);
+    if (!last || last.pctB === null) {
+        return `- Bollinger %B: N/A ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
+    }
+    const bandwidthStr =
+        last.bandwidth !== null ? ` / BandWidth ${fmt(last.bandwidth)}` : '';
+    return `- Bollinger %B: ${fmt(last.pctB)}${bandwidthStr}${pctBLabel(last.pctB)} ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
+};
+
+const formatMacdVLine = (
+    indicators: IndicatorResult,
+    config: PromptConfig
+): string => {
+    const value = lastNonNull(indicators.macdV);
+    if (value === null) {
+        return `- MACD-V: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
+    }
+    const trend = detectTrend(indicators.macdV, config.trendSampleCount);
+    return `- MACD-V: ${fmt(value)}${macdVZoneLabel(value)}${trendLabel(trend)} ${PRO_RELIABILITY_NOTE.advisory}`;
+};
+
+const formatConnorsRsiLine = (indicators: IndicatorResult): string => {
+    const value = lastNonNull(indicators.connorsRsi);
+    if (value === null) {
+        return `- Connors RSI: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
+    }
+    return `- Connors RSI: ${fmt(value)}${crsiLabel(value)} ${PRO_RELIABILITY_NOTE.advisory}`;
+};
+
+const formatForceIndexLine = (
+    indicators: IndicatorResult,
+    config: PromptConfig
+): string => {
+    const value = lastNonNull(indicators.forceIndex);
+    if (value === null) {
+        return `- Force Index: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
+    }
+    const trend = detectTrend(indicators.forceIndex, config.trendSampleCount);
+    return `- Force Index: ${fmt(value)}${forceIndexSignLabel(value)}${trendLabel(trend)} ${PRO_RELIABILITY_NOTE.advisory}`;
+};
+
+const formatElderRayLine = (indicators: IndicatorResult): string => {
+    const last = lastOf(indicators.elderRay);
+    if (!last || (last.bullPower === null && last.bearPower === null)) {
+        return `- Elder-Ray: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
+    }
+    return `- Elder-Ray: Bull Power ${fmt(last.bullPower)} / Bear Power ${fmt(last.bearPower)} ${PRO_RELIABILITY_NOTE.advisory}`;
+};
+
+const formatElderImpulseLine = (indicators: IndicatorResult): string => {
+    const colors = indicators.elderImpulse;
+    const last = lastOf(colors);
+    if (!last) {
+        return `- Elder Impulse: N/A ${PRO_RELIABILITY_NOTE.impulse}`;
+    }
+    return `- Elder Impulse: ${last}${impulseFlipNote(colors)} ${PRO_RELIABILITY_NOTE.impulse}`;
+};
+
+const formatChandelierLine = (indicators: IndicatorResult): string => {
+    const last = lastOf(indicators.chandelierExit);
+    if (!last || last.trend === null) {
+        return `- Chandelier Exit: N/A ${PRO_RELIABILITY_NOTE.chandelier}`;
+    }
+    const activeStop =
+        last.trend === 'long'
+            ? `long stop ${fmt(last.longStop)}`
+            : `short stop ${fmt(last.shortStop)}`;
+    return `- Chandelier Exit: ${activeStop} (trend: ${last.trend}) ${PRO_RELIABILITY_NOTE.chandelier}`;
+};
+
+const formatProIndicatorSection = (
+    indicators: IndicatorResult,
+    config: PromptConfig
+): string =>
+    [
+        PRO_INDICATOR_SECTION_HEADER,
+        formatBollingerPercentBLine(indicators),
+        formatMacdVLine(indicators, config),
+        formatConnorsRsiLine(indicators),
+        formatForceIndexLine(indicators, config),
+        formatElderRayLine(indicators),
+        formatElderImpulseLine(indicators),
+        formatChandelierLine(indicators),
+    ].join('\n');
+
 const formatIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig
@@ -824,7 +1148,7 @@ const formatIndicatorSection = (
     const cmfTrend = detectTrend(indicators.cmf, sampleCount);
 
     return [
-        '## Indicator Values',
+        INDICATOR_VALUES_SECTION_HEADER,
         `- RSI(${RSI_DEFAULT_PERIOD}): ${fmt(lastRSI)}${trendLabel(rsiTrend)}`,
         `- MACD: ${fmt(lastMACD?.macd ?? null)} / Signal ${fmt(lastMACD?.signal ?? null)} / Histogram ${fmt(lastMACD?.histogram ?? null)}${trendLabel(macdTrend)}`,
         `- Bollinger Bands: Upper ${fmt(lastBollinger?.upper ?? null)} / Middle ${fmt(lastBollinger?.middle ?? null)} / Lower ${fmt(lastBollinger?.lower ?? null)}`,
@@ -1247,9 +1571,13 @@ const buildSkillSelectionContext = (
  * Composes a fully-rendered English prompt that the worker LLM consumes to
  * produce an `AnalysisResponse`. Sections include analysis snapshot,
  * long-term context, recent bars with detected candle patterns, buy / sell
- * volume split, every indicator value with timeframe-aware trend labels,
- * market reference (deterministic advisory levels and structure per horizon),
- * SMC structure, and per-skill writing rules.
+ * volume split, a market-regime & risk-context lens (Hurst / Variance Ratio /
+ * regression R² + Yang-Zhang / EWMA volatility), every indicator value with
+ * timeframe-aware trend labels, a pro-indicator confluence panel (MACD-V,
+ * Connors RSI, Force Index, Elder-Ray, Elder Impulse, Bollinger %B, Chandelier
+ * Exit) with measured-reliability annotations, market reference (deterministic
+ * advisory levels and structure per horizon), SMC structure, and per-skill
+ * writing rules.
  *
  * Skills are dynamically gated by {@link selectSkills}: only those whose
  * frontmatter `gating` fires for this chart's state (detected signals, textbook
@@ -1336,7 +1664,9 @@ export function buildAnalysisPrompt(
         formatLongTermContext(bars),
         formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
+        formatRegimeContextSection(indicators, config),
         formatIndicatorSection(indicators, config),
+        formatProIndicatorSection(indicators, config),
         formatSMCSection(indicators, bars),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(marketReference, timeframe),

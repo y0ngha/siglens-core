@@ -38,6 +38,18 @@ export const EMPTY_INDICATOR_RESULT: IndicatorResult = {
     buySellVolume: [],
     smc: EMPTY_SMC_RESULT,
     squeezeMomentum: [],
+    macdV: [],
+    connorsRsi: [],
+    forceIndex: [],
+    elderRay: [],
+    elderImpulse: [],
+    bollingerDerived: [],
+    chandelierExit: [],
+    yangZhang: [],
+    ewmaVolatility: [],
+    hurst: [],
+    varianceRatio: [],
+    regression: [],
 };
 
 export const RSI_DEFAULT_PERIOD = 14;
@@ -224,14 +236,34 @@ export const HURST_MIN_SUBWINDOWS = 2;
 export const HURST_MIN = 0;
 /** @internal Hurst exponent clamp upper bound. */
 export const HURST_MAX = 1;
+/**
+ * @internal Hurst random-walk midpoint — H > 0.5 trending (persistent),
+ * H < 0.5 mean-reverting (anti-persistent), H ≈ 0.5 random walk. Single
+ * source of truth shared by the regime gate and the prompt regime classifier.
+ */
+export const HURST_RANDOM_WALK = 0.5;
 
 /** @internal Variance Ratio aggregation horizon (q-period returns). */
 export const VR_Q = 2;
 /** @internal Variance Ratio rolling window of 1-period returns. */
 export const VR_WINDOW = 60;
+/**
+ * @internal Variance-ratio random-walk center — VR > 1 trending, VR < 1
+ * mean-reverting, VR ≈ 1 random walk. Shared by the regime gate and prompt.
+ */
+export const VR_RANDOM_WALK = 1;
 
 /** @internal Linear-regression trailing window (bars). */
 export const REGRESSION_PERIOD = 20;
+/**
+ * @internal Regression trend is "clean enough to flag" at r² ≥ this cutoff. A
+ * fixed cutoff is a deliberate simplification of the window-scaled critical-R²
+ * table (which tightens as the window shrinks); 0.3 is a conservative pick for
+ * the default {@link REGRESSION_PERIOD} window (~20 bars, whose 95% critical-R²
+ * ≈ 0.20). Shared by the skill-gating predicate and the prompt regime narrative.
+ * See the research dossier (section 10) for the full table.
+ */
+export const REGRESSION_R2_SIGNIFICANT = 0.3;
 
 /** @internal MACD-V oversold reset threshold (volatility-normalised MACD). */
 export const MACDV_OVERSOLD = -150;
