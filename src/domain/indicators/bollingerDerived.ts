@@ -22,7 +22,11 @@ export function calculateBollingerDerived(
 ): BollingerDerivedResult[] {
     const n = bars.length;
     if (n === 0) return [];
-    if (period <= 0) return new Array(n).fill({ pctB: null, bandwidth: null });
+    if (period <= 0)
+        return Array.from({ length: n }, () => ({
+            pctB: null,
+            bandwidth: null,
+        }));
     const bands = calculateBollinger(bars, period, stdDev);
 
     return Array.from({ length: n }, (_, i) => {

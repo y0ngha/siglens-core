@@ -29,11 +29,11 @@ export function calculateChandelierExit(
 
     const n = bars.length;
     if (period <= 0)
-        return new Array(n).fill({
+        return Array.from({ length: n }, () => ({
             longStop: null,
             shortStop: null,
             trend: null,
-        });
+        }));
     const atr = calculateATR(bars, period);
     const highs = bars.map(b => b.high);
     const lows = bars.map(b => b.low);

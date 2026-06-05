@@ -94,9 +94,8 @@ describe('calculateBollingerDerived', () => {
             const bars = makeBars(closes);
             const result = calculateBollingerDerived(bars, period, stdDev);
             const last = result[result.length - 1];
-            if (last.pctB !== null) {
-                expect(last.pctB).toBeCloseTo(0.5, 5);
-            }
+            expect(last.pctB).not.toBeNull();
+            expect(last.pctB!).toBeCloseTo(0.5, 5);
         });
 
         it('수동 계산값이 정확하다 (period=3, stdDev=1)', () => {
@@ -134,9 +133,8 @@ describe('calculateBollingerDerived', () => {
             const bars = makeBars([110, 100, 90]);
             const result = calculateBollingerDerived(bars, 3, 0.5);
             const last = result[result.length - 1];
-            if (last.pctB !== null) {
-                expect(last.pctB).toBeLessThan(0);
-            }
+            expect(last.pctB).not.toBeNull();
+            expect(last.pctB!).toBeLessThan(0);
         });
     });
 

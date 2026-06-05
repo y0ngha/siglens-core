@@ -17,7 +17,10 @@ export function calculateElderRay(
     const n = bars.length;
     if (n === 0) return [];
     if (period <= 0)
-        return new Array(n).fill({ bullPower: null, bearPower: null });
+        return Array.from({ length: n }, () => ({
+            bullPower: null,
+            bearPower: null,
+        }));
 
     const emaValues = calculateEMA(bars, period);
 

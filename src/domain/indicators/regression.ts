@@ -50,7 +50,8 @@ export function calculateRegression(
 ): RegressionResult[] {
     const n = closes.length;
     if (n === 0) return [];
-    if (period < 2) return new Array(n).fill({ slope: null, r2: null });
+    if (period < 2)
+        return Array.from({ length: n }, () => ({ slope: null, r2: null }));
 
     return closes.map((_, i) => {
         // Trailing window of `period` closes ending at bar i: requires i >= period-1.

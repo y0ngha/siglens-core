@@ -28,6 +28,26 @@ describe('calculateHurst', () => {
         });
     });
 
+    describe('기준값 (regression-lock)', () => {
+        it('결정론적 시리즈에서 구체적인 Hurst 값을 반환한다', () => {
+            // Fixed series: window=16, closes = 100, 101, ..., 116 (17 elements).
+            // Strongly trending → one valid output at index 16.
+            // Golden value derived by running calculateHurst and locked here as a
+            // regression sentinel — any algorithmic change that shifts this value
+            // breaks the test intentionally.
+            const window = 16;
+            const closes = Array.from(
+                { length: window + 1 },
+                (_, i) => 100 + i
+            );
+            const result = calculateHurst(closes, window);
+            const last = result[result.length - 1];
+            expect(last).not.toBeNull();
+            // Regression-lock golden value: 0.9772660781700692
+            expect(last!).toBeCloseTo(0.9772660781700692, 6);
+        });
+    });
+
     describe('값 범위', () => {
         it('Hurst 값은 항상 [0, 1] 범위 안에 있다', () => {
             const closes = Array.from(
