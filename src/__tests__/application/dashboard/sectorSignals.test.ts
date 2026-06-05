@@ -60,6 +60,17 @@ import { getSectorSignals } from '@/application/dashboard/sectorSignals';
 
 const fixedNow = new Date('2026-04-25T13:48:00.000Z');
 
+// 캐시 write 분기(stocks.length > 0)를 구동하기 위한 non-empty 신호 결과.
+const nonEmptySignal: StockSignalResult = {
+    symbol: 'AAPL',
+    koreanName: '애플',
+    sectorSymbol: 'XLK',
+    price: 150,
+    changePercent: 1.5,
+    trend: 'uptrend',
+    signals: [],
+};
+
 describe('getSectorSignals', () => {
     beforeEach(() => {
         mockCache.get.mockReset();
@@ -92,17 +103,26 @@ describe('getSectorSignals', () => {
         expect(mockGetBars).not.toHaveBeenCalled();
     });
 
-    it('cache miss 시 provider fetch 후 결과를 캐시에 저장한다', async () => {
+    it('cache miss + non-empty stocks 시 provider fetch 후 결과를 캐시에 저장한다', async () => {
         mockCache.get.mockResolvedValue(null);
+        computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
 
         const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
         expect(result.computedAt).toBe(fixedNow.toISOString());
-        expect(result.stocks).toEqual([]);
+        expect(result.stocks.length).toBeGreaterThan(0);
         expect(mockCache.set).toHaveBeenCalledTimes(1);
         const [key, payload, ttl] = mockCache.set.mock.calls[0];
         expect(key).toMatch(/^dashboard:signals:1Day:/);
         expect(payload).toEqual(result);
         expect(typeof ttl).toBe('number');
+    });
+
+    it('stocks 가 비면(전면 fetch 실패) 캐시에 저장하지 않는다 (poison 방지)', async () => {
+        mockCache.get.mockResolvedValue(null);
+        // 기본 setup: computeStockSignalResult → null → stocks=[].
+        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        expect(result.stocks).toEqual([]);
+        expect(mockCache.set).not.toHaveBeenCalled();
     });
 
     it('cache provider 가 null 이어도 정상 동작', async () => {
@@ -119,6 +139,7 @@ describe('getSectorSignals', () => {
 
     it('cache set 실패는 호출자에게 전파되지 않는다', async () => {
         mockCache.get.mockResolvedValue(null);
+        computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
         mockCache.set.mockRejectedValue(new Error('cache write down'));
         await expect(
             getSectorSignals(fakeProvider, '1Day', fixedNow)
@@ -127,6 +148,7 @@ describe('getSectorSignals', () => {
 
     it('default timeframe 은 1Day', async () => {
         mockCache.get.mockResolvedValue(null);
+        computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
         await getSectorSignals(fakeProvider, undefined, fixedNow);
         const [key] = mockCache.set.mock.calls[0];
         expect(key).toMatch(/^dashboard:signals:1Day:/);
