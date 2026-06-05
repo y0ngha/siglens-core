@@ -25,6 +25,7 @@ import {
     MFI_DEFAULT_PERIOD,
     PCTB_OVERBOUGHT,
     PCTB_OVERSOLD,
+    REGRESSION_R2_SIGNIFICANT,
     RSI_DEFAULT_PERIOD,
     SMC_SWING_PERIOD,
     SQUEEZE_MOMENTUM_BB_LENGTH,
@@ -79,7 +80,6 @@ import type {
     Trend,
 } from '@/domain/types';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
-import { REGRESSION_R2_SIGNIFICANT } from '@/domain/analysis/skillGatingPredicates';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
@@ -847,10 +847,10 @@ const HURST_REGIME_VERDICT_MARGIN = 0.05;
  * threshold.
  */
 const VR_REGIME_VERDICT_MARGIN = 0.1;
-// Direction-blind R²: high → clean trend. The "visibly trending" floor is shared
-// with the gating layer (REGRESSION_R2_SIGNIFICANT) so the prompt narrative and
-// the skill gate never drift apart; see its JSDoc in skillGatingPredicates.ts for
-// the window-scaled critical-R² rationale (research §10).
+// Direction-blind R²: high → clean trend. The "visibly trending" floor uses the
+// shared REGRESSION_R2_SIGNIFICANT (domain/indicators/constants.ts) so the prompt
+// narrative and the skill gate never drift apart; see its JSDoc for the
+// window-scaled critical-R² rationale (research §10).
 
 type RegimeVerdict = 'trending' | 'mean-reverting' | 'random';
 
@@ -911,6 +911,14 @@ const REGIME_INSUFFICIENT_DATA_LINE =
  * trend/mean-revert classification + R² narrative live in one named place.
  * Called only when at least one of Hurst / VR (the verdict voters) is non-null.
  */
+/** @internal Directional suffix for the R² narrative from a regression slope. */
+const slopeDirLabel = (slope: number | null): string => {
+    if (slope === null) return '';
+    if (slope > 0) return ', slope up';
+    if (slope < 0) return ', slope down';
+    return ', slope flat';
+};
+
 const computeRegimeLine = (
     lastHurst: number | null,
     lastVR: number | null,
@@ -922,14 +930,7 @@ const computeRegimeLine = (
         varianceRatioVote(lastVR),
     ]);
     const cleanTrend = lastR2 !== null && lastR2 >= REGRESSION_R2_SIGNIFICANT;
-    const slopeDir =
-        lastSlope === null
-            ? ''
-            : lastSlope > 0
-              ? ', slope up'
-              : lastSlope < 0
-                ? ', slope down'
-                : ', slope flat';
+    const slopeDir = slopeDirLabel(lastSlope);
     const r2Note =
         lastR2 === null
             ? ''

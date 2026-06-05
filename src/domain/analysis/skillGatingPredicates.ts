@@ -4,6 +4,7 @@ import {
     CRSI_OVERSOLD,
     HURST_RANDOM_WALK,
     MACDV_OVERBOUGHT,
+    REGRESSION_R2_SIGNIFICANT,
     VR_RANDOM_WALK,
 } from '@/domain/indicators/constants';
 import type {
@@ -94,15 +95,6 @@ export const HURST_DECISIVE_MARGIN = 0.1;
  * boundary tests reference the exact threshold.
  */
 export const VR_DECISIVE_MARGIN = 0.2;
-
-/**
- * @internal Regression trend is "clean enough to flag" at r² ≥ this cutoff. A
- * fixed cutoff is a deliberate simplification of the window-scaled critical-R²
- * table (which tightens as the window shrinks); 0.3 is a conservative pick for
- * the default REGRESSION_PERIOD window (~20 bars, whose 95% critical-R² ≈ 0.20).
- * See the research dossier (section 10). Exported so boundary tests reference it.
- */
-export const REGRESSION_R2_SIGNIFICANT = 0.3;
 
 /**
  * Volatility-regime window + multipliers shared by Yang-Zhang and EWMA. A latest

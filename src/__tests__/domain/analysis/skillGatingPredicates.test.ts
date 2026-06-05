@@ -4,7 +4,6 @@ import {
     BOLLINGER_PCTB_BY_TF,
     HURST_DECISIVE_MARGIN,
     VR_DECISIVE_MARGIN,
-    REGRESSION_R2_SIGNIFICANT,
 } from '@/domain/analysis/skillGatingPredicates';
 import {
     CRSI_OVERBOUGHT,
@@ -12,6 +11,7 @@ import {
     EMPTY_INDICATOR_RESULT,
     HURST_RANDOM_WALK,
     MACDV_OVERBOUGHT,
+    REGRESSION_R2_SIGNIFICANT,
     VR_RANDOM_WALK,
 } from '@/domain/indicators/constants';
 import type {

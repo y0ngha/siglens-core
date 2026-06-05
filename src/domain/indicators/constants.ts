@@ -255,6 +255,15 @@ export const VR_RANDOM_WALK = 1;
 
 /** @internal Linear-regression trailing window (bars). */
 export const REGRESSION_PERIOD = 20;
+/**
+ * @internal Regression trend is "clean enough to flag" at r² ≥ this cutoff. A
+ * fixed cutoff is a deliberate simplification of the window-scaled critical-R²
+ * table (which tightens as the window shrinks); 0.3 is a conservative pick for
+ * the default {@link REGRESSION_PERIOD} window (~20 bars, whose 95% critical-R²
+ * ≈ 0.20). Shared by the skill-gating predicate and the prompt regime narrative.
+ * See the research dossier (section 10) for the full table.
+ */
+export const REGRESSION_R2_SIGNIFICANT = 0.3;
 
 /** @internal MACD-V oversold reset threshold (volatility-normalised MACD). */
 export const MACDV_OVERSOLD = -150;

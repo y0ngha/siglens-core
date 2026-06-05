@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { calculateIndicators } from '@/domain/indicators/index';
+import { calculateForceIndex } from '@/domain/indicators/forceIndex';
+import { calculateBollingerDerived } from '@/domain/indicators/bollingerDerived';
 import type { Bar } from '@/domain/types';
 
 function makeBar(high: number, low: number, close: number, time: number): Bar {
@@ -180,6 +182,26 @@ describe('calculateIndicators', () => {
             expect(result.chandelierExit[last].longStop).not.toBeNull();
             expect(result.regression[last].slope).not.toBeNull();
             expect(result.regression[last].r2).not.toBeNull();
+        });
+
+        it('대표 pro-indicator가 올바른 계산기 출력과 일치한다 (wiring 정확성)', () => {
+            // Guards against a field being wired to the wrong calculator: the
+            // wired value must equal the indicator's own calculator on the same
+            // bars (scalar via toBeCloseTo, MISTAKES.md Tests #12).
+            const bars = buildBars(ENOUGH_BARS);
+            const result = calculateIndicators(bars);
+            const last = ENOUGH_BARS - 1;
+
+            const fi = calculateForceIndex(bars)[last];
+            expect(fi).not.toBeNull();
+            expect(result.forceIndex[last]).toBeCloseTo(fi as number, 10);
+
+            const pctB = calculateBollingerDerived(bars)[last].pctB;
+            expect(pctB).not.toBeNull();
+            expect(result.bollingerDerived[last].pctB).toBeCloseTo(
+                pctB as number,
+                10
+            );
         });
     });
 });
