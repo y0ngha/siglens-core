@@ -147,11 +147,13 @@ export async function getSectorSignals(
         stocks,
     };
 
-    // Skip caching an empty result: `stocks` is empty only when every per-ticker
-    // bars/quote fetch failed (full provider outage) — caching it would freeze an
-    // empty dashboard for the whole TTL even after the provider recovers. Skipping
-    // the write lets the next request retry. Mirrors the siglens-side shouldCache
-    // guard (CachedMarketDataProvider / getCachedSectorSignals: `stocks.length > 0`).
+    // Skip caching an empty result: `stocks` is empty when every per-ticker fetch
+    // rejected (full provider outage) OR when fetches succeeded but no ticker
+    // produced a signal (e.g. insufficient bars while the market is closed). In
+    // either case caching it would freeze an empty dashboard for the whole TTL even
+    // after the provider recovers; skipping the write lets the next request retry.
+    // Mirrors the siglens-side shouldCache guard (CachedMarketDataProvider /
+    // getCachedSectorSignals: `stocks.length > 0`).
     if (cache !== null && stocks.length > 0) {
         cache
             .set(cacheKey, payload, SECTOR_SIGNALS_TTL_BY_TIMEFRAME[timeframe])

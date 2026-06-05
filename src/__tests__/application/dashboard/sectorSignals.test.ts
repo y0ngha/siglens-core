@@ -117,9 +117,9 @@ describe('getSectorSignals', () => {
         expect(typeof ttl).toBe('number');
     });
 
-    it('stocks 가 비면(전면 fetch 실패) 캐시에 저장하지 않는다 (poison 방지)', async () => {
+    it('stocks 가 빈 배열이면 캐시에 저장하지 않는다 (poison 방지)', async () => {
         mockCache.get.mockResolvedValue(null);
-        // 기본 setup: computeStockSignalResult → null → stocks=[].
+        // 기본 setup: computeStockSignalResult → null → stocks=[] (fetch는 성공·빈 배열).
         const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
         expect(result.stocks).toEqual([]);
         expect(mockCache.set).not.toHaveBeenCalled();
