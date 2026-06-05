@@ -3,10 +3,10 @@ import {
     isStateNotable,
     BOLLINGER_PCTB_BY_TF,
 } from '@/domain/analysis/skillGatingPredicates';
-import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
 import {
     CRSI_OVERBOUGHT,
     CRSI_OVERSOLD,
+    EMPTY_INDICATOR_RESULT,
     MACDV_OVERBOUGHT,
 } from '@/domain/indicators/constants';
 import type {

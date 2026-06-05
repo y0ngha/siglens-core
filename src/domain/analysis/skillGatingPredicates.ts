@@ -9,7 +9,6 @@ import {
 import type {
     ChandelierResult,
     ImpulseColor,
-    RegressionResult,
     SkillSelectionContext,
     SkillStatePredicate,
     Timeframe,
@@ -344,8 +343,8 @@ const elderRayLevelNotable = (ctx: SkillSelectionContext): boolean => {
  */
 const elderImpulseLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const series = ctx.indicators.elderImpulse;
-    const latest = lastOf(series) as ImpulseColor | null;
-    if (latest === null) return false;
+    const latest = lastOf(series);
+    if (!latest) return false;
 
     // Previous *coloured* bar (skip trailing nulls) to detect a flip.
     let prev: ImpulseColor | null = null;
@@ -373,9 +372,9 @@ const chandelierLevelNotable = (ctx: SkillSelectionContext): boolean => {
 
     const from = Math.max(0, series.length - CHANDELIER_FLIP_LOOKBACK - 1);
     for (let i = series.length - 2; i >= from; i -= 1) {
-        const t = series[i].trend;
-        if (t === null) continue;
-        return t !== latest.trend;
+        const item = series[i];
+        if (!item || item.trend === null) continue;
+        return item.trend !== latest.trend;
     }
     return false;
 };
@@ -396,7 +395,7 @@ const varianceRatioLevelNotable = (ctx: SkillSelectionContext): boolean => {
 
 /** Regression: notable when the trend fit is clean (r² ≥ significance cutoff). */
 const regressionLevelNotable = (ctx: SkillSelectionContext): boolean => {
-    const latest = lastOf(ctx.indicators.regression) as RegressionResult | null;
+    const latest = lastOf(ctx.indicators.regression);
     if (!latest || !isFiniteNumber(latest.r2)) return false;
     return latest.r2 >= REGRESSION_R2_SIGNIFICANT;
 };

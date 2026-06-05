@@ -833,9 +833,9 @@ export const PRO_RELIABILITY_NOTE = {
 // gating layer); a symmetric "decisive margin" keeps a read near the centre
 // labelled inconclusive instead of forcing a trend/revert call.
 /** @internal |H − centre| below this → too close to random to classify. */
-const HURST_DECISIVE_MARGIN = 0.05;
+const HURST_REGIME_VERDICT_MARGIN = 0.05;
 /** @internal |VR − 1| below this → too close to random to classify. */
-const VR_DECISIVE_MARGIN = 0.1;
+const VR_REGIME_VERDICT_MARGIN = 0.1;
 // Direction-blind R²: high → clean trend. A fixed cut-point is a deliberate
 // simplification of the window-scaled critical-R² table (research §10); for the
 // default REGRESSION_PERIOD (20) the 95% critical R² ≈ 0.20, so this is a
@@ -857,15 +857,17 @@ const VERDICT_LABEL: Record<RegimeVerdict, string> = {
 // does not vote on a side — high R² only reinforces an existing trend vote.
 const hurstVote = (h: number | null): RegimeVerdict | null => {
     if (h === null) return null;
-    if (h - HURST_RANDOM_WALK >= HURST_DECISIVE_MARGIN) return 'trending';
-    if (HURST_RANDOM_WALK - h >= HURST_DECISIVE_MARGIN) return 'mean-reverting';
+    if (h - HURST_RANDOM_WALK >= HURST_REGIME_VERDICT_MARGIN) return 'trending';
+    if (HURST_RANDOM_WALK - h >= HURST_REGIME_VERDICT_MARGIN)
+        return 'mean-reverting';
     return 'random';
 };
 
 const varianceRatioVote = (vr: number | null): RegimeVerdict | null => {
     if (vr === null) return null;
-    if (vr - VR_RANDOM_WALK >= VR_DECISIVE_MARGIN) return 'trending';
-    if (VR_RANDOM_WALK - vr >= VR_DECISIVE_MARGIN) return 'mean-reverting';
+    if (vr - VR_RANDOM_WALK >= VR_REGIME_VERDICT_MARGIN) return 'trending';
+    if (VR_RANDOM_WALK - vr >= VR_REGIME_VERDICT_MARGIN)
+        return 'mean-reverting';
     return 'random';
 };
 
@@ -886,6 +888,40 @@ const combineRegimeVerdict = (
 
 const REGIME_INSUFFICIENT_DATA_LINE =
     '- Regime: insufficient data (regime indicators still in warm-up)';
+
+/**
+ * @internal Build the `- Regime: …` line from the latest regime reads. Pulled
+ * out of {@link formatRegimeContextSection} (was an inline IIFE) so the
+ * trend/mean-revert classification + R² narrative live in one named place.
+ * Called only when at least one of Hurst / VR / slope is non-null.
+ */
+const computeRegimeLine = (
+    lastHurst: number | null,
+    lastVR: number | null,
+    lastSlope: number | null,
+    lastR2: number | null
+): string => {
+    const verdict = combineRegimeVerdict([
+        hurstVote(lastHurst),
+        varianceRatioVote(lastVR),
+    ]);
+    const cleanTrend = lastR2 !== null && lastR2 >= REGRESSION_R2_TREND;
+    const slopeDir =
+        lastSlope === null
+            ? ''
+            : lastSlope > 0
+              ? ', slope up'
+              : lastSlope < 0
+                ? ', slope down'
+                : ', slope flat';
+    const r2Note =
+        lastR2 === null
+            ? ''
+            : cleanTrend
+              ? ` — R² ${fmt(lastR2)} high (clean directional fit${slopeDir}; significance scales with window)`
+              : ` — R² ${fmt(lastR2)} low (choppy / weak linear fit${slopeDir}; significance scales with window)`;
+    return `- Regime: Hurst ${fmt(lastHurst)} / Variance Ratio ${fmt(lastVR)}${r2Note} → ${VERDICT_LABEL[verdict]} ${PRO_RELIABILITY_NOTE.regime}`;
+};
 
 const formatRegimeContextSection = (
     indicators: IndicatorResult,
@@ -908,29 +944,7 @@ const formatRegimeContextSection = (
 
     const regimeLine = regimeAllNull
         ? REGIME_INSUFFICIENT_DATA_LINE
-        : (() => {
-              const verdict = combineRegimeVerdict([
-                  hurstVote(lastHurst),
-                  varianceRatioVote(lastVR),
-              ]);
-              const cleanTrend =
-                  lastR2 !== null && lastR2 >= REGRESSION_R2_TREND;
-              const slopeDir =
-                  lastSlope === null
-                      ? ''
-                      : lastSlope > 0
-                        ? ', slope up'
-                        : lastSlope < 0
-                          ? ', slope down'
-                          : ', slope flat';
-              const r2Note =
-                  lastR2 === null
-                      ? ''
-                      : cleanTrend
-                        ? ` — R² ${fmt(lastR2)} high (clean directional fit${slopeDir}; significance scales with window)`
-                        : ` — R² ${fmt(lastR2)} low (choppy / weak linear fit${slopeDir}; significance scales with window)`;
-              return `- Regime: Hurst ${fmt(lastHurst)} / Variance Ratio ${fmt(lastVR)}${r2Note} → ${VERDICT_LABEL[verdict]} ${PRO_RELIABILITY_NOTE.regime}`;
-          })();
+        : computeRegimeLine(lastHurst, lastVR, lastSlope, lastR2);
 
     const volAllNull = lastYangZhang === null && lastEwma === null;
     const yzTrend = detectTrend(indicators.yangZhang, config.trendSampleCount);
@@ -1042,7 +1056,7 @@ const formatElderRayLine = (indicators: IndicatorResult): string => {
 const formatElderImpulseLine = (indicators: IndicatorResult): string => {
     const colors = indicators.elderImpulse;
     const last = lastOf(colors);
-    if (last === null) {
+    if (!last) {
         return `- Elder Impulse: N/A ${PRO_RELIABILITY_NOTE.impulse}`;
     }
     return `- Elder Impulse: ${last}${impulseFlipNote(colors)} ${PRO_RELIABILITY_NOTE.impulse}`;
