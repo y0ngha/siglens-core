@@ -2,12 +2,17 @@ import { describe, it, expect } from 'vitest';
 import {
     isStateNotable,
     BOLLINGER_PCTB_BY_TF,
+    HURST_DECISIVE_MARGIN,
+    VR_DECISIVE_MARGIN,
+    REGRESSION_R2_SIGNIFICANT,
 } from '@/domain/analysis/skillGatingPredicates';
 import {
     CRSI_OVERBOUGHT,
     CRSI_OVERSOLD,
     EMPTY_INDICATOR_RESULT,
+    HURST_RANDOM_WALK,
     MACDV_OVERBOUGHT,
+    VR_RANDOM_WALK,
 } from '@/domain/indicators/constants';
 import type {
     BollingerResult,
@@ -716,16 +721,22 @@ describe('isStateNotable — chandelier level (trend flip)', () => {
 });
 
 describe('isStateNotable — hurst level', () => {
-    it('fires when H is decisively trending (>= 0.6)', () => {
-        const ctx = ctxWithIndicators({ hurst: [0.65] });
+    it('fires when H is decisively trending (past centre + margin)', () => {
+        const ctx = ctxWithIndicators({
+            hurst: [HURST_RANDOM_WALK + HURST_DECISIVE_MARGIN * 1.5],
+        });
         expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(true);
     });
-    it('fires when H is decisively mean-reverting (<= 0.4)', () => {
-        const ctx = ctxWithIndicators({ hurst: [0.35] });
+    it('fires when H is decisively mean-reverting (past centre - margin)', () => {
+        const ctx = ctxWithIndicators({
+            hurst: [HURST_RANDOM_WALK - HURST_DECISIVE_MARGIN * 1.5],
+        });
         expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(true);
     });
-    it('does NOT fire near the random-walk midpoint', () => {
-        const ctx = ctxWithIndicators({ hurst: [0.52] });
+    it('does NOT fire just inside the decisive margin', () => {
+        const ctx = ctxWithIndicators({
+            hurst: [HURST_RANDOM_WALK + HURST_DECISIVE_MARGIN / 2],
+        });
         expect(isStateNotable(P('hurst', 'level'), ctx)).toBe(false);
     });
     it('returns false when latest is null', () => {
@@ -739,16 +750,22 @@ describe('isStateNotable — hurst level', () => {
 });
 
 describe('isStateNotable — varianceRatio level', () => {
-    it('fires when VR is decisively trending (>= 1.2)', () => {
-        const ctx = ctxWithIndicators({ varianceRatio: [1.25] });
+    it('fires when VR is decisively trending (past centre + margin)', () => {
+        const ctx = ctxWithIndicators({
+            varianceRatio: [VR_RANDOM_WALK + VR_DECISIVE_MARGIN * 1.5],
+        });
         expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(true);
     });
-    it('fires when VR is decisively mean-reverting (<= 0.8)', () => {
-        const ctx = ctxWithIndicators({ varianceRatio: [0.75] });
+    it('fires when VR is decisively mean-reverting (past centre - margin)', () => {
+        const ctx = ctxWithIndicators({
+            varianceRatio: [VR_RANDOM_WALK - VR_DECISIVE_MARGIN * 1.5],
+        });
         expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(true);
     });
-    it('does NOT fire near the random-walk value of 1', () => {
-        const ctx = ctxWithIndicators({ varianceRatio: [1.05] });
+    it('does NOT fire just inside the decisive margin', () => {
+        const ctx = ctxWithIndicators({
+            varianceRatio: [VR_RANDOM_WALK + VR_DECISIVE_MARGIN / 2],
+        });
         expect(isStateNotable(P('varianceRatio', 'level'), ctx)).toBe(false);
     });
     it('returns false when latest is null', () => {
@@ -762,12 +779,16 @@ describe('isStateNotable — varianceRatio level', () => {
 });
 
 describe('isStateNotable — regression level (r²)', () => {
-    it('fires when r² is at/above the significance cutoff', () => {
-        const ctx = ctxWithIndicators({ regression: [regression(0.4)] });
+    it('fires exactly at the significance cutoff', () => {
+        const ctx = ctxWithIndicators({
+            regression: [regression(REGRESSION_R2_SIGNIFICANT)],
+        });
         expect(isStateNotable(P('regression', 'level'), ctx)).toBe(true);
     });
-    it('does NOT fire below the cutoff (choppy)', () => {
-        const ctx = ctxWithIndicators({ regression: [regression(0.1)] });
+    it('does NOT fire just below the cutoff (choppy)', () => {
+        const ctx = ctxWithIndicators({
+            regression: [regression(REGRESSION_R2_SIGNIFICANT - 0.1)],
+        });
         expect(isStateNotable(P('regression', 'level'), ctx)).toBe(false);
     });
     it('returns false when r² is null (flat series)', () => {

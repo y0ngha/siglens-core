@@ -4448,6 +4448,34 @@ describe('prompt', () => {
             expect(regimeSection).toContain(PRO_RELIABILITY_NOTE.volatility);
         });
 
+        it('Hurst와 Variance Ratio가 결정적으로 충돌하면 random verdict를 렌더한다', () => {
+            // Hurst 0.65 → trending (0.65 - 0.5 = 0.15 ≥ prompt margin 0.05),
+            // Variance Ratio 0.75 → mean-reverting (1 - 0.75 = 0.25 ≥ margin 0.1).
+            // Decisive disagreement collapses to the 'random' (low-conviction) verdict.
+            const indicators = makeIndicators({
+                hurst: [0.65],
+                varianceRatio: [0.75],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain(
+                'near-random (low directional conviction; demand stronger confluence)'
+            );
+        });
+
         it('빈 bars에서도 throw 없이 insufficient data / N/A를 렌더한다', () => {
             let prompt = '';
             expect(() => {

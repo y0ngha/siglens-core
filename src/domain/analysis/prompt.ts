@@ -1549,9 +1549,13 @@ const buildSkillSelectionContext = (
  * Composes a fully-rendered English prompt that the worker LLM consumes to
  * produce an `AnalysisResponse`. Sections include analysis snapshot,
  * long-term context, recent bars with detected candle patterns, buy / sell
- * volume split, every indicator value with timeframe-aware trend labels,
- * market reference (deterministic advisory levels and structure per horizon),
- * SMC structure, and per-skill writing rules.
+ * volume split, a market-regime & risk-context lens (Hurst / Variance Ratio /
+ * regression R² + Yang-Zhang / EWMA volatility), every indicator value with
+ * timeframe-aware trend labels, a pro-indicator confluence panel (MACD-V,
+ * Connors RSI, Force Index, Elder-Ray, Elder Impulse, Bollinger %B, Chandelier
+ * Exit) with measured-reliability annotations, market reference (deterministic
+ * advisory levels and structure per horizon), SMC structure, and per-skill
+ * writing rules.
  *
  * Skills are dynamically gated by {@link selectSkills}: only those whose
  * frontmatter `gating` fires for this chart's state (detected signals, textbook

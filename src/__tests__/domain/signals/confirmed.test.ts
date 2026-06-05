@@ -1403,5 +1403,21 @@ describe('detectBollingerPercentBOverbought', () => {
                 }
             );
         });
+
+        it('마지막 두 봉만으로 평가하므로 detectedAt이 마지막 인덱스다', () => {
+            const indicators = withBollingerDerived([
+                pctb(0.5),
+                pctb(0.97),
+                pctb(0.8),
+            ]);
+            expect(detectBollingerPercentBOverbought(bars, indicators)).toEqual(
+                {
+                    type: 'bollinger_percentb_overbought',
+                    direction: 'bearish',
+                    phase: 'confirmed',
+                    detectedAt: 2,
+                }
+            );
+        });
     });
 });

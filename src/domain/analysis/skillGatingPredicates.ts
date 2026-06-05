@@ -8,7 +8,6 @@ import {
 } from '@/domain/indicators/constants';
 import type {
     ChandelierResult,
-    ImpulseColor,
     SkillSelectionContext,
     SkillStatePredicate,
     Timeframe,
@@ -79,29 +78,31 @@ const BUY_SELL_RATIO_BEARISH = 0.35;
 const CHANDELIER_FLIP_LOOKBACK = 3;
 
 /**
- * Hurst is decisive only when it clears |H − 0.5| ≥ this margin — i.e. far enough
- * from the random-walk midpoint to lean trend-following (>0.5) or mean-reversion
- * (<0.5). Inside the margin the read is low-confidence noise, so the skill stays
- * dormant.
+ * @internal Hurst is decisive only when it clears |H − 0.5| ≥ this margin — i.e.
+ * far enough from the random-walk midpoint to lean trend-following (>0.5) or
+ * mean-reversion (<0.5). Inside the margin the read is low-confidence noise, so
+ * the skill stays dormant. Exported so boundary tests reference the exact
+ * threshold instead of re-hardcoding it.
  */
-const HURST_DECISIVE_MARGIN = 0.1;
+export const HURST_DECISIVE_MARGIN = 0.1;
 
 /**
- * Variance Ratio is decisive only when |VR − 1| ≥ this margin (VR ≈ 1 = random
- * walk; >1 trending, <1 mean-reverting). A fixed margin is a simplification of
- * the q-/sample-dependent robust Z* test (Lo & MacKinlay 1988); it is a gating
- * heuristic, not a significance claim.
+ * @internal Variance Ratio is decisive only when |VR − 1| ≥ this margin (VR ≈ 1
+ * = random walk; >1 trending, <1 mean-reverting). A fixed margin is a
+ * simplification of the q-/sample-dependent robust Z* test (Lo & MacKinlay
+ * 1988); it is a gating heuristic, not a significance claim. Exported so
+ * boundary tests reference the exact threshold.
  */
-const VR_DECISIVE_MARGIN = 0.2;
+export const VR_DECISIVE_MARGIN = 0.2;
 
 /**
- * Regression trend is "clean enough to flag" at r² ≥ this cutoff. A fixed cutoff
- * is a deliberate simplification of the window-scaled critical-R² table (which
- * tightens as the window shrinks); 0.3 is a conservative pick for the default
- * REGRESSION_PERIOD window (~20 bars, whose 95% critical-R² ≈ 0.20). See the
- * research dossier (section 10) for the full table.
+ * @internal Regression trend is "clean enough to flag" at r² ≥ this cutoff. A
+ * fixed cutoff is a deliberate simplification of the window-scaled critical-R²
+ * table (which tightens as the window shrinks); 0.3 is a conservative pick for
+ * the default REGRESSION_PERIOD window (~20 bars, whose 95% critical-R² ≈ 0.20).
+ * See the research dossier (section 10). Exported so boundary tests reference it.
  */
-const REGRESSION_R2_SIGNIFICANT = 0.3;
+export const REGRESSION_R2_SIGNIFICANT = 0.3;
 
 /**
  * Volatility-regime window + multipliers shared by Yang-Zhang and EWMA. A latest
@@ -347,14 +348,8 @@ const elderImpulseLevelNotable = (ctx: SkillSelectionContext): boolean => {
     if (!latest) return false;
 
     // Previous *coloured* bar (skip trailing nulls) to detect a flip.
-    let prev: ImpulseColor | null = null;
-    for (let i = series.length - 2; i >= 0; i -= 1) {
-        const c = series[i];
-        if (c !== null) {
-            prev = c;
-            break;
-        }
-    }
+    const prev =
+        series.slice(0, series.length - 1).findLast(c => c !== null) ?? null;
     const flipped = prev !== null && prev !== latest;
     return flipped || latest !== 'blue';
 };
