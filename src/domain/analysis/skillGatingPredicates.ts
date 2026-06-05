@@ -319,9 +319,10 @@ const forceIndexLevelNotable = (ctx: SkillSelectionContext): boolean => {
  */
 const elderRayLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const series = ctx.indicators.elderRay;
-    if (series.length < 2) return false;
-    const prev = series[series.length - 2];
-    const cur = series[series.length - 1];
+    const n = series.length;
+    if (n < 2) return false;
+    const prev = series[n - 2];
+    const cur = series[n - 1];
     if (!prev || !cur) return false;
 
     const bearTurningUp =
@@ -347,9 +348,10 @@ const elderImpulseLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const latest = lastOf(series);
     if (!latest) return false;
 
-    // Previous *coloured* bar (skip trailing nulls) to detect a flip.
-    const prev =
-        series.slice(0, series.length - 1).findLast(c => c !== null) ?? null;
+    // Previous *coloured* bar (skip trailing nulls) to detect a flip. Predicate
+    // excludes the last index without allocating an O(N) slice.
+    const lastIdx = series.length - 1;
+    const prev = series.findLast((c, i) => c !== null && i < lastIdx) ?? null;
     const flipped = prev !== null && prev !== latest;
     return flipped || latest !== 'blue';
 };
@@ -361,12 +363,13 @@ const elderImpulseLevelNotable = (ctx: SkillSelectionContext): boolean => {
  */
 const chandelierLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const series: ChandelierResult[] = ctx.indicators.chandelierExit;
-    if (series.length < 2) return false;
-    const latest = series[series.length - 1];
+    const n = series.length;
+    if (n < 2) return false;
+    const latest = series[n - 1];
     if (!latest || latest.trend === null) return false;
 
-    const from = Math.max(0, series.length - CHANDELIER_FLIP_LOOKBACK - 1);
-    for (let i = series.length - 2; i >= from; i -= 1) {
+    const from = Math.max(0, n - CHANDELIER_FLIP_LOOKBACK - 1);
+    for (let i = n - 2; i >= from; i -= 1) {
         const item = series[i];
         if (!item || item.trend === null) continue;
         return item.trend !== latest.trend;

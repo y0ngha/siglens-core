@@ -79,6 +79,7 @@ import type {
     Trend,
 } from '@/domain/types';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
+import { REGRESSION_R2_SIGNIFICANT } from '@/domain/analysis/skillGatingPredicates';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
@@ -832,16 +833,24 @@ export const PRO_RELIABILITY_NOTE = {
 // random-walk centres (HURST_RANDOM_WALK / VR_RANDOM_WALK, shared with the
 // gating layer); a symmetric "decisive margin" keeps a read near the centre
 // labelled inconclusive instead of forcing a trend/revert call.
-/** @internal |H − centre| below this → too close to random to classify. */
+/**
+ * @internal |H − centre| below this → too close to random to classify.
+ * Intentionally looser than `skillGatingPredicates.ts`'s `HURST_DECISIVE_MARGIN`
+ * (0.1): prompt classification labels are more permissive than the skill-gating
+ * threshold.
+ */
 const HURST_REGIME_VERDICT_MARGIN = 0.05;
-/** @internal |VR − 1| below this → too close to random to classify. */
+/**
+ * @internal |VR − 1| below this → too close to random to classify.
+ * Intentionally looser than `skillGatingPredicates.ts`'s `VR_DECISIVE_MARGIN`
+ * (0.2): prompt classification labels are more permissive than the skill-gating
+ * threshold.
+ */
 const VR_REGIME_VERDICT_MARGIN = 0.1;
-// Direction-blind R²: high → clean trend. A fixed cut-point is a deliberate
-// simplification of the window-scaled critical-R² table (research §10); for the
-// default REGRESSION_PERIOD (20) the 95% critical R² ≈ 0.20, so this is a
-// conservative "visibly trending" floor, not a significance test.
-/** @internal Regression R² above which the fit is treated as a clean trend. */
-const REGRESSION_R2_TREND = 0.3;
+// Direction-blind R²: high → clean trend. The "visibly trending" floor is shared
+// with the gating layer (REGRESSION_R2_SIGNIFICANT) so the prompt narrative and
+// the skill gate never drift apart; see its JSDoc in skillGatingPredicates.ts for
+// the window-scaled critical-R² rationale (research §10).
 
 type RegimeVerdict = 'trending' | 'mean-reverting' | 'random';
 
@@ -893,7 +902,7 @@ const REGIME_INSUFFICIENT_DATA_LINE =
  * @internal Build the `- Regime: …` line from the latest regime reads. Pulled
  * out of {@link formatRegimeContextSection} (was an inline IIFE) so the
  * trend/mean-revert classification + R² narrative live in one named place.
- * Called only when at least one of Hurst / VR / slope is non-null.
+ * Called only when at least one of Hurst / VR (the verdict voters) is non-null.
  */
 const computeRegimeLine = (
     lastHurst: number | null,
@@ -905,7 +914,7 @@ const computeRegimeLine = (
         hurstVote(lastHurst),
         varianceRatioVote(lastVR),
     ]);
-    const cleanTrend = lastR2 !== null && lastR2 >= REGRESSION_R2_TREND;
+    const cleanTrend = lastR2 !== null && lastR2 >= REGRESSION_R2_SIGNIFICANT;
     const slopeDir =
         lastSlope === null
             ? ''
@@ -939,8 +948,10 @@ const formatRegimeContextSection = (
 
     const header = '## Market Regime & Risk Context';
 
-    const regimeAllNull =
-        lastHurst === null && lastVR === null && lastSlope === null;
+    // Only Hurst + VR vote on the verdict; slope/R² merely annotate it. So when
+    // both voters are null, the verdict is undefined regardless of slope — render
+    // "insufficient data" instead of a spurious near-random call from slope alone.
+    const regimeAllNull = lastHurst === null && lastVR === null;
 
     const regimeLine = regimeAllNull
         ? REGIME_INSUFFICIENT_DATA_LINE
@@ -992,14 +1003,17 @@ const forceIndexSignLabel = (value: number | null): string => {
     return ' [neutral]';
 };
 
-// "Just flipped" = latest color differs from the immediately prior non-null
-// color, i.e. a permission change printed on the last bar.
+// "Just flipped" = latest color differs from the previous *coloured* bar (nulls
+// skipped), i.e. a permission change printed on the last bar. Skipping nulls
+// mirrors the gating layer's `elderImpulseLevelNotable`, so both layers compare
+// against the same "previous coloured bar".
 const impulseFlipNote = (colors: (ImpulseColor | null)[]): string => {
-    const i = colors.length - 1;
-    if (i < 1) return '';
-    const cur = colors[i];
-    const prev = colors[i - 1];
-    if (cur === null || prev === null) return '';
+    const lastIdx = colors.length - 1;
+    if (lastIdx < 1) return '';
+    const cur = colors[lastIdx];
+    if (cur === null) return '';
+    const prev = colors.findLast((c, i) => c !== null && i < lastIdx) ?? null;
+    if (prev === null) return '';
     return cur !== prev ? ` (flipped from ${prev})` : ' (no flip)';
 };
 

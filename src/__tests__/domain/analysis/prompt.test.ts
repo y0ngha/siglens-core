@@ -4476,6 +4476,82 @@ describe('prompt', () => {
             );
         });
 
+        it('Hurst와 Variance Ratio가 모두 mean-reverting이면 mean-reverting verdict를 렌더한다', () => {
+            // Hurst 0.35 → mean-reverting (0.5 - 0.35 = 0.15 ≥ prompt margin 0.05),
+            // Variance Ratio 0.75 → mean-reverting (1 - 0.75 = 0.25 ≥ margin 0.1).
+            // Both voters agree → 'mean-reverting' verdict.
+            const indicators = makeIndicators({
+                hurst: [0.35],
+                varianceRatio: [0.75],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain(
+                'mean-reverting (favour fade/reversion; be wary of breakouts)'
+            );
+        });
+
+        it('Hurst/VR는 null이고 slope만 있으면 near-random이 아닌 insufficient data를 렌더한다', () => {
+            // Only Hurst + VR vote on the verdict; slope merely annotates it. With
+            // both voters null, slope alone must not force a near-random verdict.
+            const indicators = makeIndicators({
+                hurst: [null],
+                varianceRatio: [null],
+                regression: [{ slope: 1.5, r2: 0.8 }],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const regimeSection = prompt.slice(
+                prompt.indexOf(REGIME_HEADER),
+                prompt.indexOf(INDICATOR_HEADER)
+            );
+            const regimeLine = regimeSection
+                .split('\n')
+                .find(l => l.startsWith('- Regime:'));
+            expect(regimeLine).toBeDefined();
+            expect(regimeLine).toContain('insufficient data');
+            expect(regimeLine).not.toContain('near-random');
+        });
+
+        it('Elder Impulse가 null을 건너뛰고 직전 유색 봉과 비교해 flip note를 렌더한다', () => {
+            // ['green', null, 'red'] → latest 'red' flipped from the previous
+            // *coloured* bar 'green' (the interspersed null is skipped), matching
+            // the gating layer's "previous coloured bar" semantics.
+            const indicators = makeIndicators({
+                elderImpulse: ['green', null, 'red'],
+            });
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                indicators,
+                []
+            );
+            const impulseLine = prompt
+                .split('\n')
+                .find(l => l.startsWith('- Elder Impulse:'));
+            expect(impulseLine).toBeDefined();
+            expect(impulseLine).toContain('(flipped from green)');
+        });
+
         it('빈 bars에서도 throw 없이 insufficient data / N/A를 렌더한다', () => {
             let prompt = '';
             expect(() => {

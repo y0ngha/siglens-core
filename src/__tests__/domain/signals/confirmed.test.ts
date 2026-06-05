@@ -22,7 +22,11 @@ import {
     findCross,
     findThresholdCross,
 } from '@/domain/signals/confirmed';
-import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
+import {
+    EMPTY_INDICATOR_RESULT,
+    PCTB_OVERBOUGHT,
+    PCTB_OVERSOLD,
+} from '@/domain/indicators/constants';
 import { calculateMA } from '@/domain/indicators/ma';
 import type {
     Bar,
@@ -1297,7 +1301,10 @@ describe('detectBollingerPercentBOversold', () => {
         });
 
         it('직전 값이 경계값과 정확히 같고 상향 교차하면 신호를 반환한다', () => {
-            const indicators = withBollingerDerived([pctb(0.05), pctb(0.1)]);
+            const indicators = withBollingerDerived([
+                pctb(PCTB_OVERSOLD),
+                pctb(0.1),
+            ]);
             expect(detectBollingerPercentBOversold(bars, indicators)).toEqual({
                 type: 'bollinger_percentb_oversold',
                 direction: 'bullish',
@@ -1393,7 +1400,10 @@ describe('detectBollingerPercentBOverbought', () => {
         });
 
         it('직전 값이 경계값과 정확히 같고 하향 교차하면 신호를 반환한다', () => {
-            const indicators = withBollingerDerived([pctb(0.95), pctb(0.9)]);
+            const indicators = withBollingerDerived([
+                pctb(PCTB_OVERBOUGHT),
+                pctb(0.9),
+            ]);
             expect(detectBollingerPercentBOverbought(bars, indicators)).toEqual(
                 {
                     type: 'bollinger_percentb_overbought',
