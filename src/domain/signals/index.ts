@@ -1,6 +1,8 @@
 import type { Bar, IndicatorResult, Signal } from '@/domain/types';
 import {
     detectBollingerLowerBounce,
+    detectBollingerPercentBOverbought,
+    detectBollingerPercentBOversold,
     detectBollingerUpperBreakout,
     detectCciBearishCross,
     detectCciBullishCross,
@@ -51,6 +53,8 @@ const DETECTORS: readonly Detector[] = [
     detectMacdBearishCross,
     detectBollingerLowerBounce,
     detectBollingerUpperBreakout,
+    detectBollingerPercentBOversold,
+    detectBollingerPercentBOverbought,
     detectSupertrendBullishFlip,
     detectSupertrendBearishFlip,
     detectIchimokuCloudBreakout,
@@ -83,9 +87,10 @@ const DETECTORS: readonly Detector[] = [
  * Run every bundled signal detector against bars + indicators and collect
  * the non-null results.
  *
- * Combines 26 confirmed-signal detectors — bullish/bearish mirror pairs for
+ * Combines 28 confirmed-signal detectors — bullish/bearish mirror pairs for
  * RSI overbought / oversold, golden / death cross, MACD cross, Bollinger band
- * touches, Supertrend / Parabolic SAR flips, Ichimoku breakout / breakdown,
+ * touches, Bollinger %B mean-reversion crosses, Supertrend / Parabolic SAR
+ * flips, Ichimoku breakout / breakdown,
  * CCI / DMI / CMF crosses, MFI bounce / reversal, Keltner breakouts, and
  * squeeze momentum — with 8 anticipation-signal detectors (RSI / MACD
  * histogram divergences, Bollinger squeeze, support / resistance proximity,

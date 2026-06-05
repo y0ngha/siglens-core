@@ -7,7 +7,10 @@ import {
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { calculateIndicators } from '@/domain/indicators';
-import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
+import {
+    EMPTY_INDICATOR_RESULT,
+    EMPTY_SMC_RESULT,
+} from '@/domain/indicators/constants';
 import type {
     Bar,
     EarningsCalendarItem,
@@ -36,29 +39,7 @@ const makeBars = (count: number, startClose = 100): Bar[] =>
     });
 
 const emptyIndicators = (): IndicatorResult => ({
-    rsi: [],
-    cci: [],
-    vwap: [],
-    macd: [],
-    bollinger: [],
-    dmi: [],
-    stochastic: [],
-    stochRsi: [],
-    ma: {},
-    ema: {},
-    volumeProfile: null,
-    ichimoku: [],
-    atr: [],
-    obv: [],
-    parabolicSar: [],
-    williamsR: [],
-    supertrend: [],
-    mfi: [],
-    keltnerChannel: [],
-    cmf: [],
-    donchianChannel: [],
-    buySellVolume: [],
-    squeezeMomentum: [],
+    ...EMPTY_INDICATOR_RESULT,
     smc: EMPTY_SMC_RESULT,
 });
 

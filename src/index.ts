@@ -368,6 +368,13 @@ export type {
     BarsData,
     BollingerResult,
     BuySellVolumeResult,
+    // Pro-indicator result types (IndicatorResult sub-types).
+    BollingerDerivedResult,
+    ChandelierResult,
+    ChandelierTrend,
+    ElderRayResult,
+    ImpulseColor,
+    RegressionResult,
     CandlePattern,
     CandlePatternEntry,
     CandlePatternSummary,

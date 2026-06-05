@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
     detectBollingerLowerBounce,
+    detectBollingerPercentBOverbought,
+    detectBollingerPercentBOversold,
     detectBollingerUpperBreakout,
     detectCciBullishCross,
     detectCmfBullishFlip,
@@ -24,6 +26,7 @@ import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
 import { calculateMA } from '@/domain/indicators/ma';
 import type {
     Bar,
+    BollingerDerivedResult,
     BollingerResult,
     DMIResult,
     IchimokuResult,
@@ -84,6 +87,16 @@ function withKeltner(values: KeltnerChannelResult[]): IndicatorResult {
 
 function withSqueezeMomentum(values: SqueezeMomentumResult[]): IndicatorResult {
     return { ...EMPTY_INDICATOR_RESULT, squeezeMomentum: values };
+}
+
+function withBollingerDerived(
+    values: BollingerDerivedResult[]
+): IndicatorResult {
+    return { ...EMPTY_INDICATOR_RESULT, bollingerDerived: values };
+}
+
+function pctb(value: number | null): BollingerDerivedResult {
+    return { pctB: value, bandwidth: null };
 }
 
 function sqz(momentum: number | null): SqueezeMomentumResult {
@@ -1211,6 +1224,184 @@ describe('findCross', () => {
             const slow = [2, 2, 2, 2, 2];
             // cross at index 1, lookback=2 covers indices [3, 4]
             expect(findCross(fast, slow, 2, 'down')).toBeNull();
+        });
+    });
+});
+
+describe('detectBollingerPercentBOversold', () => {
+    const bars = buildBars(3);
+
+    describe('bollingerDerived가 2개 미만일 때', () => {
+        it('null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.5)]);
+            expect(
+                detectBollingerPercentBOversold(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('bollingerDerived가 비어 있으면 null을 반환한다', () => {
+            expect(
+                detectBollingerPercentBOversold(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
+        });
+    });
+
+    describe('마지막 또는 직전 pctB가 null일 때', () => {
+        it('마지막 pctB가 null이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.02), pctb(null)]);
+            expect(
+                detectBollingerPercentBOversold(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('직전 pctB가 null이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(null), pctb(0.1)]);
+            expect(
+                detectBollingerPercentBOversold(bars, indicators)
+            ).toBeNull();
+        });
+    });
+
+    describe('PCTB_OVERSOLD를 상향 교차하지 않을 때', () => {
+        it('두 값 모두 임계값 위면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.3), pctb(0.4)]);
+            expect(
+                detectBollingerPercentBOversold(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('두 값 모두 임계값 이하면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.02), pctb(0.04)]);
+            expect(
+                detectBollingerPercentBOversold(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('하향 이동(상향 교차 아님)이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.3), pctb(0.02)]);
+            expect(
+                detectBollingerPercentBOversold(bars, indicators)
+            ).toBeNull();
+        });
+    });
+
+    describe('PCTB_OVERSOLD를 상향 교차할 때', () => {
+        it('마지막 봉 인덱스에서 bullish 신호를 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.03), pctb(0.2)]);
+            expect(detectBollingerPercentBOversold(bars, indicators)).toEqual({
+                type: 'bollinger_percentb_oversold',
+                direction: 'bullish',
+                phase: 'confirmed',
+                detectedAt: 1,
+            });
+        });
+
+        it('직전 값이 경계값과 정확히 같고 상향 교차하면 신호를 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.05), pctb(0.1)]);
+            expect(detectBollingerPercentBOversold(bars, indicators)).toEqual({
+                type: 'bollinger_percentb_oversold',
+                direction: 'bullish',
+                phase: 'confirmed',
+                detectedAt: 1,
+            });
+        });
+
+        it('마지막 두 봉만으로 평가하므로 detectedAt이 마지막 인덱스다', () => {
+            const indicators = withBollingerDerived([
+                pctb(0.5),
+                pctb(0.04),
+                pctb(0.3),
+            ]);
+            expect(detectBollingerPercentBOversold(bars, indicators)).toEqual({
+                type: 'bollinger_percentb_oversold',
+                direction: 'bullish',
+                phase: 'confirmed',
+                detectedAt: 2,
+            });
+        });
+    });
+});
+
+describe('detectBollingerPercentBOverbought', () => {
+    const bars = buildBars(3);
+
+    describe('bollingerDerived가 2개 미만일 때', () => {
+        it('null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.5)]);
+            expect(
+                detectBollingerPercentBOverbought(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('bollingerDerived가 비어 있으면 null을 반환한다', () => {
+            expect(
+                detectBollingerPercentBOverbought(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
+        });
+    });
+
+    describe('마지막 또는 직전 pctB가 null일 때', () => {
+        it('마지막 pctB가 null이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.98), pctb(null)]);
+            expect(
+                detectBollingerPercentBOverbought(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('직전 pctB가 null이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(null), pctb(0.9)]);
+            expect(
+                detectBollingerPercentBOverbought(bars, indicators)
+            ).toBeNull();
+        });
+    });
+
+    describe('PCTB_OVERBOUGHT를 하향 교차하지 않을 때', () => {
+        it('두 값 모두 임계값 아래면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.6), pctb(0.5)]);
+            expect(
+                detectBollingerPercentBOverbought(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('두 값 모두 임계값 이상이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.98), pctb(0.96)]);
+            expect(
+                detectBollingerPercentBOverbought(bars, indicators)
+            ).toBeNull();
+        });
+
+        it('상향 이동(하향 교차 아님)이면 null을 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.6), pctb(0.98)]);
+            expect(
+                detectBollingerPercentBOverbought(bars, indicators)
+            ).toBeNull();
+        });
+    });
+
+    describe('PCTB_OVERBOUGHT를 하향 교차할 때', () => {
+        it('마지막 봉 인덱스에서 bearish 신호를 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.97), pctb(0.8)]);
+            expect(detectBollingerPercentBOverbought(bars, indicators)).toEqual(
+                {
+                    type: 'bollinger_percentb_overbought',
+                    direction: 'bearish',
+                    phase: 'confirmed',
+                    detectedAt: 1,
+                }
+            );
+        });
+
+        it('직전 값이 경계값과 정확히 같고 하향 교차하면 신호를 반환한다', () => {
+            const indicators = withBollingerDerived([pctb(0.95), pctb(0.9)]);
+            expect(detectBollingerPercentBOverbought(bars, indicators)).toEqual(
+                {
+                    type: 'bollinger_percentb_overbought',
+                    direction: 'bearish',
+                    phase: 'confirmed',
+                    detectedAt: 1,
+                }
+            );
         });
     });
 });

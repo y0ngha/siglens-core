@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { selectSkills } from '@/domain/analysis/selectSkills';
+import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
 import type {
     IndicatorResult,
     Signal,
@@ -14,41 +15,7 @@ import type {
 // ── Deterministic fixtures ──────────────────────────────────────────────────
 
 const emptyIndicators = (): IndicatorResult => ({
-    macd: [],
-    bollinger: [],
-    dmi: [],
-    stochastic: [],
-    stochRsi: [],
-    rsi: [],
-    cci: [],
-    vwap: [],
-    ma: {},
-    ema: {},
-    volumeProfile: null,
-    ichimoku: [],
-    atr: [],
-    obv: [],
-    parabolicSar: [],
-    williamsR: [],
-    supertrend: [],
-    mfi: [],
-    keltnerChannel: [],
-    cmf: [],
-    donchianChannel: [],
-    buySellVolume: [],
-    smc: {
-        swingHighs: [],
-        swingLows: [],
-        orderBlocks: [],
-        fairValueGaps: [],
-        equalHighs: [],
-        equalLows: [],
-        premiumZone: null,
-        discountZone: null,
-        equilibriumZone: null,
-        structureBreaks: [],
-    },
-    squeezeMomentum: [],
+    ...EMPTY_INDICATOR_RESULT,
 });
 
 interface CtxOverrides {

@@ -26,7 +26,10 @@ import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import { EMPTY_SMC_RESULT } from '@/domain/indicators/constants';
+import {
+    EMPTY_INDICATOR_RESULT,
+    EMPTY_SMC_RESULT,
+} from '@/domain/indicators/constants';
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
@@ -69,29 +72,7 @@ const mockDailyBarsData = {
         },
     ],
     indicators: {
-        macd: [],
-        bollinger: [],
-        dmi: [],
-        stochastic: [],
-        stochRsi: [],
-        rsi: [],
-        cci: [],
-        vwap: [],
-        ma: {},
-        ema: {},
-        volumeProfile: null,
-        ichimoku: [],
-        atr: [],
-        obv: [],
-        parabolicSar: [],
-        williamsR: [],
-        supertrend: [],
-        mfi: [],
-        keltnerChannel: [],
-        cmf: [],
-        donchianChannel: [],
-        buySellVolume: [],
-        squeezeMomentum: [],
+        ...EMPTY_INDICATOR_RESULT,
         smc: EMPTY_SMC_RESULT,
     },
 };
