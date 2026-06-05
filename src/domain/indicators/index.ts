@@ -49,6 +49,21 @@ export * from './donchianChannel';
 export * from './buySellVolume';
 export * from './smc';
 export * from './squeezeMomentum';
+// Pro-indicator calculation functions. Intentionally NOT wired into
+// calculateIndicators / IndicatorResult / the prompt yet — they are surfaced
+// only after their forward-edge is validated.
+export * from './bollingerDerived';
+export * from './chandelierExit';
+export * from './connorsRsi';
+export * from './elderImpulse';
+export * from './elderRay';
+export * from './ewmaVolatility';
+export * from './forceIndex';
+export * from './hurst';
+export * from './macdV';
+export * from './regression';
+export * from './varianceRatio';
+export * from './yangZhang';
 export {
     computeFearGreedIndex,
     computeFearGreedHistory,
