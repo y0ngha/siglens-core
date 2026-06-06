@@ -130,7 +130,7 @@ describe('buildNewsAnalysisPrompt', () => {
         );
     });
 
-    it('includes the qualifying news skill and filters out low-weight and non-news skills', () => {
+    it('includes news skills at all confidence levels with appropriate labels, and filters non-news skills', () => {
         const prompt = buildNewsAnalysisPrompt(
             TEST_SYMBOL,
             [NEWS_ITEM_1],
@@ -141,9 +141,10 @@ describe('buildNewsAnalysisPrompt', () => {
         // High-weight news skill is included
         expect(prompt).toContain('event-driven');
         expect(prompt).toContain('Focus on catalyst events');
-        // Low-weight news skill is excluded
-        expect(prompt).not.toContain('low-weight-news');
-        expect(prompt).not.toContain('This content should not appear.');
+        // Low-weight news skill is now included (confidence is a display label, not a gate)
+        expect(prompt).toContain('low-weight-news');
+        expect(prompt).toContain('[Low Confidence]');
+        expect(prompt).toContain('This content should not appear.');
         // Fundamental skill is excluded (wrong category)
         expect(prompt).not.toContain('value-investing');
         expect(prompt).not.toContain('Not a news skill');
@@ -204,5 +205,28 @@ describe('buildNewsAnalysisPrompt', () => {
         expect(prompt).toContain('Actual EPS:');
         expect(prompt).toContain('1.55');
         expect(prompt).toContain('Rev est. N/A');
+    });
+
+    it('includes a low-confidence news skill with a [Low Confidence] label', () => {
+        const skills: Skill[] = [
+            {
+                name: 'Catalyst Lens',
+                description: '',
+                type: 'pattern' as const,
+                category: 'news' as const,
+                indicators: [],
+                confidenceWeight: 0.3,
+                content: 'news body',
+            },
+        ];
+        const prompt = buildNewsAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            [],
+            [],
+            skills
+        );
+        expect(prompt).toContain('### Catalyst Lens [Low Confidence]');
+        expect(prompt).toContain('news body');
     });
 });

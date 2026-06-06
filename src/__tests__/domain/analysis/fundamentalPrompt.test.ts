@@ -222,17 +222,20 @@ describe('buildFundamentalAnalysisPrompt', () => {
         );
     });
 
-    it('includes the qualifying fundamental skill and omits skills below weight threshold', () => {
+    it('includes fundamental skills at all confidence levels with appropriate labels', () => {
         const prompt = buildFundamentalAnalysisPrompt(
             TEST_SYMBOL,
             TEST_SNAPSHOT,
             [FUNDAMENTAL_SKILL_HIGH, FUNDAMENTAL_SKILL_LOW]
         );
 
+        // High-weight skill is included with its label
         expect(prompt).toContain('value-investing');
         expect(prompt).toContain('Look for low P/E relative to peers');
-        expect(prompt).not.toContain('low-weight-fund');
-        expect(prompt).not.toContain('Should not appear in prompt.');
+        // Low-weight skill is now included (confidence is a display label, not a gate)
+        expect(prompt).toContain('low-weight-fund');
+        expect(prompt).toContain('[Low Confidence]');
+        expect(prompt).toContain('Should not appear in prompt.');
     });
 
     it('omits skills with a non-fundamental category even if weight is sufficient', () => {
@@ -245,5 +248,26 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('value-investing');
         expect(prompt).not.toContain('event-driven');
         expect(prompt).not.toContain('React to earnings surprises');
+    });
+
+    it('includes a low-confidence fundamental skill with a [Low Confidence] label', () => {
+        const skills: Skill[] = [
+            {
+                name: 'Deep Value Lens',
+                description: '',
+                type: 'pattern' as const,
+                category: 'fundamental' as const,
+                indicators: [],
+                confidenceWeight: 0.3,
+                content: 'value body',
+            },
+        ];
+        const prompt = buildFundamentalAnalysisPrompt(
+            'AAPL',
+            TEST_SNAPSHOT,
+            skills
+        );
+        expect(prompt).toContain('### Deep Value Lens [Low Confidence]');
+        expect(prompt).toContain('value body');
     });
 });
