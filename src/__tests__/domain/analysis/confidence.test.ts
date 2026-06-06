@@ -62,19 +62,6 @@ const makeStrategyResult = (
     ...overrides,
 });
 
-const makePatternResult = (
-    overrides?: Partial<PatternResult>
-): PatternResult => ({
-    id: '테스트 패턴_0',
-    patternName: '테스트 패턴',
-    skillName: '테스트 스킬',
-    detected: true,
-    trend: 'bullish',
-    summary: '테스트 요약',
-    confidenceWeight: HIGH_CONFIDENCE_WEIGHT,
-    ...overrides,
-});
-
 const makeAnalysisResponse = (
     overrides?: Partial<RawAnalysisResponse>
 ): RawAnalysisResponse => ({
