@@ -51,6 +51,7 @@ import type {
     FearGreedSnapshot,
     IndicatorResult,
     Skill,
+    SkillUsageRole,
     SMCResult,
     SqueezeMomentumResult,
 } from '@/domain/types';
@@ -1333,6 +1334,31 @@ describe('prompt', () => {
                 [skill]
             );
             expect(result).toContain('[Medium Confidence]');
+        });
+
+        it('labels a low-confidence indicator guide with [Low Confidence] and its roles', () => {
+            const skills = [
+                {
+                    name: 'MACD-V Signal Guide',
+                    description: '',
+                    type: 'indicator_guide' as const,
+                    indicators: [],
+                    confidenceWeight: 0.2,
+                    content: 'macd-v body',
+                    usageRoles: ['confirmation'] as SkillUsageRole[],
+                },
+            ];
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                skills
+            );
+            expect(prompt).toContain(
+                '### MACD-V Signal Guide [Low Confidence] [Roles: Confirmation]'
+            );
+            expect(prompt).toContain('macd-v body');
         });
     });
 
