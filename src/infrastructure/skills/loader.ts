@@ -11,6 +11,7 @@ import type {
     SkillStatePredicate,
     SkillStatePredicateKind,
     SkillType,
+    SkillUsageRole,
     SignalKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
@@ -302,6 +303,34 @@ const parseGating = (raw: unknown): SkillGating | undefined => {
 const isYamlTrue = (value: unknown): boolean =>
     value === true || value === 'true';
 
+const USAGE_ROLE_ORDER: readonly SkillUsageRole[] = [
+    'signal',
+    'confirmation',
+    'regime',
+    'measurement',
+    'risk',
+];
+
+/**
+ * Normalize a frontmatter `usage_roles` value to canonical-ordered roles.
+ * Fail-safe: returns `undefined` for any malformed input (non-array, empty,
+ * unknown role, duplicates, non-string element) so external/older catalogs
+ * never crash the loader. The siglens build-time validator rejects the same
+ * malformed states.
+ */
+const parseUsageRoles = (raw: unknown): SkillUsageRole[] | undefined => {
+    if (!Array.isArray(raw) || raw.length === 0) return undefined;
+    const seen = new Set<string>();
+    for (const r of raw) {
+        if (typeof r !== 'string') return undefined;
+        if (seen.has(r)) return undefined;
+        if (!(USAGE_ROLE_ORDER as readonly string[]).includes(r))
+            return undefined;
+        seen.add(r);
+    }
+    return USAGE_ROLE_ORDER.filter(r => seen.has(r));
+};
+
 const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     name: String(data.name ?? ''),
     description: String(data.description ?? ''),
@@ -321,6 +350,7 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
     tokenCost:
         typeof data.token_cost === 'number' ? data.token_cost : undefined,
     smcFullGuide: isYamlTrue(data.smc_full_guide),
+    usageRoles: parseUsageRoles(data.usage_roles),
 });
 
 /**
