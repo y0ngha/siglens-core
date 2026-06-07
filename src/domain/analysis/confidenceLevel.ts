@@ -31,7 +31,13 @@ export function confidenceLabel(weight: number): string {
     return LEVEL_LABEL[getConfidenceLevel(weight)];
 }
 
-const ROLE_ORDER: readonly SkillUsageRole[] = [
+/**
+ * Canonical order of usage roles — the single source of truth for role
+ * ordering. Also consumed by the skills loader's `parseUsageRoles` so the
+ * order is defined in exactly one place (the type union in `types.ts` is the
+ * only other place a role name appears).
+ */
+export const USAGE_ROLE_ORDER: readonly SkillUsageRole[] = [
     'signal',
     'confirmation',
     'regime',
@@ -54,7 +60,7 @@ const ROLE_LABEL: Record<SkillUsageRole, string> = {
  */
 export function roleLabel(roles: SkillUsageRole[] | undefined): string {
     if (!roles || roles.length === 0) return '';
-    const ordered = ROLE_ORDER.filter(r => roles.includes(r));
+    const ordered = USAGE_ROLE_ORDER.filter(r => roles.includes(r));
     if (ordered.length === 0) return '';
     return ` [Roles: ${ordered.map(r => ROLE_LABEL[r]).join(', ')}]`;
 }

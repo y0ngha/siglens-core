@@ -16,6 +16,7 @@ import type {
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
+import { USAGE_ROLE_ORDER } from '@/domain/analysis/confidenceLevel';
 import type { LoadSkillsCachedResult } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
@@ -302,14 +303,6 @@ const parseGating = (raw: unknown): SkillGating | undefined => {
  */
 const isYamlTrue = (value: unknown): boolean =>
     value === true || value === 'true';
-
-const USAGE_ROLE_ORDER: readonly SkillUsageRole[] = [
-    'signal',
-    'confirmation',
-    'regime',
-    'measurement',
-    'risk',
-];
 
 /**
  * Normalize a frontmatter `usage_roles` value to canonical-ordered roles.
