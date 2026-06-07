@@ -46,14 +46,14 @@ export const MODEL_SPECS = {
         provider: 'gemini',
         apiModelId: 'gemini-2.5-flash',
         maxOutputTokens: 65_536,
-        thinkingBudget: 12_288,
+        thinkingBudget: 8_192,
         temperature: DEFAULT_TEMPERATURE,
     },
     'gemini-2.5-flash-lite': {
         provider: 'gemini',
         apiModelId: 'gemini-2.5-flash-lite',
         maxOutputTokens: 65_536,
-        thinkingBudget: 12_288,
+        thinkingBudget: 8_192,
         temperature: DEFAULT_TEMPERATURE,
     },
     'gemini-2.5-pro': {

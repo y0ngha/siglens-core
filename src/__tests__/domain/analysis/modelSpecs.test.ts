@@ -102,11 +102,9 @@ describe('MODEL_SPECS', () => {
         expect('temperature' in MODEL_SPECS['gpt-5.5']).toBe(false);
     });
 
-    it('keeps gemini-2.5-flash and gemini-2.5-flash-lite at the documented 24_576 thinking budget', () => {
-        expect(MODEL_SPECS['gemini-2.5-flash'].thinkingBudget).toBe(12_288);
-        expect(MODEL_SPECS['gemini-2.5-flash-lite'].thinkingBudget).toBe(
-            12_288
-        );
+    it('keeps gemini-2.5-flash and gemini-2.5-flash-lite at the documented 8_192 thinking budget', () => {
+        expect(MODEL_SPECS['gemini-2.5-flash'].thinkingBudget).toBe(8_192);
+        expect(MODEL_SPECS['gemini-2.5-flash-lite'].thinkingBudget).toBe(8_192);
     });
 
     it('uses 32_768 thinking budget for the remaining Gemini models', () => {
