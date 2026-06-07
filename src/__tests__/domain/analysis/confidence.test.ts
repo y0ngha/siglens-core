@@ -247,14 +247,19 @@ describe('confidence', () => {
                         makeStrategyResult({ strategyName: 'RSI 다이버전스' }),
                     ],
                 });
+                // Arbitrary mid-range sample weight — the test only asserts the
+                // skill's weight is copied onto the result, not a specific value.
+                const sampleWeight = 0.7;
                 const skills = [
                     makeSkill({
                         name: 'RSI 다이버전스',
-                        confidenceWeight: 0.7,
+                        confidenceWeight: sampleWeight,
                     }),
                 ];
                 const result = enrichAnalysisWithConfidence(analysis, skills);
-                expect(result.strategyResults[0].confidenceWeight).toBe(0.7);
+                expect(result.strategyResults[0].confidenceWeight).toBe(
+                    sampleWeight
+                );
             });
 
             it('매칭되지 않는 strategyName은 confidenceWeight를 0으로 채운다', () => {
