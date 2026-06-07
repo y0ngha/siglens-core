@@ -66,13 +66,14 @@ const NEWS_SKILL_HIGH: Skill = {
         'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
 };
 
+/** A low-confidence news skill — now included with a [Low Confidence] label (confidence is a display weight, not a gate). */
 const NEWS_SKILL_LOW: Skill = {
     name: 'low-weight-news',
     description: 'Low confidence news skill.',
     category: 'news',
     indicators: [],
     confidenceWeight: 0.4,
-    content: 'This content should not appear.',
+    content: 'Low confidence news skill content.',
 };
 
 const FUNDAMENTAL_SKILL: Skill = {
@@ -143,7 +144,7 @@ describe('buildNewsAnalysisPrompt', () => {
         // Low-weight news skill is now included (confidence is a display label, not a gate)
         expect(prompt).toContain('low-weight-news');
         expect(prompt).toContain('[Low Confidence]');
-        expect(prompt).toContain('This content should not appear.');
+        expect(prompt).toContain('Low confidence news skill content.');
         // Fundamental skill is excluded (wrong category)
         expect(prompt).not.toContain('value-investing');
         expect(prompt).not.toContain('Not a news skill');

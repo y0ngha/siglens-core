@@ -97,14 +97,14 @@ const FUNDAMENTAL_SKILL_HIGH: Skill = {
     content: 'Look for low P/E relative to peers and strong FCF yield.',
 };
 
-/** A fundamental skill below the weight threshold — must be filtered out. */
+/** A low-confidence fundamental skill — now included with a [Low Confidence] label (confidence is a display weight, not a gate). */
 const FUNDAMENTAL_SKILL_LOW: Skill = {
     name: 'low-weight-fund',
     description: 'Low confidence fundamental skill.',
     category: 'fundamental',
     indicators: [],
     confidenceWeight: 0.4,
-    content: 'Should not appear in prompt.',
+    content: 'Low confidence fundamental skill content.',
 };
 
 /** A news category skill — must be filtered out (wrong category). */
@@ -234,7 +234,7 @@ describe('buildFundamentalAnalysisPrompt', () => {
         // Low-weight skill is now included (confidence is a display label, not a gate)
         expect(prompt).toContain('low-weight-fund');
         expect(prompt).toContain('[Low Confidence]');
-        expect(prompt).toContain('Should not appear in prompt.');
+        expect(prompt).toContain('Low confidence fundamental skill content.');
     });
 
     it('omits skills with a non-fundamental category even if weight is sufficient', () => {
