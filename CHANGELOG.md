@@ -1,5 +1,30 @@
 # Changelog
 
+# [0.21.0](https://github.com/y0ngha/siglens-core/compare/v0.20.0...v0.21.0) (2026-06-07)
+
+
+### Bug Fixes
+
+* **review:** apply PR [#152](https://github.com/y0ngha/siglens-core/issues/152) review — [@internal](https://github.com/internal) tags, role Set, readonly, boundary tests ([401565b](https://github.com/y0ngha/siglens-core/commit/401565ba0bf3b723c7373fa74414b82027f3800d))
+* **review:** sync low-confidence test fixtures with new include-and-label behavior ([3d89396](https://github.com/y0ngha/siglens-core/commit/3d89396420af5d10ad769771f3fe94e54d3c528a)), closes [#152](https://github.com/y0ngha/siglens-core/issues/152)
+
+
+### Features
+
+* **analysis:** add single-source confidence level/label + role helper ([66302d9](https://github.com/y0ngha/siglens-core/commit/66302d9d3b2c02a15ea3370daff286b20f2657b8))
+* **analysis:** chart prompt uses shared 3-tier label + indicator role label ([d5fafb2](https://github.com/y0ngha/siglens-core/commit/d5fafb2551ce80a9a3a5dbeec515ef45c8db9e35))
+* **analysis:** drop fundamental/news confidence floor, add confidence labels ([d8de29d](https://github.com/y0ngha/siglens-core/commit/d8de29d1224466138c3609cbb9f7f517e6570fda))
+* **analysis:** drop pattern confidence floor filter ([4459b02](https://github.com/y0ngha/siglens-core/commit/4459b02c8f56fe650014370849307472de2541a6))
+* **loader:** parse usage_roles with fail-safe canonical normalization ([c67d13f](https://github.com/y0ngha/siglens-core/commit/c67d13f7d129913311718932c3c8ab864260fa76))
+* **types:** add SkillUsageRole and Skill.usageRoles ([ee14dcc](https://github.com/y0ngha/siglens-core/commit/ee14dcc7c4f127fe97e4f1a5ae8d8f8f8611a9b4))
+
+
+### BREAKING CHANGES
+
+* **review:** MIN_CONFIDENCE_WEIGHT and MEDIUM_CONFIDENCE_WEIGHT are removed from the public API. confidenceWeight is now a display weight (Low/Medium/High label) and no longer gates skill inclusion.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 # [0.20.0](https://github.com/y0ngha/siglens-core/compare/v0.19.1...v0.20.0) (2026-06-05)
 
 
