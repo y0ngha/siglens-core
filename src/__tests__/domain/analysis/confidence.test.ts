@@ -19,7 +19,6 @@ import type {
 } from '@/domain/types';
 import {
     HIGH_CONFIDENCE_WEIGHT,
-    MEDIUM_CONFIDENCE_WEIGHT,
     UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
 } from '@/domain/indicators/constants';
 
@@ -251,13 +250,11 @@ describe('confidence', () => {
                 const skills = [
                     makeSkill({
                         name: 'RSI 다이버전스',
-                        confidenceWeight: MEDIUM_CONFIDENCE_WEIGHT,
+                        confidenceWeight: 0.7,
                     }),
                 ];
                 const result = enrichAnalysisWithConfidence(analysis, skills);
-                expect(result.strategyResults[0].confidenceWeight).toBe(
-                    MEDIUM_CONFIDENCE_WEIGHT
-                );
+                expect(result.strategyResults[0].confidenceWeight).toBe(0.7);
             });
 
             it('매칭되지 않는 strategyName은 confidenceWeight를 0으로 채운다', () => {

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
-import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type { FundamentalSnapshot, Skill } from '@/domain/types';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -94,7 +93,7 @@ const FUNDAMENTAL_SKILL_HIGH: Skill = {
     description: 'Warren Buffett style value investing framework.',
     category: 'fundamental',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content: 'Look for low P/E relative to peers and strong FCF yield.',
 };
 
@@ -104,7 +103,7 @@ const FUNDAMENTAL_SKILL_LOW: Skill = {
     description: 'Low confidence fundamental skill.',
     category: 'fundamental',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
+    confidenceWeight: 0.4,
     content: 'Should not appear in prompt.',
 };
 
@@ -114,7 +113,7 @@ const NEWS_SKILL: Skill = {
     description: 'Event-driven news strategy.',
     category: 'news',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content: 'React to earnings surprises and macro events.',
 };
 

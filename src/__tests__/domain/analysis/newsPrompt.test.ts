@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -62,7 +61,7 @@ const NEWS_SKILL_HIGH: Skill = {
     description: 'Event-driven news analysis framework.',
     category: 'news',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content:
         'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
 };
@@ -72,7 +71,7 @@ const NEWS_SKILL_LOW: Skill = {
     description: 'Low confidence news skill.',
     category: 'news',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
+    confidenceWeight: 0.4,
     content: 'This content should not appear.',
 };
 
@@ -81,7 +80,7 @@ const FUNDAMENTAL_SKILL: Skill = {
     description: 'Fundamental analysis framework.',
     category: 'fundamental',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content: 'Not a news skill — should be filtered out.',
 };
 
