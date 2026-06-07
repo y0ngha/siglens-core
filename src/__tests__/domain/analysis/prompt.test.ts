@@ -1364,7 +1364,7 @@ describe('prompt', () => {
 
     describe('Skills 섹션 - skill 내용 포함', () => {
         it('skill의 name이 포함된다', () => {
-            const skill = makeSkill({ name: 'Wyckoff Theory' });
+            const skill = makeSkill({ name: 'Generic Theory Strategy' });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -1372,7 +1372,7 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            expect(result).toContain('Wyckoff Theory');
+            expect(result).toContain('Generic Theory Strategy');
         });
 
         it('skill의 content가 포함된다', () => {
@@ -2331,7 +2331,7 @@ describe('prompt', () => {
             });
             const regularSkill = makeSkill({
                 type: undefined,
-                name: 'Wyckoff Theory',
+                name: 'Generic Theory Strategy',
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -2345,7 +2345,7 @@ describe('prompt', () => {
             expect(result).toContain('Pattern Analysis');
             expect(result).toContain('Head and Shoulders');
             expect(result).toContain('## Active Skills\n');
-            expect(result).toContain('Wyckoff Theory');
+            expect(result).toContain('Generic Theory Strategy');
         });
 
         it('gated-inactive indicator_guide skill은 포함되지 않는다', () => {
@@ -2941,7 +2941,7 @@ describe('prompt', () => {
             });
             const regularSkill = makeSkill({
                 type: undefined,
-                name: 'Wyckoff Theory',
+                name: 'Generic Theory Strategy',
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -2955,7 +2955,7 @@ describe('prompt', () => {
             expect(result).toContain('Strategy Analysis');
             expect(result).toContain('엘리어트 파동');
             expect(result).toContain('## Active Skills\n');
-            expect(result).toContain('Wyckoff Theory');
+            expect(result).toContain('Generic Theory Strategy');
         });
 
         it('strategyInstruction에 trend 필드 필수 + neutral fallback을 명시한다', () => {
@@ -3112,7 +3112,7 @@ describe('prompt', () => {
             });
             const regularSkill = makeSkill({
                 type: undefined,
-                name: 'Wyckoff Theory',
+                name: 'Generic Theory Strategy',
             });
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -3136,7 +3136,7 @@ describe('prompt', () => {
             expect(result).toContain('Strategy Analysis');
             expect(result).toContain('엘리어트 파동');
             expect(result).toContain('## Active Skills\n');
-            expect(result).toContain('Wyckoff Theory');
+            expect(result).toContain('Generic Theory Strategy');
         });
 
         it('gated-inactive candlestick skill은 포함되지 않는다', () => {
