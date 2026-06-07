@@ -19,9 +19,17 @@ describe('getConfidenceLevel — boundary values', () => {
         expect(getConfidenceLevel(weight)).toBe(level);
     });
 
-    it('thresholds are 0.5 and HIGH_CONFIDENCE_WEIGHT', () => {
-        expect(MEDIUM_CONFIDENCE_THRESHOLD).toBe(0.5);
-        expect(HIGH_CONFIDENCE_WEIGHT).toBe(0.8);
+    it('threshold boundaries are exclusive-below / inclusive-at', () => {
+        // Verify behavior at the owned boundaries rather than hardcoding the
+        // literals: just-below maps down, exactly-at maps up.
+        expect(
+            getConfidenceLevel(MEDIUM_CONFIDENCE_THRESHOLD - Number.EPSILON)
+        ).toBe('low');
+        expect(getConfidenceLevel(MEDIUM_CONFIDENCE_THRESHOLD)).toBe('medium');
+        expect(
+            getConfidenceLevel(HIGH_CONFIDENCE_WEIGHT - Number.EPSILON)
+        ).toBe('medium');
+        expect(getConfidenceLevel(HIGH_CONFIDENCE_WEIGHT)).toBe('high');
     });
 });
 

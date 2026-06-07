@@ -304,6 +304,12 @@ const parseGating = (raw: unknown): SkillGating | undefined => {
 const isYamlTrue = (value: unknown): boolean =>
     value === true || value === 'true';
 
+// Membership lookup for the canonical role set. A Set (built once at module
+// load) gives O(1) `has` and accepts an arbitrary `string` argument directly,
+// so the per-element check needs no `readonly SkillUsageRole[]` → `string[]`
+// widening cast.
+const USAGE_ROLE_SET: ReadonlySet<string> = new Set(USAGE_ROLE_ORDER);
+
 /**
  * Normalize a frontmatter `usage_roles` value to canonical-ordered roles.
  * Fail-safe: returns `undefined` for any malformed input (non-array, empty,
@@ -317,8 +323,7 @@ const parseUsageRoles = (raw: unknown): SkillUsageRole[] | undefined => {
     for (const r of raw) {
         if (typeof r !== 'string') return undefined;
         if (seen.has(r)) return undefined;
-        if (!(USAGE_ROLE_ORDER as readonly string[]).includes(r))
-            return undefined;
+        if (!USAGE_ROLE_SET.has(r)) return undefined;
         seen.add(r);
     }
     return USAGE_ROLE_ORDER.filter(r => seen.has(r));

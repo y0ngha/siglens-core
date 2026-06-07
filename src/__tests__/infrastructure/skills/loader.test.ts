@@ -733,6 +733,19 @@ Body content`;
         expect(skills[0].usageRoles).toBeUndefined();
     });
 
+    it('array with a non-role token [1, signal] → usageRoles is undefined', async () => {
+        // The inline-YAML loader stringifies every element, so `1` arrives as
+        // the string '1'; it fails the canonical-role membership check and the
+        // whole array is rejected fail-safe.
+        const fm = indicatorGuideFm('usage_roles: [1, signal]');
+        mockReaddir.mockResolvedValue([makeDirent('usage-nonrole.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+
     it('non-array scalar (usage_roles: signal) → usageRoles is undefined', async () => {
         const fm = indicatorGuideFm('usage_roles: signal');
         mockReaddir.mockResolvedValue([makeDirent('usage-scalar.md')]);
