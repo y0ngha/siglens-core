@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
-import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type { FundamentalSnapshot, Skill } from '@/domain/types';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -94,18 +93,18 @@ const FUNDAMENTAL_SKILL_HIGH: Skill = {
     description: 'Warren Buffett style value investing framework.',
     category: 'fundamental',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content: 'Look for low P/E relative to peers and strong FCF yield.',
 };
 
-/** A fundamental skill below the weight threshold — must be filtered out. */
+/** A low-confidence fundamental skill — now included with a [Low Confidence] label (confidence is a display weight, not a gate). */
 const FUNDAMENTAL_SKILL_LOW: Skill = {
     name: 'low-weight-fund',
     description: 'Low confidence fundamental skill.',
     category: 'fundamental',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
-    content: 'Should not appear in prompt.',
+    confidenceWeight: 0.4,
+    content: 'Low confidence fundamental skill content.',
 };
 
 /** A news category skill — must be filtered out (wrong category). */
@@ -114,7 +113,7 @@ const NEWS_SKILL: Skill = {
     description: 'Event-driven news strategy.',
     category: 'news',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content: 'React to earnings surprises and macro events.',
 };
 
@@ -222,17 +221,20 @@ describe('buildFundamentalAnalysisPrompt', () => {
         );
     });
 
-    it('includes the qualifying fundamental skill and omits skills below weight threshold', () => {
+    it('includes fundamental skills at all confidence levels with appropriate labels', () => {
         const prompt = buildFundamentalAnalysisPrompt(
             TEST_SYMBOL,
             TEST_SNAPSHOT,
             [FUNDAMENTAL_SKILL_HIGH, FUNDAMENTAL_SKILL_LOW]
         );
 
+        // High-weight skill is included with its label
         expect(prompt).toContain('value-investing');
         expect(prompt).toContain('Look for low P/E relative to peers');
-        expect(prompt).not.toContain('low-weight-fund');
-        expect(prompt).not.toContain('Should not appear in prompt.');
+        // Low-weight skill is now included (confidence is a display label, not a gate)
+        expect(prompt).toContain('low-weight-fund');
+        expect(prompt).toContain('[Low Confidence]');
+        expect(prompt).toContain('Low confidence fundamental skill content.');
     });
 
     it('omits skills with a non-fundamental category even if weight is sufficient', () => {
@@ -245,5 +247,26 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('value-investing');
         expect(prompt).not.toContain('event-driven');
         expect(prompt).not.toContain('React to earnings surprises');
+    });
+
+    it('includes a low-confidence fundamental skill with a [Low Confidence] label', () => {
+        const skills: Skill[] = [
+            {
+                name: 'Deep Value Lens',
+                description: '',
+                type: 'pattern' as const,
+                category: 'fundamental' as const,
+                indicators: [],
+                confidenceWeight: 0.3,
+                content: 'value body',
+            },
+        ];
+        const prompt = buildFundamentalAnalysisPrompt(
+            'AAPL',
+            TEST_SNAPSHOT,
+            skills
+        );
+        expect(prompt).toContain('### Deep Value Lens [Low Confidence]');
+        expect(prompt).toContain('value body');
     });
 });

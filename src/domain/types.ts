@@ -609,6 +609,19 @@ export type SkillType =
     | 'candlestick'
     | 'support_resistance';
 
+/**
+ * Usage role of an `indicator_guide` skill — what analytical job the indicator
+ * performs. Decoupled from `confidenceWeight` (which is *how much* to trust the
+ * interpretation, not *what kind* of interpretation). Canonical order:
+ * signal → confirmation → regime → measurement → risk.
+ */
+export type SkillUsageRole =
+    | 'signal'
+    | 'confirmation'
+    | 'regime'
+    | 'measurement'
+    | 'risk';
+
 /** A single skill loaded from `skills/*.md` and consumed by the prompt builders. */
 export interface Skill {
     name: string;
@@ -640,6 +653,14 @@ export interface Skill {
      * display name keeps the routing stable if the skill is renamed.
      */
     smcFullGuide?: boolean;
+    /**
+     * Usage roles for `indicator_guide` skills (e.g. `[signal, confirmation]`).
+     * Optional in the public type for compatibility with external/older
+     * catalogs; the siglens catalog validator enforces it as required on
+     * `indicator_guide`. Stored in canonical order; the loader normalizes
+     * invalid/missing values to `undefined` (fail-safe).
+     */
+    usageRoles?: SkillUsageRole[];
 }
 
 /**

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -62,18 +61,19 @@ const NEWS_SKILL_HIGH: Skill = {
     description: 'Event-driven news analysis framework.',
     category: 'news',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content:
         'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
 };
 
+/** A low-confidence news skill — now included with a [Low Confidence] label (confidence is a display weight, not a gate). */
 const NEWS_SKILL_LOW: Skill = {
     name: 'low-weight-news',
     description: 'Low confidence news skill.',
     category: 'news',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
-    content: 'This content should not appear.',
+    confidenceWeight: 0.4,
+    content: 'Low confidence news skill content.',
 };
 
 const FUNDAMENTAL_SKILL: Skill = {
@@ -81,7 +81,7 @@ const FUNDAMENTAL_SKILL: Skill = {
     description: 'Fundamental analysis framework.',
     category: 'fundamental',
     indicators: [],
-    confidenceWeight: MIN_CONFIDENCE_WEIGHT,
+    confidenceWeight: 0.5,
     content: 'Not a news skill — should be filtered out.',
 };
 
@@ -130,7 +130,7 @@ describe('buildNewsAnalysisPrompt', () => {
         );
     });
 
-    it('includes the qualifying news skill and filters out low-weight and non-news skills', () => {
+    it('includes news skills at all confidence levels with appropriate labels, and filters non-news skills', () => {
         const prompt = buildNewsAnalysisPrompt(
             TEST_SYMBOL,
             [NEWS_ITEM_1],
@@ -141,9 +141,10 @@ describe('buildNewsAnalysisPrompt', () => {
         // High-weight news skill is included
         expect(prompt).toContain('event-driven');
         expect(prompt).toContain('Focus on catalyst events');
-        // Low-weight news skill is excluded
-        expect(prompt).not.toContain('low-weight-news');
-        expect(prompt).not.toContain('This content should not appear.');
+        // Low-weight news skill is now included (confidence is a display label, not a gate)
+        expect(prompt).toContain('low-weight-news');
+        expect(prompt).toContain('[Low Confidence]');
+        expect(prompt).toContain('Low confidence news skill content.');
         // Fundamental skill is excluded (wrong category)
         expect(prompt).not.toContain('value-investing');
         expect(prompt).not.toContain('Not a news skill');
@@ -204,5 +205,28 @@ describe('buildNewsAnalysisPrompt', () => {
         expect(prompt).toContain('Actual EPS:');
         expect(prompt).toContain('1.55');
         expect(prompt).toContain('Rev est. N/A');
+    });
+
+    it('includes a low-confidence news skill with a [Low Confidence] label', () => {
+        const skills: Skill[] = [
+            {
+                name: 'Catalyst Lens',
+                description: '',
+                type: 'pattern' as const,
+                category: 'news' as const,
+                indicators: [],
+                confidenceWeight: 0.3,
+                content: 'news body',
+            },
+        ];
+        const prompt = buildNewsAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            [],
+            [],
+            skills
+        );
+        expect(prompt).toContain('### Catalyst Lens [Low Confidence]');
+        expect(prompt).toContain('news body');
     });
 });

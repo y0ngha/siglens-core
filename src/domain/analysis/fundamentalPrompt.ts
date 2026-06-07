@@ -1,6 +1,6 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
-import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
+import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import type {
     FundamentalSnapshot,
     GradesConsensus,
@@ -12,13 +12,9 @@ import { formatNullableNumber as fmt } from './promptFormat';
 
 const PEER_METRIC_DECIMAL_PLACES = 1;
 
-/** Filter skills to fundamental category with sufficient confidence weight. */
+/** Filter skills to the fundamental category. Confidence is a display weight, not an inclusion gate. */
 function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(
-        s =>
-            s.category === 'fundamental' &&
-            s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT
-    );
+    return skills.filter(s => s.category === 'fundamental');
 }
 
 /** Render analyst grade counts into a compact inline string. */
@@ -71,15 +67,15 @@ function formatSectorDirection(
  * Build the AI fundamental-analysis prompt.
  *
  * Accepts the normalised {@link FundamentalSnapshot} and a list of loaded
- * {@link Skill}s. Only skills with `category === 'fundamental'` and
- * `confidenceWeight >= MIN_CONFIDENCE_WEIGHT` are injected into the prompt.
+ * {@link Skill}s. Only skills with `category === 'fundamental'` are injected
+ * into the prompt; `confidenceWeight` is a display label, not an inclusion gate.
  *
  * Returns a fully self-contained English prompt string; the JSON output schema
  * specifies Korean text for fields labelled `KO`.
  *
  * @param symbol   - Stock ticker (e.g. `'AAPL'`).
  * @param snapshot - Normalised fundamental data for the symbol.
- * @param skills   - All loaded skills; non-fundamental / low-weight entries are filtered out.
+ * @param skills   - All loaded skills; non-fundamental entries are filtered out.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 export function buildFundamentalAnalysisPrompt(
@@ -102,7 +98,10 @@ export function buildFundamentalAnalysisPrompt(
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills
-                  .map(s => `### ${s.name}\n${s.content}`)
+                  .map(
+                      s =>
+                          `### ${s.name} ${confidenceLabel(s.confidenceWeight)}\n${s.content}`
+                  )
                   .join('\n\n')
             : 'No additional fundamental skills loaded.';
 

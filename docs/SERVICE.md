@@ -168,7 +168,7 @@ consumer (web app / worker / CLI)
 
 domain/analysis/prompt.ts
   → buildAnalysisPrompt(symbol, bars, indicators, skills)
-  → filters by confidenceWeight (< 0.5 excluded)
+  → applies confidence label (Low/Medium/High); all skills included regardless of weight
   → builds the prompt (pure function, no file access)
 ```
 
@@ -176,6 +176,6 @@ domain/analysis/prompt.ts
 
 - Read all `.md` files in the `skills/` directory
 - Check the `indicators` field in each file's frontmatter to identify required indicators
-- Skills with `confidence_weight < 0.5` are excluded from the prompt entirely
+- `confidence_weight` maps to a Low/Medium/High display label in the prompt; there is no exclusion floor — all skills are included regardless of weight
 - Refer to the Skills System section in `docs/DOMAIN.md` for the full file format spec,
   type definitions, and `Skill` interface

@@ -997,7 +997,6 @@ IN_NECK_RATIO = 0.05        — 인넥 허용 비율
 | `strategies/mean-reversion.md` | 평균 회귀 전략 | 0.7 |
 | `strategies/elliott-wave.md` | 엘리어트 파동 | 0.7 |
 | `strategies/fibonacci.md` | 피보나치 전략 | 0.65 |
-| `strategies/wyckoff.md` | 와이코프 방법론 | 0.0 (비활성) |
 
 ---
 
@@ -1028,10 +1027,10 @@ function buildAnalysisPrompt(
 4. 거래량 분석 (평균 대비 비율)
 5. 인디케이터 수치 (RSI, MACD, 볼린저, DMI, Stochastic, StochRSI, CCI, Volume Profile POC/VAH/VAL, Ichimoku 전환선/기준선/SpanA/SpanB/후행스팬)
 6. 마켓 레퍼런스 (결정론적·어드바이저리, `## Market Reference (deterministic · advisory)`) — `computeMarketReference(bars, indicators, timeframe)`가 시장 참여자들이 흔히 주시하는 **레퍼런스 레벨 + 추세 구조**를 결정론적으로 산출. 자세한 정의는 아래 **마켓 레퍼런스 레이어** 절 참조. **예측이 아니라 어드바이저리** — 백테스트 결과 정밀한 레벨/추세 예측은 distance-matched random 대비 forward edge가 ~0이라(fib 되돌림/확장만 유효), 프롬프트는 명시적으로 "NOT validated forward predictors … 다른 증거와 함께 가늠하는 컨텍스트"로 프레이밍한다. AI는 레벨을 직접 계산하지 않고(arithmetic hallucination 제거) keyLevels에 정확한 레퍼런스 가격을 **재사용해도 되고** 패턴·SMC·볼륨에서 직접 도출해도 된다 — 둘 다 강제는 아니며, **사전계산되었다는 이유만으로 더 높은 컨빅션을 부여하지 않는다.**
-7. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence >= 0.5)
-8. 패턴 분석 (type='pattern' skills, confidence >= 0.5)
-9. 전략 분석 (type='strategy' skills, confidence >= 0.5)
-10. 활성화된 Skills (type 없는 skills, confidence >= 0.5)
+7. 인디케이터 신호 가이드 (type='indicator_guide' skills, confidence 라벨 포함)
+8. 패턴 분석 (type='pattern' skills, confidence 라벨 포함)
+9. 전략 분석 (type='strategy' skills, confidence 라벨 포함)
+10. 활성화된 Skills (type 없는 skills, confidence 라벨 포함)
 11. 분석 가이드라인 (지지/저항 판단 기준, 가격 목표 산출 기준)
 12. 분석 요청 및 JSON 응답 형식 지시
 ```
@@ -1328,7 +1327,8 @@ type: pattern | indicator_guide | strategy | candlestick | support_resistance  #
 category: string              # 선택. reversal_bullish | reversal_bearish | continuation_bullish | continuation_bearish | neutral
 pattern: string               # type: pattern일 때 패턴 식별자
 indicators: string[]          # 이 skill이 필요로 하는 인디케이터 목록
-confidence_weight: number     # 0.0 ~ 1.0. 프롬프트 포함 여부와 강조도 결정
+confidence_weight: number     # 0.0 ~ 1.0. 표시 가중치 — Low/Medium/High 라벨로 매핑. 포함 여부와 무관
+usage_roles: string[]         # type=indicator_guide 필수. 허용 값: signal | confirmation | regime | measurement | risk (canonical 순서)
 display:                      # 선택. 차트 표시 설정
   chart:
     show: boolean             # 기본 show/hide 여부 (기본값: false)
@@ -1354,13 +1354,20 @@ type 필드: 'pattern' | 'indicator_guide' | 'strategy' | 'candlestick' | 'suppo
 
 필수 필드: name, description, indicators, confidence_weight
   → 누락 시 파싱 에러. 모든 필수 필드가 frontmatter와 body에 존재해야 함
+
+type=indicator_guide 추가 필수 필드: usage_roles
+  → 허용 값: signal | confirmation | regime | measurement | risk (canonical 순서)
+  → 누락 또는 빈 배열이면 파싱 경고, 해당 스킬은 역할 컨텍스트 없이 포함됨
 ```
 
 ### confidence_weight 적용 규칙
 
+`confidence_weight`(0.0–1.0)는 **표시 가중치**로, 해당 스킬의 해석을 얼마나 신뢰할지를 나타낸다.
+가중치는 Low/Medium/High 라벨로 매핑되어 프롬프트에 표시된다. 가중치 값과 무관하게 스킬은 항상 포함되며(하한 필터 없음), 라벨이 AI에게 신뢰 수준 맥락을 제공한다.
+
 | 범위 | 프롬프트 처리 |
 |---|---|
-| `< 0.5` | 프롬프트에서 **완전 제외** |
+| `< 0.5` | 프롬프트에 포함, `[낮은 신뢰도]` 라벨 |
 | `0.5 ~ 0.8` | 프롬프트에 포함, `[중간 신뢰도]` 라벨 |
 | `>= 0.8` | 프롬프트에 포함, `[높은 신뢰도]` 라벨로 강조 |
 
@@ -1396,6 +1403,8 @@ type SkillCategory =
     | 'continuation_bearish'
     | 'neutral';
 
+type SkillUsageRole = 'signal' | 'confirmation' | 'regime' | 'measurement' | 'risk';
+
 interface Skill {
     name: string;
     description: string;
@@ -1403,7 +1412,8 @@ interface Skill {
     category?: SkillCategory;   // skill 분류 (선택)
     pattern?: string;           // type='pattern'일 때 패턴 식별자 (예: 'double_top')
     indicators: string[];
-    confidenceWeight: number;
+    confidenceWeight: number;   // 표시 가중치 (0.0–1.0); 포함 여부를 결정하지 않음
+    usageRoles?: SkillUsageRole[]; // type='indicator_guide'일 때 필수 — 역할 컨텍스트 (signal/confirmation/regime/measurement/risk)
     content: string;            // frontmatter 제거 후 순수 Markdown 본문
     display?: SkillDisplay;     // 차트 표시 설정 (선택)
 }
@@ -1430,14 +1440,14 @@ consumer (web app / worker / CLI)
 
 domain/analysis/prompt.ts
   → buildAnalysisPrompt(symbol, bars, indicators, skills)
-  → confidenceWeight < 0.5인 항목 필터링
+  → 모든 스킬 포함 (confidenceWeight 하한 필터 없음)
   → type='indicator_guide' skills → "Indicator Signal Guides" 섹션
   → type='pattern' skills → "Pattern Analysis" 섹션
   → type='candlestick' skills → "Candlestick Pattern Guides" 섹션
   → type='support_resistance' skills → "Support/Resistance Tool Guides" 섹션
   → type='strategy' skills → "Strategy Analysis" 섹션
   → 나머지 skills (type 없음) → "Active Skills" 섹션
-  → confidenceWeight >= 0.8이면 "[높은 신뢰도]" 라벨 추가
+  → confidenceWeight에 따라 "[낮은 신뢰도]" / "[중간 신뢰도]" / "[높은 신뢰도]" 라벨 추가
   → 순수 함수 — 파일 접근 없음
 
 infrastructure/ai/claude.ts
@@ -1454,8 +1464,8 @@ skill의 `indicators` 필드는 **해당 skill이 분석에 필요로 하는 인
 
 ```typescript
 // 예시 (향후 최적화 용도)
-const activeSkills = allSkills.filter(s => s.confidenceWeight >= 0.5);
-const requiredIndicators = new Set(activeSkills.flatMap(s => s.indicators));
+// confidenceWeight는 표시 라벨용이며 포함 여부를 결정하지 않는다
+const requiredIndicators = new Set(allSkills.flatMap(s => s.indicators));
 
 // requiredIndicators에 없는 인디케이터는 계산 생략 가능
 // (현재는 전체 계산 후 전달하는 단순 구현)

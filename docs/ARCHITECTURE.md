@@ -249,7 +249,7 @@ Consumer (web app / worker / CLI)
   ├─ 3. 프롬프트 구성
   │     → domain/analysis/prompt.ts
   │     → buildAnalysisPrompt(symbol, bars, indicators, skills)
-  │     → confidenceWeight < 0.5 인 Skill은 제외 (pure function)
+  │     → confidence 라벨(Low/Medium/High) 적용; 하한 필터 없음 (pure function)
   │
   ├─ 4. AI 호출
   │     → infrastructure/ai/<provider>.ts

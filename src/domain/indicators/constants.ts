@@ -176,9 +176,6 @@ export const SMC_PREMIUM_RATIO = 0.75;
 export const SMC_DISCOUNT_RATIO = 0.25;
 
 export const HIGH_CONFIDENCE_WEIGHT = 0.8;
-/** @internal Confidence weight for medium-strength signal matches. */
-export const MEDIUM_CONFIDENCE_WEIGHT = 0.7;
-export const MIN_CONFIDENCE_WEIGHT = 0.5;
 /** @internal Confidence weight applied when no skill matches a signal. */
 export const UNMATCHED_SKILL_CONFIDENCE_WEIGHT = 0;
 

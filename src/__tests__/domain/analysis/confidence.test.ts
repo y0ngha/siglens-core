@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     enrichAnalysisWithConfidence,
-    filterPatterns,
     isFallbackAnalysis,
     normalizeCachedAnalysisResponse,
     EMPTY_ANALYSIS_FALLBACK_SUMMARY,
@@ -20,8 +19,6 @@ import type {
 } from '@/domain/types';
 import {
     HIGH_CONFIDENCE_WEIGHT,
-    MEDIUM_CONFIDENCE_WEIGHT,
-    MIN_CONFIDENCE_WEIGHT,
     UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
 } from '@/domain/indicators/constants';
 
@@ -64,19 +61,6 @@ const makeStrategyResult = (
     ...overrides,
 });
 
-const makePatternResult = (
-    overrides?: Partial<PatternResult>
-): PatternResult => ({
-    id: '테스트 패턴_0',
-    patternName: '테스트 패턴',
-    skillName: '테스트 스킬',
-    detected: true,
-    trend: 'bullish',
-    summary: '테스트 요약',
-    confidenceWeight: HIGH_CONFIDENCE_WEIGHT,
-    ...overrides,
-});
-
 const makeAnalysisResponse = (
     overrides?: Partial<RawAnalysisResponse>
 ): RawAnalysisResponse => ({
@@ -97,51 +81,6 @@ const makeAnalysisResponse = (
 });
 
 describe('confidence', () => {
-    describe('filterPatterns', () => {
-        it('confidenceWeight가 MIN_CONFIDENCE_WEIGHT 이상인 패턴만 반환한다', () => {
-            const patterns = [
-                makePatternResult({ confidenceWeight: MIN_CONFIDENCE_WEIGHT }),
-                makePatternResult({
-                    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
-                }),
-                makePatternResult({ confidenceWeight: HIGH_CONFIDENCE_WEIGHT }),
-            ];
-            const result = filterPatterns(patterns);
-            expect(result).toHaveLength(2);
-            expect(
-                result.every(p => p.confidenceWeight >= MIN_CONFIDENCE_WEIGHT)
-            ).toBe(true);
-        });
-
-        it('모든 패턴이 MIN_CONFIDENCE_WEIGHT 미만이면 빈 배열을 반환한다', () => {
-            const patterns = [
-                makePatternResult({
-                    confidenceWeight: MIN_CONFIDENCE_WEIGHT - 0.1,
-                }),
-                makePatternResult({
-                    confidenceWeight: UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
-                }),
-            ];
-            const result = filterPatterns(patterns);
-            expect(result).toHaveLength(0);
-        });
-
-        it('빈 배열을 입력하면 빈 배열을 반환한다', () => {
-            const result = filterPatterns([]);
-            expect(result).toHaveLength(0);
-        });
-
-        it('모든 패턴이 MIN_CONFIDENCE_WEIGHT를 초과하면 전체가 반환된다', () => {
-            const aboveMin = MIN_CONFIDENCE_WEIGHT + 0.1;
-            const patterns = [
-                makePatternResult({ confidenceWeight: aboveMin }),
-                makePatternResult({ confidenceWeight: HIGH_CONFIDENCE_WEIGHT }),
-            ];
-            const result = filterPatterns(patterns);
-            expect(result).toHaveLength(2);
-        });
-    });
-
     describe('enrichAnalysisWithConfidence', () => {
         describe('patternSummaries id 부여', () => {
             it('단일 패턴에 id가 부여된다', () => {
@@ -207,7 +146,7 @@ describe('confidence', () => {
                 );
             });
 
-            it('매칭되지 않는 skillName은 confidenceWeight 0으로 처리되어 필터링된다', () => {
+            it('매칭되지 않는 skillName은 confidenceWeight 0으로 처리되어 결과에 포함된다', () => {
                 const analysis = makeAnalysisResponse({
                     patternSummaries: [
                         makePatternSummary({ skillName: '존재하지않는스킬' }),
@@ -220,7 +159,10 @@ describe('confidence', () => {
                     }),
                 ];
                 const result = enrichAnalysisWithConfidence(analysis, skills);
-                expect(result.patternSummaries).toHaveLength(0);
+                expect(result.patternSummaries).toHaveLength(1);
+                expect(result.patternSummaries[0].confidenceWeight).toBe(
+                    UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+                );
             });
         });
 
@@ -260,14 +202,17 @@ describe('confidence', () => {
                 expect(result.patternSummaries[0].renderConfig).toBeUndefined();
             });
 
-            it('매칭되는 skill이 없을 때 해당 패턴은 필터링된다', () => {
+            it('매칭되는 skill이 없을 때 해당 패턴은 UNMATCHED 가중치로 결과에 포함된다', () => {
                 const analysis = makeAnalysisResponse({
                     patternSummaries: [
                         makePatternSummary({ skillName: '없는스킬' }),
                     ],
                 });
                 const result = enrichAnalysisWithConfidence(analysis, []);
-                expect(result.patternSummaries).toHaveLength(0);
+                expect(result.patternSummaries).toHaveLength(1);
+                expect(result.patternSummaries[0].confidenceWeight).toBe(
+                    UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+                );
             });
         });
 
@@ -302,15 +247,18 @@ describe('confidence', () => {
                         makeStrategyResult({ strategyName: 'RSI 다이버전스' }),
                     ],
                 });
+                // Arbitrary mid-range sample weight — the test only asserts the
+                // skill's weight is copied onto the result, not a specific value.
+                const sampleWeight = 0.7;
                 const skills = [
                     makeSkill({
                         name: 'RSI 다이버전스',
-                        confidenceWeight: MEDIUM_CONFIDENCE_WEIGHT,
+                        confidenceWeight: sampleWeight,
                     }),
                 ];
                 const result = enrichAnalysisWithConfidence(analysis, skills);
                 expect(result.strategyResults[0].confidenceWeight).toBe(
-                    MEDIUM_CONFIDENCE_WEIGHT
+                    sampleWeight
                 );
             });
 
@@ -334,7 +282,7 @@ describe('confidence', () => {
         });
 
         describe('skills 빈 배열일 때', () => {
-            it('skills가 빈 배열이면 patternSummaries는 모두 필터링된다', () => {
+            it('skills가 빈 배열이면 patternSummaries는 UNMATCHED 가중치로 모두 포함된다', () => {
                 const analysis = makeAnalysisResponse({
                     patternSummaries: [
                         makePatternSummary({ skillName: '헤드앤숄더' }),
@@ -344,7 +292,10 @@ describe('confidence', () => {
                     ],
                 });
                 const result = enrichAnalysisWithConfidence(analysis, []);
-                expect(result.patternSummaries).toHaveLength(0);
+                expect(result.patternSummaries).toHaveLength(1);
+                expect(result.patternSummaries[0].confidenceWeight).toBe(
+                    UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+                );
             });
 
             it('skills가 빈 배열이면 strategyResults의 confidenceWeight는 0이다', () => {
@@ -446,8 +397,8 @@ describe('confidence', () => {
             });
         });
 
-        describe('filterPatterns 적용', () => {
-            it('confidenceWeight가 MIN_CONFIDENCE_WEIGHT 미만인 패턴은 결과에서 제외된다', () => {
+        describe('no confidence floor — unmatched patterns are kept', () => {
+            it('confidenceWeight와 상관없이 모든 패턴이 결과에 포함된다', () => {
                 const analysis = makeAnalysisResponse({
                     patternSummaries: [
                         makePatternSummary({ skillName: '없는스킬' }),
@@ -461,13 +412,14 @@ describe('confidence', () => {
                     }),
                 ];
                 const result = enrichAnalysisWithConfidence(analysis, skills);
-                expect(
-                    result.patternSummaries.every(
-                        p => p.confidenceWeight >= MIN_CONFIDENCE_WEIGHT
-                    )
-                ).toBe(true);
-                expect(result.patternSummaries).toHaveLength(1);
-                expect(result.patternSummaries[0].skillName).toBe('헤드앤숄더');
+                expect(result.patternSummaries).toHaveLength(2);
+                expect(result.patternSummaries[0].confidenceWeight).toBe(
+                    UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+                );
+                expect(result.patternSummaries[1].skillName).toBe('헤드앤숄더');
+                expect(result.patternSummaries[1].confidenceWeight).toBe(
+                    HIGH_CONFIDENCE_WEIGHT
+                );
             });
         });
 
@@ -884,6 +836,35 @@ describe('confidence', () => {
             expect(result.strategyResults[0].confidenceWeight).toBe(
                 UNMATCHED_SKILL_CONFIDENCE_WEIGHT
             );
+        });
+    });
+
+    describe('enrichAnalysisWithConfidence — low-confidence patterns are kept', () => {
+        it('keeps a pattern whose matched skill confidence is below 0.5', () => {
+            const skills = [
+                makeSkill({
+                    name: 'Low Pattern',
+                    description: '',
+                    type: 'pattern' as const,
+                    pattern: 'low_pattern',
+                    indicators: [],
+                    confidenceWeight: 0.2,
+                    content: '',
+                }),
+            ];
+            const raw = makeAnalysisResponse({
+                patternSummaries: [
+                    makePatternSummary({
+                        patternName: 'Low Pattern',
+                        skillName: 'Low Pattern',
+                        trend: 'bullish',
+                        summary: 's',
+                    }),
+                ],
+            });
+            const result = enrichAnalysisWithConfidence(raw, skills);
+            expect(result.patternSummaries).toHaveLength(1);
+            expect(result.patternSummaries[0].confidenceWeight).toBe(0.2);
         });
     });
 

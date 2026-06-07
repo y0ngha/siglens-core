@@ -672,3 +672,105 @@ Body`;
         expect(skills[0].description).toBe('d');
     });
 });
+
+// ─────────────────────────────────────────
+// usage_roles parsing — fail-safe canonical normalization
+// ─────────────────────────────────────────
+
+describe('FileSkillsLoader — usage_roles parsing', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const indicatorGuideFm = (usageRolesLine: string) => `---
+name: Usage Role Skill
+description: Test usage roles
+type: indicator_guide
+category: neutral
+indicators: [RSI]
+confidence_weight: 0.7
+${usageRolesLine}
+---
+Body content`;
+
+    it('valid [confirmation, signal] → usageRoles deep-equals [signal, confirmation] (canonical order)', async () => {
+        const fm = indicatorGuideFm('usage_roles: [confirmation, signal]');
+        mockReaddir.mockResolvedValue([makeDirent('usage-valid.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toEqual(['signal', 'confirmation']);
+    });
+
+    it('unknown role [signal, bogus] → usageRoles is undefined', async () => {
+        const fm = indicatorGuideFm('usage_roles: [signal, bogus]');
+        mockReaddir.mockResolvedValue([makeDirent('usage-bogus.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+
+    it('empty array [] → usageRoles is undefined', async () => {
+        const fm = indicatorGuideFm('usage_roles: []');
+        mockReaddir.mockResolvedValue([makeDirent('usage-empty.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+
+    it('duplicate [signal, signal] → usageRoles is undefined', async () => {
+        const fm = indicatorGuideFm('usage_roles: [signal, signal]');
+        mockReaddir.mockResolvedValue([makeDirent('usage-dup.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+
+    it('array with a non-role token [1, signal] → usageRoles is undefined', async () => {
+        // The inline-YAML loader stringifies every element, so `1` arrives as
+        // the string '1'; it fails the canonical-role membership check and the
+        // whole array is rejected fail-safe.
+        const fm = indicatorGuideFm('usage_roles: [1, signal]');
+        mockReaddir.mockResolvedValue([makeDirent('usage-nonrole.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+
+    it('non-array scalar (usage_roles: signal) → usageRoles is undefined', async () => {
+        const fm = indicatorGuideFm('usage_roles: signal');
+        mockReaddir.mockResolvedValue([makeDirent('usage-scalar.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+
+    it('no usage_roles field → usageRoles is undefined', async () => {
+        const fm = `---
+name: No Usage Role Skill
+description: No usage roles
+type: indicator_guide
+category: neutral
+indicators: [RSI]
+confidence_weight: 0.7
+---
+Body content`;
+        mockReaddir.mockResolvedValue([makeDirent('usage-absent.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].usageRoles).toBeUndefined();
+    });
+});

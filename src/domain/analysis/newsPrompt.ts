@@ -1,6 +1,6 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
-import { MIN_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
+import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -8,12 +8,9 @@ import type {
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
-/** Filter skills to news category with sufficient confidence weight. */
+/** Filter skills to the news category. Confidence is a display weight, not an inclusion gate. */
 function filterNewsSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(
-        s =>
-            s.category === 'news' && s.confidenceWeight >= MIN_CONFIDENCE_WEIGHT
-    );
+    return skills.filter(s => s.category === 'news');
 }
 
 /** Format a single enriched news item into a compact block for the prompt. */
@@ -57,8 +54,8 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * Accepts enriched news items (each already tagged with a
  * {@link NewsCardAnalysis} via the flash-lite model), the upcoming earnings
  * calendar, and a list of loaded {@link Skill}s. Only skills with
- * `category === 'news'` and `confidenceWeight >= MIN_CONFIDENCE_WEIGHT` are
- * injected into the prompt.
+ * `category === 'news'` are injected into the prompt; `confidenceWeight` is
+ * a display label, not an inclusion gate.
  *
  * Returns a fully self-contained English prompt string; the JSON output schema
  * specifies Korean text for fields labelled `KO`.
@@ -67,7 +64,7 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * @param companyName       - Full company name (e.g. `'Apple Inc.'`).
  * @param news              - Enriched news items with per-card analysis.
  * @param upcomingCalendar  - Upcoming or recent earnings events for the symbol.
- * @param skills            - All loaded skills; non-news / low-weight entries are filtered out.
+ * @param skills            - All loaded skills; non-news entries are filtered out.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 export function buildNewsAnalysisPrompt(
@@ -110,7 +107,10 @@ export function buildNewsAnalysisPrompt(
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills
-                  .map(s => `### ${s.name}\n${s.content}`)
+                  .map(
+                      s =>
+                          `### ${s.name} ${confidenceLabel(s.confidenceWeight)}\n${s.content}`
+                  )
                   .join('\n\n')
             : 'No additional news skills loaded.';
 

@@ -11,7 +11,6 @@ import {
     EMA_SUPPORT_RESISTANCE_LONG_INDEX,
     EMA_SUPPORT_RESISTANCE_SHORT_INDEX,
     FORCE_INDEX_ZERO,
-    HIGH_CONFIDENCE_WEIGHT,
     HURST_RANDOM_WALK,
     ICHIMOKU_BASE_PERIOD,
     ICHIMOKU_CONVERSION_PERIOD,
@@ -56,6 +55,7 @@ import {
     selectLastCandlePatternEntries,
 } from '@/domain/analysis/candle-detection';
 import { selectSkills } from '@/domain/analysis/selectSkills';
+import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import type {
     CandlePatternEntry,
@@ -1174,13 +1174,11 @@ const formatIndicatorSection = (
     ].join('\n');
 };
 
-const confidenceLabel = (weight: number): string =>
-    weight >= HIGH_CONFIDENCE_WEIGHT
-        ? '[High Confidence]'
-        : '[Medium Confidence]';
-
-const buildSkillBlock = (skill: Skill): string =>
-    `### ${skill.name} ${confidenceLabel(skill.confidenceWeight)}\n${skill.content}`;
+const buildSkillBlock = (skill: Skill): string => {
+    const roles =
+        skill.type === 'indicator_guide' ? roleLabel(skill.usageRoles) : '';
+    return `### ${skill.name} ${confidenceLabel(skill.confidenceWeight)}${roles}\n${skill.content}`;
+};
 
 /**
  * Per-field content guidance for the few AnalysisResponse fields whose unique
