@@ -6,6 +6,7 @@ import type {
     ChatMessage,
     ChatPromptPayload,
     CurrentAnalysisContext,
+    FinancialsAnalysisResponse,
     FundamentalAnalysisResponse,
     KeyLevel,
     NewsAnalysisResponse,
@@ -167,6 +168,27 @@ function formatOptionsContext(payload: OptionsAnalysisResponse): string {
 }
 
 /**
+ * Format a financials (재무제표) analysis context section for the system prompt.
+ *
+ * Surfaces the overall conclusion, per-axis assessments, and risk factors so
+ * the assistant can reference the financial scorecard without re-fetching data.
+ *
+ * @param p - The {@link FinancialsAnalysisResponse} to format.
+ * @returns A markdown section string.
+ */
+function formatFinancialsContext(p: FinancialsAnalysisResponse): string {
+    return [
+        `Overall: ${p.overallConclusionKo} (${p.overallSentiment})`,
+        ...p.axisAssessments.map(
+            a => `- ${a.axis} [${a.sentiment}]: ${a.rationaleKo}`
+        ),
+        p.riskFactorsKo.length ? `Risks: ${p.riskFactorsKo.join('; ')}` : '',
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+/**
  * Build the `## Current analysis context` section for the system prompt
  * from a {@link CurrentAnalysisContext} tagged union.
  *
@@ -197,6 +219,9 @@ function formatCurrentAnalysisContext(
             break;
         case 'options':
             body = formatOptionsContext(context.payload);
+            break;
+        case 'financials':
+            body = formatFinancialsContext(context.payload);
             break;
     }
 

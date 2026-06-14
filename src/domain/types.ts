@@ -2678,7 +2678,8 @@ export type CurrentAnalysisContext =
     | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
     | { kind: 'news'; payload: NewsAnalysisResponse }
     | { kind: 'overall'; payload: OverallAnalysisResponse }
-    | { kind: 'options'; payload: OptionsAnalysisResponse };
+    | { kind: 'options'; payload: OptionsAnalysisResponse }
+    | { kind: 'financials'; payload: FinancialsAnalysisResponse };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here

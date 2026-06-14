@@ -3,6 +3,7 @@ import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import type {
     AnalysisResponse,
     CurrentAnalysisContext,
+    FinancialsAnalysisResponse,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
@@ -601,5 +602,95 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         expect(result.systemPrompt).toContain('ATM IV가 한 주 사이 5%p 상승');
         // analyzedAt
         expect(result.systemPrompt).toContain('2026-05-22T10:30:00Z');
+    });
+
+    it('renders financials context section', () => {
+        const payload: FinancialsAnalysisResponse = {
+            overallConclusionKo: '현금흐름 견조',
+            axisAssessments: [
+                {
+                    axis: 'cash' as const,
+                    sentiment: 'bullish' as const,
+                    rationaleKo: 'FCF 견조',
+                },
+            ],
+            riskFactorsKo: ['부채 증가'],
+            overallSentiment: 'bullish' as const,
+        };
+        const context: CurrentAnalysisContext = {
+            kind: 'financials',
+            payload,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: financials');
+        expect(result.systemPrompt).toContain('현금흐름 견조');
+        expect(result.systemPrompt).toContain('FCF 견조');
+    });
+
+    it('financials context — riskFactorsKo가 없으면 Risks 줄을 포함하지 않는다', () => {
+        const payload: FinancialsAnalysisResponse = {
+            overallConclusionKo: '안정적인 수익 구조',
+            axisAssessments: [],
+            riskFactorsKo: [],
+            overallSentiment: 'neutral' as const,
+        };
+        const context: CurrentAnalysisContext = {
+            kind: 'financials',
+            payload,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        expect(result.systemPrompt).toContain('안정적인 수익 구조');
+        expect(result.systemPrompt).not.toContain('Risks:');
+    });
+
+    it('7-arg overload (companyName 포함): financials 컨텍스트가 올바르게 주입된다', () => {
+        const payload: FinancialsAnalysisResponse = {
+            overallConclusionKo: '매출 성장 지속',
+            axisAssessments: [
+                {
+                    axis: 'growth' as const,
+                    sentiment: 'bullish' as const,
+                    rationaleKo: '3년 연속 매출 성장',
+                },
+            ],
+            riskFactorsKo: ['경쟁 심화'],
+            overallSentiment: 'bullish' as const,
+        };
+        const context: CurrentAnalysisContext = {
+            kind: 'financials',
+            payload,
+        };
+        // 7-arg overload: (symbol, companyName, timeframe, analysis, history, userMessage, context)
+        const result = buildChatPrompt(
+            'AAPL',
+            'Apple Inc.',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '재무제표 어때?',
+            context
+        );
+        expect(result.systemPrompt).toContain('AAPL (Apple Inc.)');
+        expect(result.systemPrompt).toContain('Kind: financials');
+        expect(result.systemPrompt).toContain('매출 성장 지속');
+        expect(result.systemPrompt).toContain('3년 연속 매출 성장');
+        expect(result.systemPrompt).toContain('Risks: 경쟁 심화');
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0].content).toBe('재무제표 어때?');
     });
 });
