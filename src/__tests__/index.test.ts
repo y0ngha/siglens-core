@@ -6,9 +6,12 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
+    buildFinancialsAnalysisPrompt,
+    cancelFinancialsAnalysisJob,
     checkAnalysisLimit,
     checkChatbotLimit,
     clusterKeyLevels,
+    computeFinancialsScorecard,
     createChatTokenStore,
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
@@ -27,10 +30,14 @@ import {
     isModelAllowed,
     isTier,
     isTimeframeAllowed,
+    normalizeFinancialsAnalysisResponse,
+    normalizeFinancialsSnapshot,
     POC_WINDOW_DEFAULT,
+    pollFinancialsAnalysis,
     requestChatCompletion,
     RSI_DEFAULT_PERIOD,
     scoreToLabel,
+    submitFinancialsAnalysis,
     TIER_CONFIG,
     VALID_CHAT_MODELS,
     validateActionPrices,
@@ -112,5 +119,15 @@ describe('public API exports', () => {
         expect(typeof createChatTokenStore).toBe('function');
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
+    });
+
+    it('exports financials domain and application entrypoints', () => {
+        expect(typeof submitFinancialsAnalysis).toBe('function');
+        expect(typeof pollFinancialsAnalysis).toBe('function');
+        expect(typeof cancelFinancialsAnalysisJob).toBe('function');
+        expect(typeof computeFinancialsScorecard).toBe('function');
+        expect(typeof normalizeFinancialsAnalysisResponse).toBe('function');
+        expect(typeof normalizeFinancialsSnapshot).toBe('function');
+        expect(typeof buildFinancialsAnalysisPrompt).toBe('function');
     });
 });
