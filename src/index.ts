@@ -318,8 +318,14 @@ export type {
 } from './application/fundamental/types';
 export type {
     PollFinancialsAnalysisResult,
+    SubmitFinancialsAnalysisApiKeyRequiredError,
+    SubmitFinancialsAnalysisCached,
+    SubmitFinancialsAnalysisFetchError,
+    SubmitFinancialsAnalysisLimitError,
+    SubmitFinancialsAnalysisMissNoTrigger,
     SubmitFinancialsAnalysisOptions,
     SubmitFinancialsAnalysisResult,
+    SubmitFinancialsAnalysisSubmitted,
 } from './application/financials/types';
 export type {
     AnalysisUsageOptions,

@@ -11,6 +11,19 @@ const pct = (num: number | null, den: number | null): number | null =>
 const ratio = (num: number | null, den: number | null): number | null =>
     num == null || den == null || den === 0 ? null : num / den;
 
+/**
+ * Composite key for the revenue lookup map.
+ *
+ * Using `fiscalYear` alone collapses multiple quarterly rows that share
+ * the same year onto a single entry — the last quarter's revenue silently
+ * overwrites earlier ones. The composite `fiscalYear|period` key ensures
+ * each row (annual *or* quarterly) maps to its own revenue value so that
+ * `fcfMargin` in `withCashDerived` is always matched against the correct
+ * quarter's revenue rather than a random survivor.
+ */
+const revenueKey = (r: { fiscalYear: string; period: string }): string =>
+    `${r.fiscalYear}|${r.period}`;
+
 function withIncomeDerived(r: IncomeStatementRow): IncomeStatementRow {
     return {
         ...r,
@@ -29,13 +42,13 @@ function withBalanceDerived(r: BalanceSheetRow): BalanceSheetRow {
 }
 function withCashDerived(
     r: CashFlowRow,
-    revenueByYear: Map<string, number | null>
+    revenueByKey: Map<string, number | null>
 ): CashFlowRow {
     return {
         ...r,
         fcfMargin:
             r.fcfMargin ??
-            pct(r.freeCashFlow, revenueByYear.get(r.fiscalYear) ?? null),
+            pct(r.freeCashFlow, revenueByKey.get(revenueKey(r)) ?? null),
     };
 }
 
@@ -43,11 +56,11 @@ export function normalizeFinancialsSnapshot(
     input: NormalizeFinancialsSnapshotInput
 ): FinancialsSnapshot {
     const income = input.income.map(withIncomeDerived);
-    const revenueByYear = new Map(income.map(r => [r.fiscalYear, r.revenue]));
+    const revenueByKey = new Map(income.map(r => [revenueKey(r), r.revenue]));
     return {
         income,
         balance: input.balance.map(withBalanceDerived),
-        cashFlow: input.cashFlow.map(r => withCashDerived(r, revenueByYear)),
+        cashFlow: input.cashFlow.map(r => withCashDerived(r, revenueByKey)),
         incomeGrowth: input.incomeGrowth,
         financialGrowth: input.financialGrowth,
         cashFlowGrowth: input.cashFlowGrowth,

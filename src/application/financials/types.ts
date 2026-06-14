@@ -69,8 +69,9 @@ export interface SubmitFinancialsAnalysisOptions extends BackgroundTaskOptions {
      */
     force?: boolean;
     /**
-     * Statement period to fetch. Defaults to `'annual'`. The cache key does not
-     * vary by period yet — annual is the only consumer path today.
+     * Statement period to fetch. Defaults to `'annual'`.
+     * The cache key varies by period — `'annual'` and `'quarter'` produce
+     * independent cache entries so the two result shapes are never mixed.
      */
     period?: StatementPeriod;
     /** Number of fiscal periods to fetch per statement. Defaults to `5`. */

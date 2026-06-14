@@ -1,6 +1,7 @@
 import type {
     DashboardTimeframe,
     OptionsExpirationFilter,
+    StatementPeriod,
     Timeframe,
 } from '@/domain/types';
 import {
@@ -263,6 +264,13 @@ export function buildSectorSignalsCacheKey(
  *   `NewsAnalysisResponse`, `NewsCardAnalysis`, or `OverallAnalysisResponse`.
  * - Changing the semantics of an existing field (units, enum value, etc.).
  *
+ * **Exception — additive, runtime-defaulted fields do NOT require a bump.**
+ * When a new field is added to a cached response type AND `normalizeFinancialsAnalysisResponse`
+ * (or the equivalent normalizer) fills it with a safe default for stale cache reads
+ * (e.g. `financialsBulletsKo` defaults to `[]`), a bump is unnecessary.
+ * Stale cached entries remain valid because the normalizer repairs the missing field
+ * on every read; bumping would flush the entire cache fleet for no correctness gain.
+ *
  * @internal
  */
 export const CACHE_KEY_SCHEMA_VERSION = 'v1' as const;
@@ -331,11 +339,13 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
  *
- * Format: `{version}:analysis:financials:<symbol>:<modelId>:<promptVersion>`.
+ * Format: `{version}:analysis:financials:<symbol>:<period>:<modelId>:<promptVersion>`.
  *
- * Mirrors {@link buildFundamentalCacheKey} but uses the `financials` path segment
- * and {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} so the two analysis types are
- * cached under independent keys and can be invalidated separately.
+ * Mirrors {@link buildFundamentalCacheKey} but uses the `financials` path segment,
+ * folds the `period` axis (`'annual'` | `'quarter'`) between `symbol` and `modelId`
+ * so annual and quarterly analyses for the same symbol are cached independently, and
+ * uses {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} so the two analysis types can be
+ * invalidated separately.
  *
  * The optional `skillFingerprint` segment folds the active skill catalog into
  * the key (see {@link buildAnalysisCacheKey}); appended only when supplied so
@@ -344,16 +354,27 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
  * @internal
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
+ * @param period - Statement period (`'annual'` or `'quarter'`). Annual and quarterly
+ *   analyses cover different data and must not share a cache entry.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
  * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * buildFinancialsCacheKey('AAPL', 'gemini-2.5-flash', 'annual');
+ * // → 'v1:analysis:financials:AAPL:annual:gemini-2.5-flash:p1'
+ * buildFinancialsCacheKey('AAPL', 'gemini-2.5-flash', 'quarter', 'sk1');
+ * // → 'v1:analysis:financials:AAPL:quarter:gemini-2.5-flash:p1:sk1'
+ * ```
  */
 export function buildFinancialsCacheKey(
     symbol: string,
     modelId: string,
+    period: StatementPeriod,
     skillFingerprint?: string
 ): string {
-    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:financials:${symbol}:${modelId}:${FINANCIALS_PROMPT_TEMPLATE_VERSION}`;
+    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:financials:${symbol}:${period}:${modelId}:${FINANCIALS_PROMPT_TEMPLATE_VERSION}`;
     return skillFingerprint !== undefined
         ? `${base}:${skillFingerprint}`
         : base;

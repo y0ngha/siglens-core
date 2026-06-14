@@ -172,6 +172,7 @@ export async function submitFinancialsAnalysis(
     const cacheKey = buildFinancialsCacheKey(
         symbol,
         modelId,
+        period,
         hashSkillCatalog(fingerprintSkills)
     );
     const cache = createCacheProvider();

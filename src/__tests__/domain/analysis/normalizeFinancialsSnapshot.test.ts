@@ -97,4 +97,79 @@ describe('normalizeFinancialsSnapshot', () => {
             cashFlowGrowth: [],
         });
     });
+
+    it('quarterly rows with the same fiscalYear use their own revenue for fcfMargin', () => {
+        // Two quarterly rows share fiscalYear '2025' but have different periods
+        // and different revenue values. Each cash-flow row's fcfMargin must be
+        // derived from its own quarter's revenue — not the last writer's.
+        const quarterly: NormalizeFinancialsSnapshotInput = {
+            income: [
+                {
+                    fiscalYear: '2025',
+                    period: 'Q1',
+                    date: '2025-03-29',
+                    revenue: 1000,
+                    grossProfit: null,
+                    operatingIncome: null,
+                    netIncome: null,
+                    ebitda: null,
+                    eps: null,
+                    epsDiluted: null,
+                    grossMargin: null,
+                    operatingMargin: null,
+                    netMargin: null,
+                },
+                {
+                    fiscalYear: '2025',
+                    period: 'Q2',
+                    date: '2025-06-28',
+                    revenue: 2000,
+                    grossProfit: null,
+                    operatingIncome: null,
+                    netIncome: null,
+                    ebitda: null,
+                    eps: null,
+                    epsDiluted: null,
+                    grossMargin: null,
+                    operatingMargin: null,
+                    netMargin: null,
+                },
+            ],
+            balance: [],
+            cashFlow: [
+                {
+                    fiscalYear: '2025',
+                    period: 'Q1',
+                    date: '2025-03-29',
+                    operatingCashFlow: null,
+                    capitalExpenditure: null,
+                    freeCashFlow: 100,
+                    dividendsPaid: null,
+                    fcfMargin: null,
+                },
+                {
+                    fiscalYear: '2025',
+                    period: 'Q2',
+                    date: '2025-06-28',
+                    operatingCashFlow: null,
+                    capitalExpenditure: null,
+                    freeCashFlow: 300,
+                    dividendsPaid: null,
+                    fcfMargin: null,
+                },
+            ],
+            incomeGrowth: [],
+            financialGrowth: [],
+            cashFlowGrowth: [],
+        };
+
+        const s = normalizeFinancialsSnapshot(quarterly);
+
+        // Q1: FCF 100 / revenue 1000 = 10 %
+        expect(s.cashFlow[0].fcfMargin).toBeCloseTo(10);
+        // Q2: FCF 300 / revenue 2000 = 15 %
+        expect(s.cashFlow[1].fcfMargin).toBeCloseTo(15);
+        // Values must be distinct — not the same collapsing value
+        expect(s.cashFlow[0].fcfMargin).not.toBe(s.cashFlow[1].fcfMargin);
+    });
 });
