@@ -2763,3 +2763,159 @@ export interface SanityOptions {
  * (`'bullish' | 'bearish'`), which labels a detected signal's bias.
  */
 export type ForwardDirection = 'up' | 'down';
+
+// ─── Financials (재무제표) domain ───────────────────────────────
+
+export type StatementPeriod = 'annual' | 'quarter';
+export type FinancialsSentiment = 'bullish' | 'neutral' | 'bearish';
+export type FinancialsAxis = 'growth' | 'quality' | 'solvency' | 'cash';
+export type FinancialsGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+
+/** 손익계산서 1행 (domain-neutral, 분석·표시 공용 핵심 필드). */
+export interface IncomeStatementRow {
+    fiscalYear: string;
+    period: string;
+    date: string;
+    revenue: number | null;
+    grossProfit: number | null;
+    operatingIncome: number | null;
+    netIncome: number | null;
+    ebitda: number | null;
+    eps: number | null;
+    epsDiluted: number | null;
+    grossMargin: number | null;
+    operatingMargin: number | null;
+    netMargin: number | null;
+}
+
+/** 재무상태표 1행. */
+export interface BalanceSheetRow {
+    fiscalYear: string;
+    period: string;
+    date: string;
+    totalAssets: number | null;
+    totalCurrentAssets: number | null;
+    totalLiabilities: number | null;
+    totalCurrentLiabilities: number | null;
+    cashAndShortTermInvestments: number | null;
+    totalDebt: number | null;
+    netDebt: number | null;
+    totalStockholdersEquity: number | null;
+    currentRatio: number | null;
+}
+
+/** 현금흐름표 1행. fcfMargin은 income.revenue가 필요해 snapshot 정규화 단계에서 채운다. */
+export interface CashFlowRow {
+    fiscalYear: string;
+    period: string;
+    date: string;
+    operatingCashFlow: number | null;
+    capitalExpenditure: number | null;
+    freeCashFlow: number | null;
+    dividendsPaid: number | null;
+    fcfMargin: number | null;
+}
+
+export interface IncomeGrowthRow {
+    fiscalYear: string;
+    period: string;
+    growthRevenue: number | null;
+    growthNetIncome: number | null;
+    growthEPS: number | null;
+    growthOperatingIncome: number | null;
+}
+
+export interface FinancialGrowthRow {
+    fiscalYear: string;
+    period: string;
+    revenueGrowth: number | null;
+    netIncomeGrowth: number | null;
+    epsgrowth: number | null;
+    freeCashFlowGrowth: number | null;
+    operatingCashFlowGrowth: number | null;
+    assetGrowth: number | null;
+    debtGrowth: number | null;
+    threeYRevenueGrowthPerShare: number | null;
+    fiveYRevenueGrowthPerShare: number | null;
+    tenYRevenueGrowthPerShare: number | null;
+}
+
+export interface CashFlowGrowthRow {
+    fiscalYear: string;
+    period: string;
+    growthOperatingCashFlow: number | null;
+    growthFreeCashFlow: number | null;
+    growthCapitalExpenditure: number | null;
+}
+
+/** computeFinancialsScorecard 입력. 각 배열은 최신→과거 정렬(0=최신). */
+export interface FinancialsSnapshot {
+    income: IncomeStatementRow[];
+    balance: BalanceSheetRow[];
+    cashFlow: CashFlowRow[];
+    incomeGrowth: IncomeGrowthRow[];
+    financialGrowth: FinancialGrowthRow[];
+    cashFlowGrowth: CashFlowGrowthRow[];
+}
+
+export interface FinancialSignal {
+    type: string;
+    direction: 'positive' | 'negative' | 'neutral';
+    labelKo: string;
+}
+
+export interface ScoreMetric {
+    labelKo: string;
+    value: number | null;
+    unit: 'pct' | 'ratio' | 'usd' | 'score';
+}
+
+export interface AxisScore {
+    score: number;
+    grade: FinancialsGrade;
+    signals: FinancialSignal[];
+    metrics: ScoreMetric[];
+}
+
+export interface FinancialsScorecard {
+    growth: AxisScore;
+    quality: AxisScore;
+    solvency: AxisScore;
+    cash: AxisScore;
+    composite: { score: number; grade: FinancialsGrade; summaryKo: string };
+}
+
+export interface FinancialsAxisAssessment {
+    axis: FinancialsAxis;
+    sentiment: FinancialsSentiment;
+    rationaleKo: string;
+}
+
+export interface FinancialsAnalysisResponse {
+    overallConclusionKo: string;
+    axisAssessments: FinancialsAxisAssessment[];
+    riskFactorsKo: string[];
+    overallSentiment: FinancialsSentiment;
+}
+
+export interface RawFinancialsAxisAssessment {
+    axis?: unknown;
+    sentiment?: unknown;
+    rationaleKo?: unknown;
+}
+export interface RawFinancialsAnalysisResponse {
+    overallConclusionKo?: unknown;
+    axisAssessments?: unknown;
+    riskFactorsKo?: unknown;
+    overallSentiment?: unknown;
+}
+
+/** normalizeFinancialsSnapshot 입력 (어댑터가 채운 domain-neutral 묶음). */
+export interface NormalizeFinancialsSnapshotInput {
+    income: IncomeStatementRow[];
+    balance: BalanceSheetRow[];
+    cashFlow: CashFlowRow[];
+    incomeGrowth: IncomeGrowthRow[];
+    financialGrowth: FinancialGrowthRow[];
+    cashFlowGrowth: CashFlowGrowthRow[];
+}
