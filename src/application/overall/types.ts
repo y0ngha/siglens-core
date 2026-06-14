@@ -24,6 +24,7 @@ import type {
     AnalysisResponse,
     EarningsCalendarItem,
     EnrichedNewsItem,
+    FinancialsScorecard,
     FundamentalAnalysisResponse,
     ModelId,
     NewsAnalysisResponse,
@@ -222,6 +223,12 @@ export interface OverallDependencyInputs {
      * open-interest counts are stale (still reflecting the previous session).
      */
     optionsOiStale?: boolean;
+
+    /**
+     * 사전 계산된 재무 스코어카드. 4개 의존성 축(technical/fundamental/news/options)과 달리
+     * financials는 동기 계산되어 폴링 없이 프롬프트에 직접 주입된다. 생략 시 financials 축 생략.
+     */
+    financialsScorecard?: FinancialsScorecard;
 
     /**
      * Top-level force flag. When true, the resolver forwards `force: true` to
