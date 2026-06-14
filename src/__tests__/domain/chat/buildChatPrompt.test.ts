@@ -401,6 +401,7 @@ const OVERALL_PAYLOAD: OverallAnalysisResponse = {
     fundamentalBulletsKo: [],
     newsBulletsKo: [],
     optionsBulletsKo: [],
+    financialsBulletsKo: [],
     integratedConclusionKo: '기술·펀더·뉴스 모두 긍정적입니다.',
     scenarios: [],
     riskFactorsKo: [],

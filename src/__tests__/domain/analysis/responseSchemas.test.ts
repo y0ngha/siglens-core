@@ -364,6 +364,7 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         fundamentalBulletsKo: ['펀더'],
         newsBulletsKo: ['뉴스'],
         optionsBulletsKo: ['옵션'],
+        financialsBulletsKo: [],
         integratedConclusionKo: '종합',
         scenarios: [nestedSample],
         riskFactorsKo: ['리스크'],

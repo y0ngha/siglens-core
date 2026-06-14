@@ -1595,6 +1595,7 @@ export interface RawOverallAnalysisResponse {
     fundamentalBulletsKo?: unknown;
     newsBulletsKo?: unknown;
     optionsBulletsKo?: unknown;
+    financialsBulletsKo?: unknown;
     integratedConclusionKo?: unknown;
     scenarios?: unknown;
     riskFactorsKo?: unknown;
@@ -2623,6 +2624,8 @@ export interface OverallAnalysisResponse {
     newsBulletsKo: string[];
     /** Options analysis summary bullet points (Korean output). */
     optionsBulletsKo: string[];
+    /** 재무 스코어카드 요약 불릿 (한국어). financials 미주입 시 빈 배열. */
+    financialsBulletsKo: string[];
     /** 4-axis synthesis conclusion block, one or two paragraphs (Korean output). */
     integratedConclusionKo: string;
     /** Scenario analysis (bullish / neutral / bearish). */

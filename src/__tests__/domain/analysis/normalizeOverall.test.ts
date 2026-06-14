@@ -91,6 +91,7 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 fundamentalBulletsKo: [],
                 newsBulletsKo: [],
                 optionsBulletsKo: [],
+                financialsBulletsKo: [],
                 integratedConclusionKo: '',
                 scenarios: [],
                 riskFactorsKo: [],
@@ -194,6 +195,21 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
         });
     });
 
+    describe('financialsBulletsKo 필드', () => {
+        it('defaults financialsBulletsKo to [] when missing', () => {
+            expect(
+                normalizeOverallAnalysisResponse({}).financialsBulletsKo
+            ).toEqual([]);
+        });
+        it('normalizes financialsBulletsKo string array (filters empty)', () => {
+            expect(
+                normalizeOverallAnalysisResponse({
+                    financialsBulletsKo: ['현금흐름 견조', ''],
+                }).financialsBulletsKo
+            ).toEqual(['현금흐름 견조']);
+        });
+    });
+
     describe('유효하지 않은 JSON 문자열이 주어졌을 때', () => {
         it('파싱 불가능한 문자열이면 에러를 던진다', () => {
             expect(() =>
@@ -216,6 +232,7 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
                 fundamentalBulletsKo: [],
                 newsBulletsKo: [],
                 optionsBulletsKo: [],
+                financialsBulletsKo: [],
                 integratedConclusionKo: '',
                 scenarios: [],
                 riskFactorsKo: [],

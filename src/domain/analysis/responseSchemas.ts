@@ -183,6 +183,7 @@ export const OVERALL_RESPONSE_SCHEMA = {
         fundamentalBulletsKo: { type: 'array', items: { type: 'string' } },
         newsBulletsKo: { type: 'array', items: { type: 'string' } },
         optionsBulletsKo: { type: 'array', items: { type: 'string' } },
+        financialsBulletsKo: { type: 'array', items: { type: 'string' } },
         integratedConclusionKo: { type: 'string' },
         scenarios: {
             type: 'array',
@@ -206,6 +207,7 @@ export const OVERALL_RESPONSE_SCHEMA = {
         'fundamentalBulletsKo',
         'newsBulletsKo',
         'optionsBulletsKo',
+        'financialsBulletsKo',
         'integratedConclusionKo',
         'scenarios',
         'riskFactorsKo',
