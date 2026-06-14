@@ -131,6 +131,44 @@ export const FUNDAMENTAL_RESPONSE_SCHEMA = {
 
 /**
  * @internal
+ * Structured-output schema for the financials (multi-year statement) analysis response
+ * (analysisType `financials`). `axisAssessments` is an array of nested objects covering
+ * four statement axes: growth, quality, solvency, and cash generation.
+ */
+export const FINANCIALS_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        overallConclusionKo: { type: 'string' },
+        axisAssessments: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    axis: {
+                        type: 'string',
+                        enum: ['growth', 'quality', 'solvency', 'cash'],
+                    },
+                    sentiment: SENTIMENT_SCHEMA,
+                    rationaleKo: { type: 'string' },
+                },
+                required: ['axis', 'sentiment', 'rationaleKo'],
+                additionalProperties: false,
+            },
+        },
+        riskFactorsKo: { type: 'array', items: { type: 'string' } },
+        overallSentiment: SENTIMENT_SCHEMA,
+    },
+    required: [
+        'overallConclusionKo',
+        'axisAssessments',
+        'riskFactorsKo',
+        'overallSentiment',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
  * Structured-output schema for {@link OverallAnalysisResponse}
  * (analysisType `overall`). `scenarios` is an array of nested objects.
  *

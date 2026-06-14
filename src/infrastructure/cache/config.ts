@@ -269,6 +269,8 @@ export const CACHE_KEY_SCHEMA_VERSION = 'v1' as const;
 
 /** @internal TTL for fundamental analysis cache results. Default: 24 hours. */
 export const FUNDAMENTAL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
+/** @internal TTL for financials (multi-year statement) analysis cache results. Default: 24 hours. */
+export const FINANCIALS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /** @internal TTL for news analysis aggregate cache results. Default: 24 hours. */
 export const NEWS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 /** @internal TTL for overall (three-axis) analysis cache results. Default: 24 hours. */
@@ -307,6 +309,51 @@ export function buildFundamentalCacheKey(
     skillFingerprint?: string
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
+    return skillFingerprint !== undefined
+        ? `${base}:${skillFingerprint}`
+        : base;
+}
+
+/**
+ * Prompt-template version for the financials (multi-year statement) analysis cache keys.
+ *
+ * Parallel to {@link PROMPT_TEMPLATE_VERSION} but scoped to the financials analysis type
+ * so that prompt-template changes for financials can be invalidated independently
+ * without busting technical or fundamental caches.
+ *
+ * Bump this string whenever the financials system prompt or user prompt template changes
+ * in a way that would make previously cached results stale.
+ *
+ * @internal
+ */
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
+ * Build the Redis key for a cached financials (multi-year statement) analysis result.
+ *
+ * Format: `{version}:analysis:financials:<symbol>:<modelId>:<promptVersion>`.
+ *
+ * Mirrors {@link buildFundamentalCacheKey} but uses the `financials` path segment
+ * and {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} so the two analysis types are
+ * cached under independent keys and can be invalidated separately.
+ *
+ * The optional `skillFingerprint` segment folds the active skill catalog into
+ * the key (see {@link buildAnalysisCacheKey}); appended only when supplied so
+ * callers that do not load skills keep the legacy key shape.
+ *
+ * @internal
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param skillFingerprint - Optional hash of the skill catalog's selection
+ *   metadata. When provided, appended as the final key segment.
+ * @returns The cache key.
+ */
+export function buildFinancialsCacheKey(
+    symbol: string,
+    modelId: string,
+    skillFingerprint?: string
+): string {
+    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:financials:${symbol}:${modelId}:${FINANCIALS_PROMPT_TEMPLATE_VERSION}`;
     return skillFingerprint !== undefined
         ? `${base}:${skillFingerprint}`
         : base;

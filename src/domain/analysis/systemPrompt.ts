@@ -53,6 +53,18 @@ Your job is to interpret financial statements, valuation multiples, growth, prof
 
 ${ANALYSIS_SYSTEM_BASE}`;
 
+/**
+ * @internal System instruction for the financials (multi-year statement) analysis LLM call.
+ *
+ * Focuses on multi-year income statement / balance sheet / cash flow trends,
+ * earnings quality and accruals, solvency metrics, and sustainable cash generation.
+ * Treat any value marked N/A or "데이터 없음" as missing data — never as zero or a neutral midpoint.
+ */
+export const FINANCIALS_SYSTEM_PROMPT = `You are a financial-statement analyst specializing in multi-year trends.
+Your job is to interpret income statement, balance sheet, and cash flow data across multiple periods to assess earnings quality, accruals, solvency, and cash generation sustainability. Treat any value marked N/A or "데이터 없음" as missing data — never as zero or a neutral midpoint.
+
+${ANALYSIS_SYSTEM_BASE}`;
+
 /** @internal System instruction for the options-analysis LLM call. */
 export const OPTIONS_SYSTEM_PROMPT = `You are an options strategist.
 Your job is to interpret the options chain, implied volatility, Greeks, and positioning into an actionable risk/reward read.
