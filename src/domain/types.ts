@@ -2646,7 +2646,8 @@ export type AnalysisType =
     | 'news'
     | 'newsCard'
     | 'fundamental'
-    | 'options';
+    | 'options'
+    | 'financials';
 
 /**
  * @internal

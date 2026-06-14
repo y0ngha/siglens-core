@@ -30,6 +30,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import type {
+    AnalysisType,
     FinancialsAnalysisResponse,
     FinancialsSnapshot,
     Skill,
@@ -244,7 +245,7 @@ export async function submitFinancialsAnalysis(
             seed: analysisSeed(prompt),
             model: modelId,
             tier,
-            analysisType: 'financials',
+            analysisType: 'financials' satisfies AnalysisType,
             system: FINANCIALS_SYSTEM_PROMPT,
             responseSchema: FINANCIALS_RESPONSE_SCHEMA,
         }),
