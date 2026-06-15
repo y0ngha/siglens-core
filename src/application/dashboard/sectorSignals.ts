@@ -1,7 +1,4 @@
-import {
-    DEFAULT_DASHBOARD_TIMEFRAME,
-    SECTOR_STOCKS,
-} from '@/domain/constants/dashboard-tickers';
+import { DEFAULT_DASHBOARD_TIMEFRAME } from '@/domain/constants/dashboard-tickers';
 import {
     bucketedTimestamp,
     computeStockSignalResult,
@@ -21,6 +18,7 @@ import {
     buildSectorSignalsCacheKey,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 // 시장 데이터 provider 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;
@@ -49,6 +47,7 @@ async function fetchInChunks<T, R>(
 
 async function fetchBarsAndQuotes(
     provider: MarketDataProvider,
+    sectorStocks: readonly SectorStock[],
     timeframe: DashboardTimeframe,
     fromIso: string
 ): Promise<BarsAndQuotesResults> {
@@ -56,13 +55,13 @@ async function fetchBarsAndQuotes(
     // provider.getBars 시그니처에 맞추기 위한 안전한 widening.
     const tf: Timeframe = timeframe;
     const barsResults = await fetchInChunks(
-        SECTOR_STOCKS,
+        sectorStocks,
         FETCH_CONCURRENCY,
         s =>
             provider.getBars({ symbol: s.symbol, timeframe: tf, from: fromIso })
     );
     const quoteResults = await fetchInChunks(
-        SECTOR_STOCKS,
+        sectorStocks,
         FETCH_CONCURRENCY,
         s => provider.getQuote(s.symbol)
     );
@@ -94,7 +93,7 @@ function combineResults(
 /**
  * Compute per-stock trading signals across every sector tracked by the dashboard.
  *
- * For each ticker in `SECTOR_STOCKS`, fetches recent bars + the latest quote,
+ * For each ticker supplied by the consumer, fetches recent bars + the latest quote,
  * runs them through the indicator and signal pipelines, and returns a
  * compact result. Results are cached per `(timeframe, time-bucket)` so
  * concurrent dashboard loads within the same bucket share a single fetch.
@@ -105,6 +104,7 @@ function combineResults(
  * dashboard still renders.
  *
  * @param provider - Market data provider injected by the consumer (siglens app).
+ * @param sectorStocks - Consumer-owned stocks grouped by sector or virtual theme.
  * @param timeframe - Dashboard bar resolution. Defaults to
  *   `DEFAULT_DASHBOARD_TIMEFRAME`.
  * @param now - Override the "now" reference used to compute the time bucket
@@ -117,12 +117,18 @@ function combineResults(
  */
 export async function getSectorSignals(
     provider: MarketDataProvider,
+    sectorStocks: readonly SectorStock[],
     timeframe: DashboardTimeframe = DEFAULT_DASHBOARD_TIMEFRAME,
     now: Date = new Date()
 ): Promise<SectorSignalsResult> {
     const cache = createCacheProvider();
     const bucket = bucketedTimestamp(timeframe, now);
-    const cacheKey = buildSectorSignalsCacheKey(timeframe, bucket);
+    const stockListHash = hashAnalysisInput(JSON.stringify(sectorStocks));
+    const cacheKey = buildSectorSignalsCacheKey(
+        timeframe,
+        bucket,
+        stockListHash
+    );
 
     if (cache !== null) {
         try {
@@ -136,11 +142,12 @@ export async function getSectorSignals(
     const fromIso = lookbackIsoFromNow(timeframe, now);
     const { barsResults, quoteResults } = await fetchBarsAndQuotes(
         provider,
+        sectorStocks,
         timeframe,
         fromIso
     );
 
-    const stocks = combineResults(SECTOR_STOCKS, barsResults, quoteResults);
+    const stocks = combineResults(sectorStocks, barsResults, quoteResults);
 
     const payload: SectorSignalsResult = {
         computedAt: now.toISOString(),

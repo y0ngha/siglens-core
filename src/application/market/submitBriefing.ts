@@ -43,7 +43,7 @@ const BRIEFING_JOB_SYMBOL = 'market';
  *
  * @example
  * ```ts
- * const summary = await getMarketSummary();
+ * const summary = await getMarketSummary(provider, marketIndices, sectorEtfs);
  * const briefing = await submitBriefing(summary);
  * if (briefing.status === 'submitted') {
  *     const polled = await pollBriefing(briefing.jobId);

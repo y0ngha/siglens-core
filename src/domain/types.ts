@@ -1613,7 +1613,7 @@ export type PollAnalysisResult =
 export interface SectorStock {
     symbol: string;
     koreanName: string;
-    /** Parent sector ETF symbol (`"XLK"`, `"XLF"`, `"XLE"`, ...). */
+    /** Parent sector ETF or virtual-theme symbol (`"XLK"`, `"QNTM"`, `"SPACE"`, ...). */
     sectorSymbol: string;
 }
 

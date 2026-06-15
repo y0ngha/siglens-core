@@ -59,6 +59,24 @@ const fakeProvider: MarketDataProvider = {
 import { getSectorSignals } from '@/application/dashboard/sectorSignals';
 
 const fixedNow = new Date('2026-04-25T13:48:00.000Z');
+const SPACE_SECTOR_SYMBOL = 'SPACE';
+const SPACE_STOCK_SYMBOLS = [
+    'SPCX',
+    'RKLB',
+    'ASTS',
+    'LUNR',
+    'RDW',
+    'PL',
+    'SPCE',
+] as const;
+const TEST_SECTOR_STOCKS: readonly SectorStock[] = [
+    { symbol: 'AAPL', koreanName: '애플', sectorSymbol: 'XLK' },
+    ...SPACE_STOCK_SYMBOLS.map(symbol => ({
+        symbol,
+        koreanName: symbol,
+        sectorSymbol: SPACE_SECTOR_SYMBOL,
+    })),
+];
 
 // 캐시 write 분기(stocks.length > 0)를 구동하기 위한 non-empty 신호 결과.
 const nonEmptySignal: StockSignalResult = {
@@ -98,7 +116,12 @@ describe('getSectorSignals', () => {
         };
         mockCache.get.mockResolvedValue(cached);
 
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
         expect(result).toBe(cached);
         expect(mockGetBars).not.toHaveBeenCalled();
     });
@@ -107,7 +130,12 @@ describe('getSectorSignals', () => {
         mockCache.get.mockResolvedValue(null);
         computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
 
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
         expect(result.computedAt).toBe(fixedNow.toISOString());
         expect(result.stocks.length).toBeGreaterThan(0);
         expect(mockCache.set).toHaveBeenCalledTimes(1);
@@ -120,20 +148,35 @@ describe('getSectorSignals', () => {
     it('stocks 가 빈 배열이면 캐시에 저장하지 않는다 (poison 방지)', async () => {
         mockCache.get.mockResolvedValue(null);
         // 기본 setup: computeStockSignalResult → null → stocks=[] (fetch는 성공·빈 배열).
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
         expect(result.stocks).toEqual([]);
         expect(mockCache.set).not.toHaveBeenCalled();
     });
 
     it('cache provider 가 null 이어도 정상 동작', async () => {
         createCacheProviderMock.mockReturnValue(null);
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
         expect(result.stocks).toEqual([]);
     });
 
     it('cache get 실패는 무시하고 provider 로 fallthrough', async () => {
         mockCache.get.mockRejectedValue(new Error('cache down'));
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
         expect(result.stocks).toEqual([]);
     });
 
@@ -142,16 +185,62 @@ describe('getSectorSignals', () => {
         computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
         mockCache.set.mockRejectedValue(new Error('cache write down'));
         await expect(
-            getSectorSignals(fakeProvider, '1Day', fixedNow)
+            getSectorSignals(fakeProvider, TEST_SECTOR_STOCKS, '1Day', fixedNow)
         ).resolves.toBeDefined();
     });
 
     it('default timeframe 은 1Day', async () => {
         mockCache.get.mockResolvedValue(null);
         computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
-        await getSectorSignals(fakeProvider, undefined, fixedNow);
+        await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            undefined,
+            fixedNow
+        );
         const [key] = mockCache.set.mock.calls[0];
         expect(key).toMatch(/^dashboard:signals:1Day:/);
+    });
+
+    it('호출자가 주입한 순수 우주 기업을 SPACE 가상 섹터로 스캔한다', async () => {
+        mockCache.get.mockResolvedValue(null);
+
+        await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
+
+        const scannedSpaceStocks = computeStockSignalResultMock.mock.calls
+            .map(([stock]) => stock)
+            .filter(stock => stock.sectorSymbol === SPACE_SECTOR_SYMBOL)
+            .map(stock => stock.symbol);
+        expect(scannedSpaceStocks).toEqual(SPACE_STOCK_SYMBOLS);
+    });
+
+    it('주입한 종목 목록이 다르면 캐시 키도 달라진다', async () => {
+        mockCache.get.mockResolvedValue(null);
+        computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
+
+        await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
+        const [firstKey] = mockCache.set.mock.calls[0];
+        mockCache.set.mockClear();
+
+        await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS.slice(0, 1),
+            '1Day',
+            fixedNow
+        );
+        const [secondKey] = mockCache.set.mock.calls[0];
+
+        expect(firstKey).not.toBe(secondKey);
     });
 
     it('getBars 가 reject 된 ticker 는 결과에서 제외된다', async () => {
@@ -163,7 +252,12 @@ describe('getSectorSignals', () => {
         // 신호 계산이 호출되더라도 결과를 만들지 않도록 null 유지.
         computeStockSignalResultMock.mockReturnValue(null);
 
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
 
         expect(result.stocks).toEqual([]);
         // reject 된 ticker 는 computeStockSignalResult 에 전달되지 않는다.
@@ -187,7 +281,12 @@ describe('getSectorSignals', () => {
         mockGetQuote.mockResolvedValue(null);
         computeStockSignalResultMock.mockReturnValue(null);
 
-        await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
 
         const firstCall = computeStockSignalResultMock.mock.calls[0];
         expect((firstCall[0] as { symbol: string }).symbol).toBe('AAPL');
@@ -228,7 +327,12 @@ describe('getSectorSignals', () => {
             q !== null ? signalResult : null
         );
 
-        const result = await getSectorSignals(fakeProvider, '1Day', fixedNow);
+        const result = await getSectorSignals(
+            fakeProvider,
+            TEST_SECTOR_STOCKS,
+            '1Day',
+            fixedNow
+        );
 
         // line 84: fulfilled quote.value 가 그대로 전달되었는지 확인.
         const firstCall = computeStockSignalResultMock.mock.calls[0];

@@ -1,10 +1,10 @@
-import {
-    MARKET_INDICES,
-    MARKET_SUMMARY_FMP_SYMBOLS,
-    SECTOR_ETFS,
-} from '@/domain/constants/dashboard-tickers';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
-import type { MarketQuote, MarketSummaryData } from '@/domain/types';
+import type {
+    IndexTicker,
+    MarketQuote,
+    MarketSummaryData,
+    SectorEtf,
+} from '@/domain/types';
 
 /**
  * Fetch real-time quotes for all dashboard market indices and sector ETFs.
@@ -15,16 +15,24 @@ import type { MarketQuote, MarketSummaryData } from '@/domain/types';
  * if a single quote is unavailable).
  *
  * @param provider - Market data provider injected by the consumer (siglens app).
+ * @param marketIndices - Consumer-owned market indices to quote.
+ * @param sectorEtfs - Consumer-owned sector ETFs to quote.
  * @returns Indices and sector ETFs with their most recent quote data —
  *   see {@link MarketSummaryData}.
  *
  * @see getSectorSignals
  */
 export async function getMarketSummary(
-    provider: MarketDataProvider
+    provider: MarketDataProvider,
+    marketIndices: readonly IndexTicker[],
+    sectorEtfs: readonly SectorEtf[]
 ): Promise<MarketSummaryData> {
+    const quoteSymbols = [
+        ...marketIndices.map(index => index.fmpSymbol),
+        ...sectorEtfs.map(etf => etf.symbol),
+    ];
     const quotes = await Promise.all(
-        MARKET_SUMMARY_FMP_SYMBOLS.map(sym => provider.getQuote(sym))
+        quoteSymbols.map(symbol => provider.getQuote(symbol))
     );
 
     const quoteMap = new Map<string, MarketQuote>(
@@ -34,7 +42,7 @@ export async function getMarketSummary(
     );
 
     return {
-        indices: MARKET_INDICES.map(idx => {
+        indices: marketIndices.map(idx => {
             const q = quoteMap.get(idx.fmpSymbol);
             return {
                 symbol: idx.symbol,
@@ -45,7 +53,7 @@ export async function getMarketSummary(
                 changesPercentage: q?.changesPercentage ?? 0,
             };
         }),
-        sectors: SECTOR_ETFS.map(etf => {
+        sectors: sectorEtfs.map(etf => {
             const q = quoteMap.get(etf.symbol);
             return {
                 symbol: etf.symbol,

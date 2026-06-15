@@ -168,8 +168,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `submitBriefing` | `application/market/submitBriefing.ts` |
 | `peekBriefingCache(data, modelId?)` — **read-only**. Reads the same `buildBriefingCacheKey` the writer uses and the same `normalizeMarketBriefing` validate path; never enqueues/dispatches/generates. Returns `Promise<MarketBriefingResponse \| null>` (null on miss / no provider / read error / corrupt payload). For SSR/bot surfacing at zero LLM cost. | `application/market/peekBriefingCache.ts` |
 | `pollBriefing` | `application/market/pollBriefing.ts` |
-| `getMarketSummary(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/getMarketSummary.ts` |
-| `getSectorSignals(provider, ...)` — `provider: MarketDataProvider` is now the first positional argument. **BREAKING**: existing callers must add the provider argument. | `application/dashboard/sectorSignals.ts` |
+| `getMarketSummary(provider, marketIndices, sectorEtfs)` — the provider and consumer-owned dashboard definitions are required positional arguments. **BREAKING**: consumers own the market summary universe and must pass it explicitly. | `application/dashboard/getMarketSummary.ts` |
+| `getSectorSignals(provider, sectorStocks, ...)` — `provider: MarketDataProvider` and the consumer-owned `sectorStocks: readonly SectorStock[]` are required positional arguments. **BREAKING**: consumers own the scanner universe and must pass it explicitly. | `application/dashboard/sectorSignals.ts` |
 | `checkAnalysisLimit` | `application/usage/limits.ts` |
 | `checkChatbotLimit` | `application/usage/limits.ts` |
 | `requestChatCompletion` | `application/chat/requestChatCompletion.ts` |
@@ -387,7 +387,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **인터페이스** — `CacheProvider`, `ChatTokenStore`, `FmpConfig`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn` — 모두 `domain/ports/aiProvider.ts`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입. (PR7에서 `SkillsProvider`·`JobStatus`·`JobMeta`·`UserTierRepository`는 `@internal` 전환 — 유지 public에서 도달 불가.)
 
-**대시보드 상수** — PR6에서 public 표면 전부 제거. consumer 미사용분(`DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `SECTOR_GROUPS`, `SIGNAL_SECTORS`)은 완전 삭제, 내부 use-case가 참조하는 분(`MARKET_INDICES`, `SECTOR_ETFS`, `SECTOR_STOCKS`, `MARKET_SUMMARY_FMP_SYMBOLS`, `DEFAULT_DASHBOARD_TIMEFRAME`)은 `@internal`로 전환(`domain/constants/dashboard-tickers.ts`).
+**대시보드 상수** — PR6에서 public 표면 전부 제거. consumer 미사용분(`DASHBOARD_TIMEFRAMES`, `DASHBOARD_TIMEFRAME_LABELS`, `SECTOR_GROUPS`, `SIGNAL_SECTORS`)은 완전 삭제했다. `DEFAULT_DASHBOARD_TIMEFRAME`만 core 내부 기본값으로 유지하며, 시장 지수·섹터 ETF·스캔 종목 목록은 consumer-owned 입력으로 이동해 core 상수에서 제거했다.
 
 **지표 상수 (consumer 사용분)** — `EMPTY_INDICATOR_RESULT`, `EMPTY_SMC_RESULT`, `RSI_DEFAULT_PERIOD`, `RSI_OVERBOUGHT_LEVEL`, `RSI_OVERSOLD_LEVEL`, `EMA_DEFAULT_PERIODS`, `MA_DEFAULT_PERIODS`, `MACD_FAST_PERIOD`/`MACD_SIGNAL_PERIOD`/`MACD_SLOW_PERIOD`, `CCI_DEFAULT_PERIOD`/`CCI_OVERBOUGHT_LEVEL`/`CCI_OVERSOLD_LEVEL`/`CCI_ZERO_LEVEL`, `DMI_DEFAULT_PERIOD`, `STOCHASTIC_*`/`STOCH_RSI_*`, `HIGH_CONFIDENCE_WEIGHT` 등 consumer가 실제 사용하는 `constants.ts` 값만 public. 나머지 계산 기본값/임계값(ATR·BOLLINGER·KELTNER·SMC·SQUEEZE·SUPERTREND·VP·ICHIMOKU·PSAR·MFI·CMF·DONCHIAN·EMA_SUPPORT_RESISTANCE·WILLIAMS 등)은 internal.
 

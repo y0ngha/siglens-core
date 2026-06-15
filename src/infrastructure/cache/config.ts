@@ -243,12 +243,13 @@ export function buildBriefingCacheKey(
     return `briefing:market:${dateHour}:${model}:${inputHash}`;
 }
 
-/** @internal 타임프레임+버킷 기준 섹터 시그널 캐시 키 빌더. */
+/** @internal 타임프레임+버킷+종목 목록 기준 섹터 시그널 캐시 키 빌더. */
 export function buildSectorSignalsCacheKey(
     timeframe: DashboardTimeframe,
-    bucket: string
+    bucket: string,
+    stockListHash: string
 ): string {
-    return `dashboard:signals:${timeframe}:${bucket}`;
+    return `dashboard:signals:${timeframe}:${bucket}:${stockListHash}`;
 }
 
 /**

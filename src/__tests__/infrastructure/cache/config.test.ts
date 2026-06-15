@@ -108,15 +108,15 @@ describe('cache key builders', () => {
     });
 
     it('buildSectorSignalsCacheKey composes timeframe and bucket', () => {
-        expect(buildSectorSignalsCacheKey('1Day', '2026-04-25')).toBe(
-            'dashboard:signals:1Day:2026-04-25'
-        );
-        expect(buildSectorSignalsCacheKey('1Hour', '2026-04-25T13')).toBe(
-            'dashboard:signals:1Hour:2026-04-25T13'
-        );
-        expect(buildSectorSignalsCacheKey('15Min', '2026-04-25T13:45')).toBe(
-            'dashboard:signals:15Min:2026-04-25T13:45'
-        );
+        expect(
+            buildSectorSignalsCacheKey('1Day', '2026-04-25', 'stocks-a')
+        ).toBe('dashboard:signals:1Day:2026-04-25:stocks-a');
+        expect(
+            buildSectorSignalsCacheKey('1Hour', '2026-04-25T13', 'stocks-b')
+        ).toBe('dashboard:signals:1Hour:2026-04-25T13:stocks-b');
+        expect(
+            buildSectorSignalsCacheKey('15Min', '2026-04-25T13:45', 'stocks-c')
+        ).toBe('dashboard:signals:15Min:2026-04-25T13:45:stocks-c');
     });
 
     it('SECTOR_SIGNALS_TTL_BY_TIMEFRAME has all dashboard timeframes', () => {
