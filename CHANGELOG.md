@@ -1,5 +1,34 @@
 # Changelog
 
+# [0.22.0](https://github.com/y0ngha/siglens-core/compare/v0.21.1...v0.22.0) (2026-06-15)
+
+
+### Bug Fixes
+
+* **financials:** address PR [#153](https://github.com/y0ngha/siglens-core/issues/153) review — use growth data, fix summary tie, FF refactor, public-API docs ([77306d2](https://github.com/y0ngha/siglens-core/commit/77306d22a03ffa0b27325dd41ebf403e24f48029))
+* **financials:** address PR [#153](https://github.com/y0ngha/siglens-core/issues/153) round 2 — English JSDoc, PUBLIC_API.md, optional-field wording, dead code ([c17dce2](https://github.com/y0ngha/siglens-core/commit/c17dce27d1ae0ceab1f2b8fba87f607dbd8fe047))
+* **financials:** address PR [#153](https://github.com/y0ngha/siglens-core/issues/153) round 3 — margin-tie bug, client barrel, signal type union ([af76f69](https://github.com/y0ngha/siglens-core/commit/af76f69ae1e6dde2ab99a869d4af4972f5c2422e))
+* **financials:** address PR [#153](https://github.com/y0ngha/siglens-core/issues/153) round 4 — camelCase, union extraction, field JSDoc, magic-number consts, declarative poll ([8c16643](https://github.com/y0ngha/siglens-core/commit/8c166437828d05fd8f8199946f00d58dd75d2187))
+* **financials:** address review — export result variants, quarterly fcfMargin key, period in cache key, schema-version doc ([9dfe899](https://github.com/y0ngha/siglens-core/commit/9dfe89919f9245277fb15f3e8d01c015f2fc4dc0))
+
+
+### Features
+
+* **financials:** add buildFinancialsAnalysisPrompt (scorecard-injected) ([906042e](https://github.com/y0ngha/siglens-core/commit/906042e569c90f852690fe15cf30a5759c5ea534))
+* **financials:** add cache key, system prompt, response schema constants ([8a9717a](https://github.com/y0ngha/siglens-core/commit/8a9717a593f07722551c8edc31e3149c3fb8c80f))
+* **financials:** add computeFinancialsScorecard (4-axis deterministic scoring) ([6456ae9](https://github.com/y0ngha/siglens-core/commit/6456ae9c1de0bfc1d17f952fe501d4e3713922cf))
+* **financials:** add domain types (rows, snapshot, scorecard, response) ([51b0146](https://github.com/y0ngha/siglens-core/commit/51b0146671e4c6dbd62269b46c95be507150ed9b))
+* **financials:** add financials kind to chat context ([98ac2c0](https://github.com/y0ngha/siglens-core/commit/98ac2c0b648f16c2f5da1c53015a5201a824026c))
+* **financials:** add financials to AnalysisType union ([34e7637](https://github.com/y0ngha/siglens-core/commit/34e7637decd78162ea1619a5e68bf3c7ac2ad02a))
+* **financials:** add financialsBulletsKo to overall response ([8aed515](https://github.com/y0ngha/siglens-core/commit/8aed5151a8fdff67dff540d0a217bb7753137383))
+* **financials:** add FinancialStatementsProvider port ([7a1d24d](https://github.com/y0ngha/siglens-core/commit/7a1d24d3eabd02959b27a28de668dce5dc487678))
+* **financials:** add normalizeFinancialsAnalysisResponse with defensive parsing ([9eff43a](https://github.com/y0ngha/siglens-core/commit/9eff43ad1719fa8d0d7b957bd589d90c9e0b291e))
+* **financials:** add normalizeFinancialsSnapshot with derived margins ([adb6228](https://github.com/y0ngha/siglens-core/commit/adb6228b48c12fbd9ab37f3e7aa6e2a3a45cf17c))
+* **financials:** add poll + cancel financials analysis ([fd06b95](https://github.com/y0ngha/siglens-core/commit/fd06b953f985201c1025ac3e9085a558fd05b1af))
+* **financials:** add submitFinancialsAnalysis use-case ([6990153](https://github.com/y0ngha/siglens-core/commit/69901537c99e30e7d6f7c719d90ac512493fdc10))
+* **financials:** inject scorecard into overall prompt, inputs, cache hash ([1f5eed3](https://github.com/y0ngha/siglens-core/commit/1f5eed3d7a0a28910e607ed8321fe36a19066430))
+* **financials:** wire financials domain into public barrel ([deedf55](https://github.com/y0ngha/siglens-core/commit/deedf55f56386decc116b39057f50f4d9c24900e))
+
 ## [0.21.1](https://github.com/y0ngha/siglens-core/compare/v0.21.0...v0.21.1) (2026-06-07)
 
 # [0.21.0](https://github.com/y0ngha/siglens-core/compare/v0.20.0...v0.21.0) (2026-06-07)
