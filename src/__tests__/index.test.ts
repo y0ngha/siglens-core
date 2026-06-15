@@ -1,5 +1,6 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
 import type {
+    FinancialSignalType,
     NewsTimeRange,
     PatternTrend,
     SectorGroupDef,
@@ -129,5 +130,9 @@ describe('public API exports', () => {
         expect(typeof normalizeFinancialsAnalysisResponse).toBe('function');
         expect(typeof normalizeFinancialsSnapshot).toBe('function');
         expect(typeof buildFinancialsAnalysisPrompt).toBe('function');
+
+        // Compile-time check: FinancialSignalType must be exported.
+        const signalType: FinancialSignalType = 'net_cash';
+        void signalType;
     });
 });

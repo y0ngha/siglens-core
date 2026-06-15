@@ -595,7 +595,7 @@ describe('buildOverallAnalysisPrompt', () => {
                 grade: 'B',
                 signals: [
                     {
-                        type: 'revenue_growth',
+                        type: 'revenue_accel',
                         direction: 'positive',
                         labelKo: '매출 성장 가속',
                     },
@@ -625,7 +625,7 @@ describe('buildOverallAnalysisPrompt', () => {
                 grade: 'B',
                 signals: [
                     {
-                        type: 'fcf_positive',
+                        type: 'fcf_solid',
                         direction: 'positive',
                         labelKo: '잉여현금흐름 흑자',
                     },

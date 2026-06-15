@@ -437,6 +437,7 @@ export type {
     FinancialGrowthRow,
     CashFlowGrowthRow,
     FinancialsSnapshot,
+    FinancialSignalType,
     FinancialSignal,
     ScoreMetric,
     AxisScore,

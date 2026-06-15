@@ -725,6 +725,42 @@ describe('composite summaryKo', () => {
     });
 });
 
+// ─── B1 (PR #153 round 3): equality-neutral margin trend ─────────────────────
+//
+// When latest netMargin === prev netMargin the scorecard must emit NO trend
+// signal (neither margin_expansion nor margin_contraction) and apply 0 delta.
+// Before the fix, `<=` covered equality causing a spurious −15 penalty and
+// a margin_contraction signal.
+
+describe('scoreQuality — margin-tie is neutral (no signal, no delta)', () => {
+    it('equal netMargin yields no margin signal and no ±15 delta', () => {
+        const card = computeFinancialsScorecard({
+            ...empty(),
+            income: [
+                income({ netMargin: 15, operatingMargin: 15 }),
+                income({ netMargin: 15 }), // tie
+            ],
+        });
+        // base avg(marginBand(15), marginBand(15)) = avg(75, 75) = 75; no delta
+        expect(card.quality.score).toBe(75);
+        const types = card.quality.signals.map(s => s.type);
+        expect(types).not.toContain('margin_contraction');
+        expect(types).not.toContain('margin_expansion');
+    });
+
+    it('tie with null prev is treated as no-trend (noContribution)', () => {
+        // Only one income row → prev is undefined → no trend contribution.
+        const card = computeFinancialsScorecard({
+            ...empty(),
+            income: [income({ netMargin: 15, operatingMargin: 15 })],
+        });
+        expect(card.quality.score).toBe(75);
+        const types = card.quality.signals.map(s => s.type);
+        expect(types).not.toContain('margin_contraction');
+        expect(types).not.toContain('margin_expansion');
+    });
+});
+
 // ─── B9: incomeGrowth & cashFlowGrowth are genuinely used ─────────────────────
 
 describe('scoreGrowth — incomeGrowth participation (B9)', () => {

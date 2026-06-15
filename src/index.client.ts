@@ -79,6 +79,36 @@ export type {
     OptionsExpirationFilter,
 } from './domain/types';
 
+// Financials analysis — domain helpers (server-only submit/poll/cancel use-cases
+// are intentionally omitted; only pure domain functions belong on the browser
+// entry, mirroring the options analysis pattern above).
+export { computeFinancialsScorecard } from './domain/analysis/financialsScorecard';
+export { normalizeFinancialsAnalysisResponse } from './domain/analysis/normalizeFinancials';
+export { normalizeFinancialsSnapshot } from './domain/analysis/normalizeFinancialsSnapshot';
+export { buildFinancialsAnalysisPrompt } from './domain/analysis/financialsPrompt';
+export type { FinancialStatementsProvider } from './domain/ports/financialStatementsProvider';
+export type {
+    StatementPeriod,
+    FinancialsSentiment,
+    FinancialsAxis,
+    FinancialsGrade,
+    IncomeStatementRow,
+    BalanceSheetRow,
+    CashFlowRow,
+    IncomeGrowthRow,
+    FinancialGrowthRow,
+    CashFlowGrowthRow,
+    FinancialsSnapshot,
+    FinancialSignalType,
+    FinancialSignal,
+    ScoreMetric,
+    AxisScore,
+    FinancialsScorecard,
+    FinancialsAxisAssessment,
+    FinancialsAnalysisResponse,
+    NormalizeFinancialsSnapshotInput,
+} from './domain/types';
+
 // Model spec helpers
 export {
     getProvider,

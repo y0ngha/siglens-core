@@ -2872,8 +2872,36 @@ export interface FinancialsSnapshot {
     cashFlowGrowth: CashFlowGrowthRow[];
 }
 
+/**
+ * All signal type strings emitted by `computeFinancialsScorecard`.
+ *
+ * Each literal corresponds to a qualitative finding on one of the four
+ * scorecard axes (growth / quality / solvency / cash). The union is kept
+ * hand-written (not auto-derived) so consumers get discriminated-union
+ * narrowing at the type level without depending on implementation internals.
+ */
+export type FinancialSignalType =
+    // Growth axis
+    | 'revenue_accel'
+    | 'operating_leverage'
+    | 'growth_decline'
+    | 'operating_income_growth'
+    // Quality axis
+    | 'earnings_quality_good'
+    | 'accrual_warning'
+    | 'margin_expansion'
+    | 'margin_contraction'
+    // Solvency axis
+    | 'net_cash'
+    | 'debt_rising'
+    // Cash axis
+    | 'fcf_solid'
+    | 'fcf_negative'
+    | 'capex_heavy'
+    | 'fcf_growth';
+
 export interface FinancialSignal {
-    type: string;
+    type: FinancialSignalType;
     direction: 'positive' | 'negative' | 'neutral';
     labelKo: string;
 }

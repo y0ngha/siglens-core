@@ -323,7 +323,7 @@ function scoreQuality(s: FinancialsSnapshot): AxisScore {
     const trendDown =
         inc?.netMargin != null &&
         prev?.netMargin != null &&
-        inc.netMargin <= prev.netMargin;
+        inc.netMargin < prev.netMargin;
 
     const trend: SignalContribution = trendUp
         ? contribute(true, 15, {
