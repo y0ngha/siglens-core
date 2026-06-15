@@ -255,12 +255,17 @@ export async function submitOverallAnalysis(
     //   present" variants of the same symbol.
     const stableTechnical = stripVolatileTechnicalFields(deps.technical);
     const stableOptions = stripVolatileOptionsFields(deps.options);
+    // `fin` (the precomputed financials scorecard) is part of the hashing
+    // surface: it is synchronously injected into the prompt (not a polled
+    // axis), so a scorecard change must yield a different overall cache key.
+    // It carries no per-poll volatile fields, so it is hashed verbatim.
     const inputHash = hashAnalysisInput(
         JSON.stringify({
             t: stableTechnical,
             f: deps.fundamental,
             n: deps.news,
             o: stableOptions,
+            fin: options.financialsScorecard,
         })
     );
     const cacheKey = buildOverallCacheKey(
@@ -340,7 +345,8 @@ export async function submitOverallAnalysis(
         timeframe,
         fearGreed ?? undefined,
         deps.options,
-        optionsOiStale
+        optionsOiStale,
+        options.financialsScorecard
     );
     const jobId = crypto.randomUUID();
 

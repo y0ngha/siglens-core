@@ -1595,6 +1595,7 @@ export interface RawOverallAnalysisResponse {
     fundamentalBulletsKo?: unknown;
     newsBulletsKo?: unknown;
     optionsBulletsKo?: unknown;
+    financialsBulletsKo?: unknown;
     integratedConclusionKo?: unknown;
     scenarios?: unknown;
     riskFactorsKo?: unknown;
@@ -2623,6 +2624,8 @@ export interface OverallAnalysisResponse {
     newsBulletsKo: string[];
     /** Options analysis summary bullet points (Korean output). */
     optionsBulletsKo: string[];
+    /** Financials scorecard summary bullet points (Korean output). Empty array when no financials data was injected. */
+    financialsBulletsKo: string[];
     /** 4-axis synthesis conclusion block, one or two paragraphs (Korean output). */
     integratedConclusionKo: string;
     /** Scenario analysis (bullish / neutral / bearish). */
@@ -2646,7 +2649,8 @@ export type AnalysisType =
     | 'news'
     | 'newsCard'
     | 'fundamental'
-    | 'options';
+    | 'options'
+    | 'financials';
 
 /**
  * @internal
@@ -2674,7 +2678,8 @@ export type CurrentAnalysisContext =
     | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
     | { kind: 'news'; payload: NewsAnalysisResponse }
     | { kind: 'overall'; payload: OverallAnalysisResponse }
-    | { kind: 'options'; payload: OptionsAnalysisResponse };
+    | { kind: 'options'; payload: OptionsAnalysisResponse }
+    | { kind: 'financials'; payload: FinancialsAnalysisResponse };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here
@@ -2763,3 +2768,317 @@ export interface SanityOptions {
  * (`'bullish' | 'bearish'`), which labels a detected signal's bias.
  */
 export type ForwardDirection = 'up' | 'down';
+
+// ─── Financials (재무제표) domain ───────────────────────────────
+
+/** Reporting cadence of a financial statement series: full-year or quarterly. */
+export type StatementPeriod = 'annual' | 'quarter';
+/** Directional verdict assigned by the financials AI analyst to an axis or the whole company. */
+export type FinancialsSentiment = 'bullish' | 'neutral' | 'bearish';
+/** The four deterministic scorecard axes: growth, quality, solvency, cash. */
+export type FinancialsAxis = 'growth' | 'quality' | 'solvency' | 'cash';
+/** Letter grade derived from a 0–100 score (A ≥ 80 … F < 35). */
+export type FinancialsGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+
+/** A single income statement row (domain-neutral core fields shared by analysis and display). */
+export interface IncomeStatementRow {
+    /** Fiscal year label (e.g. `"2024"`). */
+    fiscalYear: string;
+    /** Reporting period label (e.g. `"FY"`, `"Q3"`). */
+    period: string;
+    /** Statement date in ISO `YYYY-MM-DD` form. */
+    date: string;
+    /** Total revenue for the period; `null` when unavailable. */
+    revenue: number | null;
+    /** Gross profit (revenue − COGS); `null` when unavailable. */
+    grossProfit: number | null;
+    /** Operating income (EBIT); `null` when unavailable. */
+    operatingIncome: number | null;
+    /** Net income (bottom-line earnings); `null` when unavailable. */
+    netIncome: number | null;
+    /** Earnings before interest, taxes, depreciation, and amortization; `null` when unavailable. */
+    ebitda: number | null;
+    /** Basic earnings per share; `null` when unavailable. */
+    eps: number | null;
+    /** Diluted earnings per share; `null` when unavailable. */
+    epsDiluted: number | null;
+    /** Gross margin as a percent (e.g. `45` for 45%); `null` when unavailable. */
+    grossMargin: number | null;
+    /** Operating margin as a percent; `null` when unavailable. */
+    operatingMargin: number | null;
+    /** Net margin as a percent; `null` when unavailable. */
+    netMargin: number | null;
+}
+
+/** A single balance sheet row. */
+export interface BalanceSheetRow {
+    /** Fiscal year label (e.g. `"2024"`). */
+    fiscalYear: string;
+    /** Reporting period label (e.g. `"FY"`, `"Q3"`). */
+    period: string;
+    /** Statement date in ISO `YYYY-MM-DD` form. */
+    date: string;
+    /** Total assets; `null` when unavailable. */
+    totalAssets: number | null;
+    /** Total current assets; `null` when unavailable. */
+    totalCurrentAssets: number | null;
+    /** Total liabilities; `null` when unavailable. */
+    totalLiabilities: number | null;
+    /** Total current liabilities; `null` when unavailable. */
+    totalCurrentLiabilities: number | null;
+    /** Cash plus short-term investments; `null` when unavailable. */
+    cashAndShortTermInvestments: number | null;
+    /** Total debt (short + long term); `null` when unavailable. */
+    totalDebt: number | null;
+    /** Net debt (total debt − cash); negative means net cash; `null` when unavailable. */
+    netDebt: number | null;
+    /** Total stockholders' equity; `null` when unavailable. */
+    totalStockholdersEquity: number | null;
+    /** Current ratio (current assets / current liabilities); `null` when unavailable. */
+    currentRatio: number | null;
+}
+
+/**
+ * A single cash flow statement row.
+ *
+ * `fcfMargin` requires `income.revenue`, so it is populated during snapshot
+ * normalization rather than by the raw provider adapter.
+ */
+export interface CashFlowRow {
+    /** Fiscal year label (e.g. `"2024"`). */
+    fiscalYear: string;
+    /** Reporting period label (e.g. `"FY"`, `"Q3"`). */
+    period: string;
+    /** Statement date in ISO `YYYY-MM-DD` form. */
+    date: string;
+    /** Cash generated by operations; `null` when unavailable. */
+    operatingCashFlow: number | null;
+    /** Capital expenditure (typically negative); `null` when unavailable. */
+    capitalExpenditure: number | null;
+    /** Free cash flow (operating cash flow − capex); `null` when unavailable. */
+    freeCashFlow: number | null;
+    /** Dividends paid (typically negative); `null` when unavailable. */
+    dividendsPaid: number | null;
+    /** Free cash flow margin as a percent (FCF / revenue × 100); populated during snapshot normalization; `null` when unavailable. */
+    fcfMargin: number | null;
+}
+
+/** A single income-growth row: year-over-year growth rates as fractions (0.2 = +20%). */
+export interface IncomeGrowthRow {
+    /** Fiscal year label (e.g. `"2024"`). */
+    fiscalYear: string;
+    /** Reporting period label (e.g. `"FY"`, `"Q3"`). */
+    period: string;
+    /** YoY revenue growth as a fraction; `null` when unavailable. */
+    growthRevenue: number | null;
+    /** YoY net income growth as a fraction; `null` when unavailable. */
+    growthNetIncome: number | null;
+    /** YoY EPS growth as a fraction; `null` when unavailable. */
+    growthEPS: number | null;
+    /** YoY operating income growth as a fraction; `null` when unavailable. */
+    growthOperatingIncome: number | null;
+}
+
+/** A single financial-growth row: YoY and multi-year growth rates as fractions (0.2 = +20%). */
+export interface FinancialGrowthRow {
+    /** Fiscal year label (e.g. `"2024"`). */
+    fiscalYear: string;
+    /** Reporting period label (e.g. `"FY"`, `"Q3"`). */
+    period: string;
+    /** YoY revenue growth as a fraction; `null` when unavailable. */
+    revenueGrowth: number | null;
+    /** YoY net income growth as a fraction; `null` when unavailable. */
+    netIncomeGrowth: number | null;
+    /** YoY EPS growth as a fraction; `null` when unavailable. */
+    epsGrowth: number | null;
+    /** YoY free cash flow growth as a fraction; `null` when unavailable. */
+    freeCashFlowGrowth: number | null;
+    /** YoY operating cash flow growth as a fraction; `null` when unavailable. */
+    operatingCashFlowGrowth: number | null;
+    /** YoY total asset growth as a fraction; `null` when unavailable. */
+    assetGrowth: number | null;
+    /** YoY total debt growth as a fraction; `null` when unavailable. */
+    debtGrowth: number | null;
+    /** 3-year revenue-per-share growth as a fraction; `null` when unavailable. */
+    threeYRevenueGrowthPerShare: number | null;
+    /** 5-year revenue-per-share growth as a fraction; `null` when unavailable. */
+    fiveYRevenueGrowthPerShare: number | null;
+    /** 10-year revenue-per-share growth as a fraction; `null` when unavailable. */
+    tenYRevenueGrowthPerShare: number | null;
+}
+
+/** A single cash-flow-growth row: YoY growth rates as fractions (0.2 = +20%). */
+export interface CashFlowGrowthRow {
+    /** Fiscal year label (e.g. `"2024"`). */
+    fiscalYear: string;
+    /** Reporting period label (e.g. `"FY"`, `"Q3"`). */
+    period: string;
+    /** YoY operating cash flow growth as a fraction; `null` when unavailable. */
+    growthOperatingCashFlow: number | null;
+    /** YoY free cash flow growth as a fraction; `null` when unavailable. */
+    growthFreeCashFlow: number | null;
+    /** YoY capital expenditure growth as a fraction; `null` when unavailable. */
+    growthCapitalExpenditure: number | null;
+}
+
+/**
+ * Input to `computeFinancialsScorecard`.
+ *
+ * Each series is sorted newest→oldest (index 0 = latest fiscal period).
+ */
+export interface FinancialsSnapshot {
+    /** Income statement rows, newest→oldest. */
+    income: IncomeStatementRow[];
+    /** Balance sheet rows, newest→oldest. */
+    balance: BalanceSheetRow[];
+    /** Cash flow statement rows, newest→oldest. */
+    cashFlow: CashFlowRow[];
+    /** Income-growth rows, newest→oldest. */
+    incomeGrowth: IncomeGrowthRow[];
+    /** Financial-growth rows, newest→oldest. */
+    financialGrowth: FinancialGrowthRow[];
+    /** Cash-flow-growth rows, newest→oldest. */
+    cashFlowGrowth: CashFlowGrowthRow[];
+}
+
+/**
+ * All signal type strings emitted by `computeFinancialsScorecard`.
+ *
+ * Each literal corresponds to a qualitative finding on one of the four
+ * scorecard axes (growth / quality / solvency / cash). The union is kept
+ * hand-written (not auto-derived) so consumers get discriminated-union
+ * narrowing at the type level without depending on implementation internals.
+ */
+export type FinancialSignalType =
+    // Growth axis
+    | 'revenue_accel'
+    | 'operating_leverage'
+    | 'growth_decline'
+    | 'operating_income_growth'
+    // Quality axis
+    | 'earnings_quality_good'
+    | 'accrual_warning'
+    | 'margin_expansion'
+    | 'margin_contraction'
+    // Solvency axis
+    | 'net_cash'
+    | 'debt_rising'
+    // Cash axis
+    | 'fcf_solid'
+    | 'fcf_negative'
+    | 'capex_heavy'
+    | 'fcf_growth';
+
+/** Whether a {@link FinancialSignal} reads as favorable, unfavorable, or informational. */
+export type FinancialSignalDirection = 'positive' | 'negative' | 'neutral';
+
+/** Unit a {@link ScoreMetric} value is expressed in: percent, raw ratio, USD amount, or 0–100 score. */
+export type ScoreMetricUnit = 'pct' | 'ratio' | 'usd' | 'score';
+
+/** A qualitative finding emitted by `computeFinancialsScorecard` for one axis. */
+export interface FinancialSignal {
+    /** Stable signal identifier (one of the {@link FinancialSignalType} literals). */
+    type: FinancialSignalType;
+    /** Whether the finding is favorable, unfavorable, or informational. */
+    direction: FinancialSignalDirection;
+    /** Korean display label for the signal. */
+    labelKo: string;
+}
+
+/** A single labelled metric shown alongside an axis score. */
+export interface ScoreMetric {
+    /** Korean display label for the metric. */
+    labelKo: string;
+    /** Metric value in the declared `unit`; `null` when not computable. */
+    value: number | null;
+    /** Unit the value is expressed in (percent, ratio, USD, or score). */
+    unit: ScoreMetricUnit;
+}
+
+/** Score, grade, signals, and metrics for one of the four scorecard axes. */
+export interface AxisScore {
+    /** Axis score from 0 (worst) to 100 (best). */
+    score: number;
+    /** Letter grade derived from `score`. */
+    grade: FinancialsGrade;
+    /** Qualitative findings for this axis. */
+    signals: FinancialSignal[];
+    /** Labelled metrics backing this axis's score. */
+    metrics: ScoreMetric[];
+}
+
+/** Composite roll-up across all four axes plus a Korean summary. */
+export interface FinancialsCompositeScore {
+    /** Composite score (mean of the four axis scores), 0–100. */
+    score: number;
+    /** Letter grade derived from the composite `score`. */
+    grade: FinancialsGrade;
+    /** Korean one-line summary naming the strongest and weakest axis. */
+    summaryKo: string;
+}
+
+/** The deterministic 4-axis financials scorecard produced by `computeFinancialsScorecard`. */
+export interface FinancialsScorecard {
+    /** Growth axis score. */
+    growth: AxisScore;
+    /** Quality (profitability) axis score. */
+    quality: AxisScore;
+    /** Solvency (balance-sheet strength) axis score. */
+    solvency: AxisScore;
+    /** Cash-generation axis score. */
+    cash: AxisScore;
+    /** Composite roll-up across all four axes. */
+    composite: FinancialsCompositeScore;
+}
+
+/** AI verdict for a single scorecard axis. */
+export interface FinancialsAxisAssessment {
+    /** Which axis this assessment covers. */
+    axis: FinancialsAxis;
+    /** Directional verdict for the axis. */
+    sentiment: FinancialsSentiment;
+    /** Korean rationale supporting the verdict. */
+    rationaleKo: string;
+}
+
+/** Normalized AI financials analysis returned to consumers. */
+export interface FinancialsAnalysisResponse {
+    /** Korean overall conclusion across all axes. */
+    overallConclusionKo: string;
+    /** Per-axis AI verdicts. */
+    axisAssessments: FinancialsAxisAssessment[];
+    /** Korean risk-factor bullet points. */
+    riskFactorsKo: string[];
+    /** Overall directional verdict for the company. */
+    overallSentiment: FinancialsSentiment;
+}
+
+/** @internal Loose pre-normalization shape of a single axis assessment from the LLM. */
+export interface RawFinancialsAxisAssessment {
+    axis?: unknown;
+    sentiment?: unknown;
+    rationaleKo?: unknown;
+}
+/** @internal Loose pre-normalization shape of the financials LLM response. */
+export interface RawFinancialsAnalysisResponse {
+    overallConclusionKo?: unknown;
+    axisAssessments?: unknown;
+    riskFactorsKo?: unknown;
+    overallSentiment?: unknown;
+}
+
+/** Input to `normalizeFinancialsSnapshot` (domain-neutral bundle assembled by the provider adapter). */
+export interface NormalizeFinancialsSnapshotInput {
+    /** Raw income statement rows from the provider adapter. */
+    income: IncomeStatementRow[];
+    /** Raw balance sheet rows from the provider adapter. */
+    balance: BalanceSheetRow[];
+    /** Raw cash flow statement rows from the provider adapter. */
+    cashFlow: CashFlowRow[];
+    /** Raw income-growth rows from the provider adapter. */
+    incomeGrowth: IncomeGrowthRow[];
+    /** Raw financial-growth rows from the provider adapter. */
+    financialGrowth: FinancialGrowthRow[];
+    /** Raw cash-flow-growth rows from the provider adapter. */
+    cashFlowGrowth: CashFlowGrowthRow[];
+}

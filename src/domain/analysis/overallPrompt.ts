@@ -4,6 +4,7 @@ import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
+    FinancialsScorecard,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
@@ -247,6 +248,39 @@ function formatOptions(
 }
 
 /**
+ * Formats the financials-scorecard section for the prompt.
+ *
+ * The financials axis is **synchronously precomputed** (not a polled
+ * dependency job), so the scorecard is injected directly by the caller. Like
+ * {@link formatOptions}, a null/undefined scorecard renders a Korean hint that
+ * instructs the LLM to leave `financialsBulletsKo` empty rather than inventing
+ * financial content. When present, the composite grade/score/summary, the four
+ * per-axis grades, and the merged signal labels are surfaced so the LLM can
+ * weave the financial-health view into its synthesis.
+ */
+function formatFinancials(
+    scorecard: FinancialsScorecard | null | undefined
+): string {
+    if (scorecard == null)
+        return '[재무 스코어카드] 데이터 없음 — financialsBulletsKo는 빈 배열로 둘 것.';
+    const { growth, quality, solvency, cash, composite } = scorecard;
+    const signals =
+        [
+            ...growth.signals,
+            ...quality.signals,
+            ...solvency.signals,
+            ...cash.signals,
+        ]
+            .map(s => s.labelKo)
+            .join(', ') || '없음';
+    return [
+        `종합: ${composite.grade} (${composite.score}/100) — ${composite.summaryKo}`,
+        `성장성: ${growth.grade}, 수익성·질: ${quality.grade}, 안정성: ${solvency.grade}, 현금창출력: ${cash.grade}`,
+        `시그널: ${signals}`,
+    ].join('\n');
+}
+
+/**
  * @internal Builds the multi-axis overall-analysis LLM prompt.
  *
  * Build the 4-axis overall analysis prompt.
@@ -276,6 +310,10 @@ function formatOptions(
  *                         options axis was gracefully skipped.
  * @param optionsOiStale - When `true`, appends a stale-OI caveat to the options
  *                         section so the LLM tempers positioning claims.
+ * @param financials     - Optional precomputed financials scorecard, or `null`
+ *                         when no financial data is available. Unlike the four
+ *                         polled axes, this is synchronously injected; a
+ *                         missing scorecard renders a Korean "데이터 없음" hint.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
@@ -292,7 +330,8 @@ export function buildOverallAnalysisPrompt(
     timeframe: Timeframe,
     fearGreed?: FearGreedSnapshot,
     options?: OptionsAnalysisResponse | null,
-    optionsOiStale?: boolean
+    optionsOiStale?: boolean,
+    financials?: FinancialsScorecard | null
 ): string {
     const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
     const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
@@ -327,6 +366,9 @@ ${formatNews(news)}
 ## Axis 4 — Options Analysis
 ${formatOptions(resolvedOptions, resolvedOptionsOiStale)}
 
+## Financials Scorecard
+${formatFinancials(financials)}
+
 ## Output Schema
 {
   "headlineKo": "한국어 한 줄 정의 + 현재 상태 1단락",
@@ -346,6 +388,10 @@ ${formatOptions(resolvedOptions, resolvedOptionsOiStale)}
     "옵션 시장 요약 bullet 1 (한국어)",
     "옵션 시장 요약 bullet 2 (한국어)"
   ],
+  "financialsBulletsKo": [
+    "재무 스코어카드 요약 bullet 1 (한국어)",
+    "재무 스코어카드 요약 bullet 2 (한국어)"
+  ],
   "integratedConclusionKo": "네 축 종합 결론 (한 단락 또는 두 단락, 한국어)",
   "scenarios": [
     {
@@ -363,13 +409,14 @@ Rules:
 - scenarios must include all three entries: bullish, neutral, bearish — in any order.
 - technicalBulletsKo, fundamentalBulletsKo, newsBulletsKo: provide 2–4 bullets each.
 - optionsBulletsKo: provide 2–4 bullets when options data is present; leave the array empty when the options axis indicates it was not included.
-- riskFactorsKo: list 3–5 key risk factors combining all four axes.
-- integratedConclusionKo: synthesise all four axes (or three when options data is absent) into a cohesive directional verdict appropriate for the ${timeframe} timeframe context described above.
-- In integratedConclusionKo, attribute each claim to its source axis (e.g. "기술적 분석에 따르면…", "펀더멘털 분석에서는…", "뉴스 분석에서는…", "옵션 시장에서는…") so the reader can see which axis each point came from. This reduces blending and hallucination.
+- financialsBulletsKo: provide 2–4 bullets when the financials scorecard is present; leave the array empty when the scorecard section indicates no data.
+- riskFactorsKo: list 3–5 key risk factors combining all available axes (technical, fundamental, news, options, and financials).
+- integratedConclusionKo: synthesise all available axes (technical, fundamental, news, plus options and financials when present) into a cohesive directional verdict appropriate for the ${timeframe} timeframe context described above.
+- In integratedConclusionKo, attribute each claim to its source axis (e.g. "기술적 분석에 따르면…", "펀더멘털 분석에서는…", "뉴스 분석에서는…", "옵션 시장에서는…", "재무제표 분석에서는…") so the reader can see which axis each point came from. This reduces blending and hallucination.
 - When axes genuinely conflict, preserve the conflict explicitly rather than averaging it into a single smoothed verdict.
 
 ## Few-Shot — conflict preservation + axis attribution
 For integratedConclusionKo, when the technical axis is bearish but the news axis turns positive, do NOT smooth them into a vague "중립" verdict. Instead, attribute and preserve the tension:
 BAD: "기술적 분석과 뉴스·펀더멘털을 종합하면 방향성이 불확실해 중립적으로 판단됩니다." (smooths away the conflict; no axis attribution)
-GOOD: "기술적 분석에 따르면 200 저항에 막혀 단기 하락 압력이 우세합니다. 다만 뉴스 분석에서는 호재가 유입되며 펀더멘털 분석의 약세 신호와 상충하고 있어, 200 돌파 여부가 확인되기 전까지는 방향이 엇갈린 구간으로 판단합니다."`;
+GOOD: "기술적 분석에 따르면 200 저항에 막혀 단기 하락 압력이 우세합니다. 다만 뉴스 분석에서는 호재가 유입되며 펀더멘털 분석의 약세 신호와 상충하고 있고, 재무제표 분석에서는 현금창출력이 견조해 하방을 일부 지지하므로, 200 돌파 여부가 확인되기 전까지는 방향이 엇갈린 구간으로 판단합니다."`;
 }

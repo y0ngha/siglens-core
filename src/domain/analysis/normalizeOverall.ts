@@ -104,6 +104,7 @@ export function normalizeOverallAnalysisResponse(
         fundamentalBulletsKo: normalizeStringArray(o.fundamentalBulletsKo),
         newsBulletsKo: normalizeStringArray(o.newsBulletsKo),
         optionsBulletsKo: normalizeStringArray(o.optionsBulletsKo),
+        financialsBulletsKo: normalizeStringArray(o.financialsBulletsKo),
         integratedConclusionKo: asString(o.integratedConclusionKo),
         scenarios: compact(asArray(o.scenarios).map(normalizeScenario)),
         riskFactorsKo: normalizeStringArray(o.riskFactorsKo),

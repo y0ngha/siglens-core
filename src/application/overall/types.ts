@@ -24,6 +24,7 @@ import type {
     AnalysisResponse,
     EarningsCalendarItem,
     EnrichedNewsItem,
+    FinancialsScorecard,
     FundamentalAnalysisResponse,
     ModelId,
     NewsAnalysisResponse,
@@ -222,6 +223,14 @@ export interface OverallDependencyInputs {
      * open-interest counts are stale (still reflecting the previous session).
      */
     optionsOiStale?: boolean;
+
+    /**
+     * Pre-computed financials scorecard. Unlike the four polled dependency axes
+     * (technical / fundamental / news / options), the financials axis is computed
+     * synchronously and injected directly into the prompt without a polling job.
+     * Omit to skip the financials axis in the overall analysis.
+     */
+    financialsScorecard?: FinancialsScorecard;
 
     /**
      * Top-level force flag. When true, the resolver forwards `force: true` to

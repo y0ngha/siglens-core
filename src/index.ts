@@ -35,6 +35,11 @@ export { cancelFundamentalAnalysisJob } from './application/fundamental/cancelFu
 export { pollFundamentalAnalysis } from './application/fundamental/pollFundamentalAnalysis';
 export { submitFundamentalAnalysis } from './application/fundamental/submitFundamentalAnalysis';
 
+// Financials analysis use-cases
+export { cancelFinancialsAnalysisJob } from './application/financials/cancelFinancialsAnalysisJob';
+export { pollFinancialsAnalysis } from './application/financials/pollFinancialsAnalysis';
+export { submitFinancialsAnalysis } from './application/financials/submitFinancialsAnalysis';
+
 // News analysis use-cases
 export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
 export { pollNewsAnalysis } from './application/news/pollNewsAnalysis';
@@ -70,6 +75,12 @@ export { classifyTrend, detectSignals } from './domain/signals';
 // Prompt builders
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
+
+// Financials domain building blocks
+export { computeFinancialsScorecard } from './domain/analysis/financialsScorecard';
+export { normalizeFinancialsAnalysisResponse } from './domain/analysis/normalizeFinancials';
+export { normalizeFinancialsSnapshot } from './domain/analysis/normalizeFinancialsSnapshot';
+export { buildFinancialsAnalysisPrompt } from './domain/analysis/financialsPrompt';
 
 // Model spec helpers
 export {
@@ -279,6 +290,7 @@ export type {
 } from './domain/types';
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
+export type { FinancialStatementsProvider } from './domain/ports/financialStatementsProvider';
 export type {
     GetBarsOptions,
     MarketDataProvider,
@@ -304,6 +316,17 @@ export type {
     SubmitFundamentalAnalysisResult,
     SubmitFundamentalAnalysisSubmitted,
 } from './application/fundamental/types';
+export type {
+    PollFinancialsAnalysisResult,
+    SubmitFinancialsAnalysisApiKeyRequiredError,
+    SubmitFinancialsAnalysisCached,
+    SubmitFinancialsAnalysisFetchError,
+    SubmitFinancialsAnalysisLimitError,
+    SubmitFinancialsAnalysisMissNoTrigger,
+    SubmitFinancialsAnalysisOptions,
+    SubmitFinancialsAnalysisResult,
+    SubmitFinancialsAnalysisSubmitted,
+} from './application/financials/types';
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
@@ -403,6 +426,28 @@ export type {
     FearGreedLabel,
     FearGreedSnapshot,
     FearGreedWarning,
+    StatementPeriod,
+    FinancialsSentiment,
+    FinancialsAxis,
+    FinancialsGrade,
+    IncomeStatementRow,
+    BalanceSheetRow,
+    CashFlowRow,
+    IncomeGrowthRow,
+    FinancialGrowthRow,
+    CashFlowGrowthRow,
+    FinancialsSnapshot,
+    NormalizeFinancialsSnapshotInput,
+    FinancialSignalType,
+    FinancialSignal,
+    FinancialSignalDirection,
+    ScoreMetric,
+    ScoreMetricUnit,
+    AxisScore,
+    FinancialsCompositeScore,
+    FinancialsScorecard,
+    FinancialsAxisAssessment,
+    FinancialsAnalysisResponse,
     FundamentalAnalysisResponse,
     FundamentalAnalystEstimateInput,
     FundamentalCashFlowInput,

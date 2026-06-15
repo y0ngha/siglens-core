@@ -3,6 +3,7 @@ import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
+    FinancialsScorecard,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
@@ -584,6 +585,165 @@ describe('buildOverallAnalysisPrompt', () => {
             expect(prompt).toContain('옵션 요약만 존재합니다.');
             expect(prompt).not.toContain('- Per-Expiration:');
             expect(prompt).not.toContain('- Signals:');
+        });
+    });
+
+    describe('financials axis integration', () => {
+        const MOCK_SCORECARD: FinancialsScorecard = {
+            growth: {
+                score: 82,
+                grade: 'B',
+                signals: [
+                    {
+                        type: 'revenue_accel',
+                        direction: 'positive',
+                        labelKo: '매출 성장 가속',
+                    },
+                ],
+                metrics: [],
+            },
+            quality: {
+                score: 90,
+                grade: 'A',
+                signals: [
+                    {
+                        type: 'margin_expansion',
+                        direction: 'positive',
+                        labelKo: '영업이익률 개선',
+                    },
+                ],
+                metrics: [],
+            },
+            solvency: {
+                score: 60,
+                grade: 'C',
+                signals: [],
+                metrics: [],
+            },
+            cash: {
+                score: 75,
+                grade: 'B',
+                signals: [
+                    {
+                        type: 'fcf_solid',
+                        direction: 'positive',
+                        labelKo: '잉여현금흐름 흑자',
+                    },
+                ],
+                metrics: [],
+            },
+            composite: {
+                score: 77,
+                grade: 'B',
+                summaryKo: '수익성 우수(A), 안정성 주의(C)',
+            },
+        };
+
+        it('renders financialsBulletsKo schema field even without a scorecard', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe
+            );
+
+            expect(prompt).toContain('financialsBulletsKo');
+        });
+
+        it('embeds composite grade + axis grades + signals when a scorecard is provided', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                null,
+                false,
+                MOCK_SCORECARD
+            );
+
+            expect(prompt).toContain('## Financials Scorecard');
+            // Composite grade + score + summary line.
+            expect(prompt).toContain('B (77/100)');
+            expect(prompt).toContain('수익성 우수(A), 안정성 주의(C)');
+            // Per-axis grades.
+            expect(prompt).toContain('성장성: B');
+            expect(prompt).toContain('수익성·질: A');
+            expect(prompt).toContain('안정성: C');
+            expect(prompt).toContain('현금창출력: B');
+            // Signal labels merged across axes.
+            expect(prompt).toContain('매출 성장 가속');
+            expect(prompt).toContain('영업이익률 개선');
+            expect(prompt).toContain('잉여현금흐름 흑자');
+            // Schema field still listed.
+            expect(prompt).toContain('financialsBulletsKo');
+        });
+
+        it('renders the 데이터 없음 hint when scorecard is null and still lists financialsBulletsKo', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                null,
+                false,
+                null
+            );
+
+            expect(prompt).toContain('## Financials Scorecard');
+            expect(prompt).toContain('[재무 스코어카드] 데이터 없음');
+            expect(prompt).toContain('financialsBulletsKo는 빈 배열로 둘 것');
+            // No analytical content from a non-null scorecard should leak in.
+            expect(prompt).not.toContain('수익성 우수(A), 안정성 주의(C)');
+            // Schema field still listed.
+            expect(prompt).toContain('financialsBulletsKo');
+        });
+
+        it('treats an omitted financials arg the same as null (데이터 없음 hint)', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                null,
+                false
+                // financials omitted → falls back to the 데이터 없음 hint.
+            );
+
+            expect(prompt).toContain('[재무 스코어카드] 데이터 없음');
+        });
+
+        it('renders 시그널: 없음 when no axis carries signals', () => {
+            const noSignals: FinancialsScorecard = {
+                ...MOCK_SCORECARD,
+                growth: { ...MOCK_SCORECARD.growth, signals: [] },
+                quality: { ...MOCK_SCORECARD.quality, signals: [] },
+                cash: { ...MOCK_SCORECARD.cash, signals: [] },
+            };
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                null,
+                false,
+                noSignals
+            );
+
+            expect(prompt).toContain('시그널: 없음');
         });
     });
 });

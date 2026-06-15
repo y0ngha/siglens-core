@@ -33,6 +33,7 @@ import {
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
+    FinancialsScorecard,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     TierConfig,
@@ -114,6 +115,7 @@ const cachedOverallResult = {
     fundamentalBulletsKo: [],
     newsBulletsKo: [],
     optionsBulletsKo: [],
+    financialsBulletsKo: [],
     integratedConclusionKo: '3축 결론',
     scenarios: [],
     riskFactorsKo: [],
@@ -380,6 +382,7 @@ describe('submitOverallAnalysis 함수는', () => {
                     fundamentalBulletsKo: [],
                     newsBulletsKo: [],
                     optionsBulletsKo: [],
+                    financialsBulletsKo: [],
                     integratedConclusionKo: '',
                     scenarios: [],
                     riskFactorsKo: [],
@@ -792,10 +795,12 @@ describe('submitOverallAnalysis 함수는', () => {
             // switches to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
-            // Phase 4-Core extended the signature to 9 positional args:
-            // (..., fearGreed, options, optionsOiStale). The first 7 retain
-            // their meaning; args 8/9 are the new options axis hooks.
-            expect(args.length).toBe(9);
+            // Phase 4-Core extended the signature to 9 positional args
+            // (..., fearGreed, options, optionsOiStale). The financials phase
+            // appends a 10th positional arg (financialsScorecard). The first 7
+            // retain their meaning; args 8/9 are the options axis hooks and
+            // arg 10 is the precomputed financials scorecard.
+            expect(args.length).toBe(10);
         });
 
         it('일봉 fetch가 throw해도 overall 분석은 fearGreed=undefined로 계속 진행된다', async () => {
@@ -1269,6 +1274,87 @@ describe('submitOverallAnalysis 함수는', () => {
             if (result.status === 'pending_dependencies') {
                 expect(result.pendingJobs.options).toBe('opt-job-abc');
             }
+        });
+    });
+
+    describe('financials scorecard injection', () => {
+        const mockScorecard: FinancialsScorecard = {
+            growth: { score: 80, grade: 'B', signals: [], metrics: [] },
+            quality: { score: 90, grade: 'A', signals: [], metrics: [] },
+            solvency: { score: 60, grade: 'C', signals: [], metrics: [] },
+            cash: { score: 70, grade: 'B', signals: [], metrics: [] },
+            composite: {
+                score: 75,
+                grade: 'B',
+                summaryKo: '재무 종합 요약',
+            },
+        };
+
+        beforeEach(() => {
+            mockCacheGet.mockReset();
+            mockResolveOverallDependencies.mockReset();
+        });
+
+        it('passes financialsScorecard to buildOverallAnalysisPrompt (10th arg)', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitOverallAnalysis(
+                makeOptions({ financialsScorecard: mockScorecard })
+            );
+
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            // 10th positional arg = precomputed financials scorecard.
+            expect(args[9]).toEqual(mockScorecard);
+        });
+
+        it('passes undefined as the 10th arg when no scorecard is provided', async () => {
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitOverallAnalysis(makeOptions());
+
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            expect(args[9]).toBeUndefined();
+        });
+
+        it('includes the scorecard in the input hash so cache keys differ when it changes', async () => {
+            // First call: no scorecard.
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(makeOptions());
+            const firstCacheKey = mockCacheGet.mock.calls[0]?.[0];
+
+            // Second call: same axes but a scorecard is now present.
+            mockResolveOverallDependencies.mockResolvedValueOnce({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValueOnce(null);
+            await submitOverallAnalysis(
+                makeOptions({ financialsScorecard: mockScorecard })
+            );
+            const secondCacheKey = mockCacheGet.mock.calls[1]?.[0];
+
+            expect(firstCacheKey).not.toBe(secondCacheKey);
         });
     });
 });

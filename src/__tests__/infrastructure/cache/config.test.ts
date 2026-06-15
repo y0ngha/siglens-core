@@ -9,6 +9,7 @@ import {
     BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildFinancialsCacheKey,
     buildFundamentalCacheKey,
     buildNewsCacheKey,
     buildOverallCacheKey,
@@ -19,6 +20,7 @@ import {
     computeBarsEffectiveTtl,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
+    FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
     NEWS_CACHE_TTL_SECONDS,
@@ -184,6 +186,48 @@ describe('PROMPT_TEMPLATE_VERSION in technical & fundamental keys', () => {
     it('fundamental key ends with the prompt-template version segment', () => {
         const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
         expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
+    });
+});
+
+describe('buildFinancialsCacheKey', () => {
+    it('includes schema version, symbol, period, model, prompt version, and fingerprint', () => {
+        const k = buildFinancialsCacheKey(
+            'AAPL',
+            'gemini-2.5-flash',
+            'annual',
+            'sk1'
+        );
+        expect(k).toContain(
+            ':analysis:financials:AAPL:annual:gemini-2.5-flash:'
+        );
+        expect(k.endsWith(':sk1')).toBe(true);
+    });
+    it('omits fingerprint segment when absent', () => {
+        expect(
+            buildFinancialsCacheKey(
+                'AAPL',
+                'gemini-2.5-flash',
+                'annual'
+            ).endsWith(':sk1')
+        ).toBe(false);
+    });
+    it('annual and quarter produce different keys for the same symbol and model', () => {
+        const annualKey = buildFinancialsCacheKey(
+            'AAPL',
+            'gemini-2.5-flash',
+            'annual'
+        );
+        const quarterKey = buildFinancialsCacheKey(
+            'AAPL',
+            'gemini-2.5-flash',
+            'quarter'
+        );
+        expect(annualKey).not.toBe(quarterKey);
+        expect(annualKey).toContain(':annual:');
+        expect(quarterKey).toContain(':quarter:');
+    });
+    it('FINANCIALS_CACHE_TTL_SECONDS equals SECONDS_PER_DAY', () => {
+        expect(FINANCIALS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
     });
 });
 
