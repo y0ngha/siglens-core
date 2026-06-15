@@ -225,8 +225,10 @@ export interface OverallDependencyInputs {
     optionsOiStale?: boolean;
 
     /**
-     * 사전 계산된 재무 스코어카드. 4개 의존성 축(technical/fundamental/news/options)과 달리
-     * financials는 동기 계산되어 폴링 없이 프롬프트에 직접 주입된다. 생략 시 financials 축 생략.
+     * Pre-computed financials scorecard. Unlike the four polled dependency axes
+     * (technical / fundamental / news / options), the financials axis is computed
+     * synchronously and injected directly into the prompt without a polling job.
+     * Omit to skip the financials axis in the overall analysis.
      */
     financialsScorecard?: FinancialsScorecard;
 

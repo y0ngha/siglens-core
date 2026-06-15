@@ -31,10 +31,10 @@ export interface SubmitFinancialsAnalysisOptions extends BackgroundTaskOptions {
     /**
      * Resolved subscription tier.
      *
-     * Required in two cases:
-     * 1. When `usage` is also provided — enforces the daily analysis limit.
-     * 2. When a premium model is requested — determines BYOK key requirement.
-     *    Defaults to {@link DEFAULT_TIER} (`'free'`) when omitted.
+     * Must be provided when:
+     * 1. `usage` is also provided — enforces the daily analysis limit.
+     * 2. A premium model is requested — determines the BYOK key requirement.
+     * Defaults to {@link DEFAULT_TIER} (`'free'`) when omitted.
      */
     tier?: Tier;
     /** Tier configuration override, mainly for tests and controlled rollouts. */
