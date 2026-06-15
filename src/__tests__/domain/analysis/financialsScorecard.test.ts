@@ -65,7 +65,7 @@ const finGrowth = (
     period: 'FY',
     revenueGrowth: null,
     netIncomeGrowth: null,
-    epsgrowth: null,
+    epsGrowth: null,
     freeCashFlowGrowth: null,
     operatingCashFlowGrowth: null,
     assetGrowth: null,
@@ -180,7 +180,7 @@ describe('computeFinancialsScorecard — strong company', () => {
             finGrowth({
                 revenueGrowth: 0.25,
                 netIncomeGrowth: 0.3,
-                epsgrowth: 0.28,
+                epsGrowth: 0.28,
                 freeCashFlowGrowth: 0.22,
                 debtGrowth: -0.05,
             }),
@@ -691,7 +691,7 @@ describe('composite summaryKo', () => {
                 finGrowth({
                     revenueGrowth: 0.25,
                     netIncomeGrowth: 0.25,
-                    epsgrowth: 0.25,
+                    epsGrowth: 0.25,
                     freeCashFlowGrowth: 0.25,
                 }),
             ], // growth 100
@@ -713,7 +713,7 @@ describe('composite summaryKo', () => {
                 finGrowth({
                     revenueGrowth: 0.21,
                     netIncomeGrowth: 0.21,
-                    epsgrowth: 0.21,
+                    epsGrowth: 0.21,
                     freeCashFlowGrowth: 0.21,
                 }),
             ], // growth 100 (A) but solvency/cash are 0/F

@@ -68,7 +68,7 @@ const growthRow: FinancialGrowthRow = {
     period: 'FY',
     revenueGrowth: -0.0027,
     netIncomeGrowth: 0.0296,
-    epsgrowth: 0.0875,
+    epsGrowth: 0.0875,
     freeCashFlowGrowth: 0.2002,
     operatingCashFlowGrowth: 0.1236,
     assetGrowth: -0.0025,

@@ -96,7 +96,7 @@ function formatGrowthSection(rows: FinancialGrowthRow[]): string {
         .slice(0, 3)
         .map(
             r =>
-                `  ${r.fiscalYear} (${r.period}): Revenue Growth ${fmtGrowthPct(r.revenueGrowth)}, Net Income Growth ${fmtGrowthPct(r.netIncomeGrowth)}, EPS Growth ${fmtGrowthPct(r.epsgrowth)}, FCF Growth ${fmtGrowthPct(r.freeCashFlowGrowth)}`
+                `  ${r.fiscalYear} (${r.period}): Revenue Growth ${fmtGrowthPct(r.revenueGrowth)}, Net Income Growth ${fmtGrowthPct(r.netIncomeGrowth)}, EPS Growth ${fmtGrowthPct(r.epsGrowth)}, FCF Growth ${fmtGrowthPct(r.freeCashFlowGrowth)}`
         )
         .join('\n');
 

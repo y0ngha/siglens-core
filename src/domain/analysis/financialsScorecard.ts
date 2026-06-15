@@ -44,10 +44,141 @@ const GROWTH_INCOME_WEIGHT = 0.2;
 
 const CASH_GROWTH_WEIGHT = 0.15;
 
+// ─── Signal score deltas ─────────────────────────────────────────────────────
+//
+// Per-signal score adjustments applied on top of an axis's banded base score
+// before clamping to [0, 100]. Positive = reward, negative = penalty.
+const MARGIN_EXPANSION_DELTA = 15;
+const MARGIN_CONTRACTION_DELTA = -15;
+const EARNINGS_QUALITY_GOOD_DELTA = 20;
+const ACCRUAL_WARNING_DELTA = -20;
+const NET_CASH_DELTA = 15;
+const DEBT_RISING_DELTA = -10;
+const CAPEX_HEAVY_DELTA = -10;
+
+// ─── Signal trigger thresholds ───────────────────────────────────────────────
+//
+// Conditions (on growth fractions / ratios) that switch a qualitative signal on.
+const ACCRUAL_GOOD_THRESHOLD = 1.0; // OCF/NI ≥ this ⇒ earnings quality good
+const ACCRUAL_WARNING_THRESHOLD = 0.8; // OCF/NI < this ⇒ accrual warning
+const OPERATING_INCOME_GROWTH_THRESHOLD = 0.1; // YoY operating-income growth
+const DEBT_RISING_THRESHOLD = 0.1; // YoY debt growth
+const CAPEX_HEAVY_THRESHOLD = 0.15; // capex / revenue
+const FCF_GROWTH_THRESHOLD = 0.1; // YoY free-cash-flow growth
+
+// ─── Letter-grade cutoffs ────────────────────────────────────────────────────
+//
+// Inclusive lower bounds for each letter grade on the 0–100 score scale.
+const GRADE_A_MIN = 80;
+const GRADE_B_MIN = 65;
+const GRADE_C_MIN = 50;
+const GRADE_D_MIN = 35;
+
+// ─── Band-score lookup tables ────────────────────────────────────────────────
+//
+// Each band maps a metric to a 0–100 score via descending [threshold, score]
+// breakpoints. The first breakpoint whose comparison passes wins; the last
+// `else` element is the floor score when no threshold is met. `growthBand` and
+// `marginBand`/`fcfMarginBand`/`currentRatioBand`/`conversionBand` use `>=`
+// (higher is better); `debtRatioBand` uses `<=` (lower is better).
+const PERCENT_SCALE = 100; // fraction → percent
+
+/** Growth-fraction breakpoints (0.20 = 20%); higher is better. */
+const GROWTH_BAND: readonly [number, number][] = [
+    [0.2, 100],
+    [0.1, 75],
+    [0.05, 55],
+    [0, 40],
+];
+const GROWTH_BAND_FLOOR = 15;
+
+/** Margin breakpoints (percent units, 20 = 20%); higher is better. */
+const MARGIN_BAND: readonly [number, number][] = [
+    [20, 100],
+    [12, 75],
+    [6, 55],
+    [0, 40],
+];
+const MARGIN_BAND_FLOOR = 15;
+
+/** Current-ratio breakpoints; higher is better. */
+const CURRENT_RATIO_BAND: readonly [number, number][] = [
+    [2, 100],
+    [1.5, 80],
+    [1, 55],
+    [0.8, 35],
+];
+const CURRENT_RATIO_BAND_FLOOR = 15;
+
+/** Debt-ratio (liabilities/assets) breakpoints; LOWER is better (uses `<=`). */
+const DEBT_RATIO_BAND: readonly [number, number][] = [
+    [0.4, 100],
+    [0.55, 75],
+    [0.7, 50],
+    [0.85, 30],
+];
+const DEBT_RATIO_BAND_FLOOR = 15;
+
+/** FCF-margin breakpoints (percent units); higher is better. */
+const FCF_MARGIN_BAND: readonly [number, number][] = [
+    [20, 100],
+    [10, 75],
+    [5, 55],
+    [0, 40],
+];
+const FCF_MARGIN_BAND_FLOOR = 15;
+
+/** FCF/OCF conversion-ratio breakpoints; higher is better. */
+const CONVERSION_BAND: readonly [number, number][] = [
+    [0.8, 100],
+    [0.6, 75],
+    [0.4, 50],
+    [0, 30],
+];
+const CONVERSION_BAND_FLOOR = 10;
+
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
 const grade = (s: number): FinancialsGrade =>
-    s >= 80 ? 'A' : s >= 65 ? 'B' : s >= 50 ? 'C' : s >= 35 ? 'D' : 'F';
+    s >= GRADE_A_MIN
+        ? 'A'
+        : s >= GRADE_B_MIN
+          ? 'B'
+          : s >= GRADE_C_MIN
+            ? 'C'
+            : s >= GRADE_D_MIN
+              ? 'D'
+              : 'F';
+
+/**
+ * Score a value against a descending "higher is better" breakpoint table.
+ * Returns the first matching score, the `floor` when none match, or `null`
+ * when the input is null.
+ */
+const bandAscending = (
+    v: number | null,
+    table: readonly [number, number][],
+    floor: number
+): number | null => {
+    if (v == null) return null;
+    const hit = table.find(([threshold]) => v >= threshold);
+    return hit ? hit[1] : floor;
+};
+
+/**
+ * Score a value against a descending "lower is better" breakpoint table.
+ * Returns the first matching score, the `floor` when none match, or `null`
+ * when the input is null.
+ */
+const bandDescending = (
+    v: number | null,
+    table: readonly [number, number][],
+    floor: number
+): number | null => {
+    if (v == null) return null;
+    const hit = table.find(([threshold]) => v <= threshold);
+    return hit ? hit[1] : floor;
+};
 
 /** null 제외 평균. 전부 null이면 0. */
 const avg = (xs: (number | null)[]): number => {
@@ -59,87 +190,27 @@ const clamp = (n: number): number => Math.max(0, Math.min(100, n));
 
 /** 성장률(소수, 0.20=20%)→구간 점수. null 통과. */
 const growthBand = (g: number | null): number | null =>
-    g == null
-        ? null
-        : g >= 0.2
-          ? 100
-          : g >= 0.1
-            ? 75
-            : g >= 0.05
-              ? 55
-              : g >= 0
-                ? 40
-                : 15;
+    bandAscending(g, GROWTH_BAND, GROWTH_BAND_FLOOR);
 
 /** 마진(퍼센트 단위, 20=20%)→구간 점수. null 통과. */
 const marginBand = (m: number | null): number | null =>
-    m == null
-        ? null
-        : m >= 20
-          ? 100
-          : m >= 12
-            ? 75
-            : m >= 6
-              ? 55
-              : m >= 0
-                ? 40
-                : 15;
+    bandAscending(m, MARGIN_BAND, MARGIN_BAND_FLOOR);
 
 /** 유동비율→구간 점수. null 통과. */
 const currentRatioBand = (cr: number | null): number | null =>
-    cr == null
-        ? null
-        : cr >= 2
-          ? 100
-          : cr >= 1.5
-            ? 80
-            : cr >= 1
-              ? 55
-              : cr >= 0.8
-                ? 35
-                : 15;
+    bandAscending(cr, CURRENT_RATIO_BAND, CURRENT_RATIO_BAND_FLOOR);
 
 /** 부채비율(부채/자산)→구간 점수. null 통과. */
 const debtRatioBand = (dr: number | null): number | null =>
-    dr == null
-        ? null
-        : dr <= 0.4
-          ? 100
-          : dr <= 0.55
-            ? 75
-            : dr <= 0.7
-              ? 50
-              : dr <= 0.85
-                ? 30
-                : 15;
+    bandDescending(dr, DEBT_RATIO_BAND, DEBT_RATIO_BAND_FLOOR);
 
 /** FCF 마진(퍼센트 단위)→구간 점수. null 통과. */
 const fcfMarginBand = (m: number | null): number | null =>
-    m == null
-        ? null
-        : m >= 20
-          ? 100
-          : m >= 10
-            ? 75
-            : m >= 5
-              ? 55
-              : m >= 0
-                ? 40
-                : 15;
+    bandAscending(m, FCF_MARGIN_BAND, FCF_MARGIN_BAND_FLOOR);
 
 /** FCF/OCF 전환율→구간 점수. null 통과. */
 const conversionBand = (c: number | null): number | null =>
-    c == null
-        ? null
-        : c >= 0.8
-          ? 100
-          : c >= 0.6
-            ? 75
-            : c >= 0.4
-              ? 50
-              : c >= 0
-                ? 30
-                : 10;
+    bandAscending(c, CONVERSION_BAND, CONVERSION_BAND_FLOOR);
 
 /** null-safe 비율. 분모가 null/0이거나 분자가 null이면 null. */
 const ratio = (
@@ -150,7 +221,7 @@ const ratio = (
 
 /** value를 퍼센트(×100)로 환산. null 통과. */
 const toPct = (g: number | null | undefined): number | null =>
-    g == null ? null : g * 100;
+    g == null ? null : g * PERCENT_SCALE;
 
 /**
  * Conditional signal helper: returns the FF-style `{ delta, signal }` pair.
@@ -196,7 +267,7 @@ function scoreGrowth(s: FinancialsSnapshot): AxisScore {
             value: toPct(fg?.netIncomeGrowth),
             unit: 'pct',
         },
-        { labelKo: 'EPS 성장률', value: toPct(fg?.epsgrowth), unit: 'pct' },
+        { labelKo: 'EPS 성장률', value: toPct(fg?.epsGrowth), unit: 'pct' },
         {
             labelKo: 'FCF 성장률',
             value: toPct(fg?.freeCashFlowGrowth),
@@ -216,14 +287,14 @@ function scoreGrowth(s: FinancialsSnapshot): AxisScore {
     const bandAvg = avg([
         growthBand(fg?.revenueGrowth ?? null),
         growthBand(fg?.netIncomeGrowth ?? null),
-        growthBand(fg?.epsgrowth ?? null),
+        growthBand(fg?.epsGrowth ?? null),
         growthBand(fg?.freeCashFlowGrowth ?? null),
     ]);
 
     const revRows = s.financialGrowth.filter(r => r.revenueGrowth != null);
     const positives = revRows.filter(r => r.revenueGrowth! > 0).length;
     const consistency =
-        revRows.length === 0 ? 0 : (positives / revRows.length) * 100;
+        revRows.length === 0 ? 0 : (positives / revRows.length) * PERCENT_SCALE;
 
     // Core score from financialGrowth alone (unchanged 0.7 / 0.3 split).
     const core =
@@ -275,7 +346,8 @@ function scoreGrowth(s: FinancialsSnapshot): AxisScore {
             labelKo: '매출 역성장',
         }),
         contribute(
-            ig?.growthOperatingIncome != null && ig.growthOperatingIncome > 0.1,
+            ig?.growthOperatingIncome != null &&
+                ig.growthOperatingIncome > OPERATING_INCOME_GROWTH_THRESHOLD,
             0,
             {
                 type: 'operating_income_growth',
@@ -326,13 +398,13 @@ function scoreQuality(s: FinancialsSnapshot): AxisScore {
         inc.netMargin < prev.netMargin;
 
     const trend: SignalContribution = trendUp
-        ? contribute(true, 15, {
+        ? contribute(true, MARGIN_EXPANSION_DELTA, {
               type: 'margin_expansion',
               direction: 'positive',
               labelKo: '마진 개선',
           })
         : trendDown
-          ? contribute(true, -15, {
+          ? contribute(true, MARGIN_CONTRACTION_DELTA, {
                 type: 'margin_contraction',
                 direction: 'negative',
                 labelKo: '마진 악화',
@@ -340,14 +412,14 @@ function scoreQuality(s: FinancialsSnapshot): AxisScore {
           : noContribution;
 
     const accruals: SignalContribution =
-        acc != null && acc >= 1.0
-            ? contribute(true, 20, {
+        acc != null && acc >= ACCRUAL_GOOD_THRESHOLD
+            ? contribute(true, EARNINGS_QUALITY_GOOD_DELTA, {
                   type: 'earnings_quality_good',
                   direction: 'positive',
                   labelKo: '이익의 질 양호',
               })
-            : acc != null && acc < 0.8
-              ? contribute(true, -20, {
+            : acc != null && acc < ACCRUAL_WARNING_THRESHOLD
+              ? contribute(true, ACCRUAL_WARNING_DELTA, {
                     type: 'accrual_warning',
                     direction: 'negative',
                     labelKo: '이익의 질 주의',
@@ -389,15 +461,19 @@ function scoreSolvency(s: FinancialsSnapshot): AxisScore {
         debtRatioBand(debtRatio),
     ]);
 
-    const netCash = contribute(bs?.netDebt != null && bs.netDebt < 0, 15, {
-        type: 'net_cash',
-        direction: 'positive',
-        labelKo: '순현금 기업',
-    });
+    const netCash = contribute(
+        bs?.netDebt != null && bs.netDebt < 0,
+        NET_CASH_DELTA,
+        {
+            type: 'net_cash',
+            direction: 'positive',
+            labelKo: '순현금 기업',
+        }
+    );
 
     const debtRising = contribute(
-        fg?.debtGrowth != null && fg.debtGrowth > 0.1,
-        -10,
+        fg?.debtGrowth != null && fg.debtGrowth > DEBT_RISING_THRESHOLD,
+        DEBT_RISING_DELTA,
         {
             type: 'debt_rising',
             direction: 'negative',
@@ -452,7 +528,7 @@ function scoreCash(s: FinancialsSnapshot): AxisScore {
     const fcfRows = s.cashFlow.filter(r => r.freeCashFlow != null);
     const positives = fcfRows.filter(r => r.freeCashFlow! > 0).length;
     const positiveRatio =
-        fcfRows.length === 0 ? 0 : (positives / fcfRows.length) * 100;
+        fcfRows.length === 0 ? 0 : (positives / fcfRows.length) * PERCENT_SCALE;
     // positiveRatio is a meaningful 0 only when at least one non-null fcf row
     // exists; with no rows it should not pollute the average as a hard 0.
     const positiveRatioMetric = fcfRows.length === 0 ? null : positiveRatio;
@@ -477,8 +553,8 @@ function scoreCash(s: FinancialsSnapshot): AxisScore {
             : base;
 
     const capexHeavy = contribute(
-        capexIntensity != null && capexIntensity > 0.15,
-        -10,
+        capexIntensity != null && capexIntensity > CAPEX_HEAVY_THRESHOLD,
+        CAPEX_HEAVY_DELTA,
         {
             type: 'capex_heavy',
             direction: 'negative',
@@ -502,7 +578,8 @@ function scoreCash(s: FinancialsSnapshot): AxisScore {
               : noContribution;
 
     const fcfGrowing = contribute(
-        cfg?.growthFreeCashFlow != null && cfg.growthFreeCashFlow > 0.1,
+        cfg?.growthFreeCashFlow != null &&
+            cfg.growthFreeCashFlow > FCF_GROWTH_THRESHOLD,
         0,
         {
             type: 'fcf_growth',

@@ -97,15 +97,27 @@ export async function pollFinancialsAnalysis(
     }
 
     // The worker stores the raw LLM response as a JSON string or object.
-    // Normalize it through the financials response normalizer.
-    let result: FinancialsAnalysisResponse;
-    try {
-        result = normalizeFinancialsAnalysisResponse(rawResult);
-    } catch (error) {
-        console.error('[PollFinancials] Normalization failed:', error);
+    // Normalize it through the financials response normalizer. The normalization
+    // is wrapped in an IIFE that returns a tagged result object so the success
+    // value can bind to a `const` (no `let` reassignment across the try/catch).
+    const normalizeResult = (() => {
+        try {
+            return {
+                ok: true as const,
+                value: normalizeFinancialsAnalysisResponse(rawResult),
+            };
+        } catch (error) {
+            console.error('[PollFinancials] Normalization failed:', error);
+            return { ok: false as const };
+        }
+    })();
+
+    if (!normalizeResult.ok) {
         cleanupInBackground(jobId, '[PollFinancials]', options);
         return { status: 'error', error: 'Invalid response from worker' };
     }
+
+    const result: FinancialsAnalysisResponse = normalizeResult.value;
 
     if (
         result.overallConclusionKo === '' &&
