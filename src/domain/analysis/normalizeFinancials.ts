@@ -48,6 +48,9 @@ function normalizeAxis(value: unknown): FinancialsAxis {
 function normalizeAxisAssessment(
     item: unknown
 ): FinancialsAxisAssessment | null {
+    // Cast needed: asObject returns Record<string, unknown> | null. Runtime-safe
+    // because RawFinancialsAxisAssessment's fields are all optional `unknown`, so
+    // any object structurally satisfies it (the cast only narrows for property access).
     const o = asObject(item) as RawFinancialsAxisAssessment | null;
     if (!o) return null;
     return {
@@ -58,14 +61,25 @@ function normalizeAxisAssessment(
 }
 
 /**
- * @internal 재무 LLM 응답을 typed {@link FinancialsAnalysisResponse}로 방어 정규화.
- * 마크다운 펜스 제거 → JSON.parse → 누락 string→'', array→[], invalid enum→기본값, malformed child 드롭.
- * @throws {SyntaxError} 펜스 제거 후에도 JSON이 아닐 때.
+ * Normalize a raw LLM response into a typed {@link FinancialsAnalysisResponse}.
+ *
+ * Strips optional markdown code fences (` ```json ` / ` ``` `), parses JSON, and
+ * defensively normalizes every field. Missing strings become `''`, missing
+ * arrays become `[]`, malformed child entries are dropped, and invalid enum
+ * values fall back to conservative defaults (`overallSentiment`/axis sentiment →
+ * `'neutral'`, axis → `'growth'`).
+ *
+ * @param raw - Raw string/object from the LLM worker or cache.
+ * @returns A fully-typed {@link FinancialsAnalysisResponse}.
+ * @throws {SyntaxError} When the string is not valid JSON after fence removal.
  */
 export function normalizeFinancialsAnalysisResponse(
     raw: unknown
 ): FinancialsAnalysisResponse {
     const parsed = parseLlmPayload(raw);
+    // Cast needed: asObject returns Record<string, unknown> | null. Runtime-safe
+    // because RawFinancialsAnalysisResponse's fields are all optional `unknown`,
+    // so any object (or the `{}` fallback) structurally satisfies it.
     const o = (asObject(parsed) ?? {}) as RawFinancialsAnalysisResponse;
     return {
         overallConclusionKo: asString(o.overallConclusionKo),

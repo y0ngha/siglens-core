@@ -1,6 +1,7 @@
 import type {
     AxisScore,
     FinancialSignal,
+    FinancialsAxis,
     FinancialsGrade,
     FinancialsScorecard,
     FinancialsSnapshot,
@@ -18,6 +19,30 @@ import type {
  * never silently drags a score toward zero; only a genuinely empty axis input
  * collapses to the deterministic worst case (score 0 / grade 'F').
  */
+
+// ─── Scoring weights ─────────────────────────────────────────────────────────
+//
+// Each growth/cash axis computes a "core" score from its primary series, then
+// blends in a secondary growth series only when that series is actually present.
+// The blend is a convex combination (weights sum to 1.0 with their core) so an
+// ABSENT secondary series leaves the core score byte-for-byte unchanged — no
+// re-normalization rounding drift, no zero-drag. When PRESENT, the secondary
+// series nudges the score by its weighted share.
+//
+// growth core  = financialGrowth band(0.7) + consistency(0.3)  [unchanged]
+// growth blend = core * (1 - INCOME) + incomeGrowthBand * INCOME
+//   incomeGrowth (revenue/NI/EPS/operating-income YoY) overlaps financialGrowth
+//   on revenue/NI/EPS, so it is kept as its own banded second opinion (avoiding
+//   double-counting the same rates inside the core band) and additionally
+//   surfaces the operating-income dimension financialGrowth lacks.
+// cash blend = core * (1 - CASHFLOWGROWTH) + cashFlowGrowthBand * CASHFLOWGROWTH
+//   cashFlowGrowth (FCF + OCF YoY) is a growth-of-cash signal distinct from the
+//   level-based core (FCF margin / positive-FCF ratio / conversion).
+const GROWTH_BAND_WEIGHT = 0.7;
+const GROWTH_CONSISTENCY_WEIGHT = 0.3;
+const GROWTH_INCOME_WEIGHT = 0.2;
+
+const CASH_GROWTH_WEIGHT = 0.15;
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -127,11 +152,38 @@ const ratio = (
 const toPct = (g: number | null | undefined): number | null =>
     g == null ? null : g * 100;
 
+/**
+ * Conditional signal helper: returns the FF-style `{ delta, signal }` pair.
+ *
+ * Centralizes the "score adjustment + optional qualitative signal" pattern so
+ * axis scorers can be built declaratively (no `let` reassignment, no array
+ * `push`). When `active` is false, contributes a 0 delta and no signal.
+ */
+type SignalContribution = { delta: number; signal: FinancialSignal | null };
+
+const contribute = (
+    active: boolean,
+    delta: number,
+    signal: FinancialSignal
+): SignalContribution =>
+    active ? { delta, signal } : { delta: 0, signal: null };
+
+const noContribution: SignalContribution = { delta: 0, signal: null };
+
+/** Collect the non-null signals from a list of contributions, in order. */
+const collectSignals = (
+    contributions: readonly SignalContribution[]
+): FinancialSignal[] =>
+    contributions
+        .map(c => c.signal)
+        .filter((s): s is FinancialSignal => s !== null);
+
 // ─── Growth axis ─────────────────────────────────────────────────────────────
 
 function scoreGrowth(s: FinancialsSnapshot): AxisScore {
     const fg = s.financialGrowth[0];
     const prev = s.financialGrowth[1];
+    const ig = s.incomeGrowth[0];
 
     const metrics: ScoreMetric[] = [
         {
@@ -148,6 +200,11 @@ function scoreGrowth(s: FinancialsSnapshot): AxisScore {
         {
             labelKo: 'FCF 성장률',
             value: toPct(fg?.freeCashFlowGrowth),
+            unit: 'pct',
+        },
+        {
+            labelKo: '영업이익 성장률',
+            value: toPct(ig?.growthOperatingIncome),
             unit: 'pct',
         },
     ];
@@ -168,38 +225,65 @@ function scoreGrowth(s: FinancialsSnapshot): AxisScore {
     const consistency =
         revRows.length === 0 ? 0 : (positives / revRows.length) * 100;
 
-    const score = Math.round(bandAvg * 0.7 + consistency * 0.3);
+    // Core score from financialGrowth alone (unchanged 0.7 / 0.3 split).
+    const core =
+        bandAvg * GROWTH_BAND_WEIGHT + consistency * GROWTH_CONSISTENCY_WEIGHT;
 
-    const signals: FinancialSignal[] = [];
-    if (
-        fg?.revenueGrowth != null &&
-        prev?.revenueGrowth != null &&
-        fg.revenueGrowth > prev.revenueGrowth
-    ) {
-        signals.push({
-            type: 'revenue_accel',
-            direction: 'positive',
-            labelKo: '매출 성장 가속',
-        });
-    }
-    if (
-        fg?.netIncomeGrowth != null &&
-        fg?.revenueGrowth != null &&
-        fg.netIncomeGrowth > fg.revenueGrowth
-    ) {
-        signals.push({
-            type: 'operating_leverage',
-            direction: 'positive',
-            labelKo: '영업 레버리지',
-        });
-    }
-    if (fg?.revenueGrowth != null && fg.revenueGrowth < 0) {
-        signals.push({
+    // incomeGrowth (revenue / net income / EPS / operating income YoY) banded
+    // second opinion. growthOperatingIncome adds the operating-income dimension
+    // financialGrowth lacks. Blended only when present so absent incomeGrowth
+    // leaves `core` exactly unchanged.
+    const incomeBand = avg([
+        growthBand(ig?.growthRevenue ?? null),
+        growthBand(ig?.growthNetIncome ?? null),
+        growthBand(ig?.growthEPS ?? null),
+        growthBand(ig?.growthOperatingIncome ?? null),
+    ]);
+    const blended =
+        s.incomeGrowth.length > 0
+            ? core * (1 - GROWTH_INCOME_WEIGHT) +
+              incomeBand * GROWTH_INCOME_WEIGHT
+            : core;
+    const score = Math.round(blended);
+
+    const signals = collectSignals([
+        contribute(
+            fg?.revenueGrowth != null &&
+                prev?.revenueGrowth != null &&
+                fg.revenueGrowth > prev.revenueGrowth,
+            0,
+            {
+                type: 'revenue_accel',
+                direction: 'positive',
+                labelKo: '매출 성장 가속',
+            }
+        ),
+        contribute(
+            fg?.netIncomeGrowth != null &&
+                fg?.revenueGrowth != null &&
+                fg.netIncomeGrowth > fg.revenueGrowth,
+            0,
+            {
+                type: 'operating_leverage',
+                direction: 'positive',
+                labelKo: '영업 레버리지',
+            }
+        ),
+        contribute(fg?.revenueGrowth != null && fg.revenueGrowth < 0, 0, {
             type: 'growth_decline',
             direction: 'negative',
             labelKo: '매출 역성장',
-        });
-    }
+        }),
+        contribute(
+            ig?.growthOperatingIncome != null && ig.growthOperatingIncome > 0.1,
+            0,
+            {
+                type: 'operating_income_growth',
+                direction: 'positive',
+                labelKo: '영업이익 성장',
+            }
+        ),
+    ]);
 
     return { score, grade: grade(score), signals, metrics };
 }
@@ -232,48 +316,54 @@ function scoreQuality(s: FinancialsSnapshot): AxisScore {
         marginBand(inc?.operatingMargin ?? null),
     ]);
 
-    const signals: FinancialSignal[] = [];
+    const trendUp =
+        inc?.netMargin != null &&
+        prev?.netMargin != null &&
+        inc.netMargin > prev.netMargin;
+    const trendDown =
+        inc?.netMargin != null &&
+        prev?.netMargin != null &&
+        inc.netMargin <= prev.netMargin;
 
-    let trend = 0;
-    if (inc?.netMargin != null && prev?.netMargin != null) {
-        if (inc.netMargin > prev.netMargin) {
-            trend = 15;
-            signals.push({
-                type: 'margin_expansion',
-                direction: 'positive',
-                labelKo: '마진 개선',
-            });
-        } else {
-            trend = -15;
-            signals.push({
+    const trend: SignalContribution = trendUp
+        ? contribute(true, 15, {
+              type: 'margin_expansion',
+              direction: 'positive',
+              labelKo: '마진 개선',
+          })
+        : trendDown
+          ? contribute(true, -15, {
                 type: 'margin_contraction',
                 direction: 'negative',
                 labelKo: '마진 악화',
-            });
-        }
-    }
+            })
+          : noContribution;
 
-    let accruals = 0;
-    if (acc != null) {
-        if (acc >= 1.0) {
-            accruals = 20;
-            signals.push({
-                type: 'earnings_quality_good',
-                direction: 'positive',
-                labelKo: '이익의 질 양호',
-            });
-        } else if (acc < 0.8) {
-            accruals = -20;
-            signals.push({
-                type: 'accrual_warning',
-                direction: 'negative',
-                labelKo: '이익의 질 주의',
-            });
-        }
-    }
+    const accruals: SignalContribution =
+        acc != null && acc >= 1.0
+            ? contribute(true, 20, {
+                  type: 'earnings_quality_good',
+                  direction: 'positive',
+                  labelKo: '이익의 질 양호',
+              })
+            : acc != null && acc < 0.8
+              ? contribute(true, -20, {
+                    type: 'accrual_warning',
+                    direction: 'negative',
+                    labelKo: '이익의 질 주의',
+                })
+              : noContribution;
 
-    const score = Math.round(clamp(base + trend + accruals));
-    return { score, grade: grade(score), signals, metrics };
+    const contributions = [trend, accruals];
+    const delta = contributions.reduce((sum, c) => sum + c.delta, 0);
+
+    const score = Math.round(clamp(base + delta));
+    return {
+        score,
+        grade: grade(score),
+        signals: collectSignals(contributions),
+        metrics,
+    };
 }
 
 // ─── Solvency axis ───────────────────────────────────────────────────────────
@@ -299,30 +389,32 @@ function scoreSolvency(s: FinancialsSnapshot): AxisScore {
         debtRatioBand(debtRatio),
     ]);
 
-    const signals: FinancialSignal[] = [];
+    const netCash = contribute(bs?.netDebt != null && bs.netDebt < 0, 15, {
+        type: 'net_cash',
+        direction: 'positive',
+        labelKo: '순현금 기업',
+    });
 
-    let bonus = 0;
-    if (bs?.netDebt != null && bs.netDebt < 0) {
-        bonus = 15;
-        signals.push({
-            type: 'net_cash',
-            direction: 'positive',
-            labelKo: '순현금 기업',
-        });
-    }
-
-    let penalty = 0;
-    if (fg?.debtGrowth != null && fg.debtGrowth > 0.1) {
-        penalty = 10;
-        signals.push({
+    const debtRising = contribute(
+        fg?.debtGrowth != null && fg.debtGrowth > 0.1,
+        -10,
+        {
             type: 'debt_rising',
             direction: 'negative',
             labelKo: '부채 증가',
-        });
-    }
+        }
+    );
 
-    const score = Math.round(clamp(base + bonus - penalty));
-    return { score, grade: grade(score), signals, metrics };
+    const contributions = [netCash, debtRising];
+    const delta = contributions.reduce((sum, c) => sum + c.delta, 0);
+
+    const score = Math.round(clamp(base + delta));
+    return {
+        score,
+        grade: grade(score),
+        signals: collectSignals(contributions),
+        metrics,
+    };
 }
 
 // ─── Cash axis ───────────────────────────────────────────────────────────────
@@ -330,6 +422,7 @@ function scoreSolvency(s: FinancialsSnapshot): AxisScore {
 function scoreCash(s: FinancialsSnapshot): AxisScore {
     const cf = s.cashFlow[0];
     const inc = s.income[0];
+    const cfg = s.cashFlowGrowth[0];
 
     const conversion = ratio(cf?.freeCashFlow, cf?.operatingCashFlow);
     const capexAbs =
@@ -340,6 +433,16 @@ function scoreCash(s: FinancialsSnapshot): AxisScore {
         { labelKo: 'FCF 마진', value: cf?.fcfMargin ?? null, unit: 'pct' },
         { labelKo: 'FCF 전환율', value: conversion, unit: 'ratio' },
         { labelKo: '설비투자 강도', value: capexIntensity, unit: 'ratio' },
+        {
+            labelKo: 'FCF 성장률',
+            value: toPct(cfg?.growthFreeCashFlow),
+            unit: 'pct',
+        },
+        {
+            labelKo: '영업현금흐름 성장률',
+            value: toPct(cfg?.growthOperatingCashFlow),
+            unit: 'pct',
+        },
     ];
 
     if (s.cashFlow.length === 0) {
@@ -360,34 +463,66 @@ function scoreCash(s: FinancialsSnapshot): AxisScore {
         conversionBand(conversion),
     ]);
 
-    const signals: FinancialSignal[] = [];
+    // cashFlowGrowth (FCF + OCF YoY) banded average — a growth-of-cash signal
+    // distinct from the level-based `base`. Blended only when present so absent
+    // cashFlowGrowth leaves `base` exactly unchanged.
+    const cashGrowthBand = avg([
+        growthBand(cfg?.growthFreeCashFlow ?? null),
+        growthBand(cfg?.growthOperatingCashFlow ?? null),
+    ]);
+    const blended =
+        s.cashFlowGrowth.length > 0
+            ? base * (1 - CASH_GROWTH_WEIGHT) +
+              cashGrowthBand * CASH_GROWTH_WEIGHT
+            : base;
 
-    let penalty = 0;
-    if (capexIntensity != null && capexIntensity > 0.15) {
-        penalty = 10;
-        signals.push({
+    const capexHeavy = contribute(
+        capexIntensity != null && capexIntensity > 0.15,
+        -10,
+        {
             type: 'capex_heavy',
             direction: 'negative',
             labelKo: '설비투자 과다',
-        });
-    }
+        }
+    );
 
-    if (cf?.freeCashFlow != null && cf.freeCashFlow > 0) {
-        signals.push({
-            type: 'fcf_solid',
+    const fcfDirection: SignalContribution =
+        cf?.freeCashFlow != null && cf.freeCashFlow > 0
+            ? contribute(true, 0, {
+                  type: 'fcf_solid',
+                  direction: 'positive',
+                  labelKo: '잉여현금흐름 견조',
+              })
+            : cf?.freeCashFlow != null && cf.freeCashFlow < 0
+              ? contribute(true, 0, {
+                    type: 'fcf_negative',
+                    direction: 'negative',
+                    labelKo: '잉여현금흐름 적자',
+                })
+              : noContribution;
+
+    const fcfGrowing = contribute(
+        cfg?.growthFreeCashFlow != null && cfg.growthFreeCashFlow > 0.1,
+        0,
+        {
+            type: 'fcf_growth',
             direction: 'positive',
-            labelKo: '잉여현금흐름 견조',
-        });
-    } else if (cf?.freeCashFlow != null && cf.freeCashFlow < 0) {
-        signals.push({
-            type: 'fcf_negative',
-            direction: 'negative',
-            labelKo: '잉여현금흐름 적자',
-        });
-    }
+            labelKo: '잉여현금흐름 성장',
+        }
+    );
 
-    const score = Math.round(clamp(base - penalty));
-    return { score, grade: grade(score), signals, metrics };
+    // Signal ordering preserves the original capex → fcf direction sequence,
+    // with the new cash-growth signal appended last.
+    const contributions = [capexHeavy, fcfDirection, fcfGrowing];
+    const delta = contributions.reduce((sum, c) => sum + c.delta, 0);
+
+    const score = Math.round(clamp(blended + delta));
+    return {
+        score,
+        grade: grade(score),
+        signals: collectSignals(contributions),
+        metrics,
+    };
 }
 
 // ─── Composite summary ───────────────────────────────────────────────────────
@@ -399,33 +534,38 @@ const AXIS_LABELS_KO = {
     cash: '현금창출력',
 } as const;
 
-const GRADE_RANK: Record<FinancialsGrade, number> = {
-    A: 5,
-    B: 4,
-    C: 3,
-    D: 2,
-    F: 1,
-};
-
+/**
+ * Build the Korean composite summary.
+ *
+ * Picks the strongest (`우수`) and weakest (`주의`) axis by **score** (not grade)
+ * so that two axes sharing a grade but differing in score are still ranked, and
+ * a stable axis order (growth → quality → solvency → cash) breaks exact ties
+ * deterministically. The weakest axis is always chosen from the set EXCLUDING
+ * the strongest, so the summary can never name the same axis twice — even when
+ * every axis collapses to the same score (e.g. an empty snapshot: all 0/F).
+ */
 function buildSummaryKo(
     growth: AxisScore,
     quality: AxisScore,
     solvency: AxisScore,
     cash: AxisScore
 ): string {
-    // Stable axis ordering keeps the summary deterministic on grade ties.
-    const axes = [
+    const axes: { key: FinancialsAxis; axis: AxisScore }[] = [
         { key: 'growth', axis: growth },
         { key: 'quality', axis: quality },
         { key: 'solvency', axis: solvency },
         { key: 'cash', axis: cash },
-    ] as const;
+    ];
 
+    // Highest score wins; first-in-order wins exact ties (stable).
     const top = axes.reduce((best, cur) =>
-        GRADE_RANK[cur.axis.grade] > GRADE_RANK[best.axis.grade] ? cur : best
+        cur.axis.score > best.axis.score ? cur : best
     );
-    const bottom = axes.reduce((worst, cur) =>
-        GRADE_RANK[cur.axis.grade] < GRADE_RANK[worst.axis.grade] ? cur : worst
+
+    // Weakest is chosen from the remaining axes only, guaranteeing top !== bottom.
+    const rest = axes.filter(a => a.key !== top.key);
+    const bottom = rest.reduce((worst, cur) =>
+        cur.axis.score < worst.axis.score ? cur : worst
     );
 
     return `${AXIS_LABELS_KO[top.key]} 우수(${top.axis.grade}), ${AXIS_LABELS_KO[bottom.key]} 주의(${bottom.axis.grade})`;
@@ -433,6 +573,15 @@ function buildSummaryKo(
 
 // ─── Public entry point ──────────────────────────────────────────────────────
 
+/**
+ * Compute the deterministic 4-axis financials scorecard for a symbol.
+ *
+ * @param s - Normalized financials snapshot (each series newest→oldest, index 0
+ *   = latest fiscal period). Empty axis arrays collapse to the worst case
+ *   (score 0 / grade 'F'); null metrics are excluded from averages.
+ * @returns A {@link FinancialsScorecard} with per-axis scores, grades, signals,
+ *   metrics, and a composite roll-up with a Korean summary string.
+ */
 export function computeFinancialsScorecard(
     s: FinancialsSnapshot
 ): FinancialsScorecard {

@@ -52,6 +52,20 @@ function withCashDerived(
     };
 }
 
+/**
+ * Normalize a raw financial-statements bundle into a {@link FinancialsSnapshot}.
+ *
+ * Fills derived metrics that depend on cross-statement values: income margins
+ * (gross/operating/net) when absent, balance-sheet current ratio, and cash-flow
+ * `fcfMargin` (matched against the same period's revenue via a `fiscalYear|period`
+ * key). Already-present values are preserved; growth series pass through
+ * unchanged. Pure and null-safe — missing inputs yield `null` derived fields.
+ *
+ * @param input - Domain-neutral bundle of statement and growth rows assembled by
+ *   the provider adapter; each series newest→oldest.
+ * @returns A structurally complete {@link FinancialsSnapshot} ready for the
+ *   scorecard and prompt builders.
+ */
 export function normalizeFinancialsSnapshot(
     input: NormalizeFinancialsSnapshotInput
 ): FinancialsSnapshot {

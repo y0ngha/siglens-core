@@ -443,8 +443,6 @@ export type {
     FinancialsScorecard,
     FinancialsAxisAssessment,
     FinancialsAnalysisResponse,
-    RawFinancialsAnalysisResponse,
-    RawFinancialsAxisAssessment,
     NormalizeFinancialsSnapshotInput,
     FundamentalAnalysisResponse,
     FundamentalAnalystEstimateInput,

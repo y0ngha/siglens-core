@@ -446,14 +446,14 @@ describe('submitFinancialsAnalysis 함수는', () => {
         });
     });
 
-    describe('BYOK gate + tier forwarding', () => {
+    describe('BYOK 게이트 + tier 전달이', () => {
         const testTierConfig = TEST_TIER_CONFIG;
 
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);
         });
 
-        it('returns user_api_key_required when non-pro premium without BYOK', async () => {
+        it('비(非)pro 사용자가 BYOK 없이 프리미엄 모델을 쓰면 user_api_key_required를 반환한다', async () => {
             const result = await submitFinancialsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-pro',
@@ -469,11 +469,11 @@ describe('submitFinancialsAnalysis 함수는', () => {
                 expect(result.tier).toBe('member');
             }
             expect(mockFetch).not.toHaveBeenCalled();
-            // Provider must not be fetched when the BYOK gate blocks early.
+            // BYOK 게이트가 조기에 막으면 provider를 호출하지 않아야 한다.
             expect(mockDataProvider.getIncomeStatements).not.toHaveBeenCalled();
         });
 
-        it('proceeds when non-pro premium with BYOK (tier in body, header set)', async () => {
+        it('비(非)pro 사용자가 BYOK를 제공하면 진행한다 (body에 tier, 헤더 설정)', async () => {
             const result = await submitFinancialsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-pro',
@@ -498,7 +498,7 @@ describe('submitFinancialsAnalysis 함수는', () => {
             expect(body.tier).toBe('member');
         });
 
-        it('proceeds when pro premium without BYOK (tier in body, no header)', async () => {
+        it('pro 사용자는 BYOK 없이도 프리미엄 모델을 진행한다 (body에 tier, 헤더 없음)', async () => {
             const result = await submitFinancialsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-pro',
@@ -517,7 +517,7 @@ describe('submitFinancialsAnalysis 함수는', () => {
             expect(body.tier).toBe('pro');
         });
 
-        it('treats missing tier as DEFAULT_TIER', async () => {
+        it('tier 미지정 시 DEFAULT_TIER로 처리한다', async () => {
             const result = await submitFinancialsAnalysis({
                 symbol: 'AAPL',
                 modelId: 'gemini-2.5-flash',

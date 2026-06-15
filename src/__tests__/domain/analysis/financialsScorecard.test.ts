@@ -76,6 +76,25 @@ const finGrowth = (
     ...o,
 });
 
+const incGrowth = (o: Partial<IncomeGrowthRow> = {}): IncomeGrowthRow => ({
+    fiscalYear: '2024',
+    period: 'FY',
+    growthRevenue: null,
+    growthNetIncome: null,
+    growthEPS: null,
+    growthOperatingIncome: null,
+    ...o,
+});
+
+const cashGrowth = (o: Partial<CashFlowGrowthRow> = {}): CashFlowGrowthRow => ({
+    fiscalYear: '2024',
+    period: 'FY',
+    growthOperatingCashFlow: null,
+    growthFreeCashFlow: null,
+    growthCapitalExpenditure: null,
+    ...o,
+});
+
 const empty = (): FinancialsSnapshot => ({
     income: [],
     balance: [],
@@ -104,10 +123,10 @@ describe('computeFinancialsScorecard — empty snapshot', () => {
     });
 
     it('every axis still emits its metrics with null values', () => {
-        expect(card.growth.metrics).toHaveLength(4);
+        expect(card.growth.metrics).toHaveLength(5);
         expect(card.quality.metrics).toHaveLength(3);
         expect(card.solvency.metrics).toHaveLength(3);
-        expect(card.cash.metrics).toHaveLength(3);
+        expect(card.cash.metrics).toHaveLength(5);
         for (const axis of [
             card.growth,
             card.quality,
@@ -645,5 +664,168 @@ describe('composite summaryKo', () => {
         expect(computeFinancialsScorecard(snap).composite.summaryKo).toBe(
             computeFinancialsScorecard(snap).composite.summaryKo
         );
+    });
+
+    // buildSummaryKo tie fix: top and bottom must be DIFFERENT axes even when
+    // every axis collapses to the same score/grade.
+    it('all-F (empty) snapshot names two different axes (top !== bottom)', () => {
+        const summary = computeFinancialsScorecard(empty()).composite.summaryKo;
+        // Format: "<top> 우수(F), <bottom> 주의(F)"
+        const top = summary.split(' 우수')[0];
+        const bottom = summary.split(', ')[1].split(' 주의')[0];
+        expect(top).not.toBe(bottom);
+        // Both grades render as F (all axes empty), so the bug would have made
+        // them identical; the fix forces distinct axis labels.
+        expect(summary).toContain('우수(F)');
+        expect(summary).toContain('주의(F)');
+    });
+
+    it('all-equal-score axes still resolve to two distinct axes', () => {
+        // Symmetric snapshot where each axis lands on the same score band.
+        const snap: FinancialsSnapshot = {
+            ...empty(),
+            income: [income({ netMargin: 25, operatingMargin: 25 })], // quality 100
+            balance: [balance({ currentRatio: 2 })], // solvency 100
+            cashFlow: [cash({ fcfMargin: 25 })], // cash 100
+            financialGrowth: [
+                finGrowth({
+                    revenueGrowth: 0.25,
+                    netIncomeGrowth: 0.25,
+                    epsgrowth: 0.25,
+                    freeCashFlowGrowth: 0.25,
+                }),
+            ], // growth 100
+        };
+        const card = computeFinancialsScorecard(snap);
+        const summary = card.composite.summaryKo;
+        const top = summary.split(' 우수')[0];
+        const bottom = summary.split(', ')[1].split(' 주의')[0];
+        expect(top).not.toBe(bottom);
+    });
+
+    it('ranks by score, not grade, when two axes share a grade', () => {
+        // Two axes are both grade A but with different scores; the higher score
+        // must win 우수 and a lower-score axis must take 주의.
+        const snap: FinancialsSnapshot = {
+            ...empty(),
+            income: [income({ netMargin: 25, operatingMargin: 25 })], // quality 100 (A)
+            financialGrowth: [
+                finGrowth({
+                    revenueGrowth: 0.21,
+                    netIncomeGrowth: 0.21,
+                    epsgrowth: 0.21,
+                    freeCashFlowGrowth: 0.21,
+                }),
+            ], // growth 100 (A) but solvency/cash are 0/F
+        };
+        const card = computeFinancialsScorecard(snap);
+        // top must be one of the high scorers; bottom one of the 0-score axes.
+        expect(card.composite.summaryKo).toContain('우수');
+        expect(card.composite.summaryKo).toContain('주의(F)');
+    });
+});
+
+// ─── B9: incomeGrowth & cashFlowGrowth are genuinely used ─────────────────────
+
+describe('scoreGrowth — incomeGrowth participation (B9)', () => {
+    it('incomeGrowth influences the growth score (blended when present)', () => {
+        const withoutIncome = computeFinancialsScorecard({
+            ...empty(),
+            financialGrowth: [finGrowth({ revenueGrowth: 0.25 })],
+        }).growth.score;
+
+        // Strong financialGrowth but WEAK incomeGrowth should pull the score down.
+        const withWeakIncome = computeFinancialsScorecard({
+            ...empty(),
+            financialGrowth: [finGrowth({ revenueGrowth: 0.25 })],
+            incomeGrowth: [incGrowth({ growthRevenue: -0.2 })],
+        }).growth.score;
+
+        expect(withWeakIncome).toBeLessThan(withoutIncome);
+    });
+
+    it('exposes the operating-income growth metric from incomeGrowth', () => {
+        const card = computeFinancialsScorecard({
+            ...empty(),
+            financialGrowth: [finGrowth({ revenueGrowth: 0.1 })],
+            incomeGrowth: [incGrowth({ growthOperatingIncome: 0.3 })],
+        });
+        const opMetric = card.growth.metrics.find(m =>
+            m.labelKo.includes('영업이익')
+        );
+        expect(opMetric?.value).toBeCloseTo(30); // ×100 percent
+    });
+
+    it('emits operating_income_growth signal when operating income grows >10%', () => {
+        const card = computeFinancialsScorecard({
+            ...empty(),
+            financialGrowth: [finGrowth({ revenueGrowth: 0.1 })],
+            incomeGrowth: [incGrowth({ growthOperatingIncome: 0.2 })],
+        });
+        expect(card.growth.signals.map(s => s.type)).toContain(
+            'operating_income_growth'
+        );
+    });
+
+    it('absent incomeGrowth leaves the core growth score unchanged', () => {
+        // Regression guard: the blend must be a no-op when incomeGrowth is empty.
+        const score = computeFinancialsScorecard({
+            ...empty(),
+            financialGrowth: [finGrowth({ revenueGrowth: 0.15 })],
+        }).growth.score;
+        expect(score).toBe(Math.round(75 * 0.7 + 100 * 0.3)); // 83, original formula
+    });
+});
+
+describe('scoreCash — cashFlowGrowth participation (B9)', () => {
+    it('cashFlowGrowth influences the cash score (blended when present)', () => {
+        const base = computeFinancialsScorecard({
+            ...empty(),
+            cashFlow: [cash({ fcfMargin: 25, freeCashFlow: 100 })],
+        }).cash.score;
+
+        const withWeakGrowth = computeFinancialsScorecard({
+            ...empty(),
+            cashFlow: [cash({ fcfMargin: 25, freeCashFlow: 100 })],
+            cashFlowGrowth: [cashGrowth({ growthFreeCashFlow: -0.3 })],
+        }).cash.score;
+
+        expect(withWeakGrowth).toBeLessThan(base);
+    });
+
+    it('exposes FCF and OCF growth metrics from cashFlowGrowth', () => {
+        const card = computeFinancialsScorecard({
+            ...empty(),
+            cashFlow: [cash({ fcfMargin: 25 })],
+            cashFlowGrowth: [
+                cashGrowth({
+                    growthFreeCashFlow: 0.2,
+                    growthOperatingCashFlow: 0.15,
+                }),
+            ],
+        });
+        const fcfG = card.cash.metrics.find(m => m.labelKo === 'FCF 성장률');
+        const ocfG = card.cash.metrics.find(m =>
+            m.labelKo.includes('영업현금흐름')
+        );
+        expect(fcfG?.value).toBeCloseTo(20);
+        expect(ocfG?.value).toBeCloseTo(15);
+    });
+
+    it('emits fcf_growth signal when FCF grows >10%', () => {
+        const card = computeFinancialsScorecard({
+            ...empty(),
+            cashFlow: [cash({ fcfMargin: 25, freeCashFlow: 100 })],
+            cashFlowGrowth: [cashGrowth({ growthFreeCashFlow: 0.2 })],
+        });
+        expect(card.cash.signals.map(s => s.type)).toContain('fcf_growth');
+    });
+
+    it('absent cashFlowGrowth leaves the core cash score unchanged', () => {
+        const score = computeFinancialsScorecard({
+            ...empty(),
+            cashFlow: [cash({ fcfMargin: 15 })],
+        }).cash.score;
+        expect(score).toBe(75); // fcfMarginBand(15)=75, no other metrics
     });
 });

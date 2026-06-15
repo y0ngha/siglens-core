@@ -2624,7 +2624,7 @@ export interface OverallAnalysisResponse {
     newsBulletsKo: string[];
     /** Options analysis summary bullet points (Korean output). */
     optionsBulletsKo: string[];
-    /** 재무 스코어카드 요약 불릿 (한국어). financials 미주입 시 빈 배열. */
+    /** Financials scorecard summary bullet points (Korean output). Empty array when no financials data was injected. */
     financialsBulletsKo: string[];
     /** 4-axis synthesis conclusion block, one or two paragraphs (Korean output). */
     integratedConclusionKo: string;
@@ -2776,7 +2776,7 @@ export type FinancialsSentiment = 'bullish' | 'neutral' | 'bearish';
 export type FinancialsAxis = 'growth' | 'quality' | 'solvency' | 'cash';
 export type FinancialsGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 
-/** 손익계산서 1행 (domain-neutral, 분석·표시 공용 핵심 필드). */
+/** A single income statement row (domain-neutral core fields shared by analysis and display). */
 export interface IncomeStatementRow {
     fiscalYear: string;
     period: string;
@@ -2793,7 +2793,7 @@ export interface IncomeStatementRow {
     netMargin: number | null;
 }
 
-/** 재무상태표 1행. */
+/** A single balance sheet row. */
 export interface BalanceSheetRow {
     fiscalYear: string;
     period: string;
@@ -2809,7 +2809,12 @@ export interface BalanceSheetRow {
     currentRatio: number | null;
 }
 
-/** 현금흐름표 1행. fcfMargin은 income.revenue가 필요해 snapshot 정규화 단계에서 채운다. */
+/**
+ * A single cash flow statement row.
+ *
+ * `fcfMargin` requires `income.revenue`, so it is populated during snapshot
+ * normalization rather than by the raw provider adapter.
+ */
 export interface CashFlowRow {
     fiscalYear: string;
     period: string;
@@ -2853,7 +2858,11 @@ export interface CashFlowGrowthRow {
     growthCapitalExpenditure: number | null;
 }
 
-/** computeFinancialsScorecard 입력. 각 배열은 최신→과거 정렬(0=최신). */
+/**
+ * Input to `computeFinancialsScorecard`.
+ *
+ * Each series is sorted newest→oldest (index 0 = latest fiscal period).
+ */
 export interface FinancialsSnapshot {
     income: IncomeStatementRow[];
     balance: BalanceSheetRow[];
@@ -2903,11 +2912,13 @@ export interface FinancialsAnalysisResponse {
     overallSentiment: FinancialsSentiment;
 }
 
+/** @internal Loose pre-normalization shape of a single axis assessment from the LLM. */
 export interface RawFinancialsAxisAssessment {
     axis?: unknown;
     sentiment?: unknown;
     rationaleKo?: unknown;
 }
+/** @internal Loose pre-normalization shape of the financials LLM response. */
 export interface RawFinancialsAnalysisResponse {
     overallConclusionKo?: unknown;
     axisAssessments?: unknown;
@@ -2915,7 +2926,7 @@ export interface RawFinancialsAnalysisResponse {
     overallSentiment?: unknown;
 }
 
-/** normalizeFinancialsSnapshot 입력 (어댑터가 채운 domain-neutral 묶음). */
+/** Input to `normalizeFinancialsSnapshot` (domain-neutral bundle assembled by the provider adapter). */
 export interface NormalizeFinancialsSnapshotInput {
     income: IncomeStatementRow[];
     balance: BalanceSheetRow[];

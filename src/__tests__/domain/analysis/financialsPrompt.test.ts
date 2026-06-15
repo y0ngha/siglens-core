@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
 import type {
+    CashFlowGrowthRow,
     FinancialsSnapshot,
+    IncomeGrowthRow,
     IncomeStatementRow,
     BalanceSheetRow,
     CashFlowRow,
@@ -76,13 +78,30 @@ const growthRow: FinancialGrowthRow = {
     tenYRevenueGrowthPerShare: 0.099,
 };
 
+const incomeGrowthRow: IncomeGrowthRow = {
+    fiscalYear: '2023',
+    period: 'FY',
+    growthRevenue: -0.0028,
+    growthNetIncome: 0.0296,
+    growthEPS: 0.0875,
+    growthOperatingIncome: 0.0417,
+};
+
+const cashFlowGrowthRow: CashFlowGrowthRow = {
+    fiscalYear: '2023',
+    period: 'FY',
+    growthOperatingCashFlow: 0.1236,
+    growthFreeCashFlow: 0.2002,
+    growthCapitalExpenditure: -0.0521,
+};
+
 const richSnapshot: FinancialsSnapshot = {
     income: [incomeRow],
     balance: [balanceRow],
     cashFlow: [cashFlowRow],
-    incomeGrowth: [],
+    incomeGrowth: [incomeGrowthRow],
     financialGrowth: [growthRow],
-    cashFlowGrowth: [],
+    cashFlowGrowth: [cashFlowGrowthRow],
 };
 
 describe('buildFinancialsAnalysisPrompt', () => {
@@ -273,6 +292,40 @@ describe('buildFinancialsAnalysisPrompt', () => {
             []
         );
         expect(p).toContain('N/A');
+    });
+    it('includes income statement growth section with operating income growth (B9)', () => {
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            richSnapshot,
+            computeFinancialsScorecard(richSnapshot),
+            []
+        );
+        expect(p).toContain('Income Statement Growth');
+        // growthOperatingIncome 0.0417 => 4.2%
+        expect(p).toContain('Operating Income Growth 4.2%');
+    });
+    it('includes cash flow growth section with FCF/OCF growth (B9)', () => {
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            richSnapshot,
+            computeFinancialsScorecard(richSnapshot),
+            []
+        );
+        expect(p).toContain('Cash Flow Growth');
+        // growthFreeCashFlow 0.2002 => 20.0%
+        expect(p).toContain('Free Cash Flow Growth 20.0%');
+        // growthOperatingCashFlow 0.1236 => 12.4%
+        expect(p).toContain('Operating Cash Flow Growth 12.4%');
+    });
+    it('shows N/A placeholders for growth sections when arrays are empty (B9)', () => {
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            empty,
+            computeFinancialsScorecard(empty),
+            []
+        );
+        expect(p).toContain('No income statement growth data available');
+        expect(p).toContain('No cash flow growth data available');
     });
     it('includes axis signals in scorecard section when signals exist', () => {
         const scorecard = computeFinancialsScorecard(richSnapshot);

@@ -2,9 +2,11 @@
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import type {
+    CashFlowGrowthRow,
     FinancialGrowthRow,
     FinancialsScorecard,
     FinancialsSnapshot,
+    IncomeGrowthRow,
     IncomeStatementRow,
     BalanceSheetRow,
     CashFlowRow,
@@ -105,6 +107,43 @@ function formatGrowthSection(rows: FinancialGrowthRow[]): string {
 }
 
 /**
+ * Render income-statement growth rows (newest first, up to 3 years).
+ *
+ * Sourced from FMP's income-statement-growth endpoint. Overlaps the financial
+ * growth series on revenue / net income / EPS but additionally carries
+ * operating-income growth, which the scorecard's growth axis blends in.
+ */
+function formatIncomeGrowthSection(rows: IncomeGrowthRow[]): string {
+    if (rows.length === 0)
+        return '  (No income statement growth data available)';
+    return rows
+        .slice(0, 3)
+        .map(
+            r =>
+                `  ${r.fiscalYear} (${r.period}): Revenue Growth ${fmtGrowthPct(r.growthRevenue)}, Net Income Growth ${fmtGrowthPct(r.growthNetIncome)}, EPS Growth ${fmtGrowthPct(r.growthEPS)}, Operating Income Growth ${fmtGrowthPct(r.growthOperatingIncome)}`
+        )
+        .join('\n');
+}
+
+/**
+ * Render cash-flow growth rows (newest first, up to 3 years).
+ *
+ * Sourced from FMP's cash-flow-growth endpoint. Surfaces operating cash flow,
+ * free cash flow, and capex growth, which the scorecard's cash axis blends in
+ * as a growth-of-cash signal distinct from the level-based FCF metrics.
+ */
+function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
+    if (rows.length === 0) return '  (No cash flow growth data available)';
+    return rows
+        .slice(0, 3)
+        .map(
+            r =>
+                `  ${r.fiscalYear} (${r.period}): Operating Cash Flow Growth ${fmtGrowthPct(r.growthOperatingCashFlow)}, Free Cash Flow Growth ${fmtGrowthPct(r.growthFreeCashFlow)}, CapEx Growth ${fmtGrowthPct(r.growthCapitalExpenditure)}`
+        )
+        .join('\n');
+}
+
+/**
  * Build the financial-statement analysis LLM prompt.
  *
  * Accepts a normalized {@link FinancialsSnapshot}, a pre-computed
@@ -174,6 +213,12 @@ ${formatCashFlowSection(snapshot.cashFlow)}
 
 ## Growth (Revenue / Net Income / EPS / FCF Growth + 3Y/5Y/10Y)
 ${formatGrowthSection(snapshot.financialGrowth)}
+
+## Income Statement Growth (Revenue / Net Income / EPS / Operating Income YoY)
+${formatIncomeGrowthSection(snapshot.incomeGrowth)}
+
+## Cash Flow Growth (Operating CF / Free CF / CapEx YoY)
+${formatCashFlowGrowthSection(snapshot.cashFlowGrowth)}
 
 ## Scorecard Summary
 - Composite: Grade ${composite.grade}, Score ${composite.score}/100 | ${composite.summaryKo}

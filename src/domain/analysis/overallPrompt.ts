@@ -410,13 +410,13 @@ Rules:
 - technicalBulletsKo, fundamentalBulletsKo, newsBulletsKo: provide 2–4 bullets each.
 - optionsBulletsKo: provide 2–4 bullets when options data is present; leave the array empty when the options axis indicates it was not included.
 - financialsBulletsKo: provide 2–4 bullets when the financials scorecard is present; leave the array empty when the scorecard section indicates no data.
-- riskFactorsKo: list 3–5 key risk factors combining all four axes.
-- integratedConclusionKo: synthesise all four axes (or three when options data is absent) into a cohesive directional verdict appropriate for the ${timeframe} timeframe context described above.
-- In integratedConclusionKo, attribute each claim to its source axis (e.g. "기술적 분석에 따르면…", "펀더멘털 분석에서는…", "뉴스 분석에서는…", "옵션 시장에서는…") so the reader can see which axis each point came from. This reduces blending and hallucination.
+- riskFactorsKo: list 3–5 key risk factors combining all available axes (technical, fundamental, news, options, and financials).
+- integratedConclusionKo: synthesise all available axes (technical, fundamental, news, plus options and financials when present) into a cohesive directional verdict appropriate for the ${timeframe} timeframe context described above.
+- In integratedConclusionKo, attribute each claim to its source axis (e.g. "기술적 분석에 따르면…", "펀더멘털 분석에서는…", "뉴스 분석에서는…", "옵션 시장에서는…", "재무제표 분석에서는…") so the reader can see which axis each point came from. This reduces blending and hallucination.
 - When axes genuinely conflict, preserve the conflict explicitly rather than averaging it into a single smoothed verdict.
 
 ## Few-Shot — conflict preservation + axis attribution
 For integratedConclusionKo, when the technical axis is bearish but the news axis turns positive, do NOT smooth them into a vague "중립" verdict. Instead, attribute and preserve the tension:
 BAD: "기술적 분석과 뉴스·펀더멘털을 종합하면 방향성이 불확실해 중립적으로 판단됩니다." (smooths away the conflict; no axis attribution)
-GOOD: "기술적 분석에 따르면 200 저항에 막혀 단기 하락 압력이 우세합니다. 다만 뉴스 분석에서는 호재가 유입되며 펀더멘털 분석의 약세 신호와 상충하고 있어, 200 돌파 여부가 확인되기 전까지는 방향이 엇갈린 구간으로 판단합니다."`;
+GOOD: "기술적 분석에 따르면 200 저항에 막혀 단기 하락 압력이 우세합니다. 다만 뉴스 분석에서는 호재가 유입되며 펀더멘털 분석의 약세 신호와 상충하고 있고, 재무제표 분석에서는 현금창출력이 견조해 하방을 일부 지지하므로, 200 돌파 여부가 확인되기 전까지는 방향이 엇갈린 구간으로 판단합니다."`;
 }
