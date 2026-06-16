@@ -243,6 +243,25 @@ export function buildBriefingCacheKey(
     return `briefing:market:${dateHour}:${model}:${inputHash}`;
 }
 
+/** @internal TTL for cached macro (economy) briefings. dateHour-bucketed. */
+export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
+
+/**
+ * @internal Build the Redis key for a cached macro (economy) briefing.
+ *
+ * Format: `briefing:macro:<dateHour>:<model>:<inputHash>`. Same bucketing
+ * contract as {@link buildBriefingCacheKey} (date+hour share, model scopes,
+ * input hash folds in the indicator/calendar snapshot) but a distinct `macro:`
+ * namespace so market and economy briefings never collide.
+ */
+export function buildMacroBriefingCacheKey(
+    dateHour: string,
+    model: string,
+    inputHash: string
+): string {
+    return `briefing:macro:${dateHour}:${model}:${inputHash}`;
+}
+
 /** @internal 타임프레임+버킷+종목 목록 기준 섹터 시그널 캐시 키 빌더. */
 export function buildSectorSignalsCacheKey(
     timeframe: DashboardTimeframe,

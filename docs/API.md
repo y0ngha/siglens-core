@@ -64,6 +64,9 @@ Header: Authorization: Bearer {UPSTASH_REDIS_REST_TOKEN}
 AI 분석 결과는 심볼·타임프레임별 TTL로 캐싱한다.
 
 - 캐시 키 예시: `analysis:{symbol}:{timeframe}:{modelId}` (예: `analysis:AAPL:1Day:gemini-2.5-flash`)
+- 시장 단위(per-market) 브리핑 캐시 키:
+    - `briefing:market:{dateHour}:{model}:{inputHash}` → `CachedBriefingData` (대시보드 시장 브리핑, 시간 단위 버킷)
+    - `briefing:macro:{dateHour}:{model}:{inputHash}` → `CachedMacroBriefingData` (`/economy` 거시 브리핑, 동일 버킷 규약, 별도 네임스페이스로 충돌 방지)
 - TTL은 타임프레임에 따라 결정한다 (`infrastructure/cache/config.ts`에서 정의)
 - 환경변수 미설정 시 캐시 없이 정상 동작(graceful degradation)
 

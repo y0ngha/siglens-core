@@ -9,6 +9,7 @@ import {
     BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildMacroBriefingCacheKey,
     buildFinancialsCacheKey,
     buildFundamentalCacheKey,
     buildNewsCacheKey,
@@ -105,6 +106,52 @@ describe('cache key builders', () => {
         const a = buildBriefingCacheKey('2026-04-26T14', 'model-x', 'hash');
         const b = buildBriefingCacheKey('2026-04-26T14', 'model-y', 'hash');
         expect(a).not.toBe(b);
+    });
+
+    it('buildMacroBriefingCacheKey uses the briefing:macro: namespace with the dateHour, model, and input hash', () => {
+        expect(
+            buildMacroBriefingCacheKey('2026-06-16T09', 'test-model', 'abc123')
+        ).toBe('briefing:macro:2026-06-16T09:test-model:abc123');
+    });
+
+    it('buildMacroBriefingCacheKey: different input hash yields a different key', () => {
+        const a = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'model-x',
+            'hashA'
+        );
+        const b = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'model-x',
+            'hashB'
+        );
+        expect(a).not.toBe(b);
+    });
+
+    it('buildMacroBriefingCacheKey: different model yields a different key', () => {
+        const a = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'model-x',
+            'hash'
+        );
+        const b = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'model-y',
+            'hash'
+        );
+        expect(a).not.toBe(b);
+    });
+
+    it('buildMacroBriefingCacheKey: namespace cannot collide with buildBriefingCacheKey for the same args', () => {
+        const macro = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'model',
+            'hash'
+        );
+        const market = buildBriefingCacheKey('2026-06-16T09', 'model', 'hash');
+        expect(macro).not.toBe(market);
+        expect(macro).toContain('briefing:macro:');
+        expect(market).toContain('briefing:market:');
     });
 
     it('buildSectorSignalsCacheKey composes timeframe and bucket', () => {
