@@ -88,6 +88,12 @@ const mockCachedResult = {
 describe('submitCongressTrend 함수는', () => {
     const originalEnv = process.env;
 
+    const BASE_OPTIONS = {
+        symbol: 'AAPL',
+        modelId: 'gemini-2.5-flash' as const,
+        dataProvider: mockDataProvider,
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubGlobal('fetch', mockFetch);
@@ -121,11 +127,7 @@ describe('submitCongressTrend 함수는', () => {
         it('cached 상태와 함께 결과를 반환하고 provider를 호출하지 않는다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockCachedResult);
 
-            const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            const result = await submitCongressTrend(BASE_OPTIONS);
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
@@ -146,11 +148,7 @@ describe('submitCongressTrend 함수는', () => {
                 overallSentiment: 'neutral',
             });
 
-            const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            const result = await submitCongressTrend(BASE_OPTIONS);
 
             expect(result.status).toBe('submitted');
             expect(mockDataProvider.getTrades).toHaveBeenCalled();
@@ -161,9 +159,7 @@ describe('submitCongressTrend 함수는', () => {
             mockCacheGet.mockResolvedValue(mockCachedResult);
 
             const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
+                ...BASE_OPTIONS,
                 force: true,
             });
 
@@ -175,11 +171,7 @@ describe('submitCongressTrend 함수는', () => {
         it('캐시 읽기가 실패하면 catch에서 흡수하고 submit 경로로 진행한다', async () => {
             mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
 
-            const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            const result = await submitCongressTrend(BASE_OPTIONS);
 
             expect(result.status).toBe('submitted');
             expect(mockDataProvider.getTrades).toHaveBeenCalled();
@@ -188,11 +180,7 @@ describe('submitCongressTrend 함수는', () => {
         it('캐시 프로바이더가 null이면 캐시 조회를 건너뛰고 제출한다', async () => {
             mockCreateCacheProvider.mockReturnValueOnce(null);
 
-            const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            const result = await submitCongressTrend(BASE_OPTIONS);
 
             expect(result.status).toBe('submitted');
             expect(mockCacheGet).not.toHaveBeenCalled();
@@ -206,11 +194,7 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         it('senate/house provider를 병렬 호출하고 submitted + jobId를 반환하며 워커에 POST 1회', async () => {
-            const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            const result = await submitCongressTrend(BASE_OPTIONS);
 
             expect(result.status).toBe('submitted');
             if (result.status === 'submitted') {
@@ -233,12 +217,7 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         it('limit을 명시하면 provider에 그대로 전달한다', async () => {
-            await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-                limit: 25,
-            });
+            await submitCongressTrend({ ...BASE_OPTIONS, limit: 25 });
 
             expect(mockDataProvider.getTrades).toHaveBeenCalledWith(
                 'AAPL',
@@ -248,11 +227,7 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         it('워커에 jobId, modelId, cacheKey를 포함한 메타를 등록한다', async () => {
-            await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            await submitCongressTrend(BASE_OPTIONS);
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -265,11 +240,7 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         it('워커 body에 analysisType=congress, system, responseSchema, seed, DEFAULT_TIER를 포함한다', async () => {
-            await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            await submitCongressTrend(BASE_OPTIONS);
 
             const body = JSON.parse(
                 mockFetch.mock.calls[0][1].body as string
@@ -282,12 +253,7 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         it('options.tier가 지정되면 worker payload에 그대로 전달된다', async () => {
-            await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-                tier: 'pro',
-            });
+            await submitCongressTrend({ ...BASE_OPTIONS, tier: 'pro' });
 
             const body = JSON.parse(
                 mockFetch.mock.calls[0][1].body as string
@@ -301,11 +267,7 @@ describe('submitCongressTrend 함수는', () => {
                 skillsDegraded: true,
             });
 
-            await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            await submitCongressTrend(BASE_OPTIONS);
 
             expect(mockSetJobMeta).toHaveBeenCalledWith(
                 expect.any(String),
@@ -317,11 +279,7 @@ describe('submitCongressTrend 함수는', () => {
             // The fixture row should survive normalize → prompt; assert the
             // member office string appears, proving normalizeCongressTrades ran.
             const expectedTrade = makeTrade()[0];
-            await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            await submitCongressTrend(BASE_OPTIONS);
 
             const body = JSON.parse(
                 mockFetch.mock.calls[0][1].body as string
@@ -332,11 +290,7 @@ describe('submitCongressTrend 함수는', () => {
         it('provider가 throw하면 fetch_failed error를 반환한다', async () => {
             mockGetTrades.mockRejectedValueOnce(new Error('FMP API error'));
 
-            const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
-            });
+            const result = await submitCongressTrend(BASE_OPTIONS);
 
             expect(result.status).toBe('error');
             if (result.status === 'error') {
@@ -353,9 +307,8 @@ describe('submitCongressTrend 함수는', () => {
             mockGetTrades.mockResolvedValue([]);
 
             const result = await submitCongressTrend({
+                ...BASE_OPTIONS,
                 symbol: 'NONE',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
             });
 
             expect(result).toEqual({ status: 'no_trades' });
@@ -376,9 +329,7 @@ describe('submitCongressTrend 함수는', () => {
             mockCacheGet.mockResolvedValue(null);
 
             const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
+                ...BASE_OPTIONS,
                 skipEnqueueIfMiss: true,
             });
 
@@ -392,9 +343,7 @@ describe('submitCongressTrend 함수는', () => {
             mockCacheGet.mockResolvedValue(mockCachedResult);
 
             const result = await submitCongressTrend({
-                symbol: 'AAPL',
-                modelId: 'gemini-2.5-flash',
-                dataProvider: mockDataProvider,
+                ...BASE_OPTIONS,
                 skipEnqueueIfMiss: true,
             });
 

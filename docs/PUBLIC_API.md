@@ -156,7 +156,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 > 분류 기준: ../siglens(분리 전 코드)에서의 직접 호출 패턴 + 합리적 확장(워커/CLI 등 미래 consumer 고려).
 
-### Tier 1 — Application Entrypoints (30)
+### Tier 1 — Application Entrypoints (33)
 
 | Symbol | Source |
 |---|---|
@@ -190,6 +190,9 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `submitFinancialsAnalysis` | `application/financials/submitFinancialsAnalysis.ts` |
 | `pollFinancialsAnalysis` | `application/financials/pollFinancialsAnalysis.ts` |
 | `cancelFinancialsAnalysisJob` | `application/financials/cancelFinancialsAnalysisJob.ts` |
+| `submitCongressTrend` | `application/congress/submitCongressTrend.ts` |
+| `pollCongressTrend` | `application/congress/pollCongressTrend.ts` |
+| `cancelCongressTrendJob` | `application/congress/cancelCongressTrendJob.ts` |
 
 ### Tier 2 — Domain Building Blocks
 
@@ -214,6 +217,14 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `normalizeFinancialsAnalysisResponse` | `domain/analysis/normalizeFinancials.ts` |
 | `normalizeFinancialsSnapshot` | `domain/analysis/normalizeFinancialsSnapshot.ts` |
 | `buildFinancialsAnalysisPrompt` | `domain/analysis/financialsPrompt.ts` |
+
+**의회 거래 동향 분석 헬퍼 (4)**
+| Symbol | Source |
+|---|---|
+| `normalizeCongressTrades` | `domain/analysis/normalizeCongressTrades.ts` |
+| `summarizeCongressTrades` | `domain/analysis/summarizeCongressTrades.ts` |
+| `buildCongressTrendPrompt` | `domain/analysis/congressTrendPrompt.ts` |
+| `normalizeCongressTrendResponse` | `domain/analysis/normalizeCongressTrend.ts` |
 
 **프롬프트 빌더 (2 + 1 상수)**
 | Symbol | Source |
@@ -376,6 +387,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - `NewsTimeRange` — `domain/ports/newsProvider.ts`. 뉴스 조회 기간 union (`'24h'` | `'7d'` | `'30d'`). **public 유지** — consumer(siglens, siglens-trader)가 자체 뉴스 fetch 어댑터의 `range` 인자를 이 union으로 타이핑한다(PR7에서 일시 `@internal`했으나 consumer typecheck 검증에서 breakage가 발견되어 복원). 부모 port `NewsProvider`는 consumer가 이름으로 import하지 않으므로 `@internal` 유지.
 - `OptionsDataProvider` — `domain/ports/optionsDataProvider.ts`. 옵션 시세 fetcher 추상화 인터페이스 (siglens가 Yahoo Finance로 구현). `fetchSnapshot`, `hasOptionsMarket` 두 메서드.
 - `FinancialStatementsProvider` — `domain/ports/financialStatementsProvider.ts`. Core가 의존하는 추상 재무제표 fetcher 인터페이스 (siglens가 FMP로 구현). `submitFinancialsAnalysis`에 주입한다.
+- `CongressTradesProvider` — `domain/ports/congressTradesProvider.ts`. Core가 의존하는 추상 의회 거래 데이터 fetcher 인터페이스 (siglens가 FMP로 구현). `submitCongressTrend`에 주입한다.
 
 새로 추가된 use-case option/result 타입:
 - 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `SubmitFundamentalAnalysisMissNoTrigger`, `PollFundamentalAnalysisResult`.
@@ -384,6 +396,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - 기술적: `SubmitAnalysisMissNoTrigger` — 0.10.0에서 추가된 봇/크롤러 게이팅용 결과 variant.
 - 옵션: `SubmitOptionsAnalysisOptions`, `SubmitOptionsAnalysisResult`, `SubmitOptionsAnalysisCached`, `SubmitOptionsAnalysisSubmitted`, `SubmitOptionsAnalysisMissNoTrigger`, `SubmitOptionsAnalysisLimitError`, `SubmitOptionsAnalysisNoChainsError`, `SubmitOptionsAnalysisApiKeyRequiredError`, `PollOptionsAnalysisResult`, `PollOptionsAnalysisProcessing`, `PollOptionsAnalysisDone`, `PollOptionsAnalysisError`. 도메인 타입(`OptionsContract`, `OptionsChain`, `OptionsSnapshot`, `StrikeOpenInterest`, `StrikeVolumeAggregate`, `TopOiQuote`, `OptionsExpirationMetrics`, `OptionsPerExpirationCommentary`, `OptionsSignal`, `OptionsAnalysisResponse`, `OptionsTone`, `OptionsSignalKind`, `OptionsExpirationFilter`)과 슬롯 매핑(`ExpirationSlot`, `ExpirationSlotKey`, `SlotMapping`), 프롬프트 옵션(`BuildOptionsAnalysisPromptOptions`) 포함.
 - 재무: `SubmitFinancialsAnalysisOptions`, `SubmitFinancialsAnalysisResult`, `SubmitFinancialsAnalysisCached`, `SubmitFinancialsAnalysisSubmitted`, `SubmitFinancialsAnalysisMissNoTrigger`, `SubmitFinancialsAnalysisLimitError`, `SubmitFinancialsAnalysisFetchError`, `SubmitFinancialsAnalysisApiKeyRequiredError` (6 `SubmitFinancialsAnalysisResult` variants), `PollFinancialsAnalysisResult`. 도메인 타입(`FinancialsAnalysisResponse`, `FinancialsAxisAssessment`, `FinancialsAxis`, `FinancialsSentiment`, `FinancialsScorecard`, `FinancialsCompositeScore`, `AxisScore`, `FinancialSignalType`, `FinancialSignal`, `FinancialSignalDirection`, `ScoreMetric`, `ScoreMetricUnit`, `FinancialsGrade`, `FinancialsSnapshot`, `IncomeStatementRow`, `BalanceSheetRow`, `CashFlowRow`, `IncomeGrowthRow`, `FinancialGrowthRow`, `CashFlowGrowthRow`, `NormalizeFinancialsSnapshotInput`, `StatementPeriod`) 포함. `FinancialSignalType` — `computeFinancialsScorecard`가 방출하는 시그널 타입 literal union (PR #153 round 3에서 `string`에서 named union으로 승격). `FinancialSignalDirection`(`'positive'|'negative'|'neutral'`)·`ScoreMetricUnit`(`'pct'|'ratio'|'usd'|'score'`)는 PR #153 round 4에서 인라인 union을 named/export type으로 추출; `FinancialsCompositeScore`는 `FinancialsScorecard.composite`의 인라인 객체를 named 타입으로 추출(reachability).
+- 의회 거래 동향: `SubmitCongressTrendOptions`, `SubmitCongressTrendResult`, `SubmitCongressTrendCached`, `SubmitCongressTrendSubmitted`, `SubmitCongressTrendMissNoTrigger`, `SubmitCongressTrendNoTrades`, `SubmitCongressTrendFetchError` (5 `SubmitCongressTrendResult` variants), `PollCongressTrendResult` — `application/congress/types.ts`. 도메인 타입(`Chamber`, `CongressTradeSide`, `CongressOwner`, `CongressSentiment`, `CongressTrendDirection`, `CongressAmountRange`, `CongressTrade`, `RawCongressTrade`, `CongressTradeStats`, `CongressTrendResponse`) 및 Provider 인터페이스(`CongressTradesProvider`) 포함. Congress 데이터는 공개 정보이므로 usage limit·BYOK 게이팅 없음 — `SubmitCongressTrendOptions`에 `usage`/`userApiKey` 필드 없음.
 
 **인터페이스** — `CacheProvider`, `ChatTokenStore`, `FmpConfig`, Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn` — 모두 `domain/ports/aiProvider.ts`), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입. (PR7에서 `SkillsProvider`·`JobStatus`·`JobMeta`·`UserTierRepository`는 `@internal` 전환 — 유지 public에서 도달 불가.)
 
@@ -548,3 +561,4 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 | 2026-06-15 | **재무제표 분석 도메인 추가 (PR #153).** Tier 1 use-cases 3종(`submitFinancialsAnalysis`, `pollFinancialsAnalysis`, `cancelFinancialsAnalysisJob`), Tier 2 헬퍼 4종(`computeFinancialsScorecard`, `normalizeFinancialsAnalysisResponse`, `normalizeFinancialsSnapshot`, `buildFinancialsAnalysisPrompt`), Tier 3/4 Port 인터페이스 1종(`FinancialStatementsProvider`), Tier 4 use-case 타입(`SubmitFinancialsAnalysisOptions`, `SubmitFinancialsAnalysisResult` 및 6개 variant, `PollFinancialsAnalysisResult`), Tier 4 도메인 타입(`FinancialsAnalysisResponse`, `FinancialsAxisAssessment`, `FinancialsAxis`, `FinancialsSentiment`, `FinancialsScorecard`, `AxisScore`, `FinancialSignal`, `ScoreMetric`, `FinancialsGrade`, `FinancialsSnapshot`, `NormalizeFinancialsSnapshotInput`, `StatementPeriod`)을 인벤토리에 등록. `OverallDependencyInputs.financialsScorecard?` 필드 추가 — 동기 주입 방식으로 4-axis 폴링 없이 overall 프롬프트에 직접 포함. Tier 1 22 → 30. 0.x semver minor bump. |
 | 2026-06-15 | **PR #153 round 3 수정.** (1) `scoreQuality` 마진 트렌드 버그 수정: `<=` → `<`로 교정해 동치(netMargin unchanged)를 `noContribution`으로 처리 — 이전에는 `margin_contraction` 시그널 + −15 패널티가 잘못 적용됨. (2) `FinancialSignalType` named union 도입: `FinancialSignal.type: string` → `FinancialSignalType` literal union(14종) — `src/index.ts`·`src/index.client.ts` 양 entrypoint에 추가 등록. (3) `index.client.ts`에 financials 순수 도메인 exports 추가: 함수 4종(`computeFinancialsScorecard`·`normalizeFinancialsAnalysisResponse`·`normalizeFinancialsSnapshot`·`buildFinancialsAnalysisPrompt`)·포트 인터페이스(`FinancialStatementsProvider`)·도메인 타입 전체 미러링(options 패턴 동일). 서버전용 `submit/poll/cancel` 미노출. |
 | 2026-06-15 | **PR #153 round 4 수정 (컨벤션 스윕).** (1) **camelCase**: `FinancialGrowthRow.epsgrowth` → `epsGrowth`(전 참조·픽스처 갱신). FMP wire 필드 `epsgrowth`→`epsGrowth` 매핑은 siglens 어댑터(별도 레포)에서 처리. (2) **인라인 union 추출**: `FinancialSignalDirection`(`'positive'|'negative'|'neutral'`)·`ScoreMetricUnit`(`'pct'|'ratio'|'usd'|'score'`)을 named/export type으로 추출 — 양 entrypoint에 추가. (3) **인라인 객체 추출(reachability)**: `FinancialsScorecard.composite`의 인라인 객체를 `FinancialsCompositeScore`로 추출·export(MISTAKES #9). (4) **필드 JSDoc**: 신규 financials Tier-4 public 타입 전 필드에 1줄 영문 JSDoc 추가. (5) **선언적 const**: `pollFinancialsAnalysis`의 `let result`+try/catch → IIFE 태그드 결과 + `const`(MISTAKES 코딩 패러다임). fundamental sibling은 let+try/catch 유지(의도된 분기). (6) **매직 넘버 추출**: 스코어카드 밴드/등급/시그널 임계값·델타를 module-level const(밴드 lookup table 포함)로 추출 — 동작 불변(2939 테스트 green). PUBLIC_API 인벤토리에 Row 타입 6종 + 신규 타입 3종 등록. 0.x semver minor bump. |
+| 2026-06-16 | **의회 거래 동향 분석 도메인 추가 (PR #155).** Tier 1 use-cases 3종(`submitCongressTrend`, `pollCongressTrend`, `cancelCongressTrendJob`), Tier 2 헬퍼 4종(`normalizeCongressTrades`, `summarizeCongressTrades`, `buildCongressTrendPrompt`, `normalizeCongressTrendResponse`), Tier 4 Port 인터페이스 1종(`CongressTradesProvider` — `domain/ports/congressTradesProvider.ts`), Tier 4 도메인 타입 10종(`Chamber`, `CongressTradeSide`, `CongressOwner`, `CongressSentiment`, `CongressTrendDirection`, `CongressAmountRange`, `CongressTrade`, `RawCongressTrade`, `CongressTradeStats`, `CongressTrendResponse` — `domain/types.ts`), Tier 4 use-case 타입(`SubmitCongressTrendOptions`, `SubmitCongressTrendResult` 및 5개 variant: `SubmitCongressTrendCached`, `SubmitCongressTrendSubmitted`, `SubmitCongressTrendMissNoTrigger`, `SubmitCongressTrendNoTrades`, `SubmitCongressTrendFetchError`, `PollCongressTrendResult` — `application/congress/types.ts`)을 인벤토리에 등록. Congress 데이터는 공개 정보이므로 usage limit·BYOK 게이팅 없음. Tier 1 30 → 33. 0.x semver minor bump. |

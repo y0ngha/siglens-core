@@ -155,7 +155,10 @@ describe('pollCongressTrend 함수는', () => {
             expect(mockFireAndForget).toHaveBeenCalled();
             expect(mockCacheSet).toHaveBeenCalledWith(
                 mockMeta.cacheKey,
-                expect.anything(),
+                expect.objectContaining({
+                    summaryKo: '상·하원 순매수 우세',
+                    overallSentiment: 'bullish',
+                }),
                 CONGRESS_CACHE_TTL_SECONDS
             );
         });
