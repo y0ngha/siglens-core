@@ -2513,6 +2513,18 @@ export type NewsCategory =
     | 'product'
     | 'other';
 
+/**
+ * Source feed a market-news article belongs to. Distinct from {@link NewsCategory}
+ * (the LLM content-classification): this is the *page bucket* of the `/news/[category]`
+ * hub, derived from the FMP feed the article came from, not from its content.
+ */
+export type NewsFeedCategory =
+    | 'general'
+    | 'stock'
+    | 'crypto'
+    | 'forex'
+    | 'articles';
+
 /** Raw news article fetched from the data provider before translation or analysis. */
 export interface NewsItem {
     id: string;

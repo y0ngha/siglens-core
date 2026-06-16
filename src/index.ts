@@ -496,6 +496,7 @@ export type {
     NewsAnalysisResponse,
     NewsCardAnalysis,
     NewsCategory,
+    NewsFeedCategory,
     NewsImpact,
     NewsItem,
     NewsSentiment,
