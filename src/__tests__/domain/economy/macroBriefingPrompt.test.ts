@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildMacroBriefingPrompt } from '@/domain/economy/macroBriefingPrompt';
-import type { EconomySnapshot } from '@/domain/economy/types';
+import type { EconomySnapshot } from '@/domain/types';
 
 const SNAP: EconomySnapshot = {
     indicators: [
