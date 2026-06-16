@@ -75,7 +75,7 @@ export interface SubmitCongressTrendNoTrades {
 export interface SubmitCongressTrendFetchError {
     status: 'error';
     code: 'fetch_failed';
-    error?: string;
+    error: string;
 }
 
 /** Union of all possible outcomes from `submitCongressTrend`. */

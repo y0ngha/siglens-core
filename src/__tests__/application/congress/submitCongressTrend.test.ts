@@ -295,6 +295,7 @@ describe('submitCongressTrend 함수는', () => {
             expect(result.status).toBe('error');
             if (result.status === 'error') {
                 expect(result.code).toBe('fetch_failed');
+                expect(result.error).toContain('FMP API error');
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
