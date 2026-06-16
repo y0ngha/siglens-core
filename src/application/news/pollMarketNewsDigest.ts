@@ -12,9 +12,11 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
-function tryNormalizeNews(
-    raw: unknown
-): { ok: true; result: NewsAnalysisResponse } | { ok: false; error: unknown } {
+type TryNormalizeNewsResult =
+    | { ok: true; result: NewsAnalysisResponse }
+    | { ok: false; error: unknown };
+
+function tryNormalizeNews(raw: unknown): TryNormalizeNewsResult {
     try {
         return { ok: true, result: normalizeNewsAnalysisResponse(raw) };
     } catch (error) {
@@ -37,7 +39,7 @@ function tryNormalizeNews(
  * Mirrors {@link pollNewsAnalysis}, adapted to the category-digest context
  * (no symbol in log messages; no per-company fallback sentinel). Unlike
  * {@link pollNewsAnalysis}, an empty or sparse digest result is still cached —
- * do not add an empty-skip guard here; the console.warn for empty/sparse digest results (currentDriverKo === '' && keyEventsKo.length === 0) is intentional — callers rely on the cached result being present even when sparse.
+ * callers rely on the cached entry being present even when sparse.
  *
  * @param jobId   - The `jobId` returned by {@link submitMarketNewsDigest}.
  * @param options - Optional background-task hooks.
@@ -89,6 +91,8 @@ export async function pollMarketNewsDigest(
     }
     const result = normalized.result;
 
+    // Do not skip empty/sparse digest results — callers rely on the cached entry being
+    // present even when currentDriverKo === '' && keyEventsKo.length === 0.
     if (result.currentDriverKo === '' && result.keyEventsKo.length === 0) {
         console.warn(
             '[PollMarketNewsDigest] Empty digest; raw payload likely malformed',

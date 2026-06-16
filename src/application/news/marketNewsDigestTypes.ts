@@ -18,7 +18,7 @@ import type {
 export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     /** Feed-category bucket (e.g. `'crypto'`, `'general'`). */
     category: NewsFeedCategory;
-    /** Human Korean label shown to the model, e.g. 'US Cryptocurrency'. */
+    /** Human-readable Korean category label shown to the model (e.g. `'미국 암호화폐'`). */
     categoryLabel: string;
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;

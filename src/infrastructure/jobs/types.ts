@@ -1,4 +1,4 @@
-import type { Timeframe } from '@/domain/types';
+import type { NewsFeedCategory, Timeframe } from '@/domain/types';
 
 /** @internal Lifecycle status of an analysis or briefing job. */
 export type JobStatus = 'processing' | 'done' | 'error';
@@ -21,7 +21,7 @@ export interface JobMeta {
      * `macro`). Distinct from {@link symbol}, which is reserved for U.S. stock
      * ticker analyses. Not set on symbol-scoped analysis jobs.
      */
-    category?: string;
+    category?: NewsFeedCategory;
     /**
      * Bar resolution. Required for technical-analysis jobs and overall
      * analysis jobs (both are timeframe-bound). Omitted for fundamental and

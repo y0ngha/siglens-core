@@ -119,7 +119,7 @@ describe('submitMarketNewsDigest 함수는', () => {
         expect(mockFireAndForget).not.toHaveBeenCalled();
     });
 
-    it('force=true면 캐시 히트도 무시하고 dispatch한다', async () => {
+    it('force=true면 캐시 히트를 무시하고 worker dispatch + submitted를 반환한다', async () => {
         // Cache has a result — without force this would return 'cached'.
         mockCacheGet.mockResolvedValue(mockCachedResult);
 
@@ -139,18 +139,21 @@ describe('submitMarketNewsDigest 함수는', () => {
         }
         expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
         expect(mockFireAndForget).toHaveBeenCalledTimes(1);
-        // Sanity-check: the same setup without force returns 'cached'.
-        vi.clearAllMocks();
+    });
+
+    it('동일한 캐시 히트 상태에서 force를 끄면 cached를 반환한다', async () => {
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(mockCachedResult);
         mockSetJobMeta.mockResolvedValue(undefined);
         mockFireAndForget.mockImplementation(() => undefined);
+
         const rCached = await submitMarketNewsDigest({
             category: 'crypto',
             categoryLabel: '미국 암호화폐',
             modelId: 'gemini-2.5-flash',
             news: [ITEM],
         });
+
         expect(rCached.status).toBe('cached');
         expect(mockFireAndForget).not.toHaveBeenCalled();
     });
