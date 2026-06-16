@@ -3082,3 +3082,81 @@ export interface NormalizeFinancialsSnapshotInput {
     /** Raw cash-flow-growth rows from the provider adapter. */
     cashFlowGrowth: CashFlowGrowthRow[];
 }
+
+// ─── Congress trades (의회 거래) ─────────────────────────────────
+export type Chamber = 'senate' | 'house';
+export type CongressTradeSide = 'buy' | 'sell' | 'unknown';
+export type CongressOwner = 'self' | 'spouse' | 'joint' | 'child' | 'unknown';
+export type CongressSentiment = 'bullish' | 'neutral' | 'bearish';
+export type CongressTrendDirection =
+    | 'net_buying'
+    | 'net_selling'
+    | 'balanced'
+    | 'no_trades';
+
+export interface CongressAmountRange {
+    min: number | null; // USD, 하한
+    max: number | null; // USD, 상한 (상한 없는 구간이면 null)
+    label: string; // FMP 원문 ("$1,001 - $15,000")
+}
+
+export interface CongressTrade {
+    chamber: Chamber;
+    firstName: string;
+    lastName: string;
+    office: string; // 표시용 의원명 (FMP office 필드)
+    district: string; // 상원=주(WV), 하원=선거구; 빈 문자열 가능
+    owner: CongressOwner;
+    side: CongressTradeSide;
+    rawType: string; // FMP 원본 type 보존 ("Sale (Partial)" 등)
+    amount: CongressAmountRange;
+    assetType: string; // "Stock" | "Stock Option" | ...
+    assetDescription: string;
+    transactionDate: string; // yyyy-mm-dd
+    disclosureDate: string; // yyyy-mm-dd
+    link: string;
+    capitalGainsOver200USD: boolean;
+}
+
+/** @internal FMP wire 단건 (느슨한 unknown — 어댑터/정규화 입력) */
+export interface RawCongressTrade {
+    senateID?: unknown;
+    disclosureDate?: unknown;
+    transactionDate?: unknown;
+    firstName?: unknown;
+    lastName?: unknown;
+    office?: unknown;
+    district?: unknown;
+    owner?: unknown;
+    assetDescription?: unknown;
+    assetType?: unknown;
+    type?: unknown;
+    amount?: unknown;
+    capitalGainsOver200USD?: unknown;
+    link?: unknown;
+}
+
+export interface CongressTradeStats {
+    buyCount: number;
+    sellCount: number;
+    unknownCount: number;
+    direction: CongressTrendDirection;
+    uniqueMembers: number;
+    senateCount: number;
+    houseCount: number;
+}
+
+export interface CongressTrendResponse {
+    summaryKo: string;
+    notableMembersKo: string[];
+    riskNoteKo: string;
+    overallSentiment: CongressSentiment;
+}
+
+/** @internal LLM raw 응답 (정규화 전) */
+export interface RawCongressTrendResponse {
+    summaryKo?: unknown;
+    notableMembersKo?: unknown;
+    riskNoteKo?: unknown;
+    overallSentiment?: unknown;
+}
