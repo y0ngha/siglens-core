@@ -12,6 +12,25 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
+type NormalizeResult =
+    | { ok: true; value: CongressTrendResponse }
+    | { ok: false };
+
+/**
+ * Normalize the raw worker result, returning a tagged result object so the
+ * success value can bind to a `const` (no `let` reassignment across the
+ * try/catch). The congress normalizer defends every field but the JSON parse
+ * inside it can throw on a non-JSON string — that case routes to `{ ok: false }`.
+ */
+function tryNormalizeCongressTrendResult(raw: unknown): NormalizeResult {
+    try {
+        return { ok: true, value: normalizeCongressTrendResponse(raw) };
+    } catch (error) {
+        console.error('[PollCongress] Normalization failed:', error);
+        return { ok: false };
+    }
+}
+
 /**
  * Poll the result of a congress trend analysis job submitted via
  * {@link submitCongressTrend}.
@@ -76,20 +95,9 @@ export async function pollCongressTrend(
     }
 
     // The worker stores the raw LLM response as a JSON string or object.
-    // Normalize it through the congress response normalizer. The normalization
-    // is wrapped in an IIFE that returns a tagged result object so the success
-    // value can bind to a `const` (no `let` reassignment across the try/catch).
-    const normalizeResult = (() => {
-        try {
-            return {
-                ok: true as const,
-                value: normalizeCongressTrendResponse(rawResult),
-            };
-        } catch (error) {
-            console.error('[PollCongress] Normalization failed:', error);
-            return { ok: false as const };
-        }
-    })();
+    // Normalize it through the congress response normalizer via the module-level
+    // tagged-result helper so the success value can bind to a `const`.
+    const normalizeResult = tryNormalizeCongressTrendResult(rawResult);
 
     if (!normalizeResult.ok) {
         cleanupInBackground(jobId, '[PollCongress]', options);

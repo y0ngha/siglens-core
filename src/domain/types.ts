@@ -3121,7 +3121,13 @@ export interface CongressTrade {
     capitalGainsOver200USD: boolean;
 }
 
-/** @internal FMP wire 단건 (느슨한 unknown — 어댑터/정규화 입력) */
+/**
+ * FMP wire 단건 (느슨한 unknown — 어댑터/정규화 입력).
+ *
+ * Public Tier-4 API: the {@link CongressTradesProvider.getTrades} port returns
+ * `Promise<RawCongressTrade[]>`, so consumers implementing an adapter must
+ * import this type. Exported from the package index.
+ */
 export interface RawCongressTrade {
     senateID?: unknown;
     disclosureDate?: unknown;

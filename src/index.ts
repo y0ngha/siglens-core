@@ -458,7 +458,6 @@ export type {
     RawCongressTrade,
     CongressTradeStats,
     CongressTrendResponse,
-    RawCongressTrendResponse,
     StatementPeriod,
     FinancialsSentiment,
     FinancialsAxis,

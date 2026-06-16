@@ -1,11 +1,6 @@
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
-import type {
-    CongressTrendResponse,
-    ModelId,
-    Tier,
-    TierConfig,
-} from '@/domain/types';
+import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
 
 // ─────────────────────────────────────────
 // Submit
@@ -34,8 +29,6 @@ export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
      * no gating is applied.
      */
     tier?: Tier;
-    /** Tier configuration override, mainly for tests and controlled rollouts. */
-    tierConfig?: TierConfig;
     /**
      * When `true`, skip enqueueing a new analysis job on cache miss and return
      * `{ status: 'miss_no_trigger' }` instead. Cache hits are unaffected.

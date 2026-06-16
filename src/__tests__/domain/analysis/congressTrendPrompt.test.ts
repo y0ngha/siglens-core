@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
-import type { CongressTrade, CongressTradeStats } from '@/domain/types';
+import type { CongressTrade, CongressTradeStats, Skill } from '@/domain/types';
 
 const stats: CongressTradeStats = {
     buyCount: 3,
@@ -46,5 +46,29 @@ describe('buildCongressTrendPrompt', () => {
         const p = buildCongressTrendPrompt('AAPL', trades, stats, []);
         expect(p).toContain('summaryKo');
         expect(p).toContain('overallSentiment');
+    });
+    it('congress 카테고리 스킬만 주입하고 비-congress는 제외한다', () => {
+        const skills = [
+            {
+                name: 'CongressInsiderGuide',
+                description: '',
+                indicators: [],
+                confidenceWeight: 1,
+                content: 'CONGRESS_SKILL_CONTENT',
+                category: 'congress',
+            },
+            {
+                name: 'TechSkill',
+                description: '',
+                indicators: [],
+                confidenceWeight: 1,
+                content: 'TECH_SKILL_CONTENT',
+                category: 'reversal_bullish',
+            },
+        ] as unknown as Skill[];
+        const p = buildCongressTrendPrompt('AAPL', trades, stats, skills);
+        expect(p).toContain('CongressInsiderGuide');
+        expect(p).toContain('CONGRESS_SKILL_CONTENT');
+        expect(p).not.toContain('TECH_SKILL_CONTENT');
     });
 });
