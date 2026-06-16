@@ -29,6 +29,7 @@ const SKILL_CATEGORIES: readonly SkillCategory[] = [
     'neutral',
     'fundamental',
     'news',
+    'congress',
 ];
 
 const parseYamlValue = (value: string): unknown => {

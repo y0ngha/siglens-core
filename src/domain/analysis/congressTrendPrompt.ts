@@ -5,15 +5,12 @@ import type { CongressTrade, CongressTradeStats, Skill } from '@/domain/types';
 /**
  * Filter skills to the congress category.
  *
- * `SkillCategory` does not include a `'congress'` variant yet, so this filter
- * will gracefully yield an empty array until the category is added to the
- * catalog — matching the same fail-open pattern used by `filterFundamentalSkills`
+ * Only skills with `category === 'congress'` are injected; all others are
+ * filtered out — matching the same pattern used by `filterFundamentalSkills`
  * in `financialsPrompt.ts`.
  */
 function filterCongressSkills(skills: readonly Skill[]): Skill[] {
-    // Cast to string comparison so the filter compiles today and picks up
-    // 'congress' automatically once the SkillCategory union is extended.
-    return skills.filter(s => (s.category as string) === 'congress');
+    return skills.filter(s => s.category === 'congress');
 }
 
 /** Format up to 50 trades as a bullet list for LLM consumption. */
@@ -36,8 +33,7 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * includes a disclosure-lag (~45 day) caveat to prevent overstatement.
  *
  * Only skills with `category === 'congress'` are injected; all others are
- * filtered out (gracefully no-ops today since the category does not yet
- * exist in `SkillCategory`).
+ * filtered out.
  *
  * Returns a fully self-contained English prompt string; the JSON output schema
  * specifies Korean text for fields labelled `Ko`.

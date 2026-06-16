@@ -586,7 +586,8 @@ export type SkillCategory =
     | 'continuation_bearish'
     | 'neutral'
     | 'fundamental'
-    | 'news';
+    | 'news'
+    | 'congress';
 
 /** Chart-rendering directive carried by a skill (color, label, style). */
 export interface SkillChartDisplay {
