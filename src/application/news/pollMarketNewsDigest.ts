@@ -12,6 +12,16 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
+function tryNormalizeNews(
+    raw: unknown
+): { ok: true; result: NewsAnalysisResponse } | { ok: false; error: unknown } {
+    try {
+        return { ok: true, result: normalizeNewsAnalysisResponse(raw) };
+    } catch (error) {
+        return { ok: false, error };
+    }
+}
+
 /**
  * Poll the result of a market-news category digest job submitted via
  * {@link submitMarketNewsDigest}.
@@ -69,14 +79,16 @@ export async function pollMarketNewsDigest(
     }
 
     // Normalize the raw LLM response through the shared news response normalizer.
-    let result: NewsAnalysisResponse;
-    try {
-        result = normalizeNewsAnalysisResponse(rawResult);
-    } catch (error) {
-        console.error('[PollMarketNewsDigest] Normalization failed:', error);
+    const normalized = tryNormalizeNews(rawResult);
+    if (!normalized.ok) {
+        console.error(
+            '[PollMarketNewsDigest] Normalization failed:',
+            normalized.error
+        );
         cleanupInBackground(jobId, '[PollMarketNewsDigest]', options);
         return { status: 'error', error: 'Invalid response from worker' };
     }
+    const result = normalized.result;
 
     if (result.currentDriverKo === '' && result.keyEventsKo.length === 0) {
         console.warn(

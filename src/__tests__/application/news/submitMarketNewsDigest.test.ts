@@ -156,6 +156,37 @@ describe('submitMarketNewsDigest 함수는', () => {
         expect(mockFireAndForget).not.toHaveBeenCalled();
     });
 
+    it('캐시 프로바이더가 null이면 cache.get을 호출하지 않고 submitted를 반환한다', async () => {
+        mockCreateCacheProvider.mockReturnValue(null);
+
+        const r = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+        });
+
+        expect(r.status).toBe('submitted');
+        expect(mockCacheGet).not.toHaveBeenCalled();
+        expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
+        expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+    });
+
+    it('cache.get이 throw하면 에러를 삼키고 submitted를 반환한다', async () => {
+        mockCacheGet.mockRejectedValue(new Error('Redis connection refused'));
+
+        const r = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+        });
+
+        expect(r.status).toBe('submitted');
+        expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
+        expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+    });
+
     it('사람 + 캐시 미스면 worker dispatch + submitted를 반환한다', async () => {
         mockCacheGet.mockResolvedValue(null);
 

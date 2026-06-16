@@ -146,6 +146,18 @@ describe('pollMarketNewsDigest 함수는', () => {
         }
     });
 
+    it('done이고 cacheKey가 있어도 캐시 프로바이더가 null이면 fireAndForget을 호출하지 않는다', async () => {
+        mockCreateCacheProvider.mockReturnValue(null);
+        mockGetJobStatus.mockResolvedValueOnce('done');
+        mockGetJobResult.mockResolvedValueOnce(rawNewsJson);
+        mockGetJobMeta.mockResolvedValueOnce(mockMeta);
+
+        const result = await pollMarketNewsDigest('job-null-cache');
+
+        expect(result.status).toBe('done');
+        expect(mockFireAndForget).not.toHaveBeenCalled();
+    });
+
     it('cacheKey가 없으면 캐시에 쓰지 않는다', async () => {
         mockGetJobStatus.mockResolvedValueOnce('done');
         mockGetJobResult.mockResolvedValueOnce(rawNewsJson);

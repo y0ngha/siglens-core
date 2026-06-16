@@ -97,7 +97,10 @@ export async function submitMarketNewsDigest(
                 return { status: 'cached', result };
             }
         } catch (error) {
-            console.error('[submitMarketNewsDigest] Cache read failed:', error);
+            console.error(
+                '[submitMarketNewsDigest] Cache lookup or normalization failed:',
+                error
+            );
         }
     }
 
