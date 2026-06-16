@@ -120,6 +120,42 @@ describe('submitMarketNewsDigest 함수는', () => {
         expect(mockFireAndForget).not.toHaveBeenCalled();
     });
 
+    it('force=true면 캐시 히트도 무시하고 dispatch한다', async () => {
+        // Cache has a result — without force this would return 'cached'.
+        mockCacheGet.mockResolvedValue(mockCachedResult);
+
+        const r = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+            force: true,
+        });
+
+        // force bypasses the cache hit → dispatch must have fired.
+        expect(r.status).toBe('submitted');
+        if (r.status === 'submitted') {
+            expect(typeof r.jobId).toBe('string');
+            expect(r.jobId.length).toBeGreaterThan(0);
+        }
+        expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
+        expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+        // Sanity-check: the same setup without force returns 'cached'.
+        vi.clearAllMocks();
+        mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
+        mockCacheGet.mockResolvedValue(mockCachedResult);
+        mockSetJobMeta.mockResolvedValue(undefined);
+        mockFireAndForget.mockImplementation(() => undefined);
+        const rCached = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+        });
+        expect(rCached.status).toBe('cached');
+        expect(mockFireAndForget).not.toHaveBeenCalled();
+    });
+
     it('사람 + 캐시 미스면 worker dispatch + submitted를 반환한다', async () => {
         mockCacheGet.mockResolvedValue(null);
 

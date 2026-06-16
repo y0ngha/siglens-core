@@ -24,8 +24,10 @@ import {
  *   {@link normalizeNewsAnalysisResponse} and cached under the pre-computed
  *   `cacheKey` from job metadata before being returned.
  *
- * Mirrors {@link pollNewsAnalysis} exactly, adapted to the category-digest
- * context (no symbol in log messages; no per-company fallback sentinel).
+ * Mirrors {@link pollNewsAnalysis}, adapted to the category-digest context
+ * (no symbol in log messages; no per-company fallback sentinel). Unlike
+ * {@link pollNewsAnalysis}, an empty or sparse digest result is still cached —
+ * do not add an empty-skip guard here; the warn log at line ~79 is intentional.
  *
  * @param jobId   - The `jobId` returned by {@link submitMarketNewsDigest}.
  * @param options - Optional background-task hooks.
