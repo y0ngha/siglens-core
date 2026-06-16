@@ -19,6 +19,13 @@ function toSide(rawType: string): CongressTradeSide {
 
 function toOwner(raw: unknown): CongressOwner {
     const o = asString(raw).trim().toLowerCase();
+    // (OWNERS as readonly string[]): `Array.prototype.includes` is typed against the
+    // array's element type, so `OWNERS` (typed as `readonly CongressOwner[]`) would
+    // reject the arbitrary `string` value `o`. Widening to `readonly string[]` lets
+    // the check accept any string.
+    // (o as CongressOwner): after `includes` returns true, runtime guarantees `o` is
+    // one of the four `CongressOwner` literals, but TypeScript cannot narrow `string`
+    // through `includes`. The cast bridges runtime guarantee to compile-time type.
     return (OWNERS as readonly string[]).includes(o)
         ? (o as CongressOwner)
         : 'unknown';

@@ -47,6 +47,10 @@ describe('buildCongressTrendPrompt', () => {
         expect(p).toContain('summaryKo');
         expect(p).toContain('overallSentiment');
     });
+    it('trades가 빈 배열이면 프롬프트에 No-trades 플레이스홀더를 포함한다', () => {
+        const p = buildCongressTrendPrompt('AAPL', [], stats, []);
+        expect(p).toContain('No trades available');
+    });
     it('congress 카테고리 스킬만 주입하고 비-congress는 제외한다', () => {
         const skills = [
             {

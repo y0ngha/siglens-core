@@ -2,6 +2,9 @@
 
 import type { CongressTrade, CongressTradeStats, Skill } from '@/domain/types';
 
+/** Maximum number of trades included in the LLM prompt body. */
+const MAX_TRADES_IN_PROMPT = 50;
+
 /**
  * Filter skills to the congress category.
  *
@@ -13,11 +16,11 @@ function filterCongressSkills(skills: readonly Skill[]): Skill[] {
     return skills.filter(s => s.category === 'congress');
 }
 
-/** Format up to 50 trades as a bullet list for LLM consumption. */
+/** Format up to MAX_TRADES_IN_PROMPT trades as a bullet list for LLM consumption. */
 function formatTrades(trades: readonly CongressTrade[]): string {
     if (trades.length === 0) return '  (No trades available)';
     return trades
-        .slice(0, 50)
+        .slice(0, MAX_TRADES_IN_PROMPT)
         .map(
             t =>
                 `- ${t.chamber} | ${t.office} (${t.district}) | ${t.side} | ${t.amount.label} | ${t.assetType} | tx ${t.transactionDate} / disclosed ${t.disclosureDate}`
@@ -72,7 +75,7 @@ Amounts are disclosed as coarse dollar ranges, so statistics are COUNT-based —
 - Net direction: ${stats.direction}
 - Unique members: ${stats.uniqueMembers} (Senate: ${stats.senateCount}, House: ${stats.houseCount})
 
-## Recent Trades (newest first, max 50)
+## Recent Trades (newest first, max ${MAX_TRADES_IN_PROMPT})
 ${formatTrades(trades)}
 
 ## Domain Skills (Active)
