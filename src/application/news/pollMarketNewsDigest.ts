@@ -30,8 +30,8 @@ function tryNormalizeNews(
  * - `processing`: the worker has not finished yet. Caller should retry.
  * - `error`: the worker reported a failure, the result was missing, or the
  *   payload could not be normalized.
- * - `done`: the result is ready. The raw worker response is normalized via
- *   {@link normalizeNewsAnalysisResponse} and cached under the pre-computed
+ * - `done`: the result is ready. The raw LLM response is normalized into a
+ *   {@link NewsAnalysisResponse} and cached under the pre-computed
  *   `cacheKey` from job metadata before being returned.
  *
  * Mirrors {@link pollNewsAnalysis}, adapted to the category-digest context

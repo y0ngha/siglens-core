@@ -1,5 +1,6 @@
 import type {
     DashboardTimeframe,
+    NewsFeedCategory,
     OptionsExpirationFilter,
     StatementPeriod,
     Timeframe,
@@ -392,13 +393,13 @@ export function buildFinancialsCacheKey(
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
  *   inside `submitMarketNewsDigest`. Do not depend on this function from outside
  *   the core library.
- * @param category  - Feed-category bucket (e.g. `'crypto'`, `'general'`).
+ * @param category  - Feed-category bucket.
  * @param modelId   - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
  * @returns The cache key.
  */
 export function buildMarketNewsDigestCacheKey(
-    category: string,
+    category: NewsFeedCategory,
     modelId: string,
     inputHash: string
 ): string {

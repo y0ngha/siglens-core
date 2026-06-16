@@ -340,6 +340,9 @@ export type {
     UserApiKeyRequiredError,
 } from './application/market/types';
 export type {
+    PollMarketNewsDigestDone,
+    PollMarketNewsDigestError,
+    PollMarketNewsDigestProcessing,
     PollMarketNewsDigestResult,
     SubmitMarketNewsDigestCached,
     SubmitMarketNewsDigestMissNoTrigger,

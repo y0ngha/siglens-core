@@ -2515,8 +2515,8 @@ export type NewsCategory =
 
 /**
  * Source feed a market-news article belongs to. Distinct from {@link NewsCategory}
- * (the LLM content-classification): this is the *page bucket* of the `/news/[category]`
- * hub, derived from the FMP feed the article came from, not from its content.
+ * (the LLM content-classification): this is the news hub page bucket derived
+ * from the FMP feed the article came from, not from its content.
  */
 export type NewsFeedCategory =
     | 'general'

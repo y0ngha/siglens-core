@@ -35,6 +35,18 @@ describe('buildMarketNewsDigestPrompt 함수는', () => {
         const prompt = buildMarketNewsDigestPrompt('미국 외환', [], []);
         expect(prompt).toContain('No recent news articles');
     });
+    it('bodyKo가 null이면 Body 행을 프롬프트에 포함하지 않는다', () => {
+        const noBodyItem: EnrichedNewsItem = {
+            ...ITEM,
+            card: { ...ITEM.card, bodyKo: null },
+        };
+        const prompt = buildMarketNewsDigestPrompt(
+            '미국 암호화폐',
+            [noBodyItem],
+            []
+        );
+        expect(prompt).not.toContain('Body (KO):');
+    });
     it('news 카테고리 스킬만 주입한다', () => {
         const newsSkill: Skill = {
             name: 'macro-lens',

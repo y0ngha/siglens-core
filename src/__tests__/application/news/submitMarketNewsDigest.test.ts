@@ -203,6 +203,16 @@ describe('submitMarketNewsDigest 함수는', () => {
         }
         expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
         expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+        expect(mockFetch).toHaveBeenCalledWith(
+            expect.stringContaining('/analyze'),
+            expect.objectContaining({
+                method: 'POST',
+                headers: expect.objectContaining({
+                    'X-Worker-Secret': expect.any(String),
+                }),
+                body: expect.stringContaining('"analysisType":"news"'),
+            })
+        );
         // setJobMeta must carry the cacheKey so pollMarketNewsDigest can write-through.
         expect(mockSetJobMeta).toHaveBeenCalledWith(
             expect.any(String),

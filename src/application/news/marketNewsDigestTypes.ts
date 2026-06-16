@@ -18,7 +18,7 @@ import type {
 export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     /** Feed-category bucket (e.g. `'crypto'`, `'general'`). */
     category: NewsFeedCategory;
-    /** Human Korean label shown to the model, e.g. '미국 암호화폐'. */
+    /** Human Korean label shown to the model, e.g. 'US Cryptocurrency'. */
     categoryLabel: string;
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;
@@ -71,8 +71,22 @@ export type SubmitMarketNewsDigestResult =
     | SubmitMarketNewsDigestMissNoTrigger
     | SubmitMarketNewsDigestNoNewsError;
 
-/** Outcome of {@link pollMarketNewsDigest}: still processing, finished, or errored. */
+/** Outcome of {@link pollMarketNewsDigest}: still processing. */
+export interface PollMarketNewsDigestProcessing {
+    status: 'processing';
+}
+/** Outcome of {@link pollMarketNewsDigest}: result is ready. */
+export interface PollMarketNewsDigestDone {
+    status: 'done';
+    result: NewsAnalysisResponse;
+}
+/** Outcome of {@link pollMarketNewsDigest}: worker reported a failure or normalization error. */
+export interface PollMarketNewsDigestError {
+    status: 'error';
+    error: string;
+}
+/** Union of all possible outcomes from {@link pollMarketNewsDigest}. */
 export type PollMarketNewsDigestResult =
-    | { status: 'processing' }
-    | { status: 'done'; result: NewsAnalysisResponse }
-    | { status: 'error'; error: string };
+    | PollMarketNewsDigestProcessing
+    | PollMarketNewsDigestDone
+    | PollMarketNewsDigestError;
