@@ -4,7 +4,6 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
-vi.mock('@/infrastructure/skills/loader');
 
 import { submitMarketNewsDigest } from '@/application/news/submitMarketNewsDigest';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -204,12 +203,11 @@ describe('submitMarketNewsDigest 함수는', () => {
         }
         expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
         expect(mockFireAndForget).toHaveBeenCalledTimes(1);
-        // setJobMeta must carry the cacheKey so pollMarketNewsDigest can write-through;
-        // `symbol` is repurposed to carry the category string (JobMeta has no category field).
+        // setJobMeta must carry the cacheKey so pollMarketNewsDigest can write-through.
         expect(mockSetJobMeta).toHaveBeenCalledWith(
             expect.any(String),
             expect.objectContaining({
-                symbol: 'crypto',
+                category: 'crypto',
                 modelId: 'gemini-2.5-flash',
                 cacheKey: expect.any(String),
             })

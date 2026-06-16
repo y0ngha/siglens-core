@@ -113,11 +113,8 @@ export async function submitMarketNewsDigest(
     const prompt = buildMarketNewsDigestPrompt(categoryLabel, news, skills);
     const jobId = crypto.randomUUID();
 
-    // `symbol` is repurposed here to carry the category string — JobMeta requires
-    // a symbol field, and the category is the closest semantic equivalent for
-    // a market-wide (non-symbol-scoped) digest job.
     await setJobMeta(jobId, {
-        symbol: category,
+        category,
         modelId,
         cacheKey,
     });

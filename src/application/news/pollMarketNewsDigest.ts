@@ -37,7 +37,7 @@ function tryNormalizeNews(
  * Mirrors {@link pollNewsAnalysis}, adapted to the category-digest context
  * (no symbol in log messages; no per-company fallback sentinel). Unlike
  * {@link pollNewsAnalysis}, an empty or sparse digest result is still cached —
- * do not add an empty-skip guard here; the warn log at line ~79 is intentional.
+ * do not add an empty-skip guard here; the console.warn for empty/sparse digest results (currentDriverKo === '' && keyEventsKo.length === 0) is intentional — callers rely on the cached result being present even when sparse.
  *
  * @param jobId   - The `jobId` returned by {@link submitMarketNewsDigest}.
  * @param options - Optional background-task hooks.
@@ -71,8 +71,7 @@ export async function pollMarketNewsDigest(
         console.error('[PollMarketNewsDigest] Result not found', {
             jobId,
             hasMeta: meta !== null,
-            // `symbol` carries the category string (see submitMarketNewsDigest).
-            category: meta?.symbol,
+            category: meta?.category,
         });
         cleanupInBackground(jobId, '[PollMarketNewsDigest]', options);
         return { status: 'error', error: 'Result not found' };

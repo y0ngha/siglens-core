@@ -21,6 +21,8 @@ function formatNewsItem(item: EnrichedNewsItem, index: number): string {
 }
 
 /**
+ * @internal
+ *
  * Build the category-level market-news digest prompt. Unlike buildNewsAnalysisPrompt
  * (one company's news), this summarises the market-wide flow of a single feed category.
  * `categoryLabel` is the human Korean label (e.g. '미국 암호화폐'); the bucket sentinel

@@ -9,8 +9,19 @@ export type JobStatus = 'processing' | 'done' | 'error';
  * the bars again.
  */
 export interface JobMeta {
-    /** U.S. equity ticker, or the sentinel `market` for market-briefing jobs. */
-    symbol: string;
+    /**
+     * U.S. stock ticker (e.g. `AAPL`) or the sentinel `market` for
+     * market-briefing jobs. For technical, fundamental, news, overall, and
+     * market-briefing analysis jobs only. Do not use for market-news feed-bucket
+     * digests — use {@link category} instead.
+     */
+    symbol?: string;
+    /**
+     * Feed-bucket identifier for market-news category digest jobs (e.g. `crypto`,
+     * `macro`). Distinct from {@link symbol}, which is reserved for U.S. stock
+     * ticker analyses. Not set on symbol-scoped analysis jobs.
+     */
+    category?: string;
     /**
      * Bar resolution. Required for technical-analysis jobs and overall
      * analysis jobs (both are timeframe-bound). Omitted for fundamental and

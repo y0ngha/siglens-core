@@ -34,7 +34,7 @@ const rawNewsJson = JSON.stringify({
 });
 
 const mockMeta = {
-    symbol: 'crypto', // category repurposed as symbol
+    category: 'crypto',
     modelId: 'gemini-2.5-flash',
     cacheKey: 'v1:analysis:market-news:crypto:gemini-2.5-flash:abc123',
 };
@@ -163,7 +163,7 @@ describe('pollMarketNewsDigest 함수는', () => {
         mockGetJobResult.mockResolvedValueOnce(rawNewsJson);
         // meta without cacheKey
         mockGetJobMeta.mockResolvedValueOnce({
-            symbol: 'crypto',
+            category: 'crypto',
             modelId: 'gemini-2.5-flash',
         });
 
