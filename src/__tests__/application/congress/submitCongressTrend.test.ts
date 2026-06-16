@@ -50,8 +50,9 @@ const senateRow = {
     capitalGainsOver200USD: 'false',
 };
 
+const mockGetTrades = vi.fn();
 const mockDataProvider: CongressTradesProvider = {
-    getTrades: vi.fn(),
+    getTrades: mockGetTrades,
 };
 
 /** Build a typed trade fixture to assert against (mirrors normalizeCongressTrades output). */
@@ -106,9 +107,8 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         // Default: senate returns one row, house returns none → 1 trade total.
-        mockDataProvider.getTrades.mockImplementation(
-            (_symbol: string, chamber: string) =>
-                Promise.resolve(chamber === 'senate' ? [senateRow] : [])
+        mockGetTrades.mockImplementation((_symbol: string, chamber: string) =>
+            Promise.resolve(chamber === 'senate' ? [senateRow] : [])
         );
     });
 
@@ -284,9 +284,7 @@ describe('submitCongressTrend 함수는', () => {
         });
 
         it('provider가 throw하면 fetch_failed error를 반환한다', async () => {
-            mockDataProvider.getTrades.mockRejectedValueOnce(
-                new Error('FMP API error')
-            );
+            mockGetTrades.mockRejectedValueOnce(new Error('FMP API error'));
 
             const result = await submitCongressTrend({
                 symbol: 'AAPL',
@@ -306,7 +304,7 @@ describe('submitCongressTrend 함수는', () => {
     describe('거래가 0건일 때', () => {
         it('no_trades를 반환하고 잡을 등록하지 않으며 워커를 호출하지 않는다', async () => {
             mockCacheGet.mockResolvedValueOnce(null);
-            mockDataProvider.getTrades.mockResolvedValue([]);
+            mockGetTrades.mockResolvedValue([]);
 
             const result = await submitCongressTrend({
                 symbol: 'NONE',
