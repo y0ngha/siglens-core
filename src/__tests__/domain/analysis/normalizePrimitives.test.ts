@@ -5,6 +5,7 @@ import {
     asEnum,
     asIsoDate,
     asNumber,
+    asNumberOrNull,
     asObject,
     asOptionalEnum,
     asString,
@@ -206,5 +207,25 @@ describe('asIsoDate', () => {
     it('returns null for non-finite numeric inputs (NaN / Infinity)', () => {
         expect(asIsoDate(NaN)).toBeNull();
         expect(asIsoDate(Infinity)).toBeNull();
+    });
+});
+
+describe('asNumberOrNull', () => {
+    it('returns finite numbers as-is (zero, negative, decimal)', () => {
+        expect(asNumberOrNull(3.63)).toBe(3.63);
+        expect(asNumberOrNull(0)).toBe(0);
+        expect(asNumberOrNull(-1.5)).toBe(-1.5);
+    });
+
+    it('returns null for non-number inputs (undefined / null / string)', () => {
+        expect(asNumberOrNull(undefined)).toBeNull();
+        expect(asNumberOrNull(null)).toBeNull();
+        expect(asNumberOrNull('3.63')).toBeNull();
+    });
+
+    it('returns null for non-finite numbers (NaN / Infinity)', () => {
+        expect(asNumberOrNull(NaN)).toBeNull();
+        expect(asNumberOrNull(Infinity)).toBeNull();
+        expect(asNumberOrNull(-Infinity)).toBeNull();
     });
 });

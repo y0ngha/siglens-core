@@ -17,6 +17,11 @@ export { submitBriefing } from './application/market/submitBriefing';
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
+// Economy (macro) briefing — mirrors market briefing for the /economy page
+export { submitMacroBriefing } from './application/economy/submitMacroBriefing';
+export { pollMacroBriefing } from './application/economy/pollMacroBriefing';
+export { peekMacroBriefingCache } from './application/economy/peekMacroBriefingCache';
+
 // Application background-task options (used by market / dashboard use-cases)
 export type { BackgroundTaskOptions } from './application/types';
 
@@ -81,6 +86,14 @@ export { computeFinancialsScorecard } from './domain/analysis/financialsScorecar
 export { normalizeFinancialsAnalysisResponse } from './domain/analysis/normalizeFinancials';
 export { normalizeFinancialsSnapshot } from './domain/analysis/normalizeFinancialsSnapshot';
 export { buildFinancialsAnalysisPrompt } from './domain/analysis/financialsPrompt';
+
+// Economy domain building blocks (normalization + 2s10s spread)
+export { normalizeEconomicIndicatorSeries } from './domain/economy/normalizeEconomicIndicators';
+export {
+    normalizeTreasuryRates,
+    computeYieldSpread,
+} from './domain/economy/normalizeTreasuryRates';
+export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
 
 // Model spec helpers
 export {
@@ -147,6 +160,30 @@ export {
 // Single source of truth shared by siglens UI, cache, and analysis gating.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
 export type { EtSessionStatus } from './domain/types';
+
+// Economy (macro) domain types — /economy page snapshot + briefing
+export type {
+    CalendarImpact,
+    EconomicIndicatorPoint,
+    EconomicIndicatorSeries,
+    TreasuryRateSnapshot,
+    EconomicCalendarEvent,
+    EconomySnapshot,
+    MacroRegime,
+    MacroBriefingResponse,
+} from './domain/economy/types';
+
+// Economy (macro) application result types — produced by submit/poll, so they
+// live in the application layer (Architecture #0), mirroring financials.
+export type {
+    SubmitMacroBriefingResult,
+    SubmitMacroBriefingCached,
+    SubmitMacroBriefingSubmitted,
+    PollMacroBriefingResult,
+    PollMacroBriefingProcessing,
+    PollMacroBriefingError,
+    PollMacroBriefingDone,
+} from './application/economy/types';
 
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
