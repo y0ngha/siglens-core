@@ -40,6 +40,11 @@ export { cancelFinancialsAnalysisJob } from './application/financials/cancelFina
 export { pollFinancialsAnalysis } from './application/financials/pollFinancialsAnalysis';
 export { submitFinancialsAnalysis } from './application/financials/submitFinancialsAnalysis';
 
+// Congress trend analysis use-cases
+export { cancelCongressTrendJob } from './application/congress/cancelCongressTrendJob';
+export { pollCongressTrend } from './application/congress/pollCongressTrend';
+export { submitCongressTrend } from './application/congress/submitCongressTrend';
+
 // News analysis use-cases
 export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
 export { pollNewsAnalysis } from './application/news/pollNewsAnalysis';
@@ -327,6 +332,16 @@ export type {
     SubmitFinancialsAnalysisResult,
     SubmitFinancialsAnalysisSubmitted,
 } from './application/financials/types';
+export type {
+    PollCongressTrendResult,
+    SubmitCongressTrendCached,
+    SubmitCongressTrendFetchError,
+    SubmitCongressTrendMissNoTrigger,
+    SubmitCongressTrendNoTrades,
+    SubmitCongressTrendOptions,
+    SubmitCongressTrendResult,
+    SubmitCongressTrendSubmitted,
+} from './application/congress/types';
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,

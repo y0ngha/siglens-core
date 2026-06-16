@@ -2651,7 +2651,8 @@ export type AnalysisType =
     | 'newsCard'
     | 'fundamental'
     | 'options'
-    | 'financials';
+    | 'financials'
+    | 'congress';
 
 /**
  * @internal

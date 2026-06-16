@@ -382,6 +382,66 @@ export function buildFinancialsCacheKey(
 }
 
 /**
+ * Prompt-template version for the congressional-trade trend analysis cache keys.
+ *
+ * Parallel to {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} but scoped to the
+ * congress analysis type so its prompt-template changes invalidate
+ * independently. Bump whenever the congress system/user prompt template changes
+ * in a way that would make previously cached results stale.
+ *
+ * @internal
+ */
+export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/** @internal TTL for congressional-trade trend analysis cache results. Default: 24 hours. */
+export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
+
+/**
+ * Build the Redis key for a cached congressional-trade trend analysis result.
+ *
+ * Format: `{version}:analysis:congress:<symbol>:<modelId>:<promptVersion>`.
+ *
+ * Mirrors {@link buildFundamentalCacheKey} (no `period` axis — congress trend
+ * has a single shape per symbol) and uses {@link CONGRESS_PROMPT_TEMPLATE_VERSION}
+ * so the congress analysis type can be invalidated separately from the others.
+ *
+ * The key is intentionally free of an input hash so the cache lookup can happen
+ * before any provider fetch — avoiding the senate/house FMP calls when a warm
+ * result already exists. Freshness is governed by the 24-hour TTL
+ * ({@link CONGRESS_CACHE_TTL_SECONDS}), the schema-version prefix
+ * ({@link CACHE_KEY_SCHEMA_VERSION}), and the trailing prompt-version segment.
+ *
+ * The optional `skillFingerprint` segment folds the active skill catalog into
+ * the key (see {@link buildAnalysisCacheKey}); appended only when supplied so
+ * callers that do not load skills keep the legacy key shape.
+ *
+ * @internal
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param skillFingerprint - Optional hash of the skill catalog's selection
+ *   metadata. When provided, appended as the final key segment.
+ * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash');
+ * // → 'v1:analysis:congress:AAPL:gemini-2.5-flash:p1'
+ * buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash', 'sk1');
+ * // → 'v1:analysis:congress:AAPL:gemini-2.5-flash:p1:sk1'
+ * ```
+ */
+export function buildCongressTrendCacheKey(
+    symbol: string,
+    modelId: string,
+    skillFingerprint?: string
+): string {
+    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:congress:${symbol}:${modelId}:${CONGRESS_PROMPT_TEMPLATE_VERSION}`;
+    return skillFingerprint !== undefined
+        ? `${base}:${skillFingerprint}`
+        : base;
+}
+
+/**
  * Build the Redis key for a cached news analysis result.
  *
  * Format: `analysis:news:<symbol>:<modelId>:<inputHash>`.
