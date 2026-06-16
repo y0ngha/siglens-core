@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { CongressTrade } from '@/domain/types';
+import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import { normalizeCongressTrendResponse } from '@/domain/analysis/normalizeCongressTrend';
 import { CONGRESS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
@@ -49,7 +50,7 @@ const senateRow = {
     capitalGainsOver200USD: 'false',
 };
 
-const mockDataProvider = {
+const mockDataProvider: CongressTradesProvider = {
     getTrades: vi.fn(),
 };
 

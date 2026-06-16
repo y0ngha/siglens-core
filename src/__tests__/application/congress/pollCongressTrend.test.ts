@@ -13,6 +13,7 @@ import {
     getJobMeta,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { CONGRESS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { fireAndForget, cleanupInBackground } from '@/application/background';
 
 const mockGetJobStatus = getJobStatus as Mock;
@@ -147,6 +148,11 @@ describe('pollCongressTrend 함수는', () => {
             await pollCongressTrend('job-cache');
 
             expect(mockFireAndForget).toHaveBeenCalled();
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                mockMeta.cacheKey,
+                expect.anything(),
+                CONGRESS_CACHE_TTL_SECONDS
+            );
         });
 
         it('meta.cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
