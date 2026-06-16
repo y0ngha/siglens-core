@@ -3082,3 +3082,19 @@ export interface NormalizeFinancialsSnapshotInput {
     /** Raw cash-flow-growth rows from the provider adapter. */
     cashFlowGrowth: CashFlowGrowthRow[];
 }
+
+// =============================================================================
+// Economy (macro) feature-local types — re-exported here so consumers continue
+// to use the canonical `@/domain/types` import path (domain/CLAUDE.md §
+// "Subdirectory `types.ts` exception", mirroring the options pattern above).
+// =============================================================================
+export type {
+    CalendarImpact,
+    EconomicIndicatorPoint,
+    EconomicIndicatorSeries,
+    TreasuryRateSnapshot,
+    EconomicCalendarEvent,
+    EconomySnapshot,
+    MacroRegime,
+    MacroBriefingResponse,
+} from './economy/types';

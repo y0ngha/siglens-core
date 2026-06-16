@@ -8,6 +8,11 @@ export function asNumber(v: unknown): number | undefined {
     return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
+/** @internal Coerces an unknown value to a finite number or null (for domain models that prefer null over undefined). */
+export function asNumberOrNull(v: unknown): number | null {
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
 /** @internal Coerces an unknown value to a boolean with a fallback. */
 export function asBoolean(v: unknown, fallback = false): boolean {
     return typeof v === 'boolean' ? v : fallback;
