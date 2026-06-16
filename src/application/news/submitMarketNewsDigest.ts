@@ -19,7 +19,7 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
-const LOG_TAG = '[submitMarketNewsDigest]' as const;
+const LOG_TAG = '[SubmitMarketNewsDigest]' as const;
 
 /**
  * Maximum time to wait for the worker to accept the market-news digest job.

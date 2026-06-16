@@ -187,4 +187,15 @@ describe('pollMarketNewsDigest 함수는', () => {
         expect(result.status).toBe('done');
         expect(mockFireAndForget).not.toHaveBeenCalled();
     });
+
+    it('meta가 null이고 rawResult가 유효해도 done을 반환하며 write-through는 호출되지 않는다', async () => {
+        mockGetJobStatus.mockResolvedValueOnce('done');
+        mockGetJobResult.mockResolvedValueOnce(rawNewsJson);
+        mockGetJobMeta.mockResolvedValueOnce(null);
+
+        const result = await pollMarketNewsDigest('job-null-meta');
+
+        expect(result.status).toBe('done');
+        expect(mockFireAndForget).not.toHaveBeenCalled();
+    });
 });

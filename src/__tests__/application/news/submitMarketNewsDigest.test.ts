@@ -191,6 +191,39 @@ describe('submitMarketNewsDigest 함수는', () => {
         expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
     });
 
+    it('force=true여도 skipEnqueueIfMiss=true가 우선하여 miss_no_trigger를 반환한다', async () => {
+        // cache hit setup — force=true alone would return 'submitted' (dispatch fires)
+        mockCacheGet.mockResolvedValue(mockCachedResult);
+
+        const r = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+            force: true,
+            skipEnqueueIfMiss: true,
+        });
+
+        expect(r.status).toBe('miss_no_trigger');
+        expect(mockSetJobMeta).not.toHaveBeenCalled();
+        expect(mockFireAndForget).not.toHaveBeenCalled();
+    });
+
+    it('cache provider가 null이고 skipEnqueueIfMiss=true이면 miss_no_trigger를 반환한다', async () => {
+        mockCreateCacheProvider.mockReturnValue(null);
+
+        const r = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+            skipEnqueueIfMiss: true,
+        });
+
+        expect(r.status).toBe('miss_no_trigger');
+        expect(mockCacheGet).not.toHaveBeenCalled();
+    });
+
     it('사람 + 캐시 미스면 worker dispatch + submitted를 반환한다', async () => {
         mockCacheGet.mockResolvedValue(null);
 
