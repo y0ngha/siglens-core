@@ -38,4 +38,23 @@ describe('normalizeCongressTrendResponse', () => {
         });
         expect(r.notableMembersKo).toEqual(['ok']);
     });
+    it('비-객체(숫자) 입력은 전부 기본값으로 폴백', () => {
+        // LLM이 숫자 같은 비-객체를 반환하면 asObject(42) → null → ?? {} 폴백
+        const r = normalizeCongressTrendResponse(42);
+        expect(r).toEqual({
+            summaryKo: '',
+            notableMembersKo: [],
+            riskNoteKo: '',
+            overallSentiment: 'neutral',
+        });
+    });
+    it('객체가 아닌 JSON 문자열(배열)도 기본값으로 폴백', () => {
+        // extractJsonFromLlmResponse('[1,2,3]') → [1,2,3](배열)
+        // asObject([1,2,3]) → null(Array.isArray guard) → ?? {} 폴백
+        const r = normalizeCongressTrendResponse('[1,2,3]');
+        expect(r.summaryKo).toBe('');
+        expect(r.notableMembersKo).toEqual([]);
+        expect(r.riskNoteKo).toBe('');
+        expect(r.overallSentiment).toBe('neutral');
+    });
 });
