@@ -12,6 +12,8 @@ import {
     getJobStatus,
 } from '@/infrastructure/jobs/queue';
 
+const LOG_TAG = '[PollMarketNewsDigest]' as const;
+
 type TryNormalizeNewsResult =
     | { ok: true; result: NewsAnalysisResponse }
     | { ok: false; error: unknown };
@@ -46,6 +48,14 @@ function tryNormalizeNews(raw: unknown): TryNormalizeNewsResult {
  * @returns The current poll outcome — see {@link PollMarketNewsDigestResult}.
  *
  * @see submitMarketNewsDigest
+ *
+ * @example
+ * ```ts
+ * const polled = await pollMarketNewsDigest(jobId);
+ * if (polled.status === 'done') return polled.result;
+ * if (polled.status === 'error') throw new Error(polled.error);
+ * // 'processing' → retry after a short delay
+ * ```
  */
 export async function pollMarketNewsDigest(
     jobId: string,
@@ -59,7 +69,7 @@ export async function pollMarketNewsDigest(
 
     if (status === 'error') {
         const error = await getJobError(jobId);
-        cleanupInBackground(jobId, '[PollMarketNewsDigest]', options);
+        cleanupInBackground(jobId, LOG_TAG, options);
         return { status: 'error', error: error ?? 'Unknown error' };
     }
 
@@ -70,23 +80,20 @@ export async function pollMarketNewsDigest(
     ]);
 
     if (!rawResult) {
-        console.error('[PollMarketNewsDigest] Result not found', {
+        console.error(LOG_TAG, 'Result not found', {
             jobId,
             hasMeta: meta !== null,
             category: meta?.category,
         });
-        cleanupInBackground(jobId, '[PollMarketNewsDigest]', options);
+        cleanupInBackground(jobId, LOG_TAG, options);
         return { status: 'error', error: 'Result not found' };
     }
 
     // Normalize the raw LLM response through the shared news response normalizer.
     const normalized = tryNormalizeNews(rawResult);
     if (!normalized.ok) {
-        console.error(
-            '[PollMarketNewsDigest] Normalization failed:',
-            normalized.error
-        );
-        cleanupInBackground(jobId, '[PollMarketNewsDigest]', options);
+        console.error(LOG_TAG, 'Normalization failed:', normalized.error);
+        cleanupInBackground(jobId, LOG_TAG, options);
         return { status: 'error', error: 'Invalid response from worker' };
     }
     const result = normalized.result;
@@ -94,10 +101,9 @@ export async function pollMarketNewsDigest(
     // Do not skip empty/sparse digest results — callers rely on the cached entry being
     // present even when currentDriverKo === '' && keyEventsKo.length === 0.
     if (result.currentDriverKo === '' && result.keyEventsKo.length === 0) {
-        console.warn(
-            '[PollMarketNewsDigest] Empty digest; raw payload likely malformed',
-            { jobId }
-        );
+        console.warn(LOG_TAG, 'Empty digest; raw payload likely malformed', {
+            jobId,
+        });
     }
 
     // Cache the normalized result if a pre-computed cache key is available.
@@ -108,17 +114,14 @@ export async function pollMarketNewsDigest(
                 cache
                     .set(meta.cacheKey, result, NEWS_CACHE_TTL_SECONDS)
                     .catch(error =>
-                        console.error(
-                            '[PollMarketNewsDigest] Cache write failed:',
-                            error
-                        )
+                        console.error(LOG_TAG, 'Cache write failed:', error)
                     ),
                 options
             );
         }
     }
 
-    cleanupInBackground(jobId, '[PollMarketNewsDigest]', options);
+    cleanupInBackground(jobId, LOG_TAG, options);
 
     return { status: 'done', result };
 }

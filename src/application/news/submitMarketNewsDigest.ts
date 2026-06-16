@@ -19,6 +19,8 @@ import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
+const LOG_TAG = '[submitMarketNewsDigest]' as const;
+
 /**
  * Maximum time to wait for the worker to accept the market-news digest job.
  * Fire-and-forget worker enqueue — 30s caps stuck requests; the worker has its own job-level timeout.
@@ -70,6 +72,21 @@ function hashMarketNewsDigestInput(
  * @returns The submission outcome.
  *
  * @see pollMarketNewsDigest
+ *
+ * @example
+ * ```ts
+ * const result = await submitMarketNewsDigest({
+ *   category: 'crypto',
+ *   categoryLabel: '미국 암호화폐',
+ *   modelId: 'gemini-2.5-flash',
+ *   news: enrichedItems,
+ * });
+ * if (result.status === 'cached') return result.result;
+ * if (result.status === 'submitted') {
+ *   const polled = await pollMarketNewsDigest(result.jobId);
+ *   if (polled.status === 'done') return polled.result;
+ * }
+ * ```
  */
 export async function submitMarketNewsDigest(
     options: SubmitMarketNewsDigestOptions
@@ -101,7 +118,8 @@ export async function submitMarketNewsDigest(
             }
         } catch (error) {
             console.error(
-                '[submitMarketNewsDigest] Cache lookup or normalization failed:',
+                LOG_TAG,
+                'Cache lookup or normalization failed:',
                 error
             );
         }
@@ -140,7 +158,7 @@ export async function submitMarketNewsDigest(
         }),
         signal: AbortSignal.timeout(SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS),
     }).catch(error => {
-        console.error('[submitMarketNewsDigest] Worker request failed:', error);
+        console.error(LOG_TAG, 'Worker request failed:', error);
     });
     fireAndForget(dispatch, options);
 

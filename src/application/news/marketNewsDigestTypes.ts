@@ -32,12 +32,14 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     /**
      * When `true`, skip enqueueing a new job on cache miss and return
      * `{ status: 'miss_no_trigger' }`. Cache hits are unaffected.
-     * Intended for bot/crawler gating.
+     * Intended for bot/crawler gating. Takes precedence over `force`.
      */
     skipEnqueueIfMiss?: boolean;
     /**
-     * When `true`, bypass the cache and enqueue a fresh analysis regardless of
-     * whether a warm cache entry exists.
+     * When true, bypass the cache and enqueue a fresh analysis (mirrors the per-symbol
+     * pattern). NOTE: `skipEnqueueIfMiss` still takes precedence — when both `force`
+     * and `skipEnqueueIfMiss` are set, the function returns `miss_no_trigger` without
+     * dispatching a worker job (preserves the bot cost guard).
      */
     force?: boolean;
 }
