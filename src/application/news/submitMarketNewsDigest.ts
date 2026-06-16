@@ -12,15 +12,18 @@ import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestP
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { NEWS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
-import { MS_PER_MINUTE } from '@/domain/constants/time';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import { buildMarketNewsDigestCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
-/** Maximum time to wait for the worker to accept the market-news digest job. */
-const SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+/**
+ * Maximum time to wait for the worker to accept the market-news digest job.
+ * Fire-and-forget worker enqueue — 30s caps stuck requests; the worker has its own job-level timeout.
+ */
+const SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS = 30 * MS_PER_SECOND;
 
 /**
  * Derive a deterministic input hash from the news article IDs and skill fingerprint.

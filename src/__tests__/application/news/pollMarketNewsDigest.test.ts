@@ -112,6 +112,21 @@ describe('pollMarketNewsDigest 함수는', () => {
         );
     });
 
+    it('캐시 쓰기가 실패해도 에러를 삼키고 done을 반환하며 fireAndForget은 호출된다', async () => {
+        // Cache write rejects — the .catch() inside the fireAndForget promise swallows it
+        mockCacheSet.mockRejectedValue(new Error('Redis write failed'));
+        mockGetJobStatus.mockResolvedValueOnce('done');
+        mockGetJobResult.mockResolvedValueOnce(rawNewsJson);
+        mockGetJobMeta.mockResolvedValueOnce(mockMeta);
+
+        const result = await pollMarketNewsDigest('job-cache-fail');
+
+        // Error is swallowed via .catch() on the cache.set promise — caller still gets 'done'
+        expect(result.status).toBe('done');
+        // fireAndForget was called with the (failing) cache promise
+        expect(mockFireAndForget).toHaveBeenCalled();
+    });
+
     it('정규화 실패 시 error를 반환한다', async () => {
         mockGetJobStatus.mockResolvedValueOnce('done');
         // Pass invalid JSON that will fail normalizeNewsAnalysisResponse

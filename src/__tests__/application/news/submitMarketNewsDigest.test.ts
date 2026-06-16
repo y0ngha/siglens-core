@@ -141,23 +141,6 @@ describe('submitMarketNewsDigest 함수는', () => {
         expect(mockFireAndForget).toHaveBeenCalledTimes(1);
     });
 
-    it('동일한 캐시 히트 상태에서 force를 끄면 cached를 반환한다', async () => {
-        mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
-        mockCacheGet.mockResolvedValue(mockCachedResult);
-        mockSetJobMeta.mockResolvedValue(undefined);
-        mockFireAndForget.mockImplementation(() => undefined);
-
-        const rCached = await submitMarketNewsDigest({
-            category: 'crypto',
-            categoryLabel: '미국 암호화폐',
-            modelId: 'gemini-2.5-flash',
-            news: [ITEM],
-        });
-
-        expect(rCached.status).toBe('cached');
-        expect(mockFireAndForget).not.toHaveBeenCalled();
-    });
-
     it('캐시 프로바이더가 null이면 cache.get을 호출하지 않고 submitted를 반환한다', async () => {
         mockCreateCacheProvider.mockReturnValue(null);
 
@@ -187,6 +170,25 @@ describe('submitMarketNewsDigest 함수는', () => {
         expect(r.status).toBe('submitted');
         expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
         expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+    });
+
+    it('worker fetch가 throw하면 에러를 삼키고 submitted를 반환하며 setJobMeta는 호출된다', async () => {
+        // cache miss → proceed to dispatch
+        mockCacheGet.mockResolvedValue(null);
+        // worker network failure — the .catch() inside submitMarketNewsDigest swallows this
+        mockFetch.mockRejectedValue(new Error('Network error'));
+
+        const r = await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+        });
+
+        // Error is swallowed via the .catch() on the fetch promise — caller still gets 'submitted'
+        expect(r.status).toBe('submitted');
+        // setJobMeta is called synchronously (await) BEFORE the fire-and-forget dispatch
+        expect(mockSetJobMeta).toHaveBeenCalledTimes(1);
     });
 
     it('사람 + 캐시 미스면 worker dispatch + submitted를 반환한다', async () => {
