@@ -24,16 +24,17 @@ function toOwner(raw: unknown): CongressOwner {
         : 'unknown';
 }
 
+function parseAmountValue(s: string): number | null {
+    const n = Number(s.replace(/[$,]/g, ''));
+    return Number.isFinite(n) ? n : null;
+}
+
 function toAmount(raw: unknown): CongressAmountRange {
     const label = asString(raw);
     const nums = label.match(/\$[\d,]+/g);
-    const parse = (s: string): number | null => {
-        const n = Number(s.replace(/[$,]/g, ''));
-        return Number.isFinite(n) ? n : null;
-    };
     if (!nums || nums.length === 0) return { min: null, max: null, label };
-    const min = parse(nums[0]);
-    const max = nums.length >= 2 ? parse(nums[1]) : null;
+    const min = parseAmountValue(nums[0]);
+    const max = nums.length >= 2 ? parseAmountValue(nums[1]) : null;
     return { min, max, label };
 }
 

@@ -125,6 +125,11 @@ describe('pollCongressTrend 함수는', () => {
                     'Jane Doe 상원의원',
                 ]);
             }
+            expect(mockCleanupInBackground).toHaveBeenCalledWith(
+                'job-done',
+                '[PollCongress]',
+                undefined
+            );
         });
 
         it('malformed JSON이면 error를 반환한다 (typed-safe)', async () => {

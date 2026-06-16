@@ -3087,37 +3087,62 @@ export interface NormalizeFinancialsSnapshotInput {
 }
 
 // ─── Congress trades ─────────────────────────────────
+/** Legislative chamber that recorded the trade. */
 export type Chamber = 'senate' | 'house';
+/** Normalized side classification for a congressional trade. */
 export type CongressTradeSide = 'buy' | 'sell' | 'unknown';
+/** Beneficial owner of a disclosed trade (self, spouse, joint, child, or unknown). */
 export type CongressOwner = 'self' | 'spouse' | 'joint' | 'child' | 'unknown';
+/** Overall AI verdict on aggregate congressional activity for a symbol. */
 export type CongressSentiment = 'bullish' | 'neutral' | 'bearish';
+/** Net flow direction derived from buy vs sell counts across all disclosed trades. */
 export type CongressTrendDirection =
     | 'net_buying'
     | 'net_selling'
     | 'balanced'
     | 'no_trades';
 
+/** USD range disclosed under the STOCK Act bands. */
 export interface CongressAmountRange {
-    min: number | null; // USD lower bound
-    max: number | null; // USD upper bound; null for open-ended ranges (e.g. "$50M+")
-    label: string; // Original FMP amount string (e.g. "$1,001 - $15,000")
+    /** Lower bound in USD; null when the label has no parseable amount. */
+    min: number | null;
+    /** Upper bound in USD; null for open-ended ranges (e.g. "$50M+"). */
+    max: number | null;
+    /** Original FMP amount string (e.g. "$1,001 - $15,000"). */
+    label: string;
 }
 
+/** Domain-normalized congressional trade record. */
 export interface CongressTrade {
+    /** Legislative chamber. */
     chamber: Chamber;
+    /** Member first name. */
     firstName: string;
+    /** Member last name. */
     lastName: string;
-    office: string; // Display name (FMP "office" field)
-    district: string; // State abbreviation for senate (e.g. "WV"); may be empty
+    /** Display name (FMP "office" field). */
+    office: string;
+    /** State abbreviation for senate (e.g. "WV"); may be empty for house rows. */
+    district: string;
+    /** Beneficial owner of the trade. */
     owner: CongressOwner;
+    /** Normalized side classification. */
     side: CongressTradeSide;
-    rawType: string; // Preserved FMP "type" value (e.g. "Sale (Partial)")
+    /** Preserved FMP "type" value (e.g. "Sale (Partial)"). */
+    rawType: string;
+    /** Parsed USD range with the original label preserved. */
     amount: CongressAmountRange;
-    assetType: string; // e.g. "Stock", "Stock Option"
+    /** Asset type label (e.g. "Stock", "Stock Option"). */
+    assetType: string;
+    /** Asset description as disclosed by the member. */
     assetDescription: string;
-    transactionDate: string; // yyyy-mm-dd
-    disclosureDate: string; // yyyy-mm-dd
+    /** Transaction date (yyyy-mm-dd). */
+    transactionDate: string;
+    /** Disclosure date (yyyy-mm-dd). */
+    disclosureDate: string;
+    /** Source disclosure document URL. */
     link: string;
+    /** Whether capital gains exceeded $200 USD on this disclosure. */
     capitalGainsOver200USD: boolean;
 }
 
@@ -3145,20 +3170,33 @@ export interface RawCongressTrade {
     link?: unknown;
 }
 
+/** Count-based statistics summarizing a normalized congress trade set. */
 export interface CongressTradeStats {
+    /** Count of trades classified as buy. */
     buyCount: number;
+    /** Count of trades classified as sell. */
     sellCount: number;
+    /** Count of trades whose side could not be classified. */
     unknownCount: number;
+    /** Net flow direction derived from buy vs sell counts. */
     direction: CongressTrendDirection;
+    /** Number of distinct member offices represented. */
     uniqueMembers: number;
+    /** Count of senate-chamber trades. */
     senateCount: number;
+    /** Count of house-chamber trades. */
     houseCount: number;
 }
 
+/** Normalized AI summary of a symbol's congressional trade activity. */
 export interface CongressTrendResponse {
+    /** Korean one-paragraph summary of net activity. */
     summaryKo: string;
+    /** Korean labels for members worth highlighting. */
     notableMembersKo: string[];
+    /** Korean note on risks or caveats (e.g. disclosure lag). */
     riskNoteKo: string;
+    /** Overall AI sentiment verdict. */
     overallSentiment: CongressSentiment;
 }
 

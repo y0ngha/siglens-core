@@ -184,6 +184,20 @@ describe('submitCongressTrend 함수는', () => {
             expect(result.status).toBe('submitted');
             expect(mockDataProvider.getTrades).toHaveBeenCalled();
         });
+
+        it('캐시 프로바이더가 null이면 캐시 조회를 건너뛰고 제출한다', async () => {
+            mockCreateCacheProvider.mockReturnValueOnce(null);
+
+            const result = await submitCongressTrend({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockFireAndForget).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('캐시 미스 + 거래가 있을 때', () => {
@@ -265,6 +279,38 @@ describe('submitCongressTrend 함수는', () => {
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
             expect(body.responseSchema).toBeDefined();
             expect(body.tier).toBe(DEFAULT_TIER);
+        });
+
+        it('options.tier가 지정되면 worker payload에 그대로 전달된다', async () => {
+            await submitCongressTrend({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tier: 'pro',
+            });
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.tier).toBe('pro');
+        });
+
+        it('skillsDegraded=true이면 job meta에 포함한다', async () => {
+            mockLoadSkillsCached.mockResolvedValue({
+                skills: [],
+                skillsDegraded: true,
+            });
+
+            await submitCongressTrend({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+            });
+
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ skillsDegraded: true })
+            );
         });
 
         it('정규화된 trades가 프롬프트에 반영된다 (sanity: 의원명 포함)', async () => {

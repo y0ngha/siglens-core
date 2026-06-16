@@ -45,21 +45,22 @@ type ProviderFetchResult =
     | SubmitCongressTrendFetchError;
 
 /**
- * Fetch senate + house trades in parallel (alongside the skill catalog) and
- * normalize them into the unified domain model. Returns `fetch_failed` on any
- * infrastructure error — an empty `trades` array is NOT an error (0건 = 정상);
- * the caller's `no_trades` guard handles that case.
+ * Fetch senate + house trades in parallel and merge with the already-loaded
+ * skill catalog. Returns `fetch_failed` on any provider error — an empty
+ * `trades` array is NOT an error (0건 = 정상); the caller's `no_trades` guard
+ * handles that case. The skill catalog is loaded once by the caller and passed
+ * in to avoid a redundant memoized fetch.
  */
 async function fetchProviderData(
     dataProvider: CongressTradesProvider,
     symbol: string,
-    limit: number
+    limit: number,
+    skillsResult: { skills: readonly Skill[]; skillsDegraded: boolean }
 ): Promise<ProviderFetchResult> {
     try {
-        const [senate, house, skillsResult] = await Promise.all([
+        const [senate, house] = await Promise.all([
             dataProvider.getTrades(symbol, 'senate', limit),
             dataProvider.getTrades(symbol, 'house', limit),
-            loadSkillsCached(),
         ]);
 
         const trades = normalizeCongressTrades(senate, house);
@@ -71,10 +72,7 @@ async function fetchProviderData(
             skillsDegraded: skillsResult.skillsDegraded ? true : undefined,
         };
     } catch (error) {
-        console.error(
-            '[submitCongressTrend] Provider or skills fetch failed:',
-            error
-        );
+        console.error('[submitCongressTrend] Provider fetch failed:', error);
         return { status: 'error', code: 'fetch_failed', error: String(error) };
     }
 }
@@ -110,13 +108,13 @@ export async function submitCongressTrend(
     const limit = options.limit ?? DEFAULT_LIMIT;
 
     // Fold the skill-catalog fingerprint into the key so a gating/frontmatter
-    // change busts the cache. loadSkillsCached is memoized, so the catalog
-    // fetchProviderData loads on a miss is the same one hashed here.
-    const { skills: fingerprintSkills } = await loadSkillsCached();
+    // change busts the cache. Load once and reuse for the provider-fetch path
+    // so we don't double-call the (memoized) skill loader.
+    const skillsResult = await loadSkillsCached();
     const cacheKey = buildCongressTrendCacheKey(
         symbol,
         modelId,
-        hashSkillCatalog(fingerprintSkills)
+        hashSkillCatalog(skillsResult.skills)
     );
     const cache = createCacheProvider();
 
@@ -140,7 +138,12 @@ export async function submitCongressTrend(
         return { status: 'miss_no_trigger' };
     }
 
-    const providerData = await fetchProviderData(dataProvider, symbol, limit);
+    const providerData = await fetchProviderData(
+        dataProvider,
+        symbol,
+        limit,
+        skillsResult
+    );
     if (providerData.status === 'error') return providerData;
     const { trades, skills, skillsDegraded } = providerData;
 

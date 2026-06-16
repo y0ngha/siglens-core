@@ -27,19 +27,32 @@ function directionOf(
 export function summarizeCongressTrades(
     trades: readonly CongressTrade[]
 ): CongressTradeStats {
-    const buyCount = trades.filter(t => t.side === 'buy').length;
-    const sellCount = trades.filter(t => t.side === 'sell').length;
-    const unknownCount = trades.filter(t => t.side === 'unknown').length;
-    const senateCount = trades.filter(t => t.chamber === 'senate').length;
-    const houseCount = trades.filter(t => t.chamber === 'house').length;
-    const uniqueMembers = new Set(trades.map(t => t.office)).size;
+    const acc = trades.reduce(
+        (a, t) => {
+            if (t.side === 'buy') a.buyCount++;
+            else if (t.side === 'sell') a.sellCount++;
+            else a.unknownCount++;
+            if (t.chamber === 'senate') a.senateCount++;
+            else a.houseCount++;
+            a.members.add(t.office);
+            return a;
+        },
+        {
+            buyCount: 0,
+            sellCount: 0,
+            unknownCount: 0,
+            senateCount: 0,
+            houseCount: 0,
+            members: new Set<string>(),
+        }
+    );
     return {
-        buyCount,
-        sellCount,
-        unknownCount,
-        direction: directionOf(buyCount, sellCount, trades.length),
-        uniqueMembers,
-        senateCount,
-        houseCount,
+        buyCount: acc.buyCount,
+        sellCount: acc.sellCount,
+        unknownCount: acc.unknownCount,
+        direction: directionOf(acc.buyCount, acc.sellCount, trades.length),
+        uniqueMembers: acc.members.size,
+        senateCount: acc.senateCount,
+        houseCount: acc.houseCount,
     };
 }
