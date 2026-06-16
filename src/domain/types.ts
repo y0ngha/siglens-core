@@ -3086,7 +3086,7 @@ export interface NormalizeFinancialsSnapshotInput {
     cashFlowGrowth: CashFlowGrowthRow[];
 }
 
-// ─── Congress trades (의회 거래) ─────────────────────────────────
+// ─── Congress trades ─────────────────────────────────
 export type Chamber = 'senate' | 'house';
 export type CongressTradeSide = 'buy' | 'sell' | 'unknown';
 export type CongressOwner = 'self' | 'spouse' | 'joint' | 'child' | 'unknown';
@@ -3098,22 +3098,22 @@ export type CongressTrendDirection =
     | 'no_trades';
 
 export interface CongressAmountRange {
-    min: number | null; // USD, 하한
-    max: number | null; // USD, 상한 (상한 없는 구간이면 null)
-    label: string; // FMP 원문 ("$1,001 - $15,000")
+    min: number | null; // USD lower bound
+    max: number | null; // USD upper bound; null for open-ended ranges (e.g. "$50M+")
+    label: string; // Original FMP amount string (e.g. "$1,001 - $15,000")
 }
 
 export interface CongressTrade {
     chamber: Chamber;
     firstName: string;
     lastName: string;
-    office: string; // 표시용 의원명 (FMP office 필드)
-    district: string; // 상원=주(WV), 하원=선거구; 빈 문자열 가능
+    office: string; // Display name (FMP "office" field)
+    district: string; // State abbreviation for senate (e.g. "WV"); may be empty
     owner: CongressOwner;
     side: CongressTradeSide;
-    rawType: string; // FMP 원본 type 보존 ("Sale (Partial)" 등)
+    rawType: string; // Preserved FMP "type" value (e.g. "Sale (Partial)")
     amount: CongressAmountRange;
-    assetType: string; // "Stock" | "Stock Option" | ...
+    assetType: string; // e.g. "Stock", "Stock Option"
     assetDescription: string;
     transactionDate: string; // yyyy-mm-dd
     disclosureDate: string; // yyyy-mm-dd
@@ -3122,7 +3122,7 @@ export interface CongressTrade {
 }
 
 /**
- * FMP wire 단건 (느슨한 unknown — 어댑터/정규화 입력).
+ * Single FMP wire row (loose `unknown` fields — adapter / normalization input).
  *
  * Public Tier-4 API: the {@link CongressTradesProvider.getTrades} port returns
  * `Promise<RawCongressTrade[]>`, so consumers implementing an adapter must
@@ -3162,7 +3162,7 @@ export interface CongressTrendResponse {
     overallSentiment: CongressSentiment;
 }
 
-/** @internal LLM raw 응답 (정규화 전) */
+/** @internal Raw LLM response (before normalization). */
 export interface RawCongressTrendResponse {
     summaryKo?: unknown;
     notableMembersKo?: unknown;

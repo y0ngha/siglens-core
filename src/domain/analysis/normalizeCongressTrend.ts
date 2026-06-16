@@ -33,6 +33,13 @@ function normalizeStringArray(raw: unknown): string[] {
  * @param raw - Raw string/object from the LLM worker or cache.
  * @returns A fully-typed {@link CongressTrendResponse}.
  * @throws {SyntaxError} When the string is not valid JSON after fence removal.
+ * @example
+ * ```ts
+ * normalizeCongressTrendResponse(
+ *   '```json\n{"summaryKo":"순매수 우세","overallSentiment":"bullish"}\n```'
+ * );
+ * // → { summaryKo: '순매수 우세', notableMembersKo: [], riskNoteKo: '', overallSentiment: 'bullish' }
+ * ```
  */
 export function normalizeCongressTrendResponse(
     raw: unknown

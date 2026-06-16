@@ -16,31 +16,29 @@ function directionOf(
 }
 
 /**
- * 거래 표를 결정론적 건수 통계로 요약한다(건수 기반 우세 — amount 구간은 합산 불가).
+ * Summarize congress trades into count-based statistics.
+ *
+ * Net direction is determined by buy/sell COUNTS only — amount ranges are
+ * coarse statutory bands and cannot be summed into a notional value.
+ *
+ * @param trades - Normalized congress trades (an empty array is valid — 0 trades is a normal state, not an error).
+ * @returns Count-based statistics and net direction — see {@link CongressTradeStats}.
  */
 export function summarizeCongressTrades(
     trades: readonly CongressTrade[]
 ): CongressTradeStats {
-    let buyCount = 0,
-        sellCount = 0,
-        unknownCount = 0,
-        senateCount = 0,
-        houseCount = 0;
-    const members = new Set<string>();
-    for (const t of trades) {
-        if (t.side === 'buy') buyCount++;
-        else if (t.side === 'sell') sellCount++;
-        else unknownCount++;
-        if (t.chamber === 'senate') senateCount++;
-        else houseCount++;
-        members.add(t.office);
-    }
+    const buyCount = trades.filter(t => t.side === 'buy').length;
+    const sellCount = trades.filter(t => t.side === 'sell').length;
+    const unknownCount = trades.filter(t => t.side === 'unknown').length;
+    const senateCount = trades.filter(t => t.chamber === 'senate').length;
+    const houseCount = trades.filter(t => t.chamber === 'house').length;
+    const uniqueMembers = new Set(trades.map(t => t.office)).size;
     return {
         buyCount,
         sellCount,
         unknownCount,
         direction: directionOf(buyCount, sellCount, trades.length),
-        uniqueMembers: members.size,
+        uniqueMembers,
         senateCount,
         houseCount,
     };

@@ -9,6 +9,7 @@ import {
     BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
+    buildCongressTrendCacheKey,
     buildFinancialsCacheKey,
     buildFundamentalCacheKey,
     buildNewsCacheKey,
@@ -228,6 +229,19 @@ describe('buildFinancialsCacheKey', () => {
     });
     it('FINANCIALS_CACHE_TTL_SECONDS equals SECONDS_PER_DAY', () => {
         expect(FINANCIALS_CACHE_TTL_SECONDS).toBe(SECONDS_PER_DAY);
+    });
+});
+
+describe('buildCongressTrendCacheKey', () => {
+    it('skillFingerprint 미제공 시 base key', () => {
+        expect(buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash')).toBe(
+            'v1:analysis:congress:AAPL:gemini-2.5-flash:p1'
+        );
+    });
+    it('skillFingerprint 제공 시 suffix 추가', () => {
+        expect(
+            buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash', 'sk1')
+        ).toBe('v1:analysis:congress:AAPL:gemini-2.5-flash:p1:sk1');
     });
 });
 

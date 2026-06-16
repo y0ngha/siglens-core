@@ -2,7 +2,7 @@ import type { Chamber, RawCongressTrade } from '@/domain/types';
 
 /**
  * @port
- * 의회 거래 공시 데이터 포트.
+ * Port for congressional trade disclosure data.
  *
  * Adapters live in the consumer (e.g. siglens provides its own adapter built on
  * FMP congress endpoints) and fetch + return **raw FMP wire rows**
@@ -10,8 +10,8 @@ import type { Chamber, RawCongressTrade } from '@/domain/types';
  * (`normalizeCongressTrades(senate, house)`) maps raw → domain `CongressTrade`
  * in one place, preventing double-normalization.
  *
- * Contract: empty array when no data is available; throw ONLY on infrastructure
- * failures (0건 != 장애 — 어댑터/래퍼 계약).
+ * Contract: return an empty array when no data is available; throw ONLY on
+ * infrastructure failures. Zero trades is a normal state, not an error.
  */
 export interface CongressTradesProvider {
     /**

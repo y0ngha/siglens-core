@@ -60,9 +60,15 @@ function toTrade(raw: RawCongressTrade, chamber: Chamber): CongressTrade {
 }
 
 /**
- * FMP senate-trades + house-trades wire 배열을 통합 도메인 모델로 정규화한다.
- * 상·하원 스키마가 동일하므로 단일 매퍼 + chamber 인자를 쓴다.
- * 거래일(transactionDate) 내림차순 정렬. 절대 throw하지 않는다.
+ * Merge FMP senate and house trade rows into a unified domain model.
+ *
+ * Both chambers share the same wire schema, so a single mapper is used with an
+ * explicit `chamber` argument. Results are sorted by `transactionDate`
+ * descending (newest first). Never throws.
+ *
+ * @param senate - Raw FMP senate trade rows.
+ * @param house - Raw FMP house trade rows.
+ * @returns Merged, sorted array of normalized {@link CongressTrade} records.
  */
 export function normalizeCongressTrades(
     senate: readonly RawCongressTrade[],

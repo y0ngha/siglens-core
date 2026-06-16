@@ -100,6 +100,7 @@ async function fetchProviderData(
  *
  * @param options - Symbol, model, provider, and optional tier/skip/limit config.
  * @returns The submission outcome.
+ * @see pollCongressTrend - Polls the worker for the result of a `submitted` job.
  */
 export async function submitCongressTrend(
     options: SubmitCongressTrendOptions

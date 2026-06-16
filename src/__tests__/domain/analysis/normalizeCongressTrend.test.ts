@@ -57,4 +57,9 @@ describe('normalizeCongressTrendResponse', () => {
         expect(r.riskNoteKo).toBe('');
         expect(r.overallSentiment).toBe('neutral');
     });
+    it('malformed JSON 문자열은 SyntaxError를 throw한다', () => {
+        expect(() =>
+            normalizeCongressTrendResponse('not valid json {{{')
+        ).toThrow(SyntaxError);
+    });
 });
