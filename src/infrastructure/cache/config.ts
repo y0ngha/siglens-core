@@ -1,5 +1,6 @@
 import type {
     DashboardTimeframe,
+    NewsFeedCategory,
     OptionsExpirationFilter,
     StatementPeriod,
     Timeframe,
@@ -243,6 +244,25 @@ export function buildBriefingCacheKey(
     return `briefing:market:${dateHour}:${model}:${inputHash}`;
 }
 
+/** @internal TTL for cached macro (economy) briefings. dateHour-bucketed. */
+export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
+
+/**
+ * @internal Build the Redis key for a cached macro (economy) briefing.
+ *
+ * Format: `briefing:macro:<dateHour>:<model>:<inputHash>`. Same bucketing
+ * contract as {@link buildBriefingCacheKey} (date+hour share, model scopes,
+ * input hash folds in the indicator/calendar snapshot) but a distinct `macro:`
+ * namespace so market and economy briefings never collide.
+ */
+export function buildMacroBriefingCacheKey(
+    dateHour: string,
+    model: string,
+    inputHash: string
+): string {
+    return `briefing:macro:${dateHour}:${model}:${inputHash}`;
+}
+
 /** @internal 타임프레임+버킷+종목 목록 기준 섹터 시그널 캐시 키 빌더. */
 export function buildSectorSignalsCacheKey(
     timeframe: DashboardTimeframe,
@@ -439,6 +459,30 @@ export function buildCongressTrendCacheKey(
     return skillFingerprint !== undefined
         ? `${base}:${skillFingerprint}`
         : base;
+}
+
+/**
+ * Build the Redis key for a cached market-news category digest.
+ * Format: `{version}:analysis:market-news:${category}:${modelId}:${inputHash}`.
+ *
+ * Keyed by `category` (the {@link NewsFeedCategory} bucket), `modelId`, and
+ * `inputHash` (a deterministic hash of the article IDs and skill fingerprint)
+ * so different feed categories, models, and article sets cache independently.
+ *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitMarketNewsDigest`. Do not depend on this function from outside
+ *   the core library.
+ * @param category  - Feed-category bucket.
+ * @param modelId   - LLM model identifier.
+ * @param inputHash - Short hash of the news items used as prompt input.
+ * @returns The cache key.
+ */
+export function buildMarketNewsDigestCacheKey(
+    category: NewsFeedCategory,
+    modelId: string,
+    inputHash: string
+): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${inputHash}`;
 }
 
 /**

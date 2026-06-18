@@ -17,6 +17,11 @@ export { submitBriefing } from './application/market/submitBriefing';
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
+// Economy (macro) briefing — mirrors market briefing for the /economy page
+export { submitMacroBriefing } from './application/economy/submitMacroBriefing';
+export { pollMacroBriefing } from './application/economy/pollMacroBriefing';
+export { peekMacroBriefingCache } from './application/economy/peekMacroBriefingCache';
+
 // Application background-task options (used by market / dashboard use-cases)
 export type { BackgroundTaskOptions } from './application/types';
 
@@ -47,8 +52,10 @@ export { submitCongressTrend } from './application/congress/submitCongressTrend'
 
 // News analysis use-cases
 export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
+export { pollMarketNewsDigest } from './application/news/pollMarketNewsDigest';
 export { pollNewsAnalysis } from './application/news/pollNewsAnalysis';
 export { pollNewsCardAnalysis } from './application/news/pollNewsCardAnalysis';
+export { submitMarketNewsDigest } from './application/news/submitMarketNewsDigest';
 export { submitNewsAnalysis } from './application/news/submitNewsAnalysis';
 export { submitNewsCardAnalysis } from './application/news/submitNewsCardAnalysis';
 
@@ -92,6 +99,14 @@ export { normalizeCongressTrades } from './domain/analysis/normalizeCongressTrad
 export { summarizeCongressTrades } from './domain/analysis/summarizeCongressTrades';
 export { buildCongressTrendPrompt } from './domain/analysis/congressTrendPrompt';
 export { normalizeCongressTrendResponse } from './domain/analysis/normalizeCongressTrend';
+
+// Economy domain building blocks (normalization + 2s10s spread)
+export { normalizeEconomicIndicatorSeries } from './domain/economy/normalizeEconomicIndicators';
+export {
+    normalizeTreasuryRates,
+    computeYieldSpread,
+} from './domain/economy/normalizeTreasuryRates';
+export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
 
 // Model spec helpers
 export {
@@ -158,6 +173,30 @@ export {
 // Single source of truth shared by siglens UI, cache, and analysis gating.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
 export type { EtSessionStatus } from './domain/types';
+
+// Economy (macro) domain types — /economy page snapshot + briefing
+export type {
+    CalendarImpact,
+    EconomicIndicatorPoint,
+    EconomicIndicatorSeries,
+    TreasuryRateSnapshot,
+    EconomicCalendarEvent,
+    EconomySnapshot,
+    MacroRegime,
+    MacroBriefingResponse,
+} from './domain/economy/types';
+
+// Economy (macro) application result types — produced by submit/poll, so they
+// live in the application layer (Architecture #0), mirroring financials.
+export type {
+    SubmitMacroBriefingResult,
+    SubmitMacroBriefingCached,
+    SubmitMacroBriefingSubmitted,
+    PollMacroBriefingResult,
+    PollMacroBriefingProcessing,
+    PollMacroBriefingError,
+    PollMacroBriefingDone,
+} from './application/economy/types';
 
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
@@ -360,6 +399,18 @@ export type {
     UserApiKeyRequiredError,
 } from './application/market/types';
 export type {
+    PollMarketNewsDigestDone,
+    PollMarketNewsDigestError,
+    PollMarketNewsDigestProcessing,
+    PollMarketNewsDigestResult,
+    SubmitMarketNewsDigestCached,
+    SubmitMarketNewsDigestMissNoTrigger,
+    SubmitMarketNewsDigestNoNewsError,
+    SubmitMarketNewsDigestOptions,
+    SubmitMarketNewsDigestResult,
+    SubmitMarketNewsDigestSubmitted,
+} from './application/news/marketNewsDigestTypes';
+export type {
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
     SubmitNewsAnalysisApiKeyRequiredError,
@@ -528,6 +579,7 @@ export type {
     NewsAnalysisResponse,
     NewsCardAnalysis,
     NewsCategory,
+    NewsFeedCategory,
     NewsImpact,
     NewsItem,
     NewsSentiment,

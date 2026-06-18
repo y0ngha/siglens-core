@@ -2514,6 +2514,18 @@ export type NewsCategory =
     | 'product'
     | 'other';
 
+/**
+ * Source feed a market-news article belongs to. Distinct from {@link NewsCategory}
+ * (the LLM content-classification): this is the news hub page bucket derived
+ * from the FMP feed the article came from, not from its content.
+ */
+export type NewsFeedCategory =
+    | 'general'
+    | 'stock'
+    | 'crypto'
+    | 'forex'
+    | 'articles';
+
 /** Raw news article fetched from the data provider before translation or analysis. */
 export interface NewsItem {
     id: string;
@@ -3207,3 +3219,19 @@ export interface RawCongressTrendResponse {
     riskNoteKo?: unknown;
     overallSentiment?: unknown;
 }
+
+// =============================================================================
+// Economy (macro) feature-local types — re-exported here so consumers continue
+// to use the canonical `@/domain/types` import path (domain/CLAUDE.md §
+// "Subdirectory `types.ts` exception", mirroring the options pattern above).
+// =============================================================================
+export type {
+    CalendarImpact,
+    EconomicIndicatorPoint,
+    EconomicIndicatorSeries,
+    TreasuryRateSnapshot,
+    EconomicCalendarEvent,
+    EconomySnapshot,
+    MacroRegime,
+    MacroBriefingResponse,
+} from './economy/types';

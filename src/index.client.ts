@@ -79,6 +79,38 @@ export type {
     OptionsExpirationFilter,
 } from './domain/types';
 
+// Economy (macro) — domain helpers (server-only submit/poll/peek use-cases are
+// intentionally omitted; only pure domain functions belong on the browser
+// entry, mirroring the options/financials patterns).
+export { normalizeEconomicIndicatorSeries } from './domain/economy/normalizeEconomicIndicators';
+export {
+    normalizeTreasuryRates,
+    computeYieldSpread,
+} from './domain/economy/normalizeTreasuryRates';
+export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
+export type {
+    CalendarImpact,
+    EconomicIndicatorPoint,
+    EconomicIndicatorSeries,
+    TreasuryRateSnapshot,
+    EconomicCalendarEvent,
+    EconomySnapshot,
+    MacroRegime,
+    MacroBriefingResponse,
+} from './domain/economy/types';
+// Application result types live alongside the use-cases (Architecture #0); the
+// server-only `submitMacroBriefing`/`pollMacroBriefing` functions stay omitted
+// from the browser entry, but their pure result-type shapes are safe to expose.
+export type {
+    SubmitMacroBriefingResult,
+    SubmitMacroBriefingCached,
+    SubmitMacroBriefingSubmitted,
+    PollMacroBriefingResult,
+    PollMacroBriefingProcessing,
+    PollMacroBriefingError,
+    PollMacroBriefingDone,
+} from './application/economy/types';
+
 // Financials analysis — domain helpers (server-only submit/poll/cancel use-cases
 // are intentionally omitted; only pure domain functions belong on the browser
 // entry, mirroring the options analysis pattern above).
