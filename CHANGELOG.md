@@ -1,5 +1,45 @@
 # Changelog
 
+# [0.24.0](https://github.com/y0ngha/siglens-core/compare/v0.23.0...v0.24.0) (2026-06-18)
+
+
+### Bug Fixes
+
+* **congress:** PR [#155](https://github.com/y0ngha/siglens-core/issues/155) 리뷰 반영 — toSorted·IIFE 추출·[@internal](https://github.com/internal) 정정·export 정리·dead 필드 제거·스킬 테스트 ([181da6d](https://github.com/y0ngha/siglens-core/commit/181da6d5248c702c5c7ff136526e6e2a597dca05))
+* **congress:** PR [#155](https://github.com/y0ngha/siglens-core/issues/155) APPROVED suggestions — error required + 에러 메시지 단언 ([2cd3a7f](https://github.com/y0ngha/siglens-core/commit/2cd3a7f26a8b4c0b5de93ab6b25fac6bf0af4f98))
+* **congress:** PR [#155](https://github.com/y0ngha/siglens-core/issues/155) R2 — 공개 API 영어 JSDoc/주석 + 분기 커버리지(cacheKey·SyntaxError) + summarize 함수형 ([e01b8be](https://github.com/y0ngha/siglens-core/commit/e01b8be284dd47e98ae78dd93c267ed1072883e0))
+* **congress:** PR [#155](https://github.com/y0ngha/siglens-core/issues/155) R3 — nested fn 추출·summarize reduce·types JSDoc·skill 중복호출 제거·테스트 분기/단언 보강 ([82a94b3](https://github.com/y0ngha/siglens-core/commit/82a94b3e9da57fe7efdd73632f1fddc885a6ce94))
+* **congress:** PR [#155](https://github.com/y0ngha/siglens-core/issues/155) R4 — summarize for-of 회귀·as 캐스트 주석·MAX_TRADES_IN_PROMPT·빈 trades 테스트·browser entry congress 노출 ([fd67482](https://github.com/y0ngha/siglens-core/commit/fd67482df0762f762023aa1c02b0d188af826b29))
+* **congress:** PR [#155](https://github.com/y0ngha/siglens-core/issues/155) R5 — PUBLIC_API.md 인벤토리·테스트 BASE_OPTIONS·캐시 값 단언 강화 ([dd49de4](https://github.com/y0ngha/siglens-core/commit/dd49de45b90afeea47a090e003214ea27ad79e5e))
+* **congress:** provider port가 raw wire 반환하도록 정정(이중 정규화 제거) + poll TTL 단언 ([fb17644](https://github.com/y0ngha/siglens-core/commit/fb17644e6730a16f131f1a7721377382a664e9a9))
+* **congress:** SkillCategory에 'congress' 추가, 프롬프트 필터 캐스트 제거 ([36bfa7f](https://github.com/y0ngha/siglens-core/commit/36bfa7f6155dff1d00e4e9b2e8ba3a3a573b3552))
+* **congress:** submit 테스트 mock을 port 타입+vi.fn 참조로 정정(루트 tsc 통과) ([decdf08](https://github.com/y0ngha/siglens-core/commit/decdf0811186a3b981eccd1a4a1f69468d72e718))
+* **news:** address PR [#154](https://github.com/y0ngha/siglens-core/issues/154) R2 — [@internal](https://github.com/internal) tag, JobMeta.category, cleanup ([17cdc6b](https://github.com/y0ngha/siglens-core/commit/17cdc6b904dfcc702b38e63aebdb1bd968ec1451))
+* **news:** address PR [#154](https://github.com/y0ngha/siglens-core/issues/154) R3 — TypeDoc links, branch test, type strength, variant naming, doc cleanup ([20baff0](https://github.com/y0ngha/siglens-core/commit/20baff0cff567b743a260d1301ec16f7d78dac5b))
+* **news:** address PR [#154](https://github.com/y0ngha/siglens-core/issues/154) R4 — JSDoc example, JobMeta type, named result type, test split ([14f2c8f](https://github.com/y0ngha/siglens-core/commit/14f2c8fb743f732f52c239527a5696d399a941b7))
+* **news:** address PR [#154](https://github.com/y0ngha/siglens-core/issues/154) R5 — cover failure branches, dedup test, tighten dispatch timeout ([b0e89bc](https://github.com/y0ngha/siglens-core/commit/b0e89bcc40e3e334027b3516054514dd291ba17f))
+* **news:** address PR [#154](https://github.com/y0ngha/siglens-core/issues/154) R8 — force/skip precedence lock, LOG_TAG case, branch tests ([32f97f3](https://github.com/y0ngha/siglens-core/commit/32f97f342614a57a1d5d18723bbcf71749976001))
+* **news:** address PR [#154](https://github.com/y0ngha/siglens-core/issues/154) review — tryNormalizeNews helper, branch tests, PUBLIC_API, log msg ([67bf962](https://github.com/y0ngha/siglens-core/commit/67bf96235c7ebc8c56ded60c62105b6110185f0a))
+
+
+### Features
+
+* **congress:** 결정론적 건수 통계(summarizeCongressTrades) ([ee52485](https://github.com/y0ngha/siglens-core/commit/ee524855cbd568bde4d6f06e356f18d9071620f8))
+* **congress:** 의회 거래 도메인 타입 추가 ([c94bd7f](https://github.com/y0ngha/siglens-core/commit/c94bd7f0573d9ef3c6d35333a03f9c5a4ec887b0))
+* **congress:** AI 동향 잡 submit/poll/cancel + 캐시 설정(no_trades 분기) ([be1e839](https://github.com/y0ngha/siglens-core/commit/be1e83912c786a52fed342534d93bca750bb7d59))
+* **congress:** AI 동향 프롬프트 빌더(건수 통계 주입) ([68fc013](https://github.com/y0ngha/siglens-core/commit/68fc01343e0fdf28efb5195b2e51210457701a5e))
+* **congress:** ChatPanel 컨텍스트에 congress kind 추가 ([f7db534](https://github.com/y0ngha/siglens-core/commit/f7db534b86bdf91152466d40a194f5f464a7e717))
+* **congress:** CongressTradesProvider port 추가 ([f97f285](https://github.com/y0ngha/siglens-core/commit/f97f285985ac62109c84ce56d3af0380b24b7ef4))
+* **congress:** LLM 응답 방어 정규화(normalizeCongressTrendResponse) ([a220367](https://github.com/y0ngha/siglens-core/commit/a220367f590be9739137ee36315f0a5c423ec501))
+* **congress:** public API barrel export 완성 ([80bd568](https://github.com/y0ngha/siglens-core/commit/80bd5686c0d990e5dde453690bdce8f09416dcdc))
+* **congress:** wire→domain 정규화(side 변종·amount 구간·chamber) ([18ab5f3](https://github.com/y0ngha/siglens-core/commit/18ab5f399a3317eda59db1131a8bf35b1a37aa55))
+* **economy:** domain types and normalizers for macro indicators ([8adfeb6](https://github.com/y0ngha/siglens-core/commit/8adfeb6a0fd7ea7bfb95760deef7c0e9f92b610a))
+* **economy:** macro briefing application layer with worker integration ([742bf19](https://github.com/y0ngha/siglens-core/commit/742bf191c3f42ffa74c85f27961364826928677b))
+* **news:** add market-news category digest prompt builder ([d58425d](https://github.com/y0ngha/siglens-core/commit/d58425df5b30410850aea28b016c07a50e30843d))
+* **news:** add market-news digest cache key builder ([51f69b5](https://github.com/y0ngha/siglens-core/commit/51f69b5d053e8507cf2cc8132793cf49819c5802))
+* **news:** add NewsFeedCategory domain type ([eeefc6b](https://github.com/y0ngha/siglens-core/commit/eeefc6be1cc544d138cec5e056e06589357213e0))
+* **news:** add submit/poll for market-news category digest ([2eb8ebc](https://github.com/y0ngha/siglens-core/commit/2eb8ebcacee7d28ec76be5b3bb02271ece9913d4))
+
 # [0.23.0](https://github.com/y0ngha/siglens-core/compare/v0.22.0...v0.23.0) (2026-06-15)
 
 # [0.22.0](https://github.com/y0ngha/siglens-core/compare/v0.21.1...v0.22.0) (2026-06-15)
