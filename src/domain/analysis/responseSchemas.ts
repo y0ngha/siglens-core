@@ -169,6 +169,30 @@ export const FINANCIALS_RESPONSE_SCHEMA = {
 
 /**
  * @internal
+ * Structured-output schema for the congressional-trade trend analysis response
+ * (analysisType `congress`). A flat object: a Korean summary paragraph, an array
+ * of notable-member/trade descriptions, a Korean risk note (disclosure-lag
+ * caveats), and an overall directional sentiment.
+ */
+export const CONGRESS_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        summaryKo: { type: 'string' },
+        notableMembersKo: { type: 'array', items: { type: 'string' } },
+        riskNoteKo: { type: 'string' },
+        overallSentiment: SENTIMENT_SCHEMA,
+    },
+    required: [
+        'summaryKo',
+        'notableMembersKo',
+        'riskNoteKo',
+        'overallSentiment',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
  * Structured-output schema for {@link OverallAnalysisResponse}
  * (analysisType `overall`). `scenarios` is an array of nested objects.
  *

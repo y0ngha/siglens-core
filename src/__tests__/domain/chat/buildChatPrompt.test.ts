@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
 import type {
     AnalysisResponse,
+    CongressTrendResponse,
     CurrentAnalysisContext,
     FinancialsAnalysisResponse,
     FundamentalAnalysisResponse,
@@ -692,5 +693,69 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         expect(result.systemPrompt).toContain('Risks: 경쟁 심화');
         expect(result.messages).toHaveLength(1);
         expect(result.messages[0].content).toBe('재무제표 어때?');
+    });
+
+    it('congress 컨텍스트가 제공되면 의회 거래 동향 섹션을 포함한다', () => {
+        const payload: CongressTrendResponse = {
+            summaryKo: '내부자 순매수 집중, 기술주 전반적 강세',
+            notableMembersKo: [
+                '낸시 펠로시 — NVDA 콜옵션 매수',
+                '존 스미스 — AAPL 주식 매수',
+            ],
+            riskNoteKo: '선거 이후 규제 리스크 주의',
+            overallSentiment: 'bullish',
+        };
+        const context: CurrentAnalysisContext = {
+            kind: 'congress',
+            payload,
+        };
+        const result = buildChatPrompt(
+            'NVDA',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '의원들 뭐 샀어?',
+            context
+        );
+        expect(result.systemPrompt).toContain('## Current analysis context');
+        expect(result.systemPrompt).toContain('Kind: congress');
+        // summaryKo
+        expect(result.systemPrompt).toContain(
+            '내부자 순매수 집중, 기술주 전반적 강세'
+        );
+        // notableMembersKo list
+        expect(result.systemPrompt).toContain('낸시 펠로시 — NVDA 콜옵션 매수');
+        expect(result.systemPrompt).toContain('존 스미스 — AAPL 주식 매수');
+        // riskNoteKo
+        expect(result.systemPrompt).toContain('선거 이후 규제 리스크 주의');
+        // overallSentiment
+        expect(result.systemPrompt).toContain('bullish');
+    });
+
+    it('congress context — notableMembersKo가 빈 배열이면 Notable Members 줄을 포함하지 않는다', () => {
+        const payload: CongressTrendResponse = {
+            summaryKo: '거래 데이터 없음',
+            notableMembersKo: [],
+            riskNoteKo: '특이사항 없음',
+            overallSentiment: 'neutral',
+        };
+        const context: CurrentAnalysisContext = {
+            kind: 'congress',
+            payload,
+        };
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            '질문',
+            context
+        );
+        const congressSection = result.systemPrompt.slice(
+            result.systemPrompt.indexOf('## Current analysis context')
+        );
+        expect(congressSection).toContain('Kind: congress');
+        expect(congressSection).toContain('거래 데이터 없음');
+        expect(congressSection).not.toContain('Notable Members:');
     });
 });

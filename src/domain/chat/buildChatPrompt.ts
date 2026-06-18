@@ -5,6 +5,7 @@ import type {
     AnalysisResponse,
     ChatMessage,
     ChatPromptPayload,
+    CongressTrendResponse,
     CurrentAnalysisContext,
     FinancialsAnalysisResponse,
     FundamentalAnalysisResponse,
@@ -188,6 +189,18 @@ function formatFinancialsContext(p: FinancialsAnalysisResponse): string {
         .join('\n');
 }
 
+function formatCongressContext(p: CongressTrendResponse): string {
+    return [
+        `Overall: ${p.summaryKo} (${p.overallSentiment})`,
+        p.notableMembersKo.length
+            ? `Notable Members:\n${p.notableMembersKo.map(m => `- ${m}`).join('\n')}`
+            : '',
+        `Risk Note: ${p.riskNoteKo}`,
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
 /**
  * Build the `## Current analysis context` section for the system prompt
  * from a {@link CurrentAnalysisContext} tagged union.
@@ -222,6 +235,9 @@ function formatCurrentAnalysisContext(
             break;
         case 'financials':
             body = formatFinancialsContext(context.payload);
+            break;
+        case 'congress':
+            body = formatCongressContext(context.payload);
             break;
     }
 

@@ -45,6 +45,11 @@ export { cancelFinancialsAnalysisJob } from './application/financials/cancelFina
 export { pollFinancialsAnalysis } from './application/financials/pollFinancialsAnalysis';
 export { submitFinancialsAnalysis } from './application/financials/submitFinancialsAnalysis';
 
+// Congress trend analysis use-cases
+export { cancelCongressTrendJob } from './application/congress/cancelCongressTrendJob';
+export { pollCongressTrend } from './application/congress/pollCongressTrend';
+export { submitCongressTrend } from './application/congress/submitCongressTrend';
+
 // News analysis use-cases
 export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
 export { pollMarketNewsDigest } from './application/news/pollMarketNewsDigest';
@@ -88,6 +93,12 @@ export { computeFinancialsScorecard } from './domain/analysis/financialsScorecar
 export { normalizeFinancialsAnalysisResponse } from './domain/analysis/normalizeFinancials';
 export { normalizeFinancialsSnapshot } from './domain/analysis/normalizeFinancialsSnapshot';
 export { buildFinancialsAnalysisPrompt } from './domain/analysis/financialsPrompt';
+
+// Congress domain building blocks
+export { normalizeCongressTrades } from './domain/analysis/normalizeCongressTrades';
+export { summarizeCongressTrades } from './domain/analysis/summarizeCongressTrades';
+export { buildCongressTrendPrompt } from './domain/analysis/congressTrendPrompt';
+export { normalizeCongressTrendResponse } from './domain/analysis/normalizeCongressTrend';
 
 // Economy domain building blocks (normalization + 2s10s spread)
 export { normalizeEconomicIndicatorSeries } from './domain/economy/normalizeEconomicIndicators';
@@ -330,6 +341,7 @@ export type {
 export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { FinancialStatementsProvider } from './domain/ports/financialStatementsProvider';
+export type { CongressTradesProvider } from './domain/ports/congressTradesProvider';
 export type {
     GetBarsOptions,
     MarketDataProvider,
@@ -366,6 +378,16 @@ export type {
     SubmitFinancialsAnalysisResult,
     SubmitFinancialsAnalysisSubmitted,
 } from './application/financials/types';
+export type {
+    PollCongressTrendResult,
+    SubmitCongressTrendCached,
+    SubmitCongressTrendFetchError,
+    SubmitCongressTrendMissNoTrigger,
+    SubmitCongressTrendNoTrades,
+    SubmitCongressTrendOptions,
+    SubmitCongressTrendResult,
+    SubmitCongressTrendSubmitted,
+} from './application/congress/types';
 export type {
     AnalysisUsageOptions,
     SubmitAnalysisGatedResult,
@@ -477,6 +499,16 @@ export type {
     FearGreedLabel,
     FearGreedSnapshot,
     FearGreedWarning,
+    Chamber,
+    CongressTradeSide,
+    CongressOwner,
+    CongressSentiment,
+    CongressTrendDirection,
+    CongressAmountRange,
+    CongressTrade,
+    RawCongressTrade,
+    CongressTradeStats,
+    CongressTrendResponse,
     StatementPeriod,
     FinancialsSentiment,
     FinancialsAxis,

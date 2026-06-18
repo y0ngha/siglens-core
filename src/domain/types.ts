@@ -586,7 +586,8 @@ export type SkillCategory =
     | 'continuation_bearish'
     | 'neutral'
     | 'fundamental'
-    | 'news';
+    | 'news'
+    | 'congress';
 
 /** Chart-rendering directive carried by a skill (color, label, style). */
 export interface SkillChartDisplay {
@@ -2662,7 +2663,8 @@ export type AnalysisType =
     | 'newsCard'
     | 'fundamental'
     | 'options'
-    | 'financials';
+    | 'financials'
+    | 'congress';
 
 /**
  * @internal
@@ -2691,7 +2693,8 @@ export type CurrentAnalysisContext =
     | { kind: 'news'; payload: NewsAnalysisResponse }
     | { kind: 'overall'; payload: OverallAnalysisResponse }
     | { kind: 'options'; payload: OptionsAnalysisResponse }
-    | { kind: 'financials'; payload: FinancialsAnalysisResponse };
+    | { kind: 'financials'; payload: FinancialsAnalysisResponse }
+    | { kind: 'congress'; payload: CongressTrendResponse };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here
@@ -3093,6 +3096,128 @@ export interface NormalizeFinancialsSnapshotInput {
     financialGrowth: FinancialGrowthRow[];
     /** Raw cash-flow-growth rows from the provider adapter. */
     cashFlowGrowth: CashFlowGrowthRow[];
+}
+
+// ─── Congress trades ─────────────────────────────────
+/** Legislative chamber that recorded the trade. */
+export type Chamber = 'senate' | 'house';
+/** Normalized side classification for a congressional trade. */
+export type CongressTradeSide = 'buy' | 'sell' | 'unknown';
+/** Beneficial owner of a disclosed trade (self, spouse, joint, child, or unknown). */
+export type CongressOwner = 'self' | 'spouse' | 'joint' | 'child' | 'unknown';
+/** Overall AI verdict on aggregate congressional activity for a symbol. */
+export type CongressSentiment = 'bullish' | 'neutral' | 'bearish';
+/** Net flow direction derived from buy vs sell counts across all disclosed trades. */
+export type CongressTrendDirection =
+    | 'net_buying'
+    | 'net_selling'
+    | 'balanced'
+    | 'no_trades';
+
+/** USD range disclosed under the STOCK Act bands. */
+export interface CongressAmountRange {
+    /** Lower bound in USD; null when the label has no parseable amount. */
+    min: number | null;
+    /** Upper bound in USD; null for open-ended ranges (e.g. "$50M+"). */
+    max: number | null;
+    /** Original FMP amount string (e.g. "$1,001 - $15,000"). */
+    label: string;
+}
+
+/** Domain-normalized congressional trade record. */
+export interface CongressTrade {
+    /** Legislative chamber. */
+    chamber: Chamber;
+    /** Member first name. */
+    firstName: string;
+    /** Member last name. */
+    lastName: string;
+    /** Display name (FMP "office" field). */
+    office: string;
+    /** State abbreviation for senate (e.g. "WV"); may be empty for house rows. */
+    district: string;
+    /** Beneficial owner of the trade. */
+    owner: CongressOwner;
+    /** Normalized side classification. */
+    side: CongressTradeSide;
+    /** Preserved FMP "type" value (e.g. "Sale (Partial)"). */
+    rawType: string;
+    /** Parsed USD range with the original label preserved. */
+    amount: CongressAmountRange;
+    /** Asset type label (e.g. "Stock", "Stock Option"). */
+    assetType: string;
+    /** Asset description as disclosed by the member. */
+    assetDescription: string;
+    /** Transaction date (yyyy-mm-dd). */
+    transactionDate: string;
+    /** Disclosure date (yyyy-mm-dd). */
+    disclosureDate: string;
+    /** Source disclosure document URL. */
+    link: string;
+    /** Whether capital gains exceeded $200 USD on this disclosure. */
+    capitalGainsOver200USD: boolean;
+}
+
+/**
+ * Single FMP wire row (loose `unknown` fields — adapter / normalization input).
+ *
+ * Public Tier-4 API: the {@link CongressTradesProvider.getTrades} port returns
+ * `Promise<RawCongressTrade[]>`, so consumers implementing an adapter must
+ * import this type. Exported from the package index.
+ */
+export interface RawCongressTrade {
+    senateID?: unknown;
+    disclosureDate?: unknown;
+    transactionDate?: unknown;
+    firstName?: unknown;
+    lastName?: unknown;
+    office?: unknown;
+    district?: unknown;
+    owner?: unknown;
+    assetDescription?: unknown;
+    assetType?: unknown;
+    type?: unknown;
+    amount?: unknown;
+    capitalGainsOver200USD?: unknown;
+    link?: unknown;
+}
+
+/** Count-based statistics summarizing a normalized congress trade set. */
+export interface CongressTradeStats {
+    /** Count of trades classified as buy. */
+    buyCount: number;
+    /** Count of trades classified as sell. */
+    sellCount: number;
+    /** Count of trades whose side could not be classified. */
+    unknownCount: number;
+    /** Net flow direction derived from buy vs sell counts. */
+    direction: CongressTrendDirection;
+    /** Number of distinct member offices represented. */
+    uniqueMembers: number;
+    /** Count of senate-chamber trades. */
+    senateCount: number;
+    /** Count of house-chamber trades. */
+    houseCount: number;
+}
+
+/** Normalized AI summary of a symbol's congressional trade activity. */
+export interface CongressTrendResponse {
+    /** Korean one-paragraph summary of net activity. */
+    summaryKo: string;
+    /** Korean labels for members worth highlighting. */
+    notableMembersKo: string[];
+    /** Korean note on risks or caveats (e.g. disclosure lag). */
+    riskNoteKo: string;
+    /** Overall AI sentiment verdict. */
+    overallSentiment: CongressSentiment;
+}
+
+/** @internal Raw LLM response (before normalization). */
+export interface RawCongressTrendResponse {
+    summaryKo?: unknown;
+    notableMembersKo?: unknown;
+    riskNoteKo?: unknown;
+    overallSentiment?: unknown;
 }
 
 // =============================================================================

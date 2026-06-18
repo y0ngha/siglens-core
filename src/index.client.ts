@@ -144,6 +144,27 @@ export type {
     NormalizeFinancialsSnapshotInput,
 } from './domain/types';
 
+// Congress analysis — domain helpers (server-only submit/poll/cancel use-cases
+// are intentionally omitted from the browser entry; only pure domain functions
+// belong here, mirroring the financials analysis pattern above).
+export { normalizeCongressTrades } from './domain/analysis/normalizeCongressTrades';
+export { summarizeCongressTrades } from './domain/analysis/summarizeCongressTrades';
+export { buildCongressTrendPrompt } from './domain/analysis/congressTrendPrompt';
+export { normalizeCongressTrendResponse } from './domain/analysis/normalizeCongressTrend';
+export type { CongressTradesProvider } from './domain/ports/congressTradesProvider';
+export type {
+    Chamber,
+    CongressTradeSide,
+    CongressOwner,
+    CongressSentiment,
+    CongressTrendDirection,
+    CongressAmountRange,
+    CongressTrade,
+    RawCongressTrade,
+    CongressTradeStats,
+    CongressTrendResponse,
+} from './domain/types';
+
 // Model spec helpers
 export {
     getProvider,
