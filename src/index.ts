@@ -47,8 +47,10 @@ export { submitFinancialsAnalysis } from './application/financials/submitFinanci
 
 // News analysis use-cases
 export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
+export { pollMarketNewsDigest } from './application/news/pollMarketNewsDigest';
 export { pollNewsAnalysis } from './application/news/pollNewsAnalysis';
 export { pollNewsCardAnalysis } from './application/news/pollNewsCardAnalysis';
+export { submitMarketNewsDigest } from './application/news/submitMarketNewsDigest';
 export { submitNewsAnalysis } from './application/news/submitNewsAnalysis';
 export { submitNewsCardAnalysis } from './application/news/submitNewsCardAnalysis';
 
@@ -375,6 +377,18 @@ export type {
     UserApiKeyRequiredError,
 } from './application/market/types';
 export type {
+    PollMarketNewsDigestDone,
+    PollMarketNewsDigestError,
+    PollMarketNewsDigestProcessing,
+    PollMarketNewsDigestResult,
+    SubmitMarketNewsDigestCached,
+    SubmitMarketNewsDigestMissNoTrigger,
+    SubmitMarketNewsDigestNoNewsError,
+    SubmitMarketNewsDigestOptions,
+    SubmitMarketNewsDigestResult,
+    SubmitMarketNewsDigestSubmitted,
+} from './application/news/marketNewsDigestTypes';
+export type {
     PollNewsAnalysisResult,
     PollNewsCardAnalysisResult,
     SubmitNewsAnalysisApiKeyRequiredError,
@@ -533,6 +547,7 @@ export type {
     NewsAnalysisResponse,
     NewsCardAnalysis,
     NewsCategory,
+    NewsFeedCategory,
     NewsImpact,
     NewsItem,
     NewsSentiment,

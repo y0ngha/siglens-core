@@ -12,6 +12,7 @@ import {
     buildMacroBriefingCacheKey,
     buildFinancialsCacheKey,
     buildFundamentalCacheKey,
+    buildMarketNewsDigestCacheKey,
     buildNewsCacheKey,
     buildOverallCacheKey,
     buildOverallPeekCacheKey,
@@ -298,5 +299,19 @@ describe('computeBarsEffectiveTtl', () => {
         expect(
             computeBarsEffectiveTtl('1Day', new Date('2026-07-04T18:00:00Z'))
         ).toBe(BARS_OFFHOURS_TTL_CEILING_SECONDS);
+    });
+});
+
+describe('buildMarketNewsDigestCacheKey 함수는', () => {
+    it('카테고리·모델·inputHash를 스키마 버전 prefix와 결합한다', () => {
+        expect(
+            buildMarketNewsDigestCacheKey(
+                'crypto',
+                'gemini-2.5-flash',
+                'abc123'
+            )
+        ).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-2.5-flash:abc123`
+        );
     });
 });

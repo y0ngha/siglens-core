@@ -181,6 +181,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `cancelNewsAnalysisJob` | `application/news/cancelNewsAnalysisJob.ts` |
 | `submitNewsCardAnalysis` | `application/news/submitNewsCardAnalysis.ts` |
 | `pollNewsCardAnalysis` | `application/news/pollNewsCardAnalysis.ts` |
+| `submitMarketNewsDigest` | `application/news/submitMarketNewsDigest.ts` |
+| `pollMarketNewsDigest` | `application/news/pollMarketNewsDigest.ts` |
 | `submitOverallAnalysis(options)` — `options.marketDataProvider?: MarketDataProvider` added (via `OverallDependencyInputs`). Required on cache miss when proceeding to fetch daily bars for the fear/greed snapshot; optional when `skipEnqueueIfMiss: true`. | `application/overall/submitOverallAnalysis.ts` |
 | `peekOverallAnalysisCache(symbol, companyName, timeframe, modelId?)` — **read-only**. Reads a content-free "overwrite-latest" peek key (`pollOverallAnalysis` writes every result under it in addition to the canonical hashed key). Never resolves dependencies / enqueues / fetches / generates. Returns `Promise<OverallAnalysisResponse \| null>` (null on missing `modelId` / miss / no provider / read error / corrupt or content-free payload). "Latest cached" semantics — a content-free read cannot reproduce the canonical input hash. | `application/overall/peekOverallAnalysisCache.ts` |
 | `pollOverallAnalysis` — now writes the normalized result under **two** keys: the canonical hashed key (`meta.cacheKey`) and the content-free `buildOverallPeekCacheKey(symbol, timeframe, modelId)` peek key (only when all three meta fields are present). | `application/overall/pollOverallAnalysis.ts` |
@@ -363,7 +365,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 새로 추가된 도메인 타입:
 - `CurrentAnalysisContext` — 챗봇 시스템 프롬프트에 주입되는 현재 분석 컨텍스트 tagged union (Task 1.17).
 - 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalProfile`, `GradesEvent`, `GradesAction`. (PR6에서 `@internal` 전환 — 정규화 입력 타입 `FundamentalSnapshot`과 그 하위 `FundamentalValuation`/`FundamentalPeer`/`FundamentalProfitability`/`FundamentalGrowth`/`FundamentalHealth`/`FundamentalFutureDirection`/`FundamentalSectorDirection`/`SectorHistoricalPoint`/`GradesConsensus`/`PriceTargetConsensus`/`PriceTargetSummary`는 public 타입에서 도달 불가하고 consumer 미사용이라 internal화. public 응답 타입 `FundamentalAnalysisResponse`는 유지.)
-- 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
+- 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsFeedCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
 - 종합: `OverallAnalysisResponse`, `OverallScenario`, `OverallScenarioName`.
 - Fear & Greed Index (per-stock):
     - `FearGreedLabel`, `FearGreedConfidence`, `FearGreedWarning`
@@ -391,6 +393,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 새로 추가된 use-case option/result 타입:
 - 펀더멘털: `SubmitFundamentalAnalysisOptions`, `SubmitFundamentalAnalysisResult`, `SubmitFundamentalAnalysisApiKeyRequiredError`, `SubmitFundamentalAnalysisMissNoTrigger`, `PollFundamentalAnalysisResult`.
 - 뉴스: `SubmitNewsAnalysisOptions`, `SubmitNewsAnalysisResult`, `SubmitNewsAnalysisApiKeyRequiredError`, `SubmitNewsAnalysisMissNoTrigger`, `PollNewsAnalysisResult`.
+- 뉴스 카테고리 다이제스트: `SubmitMarketNewsDigestOptions`, `SubmitMarketNewsDigestResult` (discriminated union — `SubmitMarketNewsDigestCached`, `SubmitMarketNewsDigestSubmitted`, `SubmitMarketNewsDigestMissNoTrigger`, `SubmitMarketNewsDigestNoNewsError`), `PollMarketNewsDigestResult`.
 - 종합: `SubmitOverallAnalysisOptions`, `SubmitOverallAnalysisResult`, `SubmitOverallAnalysisApiKeyRequiredError`, `SubmitOverallAnalysisMissNoTrigger`, `DependencyStateMissNoTrigger`, `PollOverallAnalysisResult`.
 - 기술적: `SubmitAnalysisMissNoTrigger` — 0.10.0에서 추가된 봇/크롤러 게이팅용 결과 variant.
 - 옵션: `SubmitOptionsAnalysisOptions`, `SubmitOptionsAnalysisResult`, `SubmitOptionsAnalysisCached`, `SubmitOptionsAnalysisSubmitted`, `SubmitOptionsAnalysisMissNoTrigger`, `SubmitOptionsAnalysisLimitError`, `SubmitOptionsAnalysisNoChainsError`, `SubmitOptionsAnalysisApiKeyRequiredError`, `PollOptionsAnalysisResult`, `PollOptionsAnalysisProcessing`, `PollOptionsAnalysisDone`, `PollOptionsAnalysisError`. 도메인 타입(`OptionsContract`, `OptionsChain`, `OptionsSnapshot`, `StrikeOpenInterest`, `StrikeVolumeAggregate`, `TopOiQuote`, `OptionsExpirationMetrics`, `OptionsPerExpirationCommentary`, `OptionsSignal`, `OptionsAnalysisResponse`, `OptionsTone`, `OptionsSignalKind`, `OptionsExpirationFilter`)과 슬롯 매핑(`ExpirationSlot`, `ExpirationSlotKey`, `SlotMapping`), 프롬프트 옵션(`BuildOptionsAnalysisPromptOptions`) 포함.

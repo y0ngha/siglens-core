@@ -1,5 +1,6 @@
 import type {
     DashboardTimeframe,
+    NewsFeedCategory,
     OptionsExpirationFilter,
     StatementPeriod,
     Timeframe,
@@ -398,6 +399,30 @@ export function buildFinancialsCacheKey(
     return skillFingerprint !== undefined
         ? `${base}:${skillFingerprint}`
         : base;
+}
+
+/**
+ * Build the Redis key for a cached market-news category digest.
+ * Format: `{version}:analysis:market-news:${category}:${modelId}:${inputHash}`.
+ *
+ * Keyed by `category` (the {@link NewsFeedCategory} bucket), `modelId`, and
+ * `inputHash` (a deterministic hash of the article IDs and skill fingerprint)
+ * so different feed categories, models, and article sets cache independently.
+ *
+ * @internal Consumer cannot construct `inputHash` themselves — it is derived
+ *   inside `submitMarketNewsDigest`. Do not depend on this function from outside
+ *   the core library.
+ * @param category  - Feed-category bucket.
+ * @param modelId   - LLM model identifier.
+ * @param inputHash - Short hash of the news items used as prompt input.
+ * @returns The cache key.
+ */
+export function buildMarketNewsDigestCacheKey(
+    category: NewsFeedCategory,
+    modelId: string,
+    inputHash: string
+): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${inputHash}`;
 }
 
 /**
