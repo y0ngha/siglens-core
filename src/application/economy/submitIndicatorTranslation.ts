@@ -1,5 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
+import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import { buildIndicatorTranslationPrompt } from '@/domain/economy/indicatorTranslationPrompt';
 import { normalizeIndicatorTranslation } from '@/domain/economy/normalizeIndicatorTranslation';
 import type { SubmitIndicatorTranslationResult } from './types';
@@ -21,8 +22,10 @@ const INDICATOR_TRANSLATION_JOB_SYMBOL = 'indicator-translation';
  *
  * Translation is a short one-field task (single Korean string): flash-lite
  * is the right cost/latency trade-off, mirroring economic-event analysis.
+ * Aliased from the shared {@link GEMINI_2_5_FLASH_LITE_MODEL} constant so all
+ * flash-lite consumers stay in sync via a single source of truth.
  */
-export const INDICATOR_TRANSLATION_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+export const INDICATOR_TRANSLATION_MODEL_ID = GEMINI_2_5_FLASH_LITE_MODEL;
 
 /**
  * Submit an indicator-name AI translation job.

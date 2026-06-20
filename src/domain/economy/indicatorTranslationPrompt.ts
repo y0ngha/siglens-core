@@ -1,7 +1,7 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 /**
- * @internal Builds the AI prompt for translating an English economic-indicator
+ * Builds the AI prompt for translating an English economic-indicator
  * base name into natural Korean as used in Korean financial media.
  *
  * The `## Data Boundary` section instructs the model to treat the indicator

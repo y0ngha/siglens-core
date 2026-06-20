@@ -6,7 +6,7 @@ function parseLlmPayload(raw: unknown): unknown {
 }
 
 /**
- * @internal Normalize a raw LLM response into a Korean indicator name string.
+ * Normalize a raw LLM response into a Korean indicator name string.
  *
  * Strips optional markdown code fences, parses JSON, and extracts the
  * `nameKo` field defensively. Returns an empty string when the payload is

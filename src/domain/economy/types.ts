@@ -1,3 +1,5 @@
+import type { NewsSentiment } from '@/domain/types';
+
 /** Calendar event importance. Mirrors FMP `impact` values. */
 export type CalendarImpact = 'Low' | 'Medium' | 'High';
 
@@ -93,8 +95,6 @@ export interface MacroBriefingResponse {
 // ─────────────────────────────────────────
 // Economic Event AI Analysis
 // ─────────────────────────────────────────
-
-import type { NewsSentiment } from '@/domain/types';
 
 /**
  * Input fields extracted from an announced economic-calendar event that the

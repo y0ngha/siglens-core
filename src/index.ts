@@ -202,7 +202,6 @@ export type {
     MacroBriefingResponse,
     EconomicEventAnalysisInput,
     EconomicEventAnalysis,
-    RawEconomicEventAnalysis,
 } from './domain/economy/types';
 
 // Economy — indicator-name translation result types

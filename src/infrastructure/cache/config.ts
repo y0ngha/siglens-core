@@ -293,7 +293,7 @@ export const ECONOMIC_EVENT_CACHE_TTL = SECONDS_PER_DAY;
  * allows prompt-template changes to invalidate the cache independently.
  *
  * Note: `inputHash` must be derived by the library's internal hashing pipeline
- * (`buildEconomicEventCacheKey`). Do not construct this key format externally.
+ * (`hashEconomicEventInput`). Do not construct this key format externally.
  *
  * @param inputHash - 16-char hex hash of the serialized {@link EconomicEventAnalysisInput}.
  * @returns The cache key.

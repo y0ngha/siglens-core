@@ -1,5 +1,6 @@
 import { fireAndForget } from '@/application/background';
 import type { BackgroundTaskOptions } from '@/application/types';
+import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import { buildEconomicEventAnalysisPrompt } from '@/domain/economy/economicEventPrompt';
 import { normalizeEconomicEventAnalysis } from '@/domain/economy/normalizeEconomicEventAnalysis';
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
@@ -22,8 +23,10 @@ const ECONOMIC_EVENT_JOB_SYMBOL = 'economic-event';
  *
  * A short structured classification task (sentiment + two Korean sentences):
  * flash-lite is the right cost/latency trade-off, mirroring news-card analysis.
+ * Aliased from the shared {@link GEMINI_2_5_FLASH_LITE_MODEL} constant so all
+ * flash-lite consumers stay in sync via a single source of truth.
  */
-export const ECONOMIC_EVENT_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+export const ECONOMIC_EVENT_MODEL_ID = GEMINI_2_5_FLASH_LITE_MODEL;
 
 /**
  * Build a deterministic hash of the economic-event input for cache-key use.

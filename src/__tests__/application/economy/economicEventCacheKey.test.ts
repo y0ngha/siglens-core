@@ -8,6 +8,7 @@ import {
     ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION,
     ECONOMIC_EVENT_CACHE_TTL,
 } from '@/infrastructure/cache/config';
+import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { submitEconomicEventAnalysis } from '@/application/economy/submitEconomicEventAnalysis';
@@ -109,8 +110,8 @@ describe('buildEconomicEventCacheKey (production path)', () => {
         expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p1$/);
     });
 
-    it('ECONOMIC_EVENT_CACHE_TTL이 양수(24h = 86400s)', () => {
+    it('ECONOMIC_EVENT_CACHE_TTL이 양수(24h = SECONDS_PER_DAY)', () => {
         expect(ECONOMIC_EVENT_CACHE_TTL).toBeGreaterThan(0);
-        expect(ECONOMIC_EVENT_CACHE_TTL).toBe(86400);
+        expect(ECONOMIC_EVENT_CACHE_TTL).toBe(SECONDS_PER_DAY);
     });
 });

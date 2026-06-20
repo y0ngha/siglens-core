@@ -105,7 +105,6 @@ export type {
     MacroBriefingResponse,
     EconomicEventAnalysisInput,
     EconomicEventAnalysis,
-    RawEconomicEventAnalysis,
 } from './domain/economy/types';
 // Application result types live alongside the use-cases (Architecture #0); the
 // server-only `submitMacroBriefing`/`pollMacroBriefing` functions stay omitted

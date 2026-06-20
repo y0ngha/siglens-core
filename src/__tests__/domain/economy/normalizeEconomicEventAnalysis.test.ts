@@ -134,4 +134,18 @@ describe('normalizeEconomicEventAnalysis', () => {
         });
         expect(out.interpretationKo).toBe('');
     });
+
+    it('garbage non-JSON string → neutral default, no throw (B5 crash-safe)', () => {
+        // A bare non-JSON string causes extractJsonFromLlmResponse to throw SyntaxError.
+        // The try-catch in normalizeEconomicEventAnalysis must absorb it and return the
+        // neutral default without propagating the error to the caller.
+        expect(() =>
+            normalizeEconomicEventAnalysis('not json at all')
+        ).not.toThrow();
+        expect(normalizeEconomicEventAnalysis('not json at all')).toEqual({
+            sentiment: 'neutral',
+            summaryKo: '',
+            interpretationKo: '',
+        });
+    });
 });

@@ -4,7 +4,7 @@ import type { EconomicEventAnalysisInput } from './types';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 
 /**
- * @internal Builds the per-event economic-calendar AI analysis prompt.
+ * Builds the per-event economic-calendar AI analysis prompt.
  *
  * Constructs an English prompt for the flash-lite model that asks for a
  * structured JSON response containing sentiment, a Korean summary of the

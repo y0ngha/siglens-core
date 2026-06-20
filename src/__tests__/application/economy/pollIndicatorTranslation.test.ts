@@ -17,6 +17,7 @@ import {
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { cleanupInBackground } from '@/application/background';
+import { INDICATOR_TRANSLATION_CACHE_TTL } from '@/infrastructure/cache/config';
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
@@ -187,7 +188,7 @@ describe('pollIndicatorTranslation 함수는', () => {
         );
     });
 
-    it('캐시 set TTL이 30일(2592000초)임을 확인', async () => {
+    it('캐시 set TTL이 INDICATOR_TRANSLATION_CACHE_TTL(30일)임을 확인', async () => {
         mockGetJobStatus.mockResolvedValueOnce('done');
         mockGetJobResult.mockResolvedValueOnce(VALID_RESULT);
         await pollIndicatorTranslation('j');
@@ -196,6 +197,6 @@ describe('pollIndicatorTranslation 함수는', () => {
             unknown,
             number,
         ];
-        expect(ttl).toBe(30 * 86400);
+        expect(ttl).toBe(INDICATOR_TRANSLATION_CACHE_TTL);
     });
 });
