@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     extractJsonFromLlmResponse,
+    parseLlmPayload,
     stripLlmJsonFence,
 } from '@/domain/analysis/promptFormat';
 
@@ -85,5 +86,38 @@ describe('stripLlmJsonFence', () => {
         expect(stripLlmJsonFence('  not json at all  ')).toBe(
             'not json at all'
         );
+    });
+});
+
+// ─────────────────────────────────────────
+// parseLlmPayload — string vs non-string coercion
+// ─────────────────────────────────────────
+
+describe('parseLlmPayload', () => {
+    it('JSON 문자열이면 extractJsonFromLlmResponse 결과를 반환한다', () => {
+        const raw = '{"a":1}';
+        expect(parseLlmPayload(raw)).toEqual(extractJsonFromLlmResponse(raw));
+    });
+
+    it('JSON 문자열이면 파싱된 객체를 반환한다', () => {
+        expect(parseLlmPayload('{"a":1}')).toEqual({ a: 1 });
+    });
+
+    it('마크다운 펜스로 감싼 JSON 문자열이면 파싱된 객체를 반환한다', () => {
+        const fenced = '```json\n{"b":2}\n```';
+        expect(parseLlmPayload(fenced)).toEqual({ b: 2 });
+    });
+
+    it('이미 파싱된 객체(non-string)이면 동일 참조를 그대로 반환한다', () => {
+        const obj = { a: 1 };
+        expect(parseLlmPayload(obj)).toBe(obj);
+    });
+
+    it('null 이면 그대로 반환한다', () => {
+        expect(parseLlmPayload(null)).toBeNull();
+    });
+
+    it('숫자이면 그대로 반환한다', () => {
+        expect(parseLlmPayload(42)).toBe(42);
     });
 });

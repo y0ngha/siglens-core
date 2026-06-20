@@ -78,3 +78,24 @@ export function stripLlmJsonFence(raw: string): string {
 export function extractJsonFromLlmResponse(raw: string): unknown {
     return JSON.parse(stripLlmJsonFence(raw));
 }
+
+/**
+ * @internal
+ *
+ * Coerce a raw LLM payload to a parsed value.
+ *
+ * When the payload is a string (the common case — LLM workers return raw JSON
+ * strings, sometimes wrapped in markdown fences) it is extracted and parsed via
+ * {@link extractJsonFromLlmResponse}. Non-string values (e.g. a cache hit that
+ * already deserialized the JSON object) are returned as-is.
+ *
+ * Shared by every domain normalizer that accepts either a raw string or a
+ * pre-parsed object so the coercion logic lives in one place.
+ *
+ * @param raw - Raw value from the LLM worker or cache.
+ * @returns Parsed JSON value, or the original value unchanged.
+ * @throws {SyntaxError} When `raw` is a string that is not valid JSON after fence removal.
+ */
+export function parseLlmPayload(raw: unknown): unknown {
+    return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
+}

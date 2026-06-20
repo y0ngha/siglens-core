@@ -8,7 +8,7 @@ import type {
     RawNewsCardAnalysis,
 } from '@/domain/types';
 import { asArray, asEnum, asObject, asString } from './normalizePrimitives';
-import { extractJsonFromLlmResponse } from './promptFormat';
+import { parseLlmPayload } from './promptFormat';
 
 /** Valid values for the {@link NewsSentiment} enum. */
 const VALID_NEWS_SENTIMENTS: readonly NewsSentiment[] = [
@@ -35,10 +35,6 @@ const VALID_NEWS_CATEGORIES: readonly NewsCategory[] = [
     'product',
     'other',
 ];
-
-function parseLlmPayload(raw: unknown): unknown {
-    return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
-}
 
 function normalizeStringArray(raw: unknown): string[] {
     return asArray(raw)
