@@ -88,6 +88,9 @@ export {
     computeYieldSpread,
 } from './domain/economy/normalizeTreasuryRates';
 export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
+// Economy — per-event AI analysis domain helpers (browser-safe: pure functions only).
+export { buildEconomicEventAnalysisPrompt } from './domain/economy/economicEventPrompt';
+export { normalizeEconomicEventAnalysis } from './domain/economy/normalizeEconomicEventAnalysis';
 export type {
     CalendarImpact,
     EconomicIndicatorPoint,
@@ -97,10 +100,14 @@ export type {
     EconomySnapshot,
     MacroRegime,
     MacroBriefingResponse,
+    EconomicEventAnalysisInput,
+    EconomicEventAnalysis,
+    RawEconomicEventAnalysis,
 } from './domain/economy/types';
 // Application result types live alongside the use-cases (Architecture #0); the
 // server-only `submitMacroBriefing`/`pollMacroBriefing` functions stay omitted
 // from the browser entry, but their pure result-type shapes are safe to expose.
+// Likewise for the economic-event analysis submit/poll use-cases.
 export type {
     SubmitMacroBriefingResult,
     SubmitMacroBriefingCached,
@@ -109,6 +116,13 @@ export type {
     PollMacroBriefingProcessing,
     PollMacroBriefingError,
     PollMacroBriefingDone,
+    SubmitEconomicEventAnalysisResult,
+    SubmitEconomicEventAnalysisCached,
+    SubmitEconomicEventAnalysisSubmitted,
+    PollEconomicEventAnalysisResult,
+    PollEconomicEventAnalysisProcessing,
+    PollEconomicEventAnalysisError,
+    PollEconomicEventAnalysisDone,
 } from './application/economy/types';
 
 // Financials analysis — domain helpers (server-only submit/poll/cancel use-cases

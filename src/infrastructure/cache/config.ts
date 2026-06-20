@@ -263,6 +263,51 @@ export function buildMacroBriefingCacheKey(
     return `briefing:macro:${dateHour}:${model}:${inputHash}`;
 }
 
+/**
+ * Prompt-template version for the economic-event AI analysis cache keys.
+ *
+ * Bump this string whenever the economic-event prompt template changes in a way
+ * that would make previously cached results stale. Old keys (e.g. `p1`) are
+ * simply never looked up after a bump and naturally expire via TTL.
+ *
+ * @internal
+ */
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
+ * @internal TTL for cached economic-event AI analysis results.
+ *
+ * Once an event is announced its figures do not change, so a 24-hour TTL is
+ * appropriate. Mirrors `FUNDAMENTAL_CACHE_TTL_SECONDS` and siblings.
+ */
+export const ECONOMIC_EVENT_CACHE_TTL = SECONDS_PER_DAY;
+
+/**
+ * @internal Build the Redis key for a cached economic-event AI analysis result.
+ *
+ * Format: `{version}:analysis:economic-event:<inputHash>:<promptVersion>`.
+ *
+ * The key folds a deterministic hash of the event identity and announced
+ * figures (`EconomicEventAnalysisInput`) so different events and different
+ * figure combinations always produce distinct keys. The prompt-version suffix
+ * allows prompt-template changes to invalidate the cache independently.
+ *
+ * Note: `inputHash` must be derived by the library's internal hashing pipeline
+ * (`buildEconomicEventCacheKey`). Do not construct this key format externally.
+ *
+ * @param inputHash - 16-char hex hash of the serialized {@link EconomicEventAnalysisInput}.
+ * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * buildEconomicEventCacheKey(hashAnalysisInput(JSON.stringify(input)));
+ * // → 'v1:analysis:economic-event:deadbeefdeadbeef:p1'
+ * ```
+ */
+export function buildEconomicEventCacheKey(inputHash: string): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:economic-event:${inputHash}:${ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION}`;
+}
+
 /** @internal 타임프레임+버킷+종목 목록 기준 섹터 시그널 캐시 키 빌더. */
 export function buildSectorSignalsCacheKey(
     timeframe: DashboardTimeframe,

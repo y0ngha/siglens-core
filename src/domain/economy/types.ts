@@ -89,3 +89,66 @@ export interface MacroBriefingResponse {
 // Application result types (`SubmitMacroBriefingResult` / `PollMacroBriefingResult`
 // and their named variants) live in `application/economy/types.ts` — the layer
 // that produces them — mirroring the financials pattern (Architecture #0).
+
+// ─────────────────────────────────────────
+// Economic Event AI Analysis
+// ─────────────────────────────────────────
+
+import type { NewsSentiment } from '@/domain/types';
+
+/**
+ * Input fields extracted from an announced economic-calendar event that the
+ * AI-analysis prompt needs. Actual vs estimate vs previous is the primary
+ * signal for the LLM's market-implication assessment.
+ */
+export interface EconomicEventAnalysisInput {
+    /** Event name as provided by FMP (e.g. `'CPI MoM'`). */
+    event: string;
+    /** Market impact classification of the event. */
+    impact: CalendarImpact;
+    /** Reported actual value; `null` before the release or when unavailable. */
+    actual: number | null;
+    /** Analyst consensus estimate; `null` when unavailable. */
+    estimate: number | null;
+    /** Previous period's reported value; `null` when unavailable. */
+    previous: number | null;
+    /** Unit label for the numeric fields (e.g. `'%'`, `'K'`). */
+    unit: string;
+}
+
+/**
+ * Normalized AI-analysis result for a single announced economic event.
+ *
+ * Reuses {@link NewsSentiment} (`bullish` / `neutral` / `bearish`) as the
+ * market-implication tri-state — "bullish" means the release supports
+ * risk-on/rate-cut expectations; "bearish" means risk-off/hawkish pressure;
+ * "neutral" means in-line or mixed signals.
+ */
+export interface EconomicEventAnalysis {
+    /**
+     * Market-implication sentiment for the release.
+     *
+     * - `bullish`: data supports risk assets / rate-cut expectations.
+     * - `bearish`: data implies risk-off / hawkish pressure on rates/USD.
+     * - `neutral`: release in line with estimates or signals are mixed.
+     */
+    sentiment: NewsSentiment;
+    /**
+     * Korean (존댓말) one-to-two sentence factual summary of what was
+     * announced: actual figure, deviation from estimate/previous.
+     */
+    summaryKo: string;
+    /**
+     * Korean (존댓말) market-interpretation commentary: what the release
+     * implies for risk assets, interest rates, or USD direction.
+     */
+    interpretationKo: string;
+}
+
+/**
+ * Loose raw shape for defensive normalization of the LLM payload.
+ *
+ * @internal Every field is typed as `unknown` because the LLM may omit or
+ * mis-type any key; the normalizer coerces each field via `as*` helpers.
+ */
+export type RawEconomicEventAnalysis = Record<string, unknown>;

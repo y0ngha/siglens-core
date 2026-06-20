@@ -22,6 +22,10 @@ export { submitMacroBriefing } from './application/economy/submitMacroBriefing';
 export { pollMacroBriefing } from './application/economy/pollMacroBriefing';
 export { peekMacroBriefingCache } from './application/economy/peekMacroBriefingCache';
 
+// Economy — per-event AI analysis (submit/poll worker-job pattern)
+export { submitEconomicEventAnalysis } from './application/economy/submitEconomicEventAnalysis';
+export { pollEconomicEventAnalysis } from './application/economy/pollEconomicEventAnalysis';
+
 // Application background-task options (used by market / dashboard use-cases)
 export type { BackgroundTaskOptions } from './application/types';
 
@@ -108,6 +112,10 @@ export {
 } from './domain/economy/normalizeTreasuryRates';
 export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
 
+// Economy — per-event AI analysis domain building blocks
+export { buildEconomicEventAnalysisPrompt } from './domain/economy/economicEventPrompt';
+export { normalizeEconomicEventAnalysis } from './domain/economy/normalizeEconomicEventAnalysis';
+
 // Model spec helpers
 export {
     getProvider,
@@ -184,6 +192,9 @@ export type {
     EconomySnapshot,
     MacroRegime,
     MacroBriefingResponse,
+    EconomicEventAnalysisInput,
+    EconomicEventAnalysis,
+    RawEconomicEventAnalysis,
 } from './domain/economy/types';
 
 // Economy (macro) application result types — produced by submit/poll, so they
@@ -196,6 +207,13 @@ export type {
     PollMacroBriefingProcessing,
     PollMacroBriefingError,
     PollMacroBriefingDone,
+    SubmitEconomicEventAnalysisResult,
+    SubmitEconomicEventAnalysisCached,
+    SubmitEconomicEventAnalysisSubmitted,
+    PollEconomicEventAnalysisResult,
+    PollEconomicEventAnalysisProcessing,
+    PollEconomicEventAnalysisError,
+    PollEconomicEventAnalysisDone,
 } from './application/economy/types';
 
 // =============================================================================
