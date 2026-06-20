@@ -4,6 +4,21 @@ import type { EconomicEventAnalysisInput } from './types';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 
 /**
+ * Append the unit string to a formatted value when the value is present.
+ *
+ * Returns the value unchanged when it equals `'N/A'` (no actual figure
+ * available) or when `unit` is empty — rendering "N/A %" would be
+ * misleading because N/A has no associated unit.
+ *
+ * @param value - Already-formatted numeric string or `'N/A'`.
+ * @param unit  - Unit string (e.g. `'%'`). May be empty.
+ * @returns Value with unit appended, e.g. `'0.20 %'`, or value unchanged.
+ */
+function withUnit(value: string, unit: string): string {
+    return value === 'N/A' || !unit ? value : `${value} ${unit}`;
+}
+
+/**
  * Builds the per-event economic-calendar AI analysis prompt.
  *
  * Constructs an English prompt for the flash-lite model that asks for a
@@ -25,13 +40,6 @@ export function buildEconomicEventAnalysisPrompt(
     const previousStr = formatNullableNumber(input.previous);
     const unit = input.unit || '';
 
-    /**
-     * Appends the unit only when the value is present (not N/A).
-     * Rendering "N/A %" would be misleading — N/A has no associated unit.
-     */
-    const withUnit = (value: string): string =>
-        value === 'N/A' || !unit ? value : `${value} ${unit}`;
-
     return `You are a macroeconomic analyst. Analyse the announced economic data release below using ONLY the provided figures. Respond with a JSON object matching the exact schema. No markdown, no extra text — only valid JSON.
 
 ## Data Boundary
@@ -43,9 +51,9 @@ export function buildEconomicEventAnalysisPrompt(
 ## Event Details
 - Event: ${input.event}
 - Impact: ${input.impact}
-- Actual: ${withUnit(actualStr)}
-- Estimate: ${withUnit(estimateStr)}
-- Previous: ${withUnit(previousStr)}
+- Actual: ${withUnit(actualStr, unit)}
+- Estimate: ${withUnit(estimateStr, unit)}
+- Previous: ${withUnit(previousStr, unit)}
 
 Key signal: Compare actual vs estimate (beat/miss/inline) and actual vs previous (acceleration/deceleration). The deviation direction and the impact level together drive sentiment.
 

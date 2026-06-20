@@ -204,19 +204,9 @@ export type {
     EconomicEventAnalysis,
 } from './domain/economy/types';
 
-// Economy — indicator-name translation result types
-export type {
-    SubmitIndicatorTranslationResult,
-    SubmitIndicatorTranslationCached,
-    SubmitIndicatorTranslationSubmitted,
-    PollIndicatorTranslationResult,
-    PollIndicatorTranslationProcessing,
-    PollIndicatorTranslationError,
-    PollIndicatorTranslationDone,
-} from './application/economy/types';
-
-// Economy (macro) application result types — produced by submit/poll, so they
+// Economy application result types — produced by submit/poll use-cases, so they
 // live in the application layer (Architecture #0), mirroring financials.
+// Covers macro briefing, per-event AI analysis, and indicator-name translation.
 export type {
     SubmitMacroBriefingResult,
     SubmitMacroBriefingCached,
@@ -232,6 +222,13 @@ export type {
     PollEconomicEventAnalysisProcessing,
     PollEconomicEventAnalysisError,
     PollEconomicEventAnalysisDone,
+    SubmitIndicatorTranslationResult,
+    SubmitIndicatorTranslationCached,
+    SubmitIndicatorTranslationSubmitted,
+    PollIndicatorTranslationResult,
+    PollIndicatorTranslationProcessing,
+    PollIndicatorTranslationError,
+    PollIndicatorTranslationDone,
 } from './application/economy/types';
 
 // =============================================================================

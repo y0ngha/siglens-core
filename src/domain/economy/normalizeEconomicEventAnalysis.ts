@@ -3,7 +3,7 @@ import {
     asObject,
     asString,
 } from '@/domain/analysis/normalizePrimitives';
-import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
+import { parseLlmPayload } from '@/domain/analysis/promptFormat';
 import type { NewsSentiment } from '@/domain/types';
 import type { EconomicEventAnalysis, RawEconomicEventAnalysis } from './types';
 
@@ -13,10 +13,6 @@ const VALID_SENTIMENTS: readonly NewsSentiment[] = [
     'neutral',
     'bearish',
 ];
-
-function parseLlmPayload(raw: unknown): unknown {
-    return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
-}
 
 /** Neutral default returned on any parse or normalization failure. */
 const NEUTRAL_DEFAULT: EconomicEventAnalysis = {

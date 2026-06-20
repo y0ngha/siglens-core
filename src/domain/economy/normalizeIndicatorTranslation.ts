@@ -1,9 +1,5 @@
 import { asObject, asString } from '@/domain/analysis/normalizePrimitives';
-import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
-
-function parseLlmPayload(raw: unknown): unknown {
-    return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
-}
+import { parseLlmPayload } from '@/domain/analysis/promptFormat';
 
 /**
  * Normalize a raw LLM response into a Korean indicator name string.

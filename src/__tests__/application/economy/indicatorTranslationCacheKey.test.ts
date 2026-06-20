@@ -8,6 +8,7 @@ import {
     INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION,
     INDICATOR_TRANSLATION_CACHE_TTL,
 } from '@/infrastructure/cache/config';
+import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { submitIndicatorTranslation } from '@/application/economy/submitIndicatorTranslation';
@@ -85,6 +86,6 @@ describe('buildIndicatorTranslationCacheKey (production path)', () => {
 
     it('INDICATOR_TRANSLATION_CACHE_TTL이 양수(30d = 2592000s)', () => {
         expect(INDICATOR_TRANSLATION_CACHE_TTL).toBeGreaterThan(0);
-        expect(INDICATOR_TRANSLATION_CACHE_TTL).toBe(30 * 86400);
+        expect(INDICATOR_TRANSLATION_CACHE_TTL).toBe(30 * SECONDS_PER_DAY);
     });
 });

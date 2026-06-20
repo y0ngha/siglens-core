@@ -4,8 +4,10 @@ import type { Mock } from 'vitest';
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/jobs/queue');
 
-import { submitIndicatorTranslation } from '@/application/economy/submitIndicatorTranslation';
-import { INDICATOR_TRANSLATION_MODEL_ID } from '@/application/economy/submitIndicatorTranslation';
+import {
+    submitIndicatorTranslation,
+    INDICATOR_TRANSLATION_MODEL_ID,
+} from '@/application/economy/submitIndicatorTranslation';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';

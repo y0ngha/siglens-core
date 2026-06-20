@@ -586,6 +586,9 @@ export function buildOverallCacheKey(
  */
 export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p1' as const;
 
+/** @internal Number of days an indicator translation result is kept in cache. */
+const INDICATOR_TRANSLATION_CACHE_TTL_DAYS = 30;
+
 /**
  * @internal TTL for cached indicator translation results (30 days, in seconds).
  *
@@ -594,7 +597,8 @@ export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p1' as const;
  * Korean equivalent. A long TTL amortises the per-translation LLM cost
  * across thousands of requests without risking staleness.
  */
-export const INDICATOR_TRANSLATION_CACHE_TTL = 30 * SECONDS_PER_DAY;
+export const INDICATOR_TRANSLATION_CACHE_TTL =
+    INDICATOR_TRANSLATION_CACHE_TTL_DAYS * SECONDS_PER_DAY;
 
 /**
  * @internal Build the Redis key for a cached indicator translation result.
