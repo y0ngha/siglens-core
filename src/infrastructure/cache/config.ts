@@ -303,6 +303,13 @@ export const ECONOMIC_EVENT_CACHE_TTL = SECONDS_PER_DAY;
  * buildEconomicEventCacheKey(hashAnalysisInput(JSON.stringify(input)));
  * // → 'v1:analysis:economic-event:deadbeefdeadbeef:p1'
  * ```
+ *
+ * Note: In production, `inputHash` is derived via `hashEconomicEventInput(input)`
+ * — NOT `hashAnalysisInput(JSON.stringify(input))`. `hashEconomicEventInput`
+ * serializes fields in a FIXED order (event → impact → actual → estimate →
+ * previous → unit) to guarantee a deterministic hash regardless of insertion
+ * order. Raw `JSON.stringify` is insertion-order-dependent and must not be used
+ * directly to construct this key.
  */
 export function buildEconomicEventCacheKey(inputHash: string): string {
     return `${CACHE_KEY_SCHEMA_VERSION}:analysis:economic-event:${inputHash}:${ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION}`;
