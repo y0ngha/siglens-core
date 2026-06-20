@@ -25,6 +25,13 @@ export function buildEconomicEventAnalysisPrompt(
     const previousStr = formatNullableNumber(input.previous);
     const unit = input.unit || '';
 
+    /**
+     * Appends the unit only when the value is present (not N/A).
+     * Rendering "N/A %" would be misleading — N/A has no associated unit.
+     */
+    const withUnit = (value: string): string =>
+        value === 'N/A' || !unit ? value : `${value} ${unit}`;
+
     return `You are a macroeconomic analyst. Analyse the announced economic data release below using ONLY the provided figures. Respond with a JSON object matching the exact schema. No markdown, no extra text — only valid JSON.
 
 ## Data Boundary
@@ -36,9 +43,9 @@ export function buildEconomicEventAnalysisPrompt(
 ## Event Details
 - Event: ${input.event}
 - Impact: ${input.impact}
-- Actual: ${actualStr}${unit ? ' ' + unit : ''}
-- Estimate: ${estimateStr}${unit ? ' ' + unit : ''}
-- Previous: ${previousStr}${unit ? ' ' + unit : ''}
+- Actual: ${withUnit(actualStr)}
+- Estimate: ${withUnit(estimateStr)}
+- Previous: ${withUnit(previousStr)}
 
 Key signal: Compare actual vs estimate (beat/miss/inline) and actual vs previous (acceleration/deceleration). The deviation direction and the impact level together drive sentiment.
 

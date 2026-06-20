@@ -4,10 +4,7 @@ import { buildEconomicEventAnalysisPrompt } from '@/domain/economy/economicEvent
 import { normalizeEconomicEventAnalysis } from '@/domain/economy/normalizeEconomicEventAnalysis';
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
 import type { SubmitEconomicEventAnalysisResult } from './types';
-import {
-    buildEconomicEventCacheKey,
-    ECONOMIC_EVENT_CACHE_TTL,
-} from '@/infrastructure/cache/config';
+import { buildEconomicEventCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     analysisSeed,
