@@ -26,6 +26,10 @@ export { peekMacroBriefingCache } from './application/economy/peekMacroBriefingC
 export { submitEconomicEventAnalysis } from './application/economy/submitEconomicEventAnalysis';
 export { pollEconomicEventAnalysis } from './application/economy/pollEconomicEventAnalysis';
 
+// Economy — indicator-name AI translation (submit/poll worker-job pattern)
+export { submitIndicatorTranslation } from './application/economy/submitIndicatorTranslation';
+export { pollIndicatorTranslation } from './application/economy/pollIndicatorTranslation';
+
 // Application background-task options (used by market / dashboard use-cases)
 export type { BackgroundTaskOptions } from './application/types';
 
@@ -116,6 +120,10 @@ export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCal
 export { buildEconomicEventAnalysisPrompt } from './domain/economy/economicEventPrompt';
 export { normalizeEconomicEventAnalysis } from './domain/economy/normalizeEconomicEventAnalysis';
 
+// Economy — indicator-name AI translation domain building blocks
+export { buildIndicatorTranslationPrompt } from './domain/economy/indicatorTranslationPrompt';
+export { normalizeIndicatorTranslation } from './domain/economy/normalizeIndicatorTranslation';
+
 // Model spec helpers
 export {
     getProvider,
@@ -196,6 +204,17 @@ export type {
     EconomicEventAnalysis,
     RawEconomicEventAnalysis,
 } from './domain/economy/types';
+
+// Economy — indicator-name translation result types
+export type {
+    SubmitIndicatorTranslationResult,
+    SubmitIndicatorTranslationCached,
+    SubmitIndicatorTranslationSubmitted,
+    PollIndicatorTranslationResult,
+    PollIndicatorTranslationProcessing,
+    PollIndicatorTranslationError,
+    PollIndicatorTranslationDone,
+} from './application/economy/types';
 
 // Economy (macro) application result types — produced by submit/poll, so they
 // live in the application layer (Architecture #0), mirroring financials.

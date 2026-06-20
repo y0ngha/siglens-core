@@ -576,6 +576,53 @@ export function buildOverallCacheKey(
 }
 
 /**
+ * Prompt-template version for the indicator-translation AI cache keys.
+ *
+ * Bump this string whenever the indicator-translation prompt template changes
+ * in a way that would make previously cached results stale. Old keys (e.g.
+ * `p1`) are simply never looked up after a bump and naturally expire via TTL.
+ *
+ * @internal
+ */
+export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
+ * @internal TTL for cached indicator translation results (30 days, in seconds).
+ *
+ * Indicator name translations are permanent: the English name of an
+ * economic indicator (e.g. "Core PCE Price Index YoY") maps to a fixed
+ * Korean equivalent. A long TTL amortises the per-translation LLM cost
+ * across thousands of requests without risking staleness.
+ */
+export const INDICATOR_TRANSLATION_CACHE_TTL = 30 * SECONDS_PER_DAY;
+
+/**
+ * @internal Build the Redis key for a cached indicator translation result.
+ *
+ * Format: `{version}:translation:indicator:<nameHash>:<promptVersion>`.
+ *
+ * The key folds a deterministic hash of the normalizedName so different
+ * indicator names always produce distinct keys. The prompt-version suffix
+ * allows prompt-template changes to invalidate the cache independently.
+ *
+ * Note: `nameHash` is derived by the application layer via
+ * `hashAnalysisInput(normalizedName)`. Do not construct this key format
+ * externally.
+ *
+ * @param nameHash - 16-char hex hash of the normalized indicator name.
+ * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * buildIndicatorTranslationCacheKey(hashAnalysisInput('Core PCE Price Index YoY'));
+ * // → 'v1:translation:indicator:deadbeefdeadbeef:p1'
+ * ```
+ */
+export function buildIndicatorTranslationCacheKey(nameHash: string): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:translation:indicator:${nameHash}:${INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION}`;
+}
+
+/**
  * Build the **content-free** "peek" key for the latest cached overall analysis.
  *
  * Format: `{version}:analysis:overall:peek:<symbol>:<timeframe>:<modelId>`.

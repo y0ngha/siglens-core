@@ -91,6 +91,9 @@ export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCal
 // Economy — per-event AI analysis domain helpers (browser-safe: pure functions only).
 export { buildEconomicEventAnalysisPrompt } from './domain/economy/economicEventPrompt';
 export { normalizeEconomicEventAnalysis } from './domain/economy/normalizeEconomicEventAnalysis';
+// Economy — indicator-name translation domain helpers (browser-safe: pure functions only).
+export { buildIndicatorTranslationPrompt } from './domain/economy/indicatorTranslationPrompt';
+export { normalizeIndicatorTranslation } from './domain/economy/normalizeIndicatorTranslation';
 export type {
     CalendarImpact,
     EconomicIndicatorPoint,
@@ -123,6 +126,13 @@ export type {
     PollEconomicEventAnalysisProcessing,
     PollEconomicEventAnalysisError,
     PollEconomicEventAnalysisDone,
+    SubmitIndicatorTranslationResult,
+    SubmitIndicatorTranslationCached,
+    SubmitIndicatorTranslationSubmitted,
+    PollIndicatorTranslationResult,
+    PollIndicatorTranslationProcessing,
+    PollIndicatorTranslationError,
+    PollIndicatorTranslationDone,
 } from './application/economy/types';
 
 // Financials analysis — domain helpers (server-only submit/poll/cancel use-cases

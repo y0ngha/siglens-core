@@ -118,3 +118,60 @@ export type PollEconomicEventAnalysisResult =
     | PollEconomicEventAnalysisProcessing
     | PollEconomicEventAnalysisError
     | PollEconomicEventAnalysisDone;
+
+// ─────────────────────────────────────────
+// Submit Indicator Translation
+// ─────────────────────────────────────────
+
+/** {@link submitIndicatorTranslation} cache-hit variant — translation already cached. */
+export interface SubmitIndicatorTranslationCached {
+    /** Discriminator: cache hit returned a previously produced translation. */
+    status: 'cached';
+    /** Cached Korean indicator name. */
+    nameKo: string;
+}
+
+/** {@link submitIndicatorTranslation} cache-miss variant — a fresh job was enqueued. */
+export interface SubmitIndicatorTranslationSubmitted {
+    /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
+    status: 'submitted';
+    /** Worker job identifier — pass to {@link pollIndicatorTranslation} to await the result. */
+    jobId: string;
+}
+
+/** Result of {@link submitIndicatorTranslation} — either a cache hit or a freshly submitted job. */
+export type SubmitIndicatorTranslationResult =
+    | SubmitIndicatorTranslationCached
+    | SubmitIndicatorTranslationSubmitted;
+
+// ─────────────────────────────────────────
+// Poll Indicator Translation
+// ─────────────────────────────────────────
+
+/** {@link pollIndicatorTranslation} variant — worker still running; the caller should retry. */
+export interface PollIndicatorTranslationProcessing {
+    /** Discriminator: worker job has not finished yet; caller should poll again. */
+    status: 'processing';
+}
+
+/** {@link pollIndicatorTranslation} variant — worker failed or returned an unusable result. */
+export interface PollIndicatorTranslationError {
+    /** Discriminator: worker reported failure or the result was missing/malformed. */
+    status: 'error';
+    /** Failure reason (worker error, missing/malformed result, etc.). */
+    error: string;
+}
+
+/** {@link pollIndicatorTranslation} variant — worker finished successfully with a Korean name. */
+export interface PollIndicatorTranslationDone {
+    /** Discriminator: worker finished successfully and a Korean name is available. */
+    status: 'done';
+    /** Korean indicator name produced by the translation job. */
+    nameKo: string;
+}
+
+/** Result of {@link pollIndicatorTranslation}. */
+export type PollIndicatorTranslationResult =
+    | PollIndicatorTranslationProcessing
+    | PollIndicatorTranslationError
+    | PollIndicatorTranslationDone;
