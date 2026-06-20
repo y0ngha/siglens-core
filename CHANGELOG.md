@@ -1,5 +1,20 @@
 # Changelog
 
+# [0.25.0](https://github.com/y0ngha/siglens-core/compare/v0.24.0...v0.25.0) (2026-06-20)
+
+
+### Bug Fixes
+
+* **economy:** analyzeEconomicEvent 리뷰 반영 — dead import 제거·캐시키 테스트 프로덕션 고정·N/A 단위 정리 ([56d158c](https://github.com/y0ngha/siglens-core/commit/56d158c7202e002a51ab7d34595a7f3beccac721))
+* **economy:** core PR [#157](https://github.com/y0ngha/siglens-core/issues/157) 리뷰 반영 — [@internal](https://github.com/internal) 제거·내부타입 비공개·import/first·as 주석·normalize try-catch·모델ID 단일화·doc/test 정리 ([75a8ad1](https://github.com/y0ngha/siglens-core/commit/75a8ad13bd2a8f9c556cc469828e55ccc465df9e))
+* **economy:** core PR [#157](https://github.com/y0ngha/siglens-core/issues/157) R2 반영 — parseLlmPayload 공유 추출·테스트 import 병합·PUBLIC_API 갱신·withUnit 모듈화·매직넘버/doc 정리 ([0332486](https://github.com/y0ngha/siglens-core/commit/03324861da0f8a1d3e3c6e796dd23f656b0dd9dc))
+
+
+### Features
+
+* **economy:** add analyzeEconomicEvent worker-job AI analysis family ([313209e](https://github.com/y0ngha/siglens-core/commit/313209e07c55e89ea8f87151798f2c7c160f5ebe))
+* **economy:** add translateIndicatorName worker-job AI translation family ([93bb7c0](https://github.com/y0ngha/siglens-core/commit/93bb7c0cf32ef7a2e2ab96be6a8cea6907e643fb))
+
 # [0.24.0](https://github.com/y0ngha/siglens-core/compare/v0.23.0...v0.24.0) (2026-06-18)
 
 
