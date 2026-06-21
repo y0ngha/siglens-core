@@ -1131,7 +1131,8 @@ describe('submitAnalysis 함수는', () => {
             // to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
-            expect(args.length).toBe(7);
+            // crypto phase adds an 8th arg (assetClass, defaulting to 'equity').
+            expect(args.length).toBe(8);
         });
 
         it('1Day가 아닌 타임프레임이면 일봉 데이터를 추가로 fetch한다', async () => {

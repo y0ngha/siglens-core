@@ -346,7 +346,8 @@ export async function submitOverallAnalysis(
         fearGreed ?? undefined,
         deps.options,
         optionsOiStale,
-        options.financialsScorecard
+        options.financialsScorecard,
+        options.assetClass ?? 'equity'
     );
     const jobId = crypto.randomUUID();
 

@@ -797,10 +797,9 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(seventh).toBe(mockSnapshot);
             // Phase 4-Core extended the signature to 9 positional args
             // (..., fearGreed, options, optionsOiStale). The financials phase
-            // appends a 10th positional arg (financialsScorecard). The first 7
-            // retain their meaning; args 8/9 are the options axis hooks and
-            // arg 10 is the precomputed financials scorecard.
-            expect(args.length).toBe(10);
+            // appends a 10th positional arg (financialsScorecard). The crypto
+            // phase appends an 11th (assetClass, defaulting to 'equity').
+            expect(args.length).toBe(11);
         });
 
         it('일봉 fetch가 throw해도 overall 분석은 fearGreed=undefined로 계속 진행된다', async () => {

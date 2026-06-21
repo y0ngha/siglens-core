@@ -22,6 +22,7 @@ import type {
 } from '@/application/usage/types';
 import type {
     AnalysisResponse,
+    AssetClass,
     EarningsCalendarItem,
     EnrichedNewsItem,
     FinancialsScorecard,
@@ -378,6 +379,12 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
+    /**
+     * Instrument asset class. Controls prompt framing: `'crypto'` treats absent
+     * fundamentals/options as intentional (not missing data).
+     * Defaults to `'equity'` for backward compatibility.
+     */
+    assetClass?: AssetClass;
 }
 
 /**
