@@ -1,5 +1,30 @@
 # Changelog
 
+# [0.26.0](https://github.com/y0ngha/siglens-core/compare/v0.25.0...v0.26.0) (2026-06-21)
+
+
+### Bug Fixes
+
+* **core:** PR [#158](https://github.com/y0ngha/siglens-core/issues/158) review round 1 — crypto fundamental-axis, dead-field removal, JSDoc/exports/docs, perf cache ([499d8ed](https://github.com/y0ngha/siglens-core/commit/499d8ed02d5704523e2a43bf21a24815dd3897ff))
+* **core:** PR [#158](https://github.com/y0ngha/siglens-core/issues/158) round 2 — private session helper, non-vacuous equity test, formatter consistency, timeless JSDoc ([1cf3ad5](https://github.com/y0ngha/siglens-core/commit/1cf3ad5c5e9170c9cc6b8d26a4853ad774d460e5))
+* **core:** PR [#158](https://github.com/y0ngha/siglens-core/issues/158) round 8 — PUBLIC_API return-type, ttl ceiling test, range-condition + DRY in utils ([839adbb](https://github.com/y0ngha/siglens-core/commit/839adbb9fe911273fb22d9a048c0e23d0d4de606))
+* **core:** remove unused imports (PR [#158](https://github.com/y0ngha/siglens-core/issues/158) round 5 lint warnings) ([f2ab93e](https://github.com/y0ngha/siglens-core/commit/f2ab93ed02ef810a3b3a55a445c7d2d4eb6305e1))
+* **prompt:** assetClass framing without fabricated chat context + crypto overall opener + falsifiable tests (core review R1-R4) ([9357a3e](https://github.com/y0ngha/siglens-core/commit/9357a3eb2635720169efe68de94fcdb813e13828))
+* **prompt:** make overall Data Boundary axis-label asset-class-aware (core review R2 round-2) ([8ddae7f](https://github.com/y0ngha/siglens-core/commit/8ddae7f3c387bc640047edf0ba08936b45bf02f0))
+* **test:** route assetClass via dedicated param, not removed context field (PR [#158](https://github.com/y0ngha/siglens-core/issues/158) typecheck) ([af00e67](https://github.com/y0ngha/siglens-core/commit/af00e67b7e5cd9a9a0abf33b3b3d558fa35fac17))
+* **types:** restore CurrentAnalysisContext backward compat — tagged union only, assetClass optional per member ([e778746](https://github.com/y0ngha/siglens-core/commit/e77874644969850dcf0f05e1a5cbf2506988e55d))
+
+
+### Features
+
+* **app:** thread assetClass through submit + chat use-cases ([4dd2ac1](https://github.com/y0ngha/siglens-core/commit/4dd2ac1b75f06bc1a7a0b6401bc96cfee04a5549))
+* **cache:** session-aware computeBarsEffectiveTtl (crypto 24/7) ([6185241](https://github.com/y0ngha/siglens-core/commit/61852419401fb02e250d497cb2a86e5ead8cc73c))
+* **core:** export AssetClass, MarketSessionSpec, session functions ([3e924ea](https://github.com/y0ngha/siglens-core/commit/3e924eabd634851aa5398c4192a71903875608e3))
+* **prompt:** assetClass-aware analysis prompt framing ([da0e099](https://github.com/y0ngha/siglens-core/commit/da0e099dc9a5e5177ff837b8a8bace1a24b01308))
+* **prompt:** assetClass-aware chat prompt framing ([cb87a38](https://github.com/y0ngha/siglens-core/commit/cb87a38ba8a150d767eeca4f7d95e2a87f5ee0b8))
+* **session:** add MarketSessionSpec and spec-driven session functions ([538c334](https://github.com/y0ngha/siglens-core/commit/538c33465a33145ee77207c30575270c2be4c402))
+* **types:** add AssetClass domain type ([883e68c](https://github.com/y0ngha/siglens-core/commit/883e68c2445319741ecf4c847ab68d8ff54e4c20))
+
 # [0.25.0](https://github.com/y0ngha/siglens-core/compare/v0.24.0...v0.25.0) (2026-06-20)
 
 
