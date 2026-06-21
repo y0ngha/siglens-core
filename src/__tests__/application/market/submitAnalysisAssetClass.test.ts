@@ -68,10 +68,6 @@ const mockBarsData = {
 describe('submitAnalysis assetClass forwarding', () => {
     const originalEnv = process.env;
 
-    afterEach(() => {
-        process.env = originalEnv;
-    });
-
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubGlobal('fetch', mockFetch);
@@ -91,6 +87,10 @@ describe('submitAnalysis assetClass forwarding', () => {
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
         mockComputeFearGreedIndex.mockReturnValue(null);
         mockCacheGet.mockResolvedValue(null); // cache miss → triggers analysis
+    });
+
+    afterEach(() => {
+        process.env = originalEnv;
     });
 
     it('forwards assetClass=crypto into the analysis prompt', async () => {

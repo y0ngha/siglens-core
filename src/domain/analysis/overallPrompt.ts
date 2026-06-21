@@ -315,6 +315,9 @@ function formatFinancials(
  *                         when no financial data is available. Unlike the four
  *                         polled axes, this is synchronously injected; a
  *                         missing scorecard renders a Korean "데이터 없음" hint.
+ * @param assetClass - Instrument asset class. `'crypto'` treats absent fundamental,
+ *   options, and financials axis data as intentional (not missing) and adjusts the
+ *   role line and axis label accordingly. Defaults to `'equity'`.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
@@ -338,29 +341,26 @@ export function buildOverallAnalysisPrompt(
     const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
     const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
     const { label, context } = TIMEFRAME_CONFIG[timeframe];
+    const isCrypto = assetClass === 'crypto';
 
     const fearGreedBlock =
         fearGreed !== undefined
             ? `\n\n${formatFearGreedSection(fearGreed)}`
             : '';
 
-    const assetContext =
-        assetClass === 'crypto'
-            ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
-            : `This is a publicly traded U.S. equity.`;
+    const assetContext = isCrypto
+        ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
+        : `This is a publicly traded U.S. equity.`;
 
-    const roleAndAxisLine =
-        assetClass === 'crypto'
-            ? `You are a senior markets analyst integrating available-axis data into a unified investment verdict. Analyse the available-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.`
-            : `You are a senior equity analyst integrating technical, fundamental, news, and options analysis into a unified investment verdict. Analyse the four-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.`;
+    const roleAndAxisLine = isCrypto
+        ? `You are a senior markets analyst integrating available-axis data into a unified investment verdict. Analyse the available-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.`
+        : `You are a senior equity analyst integrating technical, fundamental, news, and options analysis into a unified investment verdict. Analyse the four-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.`;
 
-    const axisDataLabel =
-        assetClass === 'crypto' ? 'available-axis' : 'four-axis';
+    const axisDataLabel = isCrypto ? 'available-axis' : 'four-axis';
 
-    const fundamentalSection =
-        assetClass === 'crypto'
-            ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
-            : `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`;
+    const fundamentalSection = isCrypto
+        ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
+        : `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`;
 
     return `${roleAndAxisLine}
 ${assetContext}

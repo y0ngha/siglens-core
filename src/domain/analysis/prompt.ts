@@ -1594,6 +1594,9 @@ const buildSkillSelectionContext = (
  * @param skills - Skill definitions to inject (defaults to none).
  * @param timeframe - Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
  * @param fearGreed - Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)" section is appended.
+ * @param assetClass - Instrument asset class controlling prompt framing. `'crypto'` drops
+ *   U.S. equity context (earnings, fundamentals, analyst ratings) and adds 24/7 market
+ *   context. Defaults to `'equity'` for backward compatibility.
  * @returns The fully-rendered prompt string.
  *
  * @see calculateIndicators

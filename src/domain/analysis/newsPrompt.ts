@@ -66,6 +66,9 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * @param news              - Enriched news items with per-card analysis.
  * @param upcomingCalendar  - Upcoming or recent earnings events for the symbol.
  * @param skills            - All loaded skills; non-news entries are filtered out.
+ * @param assetClass - Optional instrument asset class. `'crypto'` drops U.S. equity
+ *   framing (earnings, analyst ratings) and adds cryptocurrency context. Defaults to
+ *   `'equity'` for backward compatibility. Available on the 6-argument overload only.
  * @returns Prompt string ready to be sent to the LLM worker.
  */
 export function buildNewsAnalysisPrompt(
