@@ -2690,37 +2690,33 @@ export type ResponseJsonSchema = {
  * Injected as context into the chat system prompt so the assistant can reference
  * live numbers from the user's current page.
  *
- * Each variant carries an optional `assetClass` field so callers (e.g. crypto
- * pages) can signal prompt-framing intent without changing the tagged discriminant.
- * Existing consumers that do not set `assetClass` default to `'equity'`.
+ * Asset-class framing is controlled by the independent `assetClass` parameter on
+ * `buildChatPrompt` — it is NOT carried per-variant here. The two concerns are
+ * decoupled: a caller can provide a context without specifying `assetClass` and
+ * vice versa.
  */
 export type CurrentAnalysisContext =
-    | { kind: 'technical'; payload: AnalysisResponse; assetClass?: AssetClass }
+    | { kind: 'technical'; payload: AnalysisResponse }
     | {
           kind: 'fundamental';
           payload: FundamentalAnalysisResponse;
-          assetClass?: AssetClass;
       }
-    | { kind: 'news'; payload: NewsAnalysisResponse; assetClass?: AssetClass }
+    | { kind: 'news'; payload: NewsAnalysisResponse }
     | {
           kind: 'overall';
           payload: OverallAnalysisResponse;
-          assetClass?: AssetClass;
       }
     | {
           kind: 'options';
           payload: OptionsAnalysisResponse;
-          assetClass?: AssetClass;
       }
     | {
           kind: 'financials';
           payload: FinancialsAnalysisResponse;
-          assetClass?: AssetClass;
       }
     | {
           kind: 'congress';
           payload: CongressTrendResponse;
-          assetClass?: AssetClass;
       };
 
 // --- Options Analysis Types ---

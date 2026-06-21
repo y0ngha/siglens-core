@@ -116,6 +116,12 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  * Unlike the analysis-cache TTL policy (which clamps to the session **close**
  * boundary), this function uses the session **open** boundary.
  *
+ * **ET-only limitation**: the off-hours fallback (`secondsUntilNextEtRegularOpen`)
+ * is hard-wired to the US Eastern Time schedule. Today only
+ * {@link US_EQUITY_SESSION} and {@link CRYPTO_SESSION} (which short-circuits to
+ * `BARS_OPEN_TTL_SECONDS`) are fully supported. A future scheduled spec for a
+ * different timezone (e.g. KST) would need a spec-driven next-open calculation.
+ *
  * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
  *   the parameter is kept for signature consistency with the analysis-cache TTL helper.
  * @param now - Reference time for market-session detection. Pass explicitly for
@@ -128,7 +134,6 @@ export function computeBarsEffectiveTtl(
     // TODO(kr-equity): generalize next-open for scheduled non-ET specs
     session: MarketSessionSpec = US_EQUITY_SESSION
 ): number {
-    void _timeframe; // policy is session-driven, not timeframe-driven (kept for signature parity)
     if (session.kind === 'always-open') return BARS_OPEN_TTL_SECONDS;
     if (isRegularSessionOpen(session, now)) return BARS_OPEN_TTL_SECONDS;
     return Math.min(

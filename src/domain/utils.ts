@@ -63,9 +63,6 @@ export const MARKET_CLOSE_MINUTE = 0;
 
 /** US 정규장 개장 시각을 자정 기준 분으로 환산 (09:30 → 570). */
 const ET_REGULAR_OPEN_MINUTES = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
-// ET_REGULAR_CLOSE_MINUTES (960) was only used by the old getEtSessionStatus body,
-// now delegated to getSessionStatus(US_EQUITY_SESSION). Keep MARKET_CLOSE_HOUR/MINUTE
-// exported for consumers, but drop the local computed constant.
 
 const ET_SESSION_FORMATTER = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',

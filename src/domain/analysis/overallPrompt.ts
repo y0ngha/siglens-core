@@ -357,6 +357,11 @@ export function buildOverallAnalysisPrompt(
     const axisDataLabel =
         assetClass === 'crypto' ? 'available-axis' : 'four-axis';
 
+    const fundamentalSection =
+        assetClass === 'crypto'
+            ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
+            : `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`;
+
     return `${roleAndAxisLine}
 ${assetContext}
 
@@ -373,8 +378,7 @@ ${context}
 ## Axis 1 — Technical Analysis
 ${formatTechnical(technical)}${fearGreedBlock}
 
-## Axis 2 — Fundamental Analysis
-${formatFundamental(fundamental)}
+${fundamentalSection}
 
 ## Axis 3 — News Analysis
 ${formatNews(news)}
@@ -423,7 +427,8 @@ Rules:
 - Respond with valid JSON only. No markdown fences.
 - All KO fields must be written in Korean (존댓말).
 - scenarios must include all three entries: bullish, neutral, bearish — in any order.
-- technicalBulletsKo, fundamentalBulletsKo, newsBulletsKo: provide 2–4 bullets each.
+- technicalBulletsKo, newsBulletsKo: provide 2–4 bullets each.
+- fundamentalBulletsKo: provide 2–4 bullets for equity assets; leave the array empty for crypto assets (no corporate fundamentals apply).
 - optionsBulletsKo: provide 2–4 bullets when options data is present; leave the array empty when the options axis indicates it was not included.
 - financialsBulletsKo: provide 2–4 bullets when the financials scorecard is present; leave the array empty when the scorecard section indicates no data.
 - riskFactorsKo: list 3–5 key risk factors combining all available axes (technical, fundamental, news, options, and financials).

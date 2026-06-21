@@ -325,7 +325,15 @@ export function buildChatPrompt(
         : (userMessageOrContext as string);
     const currentAnalysisContext = oldSignature
         ? (userMessageOrContext as CurrentAnalysisContext | undefined)
-        : (maybeCurrentAnalysisContext as CurrentAnalysisContext | undefined);
+        : // The 7th positional arg (`maybeCurrentAnalysisContext`) is typed as
+          // `CurrentAnalysisContext | AssetClass` in the implementation
+          // signature to accommodate both overloads. On the new 8-arg overload
+          // path (`!oldSignature`), callers bind `assetClass` to the 8th arg
+          // and `currentAnalysisContext` to the 7th — so when we reach this
+          // branch the value is always `CurrentAnalysisContext | undefined`,
+          // never `AssetClass`. The cast is therefore safe by the overload
+          // contract established in the two explicit signatures above.
+          (maybeCurrentAnalysisContext as CurrentAnalysisContext | undefined);
 
     // assetClass is an independent framing parameter — it does NOT gate or
     // synthesize currentAnalysisContext. The context section is emitted if and

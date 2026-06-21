@@ -4,6 +4,9 @@ import type { EtSessionStatus } from '@/domain/types';
  * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
  * `scheduled` = a regional regular session (US ET today, KST later).
  * Pure data so callers can branch without per-market code.
+ *
+ * DST is handled automatically by `Intl.DateTimeFormat` with the IANA
+ * `timeZone` — no `dst` field is needed on the spec.
  */
 export type MarketSessionSpec =
     | { kind: 'always-open' }
@@ -13,7 +16,6 @@ export type MarketSessionSpec =
           openMinute: number; // minutes from local midnight
           closeMinute: number; // close excluded
           weekendDays: number[]; // local weekday indexes (0=Sun..6=Sat)
-          dst: 'us' | 'none';
       };
 
 /** US NYSE regular session: 09:30–16:00 ET, Mon–Fri. */
@@ -23,24 +25,43 @@ export const US_EQUITY_SESSION: MarketSessionSpec = {
     openMinute: 9 * 60 + 30,
     closeMinute: 16 * 60,
     weekendDays: [0, 6],
-    dst: 'us',
 };
 
 /** Crypto: trades 24/7. */
 export const CRYPTO_SESSION: MarketSessionSpec = { kind: 'always-open' };
 
-/** Local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in `timeZone`. */
+/**
+ * @internal
+ * Derive local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in
+ * the given IANA `timeZone`. Used internally by {@link getSessionStatus}; not
+ * part of the public API.
+ *
+ * The `Intl.DateTimeFormat` instance is cached per `timeZone` so repeated
+ * calls for the same zone (e.g. `'America/New_York'`) do not allocate a new
+ * formatter on every invocation.
+ */
+const _dtfCache = new Map<string, Intl.DateTimeFormat>();
+
+function _getDtf(timeZone: string): Intl.DateTimeFormat {
+    let dtf = _dtfCache.get(timeZone);
+    if (dtf === undefined) {
+        dtf = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        });
+        _dtfCache.set(timeZone, dtf);
+    }
+    return dtf;
+}
+
 export function localSessionParts(
     now: Date,
     timeZone: string
 ): { weekdayIndex: number; minutesOfDay: number } {
-    const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        weekday: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    });
+    const fmt = _getDtf(timeZone);
     const parts = fmt.formatToParts(now);
     const wd = parts.find(p => p.type === 'weekday')?.value ?? 'Sun';
     const hour = Number(parts.find(p => p.type === 'hour')?.value ?? '0') % 24;
@@ -57,7 +78,20 @@ export function localSessionParts(
     return { weekdayIndex: map[wd] ?? 0, minutesOfDay: hour * 60 + minute };
 }
 
-/** Classify `now` against a session spec. */
+/**
+ * Classify an instant against a {@link MarketSessionSpec}.
+ *
+ * DST-safe: the IANA `timeZone` on `spec` is resolved via `Intl.DateTimeFormat`,
+ * so summer-time transitions are handled automatically by the platform without
+ * any manual offset arithmetic.
+ *
+ * @param spec - The session schedule to evaluate against. Use
+ *   {@link US_EQUITY_SESSION} for NYSE, {@link CRYPTO_SESSION} for 24/7 assets.
+ * @param now - The instant to classify.
+ * @returns `'open'` when the session is active (including any `always-open`
+ *   spec), `'weekend'` when `now` falls on a configured weekend day, or
+ *   `'closed'` for any other weekday time outside the open window.
+ */
 export function getSessionStatus(
     spec: MarketSessionSpec,
     now: Date
@@ -74,7 +108,19 @@ export function getSessionStatus(
     return 'closed';
 }
 
-/** Whether `now` is inside the regular session for this spec. */
+/**
+ * Return `true` when `now` falls inside the regular trading session for
+ * the given {@link MarketSessionSpec}.
+ *
+ * Thin wrapper over {@link getSessionStatus} that collapses the 3-state
+ * result to a boolean. DST-safe — see {@link getSessionStatus} for details.
+ *
+ * @param spec - The session schedule to evaluate against. Use
+ *   {@link US_EQUITY_SESSION} for NYSE, {@link CRYPTO_SESSION} for 24/7 assets.
+ * @param now - The instant to test.
+ * @returns `true` only while the session is open (i.e. `getSessionStatus`
+ *   returns `'open'`); `false` on weekends or closed weekday hours.
+ */
 export function isRegularSessionOpen(
     spec: MarketSessionSpec,
     now: Date

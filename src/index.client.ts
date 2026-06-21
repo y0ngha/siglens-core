@@ -234,7 +234,16 @@ export {
 // Market session — DST-safe US regular-session (ET) classification. Pure and
 // browser-safe (no Node deps), so it belongs in the client entrypoint too.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
-export type { EtSessionStatus } from './domain/types';
+// Spec-driven session helpers + canonical spec constants (browser-safe; same
+// pure-domain rationale as getEtSessionStatus above).
+export {
+    US_EQUITY_SESSION,
+    CRYPTO_SESSION,
+    getSessionStatus,
+    isRegularSessionOpen,
+} from './domain/session';
+export type { AssetClass, EtSessionStatus } from './domain/types';
+export type { MarketSessionSpec } from './domain/session';
 
 // =============================================================================
 // Tier 4 — Public Types & Constants
