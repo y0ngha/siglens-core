@@ -12,7 +12,7 @@ describe('MarketSessionSpec', () => {
     const monOpen = new Date('2026-06-22T14:30:00Z');
     // 2026-06-21 14:30 UTC = Sunday → weekend for ET.
     const sun = new Date('2026-06-21T14:30:00Z');
-    // 2026-06-22 02:00 UTC = 22:00 ET prev day (Sunday night) → closed for ET.
+    // 2026-06-22 08:00 UTC = 04:00 EDT (Monday pre-market) → closed for ET.
     const monPremarketUtc = new Date('2026-06-22T08:00:00Z'); // 04:00 ET → closed
 
     it('US equity session: open during ET regular hours', () => {

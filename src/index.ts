@@ -199,8 +199,7 @@ export {
     getSessionStatus,
     isRegularSessionOpen,
 } from './domain/session';
-export type { MarketSessionSpec } from './domain/session';
-export type { AssetClass } from './domain/types';
+export type { AssetClass, MarketSessionSpec } from './domain/types';
 
 // Economy (macro) domain types — /economy page snapshot + briefing
 export type {

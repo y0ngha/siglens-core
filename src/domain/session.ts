@@ -1,32 +1,10 @@
-import type { MarketSessionStatus } from '@/domain/types';
+import type { MarketSessionStatus, MarketSessionSpec } from '@/domain/types';
 import {
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
     MARKET_CLOSE_HOUR,
     MARKET_CLOSE_MINUTE,
 } from '@/domain/constants/time';
-
-/**
- * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
- * `scheduled` = a regional regular session (US ET today, KST later).
- * Pure data so callers can branch without per-market code.
- *
- * DST is handled automatically by `Intl.DateTimeFormat` with the IANA
- * `timeZone` — no `dst` field is needed on the spec.
- */
-export type MarketSessionSpec =
-    | { kind: 'always-open' }
-    | {
-          kind: 'scheduled';
-          /** IANA timezone, e.g. `'America/New_York'`. */
-          timeZone: string;
-          /** Open time in minutes from local midnight (inclusive), e.g. 570 for 09:30. */
-          openMinute: number;
-          /** Close time in minutes from local midnight (exclusive), e.g. 960 for 16:00. */
-          closeMinute: number;
-          /** Local weekday indexes treated as weekend (0 = Sun … 6 = Sat). */
-          weekendDays: number[];
-      };
 
 /**
  * US NYSE regular session: 09:30–16:00 ET, Mon–Fri.

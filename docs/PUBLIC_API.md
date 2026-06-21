@@ -439,7 +439,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **`MarketSessionStatus` (PR #158 R4 추가, Tier 4)** — `EtSessionStatus`의 의미 중립적 별칭(`type MarketSessionStatus = EtSessionStatus`). `getSessionStatus`/`isRegularSessionOpen`의 반환-타입 어노테이션에 사용되며, spec-driven generic 세션 함수의 소비자가 보다 중립적인 이름으로 타입을 참조할 수 있도록 도입. `EtSessionStatus`는 하위 호환성을 위해 유지되며 제거되지 않는다. `src/index.ts`, `src/index.client.ts` 양 진입점에서 export.
 
-**시장 세션 스펙/상수 (PR #158 추가)** — `MarketSessionSpec` (discriminated union: `{ kind: 'always-open' }` | `{ kind: 'scheduled'; timeZone; openMinute; closeMinute; weekendDays }`), `US_EQUITY_SESSION` (NYSE 09:30–16:00 ET Mon–Fri 기본값), `CRYPTO_SESSION` (24/7 always-open 기본값) — `domain/session.ts`. `dst` 필드는 `Intl.DateTimeFormat` IANA zone이 DST를 자동 처리하므로 포함되지 않는다.
+**시장 세션 스펙/상수 (PR #158 추가)** — `MarketSessionSpec` (discriminated union: `{ kind: 'always-open' }` | `{ kind: 'scheduled'; timeZone; openMinute; closeMinute; weekendDays: readonly number[] }`), `US_EQUITY_SESSION` (NYSE 09:30–16:00 ET Mon–Fri 기본값), `CRYPTO_SESSION` (24/7 always-open 기본값). `MarketSessionSpec` 타입 정의는 `domain/types.ts`(PR #158 R7에서 이동; 값 상수 `US_EQUITY_SESSION`/`CRYPTO_SESSION`은 `domain/session.ts` 잔류). `dst` 필드는 `Intl.DateTimeFormat` IANA zone이 DST를 자동 처리하므로 포함되지 않는다.
 
 **자산 클래스 (PR #158)** — `AssetClass` (`'equity' \| 'crypto'`) — `domain/types.ts`, `index.client.ts`에도 노출. `buildChatPrompt` 8번째 인자(`assetClass?: AssetClass`)와 `submitAnalysis`/`submitOverallAnalysis`/`submitNewsAnalysis`의 `options.assetClass?: AssetClass` 선택적 필드가 이 타입을 사용한다.
 

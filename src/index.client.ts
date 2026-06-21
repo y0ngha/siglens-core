@@ -246,8 +246,8 @@ export type {
     AssetClass,
     EtSessionStatus,
     MarketSessionStatus,
+    MarketSessionSpec,
 } from './domain/types';
-export type { MarketSessionSpec } from './domain/session';
 
 // =============================================================================
 // Tier 4 — Public Types & Constants

@@ -14,11 +14,8 @@ import {
     computeSecondsUntilCacheExpiry,
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
-import {
-    isRegularSessionOpen,
-    US_EQUITY_SESSION,
-    type MarketSessionSpec,
-} from '@/domain/session';
+import type { MarketSessionSpec } from '@/domain/types';
+import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 
 /**
  * @internal TTL for cached market briefings (in seconds).
@@ -126,6 +123,10 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  *   the parameter is kept for signature consistency with the analysis-cache TTL helper.
  * @param now - Reference time for market-session detection. Pass explicitly for
  *   deterministic testing.
+ * @param session - Market session schedule determining open vs off-hours TTL.
+ *   Defaults to US_EQUITY_SESSION; pass CRYPTO_SESSION for 24/7 assets (always
+ *   returns BARS_OPEN_TTL_SECONDS). Off-hours fallback timing is ET-based; a
+ *   non-ET scheduled spec would fall back to ET next-open timing.
  * @returns Effective TTL in seconds.
  */
 export function computeBarsEffectiveTtl(
@@ -133,6 +134,9 @@ export function computeBarsEffectiveTtl(
     now: Date,
     session: MarketSessionSpec = US_EQUITY_SESSION
 ): number {
+    // Fast path: skip the Intl/timezone computation entirely for 24/7 assets.
+    // isRegularSessionOpen would also return true for always-open, but this
+    // branch avoids the Intl.DateTimeFormat overhead for crypto callers.
     if (session.kind === 'always-open') return BARS_OPEN_TTL_SECONDS;
     if (isRegularSessionOpen(session, now)) return BARS_OPEN_TTL_SECONDS;
     return Math.min(

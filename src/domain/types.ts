@@ -22,6 +22,28 @@ export type MarketSessionStatus = EtSessionStatus;
 /** Top-level asset class. Controls prompt framing across the analysis and chat layers. */
 export type AssetClass = 'equity' | 'crypto';
 
+/**
+ * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
+ * `scheduled` = a regional regular session (US ET today, KST later).
+ * Pure data so callers can branch without per-market code.
+ *
+ * DST is handled automatically by `Intl.DateTimeFormat` with the IANA
+ * `timeZone` — no `dst` field is needed on the spec.
+ */
+export type MarketSessionSpec =
+    | { kind: 'always-open' }
+    | {
+          kind: 'scheduled';
+          /** IANA timezone, e.g. `'America/New_York'`. */
+          timeZone: string;
+          /** Open time in minutes from local midnight (inclusive), e.g. 570 for 09:30. */
+          openMinute: number;
+          /** Close time in minutes from local midnight (exclusive), e.g. 960 for 16:00. */
+          closeMinute: number;
+          /** Local weekday indexes treated as weekend (0 = Sun … 6 = Sat). */
+          weekendDays: readonly number[];
+      };
+
 /** Definition of a market index tracked by the dashboard. */
 export interface IndexTicker {
     symbol: string;
