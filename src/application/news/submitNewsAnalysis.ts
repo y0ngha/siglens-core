@@ -190,7 +190,8 @@ export async function submitNewsAnalysis(
         companyName,
         news,
         upcomingCalendar,
-        skills
+        skills,
+        options.assetClass ?? 'equity'
     );
     const jobId = crypto.randomUUID();
 

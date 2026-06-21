@@ -2,6 +2,7 @@ import type { ChatbotLimitError } from '@/application/usage/types';
 import type { CallAiProvider } from '@/domain/ports/aiProvider';
 import type {
     AnalysisResponse,
+    AssetClass,
     ChatMessage,
     CurrentAnalysisContext,
     ModelId,
@@ -68,6 +69,12 @@ export interface RequestChatCompletionParams {
      * behavior.
      */
     currentAnalysisContext?: CurrentAnalysisContext;
+    /**
+     * Instrument asset class. Controls chat prompt framing: `'crypto'` drops
+     * U.S. equity framing and "unrelated stock" refusal examples.
+     * Defaults to `'equity'` for backward compatibility.
+     */
+    assetClass?: AssetClass;
 }
 
 /** Injectable dependencies for `requestChatCompletion`. */

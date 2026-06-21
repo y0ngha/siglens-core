@@ -3,6 +3,7 @@
 
 import type {
     AnalysisResponse,
+    AssetClass,
     ChatMessage,
     ChatPromptPayload,
     CongressTrendResponse,
@@ -256,8 +257,14 @@ function formatCurrentAnalysisContext(
  * detected patterns, indicator signals, and price targets so the LLM can
  * answer without re-fetching anything.
  *
- * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
- * @param companyName - Full company name (e.g. `"Apple Inc."`).
+ * `assetClass` is a standalone framing parameter — it controls the role line
+ * and refusal-example wording only. It is **independent** of
+ * `currentAnalysisContext`: passing one does not imply the other, and a
+ * caller that only sets `assetClass` (without a context) will never produce
+ * a spurious `## Current analysis context` section.
+ *
+ * @param symbol - Ticker symbol (e.g. `"AAPL"` or `"BTCUSD"`).
+ * @param companyName - Full company/asset name (e.g. `"Apple Inc."` or `"Bitcoin"`).
  * @param timeframe - The timeframe of the analysis being discussed.
  * @param analysis - The `AnalysisResponse` from a previously completed job.
  * @param history - Prior conversation turns; appended verbatim to the
@@ -268,6 +275,10 @@ function formatCurrentAnalysisContext(
  *   overall / options). When provided, a `## Current analysis context` section
  *   is appended to the system prompt so the LLM can reference live numbers
  *   without re-fetching data. Omit to keep the original behavior.
+ * @param assetClass - Optional asset class controlling prompt framing
+ *   (role line + refusal example). Defaults to `'equity'`. Does NOT gate
+ *   the `## Current analysis context` section — that is controlled solely
+ *   by `currentAnalysisContext`.
  * @returns The prompt payload — see {@link ChatPromptPayload}.
  */
 export function buildChatPrompt(
@@ -285,7 +296,8 @@ export function buildChatPrompt(
     analysis: AnalysisResponse,
     history: ChatMessage[],
     userMessage: string,
-    currentAnalysisContext?: CurrentAnalysisContext
+    currentAnalysisContext?: CurrentAnalysisContext,
+    assetClass?: AssetClass
 ): ChatPromptPayload;
 export function buildChatPrompt(
     symbol: string,
@@ -294,7 +306,8 @@ export function buildChatPrompt(
     analysisOrHistory: AnalysisResponse | ChatMessage[],
     historyOrUserMessage: ChatMessage[] | string,
     userMessageOrContext?: string | CurrentAnalysisContext,
-    maybeCurrentAnalysisContext?: CurrentAnalysisContext
+    maybeCurrentAnalysisContext?: CurrentAnalysisContext | AssetClass,
+    maybeAssetClass?: AssetClass
 ): ChatPromptPayload {
     const oldSignature = isTimeframe(companyNameOrTimeframe);
     const companyName = oldSignature ? symbol : companyNameOrTimeframe;
@@ -312,13 +325,33 @@ export function buildChatPrompt(
         : (userMessageOrContext as string);
     const currentAnalysisContext = oldSignature
         ? (userMessageOrContext as CurrentAnalysisContext | undefined)
-        : maybeCurrentAnalysisContext;
+        : // The 7th positional arg (`maybeCurrentAnalysisContext`) is typed as
+          // `CurrentAnalysisContext | AssetClass` in the implementation
+          // signature to accommodate both overloads. On the new 8-arg overload
+          // path (`!oldSignature`), callers bind `assetClass` to the 8th arg
+          // and `currentAnalysisContext` to the 7th — so when we reach this
+          // branch the value is always `CurrentAnalysisContext | undefined`,
+          // never `AssetClass`. The cast is therefore safe by the overload
+          // contract established in the two explicit signatures above.
+          (maybeCurrentAnalysisContext as CurrentAnalysisContext | undefined);
+
+    // assetClass is an independent framing parameter — it does NOT gate or
+    // synthesize currentAnalysisContext. The context section is emitted if and
+    // only if currentAnalysisContext is explicitly provided by the caller.
+    const assetClass: AssetClass = oldSignature
+        ? 'equity'
+        : (maybeAssetClass ?? 'equity');
+    const isCrypto = assetClass === 'crypto';
+    const assetKind = isCrypto ? 'cryptocurrency' : 'U.S. equity';
+    const refuseExample = isCrypto
+        ? `- REFUSE (unrelated asset): "다른 코인은 지금 어때요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`
+        : `- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`;
 
     const rec = analysis.actionRecommendation;
     const subject =
         companyName === symbol ? symbol : `${symbol} (${companyName})`;
 
-    const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject}.
+    const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject} (${assetKind}).
 Ground every answer in the analysis data provided below.
 If a requested price, indicator, event, or market fact is not present in the provided analysis data, say in Korean that the data is not included instead of guessing.
 You MAY answer follow-up questions when they are clearly connected to this analysis, including:
@@ -337,7 +370,7 @@ Do not refuse a question only because the exact wording is absent from the repor
 ## Boundary Few-Shot
 - ALLOW (a level/indicator/scenario in this analysis): "180 지지선이 깨지면 어떻게 돼요?" → answer using the provided support level and scenarios.
 - ALLOW (a concept from your prior answer): "방금 말한 다이버전스가 정확히 뭐예요?" → explain the concept and connect it back to this analysis.
-- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."
+${refuseExample}
 - REFUSE (unrelated macro / personal portfolio advice): "연준 금리 결정이 제 포트폴리오에 어떤 영향을 줘요?" → decline with the same Korean line.
 
 The user is NOT a technical trader — they may not know terms like RSI, MACD, or support levels.

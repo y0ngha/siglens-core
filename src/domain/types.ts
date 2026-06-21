@@ -6,6 +6,44 @@ export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 /** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
 export type EtSessionStatus = 'weekend' | 'open' | 'closed';
 
+/**
+ * Generic market-session state alias for the spec-driven session helpers
+ * ({@link getSessionStatus}, {@link isRegularSessionOpen}).
+ *
+ * Identical to {@link EtSessionStatus} at the type level — introduced as a
+ * forward-compatible alias so callers of the generic helpers can annotate with
+ * the semantically neutral name without a breaking rename of `EtSessionStatus`.
+ * Both names remain valid; `EtSessionStatus` is kept for backward compatibility.
+ *
+ * @see {@link EtSessionStatus} for the underlying union (`'weekend' | 'open' | 'closed'`).
+ */
+export type MarketSessionStatus = EtSessionStatus;
+
+/** Top-level asset class. Controls prompt framing across the analysis and chat layers. */
+export type AssetClass = 'equity' | 'crypto';
+
+/**
+ * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
+ * `scheduled` = a regional regular session (US ET today, KST later).
+ * Pure data so callers can branch without per-market code.
+ *
+ * DST is handled automatically by `Intl.DateTimeFormat` with the IANA
+ * `timeZone` — no `dst` field is needed on the spec.
+ */
+export type MarketSessionSpec =
+    | { kind: 'always-open' }
+    | {
+          kind: 'scheduled';
+          /** IANA timezone, e.g. `'America/New_York'`. */
+          timeZone: string;
+          /** Open time in minutes from local midnight (inclusive), e.g. 570 for 09:30. */
+          openMinute: number;
+          /** Close time in minutes from local midnight (exclusive), e.g. 960 for 16:00. */
+          closeMinute: number;
+          /** Local weekday indexes treated as weekend (0 = Sun … 6 = Sat). */
+          weekendDays: readonly number[];
+      };
+
 /** Definition of a market index tracked by the dashboard. */
 export interface IndexTicker {
     symbol: string;
@@ -2686,15 +2724,41 @@ export type ResponseJsonSchema = {
  * Tagged union representing the analysis result currently in view by the chatbot.
  * Injected as context into the chat system prompt so the assistant can reference
  * live numbers from the user's current page.
+ *
+ * Asset-class framing is controlled by the independent `assetClass` parameter on
+ * `buildChatPrompt` — it is NOT carried per-variant here. The two concerns are
+ * decoupled: a caller can provide a context without specifying `assetClass` and
+ * vice versa.
  */
 export type CurrentAnalysisContext =
-    | { kind: 'technical'; payload: AnalysisResponse }
-    | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
-    | { kind: 'news'; payload: NewsAnalysisResponse }
-    | { kind: 'overall'; payload: OverallAnalysisResponse }
-    | { kind: 'options'; payload: OptionsAnalysisResponse }
-    | { kind: 'financials'; payload: FinancialsAnalysisResponse }
-    | { kind: 'congress'; payload: CongressTrendResponse };
+    | {
+          kind: 'technical';
+          payload: AnalysisResponse;
+      }
+    | {
+          kind: 'fundamental';
+          payload: FundamentalAnalysisResponse;
+      }
+    | {
+          kind: 'news';
+          payload: NewsAnalysisResponse;
+      }
+    | {
+          kind: 'overall';
+          payload: OverallAnalysisResponse;
+      }
+    | {
+          kind: 'options';
+          payload: OptionsAnalysisResponse;
+      }
+    | {
+          kind: 'financials';
+          payload: FinancialsAnalysisResponse;
+      }
+    | {
+          kind: 'congress';
+          payload: CongressTrendResponse;
+      };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here

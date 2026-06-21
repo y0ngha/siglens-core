@@ -5,6 +5,7 @@ import type {
     AnalysisUsageOptions,
 } from '@/application/usage/types';
 import type {
+    AssetClass,
     EarningsCalendarItem,
     EnrichedNewsItem,
     ModelId,
@@ -75,6 +76,12 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * the same re-analyze lever.
      */
     force?: boolean;
+    /**
+     * Instrument asset class. Controls prompt framing: `'crypto'` drops
+     * equity-specific language (earnings, fundamentals, analyst ratings).
+     * Defaults to `'equity'` for backward compatibility.
+     */
+    assetClass?: AssetClass;
 }
 
 /**

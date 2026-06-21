@@ -328,6 +328,10 @@ export async function requestChatCompletion(
         return { ok: false, error: 'token_exhausted' };
     }
 
+    // Pass assetClass as an independent framing parameter to buildChatPrompt.
+    // currentAnalysisContext is forwarded unchanged — no fabricated context
+    // object is synthesized. The "## Current analysis context" section is
+    // emitted if and only if currentAnalysisContext is explicitly provided.
     const prompt = buildChatPrompt(
         params.symbol,
         params.companyName ?? params.symbol,
@@ -335,7 +339,8 @@ export async function requestChatCompletion(
         params.analysis,
         params.history,
         params.userMessage,
-        params.currentAnalysisContext
+        params.currentAnalysisContext,
+        params.assetClass
     );
 
     const {

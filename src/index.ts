@@ -188,7 +188,18 @@ export {
 // Market session — DST-safe US regular-session (ET) classification.
 // Single source of truth shared by siglens UI, cache, and analysis gating.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
-export type { EtSessionStatus } from './domain/types';
+export type { EtSessionStatus, MarketSessionStatus } from './domain/types';
+
+// Spec-driven session model — MarketSessionSpec + generic helpers.
+// Crypto consumers use CRYPTO_SESSION (always-open);
+// US equity maps to US_EQUITY_SESSION (same semantics as getEtSessionStatus).
+export {
+    US_EQUITY_SESSION,
+    CRYPTO_SESSION,
+    getSessionStatus,
+    isRegularSessionOpen,
+} from './domain/session';
+export type { AssetClass, MarketSessionSpec } from './domain/types';
 
 // Economy (macro) domain types — /economy page snapshot + briefing
 export type {

@@ -6,6 +6,7 @@ import type {
 } from '@/application/usage/types';
 import type {
     AnalysisResponse,
+    AssetClass,
     ModelId,
     Tier,
     TierConfig,
@@ -58,6 +59,12 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * that should not trigger worker compute.
      */
     skipEnqueueIfMiss?: boolean;
+    /**
+     * Instrument asset class. Controls prompt framing: `'crypto'` drops
+     * equity-specific language (earnings, fundamentals, analyst ratings) and
+     * adds 24/7 context. Defaults to `'equity'` for backward compatibility.
+     */
+    assetClass?: AssetClass;
 }
 
 /**
