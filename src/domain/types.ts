@@ -2696,12 +2696,18 @@ export type ResponseJsonSchema = {
  * vice versa.
  */
 export type CurrentAnalysisContext =
-    | { kind: 'technical'; payload: AnalysisResponse }
+    | {
+          kind: 'technical';
+          payload: AnalysisResponse;
+      }
     | {
           kind: 'fundamental';
           payload: FundamentalAnalysisResponse;
       }
-    | { kind: 'news'; payload: NewsAnalysisResponse }
+    | {
+          kind: 'news';
+          payload: NewsAnalysisResponse;
+      }
     | {
           kind: 'overall';
           payload: OverallAnalysisResponse;

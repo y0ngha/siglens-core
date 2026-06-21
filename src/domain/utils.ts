@@ -1,5 +1,9 @@
 import {
     KST_OFFSET_HOURS,
+    MARKET_CLOSE_HOUR,
+    MARKET_CLOSE_MINUTE,
+    MARKET_OPEN_HOUR,
+    MARKET_OPEN_MINUTE,
     MINUTES_PER_DAY,
     MS_PER_DAY,
     MS_PER_HOUR,
@@ -10,6 +14,7 @@ import {
     US_EQUITY_SESSION,
     getSessionStatus,
     isRegularSessionOpen,
+    localSessionParts,
 } from '@/domain/session';
 import type { EtSessionStatus } from '@/domain/types';
 
@@ -50,51 +55,22 @@ export function computeSecondsUntilCacheExpiry(
     return Math.max(1, Math.floor(diffMs / MS_PER_SECOND));
 }
 
-// U.S. regular-session open/close times (ET) — single source of truth for
-// cross-module session gating.
+// Re-export market-hours constants so the public API surface (index.ts /
+// index.client.ts) is unchanged. The canonical definitions live in
+// `@/domain/constants/time` to allow both this module and `session.ts` to
+// import them without a circular dependency.
+
 /** U.S. regular-session open hour in Eastern Time. */
-export const MARKET_OPEN_HOUR = 9;
+export { MARKET_OPEN_HOUR } from '@/domain/constants/time';
 /** U.S. regular-session open minute in Eastern Time (opens at 09:30). */
-export const MARKET_OPEN_MINUTE = 30;
+export { MARKET_OPEN_MINUTE } from '@/domain/constants/time';
 /** U.S. regular-session close hour in Eastern Time. */
-export const MARKET_CLOSE_HOUR = 16;
+export { MARKET_CLOSE_HOUR } from '@/domain/constants/time';
 /** U.S. regular-session close minute in Eastern Time (closes at 16:00, exclusive). */
-export const MARKET_CLOSE_MINUTE = 0;
+export { MARKET_CLOSE_MINUTE } from '@/domain/constants/time';
 
 /** US 정규장 개장 시각을 자정 기준 분으로 환산 (09:30 → 570). */
 const ET_REGULAR_OPEN_MINUTES = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
-
-const ET_SESSION_FORMATTER = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-});
-
-const ET_WEEKDAY_INDEX: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-};
-
-interface EtSessionParts {
-    weekdayIndex: number; // 0=Sun … 6=Sat
-    minutesOfDay: number; // 0..1439, ET wall-clock
-}
-
-function etSessionParts(now: Date): EtSessionParts {
-    const parts = ET_SESSION_FORMATTER.formatToParts(now);
-    const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
-    const weekdayIndex = ET_WEEKDAY_INDEX[get('weekday')] ?? 0;
-    const hour = Number.parseInt(get('hour'), 10);
-    const minute = Number.parseInt(get('minute'), 10);
-    return { weekdayIndex, minutesOfDay: hour * 60 + minute };
-}
 
 /**
  * Classify an instant into a U.S. regular-session state in Eastern Time.
@@ -136,7 +112,10 @@ function daysToNextWeekday(fromWeekdayIndex: number): number {
 
 /** @internal 다음 뉴욕 정규장 개장(09:30 ET)까지 남은 초를 반환한다. */
 export function secondsUntilNextEtRegularOpen(now: Date): number {
-    const { weekdayIndex, minutesOfDay } = etSessionParts(now);
+    const { weekdayIndex, minutesOfDay } = localSessionParts(
+        now,
+        'America/New_York'
+    );
     const isWeekday = weekdayIndex >= 1 && weekdayIndex <= 5;
 
     const dayOffset =

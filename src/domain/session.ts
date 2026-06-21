@@ -1,4 +1,10 @@
 import type { EtSessionStatus } from '@/domain/types';
+import {
+    MARKET_OPEN_HOUR,
+    MARKET_OPEN_MINUTE,
+    MARKET_CLOSE_HOUR,
+    MARKET_CLOSE_MINUTE,
+} from '@/domain/constants/time';
 
 /**
  * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
@@ -18,12 +24,20 @@ export type MarketSessionSpec =
           weekendDays: number[]; // local weekday indexes (0=Sun..6=Sat)
       };
 
-/** US NYSE regular session: 09:30–16:00 ET, Mon–Fri. */
+/**
+ * US NYSE regular session: 09:30–16:00 ET, Mon–Fri.
+ *
+ * `openMinute` and `closeMinute` are derived from the shared market-hours
+ * constants ({@link MARKET_OPEN_HOUR}/{@link MARKET_OPEN_MINUTE} and
+ * {@link MARKET_CLOSE_HOUR}/{@link MARKET_CLOSE_MINUTE}) so there is a
+ * single source of truth for the ET session boundaries across this module
+ * and `utils.ts`.
+ */
 export const US_EQUITY_SESSION: MarketSessionSpec = {
     kind: 'scheduled',
     timeZone: 'America/New_York',
-    openMinute: 9 * 60 + 30,
-    closeMinute: 16 * 60,
+    openMinute: MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE,
+    closeMinute: MARKET_CLOSE_HOUR * 60 + MARKET_CLOSE_MINUTE,
     weekendDays: [0, 6],
 };
 
@@ -35,40 +49,57 @@ const _dtfCache = new Map<string, Intl.DateTimeFormat>();
 
 /** Returns (or creates and caches) a formatter for the given IANA `timeZone`. */
 function _getDtf(timeZone: string): Intl.DateTimeFormat {
-    let dtf = _dtfCache.get(timeZone);
-    if (dtf === undefined) {
-        dtf = new Intl.DateTimeFormat('en-US', {
-            timeZone,
-            weekday: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-            hourCycle: 'h23',
-        });
-        _dtfCache.set(timeZone, dtf);
-    }
+    const cached = _dtfCache.get(timeZone);
+    if (cached !== undefined) return cached;
+    const dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    });
+    _dtfCache.set(timeZone, dtf);
     return dtf;
 }
 
-/** Derive local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in `timeZone`. */
-function localSessionParts(
-    now: Date,
-    timeZone: string
-): { weekdayIndex: number; minutesOfDay: number } {
+/**
+ * Shape returned by {@link localSessionParts} — local weekday + clock position
+ * for a given IANA time zone.
+ */
+export interface SessionParts {
+    /** Local weekday index (0 = Sun … 6 = Sat). */
+    weekdayIndex: number;
+    /** Minutes elapsed since local midnight (0–1439). */
+    minutesOfDay: number;
+}
+
+/** Stable weekday abbreviation → index map shared by all callers. */
+const WEEKDAY_INDEX: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+};
+
+/**
+ * Derive local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in `timeZone`.
+ *
+ * @internal — consumed by `utils.ts` via cross-module import. Not re-exported
+ *   from `index.ts` / `index.client.ts`.
+ */
+export function localSessionParts(now: Date, timeZone: string): SessionParts {
     const fmt = _getDtf(timeZone);
     const parts = fmt.formatToParts(now);
     const wd = parts.find(p => p.type === 'weekday')?.value ?? 'Sun';
     const hour = Number(parts.find(p => p.type === 'hour')?.value ?? '0');
     const minute = Number(parts.find(p => p.type === 'minute')?.value ?? '0');
-    const map: Record<string, number> = {
-        Sun: 0,
-        Mon: 1,
-        Tue: 2,
-        Wed: 3,
-        Thu: 4,
-        Fri: 5,
-        Sat: 6,
+    return {
+        weekdayIndex: WEEKDAY_INDEX[wd] ?? 0,
+        minutesOfDay: hour * 60 + minute,
     };
-    return { weekdayIndex: map[wd] ?? 0, minutesOfDay: hour * 60 + minute };
 }
 
 /**

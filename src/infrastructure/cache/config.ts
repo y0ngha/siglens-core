@@ -131,7 +131,6 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
 export function computeBarsEffectiveTtl(
     _timeframe: Timeframe,
     now: Date,
-    // TODO(kr-equity): generalize next-open for scheduled non-ET specs
     session: MarketSessionSpec = US_EQUITY_SESSION
 ): number {
     if (session.kind === 'always-open') return BARS_OPEN_TTL_SECONDS;
