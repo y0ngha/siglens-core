@@ -257,8 +257,14 @@ function formatCurrentAnalysisContext(
  * detected patterns, indicator signals, and price targets so the LLM can
  * answer without re-fetching anything.
  *
- * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
- * @param companyName - Full company name (e.g. `"Apple Inc."`).
+ * `assetClass` is a standalone framing parameter — it controls the role line
+ * and refusal-example wording only. It is **independent** of
+ * `currentAnalysisContext`: passing one does not imply the other, and a
+ * caller that only sets `assetClass` (without a context) will never produce
+ * a spurious `## Current analysis context` section.
+ *
+ * @param symbol - Ticker symbol (e.g. `"AAPL"` or `"BTCUSD"`).
+ * @param companyName - Full company/asset name (e.g. `"Apple Inc."` or `"Bitcoin"`).
  * @param timeframe - The timeframe of the analysis being discussed.
  * @param analysis - The `AnalysisResponse` from a previously completed job.
  * @param history - Prior conversation turns; appended verbatim to the
@@ -269,6 +275,10 @@ function formatCurrentAnalysisContext(
  *   overall / options). When provided, a `## Current analysis context` section
  *   is appended to the system prompt so the LLM can reference live numbers
  *   without re-fetching data. Omit to keep the original behavior.
+ * @param assetClass - Optional asset class controlling prompt framing
+ *   (role line + refusal example). Defaults to `'equity'`. Does NOT gate
+ *   the `## Current analysis context` section — that is controlled solely
+ *   by `currentAnalysisContext`.
  * @returns The prompt payload — see {@link ChatPromptPayload}.
  */
 export function buildChatPrompt(
@@ -286,7 +296,8 @@ export function buildChatPrompt(
     analysis: AnalysisResponse,
     history: ChatMessage[],
     userMessage: string,
-    currentAnalysisContext?: CurrentAnalysisContext
+    currentAnalysisContext?: CurrentAnalysisContext,
+    assetClass?: AssetClass
 ): ChatPromptPayload;
 export function buildChatPrompt(
     symbol: string,
@@ -295,7 +306,8 @@ export function buildChatPrompt(
     analysisOrHistory: AnalysisResponse | ChatMessage[],
     historyOrUserMessage: ChatMessage[] | string,
     userMessageOrContext?: string | CurrentAnalysisContext,
-    maybeCurrentAnalysisContext?: CurrentAnalysisContext
+    maybeCurrentAnalysisContext?: CurrentAnalysisContext | AssetClass,
+    maybeAssetClass?: AssetClass
 ): ChatPromptPayload {
     const oldSignature = isTimeframe(companyNameOrTimeframe);
     const companyName = oldSignature ? symbol : companyNameOrTimeframe;
@@ -313,10 +325,14 @@ export function buildChatPrompt(
         : (userMessageOrContext as string);
     const currentAnalysisContext = oldSignature
         ? (userMessageOrContext as CurrentAnalysisContext | undefined)
-        : maybeCurrentAnalysisContext;
+        : (maybeCurrentAnalysisContext as CurrentAnalysisContext | undefined);
 
-    const assetClass: AssetClass =
-        currentAnalysisContext?.assetClass ?? 'equity';
+    // assetClass is an independent framing parameter — it does NOT gate or
+    // synthesize currentAnalysisContext. The context section is emitted if and
+    // only if currentAnalysisContext is explicitly provided by the caller.
+    const assetClass: AssetClass = oldSignature
+        ? 'equity'
+        : (maybeAssetClass ?? 'equity');
     const isCrypto = assetClass === 'crypto';
     const assetKind = isCrypto ? 'cryptocurrency' : 'U.S. equity';
     const refuseExample = isCrypto

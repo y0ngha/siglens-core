@@ -35,19 +35,49 @@ describe('MarketSessionSpec', () => {
     });
 });
 
-describe('ET wrappers stay behavior-compatible', () => {
-    const samples = [
-        new Date('2026-06-22T14:30:00Z'), // Mon 10:30 ET → open
-        new Date('2026-06-21T14:30:00Z'), // Sun → weekend
-        new Date('2026-06-22T08:00:00Z'), // Mon 04:00 ET → closed
-        new Date('2026-06-22T20:30:00Z'), // Mon 16:30 ET → closed
-    ];
-    it.each(samples)('matches spec-driven status for %s', d => {
-        expect(getEtSessionStatus(d)).toBe(
-            getSessionStatus(US_EQUITY_SESSION, d)
-        );
-        expect(isEtRegularSessionOpen(d)).toBe(
-            isRegularSessionOpen(US_EQUITY_SESSION, d)
-        );
+describe('ET wrappers — expected literal verdicts for concrete ET boundary instants', () => {
+    // All instants below are in EDT (UTC-4) unless noted as EST (UTC-5).
+    // Regular session: 09:30–16:00 ET, EXCLUSIVE of 16:00.
+
+    it('09:30 ET on a weekday is open (inclusive open boundary)', () => {
+        // 2026-06-22 13:30 UTC = 09:30 EDT (Monday)
+        const d = new Date('2026-06-22T13:30:00Z');
+        expect(getEtSessionStatus(d)).toBe('open');
+        expect(isEtRegularSessionOpen(d)).toBe(true);
+    });
+
+    it('midday ET on a weekday is open', () => {
+        // 2026-06-22 17:00 UTC = 13:00 EDT (Monday)
+        const d = new Date('2026-06-22T17:00:00Z');
+        expect(getEtSessionStatus(d)).toBe('open');
+        expect(isEtRegularSessionOpen(d)).toBe(true);
+    });
+
+    it('15:59 ET is open (one minute before exclusive close boundary)', () => {
+        // 2026-06-22 19:59 UTC = 15:59 EDT (Monday)
+        const d = new Date('2026-06-22T19:59:00Z');
+        expect(getEtSessionStatus(d)).toBe('open');
+        expect(isEtRegularSessionOpen(d)).toBe(true);
+    });
+
+    it('16:00 ET is closed (exclusive close boundary — session is CLOSED at 16:00)', () => {
+        // 2026-06-22 20:00 UTC = 16:00 EDT (Monday)
+        const d = new Date('2026-06-22T20:00:00Z');
+        expect(getEtSessionStatus(d)).toBe('closed');
+        expect(isEtRegularSessionOpen(d)).toBe(false);
+    });
+
+    it('overnight (pre-market) is closed', () => {
+        // 2026-06-22 08:00 UTC = 04:00 EDT (Monday pre-market)
+        const d = new Date('2026-06-22T08:00:00Z');
+        expect(getEtSessionStatus(d)).toBe('closed');
+        expect(isEtRegularSessionOpen(d)).toBe(false);
+    });
+
+    it('Sunday is weekend', () => {
+        // 2026-06-21 14:30 UTC = Sunday
+        const d = new Date('2026-06-21T14:30:00Z');
+        expect(getEtSessionStatus(d)).toBe('weekend');
+        expect(isEtRegularSessionOpen(d)).toBe(false);
     });
 });

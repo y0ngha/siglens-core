@@ -349,7 +349,12 @@ export function buildOverallAnalysisPrompt(
             ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
             : `This is a publicly traded U.S. equity.`;
 
-    return `You are a senior equity analyst integrating technical, fundamental, news, and options analysis into a unified investment verdict. Analyse the four-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.
+    const roleAndAxisLine =
+        assetClass === 'crypto'
+            ? `You are a senior markets analyst integrating available-axis data into a unified investment verdict. Analyse the available-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.`
+            : `You are a senior equity analyst integrating technical, fundamental, news, and options analysis into a unified investment verdict. Analyse the four-axis data for ${symbol} (${companyName}) on the ${label} (${timeframe}) timeframe and respond with a JSON object matching the exact schema below. No markdown, no extra text — only valid JSON.`;
+
+    return `${roleAndAxisLine}
 ${assetContext}
 
 ## Data Boundary
