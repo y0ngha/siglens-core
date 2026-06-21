@@ -188,7 +188,7 @@ export {
 // Market session — DST-safe US regular-session (ET) classification.
 // Single source of truth shared by siglens UI, cache, and analysis gating.
 export { getEtSessionStatus, isEtRegularSessionOpen } from './domain/utils';
-export type { EtSessionStatus } from './domain/types';
+export type { EtSessionStatus, MarketSessionStatus } from './domain/types';
 
 // Spec-driven session model — MarketSessionSpec + generic helpers.
 // Crypto consumers use CRYPTO_SESSION (always-open);

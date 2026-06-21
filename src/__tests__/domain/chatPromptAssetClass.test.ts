@@ -244,4 +244,25 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
         expect(prompt).toContain('four-axis data as evidence');
         expect(prompt).not.toContain('available-axis data');
     });
+
+    it('crypto: Axis 2 section contains the empty-array instruction for fundamentalBulletsKo', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            'BTCUSD',
+            'Bitcoin',
+            analysis,
+            mockFundamental,
+            mockNews,
+            '1Day',
+            undefined,
+            null,
+            false,
+            null,
+            'crypto'
+        );
+        // Verify the exact text emitted by overallPrompt.ts for the crypto Axis 2 branch.
+        expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
+        expect(prompt).toContain(
+            '이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.'
+        );
+    });
 });

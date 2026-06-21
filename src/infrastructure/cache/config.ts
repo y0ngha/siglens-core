@@ -117,10 +117,10 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  * boundary), this function uses the session **open** boundary.
  *
  * **ET-only limitation**: the off-hours fallback (`secondsUntilNextEtRegularOpen`)
- * is hard-wired to the US Eastern Time schedule. Today only
+ * is hard-wired to the US Eastern Time schedule. Currently only
  * {@link US_EQUITY_SESSION} and {@link CRYPTO_SESSION} (which short-circuits to
- * `BARS_OPEN_TTL_SECONDS`) are fully supported. A future scheduled spec for a
- * different timezone (e.g. KST) would need a spec-driven next-open calculation.
+ * `BARS_OPEN_TTL_SECONDS`) are fully supported; a spec for another timezone would
+ * need a spec-driven next-open calculation in the off-hours fallback.
  *
  * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
  *   the parameter is kept for signature consistency with the analysis-cache TTL helper.

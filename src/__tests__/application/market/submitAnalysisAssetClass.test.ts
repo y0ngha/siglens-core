@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { Timeframe } from '@/domain/types';
 import {
@@ -67,6 +67,10 @@ const mockBarsData = {
 
 describe('submitAnalysis assetClass forwarding', () => {
     const originalEnv = process.env;
+
+    afterEach(() => {
+        process.env = originalEnv;
+    });
 
     beforeEach(() => {
         vi.clearAllMocks();

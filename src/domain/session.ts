@@ -1,4 +1,4 @@
-import type { EtSessionStatus } from '@/domain/types';
+import type { EtSessionStatus, MarketSessionStatus } from '@/domain/types';
 import {
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
@@ -18,10 +18,14 @@ export type MarketSessionSpec =
     | { kind: 'always-open' }
     | {
           kind: 'scheduled';
-          timeZone: string; // IANA, e.g. 'America/New_York'
-          openMinute: number; // minutes from local midnight
-          closeMinute: number; // close excluded
-          weekendDays: number[]; // local weekday indexes (0=Sun..6=Sat)
+          /** IANA timezone, e.g. `'America/New_York'`. */
+          timeZone: string;
+          /** Open time in minutes from local midnight (inclusive), e.g. 570 for 09:30. */
+          openMinute: number;
+          /** Close time in minutes from local midnight (exclusive), e.g. 960 for 16:00. */
+          closeMinute: number;
+          /** Local weekday indexes treated as weekend (0 = Sun … 6 = Sat). */
+          weekendDays: number[];
       };
 
 /**
@@ -63,6 +67,8 @@ function _getDtf(timeZone: string): Intl.DateTimeFormat {
 }
 
 /**
+ * @internal Weekday index + minutes-since-local-midnight decomposition.
+ *
  * Shape returned by {@link localSessionParts} — local weekday + clock position
  * for a given IANA time zone.
  */
@@ -85,10 +91,8 @@ const WEEKDAY_INDEX: Record<string, number> = {
 };
 
 /**
- * Derive local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in `timeZone`.
- *
- * @internal — consumed by `utils.ts` via cross-module import. Not re-exported
- *   from `index.ts` / `index.client.ts`.
+ * @internal Decompose an IANA-zoned instant into local weekday index (0=Sun…6=Sat)
+ * and minutes elapsed since local midnight.
  */
 export function localSessionParts(now: Date, timeZone: string): SessionParts {
     const fmt = _getDtf(timeZone);
@@ -119,7 +123,7 @@ export function localSessionParts(now: Date, timeZone: string): SessionParts {
 export function getSessionStatus(
     spec: MarketSessionSpec,
     now: Date
-): EtSessionStatus {
+): MarketSessionStatus {
     if (spec.kind === 'always-open') return 'open';
     const { weekdayIndex, minutesOfDay } = localSessionParts(
         now,

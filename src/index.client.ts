@@ -242,7 +242,11 @@ export {
     getSessionStatus,
     isRegularSessionOpen,
 } from './domain/session';
-export type { AssetClass, EtSessionStatus } from './domain/types';
+export type {
+    AssetClass,
+    EtSessionStatus,
+    MarketSessionStatus,
+} from './domain/types';
 export type { MarketSessionSpec } from './domain/session';
 
 // =============================================================================

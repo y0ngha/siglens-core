@@ -6,6 +6,19 @@ export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 /** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
 export type EtSessionStatus = 'weekend' | 'open' | 'closed';
 
+/**
+ * Generic market-session state alias for the spec-driven session helpers
+ * ({@link getSessionStatus}, {@link isRegularSessionOpen}).
+ *
+ * Identical to {@link EtSessionStatus} at the type level — introduced as a
+ * forward-compatible alias so callers of the generic helpers can annotate with
+ * the semantically neutral name without a breaking rename of `EtSessionStatus`.
+ * Both names remain valid; `EtSessionStatus` is kept for backward compatibility.
+ *
+ * @see {@link EtSessionStatus} for the underlying union (`'weekend' | 'open' | 'closed'`).
+ */
+export type MarketSessionStatus = EtSessionStatus;
+
 /** Top-level asset class. Controls prompt framing across the analysis and chat layers. */
 export type AssetClass = 'equity' | 'crypto';
 
