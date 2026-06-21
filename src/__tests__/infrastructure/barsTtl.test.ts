@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     computeBarsEffectiveTtl,
     BARS_OPEN_TTL_SECONDS,
+    BARS_OFFHOURS_TTL_CEILING_SECONDS,
 } from '@/infrastructure/cache/config';
 import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
 
@@ -27,5 +28,14 @@ describe('computeBarsEffectiveTtl with session spec', () => {
         expect(
             computeBarsEffectiveTtl('1Day', duringSession, US_EQUITY_SESSION)
         ).toBe(BARS_OPEN_TTL_SECONDS);
+    });
+
+    it('caps off-hours TTL at the ceiling when next open is >24h away (late Saturday ET)', () => {
+        // 2026-06-20T04:00:00Z = Saturday 00:00 EDT — next open is Mon 09:30 ET (~57.5 h away),
+        // which exceeds BARS_OFFHOURS_TTL_CEILING_SECONDS (86400 s / 24 h).
+        const lateSat = new Date('2026-06-20T04:00:00Z');
+        expect(computeBarsEffectiveTtl('1Day', lateSat)).toBe(
+            BARS_OFFHOURS_TTL_CEILING_SECONDS
+        );
     });
 });

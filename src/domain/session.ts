@@ -108,7 +108,7 @@ export function getSessionStatus(
         spec.timeZone
     );
     if (spec.weekendDays.includes(weekdayIndex)) return 'weekend';
-    if (minutesOfDay >= spec.openMinute && minutesOfDay < spec.closeMinute) {
+    if (spec.openMinute <= minutesOfDay && minutesOfDay < spec.closeMinute) {
         return 'open';
     }
     return 'closed';

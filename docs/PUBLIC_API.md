@@ -304,7 +304,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `isEtRegularSessionOpen(now)` — DST-safe US 정규장(09:30–16:00 ET, 마감 정각 제외) 개장 여부. | `domain/utils.ts` |
 | `getEtSessionStatus(now)` — `'weekend' \| 'open' \| 'closed'` 3-state 세션 분류. | `domain/utils.ts` |
 | `getSessionStatus(spec, now)` — 임의의 `MarketSessionSpec`에 대해 `MarketSessionStatus`를 반환하는 spec-driven 버전. DST-safe. (`MarketSessionStatus`는 `EtSessionStatus`의 별칭으로 동일한 타입.) | `domain/session.ts` |
-| `isRegularSessionOpen(spec, now)` — `getSessionStatus`를 boolean으로 래핑한 편의 함수. 반환 타입 어노테이션은 `MarketSessionStatus`로 표기됨. | `domain/session.ts` |
+| `isRegularSessionOpen(spec, now)` — `getSessionStatus`를 boolean으로 래핑한 편의 함수. `boolean`을 반환한다 (`getSessionStatus(...) === 'open'`). | `domain/session.ts` |
 
 > **@internal (not exported)**: `secondsUntilNextEtRegularOpen` — bars 캐시 TTL 계산 전용으로 cache config 내부에서만 사용. `localSessionParts` — `getSessionStatus` 내부 헬퍼.
 
@@ -437,7 +437,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **시장 세션 상수/타입** — `MARKET_OPEN_HOUR`, `MARKET_OPEN_MINUTE`, `MARKET_CLOSE_HOUR`, `MARKET_CLOSE_MINUTE` (`domain/utils.ts`), `EtSessionStatus` (`domain/types.ts`). US 정규장 개장/마감 시각(ET) 상수와 세션 상태 union. siglens 옵션 UI·캐시·분석 게이팅에서 사용.
 
-**`MarketSessionStatus` (PR #158 R4 추가, Tier 4)** — `EtSessionStatus`의 의미 중립적 별칭(`type MarketSessionStatus = EtSessionStatus`). `getSessionStatus`/`isRegularSessionOpen`의 반환-타입 어노테이션에 사용되며, spec-driven generic 세션 함수의 소비자가 보다 중립적인 이름으로 타입을 참조할 수 있도록 도입. `EtSessionStatus`는 하위 호환성을 위해 유지되며 제거되지 않는다. `src/index.ts`, `src/index.client.ts` 양 진입점에서 export.
+**`MarketSessionStatus` (PR #158 R4 추가, Tier 4)** — `EtSessionStatus`의 의미 중립적 별칭(`type MarketSessionStatus = EtSessionStatus`). `getSessionStatus`의 반환 타입으로 사용되며, spec-driven generic 세션 함수의 소비자가 보다 중립적인 이름으로 타입을 참조할 수 있도록 도입. (`isRegularSessionOpen`은 `boolean`을 반환하므로 이 타입을 사용하지 않는다.) `EtSessionStatus`는 하위 호환성을 위해 유지되며 제거되지 않는다. `src/index.ts`, `src/index.client.ts` 양 진입점에서 export.
 
 **시장 세션 스펙/상수 (PR #158 추가)** — `MarketSessionSpec` (discriminated union: `{ kind: 'always-open' }` | `{ kind: 'scheduled'; timeZone; openMinute; closeMinute; weekendDays: readonly number[] }`), `US_EQUITY_SESSION` (NYSE 09:30–16:00 ET Mon–Fri 기본값), `CRYPTO_SESSION` (24/7 always-open 기본값). `MarketSessionSpec` 타입 정의는 `domain/types.ts`(PR #158 R7에서 이동; 값 상수 `US_EQUITY_SESSION`/`CRYPTO_SESSION`은 `domain/session.ts` 잔류). `dst` 필드는 `Intl.DateTimeFormat` IANA zone이 DST를 자동 처리하므로 포함되지 않는다.
 

@@ -1,7 +1,5 @@
 import {
     KST_OFFSET_HOURS,
-    MARKET_OPEN_HOUR,
-    MARKET_OPEN_MINUTE,
     MINUTES_PER_DAY,
     MS_PER_DAY,
     MS_PER_HOUR,
@@ -67,9 +65,6 @@ export { MARKET_CLOSE_HOUR } from '@/domain/constants/time';
 /** U.S. regular-session close minute in Eastern Time (closes at 16:00, exclusive). */
 export { MARKET_CLOSE_MINUTE } from '@/domain/constants/time';
 
-/** US 정규장 개장 시각을 자정 기준 분으로 환산 (09:30 → 570). */
-const ET_REGULAR_OPEN_MINUTES = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
-
 /**
  * Classify an instant into a U.S. regular-session state in Eastern Time.
  *
@@ -110,18 +105,23 @@ function daysToNextWeekday(fromWeekdayIndex: number): number {
 
 /** @internal 다음 뉴욕 정규장 개장(09:30 ET)까지 남은 초를 반환한다. */
 export function secondsUntilNextEtRegularOpen(now: Date): number {
+    // US_EQUITY_SESSION is a 'scheduled' spec — the kind guard lets TypeScript
+    // narrow to the branch that carries timeZone and openMinute.
+    if (US_EQUITY_SESSION.kind !== 'scheduled') return 0;
     const { weekdayIndex, minutesOfDay } = localSessionParts(
         now,
-        'America/New_York'
+        US_EQUITY_SESSION.timeZone
     );
     const isWeekday = weekdayIndex >= 1 && weekdayIndex <= 5;
 
     const dayOffset =
-        isWeekday && minutesOfDay < ET_REGULAR_OPEN_MINUTES
+        isWeekday && minutesOfDay < US_EQUITY_SESSION.openMinute
             ? 0
             : daysToNextWeekday(weekdayIndex);
 
     const minutesUntilOpen =
-        dayOffset * MINUTES_PER_DAY + ET_REGULAR_OPEN_MINUTES - minutesOfDay;
+        dayOffset * MINUTES_PER_DAY +
+        US_EQUITY_SESSION.openMinute -
+        minutesOfDay;
     return minutesUntilOpen * SECONDS_PER_MINUTE - now.getUTCSeconds();
 }
