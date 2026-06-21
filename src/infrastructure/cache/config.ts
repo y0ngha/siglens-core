@@ -15,6 +15,11 @@ import {
     isEtRegularSessionOpen,
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
+import {
+    isRegularSessionOpen,
+    US_EQUITY_SESSION,
+    type MarketSessionSpec,
+} from '@/domain/session';
 
 /**
  * @internal TTL for cached market briefings (in seconds).
@@ -120,9 +125,13 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  */
 export function computeBarsEffectiveTtl(
     _timeframe: Timeframe,
-    now: Date
+    now: Date,
+    // TODO(kr-equity): generalize next-open for scheduled non-ET specs
+    session: MarketSessionSpec = US_EQUITY_SESSION
 ): number {
-    if (isEtRegularSessionOpen(now)) return BARS_OPEN_TTL_SECONDS;
+    void _timeframe; // policy is session-driven, not timeframe-driven (kept for signature parity)
+    if (session.kind === 'always-open') return BARS_OPEN_TTL_SECONDS;
+    if (isRegularSessionOpen(session, now)) return BARS_OPEN_TTL_SECONDS;
     return Math.min(
         BARS_OFFHOURS_TTL_CEILING_SECONDS,
         secondsUntilNextEtRegularOpen(now)
