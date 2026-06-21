@@ -30,18 +30,10 @@ export const US_EQUITY_SESSION: MarketSessionSpec = {
 /** Crypto: trades 24/7. */
 export const CRYPTO_SESSION: MarketSessionSpec = { kind: 'always-open' };
 
-/**
- * @internal
- * Derive local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in
- * the given IANA `timeZone`. Used internally by {@link getSessionStatus}; not
- * part of the public API.
- *
- * The `Intl.DateTimeFormat` instance is cached per `timeZone` so repeated
- * calls for the same zone (e.g. `'America/New_York'`) do not allocate a new
- * formatter on every invocation.
- */
+/** Per-timezone `Intl.DateTimeFormat` cache — avoids allocating a new formatter per call. */
 const _dtfCache = new Map<string, Intl.DateTimeFormat>();
 
+/** Returns (or creates and caches) a formatter for the given IANA `timeZone`. */
 function _getDtf(timeZone: string): Intl.DateTimeFormat {
     let dtf = _dtfCache.get(timeZone);
     if (dtf === undefined) {
@@ -50,21 +42,22 @@ function _getDtf(timeZone: string): Intl.DateTimeFormat {
             weekday: 'short',
             hour: '2-digit',
             minute: '2-digit',
-            hour12: false,
+            hourCycle: 'h23',
         });
         _dtfCache.set(timeZone, dtf);
     }
     return dtf;
 }
 
-export function localSessionParts(
+/** Derive local weekday index (0=Sun..6=Sat) and minutes-of-day for `now` in `timeZone`. */
+function localSessionParts(
     now: Date,
     timeZone: string
 ): { weekdayIndex: number; minutesOfDay: number } {
     const fmt = _getDtf(timeZone);
     const parts = fmt.formatToParts(now);
     const wd = parts.find(p => p.type === 'weekday')?.value ?? 'Sun';
-    const hour = Number(parts.find(p => p.type === 'hour')?.value ?? '0') % 24;
+    const hour = Number(parts.find(p => p.type === 'hour')?.value ?? '0');
     const minute = Number(parts.find(p => p.type === 'minute')?.value ?? '0');
     const map: Record<string, number> = {
         Sun: 0,

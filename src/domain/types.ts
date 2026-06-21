@@ -6,7 +6,7 @@ export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
 /** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
 export type EtSessionStatus = 'weekend' | 'open' | 'closed';
 
-/** Top-level instrument kind. Drives tab whitelist (siglens) + prompt framing (core). */
+/** Top-level asset class. Controls prompt framing across the analysis and chat layers. */
 export type AssetClass = 'equity' | 'crypto';
 
 /** Definition of a market index tracked by the dashboard. */

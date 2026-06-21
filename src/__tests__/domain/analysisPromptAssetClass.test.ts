@@ -31,7 +31,9 @@ describe('buildAnalysisPrompt assetClass framing', () => {
             [],
             '1Day'
         );
-        expect(typeof p).toBe('string');
-        expect(p.length).toBeGreaterThan(0);
+        // Must contain the equity framing literal emitted by buildAnalysisPrompt.
+        expect(p).toContain('U.S. equity');
+        // Must not bleed crypto-specific context into an equity prompt.
+        expect(p).not.toMatch(/24\/7|around the clock|no market close/i);
     });
 });
