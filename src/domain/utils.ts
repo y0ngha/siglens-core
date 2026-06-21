@@ -6,6 +6,11 @@ import {
     MS_PER_SECOND,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
+import {
+    US_EQUITY_SESSION,
+    getSessionStatus,
+    isRegularSessionOpen,
+} from '@/domain/session';
 import type { EtSessionStatus } from '@/domain/types';
 
 export function parseNumberOrDefault(
@@ -106,15 +111,7 @@ function etSessionParts(now: Date): EtSessionParts {
  *   16:00 close **excluded**), or `'closed'` (any other weekday time).
  */
 export function getEtSessionStatus(now: Date): EtSessionStatus {
-    const { weekdayIndex, minutesOfDay } = etSessionParts(now);
-    if (weekdayIndex === 0 || weekdayIndex === 6) return 'weekend';
-    if (
-        minutesOfDay >= ET_REGULAR_OPEN_MINUTES &&
-        minutesOfDay < ET_REGULAR_CLOSE_MINUTES
-    ) {
-        return 'open';
-    }
-    return 'closed';
+    return getSessionStatus(US_EQUITY_SESSION, now);
 }
 
 /**
@@ -125,7 +122,7 @@ export function getEtSessionStatus(now: Date): EtSessionStatus {
  * @returns `true` only while the regular session is open.
  */
 export function isEtRegularSessionOpen(now: Date): boolean {
-    return getEtSessionStatus(now) === 'open';
+    return isRegularSessionOpen(US_EQUITY_SESSION, now);
 }
 
 /** @internal 주어진 ET 요일 인덱스(0=일~6=토) 기준 다음 평일까지의 일수. 주말은 건너뛴다. */

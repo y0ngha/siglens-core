@@ -5,6 +5,7 @@ import {
     getSessionStatus,
     isRegularSessionOpen,
 } from '@/domain/session';
+import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
 
 describe('MarketSessionSpec', () => {
     // 2026-06-22 14:30 UTC = 10:30 ET (Monday) → regular session open.
@@ -31,5 +32,22 @@ describe('MarketSessionSpec', () => {
         expect(getSessionStatus(CRYPTO_SESSION, sun)).toBe('open');
         expect(getSessionStatus(CRYPTO_SESSION, monPremarketUtc)).toBe('open');
         expect(isRegularSessionOpen(CRYPTO_SESSION, sun)).toBe(true);
+    });
+});
+
+describe('ET wrappers stay behavior-compatible', () => {
+    const samples = [
+        new Date('2026-06-22T14:30:00Z'), // Mon 10:30 ET → open
+        new Date('2026-06-21T14:30:00Z'), // Sun → weekend
+        new Date('2026-06-22T08:00:00Z'), // Mon 04:00 ET → closed
+        new Date('2026-06-22T20:30:00Z'), // Mon 16:30 ET → closed
+    ];
+    it.each(samples)('matches spec-driven status for %s', d => {
+        expect(getEtSessionStatus(d)).toBe(
+            getSessionStatus(US_EQUITY_SESSION, d)
+        );
+        expect(isEtRegularSessionOpen(d)).toBe(
+            isRegularSessionOpen(US_EQUITY_SESSION, d)
+        );
     });
 });
