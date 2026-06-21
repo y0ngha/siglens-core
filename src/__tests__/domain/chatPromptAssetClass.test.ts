@@ -221,5 +221,28 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
         expect(firstLine).toContain('available-axis data');
         expect(firstLine).not.toContain('senior equity analyst');
         expect(firstLine).not.toContain('four-axis data');
+        // The crypto branch must be internally consistent: no "four-axis data"
+        // wording anywhere (R2 round-2 fix — the Data Boundary line previously
+        // hardcoded "four-axis data", contradicting the crypto opener).
+        expect(prompt).not.toContain('four-axis data');
+        expect(prompt).toContain('available-axis data as evidence');
+    });
+
+    it('equity Data Boundary keeps the "four-axis data as evidence" wording', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            analysis,
+            mockFundamental,
+            mockNews,
+            '1Day',
+            undefined,
+            null,
+            false,
+            null,
+            'equity'
+        );
+        expect(prompt).toContain('four-axis data as evidence');
+        expect(prompt).not.toContain('available-axis data');
     });
 });
