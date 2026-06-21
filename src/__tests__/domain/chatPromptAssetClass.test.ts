@@ -27,7 +27,8 @@ describe('buildChatPrompt assetClass framing', () => {
             analysis,
             [],
             'Is now a good entry?',
-            { assetClass: 'crypto' }
+            // Pass assetClass via the CurrentAnalysisContext technical variant.
+            { kind: 'technical', payload: analysis, assetClass: 'crypto' }
         );
         const text = JSON.stringify(payload);
         expect(text).not.toMatch(/U\.S\. (equity|stock)/i);

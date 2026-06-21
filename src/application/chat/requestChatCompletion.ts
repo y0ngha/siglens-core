@@ -328,15 +328,23 @@ export async function requestChatCompletion(
         return { ok: false, error: 'token_exhausted' };
     }
 
-    // Forward assetClass via CurrentAnalysisContext so buildChatPrompt can
+    // Forward assetClass into the CurrentAnalysisContext so buildChatPrompt can
     // branch prompt framing without a new positional arg.
-    const chatContext =
-        params.assetClass !== undefined
+    // If assetClass is set but no context exists, synthesize a minimal technical
+    // context to carry the assetClass field through.
+    const chatContext: typeof params.currentAnalysisContext =
+        params.assetClass !== undefined && params.currentAnalysisContext
             ? {
-                  ...(params.currentAnalysisContext ?? {}),
+                  ...params.currentAnalysisContext,
                   assetClass: params.assetClass,
               }
-            : params.currentAnalysisContext;
+            : params.assetClass !== undefined
+              ? {
+                    kind: 'technical',
+                    payload: params.analysis,
+                    assetClass: params.assetClass,
+                }
+              : params.currentAnalysisContext;
     const prompt = buildChatPrompt(
         params.symbol,
         params.companyName ?? params.symbol,
@@ -344,7 +352,7 @@ export async function requestChatCompletion(
         params.analysis,
         params.history,
         params.userMessage,
-        chatContext as typeof params.currentAnalysisContext
+        chatContext
     );
 
     const {

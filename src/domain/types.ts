@@ -2690,9 +2690,9 @@ export type ResponseJsonSchema = {
  * Injected as context into the chat system prompt so the assistant can reference
  * live numbers from the user's current page.
  *
- * The `extras` variant carries no payload; it conveys only chat metadata (e.g.
- * `assetClass`) when there is no analysis page in view but the caller still
- * needs to pass asset-class framing.
+ * Each variant carries an optional `assetClass` field so callers (e.g. crypto
+ * pages) can signal prompt-framing intent without changing the tagged discriminant.
+ * Existing consumers that do not set `assetClass` default to `'equity'`.
  */
 export type CurrentAnalysisContext =
     | { kind: 'technical'; payload: AnalysisResponse; assetClass?: AssetClass }
@@ -2721,8 +2721,7 @@ export type CurrentAnalysisContext =
           kind: 'congress';
           payload: CongressTrendResponse;
           assetClass?: AssetClass;
-      }
-    | { assetClass: AssetClass };
+      };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here

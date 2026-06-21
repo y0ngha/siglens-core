@@ -216,8 +216,6 @@ function formatCurrentAnalysisContext(
     context: CurrentAnalysisContext | undefined
 ): string {
     if (!context) return '';
-    // The `{ assetClass }` extras-only member has no `kind` or `payload` — skip rendering context body.
-    if (!('kind' in context)) return '';
 
     let body: string;
     switch (context.kind) {
@@ -318,9 +316,7 @@ export function buildChatPrompt(
         : maybeCurrentAnalysisContext;
 
     const assetClass: AssetClass =
-        currentAnalysisContext && 'assetClass' in currentAnalysisContext
-            ? (currentAnalysisContext.assetClass ?? 'equity')
-            : 'equity';
+        currentAnalysisContext?.assetClass ?? 'equity';
     const isCrypto = assetClass === 'crypto';
     const assetKind = isCrypto ? 'cryptocurrency' : 'U.S. equity';
     const refuseExample = isCrypto
