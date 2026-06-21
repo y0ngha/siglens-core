@@ -3,6 +3,7 @@
 
 import type {
     AnalysisResponse,
+    AssetClass,
     ChatMessage,
     ChatPromptPayload,
     CongressTrendResponse,
@@ -215,6 +216,8 @@ function formatCurrentAnalysisContext(
     context: CurrentAnalysisContext | undefined
 ): string {
     if (!context) return '';
+    // The `{ assetClass }` extras-only member has no `kind` or `payload` — skip rendering context body.
+    if (!('kind' in context)) return '';
 
     let body: string;
     switch (context.kind) {
@@ -314,11 +317,21 @@ export function buildChatPrompt(
         ? (userMessageOrContext as CurrentAnalysisContext | undefined)
         : maybeCurrentAnalysisContext;
 
+    const assetClass: AssetClass =
+        currentAnalysisContext && 'assetClass' in currentAnalysisContext
+            ? (currentAnalysisContext.assetClass ?? 'equity')
+            : 'equity';
+    const isCrypto = assetClass === 'crypto';
+    const assetKind = isCrypto ? 'cryptocurrency' : 'U.S. equity';
+    const refuseExample = isCrypto
+        ? `- REFUSE (unrelated asset): "다른 코인은 지금 어때요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`
+        : `- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`;
+
     const rec = analysis.actionRecommendation;
     const subject =
         companyName === symbol ? symbol : `${symbol} (${companyName})`;
 
-    const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject}.
+    const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject} (${assetKind}).
 Ground every answer in the analysis data provided below.
 If a requested price, indicator, event, or market fact is not present in the provided analysis data, say in Korean that the data is not included instead of guessing.
 You MAY answer follow-up questions when they are clearly connected to this analysis, including:
@@ -337,7 +350,7 @@ Do not refuse a question only because the exact wording is absent from the repor
 ## Boundary Few-Shot
 - ALLOW (a level/indicator/scenario in this analysis): "180 지지선이 깨지면 어떻게 돼요?" → answer using the provided support level and scenarios.
 - ALLOW (a concept from your prior answer): "방금 말한 다이버전스가 정확히 뭐예요?" → explain the concept and connect it back to this analysis.
-- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."
+${refuseExample}
 - REFUSE (unrelated macro / personal portfolio advice): "연준 금리 결정이 제 포트폴리오에 어떤 영향을 줘요?" → decline with the same Korean line.
 
 The user is NOT a technical trader — they may not know terms like RSI, MACD, or support levels.

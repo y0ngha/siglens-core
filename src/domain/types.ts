@@ -2689,15 +2689,40 @@ export type ResponseJsonSchema = {
  * Tagged union representing the analysis result currently in view by the chatbot.
  * Injected as context into the chat system prompt so the assistant can reference
  * live numbers from the user's current page.
+ *
+ * The `extras` variant carries no payload; it conveys only chat metadata (e.g.
+ * `assetClass`) when there is no analysis page in view but the caller still
+ * needs to pass asset-class framing.
  */
 export type CurrentAnalysisContext =
-    | { kind: 'technical'; payload: AnalysisResponse }
-    | { kind: 'fundamental'; payload: FundamentalAnalysisResponse }
-    | { kind: 'news'; payload: NewsAnalysisResponse }
-    | { kind: 'overall'; payload: OverallAnalysisResponse }
-    | { kind: 'options'; payload: OptionsAnalysisResponse }
-    | { kind: 'financials'; payload: FinancialsAnalysisResponse }
-    | { kind: 'congress'; payload: CongressTrendResponse };
+    | { kind: 'technical'; payload: AnalysisResponse; assetClass?: AssetClass }
+    | {
+          kind: 'fundamental';
+          payload: FundamentalAnalysisResponse;
+          assetClass?: AssetClass;
+      }
+    | { kind: 'news'; payload: NewsAnalysisResponse; assetClass?: AssetClass }
+    | {
+          kind: 'overall';
+          payload: OverallAnalysisResponse;
+          assetClass?: AssetClass;
+      }
+    | {
+          kind: 'options';
+          payload: OptionsAnalysisResponse;
+          assetClass?: AssetClass;
+      }
+    | {
+          kind: 'financials';
+          payload: FinancialsAnalysisResponse;
+          assetClass?: AssetClass;
+      }
+    | {
+          kind: 'congress';
+          payload: CongressTrendResponse;
+          assetClass?: AssetClass;
+      }
+    | { assetClass: AssetClass };
 
 // --- Options Analysis Types ---
 // 15+ options domain types live in ./options/types and are re-exported here
