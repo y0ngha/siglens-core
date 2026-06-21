@@ -1,4 +1,4 @@
-import type { EtSessionStatus, MarketSessionStatus } from '@/domain/types';
+import type { MarketSessionStatus } from '@/domain/types';
 import {
     MARKET_OPEN_HOUR,
     MARKET_OPEN_MINUTE,
