@@ -12,7 +12,6 @@ import {
 } from '@/domain/constants/time';
 import {
     computeSecondsUntilCacheExpiry,
-    isEtRegularSessionOpen,
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
 import {
