@@ -58,6 +58,7 @@ import { selectSkills } from '@/domain/analysis/selectSkills';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import type {
+    AssetClass,
     CandlePatternEntry,
     AnalysisResponse,
     Bar,
@@ -1605,7 +1606,8 @@ export function buildAnalysisPrompt(
     indicators: IndicatorResult,
     skills: Skill[] = [],
     timeframe: Timeframe = '1Day',
-    fearGreed?: FearGreedSnapshot
+    fearGreed?: FearGreedSnapshot,
+    assetClass: AssetClass = 'equity'
 ): string {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1653,8 +1655,13 @@ export function buildAnalysisPrompt(
     const marketReference = computeMarketReference(bars, indicators, timeframe);
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
 
+    const assetContext =
+        assetClass === 'crypto'
+            ? `This is a cryptocurrency trading 24/7 with no market open/close. There are no earnings, fundamentals, or analyst ratings — focus purely on price action, technical structure, volatility, and macro/liquidity context.`
+            : `This is a publicly traded U.S. equity.`;
+
     const sections = [
-        `Symbol: ${symbol}\nCompany: ${companyName}`,
+        `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
         ANALYSIS_INTENT_BLOCK,
         ANALYSIS_GUIDELINES,

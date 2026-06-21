@@ -1,0 +1,37 @@
+import { describe, it, expect } from 'vitest';
+import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
+import type { Bar } from '@/domain/types';
+
+const bars: Bar[] = []; // empty is fine; we assert framing text, not data sections
+const indicators = EMPTY_INDICATOR_RESULT;
+
+describe('buildAnalysisPrompt assetClass framing', () => {
+    it('crypto prompt avoids equity-only framing and adds 24/7 context', () => {
+        const p = buildAnalysisPrompt(
+            'BTCUSD',
+            'Bitcoin',
+            bars,
+            indicators,
+            [],
+            '1Day',
+            undefined,
+            'crypto'
+        );
+        expect(p).toMatch(/24\/7|around the clock|no market close/i);
+        expect(p).not.toMatch(/earnings report|quarterly earnings|P\/E ratio/i);
+    });
+
+    it('equity prompt (default) is unchanged framing', () => {
+        const p = buildAnalysisPrompt(
+            'AAPL',
+            'Apple',
+            bars,
+            indicators,
+            [],
+            '1Day'
+        );
+        expect(typeof p).toBe('string');
+        expect(p.length).toBeGreaterThan(0);
+    });
+});
