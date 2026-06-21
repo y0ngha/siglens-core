@@ -1,5 +1,6 @@
 import type {
     DashboardTimeframe,
+    MarketSessionSpec,
     NewsFeedCategory,
     OptionsExpirationFilter,
     StatementPeriod,
@@ -14,7 +15,6 @@ import {
     computeSecondsUntilCacheExpiry,
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
-import type { MarketSessionSpec } from '@/domain/types';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 
 /**
