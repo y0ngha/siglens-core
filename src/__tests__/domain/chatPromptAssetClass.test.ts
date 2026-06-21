@@ -105,7 +105,6 @@ describe('buildChatPrompt assetClass framing', () => {
         const context: CurrentAnalysisContext = {
             kind: 'news',
             payload: mockNews,
-            assetClass: 'crypto',
         };
         const payload = buildChatPrompt(
             'BTCUSD',
