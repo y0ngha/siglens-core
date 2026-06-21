@@ -134,9 +134,7 @@ export function computeBarsEffectiveTtl(
     now: Date,
     session: MarketSessionSpec = US_EQUITY_SESSION
 ): number {
-    // Fast path: skip the Intl/timezone computation entirely for 24/7 assets.
-    // isRegularSessionOpen would also return true for always-open, but this
-    // branch avoids the Intl.DateTimeFormat overhead for crypto callers.
+    // Fast path: 24/7 assets are always open; skip the getSessionStatus/isRegularSessionOpen call chain.
     if (session.kind === 'always-open') return BARS_OPEN_TTL_SECONDS;
     if (isRegularSessionOpen(session, now)) return BARS_OPEN_TTL_SECONDS;
     return Math.min(

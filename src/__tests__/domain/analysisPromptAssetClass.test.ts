@@ -18,7 +18,7 @@ describe('buildAnalysisPrompt assetClass framing', () => {
             undefined,
             'crypto'
         );
-        expect(p).toMatch(/24\/7|around the clock|no market close/i);
+        expect(p).toMatch(/24\/7|no market open\/close/i);
         expect(p).not.toMatch(/earnings report|quarterly earnings|P\/E ratio/i);
     });
 
@@ -34,6 +34,6 @@ describe('buildAnalysisPrompt assetClass framing', () => {
         // Must contain the equity framing literal emitted by buildAnalysisPrompt.
         expect(p).toContain('U.S. equity');
         // Must not bleed crypto-specific context into an equity prompt.
-        expect(p).not.toMatch(/24\/7|around the clock|no market close/i);
+        expect(p).not.toMatch(/24\/7|no market open\/close/i);
     });
 });

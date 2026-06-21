@@ -26,23 +26,23 @@ export const US_EQUITY_SESSION: MarketSessionSpec = {
 /** Crypto: trades 24/7. */
 export const CRYPTO_SESSION: MarketSessionSpec = { kind: 'always-open' };
 
-/** Per-timezone `Intl.DateTimeFormat` cache — avoids allocating a new formatter per call. */
-const _dtfCache = new Map<string, Intl.DateTimeFormat>();
-
-/** Returns (or creates and caches) a formatter for the given IANA `timeZone`. */
-function _getDtf(timeZone: string): Intl.DateTimeFormat {
-    const cached = _dtfCache.get(timeZone);
-    if (cached !== undefined) return cached;
-    const dtf = new Intl.DateTimeFormat('en-US', {
-        timeZone,
+/**
+ * Eagerly-created, immutable formatters for known IANA time zones.
+ *
+ * Known zones (currently only `America/New_York` for {@link US_EQUITY_SESSION})
+ * are pre-allocated at module load so the hot ET path never allocates during a
+ * request. Zones not listed here fall back to an inline `new Intl.DateTimeFormat`
+ * call in {@link localSessionParts} — non-crashing but not pre-warmed.
+ */
+const _dtfByZone: Readonly<Record<string, Intl.DateTimeFormat>> = {
+    'America/New_York': new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
         weekday: 'short',
         hour: '2-digit',
         minute: '2-digit',
         hourCycle: 'h23',
-    });
-    _dtfCache.set(timeZone, dtf);
-    return dtf;
-}
+    }),
+};
 
 /**
  * @internal Weekday index + minutes-since-local-midnight decomposition.
@@ -73,7 +73,17 @@ const WEEKDAY_INDEX: Record<string, number> = {
  * and minutes elapsed since local midnight.
  */
 export function localSessionParts(now: Date, timeZone: string): SessionParts {
-    const fmt = _getDtf(timeZone);
+    // Use the pre-created eager formatter for known zones; fall back to an
+    // inline formatter for any zone not in _dtfByZone (non-crashing, on-demand).
+    const fmt =
+        _dtfByZone[timeZone] ??
+        new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+        });
     const parts = fmt.formatToParts(now);
     const wd = parts.find(p => p.type === 'weekday')?.value ?? 'Sun';
     const hour = Number(parts.find(p => p.type === 'hour')?.value ?? '0');
