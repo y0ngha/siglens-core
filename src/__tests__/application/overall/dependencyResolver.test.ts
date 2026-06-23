@@ -1284,7 +1284,7 @@ describe('resolveOverallDependencies 함수는', () => {
             }
         });
 
-        it('fundamental 프로바이더 에러가 발생해도 crypto 종합 분석이 실패하지 않는다', async () => {
+        it('crypto 에서는 submitFundamentalAnalysis 를 호출하지 않으므로 provider 에러가 전파될 수 없다', async () => {
             // Even if somehow a fundamental error were to occur, for crypto we
             // never call submitFundamentalAnalysis, so it cannot produce an error.
             // This test documents the invariant: fundamental mock is not set up
@@ -1320,32 +1320,6 @@ describe('resolveOverallDependencies 함수는', () => {
             }
         });
 
-        it('equity(기본값) 는 fundamental 과 options 를 모두 호출한다 (회귀 방지)', async () => {
-            mockSubmitFundamentalAnalysis.mockResolvedValue({
-                status: 'cached',
-                result: cachedFundamental,
-            });
-            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
-                status: 'no_chains_error',
-                code: 'no_options_chains',
-                error: 'No chains',
-            });
-
-            const state = await resolveOverallDependencies(
-                makeInputs({
-                    // No assetClass → defaults to equity behavior.
-                    optionsSnapshot: makeSnapshot(),
-                })
-            );
-
-            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(1);
-            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(1);
-            expect(state.kind).toBe('cached');
-            if (state.kind === 'cached') {
-                expect(state.fundamental).toEqual(cachedFundamental);
-            }
-        });
-
         it('crypto 에서 technical 이 submitted 이면 kind: pending 을 반환한다', async () => {
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'submitted',
@@ -1366,6 +1340,45 @@ describe('resolveOverallDependencies 함수는', () => {
             // Fundamental and options submit functions were never called.
             expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(0);
             expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(0);
+        });
+    });
+
+    // ─────────────────────────────────────────
+    // Equity regression after crypto gating
+    // ─────────────────────────────────────────
+    describe('equity 기본 동작 — crypto 게이팅 후 회귀 방지', () => {
+        it('equity(기본값) 는 fundamental 과 options 를 모두 호출한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No chains',
+            });
+
+            const state = await resolveOverallDependencies(
+                makeInputs({
+                    // No assetClass → defaults to equity behavior.
+                    optionsSnapshot: makeSnapshot(),
+                })
+            );
+
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(1);
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(1);
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.fundamental).toEqual(cachedFundamental);
+            }
         });
     });
 });

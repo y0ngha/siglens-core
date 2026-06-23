@@ -678,6 +678,40 @@ describe('buildOverallAnalysisPrompt', () => {
             expect(prompt).not.toContain('가상자산(Crypto)');
             expect(prompt).not.toContain('available-axis data');
         });
+
+        it('equity + null fundamental: emits neutral fallback (no crypto wording, no formatFundamental output)', () => {
+            // Defensive branch: equity asset with fundamental=null (impossible in
+            // normal flow but must not emit crypto-specific wording).
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                null, // equity + null fundamental (defensive fallback)
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'equity'
+            );
+
+            // The neutral fallback text must appear
+            expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
+            expect(prompt).toContain('(펀더멘털 데이터 없음)');
+
+            // Crypto wording must NOT appear — equity+null must NOT emit crypto hint
+            expect(prompt).not.toContain('가상자산(Crypto)');
+            expect(prompt).not.toContain(
+                '기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.'
+            );
+
+            // formatFundamental output must NOT appear (fundamental is null)
+            expect(prompt).not.toContain('펀더멘털 관점에서 테슬라는');
+
+            // Equity framing still used
+            expect(prompt).toContain('This is a publicly traded U.S. equity.');
+        });
     });
 
     describe('financials axis integration', () => {

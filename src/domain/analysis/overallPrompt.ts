@@ -331,9 +331,13 @@ export function buildOverallAnalysisPrompt(
     technical: AnalysisResponse,
     /**
      * `null` when the fundamental axis was gracefully skipped (e.g.
-     * `assetClass: 'crypto'`). The prompt builder already branches on
-     * `isCrypto` and never calls `formatFundamental` with a null value —
-     * the crypto branch emits a fixed "no fundamentals" label instead.
+     * `assetClass: 'crypto'`). The prompt builder uses a 3-way branch:
+     * - crypto (`isCrypto === true`): emits a fixed crypto-specific hint;
+     *   `formatFundamental` is never called.
+     * - equity with data (`fundamental !== null`): calls `formatFundamental`
+     *   and embeds the result; TS narrows away `null` in this branch.
+     * - equity without data (defensive fallback): emits a neutral
+     *   "펀더멘털 데이터 없음" label; must not contain crypto wording.
      */
     fundamental: FundamentalAnalysisResponse | null,
     news: NewsAnalysisResponse,
@@ -364,10 +368,11 @@ export function buildOverallAnalysisPrompt(
 
     const axisDataLabel = isCrypto ? 'available-axis' : 'four-axis';
 
-    const fundamentalSection =
-        isCrypto || fundamental === null
-            ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
-            : `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`;
+    const fundamentalSection = isCrypto
+        ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
+        : fundamental !== null
+          ? `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`
+          : `## Axis 2 — Fundamental Analysis\n(펀더멘털 데이터 없음)`;
 
     return `${roleAndAxisLine}
 ${assetContext}

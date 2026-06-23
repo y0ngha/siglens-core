@@ -370,6 +370,25 @@ export type DependencyState =
     | DependencyStateMissNoTrigger;
 
 // ─────────────────────────────────────────
+// Crypto-skip sentinel types
+// ─────────────────────────────────────────
+
+/**
+ * Sentinel returned by the dependency resolver when the fundamental axis is
+ * gracefully skipped for a crypto instrument. Mirrors the options-axis
+ * `no_chains_error` skip pattern — the resolver produces this value instead
+ * of calling `submitFundamentalAnalysis`, so no provider error can propagate.
+ *
+ * `status` and `code` share the same literal so consumers can narrow on either
+ * field without ambiguity.
+ */
+export interface FundamentalCryptoSkip {
+    status: 'no_fundamental_crypto';
+    code: 'no_fundamental_crypto';
+    error: string;
+}
+
+// ─────────────────────────────────────────
 // Submit
 // ─────────────────────────────────────────
 

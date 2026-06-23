@@ -1380,11 +1380,10 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(result.status).toBe('submitted');
         });
 
-        it('FMP 프로파일 미발견 에러가 overall 을 실패시키지 않는다', async () => {
-            // The real-world bug: resolver would return kind:'error' axis:'fundamental'
-            // for crypto because submitFundamentalAnalysis throws a profile-not-found
-            // error. With the fix, the resolver skips the axis and returns cached
-            // with fundamental=null. Simulate that correct resolver behavior here.
+        it('overall 캐시 히트 시 cached 를 반환하고 잡 등록을 하지 않는다 (crypto)', async () => {
+            // Distinct from the cache-miss test above: verifies that the
+            // overall cache-hit path works correctly for crypto (fundamental=null,
+            // options=null) and that no job is enqueued.
             mockResolveOverallDependencies.mockResolvedValue({
                 kind: 'cached',
                 technical: cachedTechnical,
@@ -1392,15 +1391,19 @@ describe('submitOverallAnalysis 함수는', () => {
                 news: cachedNews,
                 options: null,
             });
-            mockCacheGet.mockResolvedValue(null);
+            mockCacheGet.mockResolvedValue(cachedOverallResult);
 
             const result = await submitOverallAnalysis(
                 makeOptions({ assetClass: 'crypto', symbol: 'ETH' })
             );
 
-            // Overall succeeds — not an axis error.
-            expect(result.status).toBe('submitted');
-            expect(result.status).not.toBe('error');
+            // Cache hit → no new job, result is embedded.
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                expect(result.result).toEqual(cachedOverallResult);
+            }
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
         });
 
         it('crypto 일 때 buildOverallAnalysisPrompt 에 assetClass: crypto 가 전달된다', async () => {

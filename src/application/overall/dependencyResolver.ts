@@ -6,12 +6,14 @@ import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     DependencyState,
+    FundamentalCryptoSkip,
     OverallDependencyInputs,
 } from '@/application/overall/types';
 import type {
     FundamentalAnalysisResponse,
     OptionsAnalysisResponse,
 } from '@/domain/types';
+import type { SubmitFundamentalAnalysisResult } from '@/application/fundamental/types';
 import type { SubmitOptionsAnalysisResult } from '@/application/options/types';
 
 /**
@@ -245,7 +247,9 @@ export async function resolveOverallDependencies(
     // sentinel `no_fundamental_crypto` status (mirrors the options-axis
     // `no_chains_error` skip pattern) so `submitFundamentalAnalysis` is never
     // called and cannot surface a "Profile not found" fetch error.
-    const fundamentalSubmit = isCrypto
+    const fundamentalSubmit: Promise<
+        SubmitFundamentalAnalysisResult | FundamentalCryptoSkip
+    > = isCrypto
         ? Promise.resolve({
               status: 'no_fundamental_crypto' as const,
               code: 'no_fundamental_crypto' as const,
