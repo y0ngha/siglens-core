@@ -47,12 +47,12 @@ export interface ResolveOverallDependenciesOptions {
 /**
  * @internal Called by {@link submitOverallAnalysis} — consumers should not call this directly.
  *
- * Resolve the three dependency axes (technical, fundamental, news) for an
+ * Resolve the four dependency axes (technical, fundamental, news, options) for an
  * overall analysis submission.
  *
- * All three submit functions are called in parallel via `Promise.all`.
+ * All four submit functions are called in parallel via `Promise.all`.
  * If **all** resolve to `status: 'cached'`, the function returns
- * `{ kind: 'cached', ... }` with the three embedded results so the caller
+ * `{ kind: 'cached', ... }` with the four embedded results so the caller
  * can immediately build the overall prompt.
  *
  * If **any** axis resolves to `status: 'submitted'`, the function returns
@@ -62,6 +62,12 @@ export interface ResolveOverallDependenciesOptions {
  * If **any** axis resolves to `status: 'error'` (tier gate, usage limit, or
  * fetch failure), the function returns `{ kind: 'error', axis, error }` immediately
  * so the caller can surface the failure to the user without waiting for other axes.
+ *
+ * For `assetClass: 'crypto'`, the fundamental and options axes are gracefully
+ * skipped: `submitFundamentalAnalysis` is never called (a `'no_fundamental_crypto'`
+ * sentinel is used instead) and the options axis short-circuits to
+ * `'no_chains_error'`. The returned `DependencyStateCached` then carries
+ * `fundamental: null` and `options: null`.
  *
  * @param inputs - Symbol, timeframe, model, providers, and pass-through
  *   options for each submit function.
@@ -74,7 +80,7 @@ export interface ResolveOverallDependenciesOptions {
  * const state = await resolveOverallDependencies(inputs);
  * if (state.kind === 'error') return { status: 'error', axis: state.axis, error: state.error };
  * if (state.kind === 'pending') return { status: 'pending_dependencies', pendingJobs: state.pendingJobs };
- * // All three cached — build overall prompt with state.technical/fundamental/news
+ * // All four axes resolved. For crypto, state.fundamental and state.options are null.
  * ```
  *
  * @see submitOverallAnalysis

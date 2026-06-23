@@ -404,7 +404,7 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
-    // NOTE: `assetClass` is inherited from `OverallDependencyInputs`. It now
+    // NOTE: `assetClass` is inherited from `OverallDependencyInputs`, which
     // controls both the dependency resolver (which axes to submit) and the
     // prompt builder framing. See `OverallDependencyInputs.assetClass`.
 }

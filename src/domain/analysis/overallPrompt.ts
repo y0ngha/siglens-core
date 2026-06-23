@@ -364,12 +364,10 @@ export function buildOverallAnalysisPrompt(
 
     const axisDataLabel = isCrypto ? 'available-axis' : 'four-axis';
 
-    const fundamentalSection = isCrypto
-        ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
-        : // For equity, `fundamental` is always non-null (the resolver only passes
-          // null when isCrypto=true). The non-null assertion is safe here because
-          // the resolver guarantees fundamental is present for equity assets.
-          `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental!)}`;
+    const fundamentalSection =
+        isCrypto || fundamental === null
+            ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
+            : `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`;
 
     return `${roleAndAxisLine}
 ${assetContext}
