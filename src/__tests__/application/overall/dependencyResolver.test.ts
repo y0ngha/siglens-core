@@ -1236,4 +1236,149 @@ describe('resolveOverallDependencies 함수는', () => {
             );
         });
     });
+
+    // ─────────────────────────────────────────
+    // Crypto asset-class gating
+    // ─────────────────────────────────────────
+    describe('assetClass: crypto 가 주어졌을 때', () => {
+        beforeEach(() => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+            // These should never be called for crypto, but reset for clean assertions.
+            mockSubmitFundamentalAnalysis.mockReset();
+            mockSubmitOptionsAnalysis.mockReset();
+        });
+
+        it('submitFundamentalAnalysis 와 submitOptionsAnalysis 를 전혀 호출하지 않는다', async () => {
+            const state = await resolveOverallDependencies(
+                makeInputs({ assetClass: 'crypto' })
+            );
+
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(0);
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(0);
+            // Technical and news are still called.
+            expect(mockSubmitAnalysis).toHaveBeenCalledTimes(1);
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledTimes(1);
+            // Resolver should succeed (not error).
+            expect(state.kind).toBe('cached');
+        });
+
+        it('resolved deps 에서 fundamental 과 options 가 null 이다', async () => {
+            const state = await resolveOverallDependencies(
+                makeInputs({ assetClass: 'crypto' })
+            );
+
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.fundamental).toBeNull();
+                expect(state.options).toBeNull();
+                // Technical and news are fully resolved.
+                expect(state.technical).toEqual(cachedTechnical);
+                expect(state.news).toEqual(cachedNews);
+            }
+        });
+
+        it('crypto 에서는 submitFundamentalAnalysis 를 호출하지 않으므로 provider 에러가 전파될 수 없다', async () => {
+            // Even if somehow a fundamental error were to occur, for crypto we
+            // never call submitFundamentalAnalysis, so it cannot produce an error.
+            // This test documents the invariant: fundamental mock is not set up
+            // (i.e. it would throw if called) but the resolver still succeeds.
+            mockSubmitFundamentalAnalysis.mockRejectedValue(
+                new Error('Profile not found for symbol: BTC')
+            );
+
+            const state = await resolveOverallDependencies(
+                makeInputs({ assetClass: 'crypto', symbol: 'BTC' })
+            );
+
+            // Resolver succeeded without touching the fundamental axis.
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.fundamental).toBeNull();
+            }
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(0);
+        });
+
+        it('optionsSnapshot 이 제공돼도 crypto 에서는 submitOptionsAnalysis 를 호출하지 않는다', async () => {
+            const state = await resolveOverallDependencies(
+                makeInputs({
+                    assetClass: 'crypto',
+                    optionsSnapshot: makeSnapshot(),
+                })
+            );
+
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(0);
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.options).toBeNull();
+            }
+        });
+
+        it('crypto 에서 technical 이 submitted 이면 kind: pending 을 반환한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'submitted',
+                jobId: 'tech-crypto-001',
+            });
+
+            const state = await resolveOverallDependencies(
+                makeInputs({ assetClass: 'crypto' })
+            );
+
+            expect(state.kind).toBe('pending');
+            if (state.kind === 'pending') {
+                expect(state.pendingJobs.technical).toBe('tech-crypto-001');
+                // Fundamental and options are never pending for crypto.
+                expect(state.pendingJobs.fundamental).toBeUndefined();
+                expect(state.pendingJobs.options).toBeUndefined();
+            }
+            // Fundamental and options submit functions were never called.
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(0);
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(0);
+        });
+    });
+
+    // ─────────────────────────────────────────
+    // Equity regression after crypto gating
+    // ─────────────────────────────────────────
+    describe('equity 기본 동작 — crypto 게이팅 후 회귀 방지', () => {
+        it('equity(기본값) 는 fundamental 과 options 를 모두 호출한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'no_chains_error',
+                code: 'no_options_chains',
+                error: 'No chains',
+            });
+
+            const state = await resolveOverallDependencies(
+                makeInputs({
+                    // No assetClass → defaults to equity behavior.
+                    optionsSnapshot: makeSnapshot(),
+                })
+            );
+
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledTimes(1);
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledTimes(1);
+            expect(state.kind).toBe('cached');
+            if (state.kind === 'cached') {
+                expect(state.fundamental).toEqual(cachedFundamental);
+            }
+        });
+    });
 });

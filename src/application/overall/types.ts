@@ -247,6 +247,21 @@ export interface OverallDependencyInputs {
      * `force = true` — `false` is a real value, not a missing one.
      */
     force?: boolean;
+
+    /**
+     * Instrument asset class. Controls which axes the dependency resolver
+     * submits:
+     * - `'equity'` (default): all four axes — technical, fundamental, news,
+     *   options.
+     * - `'crypto'`: technical + news only. The fundamental and options axes
+     *   are skipped entirely (not submitted, not surfaced as errors). The
+     *   resolved `DependencyStateCached` carries `fundamental: null` /
+     *   `options: null` so the prompt builder treats them as intentionally
+     *   absent rather than missing data.
+     *
+     * Optional for backward compatibility — omit to keep equity behavior.
+     */
+    assetClass?: AssetClass;
 }
 
 // ─────────────────────────────────────────
@@ -260,11 +275,21 @@ export interface OverallDependencyInputs {
  * `options` is `null` when the axis was gracefully skipped (the caller omitted
  * `optionsSnapshot` or `submitOptionsAnalysis` returned `no_chains_error`).
  * Non-null payloads carry the full options analysis to feed into the prompt.
+ *
+ * `fundamental` is `null` when the asset class is `'crypto'` — the fundamental
+ * axis is intentionally not submitted for crypto instruments (no FMP company
+ * profile exists). The prompt builder treats `null` as "no fundamentals"
+ * rather than a missing-data error, matching the same null-means-skipped
+ * convention already used by the options axis.
  */
 export interface DependencyStateCached {
     kind: 'cached';
     technical: AnalysisResponse;
-    fundamental: FundamentalAnalysisResponse;
+    /**
+     * `null` when the fundamental axis was gracefully skipped (e.g. for
+     * `assetClass: 'crypto'`). Non-null for equity instruments.
+     */
+    fundamental: FundamentalAnalysisResponse | null;
     news: NewsAnalysisResponse;
     /**
      * Options axis result. `null` indicates a graceful skip (NoChains symbol
@@ -345,6 +370,26 @@ export type DependencyState =
     | DependencyStateMissNoTrigger;
 
 // ─────────────────────────────────────────
+// Crypto-skip sentinel types
+// ─────────────────────────────────────────
+
+/**
+ * @internal
+ * Sentinel returned by the dependency resolver when the fundamental axis is
+ * gracefully skipped for a crypto instrument. Mirrors the options-axis
+ * `no_chains_error` skip pattern — the resolver produces this value instead
+ * of calling `submitFundamentalAnalysis`, so no provider error can propagate.
+ *
+ * `status` and `code` share the same literal so consumers can narrow on either
+ * field without ambiguity.
+ */
+export interface FundamentalCryptoSkip {
+    status: 'no_fundamental_crypto';
+    code: 'no_fundamental_crypto';
+    error: string;
+}
+
+// ─────────────────────────────────────────
 // Submit
 // ─────────────────────────────────────────
 
@@ -379,12 +424,9 @@ export interface SubmitOverallAnalysisOptions
      * Defaults to `usage?.occurredAt ?? new Date()`.
      */
     now?: Date;
-    /**
-     * Instrument asset class. Controls prompt framing: `'crypto'` treats absent
-     * fundamentals/options as intentional (not missing data).
-     * Defaults to `'equity'` for backward compatibility.
-     */
-    assetClass?: AssetClass;
+    // NOTE: `assetClass` is inherited from `OverallDependencyInputs`, which
+    // controls both the dependency resolver (which axes to submit) and the
+    // prompt builder framing. See `OverallDependencyInputs.assetClass`.
 }
 
 /**

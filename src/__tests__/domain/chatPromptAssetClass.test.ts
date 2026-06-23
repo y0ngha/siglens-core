@@ -262,7 +262,7 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
         // Verify the exact text emitted by overallPrompt.ts for the crypto Axis 2 branch.
         expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
         expect(prompt).toContain(
-            '이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.'
+            'This asset is a cryptocurrency and is not subject to corporate fundamental analysis. Keep fundamentalBulletsKo as an empty array.'
         );
     });
 });

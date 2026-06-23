@@ -588,6 +588,138 @@ describe('buildOverallAnalysisPrompt', () => {
         });
     });
 
+    describe('crypto assetClass branch', () => {
+        it('crypto + fundamental=null: emits crypto role line, crypto fundamental hint, and never calls formatFundamental', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                'BTC',
+                'Bitcoin',
+                MOCK_TECHNICAL,
+                null, // fundamental intentionally absent for crypto
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'crypto'
+            );
+
+            // Crypto role line — "available-axis" framing, not "four-axis"
+            expect(prompt).toContain('senior markets analyst');
+            expect(prompt).toContain('available-axis data');
+            // The equity role line must NOT appear
+            expect(prompt).not.toContain('senior equity analyst');
+            expect(prompt).not.toContain('four-axis data');
+
+            // assetContext crypto line
+            expect(prompt).toContain(
+                'This is a cryptocurrency (24/7 market, no earnings/fundamentals/options).'
+            );
+
+            // axisDataLabel in Data Boundary section — crypto uses 'available-axis'
+            expect(prompt).toContain(
+                'Use only the provided available-axis data as evidence'
+            );
+
+            // Crypto fundamental section hint: English text for crypto asset class
+            expect(prompt).toContain(
+                'This asset is a cryptocurrency and is not subject to corporate fundamental analysis.'
+            );
+            expect(prompt).toContain(
+                'Keep fundamentalBulletsKo as an empty array.'
+            );
+
+            // formatFundamental output must NOT appear — equity fundamental strings would
+            // only come from formatFundamental(MOCK_FUNDAMENTAL), which is never called here.
+            // Use strings unique to formatFundamental (overallConclusionKo, riskFactorsKo):
+            expect(prompt).not.toContain('펀더멘털 관점에서 테슬라는');
+            // Conclusion (KO) line is emitted by formatFundamental only:
+            expect(prompt).not.toContain(
+                'Conclusion (KO): 펀더멘털 관점에서 테슬라는'
+            );
+            // Risk factor unique to MOCK_FUNDAMENTAL.riskFactorsKo:
+            expect(prompt).not.toContain('Risk Factors: 경쟁 심화');
+        });
+
+        it('equity (explicit) + non-null fundamental: emits equity role line and formatted fundamental section', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'equity'
+            );
+
+            // Equity role line
+            expect(prompt).toContain('senior equity analyst');
+            expect(prompt).toContain(
+                'integrating technical, fundamental, news, and options analysis'
+            );
+            // Equity four-axis framing
+            expect(prompt).toContain('four-axis data');
+            expect(prompt).toContain(
+                'Use only the provided four-axis data as evidence'
+            );
+
+            // assetContext equity line
+            expect(prompt).toContain('This is a publicly traded U.S. equity.');
+
+            // Formatted fundamental section content from MOCK_FUNDAMENTAL
+            expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
+            expect(prompt).toContain('펀더멘털 관점에서 테슬라는');
+            expect(prompt).toContain('경쟁 심화');
+            expect(prompt).toContain('Overall Sentiment: bearish');
+
+            // Crypto hint must NOT appear
+            expect(prompt).not.toContain(
+                'This asset is a cryptocurrency and is not subject to corporate fundamental analysis.'
+            );
+            expect(prompt).not.toContain('available-axis data');
+        });
+
+        it('equity + null fundamental: emits neutral fallback (no crypto wording, no formatFundamental output)', () => {
+            // Defensive branch: equity asset with fundamental=null (impossible in
+            // normal flow but must not emit crypto-specific wording).
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                null, // equity + null fundamental (defensive fallback)
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'equity'
+            );
+
+            // The neutral fallback text must appear
+            expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
+            expect(prompt).toContain('(No fundamental data)');
+
+            // Crypto wording must NOT appear — equity+null must NOT emit crypto hint
+            expect(prompt).not.toContain(
+                'This asset is a cryptocurrency and is not subject to corporate fundamental analysis.'
+            );
+            expect(prompt).not.toContain(
+                'Keep fundamentalBulletsKo as an empty array.'
+            );
+
+            // formatFundamental output must NOT appear (fundamental is null)
+            expect(prompt).not.toContain('펀더멘털 관점에서 테슬라는');
+
+            // Equity framing still used
+            expect(prompt).toContain('This is a publicly traded U.S. equity.');
+        });
+    });
+
     describe('financials axis integration', () => {
         const MOCK_SCORECARD: FinancialsScorecard = {
             growth: {

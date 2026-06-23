@@ -1356,4 +1356,124 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(firstCacheKey).not.toBe(secondCacheKey);
         });
     });
+
+    // ─────────────────────────────────────────
+    // Crypto asset-class gating (integration)
+    // ─────────────────────────────────────────
+    describe('assetClass: crypto 일 때', () => {
+        it('resolver 가 fundamental=null / options=null 로 반환해도 submitted 를 반환한다', async () => {
+            // Simulate resolver returning cached state with null fundamental+options
+            // (the shape the resolver produces for crypto).
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: null,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ assetClass: 'crypto' })
+            );
+
+            expect(result.status).toBe('submitted');
+        });
+
+        it('overall 캐시 히트 시 cached 를 반환하고 잡 등록을 하지 않는다 (crypto)', async () => {
+            // Distinct from the cache-miss test above: verifies that the
+            // overall cache-hit path works correctly for crypto (fundamental=null,
+            // options=null) and that no job is enqueued.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: null,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValue(cachedOverallResult);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ assetClass: 'crypto', symbol: 'ETH' })
+            );
+
+            // Cache hit → no new job, result is embedded.
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                expect(result.result).toEqual(cachedOverallResult);
+            }
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
+        });
+
+        it('crypto 일 때 buildOverallAnalysisPrompt 에 assetClass: crypto 가 전달된다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: null,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(makeOptions({ assetClass: 'crypto' }));
+
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            // buildOverallAnalysisPrompt signature (11 positional args):
+            //   symbol, companyName, technical, fundamental, news, timeframe,
+            //   fearGreed, options, optionsOiStale, financials, assetClass
+            // assetClass is the last arg — use args.at(-1) so this assertion
+            // remains correct if new parameters are inserted before it.
+            expect(args.at(-1)).toBe('crypto');
+        });
+
+        it('pending_dependencies 에서 fundamental / options jobId 가 없다 (crypto)', async () => {
+            // Resolver returns pending but only for technical+news (no fundamental/options).
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'pending',
+                pendingJobs: {
+                    technical: 'tech-btc-001',
+                    fundamental: undefined,
+                    news: 'news-btc-001',
+                    options: undefined,
+                },
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ assetClass: 'crypto', symbol: 'BTC' })
+            );
+
+            expect(result.status).toBe('pending_dependencies');
+            if (result.status === 'pending_dependencies') {
+                expect(result.pendingJobs.technical).toBe('tech-btc-001');
+                expect(result.pendingJobs.fundamental).toBeUndefined();
+                expect(result.pendingJobs.news).toBe('news-btc-001');
+                expect(result.pendingJobs.options).toBeUndefined();
+            }
+        });
+
+        it('equity(기본값)는 fundamental 에러를 axis 에러로 surfacing 한다 (회귀 방지)', async () => {
+            // Without the fix, crypto also surfaced fundamental errors. Confirm equity
+            // still does — the fix must not change equity behavior.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'error',
+                axis: 'fundamental',
+                error: {
+                    status: 'error',
+                    code: 'fetch_failed',
+                    error: 'Profile not found for symbol: FAKE',
+                },
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ symbol: 'FAKE' }) // no assetClass → equity
+            );
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error' && 'axis' in result) {
+                expect(result.axis).toBe('fundamental');
+            }
+        });
+    });
 });

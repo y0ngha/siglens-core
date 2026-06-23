@@ -6,9 +6,14 @@ import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     DependencyState,
+    FundamentalCryptoSkip,
     OverallDependencyInputs,
 } from '@/application/overall/types';
-import type { OptionsAnalysisResponse } from '@/domain/types';
+import type {
+    FundamentalAnalysisResponse,
+    OptionsAnalysisResponse,
+} from '@/domain/types';
+import type { SubmitFundamentalAnalysisResult } from '@/application/fundamental/types';
 import type { SubmitOptionsAnalysisResult } from '@/application/options/types';
 
 /**
@@ -44,12 +49,12 @@ export interface ResolveOverallDependenciesOptions {
 /**
  * @internal Called by {@link submitOverallAnalysis} — consumers should not call this directly.
  *
- * Resolve the three dependency axes (technical, fundamental, news) for an
+ * Resolve the four dependency axes (technical, fundamental, news, options) for an
  * overall analysis submission.
  *
- * All three submit functions are called in parallel via `Promise.all`.
+ * Four Promises are resolved in parallel via `Promise.all`. For equity, all four submit functions are invoked; for `assetClass: 'crypto'`, only the technical and news axes call their submit functions — fundamental and options resolve via in-memory sentinels.
  * If **all** resolve to `status: 'cached'`, the function returns
- * `{ kind: 'cached', ... }` with the three embedded results so the caller
+ * `{ kind: 'cached', ... }` with the four embedded results so the caller
  * can immediately build the overall prompt.
  *
  * If **any** axis resolves to `status: 'submitted'`, the function returns
@@ -59,6 +64,12 @@ export interface ResolveOverallDependenciesOptions {
  * If **any** axis resolves to `status: 'error'` (tier gate, usage limit, or
  * fetch failure), the function returns `{ kind: 'error', axis, error }` immediately
  * so the caller can surface the failure to the user without waiting for other axes.
+ *
+ * For `assetClass: 'crypto'`, the fundamental and options axes are gracefully
+ * skipped: `submitFundamentalAnalysis` is never called (a `'no_fundamental_crypto'`
+ * sentinel is used instead) and the options axis short-circuits to
+ * `'no_chains_error'`. The returned `DependencyStateCached` then carries
+ * `fundamental: null` and `options: null`.
  *
  * @param inputs - Symbol, timeframe, model, providers, and pass-through
  *   options for each submit function.
@@ -71,7 +82,7 @@ export interface ResolveOverallDependenciesOptions {
  * const state = await resolveOverallDependencies(inputs);
  * if (state.kind === 'error') return { status: 'error', axis: state.axis, error: state.error };
  * if (state.kind === 'pending') return { status: 'pending_dependencies', pendingJobs: state.pendingJobs };
- * // All three cached — build overall prompt with state.technical/fundamental/news
+ * // All four axes resolved. For crypto, state.fundamental and state.options are null.
  * ```
  *
  * @see submitOverallAnalysis
@@ -95,7 +106,16 @@ export async function resolveOverallDependencies(
         optionsSnapshot,
         options: optionsAxisOptions,
         force: topLevelForce,
+        assetClass,
     } = inputs;
+
+    // ── Asset-class gating ──
+    // Crypto instruments have no FMP company profile, so submitting the
+    // fundamental or options axes would always fail with a provider error.
+    // Skip both axes entirely and treat them as intentionally absent
+    // (same `no_chains_error` graceful-skip pattern used by the options axis
+    // when no snapshot is provided).
+    const isCrypto = assetClass === 'crypto';
     const dropAxisUsage = options.dropAxisUsage ?? false;
     // ── Backward-compat disambiguation for the renamed news fields ──
     // Old API: `news` (data: EnrichedNewsItem[]) + `newsOptions` (axis options).
@@ -181,17 +201,21 @@ export async function resolveOverallDependencies(
     // future chains; we treat that as a graceful skip (same shape as
     // submitOptionsAnalysis's `no_chains_error`) so the prompt builder can
     // proceed with `options: null`.
+    // Crypto instruments also skip the options axis entirely — no listed
+    // derivatives exist for them in the FMP dataset.
     const optionsExpirationDate =
-        optionsSnapshot !== undefined
+        !isCrypto && optionsSnapshot !== undefined
             ? pickNearestExpiration(optionsSnapshot, new Date())
             : null;
 
-    // ── Options-axis submit (gracefully short-circuited when no snapshot) ──
+    // ── Options-axis submit (gracefully short-circuited when no snapshot or crypto) ──
     // The four axes all consume `force` through their option types now, so
     // we can drop the explicit `as SubmitOptionsAnalysisOptions & { force }`
     // cast and rely on the structural type check.
     const optionsSubmit: Promise<SubmitOptionsAnalysisResult> =
-        optionsSnapshot !== undefined && optionsExpirationDate !== null
+        !isCrypto &&
+        optionsSnapshot !== undefined &&
+        optionsExpirationDate !== null
             ? submitOptionsAnalysis({
                   symbol,
                   companyName,
@@ -207,16 +231,42 @@ export async function resolveOverallDependencies(
             : Promise.resolve({
                   status: 'no_chains_error' as const,
                   code: 'no_options_chains' as const,
-                  error:
-                      optionsSnapshot === undefined
-                          ? 'No options snapshot provided'
-                          : 'No usable future expiration in snapshot',
+                  error: isCrypto
+                      ? 'Crypto asset: options axis skipped'
+                      : optionsSnapshot === undefined
+                        ? 'No options snapshot provided'
+                        : 'No usable future expiration in snapshot',
               });
 
     // ── Kick off all four axes in parallel ──
     // `skipEnqueueIfMiss` is forced from the top level for every axis when
     // set: bot/crawler gating must apply uniformly to all sub-axis enqueues,
     // not just the overall job, otherwise sub-axis workers would still fire.
+    //
+    // For crypto instruments the fundamental axis is gracefully skipped via a
+    // sentinel `no_fundamental_crypto` status (mirrors the options-axis
+    // `no_chains_error` skip pattern) so `submitFundamentalAnalysis` is never
+    // called and cannot surface a "Profile not found" fetch error.
+    const fundamentalSubmit: Promise<
+        SubmitFundamentalAnalysisResult | FundamentalCryptoSkip
+    > = isCrypto
+        ? Promise.resolve({
+              status: 'no_fundamental_crypto' as const,
+              code: 'no_fundamental_crypto' as const,
+              error: 'Crypto asset: fundamental axis skipped',
+          })
+        : submitFundamentalAnalysis({
+              symbol,
+              modelId,
+              dataProvider: fundamentalProvider,
+              // Top-level fallbacks: axis-level values win because the spread comes last.
+              tier: topLevelTier ?? DEFAULT_TIER,
+              userApiKey: topLevelUserApiKey,
+              ...fundamentalAxisOptions,
+              skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
+              force: effectiveAxisForce,
+          });
+
     const [technicalResult, fundamentalResult, newsResult, optionsResult] =
         await Promise.all([
             submitAnalysis(
@@ -239,17 +289,7 @@ export async function resolveOverallDependencies(
                     skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                 }
             ),
-            submitFundamentalAnalysis({
-                symbol,
-                modelId,
-                dataProvider: fundamentalProvider,
-                // Top-level fallbacks: axis-level values win because the spread comes last.
-                tier: topLevelTier ?? DEFAULT_TIER,
-                userApiKey: topLevelUserApiKey,
-                ...fundamentalAxisOptions,
-                skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
-                force: effectiveAxisForce,
-            }),
+            fundamentalSubmit,
             submitNewsAnalysis({
                 symbol,
                 companyName,
@@ -331,23 +371,36 @@ export async function resolveOverallDependencies(
     const optionsPayload: OptionsAnalysisResponse | null =
         optionsResult.status === 'cached' ? optionsResult.result : null;
 
-    // ── All four axes terminal (cached or no_chains for options) → cached state ──
-    // The options axis is "resolved" when it's either cached or no_chains_error;
-    // both produce a non-pending payload that the prompt builder can consume.
+    // ── Resolve the fundamental-axis payload for the cached branch ──
+    // `cached` → embed the analysis; `no_fundamental_crypto` → null (graceful
+    // skip for crypto instruments — mirrors options `no_chains_error` pattern).
+    // The prompt builder receives `null` and uses the crypto-specific label
+    // ("no fundamentals for crypto") rather than treating it as missing data.
+    const fundamentalPayload: FundamentalAnalysisResponse | null =
+        fundamentalResult.status === 'cached' ? fundamentalResult.result : null;
+
+    // ── All four axes terminal → cached state ──
+    // The options axis is "resolved" when it's either cached or no_chains_error.
+    // The fundamental axis is "resolved" when it's either cached or
+    // no_fundamental_crypto (crypto graceful skip).
+    // Both produce a non-pending payload that the prompt builder can consume.
     const optionsResolved =
         optionsResult.status === 'cached' ||
         optionsResult.status === 'no_chains_error';
+    const fundamentalResolved =
+        fundamentalResult.status === 'cached' ||
+        fundamentalResult.status === 'no_fundamental_crypto';
 
     if (
         technicalResult.status === 'cached' &&
-        fundamentalResult.status === 'cached' &&
+        fundamentalResolved &&
         newsResult.status === 'cached' &&
         optionsResolved
     ) {
         return {
             kind: 'cached',
             technical: technicalResult.result,
-            fundamental: fundamentalResult.result,
+            fundamental: fundamentalPayload,
             news: newsResult.result,
             options: optionsPayload,
         };
