@@ -301,7 +301,10 @@ function formatFinancials(
  * @param symbol         - Stock ticker (e.g. `'AAPL'`).
  * @param companyName    - Full company name (e.g. `'Apple Inc.'`).
  * @param technical      - Completed technical analysis result.
- * @param fundamental    - Completed fundamental analysis result.
+ * @param fundamental    - Completed fundamental analysis result, or `null` when the
+ *                         axis was gracefully skipped (e.g. `assetClass: 'crypto'`).
+ *                         When `null`, a crypto-specific or asset-neutral fallback label
+ *                         is emitted instead of calling `formatFundamental`.
  * @param news           - Completed news analysis result.
  * @param timeframe      - The chart timeframe; determines interpretation context.
  * @param fearGreed      - Optional Fear & Greed snapshot. When provided, a
@@ -332,12 +335,12 @@ export function buildOverallAnalysisPrompt(
     /**
      * `null` when the fundamental axis was gracefully skipped (e.g.
      * `assetClass: 'crypto'`). The prompt builder uses a 3-way branch:
-     * - crypto (`isCrypto === true`): emits a fixed crypto-specific hint;
-     *   `formatFundamental` is never called.
+     * - crypto (`isCrypto === true`): emits a fixed crypto-specific hint
+     *   ("This asset is a cryptocurrency…"); `formatFundamental` is never called.
      * - equity with data (`fundamental !== null`): calls `formatFundamental`
      *   and embeds the result; TS narrows away `null` in this branch.
-     * - equity without data (defensive fallback): emits a neutral
-     *   "펀더멘털 데이터 없음" label; must not contain crypto wording.
+     * - equity without data (defensive fallback): emits the asset-neutral English
+     *   label `"(No fundamental data)"`; must not contain crypto wording.
      */
     fundamental: FundamentalAnalysisResponse | null,
     news: NewsAnalysisResponse,

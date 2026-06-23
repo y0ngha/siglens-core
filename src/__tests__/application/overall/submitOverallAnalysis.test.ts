@@ -1420,8 +1420,12 @@ describe('submitOverallAnalysis 함수는', () => {
 
             expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
             const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
-            // 11th positional arg (index 10) = assetClass.
-            expect(args[10]).toBe('crypto');
+            // buildOverallAnalysisPrompt signature (11 positional args):
+            //   symbol, companyName, technical, fundamental, news, timeframe,
+            //   fearGreed, options, optionsOiStale, financials, assetClass
+            // assetClass is the last arg — use args.at(-1) so this assertion
+            // remains correct if new parameters are inserted before it.
+            expect(args.at(-1)).toBe('crypto');
         });
 
         it('pending_dependencies 에서 fundamental / options jobId 가 없다 (crypto)', async () => {
