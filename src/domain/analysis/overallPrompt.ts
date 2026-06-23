@@ -303,8 +303,13 @@ function formatFinancials(
  * @param technical      - Completed technical analysis result.
  * @param fundamental    - Completed fundamental analysis result, or `null` when the
  *                         axis was gracefully skipped (e.g. `assetClass: 'crypto'`).
- *                         When `null`, a crypto-specific or asset-neutral fallback label
- *                         is emitted instead of calling `formatFundamental`.
+ *                         The prompt builder resolves `null` via a 3-way branch:
+ *                         - crypto (`isCrypto === true`): emits a fixed crypto-specific hint
+ *                           ("This asset is a cryptocurrency…"); `formatFundamental` is never called.
+ *                         - equity with data (`fundamental !== null`): calls `formatFundamental`
+ *                           and embeds the result; TS narrows away `null` in this branch.
+ *                         - equity without data (defensive fallback): emits the asset-neutral
+ *                           label `"(No fundamental data)"`; must not contain crypto wording.
  * @param news           - Completed news analysis result.
  * @param timeframe      - The chart timeframe; determines interpretation context.
  * @param fearGreed      - Optional Fear & Greed snapshot. When provided, a
@@ -332,16 +337,8 @@ export function buildOverallAnalysisPrompt(
     symbol: string,
     companyName: string,
     technical: AnalysisResponse,
-    /**
-     * `null` when the fundamental axis was gracefully skipped (e.g.
-     * `assetClass: 'crypto'`). The prompt builder uses a 3-way branch:
-     * - crypto (`isCrypto === true`): emits a fixed crypto-specific hint
-     *   ("This asset is a cryptocurrency…"); `formatFundamental` is never called.
-     * - equity with data (`fundamental !== null`): calls `formatFundamental`
-     *   and embeds the result; TS narrows away `null` in this branch.
-     * - equity without data (defensive fallback): emits the asset-neutral English
-     *   label `"(No fundamental data)"`; must not contain crypto wording.
-     */
+    // 3-way branch: crypto → fixed hint (no formatFundamental call);
+    // equity with data → formatFundamental; equity without data → "(No fundamental data)".
     fundamental: FundamentalAnalysisResponse | null,
     news: NewsAnalysisResponse,
     timeframe: Timeframe,
@@ -371,11 +368,12 @@ export function buildOverallAnalysisPrompt(
 
     const axisDataLabel = isCrypto ? 'available-axis' : 'four-axis';
 
-    const fundamentalSection = isCrypto
-        ? `## Axis 2 — Fundamental Analysis\nThis asset is a cryptocurrency and is not subject to corporate fundamental analysis. Keep fundamentalBulletsKo as an empty array.`
+    const fundamentalBody = isCrypto
+        ? 'This asset is a cryptocurrency and is not subject to corporate fundamental analysis. Keep fundamentalBulletsKo as an empty array.'
         : fundamental !== null
-          ? `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`
-          : `## Axis 2 — Fundamental Analysis\n(No fundamental data)`;
+          ? formatFundamental(fundamental)
+          : '(No fundamental data)';
+    const fundamentalSection = `## Axis 2 — Fundamental Analysis\n${fundamentalBody}`;
 
     return `${roleAndAxisLine}
 ${assetContext}
