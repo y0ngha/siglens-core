@@ -588,6 +588,98 @@ describe('buildOverallAnalysisPrompt', () => {
         });
     });
 
+    describe('crypto assetClass branch', () => {
+        it('crypto + fundamental=null: emits crypto role line, crypto fundamental hint, and never calls formatFundamental', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                'BTC',
+                'Bitcoin',
+                MOCK_TECHNICAL,
+                null, // fundamental intentionally absent for crypto
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'crypto'
+            );
+
+            // Crypto role line — "available-axis" framing, not "four-axis"
+            expect(prompt).toContain('senior markets analyst');
+            expect(prompt).toContain('available-axis data');
+            // The equity role line must NOT appear
+            expect(prompt).not.toContain('senior equity analyst');
+            expect(prompt).not.toContain('four-axis data');
+
+            // assetContext crypto line
+            expect(prompt).toContain(
+                'This is a cryptocurrency (24/7 market, no earnings/fundamentals/options).'
+            );
+
+            // axisDataLabel in Data Boundary section — crypto uses 'available-axis'
+            expect(prompt).toContain(
+                'Use only the provided available-axis data as evidence'
+            );
+
+            // Crypto fundamental section hint: Korean text mentioning 가상자산(Crypto)
+            expect(prompt).toContain('가상자산(Crypto)');
+            expect(prompt).toContain(
+                '기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.'
+            );
+
+            // formatFundamental output must NOT appear — equity fundamental strings would
+            // only come from formatFundamental(MOCK_FUNDAMENTAL), which is never called here.
+            // Use strings unique to formatFundamental (overallConclusionKo, riskFactorsKo):
+            expect(prompt).not.toContain('펀더멘털 관점에서 테슬라는');
+            // Conclusion (KO) line is emitted by formatFundamental only:
+            expect(prompt).not.toContain(
+                'Conclusion (KO): 펀더멘털 관점에서 테슬라는'
+            );
+            // Risk factor unique to MOCK_FUNDAMENTAL.riskFactorsKo:
+            expect(prompt).not.toContain('Risk Factors: 경쟁 심화');
+        });
+
+        it('equity (explicit) + non-null fundamental: emits equity role line and formatted fundamental section', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'equity'
+            );
+
+            // Equity role line
+            expect(prompt).toContain('senior equity analyst');
+            expect(prompt).toContain(
+                'integrating technical, fundamental, news, and options analysis'
+            );
+            // Equity four-axis framing
+            expect(prompt).toContain('four-axis data');
+            expect(prompt).toContain(
+                'Use only the provided four-axis data as evidence'
+            );
+
+            // assetContext equity line
+            expect(prompt).toContain('This is a publicly traded U.S. equity.');
+
+            // Formatted fundamental section content from MOCK_FUNDAMENTAL
+            expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
+            expect(prompt).toContain('펀더멘털 관점에서 테슬라는');
+            expect(prompt).toContain('경쟁 심화');
+            expect(prompt).toContain('Overall Sentiment: bearish');
+
+            // Crypto hint must NOT appear
+            expect(prompt).not.toContain('가상자산(Crypto)');
+            expect(prompt).not.toContain('available-axis data');
+        });
+    });
+
     describe('financials axis integration', () => {
         const MOCK_SCORECARD: FinancialsScorecard = {
             growth: {

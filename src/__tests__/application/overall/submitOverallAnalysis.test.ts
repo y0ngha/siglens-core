@@ -1356,4 +1356,117 @@ describe('submitOverallAnalysis 함수는', () => {
             expect(firstCacheKey).not.toBe(secondCacheKey);
         });
     });
+
+    // ─────────────────────────────────────────
+    // Crypto asset-class gating (integration)
+    // ─────────────────────────────────────────
+    describe('assetClass: crypto 일 때', () => {
+        it('resolver 가 fundamental=null / options=null 로 반환해도 submitted 를 반환한다', async () => {
+            // Simulate resolver returning cached state with null fundamental+options
+            // (the shape the resolver produces for crypto).
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: null,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ assetClass: 'crypto' })
+            );
+
+            expect(result.status).toBe('submitted');
+        });
+
+        it('FMP 프로파일 미발견 에러가 overall 을 실패시키지 않는다', async () => {
+            // The real-world bug: resolver would return kind:'error' axis:'fundamental'
+            // for crypto because submitFundamentalAnalysis throws a profile-not-found
+            // error. With the fix, the resolver skips the axis and returns cached
+            // with fundamental=null. Simulate that correct resolver behavior here.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: null,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ assetClass: 'crypto', symbol: 'ETH' })
+            );
+
+            // Overall succeeds — not an axis error.
+            expect(result.status).toBe('submitted');
+            expect(result.status).not.toBe('error');
+        });
+
+        it('crypto 일 때 buildOverallAnalysisPrompt 에 assetClass: crypto 가 전달된다', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: null,
+                news: cachedNews,
+                options: null,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitOverallAnalysis(makeOptions({ assetClass: 'crypto' }));
+
+            expect(mockBuildOverallAnalysisPrompt).toHaveBeenCalledTimes(1);
+            const args = mockBuildOverallAnalysisPrompt.mock.calls[0];
+            // 11th positional arg (index 10) = assetClass.
+            expect(args[10]).toBe('crypto');
+        });
+
+        it('pending_dependencies 에서 fundamental / options jobId 가 없다 (crypto)', async () => {
+            // Resolver returns pending but only for technical+news (no fundamental/options).
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'pending',
+                pendingJobs: {
+                    technical: 'tech-btc-001',
+                    fundamental: undefined,
+                    news: 'news-btc-001',
+                    options: undefined,
+                },
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ assetClass: 'crypto', symbol: 'BTC' })
+            );
+
+            expect(result.status).toBe('pending_dependencies');
+            if (result.status === 'pending_dependencies') {
+                expect(result.pendingJobs.technical).toBe('tech-btc-001');
+                expect(result.pendingJobs.fundamental).toBeUndefined();
+                expect(result.pendingJobs.news).toBe('news-btc-001');
+                expect(result.pendingJobs.options).toBeUndefined();
+            }
+        });
+
+        it('equity(기본값)는 fundamental 에러를 axis 에러로 surfacing 한다 (회귀 방지)', async () => {
+            // Without the fix, crypto also surfaced fundamental errors. Confirm equity
+            // still does — the fix must not change equity behavior.
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'error',
+                axis: 'fundamental',
+                error: {
+                    status: 'error',
+                    code: 'fetch_failed',
+                    error: 'Profile not found for symbol: FAKE',
+                },
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ symbol: 'FAKE' }) // no assetClass → equity
+            );
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error' && 'axis' in result) {
+                expect(result.axis).toBe('fundamental');
+            }
+        });
+    });
 });

@@ -329,7 +329,13 @@ export function buildOverallAnalysisPrompt(
     symbol: string,
     companyName: string,
     technical: AnalysisResponse,
-    fundamental: FundamentalAnalysisResponse,
+    /**
+     * `null` when the fundamental axis was gracefully skipped (e.g.
+     * `assetClass: 'crypto'`). The prompt builder already branches on
+     * `isCrypto` and never calls `formatFundamental` with a null value —
+     * the crypto branch emits a fixed "no fundamentals" label instead.
+     */
+    fundamental: FundamentalAnalysisResponse | null,
     news: NewsAnalysisResponse,
     timeframe: Timeframe,
     fearGreed?: FearGreedSnapshot,
@@ -360,7 +366,10 @@ export function buildOverallAnalysisPrompt(
 
     const fundamentalSection = isCrypto
         ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
-        : `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`;
+        : // For equity, `fundamental` is always non-null (the resolver only passes
+          // null when isCrypto=true). The non-null assertion is safe here because
+          // the resolver guarantees fundamental is present for equity assets.
+          `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental!)}`;
 
     return `${roleAndAxisLine}
 ${assetContext}
