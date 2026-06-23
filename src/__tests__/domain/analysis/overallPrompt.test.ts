@@ -621,10 +621,12 @@ describe('buildOverallAnalysisPrompt', () => {
                 'Use only the provided available-axis data as evidence'
             );
 
-            // Crypto fundamental section hint: Korean text mentioning 가상자산(Crypto)
-            expect(prompt).toContain('가상자산(Crypto)');
+            // Crypto fundamental section hint: English text for crypto asset class
             expect(prompt).toContain(
-                '기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.'
+                'This asset is a cryptocurrency and is not subject to corporate fundamental analysis.'
+            );
+            expect(prompt).toContain(
+                'Keep fundamentalBulletsKo as an empty array.'
             );
 
             // formatFundamental output must NOT appear — equity fundamental strings would
@@ -675,7 +677,9 @@ describe('buildOverallAnalysisPrompt', () => {
             expect(prompt).toContain('Overall Sentiment: bearish');
 
             // Crypto hint must NOT appear
-            expect(prompt).not.toContain('가상자산(Crypto)');
+            expect(prompt).not.toContain(
+                'This asset is a cryptocurrency and is not subject to corporate fundamental analysis.'
+            );
             expect(prompt).not.toContain('available-axis data');
         });
 
@@ -698,12 +702,14 @@ describe('buildOverallAnalysisPrompt', () => {
 
             // The neutral fallback text must appear
             expect(prompt).toContain('## Axis 2 — Fundamental Analysis');
-            expect(prompt).toContain('(펀더멘털 데이터 없음)');
+            expect(prompt).toContain('(No fundamental data)');
 
             // Crypto wording must NOT appear — equity+null must NOT emit crypto hint
-            expect(prompt).not.toContain('가상자산(Crypto)');
             expect(prompt).not.toContain(
-                '기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.'
+                'This asset is a cryptocurrency and is not subject to corporate fundamental analysis.'
+            );
+            expect(prompt).not.toContain(
+                'Keep fundamentalBulletsKo as an empty array.'
             );
 
             // formatFundamental output must NOT appear (fundamental is null)

@@ -369,10 +369,10 @@ export function buildOverallAnalysisPrompt(
     const axisDataLabel = isCrypto ? 'available-axis' : 'four-axis';
 
     const fundamentalSection = isCrypto
-        ? `## Axis 2 — Fundamental Analysis\n이 자산군은 가상자산(Crypto)으로 기업 펀더멘털 분석 대상이 아닙니다. fundamentalBulletsKo는 빈 배열로 유지하세요.`
+        ? `## Axis 2 — Fundamental Analysis\nThis asset is a cryptocurrency and is not subject to corporate fundamental analysis. Keep fundamentalBulletsKo as an empty array.`
         : fundamental !== null
           ? `## Axis 2 — Fundamental Analysis\n${formatFundamental(fundamental)}`
-          : `## Axis 2 — Fundamental Analysis\n(펀더멘털 데이터 없음)`;
+          : `## Axis 2 — Fundamental Analysis\n(No fundamental data)`;
 
     return `${roleAndAxisLine}
 ${assetContext}

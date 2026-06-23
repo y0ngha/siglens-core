@@ -52,7 +52,7 @@ export interface ResolveOverallDependenciesOptions {
  * Resolve the four dependency axes (technical, fundamental, news, options) for an
  * overall analysis submission.
  *
- * All four submit functions are called in parallel via `Promise.all`.
+ * Four Promises are resolved in parallel via `Promise.all`. For equity, all four submit functions are invoked; for `assetClass: 'crypto'`, only the technical and news axes call their submit functions — fundamental and options resolve via in-memory sentinels.
  * If **all** resolve to `status: 'cached'`, the function returns
  * `{ kind: 'cached', ... }` with the four embedded results so the caller
  * can immediately build the overall prompt.

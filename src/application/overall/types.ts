@@ -374,6 +374,7 @@ export type DependencyState =
 // ─────────────────────────────────────────
 
 /**
+ * @internal
  * Sentinel returned by the dependency resolver when the fundamental axis is
  * gracefully skipped for a crypto instrument. Mirrors the options-axis
  * `no_chains_error` skip pattern — the resolver produces this value instead
