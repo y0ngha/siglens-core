@@ -32,3 +32,19 @@ export function makeHLBars(pairs: Array<[high: number, low: number]>): Bar[] {
         volume: 1000,
     }));
 }
+
+/**
+ * Builds a flat-bar series that produces an exact alternating pivot ladder
+ * when run through `extractPivots`: `seed` is bar 0, then each of `targets`
+ * (alternating high/low, starting high) becomes a confirmed pivot at its own
+ * bar index once the NEXT target (or `closer`) retraces far enough from it.
+ * Used across the classifiers suite to build precise, controllable pivot
+ * geometry without `makeBars`' fixed +/-0.05 offset noise.
+ */
+export function makeAlternatingPivotBars(
+    seed: number,
+    targets: number[],
+    closer: number
+): Bar[] {
+    return makeHLBars([seed, ...targets, closer].map(v => [v, v]));
+}

@@ -5,8 +5,13 @@ import {
     classifyDoubleTripleBottom,
     classifyHeadAndShoulders,
     classifyInverseHeadAndShoulders,
+    classifyTrendlinePatterns,
 } from '@/domain/patterns/classifiers';
-import { makeBars, makeHLBars } from '@/__tests__/domain/patterns/helpers';
+import {
+    makeAlternatingPivotBars,
+    makeBars,
+    makeHLBars,
+} from '@/__tests__/domain/patterns/helpers';
 
 const ATR = 1;
 
@@ -141,5 +146,111 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
         expect(candidates).toEqual([
             { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
+    });
+});
+
+describe('classifyTrendlinePatterns', () => {
+    // Each case is [seed, targets (alternating high/low from index 1), closer]
+    // — see makeAlternatingPivotBars. Produces exactly 2 highs + 2 lows,
+    // classified by the flat/rising/falling table.
+    const cases: Array<{
+        name: string;
+        seed: number;
+        targets: number[];
+        closer: number;
+        expectedId: string;
+    }> = [
+        {
+            name: 'ascending_triangle: 고점 평평 + 저점 상승',
+            seed: 10,
+            targets: [20, 10, 20, 12],
+            closer: 20,
+            expectedId: 'ascending_triangle',
+        },
+        {
+            name: 'descending_triangle: 고점 하락 + 저점 평평',
+            seed: 10,
+            targets: [20, 10, 18, 10],
+            closer: 20,
+            expectedId: 'descending_triangle',
+        },
+        {
+            name: 'symmetrical_triangle: 고점 하락 + 저점 상승 (수렴)',
+            seed: 10,
+            targets: [20, 5, 18, 7],
+            closer: 20,
+            expectedId: 'symmetrical_triangle',
+        },
+        {
+            name: 'ascending_wedge: 둘 다 상승, 저점 기울기가 고점보다 가파름',
+            seed: 10,
+            targets: [20, 5, 22, 10],
+            closer: 25,
+            expectedId: 'ascending_wedge',
+        },
+        {
+            name: 'descending_wedge: 둘 다 하락, 고점 기울기가 저점보다 가파름',
+            seed: 10,
+            targets: [20, 5, 15, 3],
+            closer: 20,
+            expectedId: 'descending_wedge',
+        },
+        {
+            name: 'rectangle: 고점/저점 모두 평평',
+            seed: 10,
+            targets: [20, 5, 20, 5],
+            closer: 20,
+            expectedId: 'rectangle',
+        },
+    ];
+
+    it.each(cases)('$name', ({ seed, targets, closer, expectedId }) => {
+        const bars = makeAlternatingPivotBars(seed, targets, closer);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots.filter(p => p.kind === 'high')).toHaveLength(2);
+        expect(pivots.filter(p => p.kind === 'low')).toHaveLength(2);
+
+        const candidates = classifyTrendlinePatterns(pivots, bars, ATR);
+
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0].id).toBe(expectedId);
+        expect(candidates[0].startIndex).toBeLessThan(candidates[0].endIndex);
+    });
+
+    it('고점/저점이 둘 다 상승하지만 기울기가 같으면(쐐기 조건 미충족) 감지하지 않는다', () => {
+        // sH === sL (both rising by the same rate) matches no row in the
+        // table: not a wedge (needs sL > sH), not flat/falling anywhere.
+        const bars = makeAlternatingPivotBars(10, [20, 5, 22, 7], 25);
+        const pivots = extractPivots(bars, ATR);
+
+        expect(classifyTrendlinePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('기울기가 정확히 FLAT_SLOPE_ATR_PER_BAR 이면 flat으로 판정한다 (느슨한 경계)', () => {
+        // atr=20 makes the normalized slope land bit-exactly on 0.05 (1/20)
+        // for both highs and lows — the inclusive boundary of "flat".
+        const atr = 20;
+        const bars = makeAlternatingPivotBars(0, [100, 0, 102, 2], 100);
+        const pivots = extractPivots(bars, atr);
+
+        const candidates = classifyTrendlinePatterns(pivots, bars, atr);
+
+        expect(candidates).toEqual([
+            { id: 'rectangle', startIndex: 1, endIndex: 4 },
+        ]);
+    });
+
+    it('고점 또는 저점이 2개 미만이면 감지하지 않는다', () => {
+        const bars = makeBars([10, 15, 10]);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots).toHaveLength(1);
+
+        expect(classifyTrendlinePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('atr가 0 이하이면 감지하지 않는다', () => {
+        const bars = makeAlternatingPivotBars(10, [20, 5, 20, 5], 20);
+        const pivots = extractPivots(bars, ATR);
+        expect(classifyTrendlinePatterns(pivots, bars, 0)).toEqual([]);
     });
 });

@@ -6,9 +6,49 @@ import type {
 } from '@/domain/patterns/types';
 import {
     EXTREME_MATCH_ATR_MULT,
+    FLAT_SLOPE_ATR_PER_BAR,
     HS_HEAD_MIN_ATR,
     HS_SHOULDER_TOLERANCE,
+    TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
+
+interface Point {
+    x: number;
+    y: number;
+}
+
+/**
+ * Ordinary least-squares slope of `y` over `x`. Returns `0` for fewer than 2
+ * points or a degenerate (zero-variance) `x` series — a flat/undefined slope
+ * is the conservative (non-triggering) default for the trendline family.
+ */
+function leastSquaresSlope(points: readonly Point[]): number {
+    const n = points.length;
+    if (n < 2) return 0;
+
+    let sumX = 0;
+    let sumY = 0;
+    let sumXY = 0;
+    let sumXX = 0;
+    for (const { x, y } of points) {
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumXX += x * x;
+    }
+
+    const denom = n * sumXX - sumX * sumX;
+    if (denom === 0) return 0;
+    return (n * sumXY - sumX * sumY) / denom;
+}
+
+type SlopeShape = 'flat' | 'rising' | 'falling';
+
+/** Classifies an ATR-normalized slope as flat/rising/falling against `FLAT_SLOPE_ATR_PER_BAR`. */
+function classifySlope(normalizedSlope: number): SlopeShape {
+    if (Math.abs(normalizedSlope) <= FLAT_SLOPE_ATR_PER_BAR) return 'flat';
+    return normalizedSlope > 0 ? 'rising' : 'falling';
+}
 
 /**
  * A pattern shape matcher — the pre-screener building block that turns
@@ -174,6 +214,53 @@ export const classifyHeadAndShoulders: PatternClassifier =
 export const classifyInverseHeadAndShoulders: PatternClassifier =
     fivePivotHeadAndShouldersClassifier('low', 'inverse_head_and_shoulders');
 
+// ─── Group 3: trendline pairs (triangles / wedges / rectangle) ────────────
+
+/**
+ * Fits independent least-squares trendlines through the last
+ * `TRENDLINE_PIVOT_WINDOW` pivots' highs and lows and classifies the pair by
+ * the flat/rising/falling table in the design doc. Emits at most one
+ * candidate — the six shapes are mutually exclusive by construction.
+ */
+export const classifyTrendlinePatterns: PatternClassifier = (
+    pivots,
+    _bars,
+    atr
+) => {
+    if (atr <= 0) return [];
+
+    const window = pivots.slice(-TRENDLINE_PIVOT_WINDOW);
+    const highs = window.filter(p => p.kind === 'high');
+    const lows = window.filter(p => p.kind === 'low');
+    if (highs.length < 2 || lows.length < 2) return [];
+
+    const sH =
+        leastSquaresSlope(highs.map(p => ({ x: p.index, y: p.price }))) / atr;
+    const sL =
+        leastSquaresSlope(lows.map(p => ({ x: p.index, y: p.price }))) / atr;
+    const cH = classifySlope(sH);
+    const cL = classifySlope(sL);
+
+    let id: ChartPatternId | null = null;
+    if (cH === 'flat' && cL === 'rising') id = 'ascending_triangle';
+    else if (cH === 'falling' && cL === 'flat') id = 'descending_triangle';
+    else if (cH === 'falling' && cL === 'rising') id = 'symmetrical_triangle';
+    else if (cH === 'rising' && cL === 'rising' && sL > sH)
+        id = 'ascending_wedge';
+    else if (cH === 'falling' && cL === 'falling' && sH < sL)
+        id = 'descending_wedge';
+    else if (cH === 'flat' && cL === 'flat') id = 'rectangle';
+
+    if (id === null) return [];
+    return [
+        {
+            id,
+            startIndex: window[0].index,
+            endIndex: window[window.length - 1].index,
+        },
+    ];
+};
+
 // ─── Facade ─────────────────────────────────────────────────────────────────
 
 /**
@@ -186,4 +273,5 @@ export const CLASSIFIERS: readonly PatternClassifier[] = [
     classifyDoubleTripleBottom,
     classifyHeadAndShoulders,
     classifyInverseHeadAndShoulders,
+    classifyTrendlinePatterns,
 ];
