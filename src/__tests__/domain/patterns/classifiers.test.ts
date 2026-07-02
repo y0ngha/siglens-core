@@ -7,6 +7,7 @@ import {
     classifyInverseHeadAndShoulders,
     classifyTrendlinePatterns,
     classifyFlagsAndPennants,
+    classifyCurvaturePatterns,
 } from '@/domain/patterns/classifiers';
 import {
     makeAlternatingPivotBars,
@@ -331,5 +332,97 @@ describe('classifyFlagsAndPennants', () => {
         const pivots = extractPivots(bars, ATR, { includeProvisional: true });
 
         expect(classifyFlagsAndPennants(pivots, bars, 0)).toEqual([]);
+    });
+});
+
+describe('classifyCurvaturePatterns', () => {
+    it('rounding_bottom: 저점 4개가 U자형(convex)이고 정점이 중앙 절반에 있으면 감지한다', () => {
+        // Low pivots at (2,10),(4,4),(6,2),(8,9) — a convex U with its
+        // vertex inside the middle half of [2,8] and depth (10-2=8) well
+        // past ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT(2) * atr.
+        const bars = makeAlternatingPivotBars(
+            15,
+            [20, 10, 20, 4, 20, 2, 20, 9],
+            20
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows).toHaveLength(4);
+
+        const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'rounding_bottom', startIndex: 2, endIndex: 8 },
+        ]);
+    });
+
+    it('cup_and_handle: 컵(저점 4개) 뒤에 얕은 되돌림 저점이 하나 더 있으면 cup_and_handle만 감지한다', () => {
+        // Same cup as the rounding_bottom case, plus a 5th (provisional)
+        // low at 7 — a shallow pullback from the cup's right-edge low (9):
+        // handleDepth=2 <= CUP_HANDLE_MAX_DEPTH_RATIO(0.5) * cup depth(8)=4.
+        // Only cup_and_handle should be emitted, not a redundant
+        // rounding_bottom.
+        const bars = makeHLBars(
+            [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 7].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows).toHaveLength(5);
+
+        const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'cup_and_handle', startIndex: 2, endIndex: 10 },
+        ]);
+    });
+
+    it('컵 깊이가 정확히 ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr 이면 감지한다 (느슨한 경계)', () => {
+        // Same U-shape as the textbook case, scaled so rim(4) - bottom(2)
+        // = 2 exactly, matching 2 * atr(1).
+        const bars = makeAlternatingPivotBars(
+            15,
+            [20, 4, 20, 2.5, 20, 2, 20, 3.75],
+            20
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'rounding_bottom', startIndex: 2, endIndex: 8 },
+        ]);
+    });
+
+    it('저점이 단조 하락(오목/직선)이면 감지하지 않는다', () => {
+        // Lows 10 -> 7 -> 4 -> 1: collinear, so the quadratic fit's `a`
+        // coefficient is <= 0 (not convex) — no rounding bottom.
+        const bars = makeAlternatingPivotBars(
+            15,
+            [20, 10, 20, 7, 20, 4, 20, 1],
+            20
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('저점이 4개 미만이면 감지하지 않는다', () => {
+        const bars = makeAlternatingPivotBars(15, [20, 10, 20, 4], 20);
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows.length).toBeLessThan(4);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('atr가 0 이하이면 감지하지 않는다', () => {
+        const bars = makeAlternatingPivotBars(
+            15,
+            [20, 10, 20, 4, 20, 2, 20, 9],
+            20
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(classifyCurvaturePatterns(pivots, bars, 0)).toEqual([]);
     });
 });

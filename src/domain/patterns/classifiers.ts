@@ -5,6 +5,7 @@ import type {
     PivotPoint,
 } from '@/domain/patterns/types';
 import {
+    CUP_HANDLE_MAX_DEPTH_RATIO,
     EXTREME_MATCH_ATR_MULT,
     FLAG_CHANNEL_MAX_RANGE_ATR,
     FLAG_CONSOLIDATION_MAX_BARS,
@@ -265,6 +266,75 @@ export const classifyTrendlinePatterns: PatternClassifier = (
     ];
 };
 
+/** Solves a 3x3 linear system `M·[a,b,c] = v` via Cramer's rule; `null` when singular. */
+function solve3x3(
+    m: readonly (readonly [number, number, number])[],
+    v: readonly [number, number, number]
+): [number, number, number] | null {
+    const det3 = (rows: readonly (readonly [number, number, number])[]) =>
+        rows[0][0] * (rows[1][1] * rows[2][2] - rows[1][2] * rows[2][1]) -
+        rows[0][1] * (rows[1][0] * rows[2][2] - rows[1][2] * rows[2][0]) +
+        rows[0][2] * (rows[1][0] * rows[2][1] - rows[1][1] * rows[2][0]);
+
+    const determinant = det3(m);
+    if (determinant === 0) return null;
+
+    const withColumn = (col: 0 | 1 | 2): [number, number, number][] =>
+        m.map((row, i) => {
+            const replaced = [...row] as [number, number, number];
+            replaced[col] = v[i];
+            return replaced;
+        });
+
+    return [
+        det3(withColumn(0)) / determinant,
+        det3(withColumn(1)) / determinant,
+        det3(withColumn(2)) / determinant,
+    ];
+}
+
+/**
+ * Least-squares quadratic fit `y = a*x^2 + b*x + c` via the normal
+ * equations. `null` for fewer than 3 points or a singular system (e.g. all
+ * points share the same `x`).
+ */
+function fitQuadratic(
+    points: readonly Point[]
+): { a: number; b: number; c: number } | null {
+    if (points.length < 3) return null;
+
+    const n = points.length;
+    let s1 = 0;
+    let s2 = 0;
+    let s3 = 0;
+    let s4 = 0;
+    let t0 = 0;
+    let t1 = 0;
+    let t2 = 0;
+    for (const { x, y } of points) {
+        const x2 = x * x;
+        s1 += x;
+        s2 += x2;
+        s3 += x2 * x;
+        s4 += x2 * x2;
+        t0 += y;
+        t1 += x * y;
+        t2 += x2 * y;
+    }
+
+    const solved = solve3x3(
+        [
+            [s4, s3, s2],
+            [s3, s2, s1],
+            [s2, s1, n],
+        ],
+        [t2, t1, t0]
+    );
+    if (!solved) return null;
+    const [a, b, c] = solved;
+    return { a, b, c };
+}
+
 // ─── Group 4: flags / pennant ───────────────────────────────────────────────
 
 interface FlagContext {
@@ -398,6 +468,112 @@ export const classifyFlagsAndPennants: PatternClassifier = (
     return results;
 };
 
+// ─── Group 5: curvature (rounding bottom, cup & handle) ───────────────────
+
+/** Quadratic-fit vertex must sit within this fraction range of the [start,end] index span to count as a genuine "bottom", not an edge-hugging arc. */
+const CURVATURE_VERTEX_MID_LO = 0.25;
+const CURVATURE_VERTEX_MID_HI = 0.75;
+
+/** Minimum cup depth (rim - bottom), as an ATR multiple, per the design doc's literal "2*atr" rule. */
+const ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT = 2;
+
+interface RoundingFit {
+    startIndex: number;
+    endIndex: number;
+    depth: number;
+}
+
+/**
+ * Fits a convex (`a > 0`) quadratic through the given low pivots and checks
+ * the rounding-bottom shape conditions: vertex within the middle half of the
+ * index span, and rim-to-bottom depth of at least
+ * `ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr`. `null` when fewer than 4
+ * points or any condition fails.
+ */
+function fitRoundingBottom(
+    points: readonly PivotPoint[],
+    atr: number
+): RoundingFit | null {
+    if (points.length < 4) return null;
+
+    const fit = fitQuadratic(points.map(p => ({ x: p.index, y: p.price })));
+    if (!fit || fit.a <= 0) return null;
+
+    const startIndex = points[0].index;
+    const endIndex = points[points.length - 1].index;
+    const span = endIndex - startIndex;
+    if (span <= 0) return null;
+
+    const vertexX = -fit.b / (2 * fit.a);
+    const lo = startIndex + span * CURVATURE_VERTEX_MID_LO;
+    const hi = startIndex + span * CURVATURE_VERTEX_MID_HI;
+    if (vertexX < lo || vertexX > hi) return null;
+
+    const prices = points.map(p => p.price);
+    const rim = Math.max(...prices);
+    const bottom = Math.min(...prices);
+    const depth = rim - bottom;
+    if (depth < ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr) return null;
+
+    return { startIndex, endIndex, depth };
+}
+
+/**
+ * rounding_bottom / cup_and_handle over the low pivots (>= 4 required,
+ * including a provisional trailing low if the caller extracted pivots with
+ * `includeProvisional: true`).
+ *
+ * When >= 5 lows are available, first tries cup_and_handle: fit the cup on
+ * all lows except the last (the handle's low), then require the pullback
+ * from the cup's right-edge low down to the handle low to be shallow
+ * (`<= CUP_HANDLE_MAX_DEPTH_RATIO * cup depth`) and downward. If that
+ * succeeds, ONLY cup_and_handle is emitted — the cup doc already covers the
+ * base, so re-emitting rounding_bottom would be redundant, not extra recall.
+ * Otherwise falls back to a plain rounding_bottom fit over all the lows.
+ */
+export const classifyCurvaturePatterns: PatternClassifier = (
+    pivots,
+    _bars,
+    atr
+) => {
+    if (atr <= 0) return [];
+
+    const lows = pivots.filter(p => p.kind === 'low');
+    if (lows.length < 4) return [];
+
+    if (lows.length >= 5) {
+        const cupLows = lows.slice(0, -1);
+        const handleLow = lows[lows.length - 1];
+        const cup = fitRoundingBottom(cupLows, atr);
+        if (cup) {
+            const rimPrice = cupLows[cupLows.length - 1].price;
+            const handleDepth = rimPrice - handleLow.price;
+            if (
+                handleDepth > 0 &&
+                handleDepth <= CUP_HANDLE_MAX_DEPTH_RATIO * cup.depth
+            ) {
+                return [
+                    {
+                        id: 'cup_and_handle',
+                        startIndex: cup.startIndex,
+                        endIndex: handleLow.index,
+                    },
+                ];
+            }
+        }
+    }
+
+    const rounding = fitRoundingBottom(lows, atr);
+    if (!rounding) return [];
+    return [
+        {
+            id: 'rounding_bottom',
+            startIndex: rounding.startIndex,
+            endIndex: rounding.endIndex,
+        },
+    ];
+};
+
 // ─── Facade ─────────────────────────────────────────────────────────────────
 
 /**
@@ -412,4 +588,5 @@ export const CLASSIFIERS: readonly PatternClassifier[] = [
     classifyInverseHeadAndShoulders,
     classifyTrendlinePatterns,
     classifyFlagsAndPennants,
+    classifyCurvaturePatterns,
 ];
