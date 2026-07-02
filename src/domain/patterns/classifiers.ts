@@ -4,7 +4,11 @@ import type {
     PatternCandidate,
     PivotPoint,
 } from '@/domain/patterns/types';
-import { EXTREME_MATCH_ATR_MULT } from '@/domain/patterns/constants';
+import {
+    EXTREME_MATCH_ATR_MULT,
+    HS_HEAD_MIN_ATR,
+    HS_SHOULDER_TOLERANCE,
+} from '@/domain/patterns/constants';
 
 /**
  * A pattern shape matcher — the pre-screener building block that turns
@@ -106,6 +110,70 @@ export const classifyDoubleTripleTop: PatternClassifier =
 export const classifyDoubleTripleBottom: PatternClassifier =
     extremeMatchClassifier('low', 'double_bottom', 'triple_bottom');
 
+// ─── Group 2: five-pivot head & shoulders ──────────────────────────────────
+
+/**
+ * Builds the 5-pivot H&S classifier shared by the regular (peaks = highs)
+ * and inverse (peaks = lows) variants.
+ *
+ * Scans the last 5 pivots, and — to tolerate one extra pivot forming after
+ * the right shoulder/foot — the 5 pivots ending one before that, for the
+ * alternating [peak, trough, peak, trough, peak] sequence. Requires the head
+ * to clear both shoulders by `HS_HEAD_MIN_ATR * atr` and the shoulders to be
+ * level within `HS_SHOULDER_TOLERANCE` of the head-to-neckline height.
+ */
+function fivePivotHeadAndShouldersClassifier(
+    peakKind: 'high' | 'low',
+    id: ChartPatternId
+): PatternClassifier {
+    const troughKind: 'high' | 'low' = peakKind === 'high' ? 'low' : 'high';
+
+    return (pivots, _bars, atr) => {
+        if (atr <= 0 || pivots.length < 5) return [];
+
+        const windows: PivotPoint[][] = [pivots.slice(-5)];
+        if (pivots.length >= 6) windows.push(pivots.slice(-6, -1));
+
+        for (const window of windows) {
+            if (window.length !== 5) continue;
+            const [ls, m1, head, m2, rs] = window;
+            const kindsOk =
+                ls.kind === peakKind &&
+                m1.kind === troughKind &&
+                head.kind === peakKind &&
+                m2.kind === troughKind &&
+                rs.kind === peakKind;
+            if (!kindsOk) continue;
+
+            const neckline = (m1.price + m2.price) / 2;
+            const headExtra =
+                peakKind === 'high'
+                    ? head.price - Math.max(ls.price, rs.price)
+                    : Math.min(ls.price, rs.price) - head.price;
+            if (headExtra < HS_HEAD_MIN_ATR * atr) continue;
+
+            const height =
+                peakKind === 'high'
+                    ? head.price - neckline
+                    : neckline - head.price;
+            if (Math.abs(ls.price - rs.price) > HS_SHOULDER_TOLERANCE * height)
+                continue;
+
+            return [{ id, startIndex: ls.index, endIndex: rs.index }];
+        }
+
+        return [];
+    };
+}
+
+/** head_and_shoulders — peaks on highs, neckline through the two lows. */
+export const classifyHeadAndShoulders: PatternClassifier =
+    fivePivotHeadAndShouldersClassifier('high', 'head_and_shoulders');
+
+/** inverse_head_and_shoulders — peaks on lows, neckline through the two highs. */
+export const classifyInverseHeadAndShoulders: PatternClassifier =
+    fivePivotHeadAndShouldersClassifier('low', 'inverse_head_and_shoulders');
+
 // ─── Facade ─────────────────────────────────────────────────────────────────
 
 /**
@@ -116,4 +184,6 @@ export const classifyDoubleTripleBottom: PatternClassifier =
 export const CLASSIFIERS: readonly PatternClassifier[] = [
     classifyDoubleTripleTop,
     classifyDoubleTripleBottom,
+    classifyHeadAndShoulders,
+    classifyInverseHeadAndShoulders,
 ];

@@ -3,8 +3,10 @@ import { extractPivots } from '@/domain/patterns/pivots';
 import {
     classifyDoubleTripleTop,
     classifyDoubleTripleBottom,
+    classifyHeadAndShoulders,
+    classifyInverseHeadAndShoulders,
 } from '@/domain/patterns/classifiers';
-import { makeBars } from '@/__tests__/domain/patterns/helpers';
+import { makeBars, makeHLBars } from '@/__tests__/domain/patterns/helpers';
 
 const ATR = 1;
 
@@ -77,5 +79,67 @@ describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
         const pivots = extractPivots(bars, ATR);
         expect(classifyDoubleTripleTop(pivots, bars, 0)).toEqual([]);
         expect(classifyDoubleTripleTop(pivots, bars, -1)).toEqual([]);
+    });
+});
+
+describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
+    it('head_and_shoulders: 대칭 어깨 + 머리가 충분히 높으면 감지한다', () => {
+        const bars = makeBars([10, 15, 10, 20, 10, 15, 10]);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots).toHaveLength(5);
+
+        const candidates = classifyHeadAndShoulders(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
+        ]);
+    });
+
+    it('inverse_head_and_shoulders: 대칭 어깨 + 머리(저점)가 충분히 깊으면 감지한다', () => {
+        const bars = makeBars([20, 15, 20, 10, 20, 15, 20]);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots).toHaveLength(5);
+
+        const candidates = classifyInverseHeadAndShoulders(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'inverse_head_and_shoulders', startIndex: 1, endIndex: 5 },
+        ]);
+    });
+
+    it('피벗이 5개 미만이면 감지하지 않는다', () => {
+        const bars = makeBars([10, 15, 10, 20, 10]);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots.length).toBeLessThan(5);
+
+        expect(classifyHeadAndShoulders(pivots, bars, ATR)).toEqual([]);
+        expect(classifyInverseHeadAndShoulders(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('어깨 차이가 정확히 HS_SHOULDER_TOLERANCE * height 이면 감지한다 (느슨한 경계)', () => {
+        // LS=15, head=20, RS=18.5 → |LS-RS|=3.5 == 0.35 * (head-neckline=10).
+        const bars = makeHLBars([
+            [10, 10], // seed
+            [15, 15], // LS candidate high
+            [10, 10], // confirms LS@1
+            [20, 20], // head candidate high
+            [10, 10], // confirms L1@2, head candidate continues
+            [18.5, 18.5], // RS candidate high
+            [10, 10], // confirms L2@4, then RS@5
+        ]);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots).toEqual([
+            { index: 1, price: 15, kind: 'high' },
+            { index: 2, price: 10, kind: 'low' },
+            { index: 3, price: 20, kind: 'high' },
+            { index: 4, price: 10, kind: 'low' },
+            { index: 5, price: 18.5, kind: 'high' },
+        ]);
+
+        const candidates = classifyHeadAndShoulders(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
+        ]);
     });
 });
