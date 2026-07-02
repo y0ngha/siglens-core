@@ -1,6 +1,7 @@
 // ─── Pivot extraction ───────────────────────────────────────────────────────
 
 /**
+ * @internal
  * Pivot confirmation threshold: minimum retracement from the running extreme,
  * expressed as a multiple of ATR, required to confirm a zigzag pivot. This is
  * the key to scale invariance — a fixed price/percent threshold would over-fire
@@ -12,6 +13,7 @@ export const PIVOT_REVERSAL_ATR_MULT = 1.5;
 // ─── Screening window ───────────────────────────────────────────────────────
 
 /**
+ * @internal
  * Lookback window (bars) the screener scans for pattern candidates. Chosen to
  * stay comfortably inside `TIMEFRAME_BARS_LIMIT` (200~500 depending on
  * timeframe) so the screener never needs more history than the chart already
@@ -22,6 +24,7 @@ export const SCREEN_LOOKBACK_BARS = 120;
 // ─── Head & Shoulders ───────────────────────────────────────────────────────
 
 /**
+ * @internal
  * H&S: maximum allowed height difference between the left and right shoulders,
  * expressed as a fraction of the head-to-neckline height. Real-world shoulders
  * are rarely perfectly level, so some slack is required — but too much slack
@@ -30,6 +33,7 @@ export const SCREEN_LOOKBACK_BARS = 120;
 export const HS_SHOULDER_TOLERANCE = 0.35;
 
 /**
+ * @internal
  * H&S: minimum amount (in ATR multiples) the head must exceed both shoulders
  * by. Guards against flagging a flat 3-peak cluster as a head & shoulders when
  * the "head" is not meaningfully more extreme than the shoulders.
@@ -39,6 +43,7 @@ export const HS_HEAD_MIN_ATR = 1.0;
 // ─── Double / triple tops & bottoms ─────────────────────────────────────────
 
 /**
+ * @internal
  * Double/triple top-bottom: maximum allowed price difference between repeated
  * extremes, expressed as a multiple of ATR. Extremes within this band are
  * treated as "the same level" for pattern-matching purposes.
@@ -48,6 +53,7 @@ export const EXTREME_MATCH_ATR_MULT = 1.0;
 // ─── Trendline-based patterns (triangles / wedges / rectangle) ─────────────
 
 /**
+ * @internal
  * Trendline family: the regression-slope threshold (as a fraction of ATR per
  * bar) below which a fitted trendline is considered "flat" rather than rising
  * or falling. Used to distinguish, e.g., a horizontal resistance line
@@ -56,6 +62,7 @@ export const EXTREME_MATCH_ATR_MULT = 1.0;
 export const FLAT_SLOPE_ATR_PER_BAR = 0.05;
 
 /**
+ * @internal
  * Trendline family: number of most-recent pivots examined when fitting the
  * high/low trendlines. A fixed, small window keeps the fit focused on the
  * "what is on the chart right now" shape instead of averaging over pivots
@@ -66,6 +73,7 @@ export const TRENDLINE_PIVOT_WINDOW = 8;
 // ─── Flags / pennants ───────────────────────────────────────────────────────
 
 /**
+ * @internal
  * Flag/pennant: minimum size of the preceding "pole" move, expressed as a
  * multiple of ATR. A flag/pennant is only meaningful as a continuation pattern
  * after a sufficiently sharp directional move — small drifts should not
@@ -74,6 +82,7 @@ export const TRENDLINE_PIVOT_WINDOW = 8;
 export const FLAG_POLE_MIN_ATR = 3.0;
 
 /**
+ * @internal
  * Flag/pennant: lookback window (bars), measured immediately before the
  * consolidation range, searched for the qualifying pole move. Bounds how far
  * back the screener looks for the sharp directional move a flag/pennant must
@@ -83,6 +92,7 @@ export const FLAG_POLE_MIN_ATR = 3.0;
 export const FLAG_POLE_LOOKBACK_BARS = 20;
 
 /**
+ * @internal
  * Flag/pennant: maximum length (bars) the consolidation range may span.
  * Flags/pennants are short-lived continuation pauses — a longer sideways
  * range is a different pattern (e.g. a rectangle), not a flag.
@@ -90,6 +100,7 @@ export const FLAG_POLE_LOOKBACK_BARS = 20;
 export const FLAG_CONSOLIDATION_MAX_BARS = 30;
 
 /**
+ * @internal
  * Flag: maximum height of the consolidation channel, expressed as a multiple
  * of ATR. Keeps the "flag" tight and channel-like rather than matching any
  * broad, choppy sideways range after a pole move.
@@ -99,6 +110,7 @@ export const FLAG_CHANNEL_MAX_RANGE_ATR = 3.0;
 // ─── Cup & handle / rounding ────────────────────────────────────────────────
 
 /**
+ * @internal
  * Cup and handle: maximum allowed handle pullback depth, expressed as a
  * fraction of the cup's own depth. Loose on purpose (recall-biased) — a
  * handle that retraces up to half the cup's depth is still plausibly a

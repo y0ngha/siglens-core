@@ -5,6 +5,7 @@ import { CLASSIFIERS } from '@/domain/patterns/classifiers';
 import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
 
 /**
+ * @internal until re-exported from src/index.ts when Phase 3 wires screener into skill selection.
  * The chart-pattern pre-screener facade — the single public entry point for
  * Task 1.5 (analysis-submission logging) and, later, Phase 3 (AI skill-doc
  * selection).

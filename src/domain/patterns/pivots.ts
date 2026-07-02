@@ -3,6 +3,7 @@ import type { PivotPoint } from '@/domain/patterns/types';
 import { PIVOT_REVERSAL_ATR_MULT } from '@/domain/patterns/constants';
 
 /**
+ * @internal
  * ATR-relative zigzag pivot extraction — the recall-biased building block the
  * chart-pattern pre-screener runs its shape matchers over.
  *

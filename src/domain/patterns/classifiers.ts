@@ -83,6 +83,7 @@ function classifyHighLowSlopes(
 }
 
 /**
+ * @internal
  * A pattern shape matcher — the pre-screener building block that turns
  * extracted pivots (+ the raw bars/ATR they came from) into zero or more
  * {@link PatternCandidate} hits.
@@ -174,11 +175,11 @@ function extremeMatchClassifier(
     };
 }
 
-/** double_top / triple_top over the most recent high pivots. */
+/** @internal double_top / triple_top over the most recent high pivots. */
 export const classifyDoubleTripleTop: PatternClassifier =
     extremeMatchClassifier('high', 'double_top', 'triple_top');
 
-/** double_bottom / triple_bottom over the most recent low pivots. */
+/** @internal double_bottom / triple_bottom over the most recent low pivots. */
 export const classifyDoubleTripleBottom: PatternClassifier =
     extremeMatchClassifier('low', 'double_bottom', 'triple_bottom');
 
@@ -238,17 +239,18 @@ function fivePivotHeadAndShouldersClassifier(
     };
 }
 
-/** head_and_shoulders — peaks on highs, neckline through the two lows. */
+/** @internal head_and_shoulders — peaks on highs, neckline through the two lows. */
 export const classifyHeadAndShoulders: PatternClassifier =
     fivePivotHeadAndShouldersClassifier('high', 'head_and_shoulders');
 
-/** inverse_head_and_shoulders — peaks on lows, neckline through the two highs. */
+/** @internal inverse_head_and_shoulders — peaks on lows, neckline through the two highs. */
 export const classifyInverseHeadAndShoulders: PatternClassifier =
     fivePivotHeadAndShouldersClassifier('low', 'inverse_head_and_shoulders');
 
 // ─── Group 3: trendline pairs (triangles / wedges / rectangle) ────────────
 
 /**
+ * @internal
  * Fits independent least-squares trendlines through the last
  * `TRENDLINE_PIVOT_WINDOW` pivots' highs and lows and classifies the pair by
  * the flat/rising/falling table in the design doc. Emits at most one
@@ -304,7 +306,12 @@ function solve3x3(
         rows[0][2] * (rows[1][0] * rows[2][1] - rows[1][1] * rows[2][0]);
 
     const determinant = det3(m);
-    if (determinant === 0) return null;
+    // Epsilon rather than exact-zero: a near-singular matrix implies an
+    // unreliable/unstable fit (huge, noise-amplified coefficients), and
+    // rejecting it here is recall-safe — a garbage fit would just get
+    // rejected by the downstream shape checks anyway, so being slightly
+    // more conservative costs nothing.
+    if (Math.abs(determinant) < 1e-9) return null;
 
     const withColumn = (col: 0 | 1 | 2): [number, number, number][] =>
         m.map((row, i) => {
@@ -433,6 +440,7 @@ function buildFlagContext(
 }
 
 /**
+ * @internal
  * bull_flag / bear_flag / pennant over the shared pole+consolidation
  * geometry. Not mutually exclusive by construction (a flat, converging
  * consolidation after an up-pole can plausibly read as both a bull flag and
@@ -539,6 +547,7 @@ function fitRoundingBottom(
 }
 
 /**
+ * @internal
  * rounding_bottom / cup_and_handle over the low pivots (>= 4 required,
  * including a provisional trailing low if the caller extracted pivots with
  * `includeProvisional: true`).
@@ -597,6 +606,7 @@ export const classifyCurvaturePatterns: PatternClassifier = (
 // ─── Facade ─────────────────────────────────────────────────────────────────
 
 /**
+ * @internal
  * All pattern classifiers, one entry per detection group. The Task-1.4
  * facade runs pivots (extracted with `includeProvisional: true`) through
  * every classifier here and flattens the results.
