@@ -55,6 +55,14 @@ export const EXTREME_MATCH_ATR_MULT = 1.0;
  */
 export const FLAT_SLOPE_ATR_PER_BAR = 0.05;
 
+/**
+ * Trendline family: number of most-recent pivots examined when fitting the
+ * high/low trendlines. A fixed, small window keeps the fit focused on the
+ * "what is on the chart right now" shape instead of averaging over pivots
+ * far outside any plausible triangle/wedge/rectangle boundary.
+ */
+export const TRENDLINE_PIVOT_WINDOW = 8;
+
 // ─── Flags / pennants ───────────────────────────────────────────────────────
 
 /**
@@ -64,3 +72,36 @@ export const FLAT_SLOPE_ATR_PER_BAR = 0.05;
  * qualify as a pole.
  */
 export const FLAG_POLE_MIN_ATR = 3.0;
+
+/**
+ * Flag/pennant: lookback window (bars), measured immediately before the
+ * consolidation range, searched for the qualifying pole move. Bounds how far
+ * back the screener looks for the sharp directional move a flag/pennant must
+ * follow — a "pole" found further back is no longer connected to the current
+ * consolidation.
+ */
+export const FLAG_POLE_LOOKBACK_BARS = 20;
+
+/**
+ * Flag/pennant: maximum length (bars) the consolidation range may span.
+ * Flags/pennants are short-lived continuation pauses — a longer sideways
+ * range is a different pattern (e.g. a rectangle), not a flag.
+ */
+export const FLAG_CONSOLIDATION_MAX_BARS = 30;
+
+/**
+ * Flag: maximum height of the consolidation channel, expressed as a multiple
+ * of ATR. Keeps the "flag" tight and channel-like rather than matching any
+ * broad, choppy sideways range after a pole move.
+ */
+export const FLAG_CHANNEL_MAX_RANGE_ATR = 3.0;
+
+// ─── Cup & handle / rounding ────────────────────────────────────────────────
+
+/**
+ * Cup and handle: maximum allowed handle pullback depth, expressed as a
+ * fraction of the cup's own depth. Loose on purpose (recall-biased) — a
+ * handle that retraces up to half the cup's depth is still plausibly a
+ * handle, not a fresh downtrend.
+ */
+export const CUP_HANDLE_MAX_DEPTH_RATIO = 0.5;
