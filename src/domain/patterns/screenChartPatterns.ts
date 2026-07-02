@@ -45,10 +45,12 @@ export function screenChartPatterns(
     if (bars.length === 0 || atr <= 0) return [];
 
     const offset = Math.max(0, bars.length - SCREEN_LOOKBACK_BARS);
-    const window = bars.slice(offset);
+    const windowBars = bars.slice(offset);
 
-    const pivots = extractPivots(window, atr, { includeProvisional: true });
-    const raw = CLASSIFIERS.flatMap(classify => classify(pivots, window, atr));
+    const pivots = extractPivots(windowBars, atr, { includeProvisional: true });
+    const raw = CLASSIFIERS.flatMap(classify =>
+        classify(pivots, windowBars, atr)
+    );
 
     const byId = new Map<string, PatternCandidate>();
     for (const candidate of raw) {

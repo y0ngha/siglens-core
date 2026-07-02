@@ -7,6 +7,11 @@
  *
  * Run with: `npx tsx src/__tests__/domain/patterns/fixtures/generate.ts`
  *
+ * The file-write loop only runs when this module is executed directly (see
+ * the `require.main === module` guard at the bottom) — importing it (e.g.
+ * from `fixtureDrift.test.ts`, which imports `fixtures` to diff against the
+ * committed JSON) has no side effects.
+ *
  * Builds each fixture as a sequence of linear price "segments" (nominal
  * control points) with small deterministic sinusoidal noise layered on top
  * — large enough swings (>= 2*atr) to confirm zigzag pivots, small enough
@@ -163,13 +168,13 @@ const cupAndHandle = buildBars(100, [
     { to: 88, bars: 10 }, // flat tail
 ]);
 
-interface Fixture {
+export interface Fixture {
     file: string;
     atr: number;
     bars: Bar[];
 }
 
-const fixtures: Fixture[] = [
+export const fixtures: Fixture[] = [
     { file: 'hs-textbook.json', atr: 1, bars: hsTextbook },
     { file: 'double-top.json', atr: 1, bars: doubleTop },
     { file: 'ascending-triangle.json', atr: 1, bars: ascendingTriangle },
@@ -177,8 +182,14 @@ const fixtures: Fixture[] = [
     { file: 'cup-and-handle.json', atr: 1, bars: cupAndHandle },
 ];
 
-for (const { file, atr, bars } of fixtures) {
-    const path = join(OUT_DIR, file);
-    writeFileSync(path, JSON.stringify({ atr, bars }, null, 4) + '\n');
-    console.log(`wrote ${path} (${bars.length} bars)`);
+// Only write fixtures to disk when this file is executed directly (`npx tsx
+// .../generate.ts`), not when imported — `fixtureDrift.test.ts` imports
+// `fixtures` above to diff against the committed JSON, and importing it must
+// be side-effect-free for that to be a meaningful drift check.
+if (require.main === module) {
+    for (const { file, atr, bars } of fixtures) {
+        const path = join(OUT_DIR, file);
+        writeFileSync(path, JSON.stringify({ atr, bars }, null, 4) + '\n');
+        console.log(`wrote ${path} (${bars.length} bars)`);
+    }
 }
