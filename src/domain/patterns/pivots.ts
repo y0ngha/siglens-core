@@ -23,14 +23,33 @@ import { PIVOT_REVERSAL_ATR_MULT } from '@/domain/patterns/constants';
  * confirmed: a zero/negative threshold degenerates into flagging every
  * single-bar wiggle as a pivot, which is pure noise, not a screening signal.
  *
+ * The final, still-forming leg (the running extreme since the last confirmed
+ * pivot, which has not yet retraced by the reversal threshold) is
+ * intentionally omitted by default — it is not a confirmed turning point.
+ * Downstream classifiers that need to see the in-progress extreme (e.g. to
+ * recognize a pattern that is actively forming at the right edge of the
+ * chart) must opt in via `opts.includeProvisional`; see below.
+ *
  * Pure and deterministic: never mutates `bars`.
  *
  * @param bars - OHLCV bars sorted oldest-first.
  * @param atr - Average True Range for the same bars (scale reference).
+ * @param opts.includeProvisional - When `true` and a swing direction has
+ * been established, append the current running extreme (since the last
+ * confirmed pivot) as a final, unconfirmed `PivotPoint` — the running high
+ * during an up leg, the running low during a down leg. Skipped when it
+ * would duplicate the last confirmed pivot's index (nothing has moved past
+ * that pivot yet). Default (`false`/omitted) is byte-identical to the
+ * confirmed-only behavior described above.
  * @returns Confirmed pivots in ascending bar-index order; alternates
- * high/low kind by construction.
+ * high/low kind by construction. With `includeProvisional: true`, may have
+ * one trailing provisional pivot of the same kind as the last confirmed one.
  */
-export function extractPivots(bars: readonly Bar[], atr: number): PivotPoint[] {
+export function extractPivots(
+    bars: readonly Bar[],
+    atr: number,
+    opts?: { includeProvisional?: boolean }
+): PivotPoint[] {
     if (atr <= 0 || bars.length < 2) return [];
 
     const threshold = PIVOT_REVERSAL_ATR_MULT * atr;
@@ -44,6 +63,9 @@ export function extractPivots(bars: readonly Bar[], atr: number): PivotPoint[] {
 
     for (let i = 1; i < bars.length; i++) {
         const bar = bars[i];
+        // Strict `>`/`<`: on an exact tie with the running extreme, the
+        // index is NOT updated, so the FIRST bar to reach a given extreme
+        // price wins and later bars merely equaling it are ignored.
         if (bar.high > runningHigh) {
             runningHigh = bar.high;
             runningHighIndex = i;
@@ -87,6 +109,20 @@ export function extractPivots(bars: readonly Bar[], atr: number): PivotPoint[] {
                 runningHigh = bar.high;
                 runningHighIndex = i;
             }
+        }
+    }
+
+    if (opts?.includeProvisional && direction !== null) {
+        const provisional: PivotPoint =
+            direction === 'up'
+                ? { index: runningHighIndex, price: runningHigh, kind: 'high' }
+                : { index: runningLowIndex, price: runningLow, kind: 'low' };
+        const lastConfirmed = pivots[pivots.length - 1];
+        if (
+            lastConfirmed === undefined ||
+            provisional.index !== lastConfirmed.index
+        ) {
+            pivots.push(provisional);
         }
     }
 
