@@ -56,6 +56,33 @@ function classifySlope(normalizedSlope: number): SlopeShape {
 }
 
 /**
+ * Fits independent least-squares trendlines through `highs`/`lows` and
+ * classifies each slope as flat/rising/falling (ATR-normalized), alongside
+ * the raw normalized slope values (needed to break ties between the two
+ * "both rising"/"both falling" wedge shapes, which the flat/rising/falling
+ * category alone can't distinguish). Shared by the trendline-pair family
+ * (Group 3) and the flag/pennant channel check (Group 4) — both need this
+ * exact "slope of the highs vs. slope of the lows" shape over a pivot
+ * window.
+ */
+function classifyHighLowSlopes(
+    highs: readonly PivotPoint[],
+    lows: readonly PivotPoint[],
+    atr: number
+): { high: SlopeShape; low: SlopeShape; slopeHigh: number; slopeLow: number } {
+    const slopeHigh =
+        leastSquaresSlope(highs.map(p => ({ x: p.index, y: p.price }))) / atr;
+    const slopeLow =
+        leastSquaresSlope(lows.map(p => ({ x: p.index, y: p.price }))) / atr;
+    return {
+        high: classifySlope(slopeHigh),
+        low: classifySlope(slopeLow),
+        slopeHigh,
+        slopeLow,
+    };
+}
+
+/**
  * A pattern shape matcher — the pre-screener building block that turns
  * extracted pivots (+ the raw bars/ATR they came from) into zero or more
  * {@link PatternCandidate} hits.
@@ -239,12 +266,12 @@ export const classifyTrendlinePatterns: PatternClassifier = (
     const lows = window.filter(p => p.kind === 'low');
     if (highs.length < 2 || lows.length < 2) return [];
 
-    const sH =
-        leastSquaresSlope(highs.map(p => ({ x: p.index, y: p.price }))) / atr;
-    const sL =
-        leastSquaresSlope(lows.map(p => ({ x: p.index, y: p.price }))) / atr;
-    const cH = classifySlope(sH);
-    const cL = classifySlope(sL);
+    const {
+        high: cH,
+        low: cL,
+        slopeHigh: sH,
+        slopeLow: sL,
+    } = classifyHighLowSlopes(highs, lows, atr);
 
     let id: ChartPatternId | null = null;
     if (cH === 'flat' && cL === 'rising') id = 'ascending_triangle';
@@ -449,14 +476,7 @@ export const classifyFlagsAndPennants: PatternClassifier = (
     const highs = ctx.consolidationPivots.filter(p => p.kind === 'high');
     const lows = ctx.consolidationPivots.filter(p => p.kind === 'low');
     if (highs.length >= 2 && lows.length >= 2) {
-        const sH =
-            leastSquaresSlope(highs.map(p => ({ x: p.index, y: p.price }))) /
-            atr;
-        const sL =
-            leastSquaresSlope(lows.map(p => ({ x: p.index, y: p.price }))) /
-            atr;
-        const cH = classifySlope(sH);
-        const cL = classifySlope(sL);
+        const { high: cH, low: cL } = classifyHighLowSlopes(highs, lows, atr);
         const highOk = cH === 'falling' || cH === 'flat';
         const lowOk = cL === 'rising' || cL === 'flat';
         const bothFlat = cH === 'flat' && cL === 'flat';
@@ -546,8 +566,8 @@ export const classifyCurvaturePatterns: PatternClassifier = (
         const handleLow = lows[lows.length - 1];
         const cup = fitRoundingBottom(cupLows, atr);
         if (cup) {
-            const rimPrice = cupLows[cupLows.length - 1].price;
-            const handleDepth = rimPrice - handleLow.price;
+            const rightEdgeLow = cupLows[cupLows.length - 1].price;
+            const handleDepth = rightEdgeLow - handleLow.price;
             if (
                 handleDepth > 0 &&
                 handleDepth <= CUP_HANDLE_MAX_DEPTH_RATIO * cup.depth
