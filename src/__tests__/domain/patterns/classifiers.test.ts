@@ -6,6 +6,7 @@ import {
     classifyHeadAndShoulders,
     classifyInverseHeadAndShoulders,
     classifyTrendlinePatterns,
+    classifyFlagsAndPennants,
 } from '@/domain/patterns/classifiers';
 import {
     makeAlternatingPivotBars,
@@ -252,5 +253,83 @@ describe('classifyTrendlinePatterns', () => {
         const bars = makeAlternatingPivotBars(10, [20, 5, 20, 5], 20);
         const pivots = extractPivots(bars, ATR);
         expect(classifyTrendlinePatterns(pivots, bars, 0)).toEqual([]);
+    });
+});
+
+describe('classifyFlagsAndPennants', () => {
+    it('bull_flag: 큰 상승 폴 뒤에 좁고 완만히 눕는 조정이 오면 감지한다', () => {
+        // Pole: closes 90 -> 109 over 20 bars (idx 0-19, +19 move, well past
+        // FLAG_POLE_MIN_ATR*atr=3). Consolidation: idx19-25 drifts down
+        // gently from the peak, channel range=2 (<= FLAG_CHANNEL_MAX_RANGE_ATR).
+        const poleCloses = Array.from({ length: 20 }, (_, i) => 90 + i);
+        const driftCloses = [107.6, 107.5, 107.4, 107.3, 107.2, 107.1];
+        const bars = makeBars([...poleCloses, ...driftCloses]);
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        const candidates = classifyFlagsAndPennants(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'bull_flag', startIndex: 19, endIndex: 25 },
+        ]);
+    });
+
+    it('bear_flag: 큰 하락 폴 뒤에 좁고 완만히 눕는 반등이 오면 감지한다', () => {
+        // Mirror of the bull_flag case: pole 109 -> 90, then a gentle
+        // up-drift consolidation.
+        const poleValues = Array.from({ length: 20 }, (_, i) => 109 - i);
+        const driftValues = [91.5, 91.6, 91.7, 91.8, 91.9, 92.0];
+        const bars = makeHLBars(
+            [...poleValues, ...driftValues].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        const candidates = classifyFlagsAndPennants(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'bear_flag', startIndex: 19, endIndex: 25 },
+        ]);
+    });
+
+    it('pennant: 폴 뒤 저점이 상승하며 고점이 평평하게 수렴하면 bull_flag와 함께 감지한다 (경계값 range=3)', () => {
+        // Pole 90 -> 109 (idx0-19), then a tight high-flat/low-rising
+        // consolidation (idx19-22): highs pinned at 109 (flat), lows rising
+        // 106 -> 107. Not mutually exclusive with bull_flag by design — the
+        // same flat-or-down consolidation also satisfies bull_flag. Channel
+        // range is exactly 3 (== FLAG_CHANNEL_MAX_RANGE_ATR * atr), exercising
+        // the inclusive boundary.
+        const poleValues = Array.from({ length: 20 }, (_, i) => 90 + i);
+        const consolidationValues = [106, 109, 107];
+        const bars = makeHLBars(
+            [...poleValues, ...consolidationValues].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        const candidates = classifyFlagsAndPennants(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'bull_flag', startIndex: 19, endIndex: 22 },
+            { id: 'pennant', startIndex: 19, endIndex: 22 },
+        ]);
+    });
+
+    it('폴 이동이 FLAG_POLE_MIN_ATR * atr 미만이면 감지하지 않는다', () => {
+        // Pole only moves 2 (< FLAG_POLE_MIN_ATR(3) * atr(1)).
+        const poleValues = Array.from(
+            { length: 20 },
+            (_, i) => 90 + (2 * i) / 19
+        );
+        const bars = makeHLBars([...poleValues, 90].map(v => [v, v]));
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('atr가 0 이하이면 감지하지 않는다', () => {
+        const poleCloses = Array.from({ length: 20 }, (_, i) => 90 + i);
+        const driftCloses = [107.6, 107.5, 107.4, 107.3, 107.2, 107.1];
+        const bars = makeBars([...poleCloses, ...driftCloses]);
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(classifyFlagsAndPennants(pivots, bars, 0)).toEqual([]);
     });
 });

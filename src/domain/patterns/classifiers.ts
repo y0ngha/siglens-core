@@ -6,6 +6,10 @@ import type {
 } from '@/domain/patterns/types';
 import {
     EXTREME_MATCH_ATR_MULT,
+    FLAG_CHANNEL_MAX_RANGE_ATR,
+    FLAG_CONSOLIDATION_MAX_BARS,
+    FLAG_POLE_LOOKBACK_BARS,
+    FLAG_POLE_MIN_ATR,
     FLAT_SLOPE_ATR_PER_BAR,
     HS_HEAD_MIN_ATR,
     HS_SHOULDER_TOLERANCE,
@@ -261,6 +265,139 @@ export const classifyTrendlinePatterns: PatternClassifier = (
     ];
 };
 
+// ─── Group 4: flags / pennant ───────────────────────────────────────────────
+
+interface FlagContext {
+    consolidationStartIndex: number;
+    consolidationEndIndex: number;
+    poleMove: number;
+    consolidationBars: readonly Bar[];
+    consolidationPivots: readonly PivotPoint[];
+}
+
+/**
+ * Shared pole+consolidation geometry for the flag/pennant family.
+ *
+ * Consolidation = the bar range covered by the last `TRENDLINE_PIVOT_WINDOW`
+ * pivots (bounded to `FLAG_CONSOLIDATION_MAX_BARS`). Pole = the
+ * `FLAG_POLE_LOOKBACK_BARS` bars immediately before the consolidation start,
+ * required to move at least `FLAG_POLE_MIN_ATR * atr`. Consolidation must
+ * additionally stay inside a `FLAG_CHANNEL_MAX_RANGE_ATR * atr`-tall
+ * high/low channel. Returns `null` when any of these fail — the geometry
+ * doesn't support a flag/pennant at all, regardless of direction.
+ */
+function buildFlagContext(
+    pivots: readonly PivotPoint[],
+    bars: readonly Bar[],
+    atr: number
+): FlagContext | null {
+    if (atr <= 0 || pivots.length < 2 || bars.length < 2) return null;
+
+    const window = pivots.slice(-TRENDLINE_PIVOT_WINDOW);
+    if (window.length < 2) return null;
+
+    const consolidationStartIndex = window[0].index;
+    const consolidationEndIndex = window[window.length - 1].index;
+    const consolidationLength =
+        consolidationEndIndex - consolidationStartIndex + 1;
+    if (
+        consolidationLength < 2 ||
+        consolidationLength > FLAG_CONSOLIDATION_MAX_BARS
+    )
+        return null;
+
+    const poleStartIndex = Math.max(
+        0,
+        consolidationStartIndex - FLAG_POLE_LOOKBACK_BARS
+    );
+    if (poleStartIndex >= consolidationStartIndex) return null;
+
+    const poleMove =
+        bars[consolidationStartIndex].close - bars[poleStartIndex].close;
+    if (Math.abs(poleMove) < FLAG_POLE_MIN_ATR * atr) return null;
+
+    const consolidationBars = bars.slice(
+        consolidationStartIndex,
+        consolidationEndIndex + 1
+    );
+    if (consolidationBars.length === 0) return null;
+    const range =
+        Math.max(...consolidationBars.map(b => b.high)) -
+        Math.min(...consolidationBars.map(b => b.low));
+    if (range > FLAG_CHANNEL_MAX_RANGE_ATR * atr) return null;
+
+    return {
+        consolidationStartIndex,
+        consolidationEndIndex,
+        poleMove,
+        consolidationBars,
+        consolidationPivots: window,
+    };
+}
+
+/**
+ * bull_flag / bear_flag / pennant over the shared pole+consolidation
+ * geometry. Not mutually exclusive by construction (a flat, converging
+ * consolidation after an up-pole can plausibly read as both a bull flag and
+ * a pennant) — recall-biased, so both are emitted when both fit.
+ *
+ * bull_flag: up pole + consolidation closes drifting flat-or-down. bear_flag:
+ * down pole + consolidation closes drifting flat-or-up (mirrored). pennant:
+ * either-direction pole + converging high/low trendlines inside the
+ * consolidation (reuses the Group-3 slope classification), with at least one
+ * side actually sloping (both flat is a rectangle, not a pennant).
+ */
+export const classifyFlagsAndPennants: PatternClassifier = (
+    pivots,
+    bars,
+    atr
+) => {
+    const ctx = buildFlagContext(pivots, bars, atr);
+    if (!ctx) return [];
+
+    const results: PatternCandidate[] = [];
+    const range = {
+        startIndex: ctx.consolidationStartIndex,
+        endIndex: ctx.consolidationEndIndex,
+    };
+
+    const closeSlope =
+        leastSquaresSlope(
+            ctx.consolidationBars.map((b, i) => ({
+                x: ctx.consolidationStartIndex + i,
+                y: b.close,
+            }))
+        ) / atr;
+
+    if (ctx.poleMove > 0 && closeSlope <= FLAT_SLOPE_ATR_PER_BAR) {
+        results.push({ id: 'bull_flag', ...range });
+    }
+    if (ctx.poleMove < 0 && closeSlope >= -FLAT_SLOPE_ATR_PER_BAR) {
+        results.push({ id: 'bear_flag', ...range });
+    }
+
+    const highs = ctx.consolidationPivots.filter(p => p.kind === 'high');
+    const lows = ctx.consolidationPivots.filter(p => p.kind === 'low');
+    if (highs.length >= 2 && lows.length >= 2) {
+        const sH =
+            leastSquaresSlope(highs.map(p => ({ x: p.index, y: p.price }))) /
+            atr;
+        const sL =
+            leastSquaresSlope(lows.map(p => ({ x: p.index, y: p.price }))) /
+            atr;
+        const cH = classifySlope(sH);
+        const cL = classifySlope(sL);
+        const highOk = cH === 'falling' || cH === 'flat';
+        const lowOk = cL === 'rising' || cL === 'flat';
+        const bothFlat = cH === 'flat' && cL === 'flat';
+        if (highOk && lowOk && !bothFlat) {
+            results.push({ id: 'pennant', ...range });
+        }
+    }
+
+    return results;
+};
+
 // ─── Facade ─────────────────────────────────────────────────────────────────
 
 /**
@@ -274,4 +411,5 @@ export const CLASSIFIERS: readonly PatternClassifier[] = [
     classifyHeadAndShoulders,
     classifyInverseHeadAndShoulders,
     classifyTrendlinePatterns,
+    classifyFlagsAndPennants,
 ];
