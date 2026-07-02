@@ -12,8 +12,8 @@
 | 실측 항목 | 값 |
 |---|---|
 | 스킬 카탈로그 (`siglens/skills`, 81개 `.md`) | 414,510 B |
-| TECHNICAL 프롬프트에 무조건 인라인되는 스킬 본문 | ~226 KB ≈ 56K tokens (always_on 28개 187KB + 미태그 fail-open 12개 39KB) |
-| always_on 28개의 구성 | **차트 패턴 17개(~105KB)** + SMC·MTF·피보나치·엘리어트 + SR 3 + 일목 + `_core` 2 |
+| TECHNICAL 프롬프트에 무조건 인라인되는 스킬 본문 | ~218 KB ≈ 54K tokens (always_on 27개 ~179KB + 미태그 fail-open 12개 ~39KB). 단 SMC 풀 가이드(13KB)는 이미 압축 노트로 대체(`prompt.ts:1633`) — 실효치는 약간 더 작음 |
+| always_on 27개의 구성 | **차트 패턴 17개(~105KB)** + SMC·MTF·피보나치·엘리어트 + SR 3 + 일목 + `_core` 2 (※ `skills/CLAUDE.md`는 grep 오탐 — 로더는 카테고리 디렉토리만 스캔하므로 미적재) |
 | 미태그 12개의 구성 | 지표 6(ma/ema/atr/adx/obv/volume-profile) + fundamental 3 + news 3 — 차트 프롬프트에 무관 콘텐츠 포함 |
 | `responseSchema` (TECHNICAL) | 9,159 chars — 프롬프트 프로즈와 규칙 중복 서술 |
 | 뉴스 프롬프트 | 기사 `bodyKo` 전문 + `summaryKo` 무제한 인라인 (`newsPrompt.ts:25-26`) |
@@ -64,10 +64,12 @@ digest_hash: a1b2c3d4      # digest 생성 시점의 원본 본문 해시 (stale
 | 분석 타입 | 허용 카테고리 |
 |---|---|
 | TECHNICAL | `_core`, indicators, patterns, strategies, candlesticks, support-resistance |
-| FUNDAMENTAL / FINANCIALS | `_core`, fundamental |
-| NEWS (ticker/card/digest) | `_core`, news |
-| OPTIONS | `_core`, indicators(변동성 관련 gated 발화만; 구현 시 옵션 프롬프트의 현행 스킬 사용 여부 재확인) |
+| FUNDAMENTAL / FINANCIALS | fundamental |
+| NEWS (ticker/card/digest) | news |
+| OPTIONS | 없음 — 옵션 프롬프트는 현재 스킬을 사용하지 않음(코드 확인). 스킬 도입 시 화이트리스트 확장은 후속 과제 |
 | OVERALL | 없음 — 하위 분석 요약만 소비(현행 유지) |
+
+※ `_core` 2개(indicator-core, candle-primer)는 지표 임계값·캔들 프라이머, 즉 **차트 전용 콘텐츠**이므로 TECHNICAL에만 허용한다 — FUNDAMENTAL/NEWS에 넣으면 이 설계가 없애려는 무관 콘텐츠 주입을 재생산한다.
 
 - **fail-open 제거**: `gating` 미태그 스킬은 로더 에러. 미태그 12개는 감사 후 전부 명시 태깅(지표 6개는 "해당 지표가 페이로드에 포함" 상태 게이트 후보, fundamental/news 6개는 카테고리 필터로 자동 해결 + 명시 태깅 병행).
 - **차트 패턴 스킬 17개 — 2단계 전환** (사용자 결정: 스크리너 최우선):
@@ -80,6 +82,8 @@ digest_hash: a1b2c3d4      # digest 생성 시점의 원본 본문 해시 (stale
 
 목적: 정밀 탐지기가 아니라 **스킬 주입 후보 선별기**. 최종 판정은 AI가 한다.
 
+선례: `_core/indicator-core.md`가 이미 "압축 코어 상시 주입 + 개별 풀 가이드는 해당 지표가 notable일 때만 게이팅" 패턴을 명문화해 운용 중이다(candle-primer도 동일 — 캔들은 `candle-detection.ts`가 스크리너 역할). 본 설계의 "패턴 인덱스 + 스크리너 발화 digest"는 이 검증된 패턴을 차트 패턴 카테고리로 확장하는 것이다.
+
 - **피벗 기하 기반, 스케일 불변**: ATR 배수/가격 % 기반 zigzag 피벗 추출 → 패턴을 피벗 시퀀스의 상대 기하로 판정. 축소·확대·타임프레임·가격대에 불변.
   - H&S: 피벗 5점 시퀀스, 좌우 숄더 높이 차 허용 밴드(X%), 머리>숄더 Y×ATR, 넥라인 기울기 허용 범위.
   - 더블탑/바텀: 두 극점이 k×ATR 이내 + 중간 되돌림 깊이 조건.
@@ -87,6 +91,7 @@ digest_hash: a1b2c3d4      # digest 생성 시점의 원본 본문 해시 (stale
 - **재현율 우선**: 오탐 비용 = digest ~1.5KB 낭비, 미탐 비용 = 품질 저하. 문턱은 느슨하게("그럴싸하면 후보").
 - 허용 밴드 파라미터는 상수 파일 1곳에 집약(튜닝 가능). 위 X/Y/k 등 초기값은 스펙에서 확정하지 않는다 — PR1에서 알려진 패턴 픽스처에 대한 재현율 튜닝으로 결정하고, 각 상수 옆에 근거를 주석으로 문서화한다.
 - `buildSkillSelectionContext`에 스크리너 결과를 셋째 입력으로 추가(기존: 신호, 캔들 패턴).
+- 판정 입력은 프롬프트 직렬화 윈도(`recentBarsCount` 30~48봉)가 아니라 **페치된 전체 bars 배열**(`TIMEFRAME_BARS_LIMIT` 200~500봉) — 패턴 lookback에 충분함을 확인함.
 - **검증**: 알려진 패턴 보유 차트 픽스처로 재현율 테스트 + 실 차트 로깅 관측(§3.7 PR1) 후에만 §3.2의 gated 전환을 실행.
 
 ### §3.4 어셈블리 2분할 + Worker 프롬프트 캐싱
@@ -101,6 +106,7 @@ interface AssembledPrompt {
 ```
 
 - `stable`: 분석 의도 블록, 가이드라인, 안티-fabrication 가드레일, 잔류 출력 서술 규칙(§3.5), always_on 스킬 digest(+ 패턴 인덱스). `jobId`/`seed`/심볼/시각 포함 금지.
+- 키 원칙: **호출별로 변하는 축은 금지, 저카디널리티 축은 허용.** 구현 중 stable 블록이 `assetClass` 등 저카디널리티 값에 의존하는 게 발견되면 키를 `(analysisType, assetClass, fingerprint)`로 확장한다 — 축별 캐시 엔트리가 소수면 적중률에 영향 없음. (현행 코드에서 assetClass 프레이밍(`assetContext`)은 심볼 섹션에 있어 dynamic으로 자연 분류됨.)
 - `dynamic`: 발화 gated 스킬 digest(관련성 정렬), bars/지표/SMC 데이터, 티어·타임프레임 조건부 노트(`PRO_RELIABILITY_NOTE`, `ATR_EXTREME_SIZING_NOTE` — prefix 변형 최소화를 위해 dynamic으로 이동), 심볼별 요청 블록.
 - 순서 원칙: 지시·지식(stable) 앞, 데이터·질문(dynamic) 뒤.
 
@@ -114,10 +120,11 @@ interface AssembledPrompt {
 
 ### §3.5 출력 규칙 일원화 + 뉴스 본문 제어
 
-- **구조는 `responseSchema`만 담당**: 필드 존재·타입·enum을 프로즈로 반복하는 문장, "SINGLE valid JSON object" 류 삭제(structured output이 강제).
+- **구조는 `responseSchema`만 담당**: 필드 존재·타입·enum을 프로즈로 반복하는 문장 삭제. 단 provider별 강제 수준이 다름(worker 코드 확인): Gemini `responseJsonSchema`·ChatGPT strict `json_schema`는 진짜 강제, **Claude는 `tool_choice: auto`로 유도일 뿐 강제가 아님**(`extractJsonWithRepair`가 존재하는 이유). 따라서 "SINGLE valid JSON object" 류 삭제는 **worker의 Claude 경로를 forced tool_choice로 전환한 뒤에만** 실행하고, 전환 전에는 최소 JSON 지시 1줄을 stable prefix에 잔류시킨다.
 - **프로즈 잔류분**: 스키마가 표현 못 하는 것만 — 존댓말·톤, 필드 간 의미 제약, 근거 인용 규칙. stable prefix로 이동.
 - `responseSchema`의 장황한 `description`도 압축(스키마도 입력 과금 대상).
 - **뉴스**: 기사 관련성·최신성 정렬 → 상위 K(기본 5)는 `bodyKo` 전문(기사당 상한 N자, 기본 3,000자), 나머지는 `summaryKo`만. 전문 포함 기사의 요약 중복 제거. K·N 상수 튜닝 가능, 뉴스 A/B 케이스로 검증.
+- 관련성 점수는 **결정적 규칙**으로 계획 단계에서 확정한다(임베딩 없음 — 예: 최신성 가중 + 본문 내 대상 티커 언급 빈도 + 소스 신뢰 가중). 같은 입력 → 같은 정렬이 캐시·재현성의 전제.
 
 ### §3.6 품질 검증 하네스 + E2E 실증
 
@@ -144,12 +151,14 @@ interface AssembledPrompt {
 | PR2 | 스킬 digest 81개 전량 작성 + 로더 digest 파싱(누락 시 에러) + `scripts/skills-digest.ts` + `token_cost` 실측화 | **A/B 하네스 필수** |
 | PR3 | 선택 엔진: 카테고리 화이트리스트, fail-open 제거, 미태그 12개 태깅, 관련성 정렬. 스크리너 검증 완료 시 패턴 스킬 gated 전환 + 패턴 인덱스 추가 | **A/B 하네스 필수**(특히 패턴 케이스) |
 | PR4 | 어셈블리 2분할 + worker 신필드/캐싱(worker 선배포 → core 전환) + 텔레메트리 | 캐시 적중률 관측 |
-| PR5 | 출력 규칙 일원화 + 뉴스 본문 제어 + `PROMPT_TEMPLATE_VERSION` bump | A/B(뉴스 케이스) |
+| PR5 | 출력 규칙 일원화(Claude forced tool_choice 전환 포함) + 뉴스 본문 제어 | A/B(뉴스 케이스) |
+
+※ 버전 bump는 PR5 단발이 아니라 §4의 정책대로 **프롬프트 바이트가 바뀌는 각 PR에서 수행**한다.
 | 최종 | E2E 실증(§3.6) — 품질·속도·토큰 3지표 통과 후 릴리스 | E2E 게이트 |
 
 ## 4. 버저닝·캐시 영향
 
-- `PROMPT_TEMPLATE_VERSION` `'p1'` → `'p2'` + 타입별 버전(`FINANCIALS_…`, `ECONOMIC_EVENT_…`) 일괄 bump — 서술·직렬화 변경이므로 필수. warm 캐시 전량 콜드 스타트 1회 감수.
+- **bump 정책: 프롬프트 바이트가 바뀌는 모든 PR마다** `PROMPT_TEMPLATE_VERSION`을 올린다(p2, p3, …) + 해당 타입별 버전(`FINANCIALS_…`, `ECONOMIC_EVENT_…`) 동반 bump. 근거: fingerprint는 스킬 메타(`{name, gating, tokenCost}`)만 커버하므로 PR4(어셈블리 재정렬)처럼 스킬 메타가 불변인 프롬프트 변경은 자동 무효화되지 않는다. PR별 warm 캐시 콜드 스타트는 감수.
 - digest 재생성 → `token_cost` 변동 → fingerprint 자동 무효화. 동일 토큰 수 edge는 수동 bump 정책 유지.
 - `CACHE_KEY_SCHEMA_VERSION`(`'v1'`)은 응답 형태 불변이므로 유지(§3.5에서 응답 스키마 구조가 바뀌면 그때 bump).
 
@@ -167,7 +176,7 @@ interface AssembledPrompt {
 
 | 단계 | 스킬 블록 크기 |
 |---|---|
-| 현재 | ~226 KB (≈56K tokens) |
+| 현재 | ~218 KB (≈54K tokens) |
 | digest 적용 (PR2) | ~65 KB |
 | 카테고리 필터 + 태깅 (PR3, 스크리너 전) | ~45–50 KB (stable prefix) |
 | 패턴 gated 전환 (PR3, 스크리너 후) | prefix ~25 KB + 동적 후보 3–8 KB |
