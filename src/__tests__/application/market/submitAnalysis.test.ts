@@ -1406,4 +1406,32 @@ describe('submitAnalysis 함수는', () => {
             consoleSpy.mockRestore();
         });
     });
+
+    describe('패턴 스크리너 observe-only 로깅', () => {
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('제출 성공 시 [PatternScreen] 로그를 남긴다', async () => {
+            const consoleInfoSpy = vi
+                .spyOn(console, 'info')
+                .mockImplementation(() => undefined);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(consoleInfoSpy).toHaveBeenCalledWith(
+                '[PatternScreen]',
+                expect.any(String)
+            );
+            consoleInfoSpy.mockRestore();
+        });
+    });
 });

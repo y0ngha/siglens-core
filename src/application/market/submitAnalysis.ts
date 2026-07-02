@@ -17,6 +17,7 @@ import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
+import { screenChartPatterns } from '@/domain/patterns';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
@@ -349,6 +350,21 @@ export async function submitAnalysis(
         atr,
         modelId: effectiveModelId,
     });
+
+    // Task 1.5 (observe-only): screen for chart patterns and log candidates
+    // for later analysis. Not yet consumed by the prompt/dispatch below —
+    // purely a logging side channel to validate recall before Phase 3 wires
+    // it into AI skill-doc selection.
+    const patternCandidates =
+        atr !== undefined ? screenChartPatterns(bars, atr) : [];
+    console.info(
+        '[PatternScreen]',
+        JSON.stringify({
+            symbol,
+            timeframe,
+            candidates: patternCandidates.map(c => c.id),
+        })
+    );
 
     const userApiKeyHeader: Record<string, string> =
         options.userApiKey !== undefined
