@@ -112,11 +112,13 @@ interface AssembledPrompt {
 
 **Dispatch 계약 (core → worker):** 기존 `prompt` 필드 유지 + `promptStable`/`promptDynamic` 추가. worker는 신필드 우선, 없으면 `prompt`. **배포 순서: worker 선배포(양쪽 수용) → core 전환.**
 
-**Worker 캐싱:**
+**Worker 캐싱 (3사 전부 — `MODEL_SPECS` 기준 Claude 4.5~4.7 / Gemini 2.5·3.x / GPT-5.x 활성):**
 
-- Gemini(기본): `promptStable + promptDynamic` 순 결합만으로 2.5 계열 implicit caching 적중. `cachedContentTokenCount` 로깅으로 적중률 관측 → 기대 이하면 explicit `cachedContent`(fingerprint 키 + TTL)로 승격(관측 후 결정).
-- Claude: system 끝 + `promptStable` 끝 `cache_control: ephemeral` breakpoint 2개(chat 경로 검증 패턴 재사용).
-- 텔레메트리: 잡별 `{ promptTokens, cachedTokens, latencyMs }` 로깅 — 전/후 비교와 §3.6 실증의 근거 데이터.
+- **Gemini(기본)**: `promptStable + promptDynamic` 순 결합만으로 2.5+ (3.x preview 포함) implicit caching 적중. `usageMetadata.cachedContentTokenCount` 로깅으로 적중률 관측 → 기대 이하면 explicit `cachedContent`(fingerprint 키 + TTL)로 승격(관측 후 결정).
+- **Claude**: system 끝 + `promptStable` 끝 `cache_control: ephemeral` breakpoint 2개(chat 경로 검증 패턴 재사용, `@anthropic-ai/sdk` 0.92 지원 확인). `usage.cache_read_input_tokens` 관측.
+- **OpenAI(GPT-5.x)**: 자동 프롬프트 캐싱 — 별도 옵션 불필요, stable-first 정렬 자체가 적중 조건. `usage.prompt_tokens_details.cached_tokens` 관측.
+- **최소 캐시 가능 prefix**: provider별 1,024~2,048토큰(모델별 상이) — 본 설계의 stable prefix(~6~12K 토큰)는 전 모델에서 여유 있게 초과.
+- 텔레메트리: 잡별 `{ promptTokens, cachedTokens, latencyMs }` 로깅. 현재 worker 어댑터에 usage 로깅이 전무하므로 신규 작업이며, 3사 usage 필드명이 다르므로 공통 형태로 정규화하는 어댑터 레이어를 둔다 — 전/후 비교와 §3.6 실증의 근거 데이터.
 
 ### §3.5 출력 규칙 일원화 + 뉴스 본문 제어
 
