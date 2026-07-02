@@ -17,6 +17,7 @@ import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
+import type { PatternCandidate } from '@/domain/patterns';
 import { screenChartPatterns } from '@/domain/patterns';
 import {
     DEFAULT_TIER,
@@ -355,11 +356,17 @@ export async function submitAnalysis(
     // for later analysis. Not yet consumed by the prompt/dispatch below —
     // purely a logging side channel to validate recall before Phase 3 wires
     // it into AI skill-doc selection.
-    const patternCandidates =
-        atr !== undefined ? screenChartPatterns(bars, atr) : [];
+    let patternCandidates: PatternCandidate[] = [];
+    try {
+        patternCandidates =
+            atr !== undefined ? screenChartPatterns(bars, atr) : [];
+    } catch (error) {
+        console.error('[PatternScreen] failed:', error);
+    }
     console.info(
         '[PatternScreen]',
         JSON.stringify({
+            jobId,
             symbol,
             timeframe,
             candidates: patternCandidates.map(c => c.id),
