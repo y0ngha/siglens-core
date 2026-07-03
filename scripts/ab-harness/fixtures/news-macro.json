@@ -1,0 +1,144 @@
+{
+    "caseId": "news-macro",
+    "symbol": "INTC",
+    "companyName": "Intel Corporation",
+    "articles": [
+        {
+            "id": "news-macro-1",
+            "symbol": "INTC",
+            "source": "Global Macro Wire",
+            "url": "https://example.com/news-macro-1",
+            "publishedAt": "2026-06-20T18:00:00Z",
+            "titleEn": "Fed Signals Hawkish Surprise, Markets Price In Fewer Rate Cuts",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "연준, 매파적 서프라이즈 시사...시장은 금리 인하 폭 축소 반영",
+                "bodyKo": "연방준비제도(Fed)가 예상보다 매파적인 신호를 내놓으며 시장은 올해 남은 기간 금리 인하 횟수를 기존 전망보다 줄여 반영하기 시작했다. 국채 금리는 급등했고, 성장주와 반도체 업종을 중심으로 밸류에이션 압박이 커졌다.",
+                "summaryKo": "연준의 매파적 신호로 국채 금리가 급등하며 성장주 밸류에이션 부담이 커졌다.",
+                "sentiment": "bearish",
+                "category": "macro",
+                "priceImpact": "high"
+            }
+        },
+        {
+            "id": "news-macro-2",
+            "symbol": "INTC",
+            "source": "Semiconductor Sector Monitor",
+            "url": "https://example.com/news-macro-2",
+            "publishedAt": "2026-06-21T14:30:00Z",
+            "titleEn": "Chip Stocks Slide Broadly as Yields Spike, Intel Among Hardest Hit",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "금리 급등에 반도체株 전반 약세...인텔 낙폭 두드러져",
+                "bodyKo": "국채 금리 급등의 여파로 반도체 업종 전반이 약세를 보인 가운데, 인텔은 업종 내에서도 낙폭이 두드러졌다. 자본 집약적 파운드리 투자 계획이 고금리 환경에서 재무 부담으로 작용할 수 있다는 우려가 반영됐다.",
+                "summaryKo": "금리 급등 여파로 반도체 업종이 약세를 보였고 인텔의 낙폭이 특히 컸다.",
+                "sentiment": "bearish",
+                "category": "macro",
+                "priceImpact": "high"
+            }
+        },
+        {
+            "id": "news-macro-3",
+            "symbol": "INTC",
+            "source": "Trade Policy Bulletin",
+            "url": "https://example.com/news-macro-3",
+            "publishedAt": "2026-06-22T09:15:00Z",
+            "titleEn": "New Export Restrictions on Advanced Chipmaking Equipment Announced",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "첨단 반도체 장비 수출 추가 규제 발표",
+                "bodyKo": "정부는 첨단 반도체 제조 장비에 대한 추가 수출 규제안을 발표했다. 업계는 공급망 재편 비용 증가와 일부 해외 파운드리 고객사와의 계약 지연 가능성을 우려하고 있다. 인텔을 포함한 주요 제조사들은 영향 범위를 검토 중이라고 밝혔다.",
+                "summaryKo": "첨단 반도체 장비에 대한 추가 수출 규제 발표로 공급망 불확실성이 커졌다.",
+                "sentiment": "bearish",
+                "category": "regulation",
+                "priceImpact": "medium"
+            }
+        },
+        {
+            "id": "news-macro-4",
+            "symbol": "INTC",
+            "source": "MarketPulse Wire",
+            "url": "https://example.com/news-macro-4",
+            "publishedAt": "2026-06-22T19:45:00Z",
+            "titleEn": "Intel Trims Near-Term Guidance, Cites Macro Headwinds Over Demand",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "인텔, 단기 가이던스 하향...\"수요보다 매크로 역풍이 원인\"",
+                "bodyKo": "인텔은 다음 분기 가이던스를 소폭 하향 조정하면서, 이는 최종 수요 둔화가 아니라 고금리와 기업 설비투자 위축 등 매크로 역풍에 기인한 것이라고 설명했다. 회사는 기존 파운드리 전략과 로드맵에는 변화가 없다고 강조했다.",
+                "summaryKo": "인텔이 수요 둔화가 아닌 매크로 역풍을 이유로 가이던스를 소폭 하향했다.",
+                "sentiment": "bearish",
+                "category": "guidance",
+                "priceImpact": "high"
+            }
+        },
+        {
+            "id": "news-macro-5",
+            "symbol": "INTC",
+            "source": "Rotation Watch",
+            "url": "https://example.com/news-macro-5",
+            "publishedAt": "2026-06-23T13:00:00Z",
+            "titleEn": "Institutional Flows Show Rotation Out of Growth Into Defensives",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "기관 자금, 성장주에서 방어주로 로테이션 뚜렷",
+                "bodyKo": "최근 자금 흐름 데이터는 기관 투자자들이 성장주 비중을 줄이고 유틸리티·필수소비재 등 방어주로 자금을 옮기고 있음을 보여준다. 반도체를 포함한 고밸류에이션 기술주가 이 흐름의 주된 매도 대상으로 지목됐다.",
+                "summaryKo": "기관 자금이 성장주에서 방어주로 이동하며 반도체株가 매도 압력을 받고 있다.",
+                "sentiment": "bearish",
+                "category": "macro",
+                "priceImpact": "medium"
+            }
+        },
+        {
+            "id": "news-macro-6",
+            "symbol": "INTC",
+            "source": "Value Desk Weekly",
+            "url": "https://example.com/news-macro-6",
+            "publishedAt": "2026-06-23T21:30:00Z",
+            "titleEn": "Some Strategists See Intel Selloff as Overdone, Point to Valuation Support",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "일부 전략가 \"인텔 매도세 과도...밸류에이션 지지선 근접\" 진단",
+                "bodyKo": "일부 시장 전략가들은 최근 매크로 충격에 따른 인텔 주가 하락이 펀더멘털 대비 과도하다고 진단했다. 이들은 현재 밸류에이션이 역사적 저점 구간에 근접했다는 점을 근거로 단기 반등 가능성을 제시했다. 다만 매크로 불확실성이 해소되기 전까지는 변동성이 지속될 것으로 내다봤다.",
+                "summaryKo": "일부 전략가는 인텔의 최근 매도세가 과도하며 밸류에이션이 지지선에 근접했다고 평가했다.",
+                "sentiment": "neutral",
+                "category": "other",
+                "priceImpact": "low"
+            }
+        },
+        {
+            "id": "news-macro-7",
+            "symbol": "INTC",
+            "source": "Global Macro Wire",
+            "url": "https://example.com/news-macro-7",
+            "publishedAt": "2026-06-24T12:00:00Z",
+            "titleEn": "Bond Market Volatility Persists as Traders Await Next Inflation Print",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "다음 인플레이션 지표 대기 속 채권시장 변동성 지속",
+                "bodyKo": "트레이더들이 다음 인플레이션 지표 발표를 앞두고 관망세를 유지하면서 채권시장 변동성이 이어지고 있다. 지표 결과에 따라 연준의 향후 정책 경로에 대한 시장의 재평가가 이루어질 것으로 예상되며, 이는 반도체를 포함한 금리 민감 업종 전반에 추가 변동성을 야기할 수 있다.",
+                "summaryKo": "다음 인플레이션 지표를 앞두고 채권시장 변동성이 지속되며 금리 민감 업종에 영향을 주고 있다.",
+                "sentiment": "neutral",
+                "category": "macro",
+                "priceImpact": "low"
+            }
+        },
+        {
+            "id": "news-macro-8",
+            "symbol": "INTC",
+            "source": "Semiconductor Sector Monitor",
+            "url": "https://example.com/news-macro-8",
+            "publishedAt": "2026-06-24T22:10:00Z",
+            "titleEn": "Intel Reaffirms Foundry Roadmap Despite Macro Turbulence",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "인텔, 매크로 혼란 속에서도 파운드리 로드맵 재확인",
+                "bodyKo": "인텔 경영진은 최근 매크로 환경 악화에도 불구하고 기존 파운드리 공정 로드맵과 신규 팹 투자 일정에는 변화가 없다고 재확인했다. 회사는 장기 수요 전망은 여전히 견조하다고 강조했지만, 시장은 단기 매크로 리스크에 더 민감하게 반응하는 모습이다.",
+                "summaryKo": "인텔이 매크로 혼란 속에서도 파운드리 로드맵에는 변화가 없다고 재확인했다.",
+                "sentiment": "neutral",
+                "category": "other",
+                "priceImpact": "low"
+            }
+        }
+    ],
+    "upcomingCalendar": []
+}

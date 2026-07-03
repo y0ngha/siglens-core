@@ -1,0 +1,146 @@
+{
+    "caseId": "news-earnings",
+    "symbol": "NFLX",
+    "companyName": "Netflix, Inc.",
+    "articles": [
+        {
+            "id": "news-earnings-1",
+            "symbol": "NFLX",
+            "source": "MarketPulse Wire",
+            "url": "https://example.com/news-earnings-1",
+            "publishedAt": "2026-06-24T13:30:00Z",
+            "titleEn": "Netflix Set to Report Q2 Earnings Thursday, Street Eyes Subscriber Growth",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "넷플릭스, 목요일 2분기 실적 발표 예정...월가는 가입자 증가율 주목",
+                "bodyKo": "넷플릭스가 이번 주 목요일 장 마감 후 2분기 실적을 발표할 예정이다. 월가 애널리스트들은 광고 요금제 가입자 증가와 콘텐츠 라인업 강세를 근거로 컨센서스를 상회하는 실적을 기대하고 있다. 시장은 특히 순증 가입자 수와 광고 매출 비중 확대 여부에 주목하고 있다.",
+                "summaryKo": "넷플릭스가 목요일 2분기 실적을 발표하며 월가는 가입자 증가에 주목하고 있다.",
+                "sentiment": "neutral",
+                "category": "earnings",
+                "priceImpact": "medium"
+            }
+        },
+        {
+            "id": "news-earnings-2",
+            "symbol": "NFLX",
+            "source": "Streaming Business Daily",
+            "url": "https://example.com/news-earnings-2",
+            "publishedAt": "2026-06-25T20:05:00Z",
+            "titleEn": "Netflix Q2 EPS Beats Estimates by 14%, Revenue Tops Consensus",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "넷플릭스, 2분기 EPS 컨센서스 14% 상회...매출도 예상치 웃돌아",
+                "bodyKo": "넷플릭스가 발표한 2분기 주당순이익(EPS)이 시장 예상치를 14% 상회했다. 매출액 역시 컨센서스를 웃돌았으며, 회사 측은 광고 요금제 가입자가 전 분기 대비 큰 폭으로 증가했다고 밝혔다. 영업이익률도 개선되며 수익성 우려를 잠재웠다. 경영진은 컨퍼런스콜에서 하반기 콘텐츠 슬레이트에 대한 자신감을 나타냈다.",
+                "summaryKo": "넷플릭스 2분기 EPS와 매출이 모두 컨센서스를 상회하는 서프라이즈를 기록했다.",
+                "sentiment": "bullish",
+                "category": "earnings",
+                "priceImpact": "high"
+            }
+        },
+        {
+            "id": "news-earnings-3",
+            "symbol": "NFLX",
+            "source": "Wall Street Desk",
+            "url": "https://example.com/news-earnings-3",
+            "publishedAt": "2026-06-25T21:40:00Z",
+            "titleEn": "Three Analysts Raise Netflix Price Targets After Earnings Beat",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "애널리스트 3곳, 넷플릭스 실적 서프라이즈 이후 목표주가 상향",
+                "bodyKo": "실적 발표 직후 최소 3개 대형 투자은행이 넷플릭스의 목표주가를 상향 조정했다. 이들은 광고 요금제의 빠른 확산과 콘텐츠 투자 대비 효율적인 마진 개선을 근거로 들었다. 다만 일부는 밸류에이션이 이미 높은 수준이라는 점을 리스크로 언급했다.",
+                "summaryKo": "복수의 애널리스트가 실적 서프라이즈 이후 넷플릭스 목표주가를 상향했다.",
+                "sentiment": "bullish",
+                "category": "earnings",
+                "priceImpact": "medium"
+            }
+        },
+        {
+            "id": "news-earnings-4",
+            "symbol": "NFLX",
+            "source": "Global Media Report",
+            "url": "https://example.com/news-earnings-4",
+            "publishedAt": "2026-06-26T02:15:00Z",
+            "titleEn": "Netflix Ad-Tier Subscribers Cross Key Milestone, Guidance Raised",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "넷플릭스 광고 요금제 가입자 주요 이정표 돌파...가이던스 상향",
+                "bodyKo": "넷플릭스는 광고 지원 요금제 가입자 수가 사상 처음으로 주요 이정표를 넘어섰다고 발표했다. 회사는 이를 근거로 3분기 매출 가이던스를 기존 대비 상향 조정했다. 광고주들의 수요도 견조하다고 밝혀 광고 매출 성장에 대한 신뢰가 높아졌다.",
+                "summaryKo": "광고 요금제 가입자가 이정표를 돌파하며 넷플릭스가 3분기 가이던스를 상향했다.",
+                "sentiment": "bullish",
+                "category": "guidance",
+                "priceImpact": "high"
+            }
+        },
+        {
+            "id": "news-earnings-5",
+            "symbol": "NFLX",
+            "source": "Content Industry Insider",
+            "url": "https://example.com/news-earnings-5",
+            "publishedAt": "2026-06-26T09:00:00Z",
+            "titleEn": "Netflix Content Spend Efficiency Improves as Hit Rate Rises",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "넷플릭스 콘텐츠 투자 효율성 개선...흥행 성공률 상승",
+                "bodyKo": "업계 분석에 따르면 넷플릭스의 콘텐츠 투자 대비 흥행 성공률이 전년 대비 상승한 것으로 나타났다. 이는 동일한 콘텐츠 예산으로 더 많은 구독자 유입을 이끌어낼 수 있다는 의미로, 향후 마진 개선의 근거로 해석된다.",
+                "summaryKo": "넷플릭스의 콘텐츠 투자 효율성이 개선되며 마진 개선 기대가 커지고 있다.",
+                "sentiment": "bullish",
+                "category": "other",
+                "priceImpact": "low"
+            }
+        },
+        {
+            "id": "news-earnings-6",
+            "symbol": "NFLX",
+            "source": "Cautious Capital Weekly",
+            "url": "https://example.com/news-earnings-6",
+            "publishedAt": "2026-06-26T15:20:00Z",
+            "titleEn": "Some Analysts Warn Netflix Valuation Now Prices In Perfection",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "일부 애널리스트 \"넷플릭스 밸류에이션, 이미 완벽한 시나리오 반영\" 경고",
+                "bodyKo": "실적 서프라이즈에도 불구하고 일부 신중론자들은 넷플릭스의 현재 주가가 향후 몇 분기의 지속적인 서프라이즈를 이미 선반영하고 있다고 지적했다. 경쟁 스트리밍 업체들의 가격 경쟁이 재점화될 경우 마진 개선 속도가 둔화될 수 있다는 우려도 제기됐다.",
+                "summaryKo": "일부 애널리스트는 넷플릭스의 밸류에이션이 이미 낙관적 시나리오를 반영했다고 경고했다.",
+                "sentiment": "bearish",
+                "category": "other",
+                "priceImpact": "low"
+            }
+        },
+        {
+            "id": "news-earnings-7",
+            "symbol": "NFLX",
+            "source": "MarketPulse Wire",
+            "url": "https://example.com/news-earnings-7",
+            "publishedAt": "2026-06-27T13:00:00Z",
+            "titleEn": "Netflix Shares Extend Post-Earnings Gains on Institutional Buying",
+            "bodyEn": null,
+            "card": {
+                "titleKo": "넷플릭스 주가, 기관 매수세에 실적 발표 이후 상승 지속",
+                "bodyKo": "넷플릭스 주가는 실적 발표 다음 거래일에도 기관 투자자들의 매수세에 힘입어 상승세를 이어갔다. 거래량은 평소 대비 크게 증가했으며, 옵션 시장에서도 콜옵션 수요가 두드러졌다.",
+                "summaryKo": "넷플릭스 주가가 기관 매수세 속에 실적 발표 이후 상승세를 이어가고 있다.",
+                "sentiment": "bullish",
+                "category": "other",
+                "priceImpact": "medium"
+            }
+        }
+    ],
+    "upcomingCalendar": [
+        {
+            "symbol": "NFLX",
+            "earningsDate": "2026-06-25",
+            "epsActual": 5.98,
+            "epsEstimated": 5.25,
+            "revenueActual": 10850000000,
+            "revenueEstimated": 10600000000,
+            "lastUpdated": "2026-06-25"
+        },
+        {
+            "symbol": "NFLX",
+            "earningsDate": "2026-09-24",
+            "epsActual": null,
+            "epsEstimated": 6.1,
+            "revenueActual": null,
+            "revenueEstimated": 11200000000,
+            "lastUpdated": "2026-06-25"
+        }
+    ]
+}

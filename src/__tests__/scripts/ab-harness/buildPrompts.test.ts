@@ -1,0 +1,116 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { calculateIndicators } from '@/domain/indicators';
+import {
+    AI_SYSTEM_PROMPT,
+    NEWS_SYSTEM_PROMPT,
+} from '@/domain/analysis/systemPrompt';
+import {
+    NEWS_RESPONSE_SCHEMA,
+    TECHNICAL_RESPONSE_SCHEMA,
+} from '@/domain/analysis/responseSchemas';
+import type {
+    Bar,
+    EarningsCalendarItem,
+    EnrichedNewsItem,
+    Skill,
+    Timeframe,
+} from '@/domain/types';
+import {
+    buildNewsCase,
+    buildTechnicalCase,
+} from '../../../../scripts/ab-harness/buildPrompts';
+
+const FIXTURES_DIR = join(__dirname, '../../../../scripts/ab-harness/fixtures');
+
+interface TechnicalFixture {
+    caseId: string;
+    symbol: string;
+    companyName: string;
+    timeframe: Timeframe;
+    bars: Bar[];
+}
+
+interface NewsFixture {
+    caseId: string;
+    symbol: string;
+    companyName: string;
+    articles: EnrichedNewsItem[];
+    upcomingCalendar: EarningsCalendarItem[];
+}
+
+function loadFixture<T>(file: string): T {
+    return JSON.parse(readFileSync(join(FIXTURES_DIR, file), 'utf-8')) as T;
+}
+
+const NO_SKILLS: Skill[] = [];
+
+describe('buildTechnicalCase', () => {
+    const fixture = loadFixture<TechnicalFixture>('tech-trend.json');
+
+    it('produces a technical prompt case wired to the real system prompt and schema', () => {
+        const result = buildTechnicalCase(fixture, NO_SKILLS);
+        expect(result.caseId).toBe('tech-trend');
+        expect(result.analysisType).toBe('technical');
+        expect(result.system).toBe(AI_SYSTEM_PROMPT);
+        expect(result.responseSchema).toBe(TECHNICAL_RESPONSE_SCHEMA);
+        expect(result.prompt).toContain(fixture.symbol);
+        expect(result.prompt).toContain(fixture.companyName);
+        expect(result.prompt.length).toBeGreaterThan(0);
+    });
+
+    it('computes indicators from the fixture bars via the real calculateIndicators pipeline', () => {
+        // Sanity check that the fixture itself is a valid, indicator-computable
+        // bar series (fails loudly if the fixture generator ever produces
+        // malformed bars) — mirrors what buildTechnicalCase does internally.
+        expect(() => calculateIndicators(fixture.bars)).not.toThrow();
+    });
+
+    it('every frozen technical fixture builds a non-empty prompt without throwing', () => {
+        const files = [
+            'tech-trend.json',
+            'tech-range.json',
+            'tech-highvol.json',
+            'tech-lowliq.json',
+            'tech-pattern-hs.json',
+            'tech-pattern-doubletop.json',
+        ];
+        for (const file of files) {
+            const f = loadFixture<TechnicalFixture>(file);
+            const result = buildTechnicalCase(f, NO_SKILLS);
+            expect(result.caseId).toBe(f.caseId);
+            expect(result.prompt.length).toBeGreaterThan(0);
+        }
+    });
+});
+
+describe('buildNewsCase', () => {
+    const fixture = loadFixture<NewsFixture>('news-earnings.json');
+
+    it('produces a news prompt case wired to the real system prompt and schema', () => {
+        const result = buildNewsCase(fixture, NO_SKILLS);
+        expect(result.caseId).toBe('news-earnings');
+        expect(result.analysisType).toBe('news');
+        expect(result.system).toBe(NEWS_SYSTEM_PROMPT);
+        expect(result.responseSchema).toBe(NEWS_RESPONSE_SCHEMA);
+        expect(result.prompt).toContain(fixture.symbol);
+        expect(result.prompt.length).toBeGreaterThan(0);
+    });
+
+    it('includes article content from every article in the fixture', () => {
+        const result = buildNewsCase(fixture, NO_SKILLS);
+        for (const article of fixture.articles) {
+            expect(result.prompt).toContain(article.card.summaryKo);
+        }
+    });
+
+    it('both frozen news fixtures build a non-empty prompt without throwing', () => {
+        for (const file of ['news-earnings.json', 'news-macro.json']) {
+            const f = loadFixture<NewsFixture>(file);
+            const result = buildNewsCase(f, NO_SKILLS);
+            expect(result.caseId).toBe(f.caseId);
+            expect(result.prompt.length).toBeGreaterThan(0);
+        }
+    });
+});
