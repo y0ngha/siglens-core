@@ -338,25 +338,43 @@ export function aggregateVerdicts(
  * (spec §3.6 "digest >= full (mean)").
  */
 const GATE_TOLERANCE = 0.1;
+
 /**
- * Max allowed (full - digest) drop for a SINGLE case's axis score, checked
- * independently of the mean-floor above. Deliberately a *different*
- * granularity (per-case, not per-axis-mean) and a looser bound than
- * `GATE_TOLERANCE` — this guards against a mean that clears the floor only
- * because a couple of strong cases offset one case that regressed badly
- * (spec §3.6 "no axis... significant drop"). A per-axis-mean check alone
- * cannot catch that; the two clauses are intentionally independent, not a
- * tighter/looser restatement of the same comparison.
+ * Scores are 1-5 INTEGERS, so a per-case outlier rule must be integer-aware.
+ * A flat `full - digest <= 0.25` bound (an earlier version of this gate) is
+ * meaningless on this scale: the minimum nonzero difference is 1, so *any*
+ * single-point regression anywhere fails it — a de facto
+ * zero-regressions-anywhere rule, far stricter than the approved spec
+ * criterion ("digest mean >= full mean per axis, no meaningful
+ * degradation"). Instead, per axis:
+ * - a single case regressing by >= GATE_OUTLIER_DROP (2) points is a hard
+ *   fail — a 2-point drop on a 1-5 scale is a real, not rounding-noise,
+ *   regression;
+ * - a 1-point drop is tolerated in isolation (a single point of judge
+ *   variance on an integer scale), but not when it recurs — see
+ *   MAX_TOLERATED_ONE_POINT_DROPS below. This is checked independently of
+ *   the mean-floor above (spec §3.6 "no axis... significant drop"): a mean
+ *   check alone can't catch one case regressing badly if other cases in the
+ *   same axis improved enough to offset it.
  */
-const GATE_MAX_DROP = 0.25;
+const GATE_OUTLIER_DROP = 2;
+
+/**
+ * Max number of cases per axis allowed to show an isolated 1-point drop
+ * before that pattern itself counts as an axis-level regression. One
+ * 1-point drop is tolerated as noise; two or more cases dropping 1 point on
+ * the same axis is a signal, not noise, and fails the axis.
+ */
+const MAX_TOLERATED_ONE_POINT_DROPS = 1;
 
 export interface AxisGateResult {
     full: number;
     digest: number;
     delta: number;
     meanOk: boolean;
-    worstCaseDrop: number;
-    worstCaseOk: boolean;
+    twoPointDropCount: number;
+    onePointDropCount: number;
+    outlierOk: boolean;
     ok: boolean;
 }
 
@@ -381,8 +399,9 @@ function unblindAxisScores(
 /**
  * PASS iff, on EVERY axis, BOTH hold:
  * 1. Mean floor: `digest mean >= full mean - GATE_TOLERANCE`.
- * 2. No single-case outlier: for every individual case,
- *    `full score - digest score <= GATE_MAX_DROP`.
+ * 2. Integer-aware outlier rule: no case regresses by
+ *    `>= GATE_OUTLIER_DROP` (2) points, AND at most
+ *    `MAX_TOLERATED_ONE_POINT_DROPS` (1) case regresses by exactly 1 point.
  *
  * Both checks and their per-axis values are returned so the report can show
  * the pass/fail logic transparently rather than just a final bit.
@@ -399,20 +418,27 @@ export function evaluateGate(
         const delta = digest - full;
         const meanOk = delta >= -GATE_TOLERANCE;
 
-        const worstCaseDrop = records.reduce((worst, record) => {
+        let twoPointDropCount = 0;
+        let onePointDropCount = 0;
+        for (const record of records) {
             const { full: f, digest: d } = unblindAxisScores(record, axis);
-            return Math.max(worst, f - d);
-        }, 0);
-        const worstCaseOk = worstCaseDrop <= GATE_MAX_DROP;
+            const drop = f - d;
+            if (drop >= GATE_OUTLIER_DROP) twoPointDropCount++;
+            else if (drop === 1) onePointDropCount++;
+        }
+        const outlierOk =
+            twoPointDropCount === 0 &&
+            onePointDropCount <= MAX_TOLERATED_ONE_POINT_DROPS;
 
-        const ok = meanOk && worstCaseOk;
+        const ok = meanOk && outlierOk;
         perAxis[axis] = {
             full,
             digest,
             delta,
             meanOk,
-            worstCaseDrop,
-            worstCaseOk,
+            twoPointDropCount,
+            onePointDropCount,
+            outlierOk,
             ok,
         };
         if (!ok) passed = false;
@@ -466,14 +492,21 @@ function buildReport(
     lines.push('## Aggregate means per variant per axis');
     lines.push('');
     lines.push(
-        '| axis | full mean | digest mean | delta (digest - full) | mean floor ok | worst-case drop | worst-case ok | axis ok |'
+        '| axis | full mean | digest mean | delta (digest - full) | mean floor ok | 2pt-drop count | 1pt-drop count | axis ok |'
     );
     lines.push('|---|---|---|---|---|---|---|---|');
     for (const axis of AXES) {
-        const { full, digest, delta, meanOk, worstCaseDrop, worstCaseOk, ok } =
-            gate.perAxis[axis];
+        const {
+            full,
+            digest,
+            delta,
+            meanOk,
+            twoPointDropCount,
+            onePointDropCount,
+            ok,
+        } = gate.perAxis[axis];
         lines.push(
-            `| ${axis} | ${fmt(full)} | ${fmt(digest)} | ${fmt(delta)} | ${meanOk ? 'yes' : 'NO'} | ${fmt(worstCaseDrop)} | ${worstCaseOk ? 'yes' : 'NO'} | ${ok ? 'yes' : 'NO'} |`
+            `| ${axis} | ${fmt(full)} | ${fmt(digest)} | ${fmt(delta)} | ${meanOk ? 'yes' : 'NO'} | ${twoPointDropCount} | ${onePointDropCount} | ${ok ? 'yes' : 'NO'} |`
         );
     }
 
@@ -481,7 +514,7 @@ function buildReport(
     lines.push('## Pass/fail logic');
     lines.push('');
     lines.push(
-        `Per axis: PASS iff BOTH (1) mean floor — \`digest_mean >= full_mean - ${GATE_TOLERANCE}\` — AND (2) no single-case outlier — every case's \`full_score - digest_score <= ${GATE_MAX_DROP}\`.`
+        `Per axis: PASS iff BOTH (1) mean floor — \`digest_mean >= full_mean - ${GATE_TOLERANCE}\` — AND (2) integer-aware outlier rule — no case regresses by >= ${GATE_OUTLIER_DROP} points on this axis, AND at most ${MAX_TOLERATED_ONE_POINT_DROPS} case regresses by exactly 1 point (a scale-minimum, single-point drop is tolerated once as judge noise; 2+ cases with a 1-point drop on the same axis fails it).`
     );
     lines.push('Overall: PASS iff every axis passes.');
     lines.push('');

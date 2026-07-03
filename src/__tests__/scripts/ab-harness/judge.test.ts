@@ -308,18 +308,86 @@ describe('evaluateGate', () => {
         expect(gate.perAxis.dataGroundedness.ok).toBe(true);
     });
 
-    it('FAILs the worst-case clause when the mean floor passes but one case regressed badly (offset by others improving)', () => {
-        // c1: full=5, digest=4 (a single-case drop of 1, exceeding GATE_MAX_DROP=0.25).
+    it('PASSes a single 1-point drop on one case (integer-scale noise, tolerated once)', () => {
+        // c1: full=4, digest=3 -> a single 1-point drop, the minimum nonzero
+        // difference on the 1-5 integer scale. c2: full=1, digest=2 offsets
+        // it so the mean floor clears too (delta=0), isolating the outlier
+        // clause as what's under test: exactly one 1-point-drop case per
+        // axis is tolerated as judge noise, not treated as a regression.
+        const records = [
+            makeVerdictRecord(
+                'c1',
+                'full',
+                { ...PERFECT_SCORES, actionability: 4 },
+                { ...PERFECT_SCORES, actionability: 3 }
+            ),
+            makeVerdictRecord(
+                'c2',
+                'full',
+                { ...PERFECT_SCORES, actionability: 1 },
+                { ...PERFECT_SCORES, actionability: 2 }
+            ),
+        ];
+        const means = aggregateVerdicts(records);
+        const gate = evaluateGate(means, records);
+        expect(gate.perAxis.actionability.meanOk).toBe(true);
+        expect(gate.perAxis.actionability.onePointDropCount).toBe(1);
+        expect(gate.perAxis.actionability.twoPointDropCount).toBe(0);
+        expect(gate.perAxis.actionability.outlierOk).toBe(true);
+        expect(gate.perAxis.actionability.ok).toBe(true);
+        expect(gate.passed).toBe(true);
+    });
+
+    it('FAILs when two different cases each have a 1-point drop on the same axis', () => {
+        // c1 and c2 each regress by exactly 1 point on `actionability` — a
+        // single 1-point drop is tolerated, but two on the same axis is a
+        // signal, not noise, and fails the axis even though no individual
+        // case regressed by >= 2. c3 offsets the mean (full=1, digest=3, a
+        // +2 improvement cancelling c1+c2's combined -2) so the mean floor
+        // clears too, isolating the outlier clause as the sole reason this
+        // axis fails.
+        const records = [
+            makeVerdictRecord(
+                'c1',
+                'full',
+                { ...PERFECT_SCORES, actionability: 4 },
+                { ...PERFECT_SCORES, actionability: 3 }
+            ),
+            makeVerdictRecord(
+                'c2',
+                'full',
+                { ...PERFECT_SCORES, actionability: 4 },
+                { ...PERFECT_SCORES, actionability: 3 }
+            ),
+            makeVerdictRecord(
+                'c3',
+                'full',
+                { ...PERFECT_SCORES, actionability: 1 },
+                { ...PERFECT_SCORES, actionability: 3 }
+            ),
+        ];
+        const means = aggregateVerdicts(records);
+        const gate = evaluateGate(means, records);
+        expect(gate.perAxis.actionability.meanOk).toBe(true);
+        expect(gate.perAxis.actionability.onePointDropCount).toBe(2);
+        expect(gate.perAxis.actionability.twoPointDropCount).toBe(0);
+        expect(gate.perAxis.actionability.outlierOk).toBe(false);
+        expect(gate.perAxis.actionability.ok).toBe(false);
+        expect(gate.passed).toBe(false);
+    });
+
+    it('FAILs when a single case regresses by 2 points on an axis, even though the mean floor passes', () => {
+        // c1: full=5, digest=3 (a 2-point drop, a real regression).
         // c2: full=1, digest=5 (a big improvement that pulls the mean up).
-        // Axis mean: full=(5+1)/2=3, digest=(4+5)/2=4.5 -> delta=+1.5, which
-        // clears the mean-floor tolerance easily — isolating the worst-case
+        // Axis mean: full=(5+1)/2=3, digest=(3+5)/2=4 -> delta=+1, which
+        // clears the mean-floor tolerance easily — isolating the outlier
         // clause as the sole reason this axis fails.
         const records = [
             makeVerdictRecord(
                 'c1',
                 'full',
                 { ...PERFECT_SCORES, actionability: 5 },
-                { ...PERFECT_SCORES, actionability: 4 }
+                { ...PERFECT_SCORES, actionability: 3 }
             ),
             makeVerdictRecord(
                 'c2',
@@ -331,8 +399,8 @@ describe('evaluateGate', () => {
         const means = aggregateVerdicts(records);
         const gate = evaluateGate(means, records);
         expect(gate.perAxis.actionability.meanOk).toBe(true);
-        expect(gate.perAxis.actionability.worstCaseDrop).toBeCloseTo(1, 5);
-        expect(gate.perAxis.actionability.worstCaseOk).toBe(false);
+        expect(gate.perAxis.actionability.twoPointDropCount).toBe(1);
+        expect(gate.perAxis.actionability.outlierOk).toBe(false);
         expect(gate.perAxis.actionability.ok).toBe(false);
         expect(gate.passed).toBe(false);
     });

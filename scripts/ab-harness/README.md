@@ -87,16 +87,23 @@ ANTHROPIC_API_KEY=... npx tsx scripts/ab-harness/judge.ts --a /tmp/results-full.
 (labels A/B are assigned deterministically per caseId, not
 `Math.random()`), then unblinds and averages per variant per axis.
 
-**PASS** iff, on **every** axis:
+**PASS** iff, on **every** axis, BOTH of these hold:
 
-1. `digest_mean >= full_mean - 0.1` (a small tolerance — digest doesn't have
-   to beat full, just not meaningfully trail it), **AND**
-2. `full_mean - digest_mean <= 0.25` (belt-and-braces: catches a case that
-   technically clears the floor but is still a real regression).
+1. **Mean floor**: `digest_mean >= full_mean - 0.1` (a small tolerance —
+   digest doesn't have to beat full, just not meaningfully trail it).
+2. **Integer-aware outlier rule**: scores are 1-5 INTEGERS, so a flat
+   fractional bound on a single case's drop is meaningless (any nonzero
+   regression is >= 1 point, so it would either always or never trip). So
+   instead: no single case may regress by `>= 2` points on that axis (a hard
+   fail — a real regression, not judge noise), and a `1`-point drop is
+   tolerated in at most one case per axis (two or more cases each dropping 1
+   point on the same axis fails it — recurring 1-point drops are a signal,
+   not noise).
 
-The generated `report.md` prints the per-axis full/digest means, the delta,
-and the `ok`/`NO` verdict for each axis transparently, plus a final
-`PASS (digest >= full)` / `FAIL` line.
+The generated `report.md` prints, per axis, the full/digest means, the
+delta, the mean-floor verdict, the count of cases with a >= 2-point drop,
+the count of cases with a 1-point drop, and the overall `ok`/`NO` verdict
+for that axis, plus a final `PASS (digest >= full)` / `FAIL` line.
 
 ## Cost note
 
