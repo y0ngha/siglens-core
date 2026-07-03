@@ -105,6 +105,9 @@ export function assignBlindLabels(caseId: string): BlindLabels {
 
 function isValidAxisScores(raw: unknown): raw is AxisScores {
     if (typeof raw !== 'object' || raw === null) return false;
+    // The guard above already excludes `null` and non-object `typeof`s, so
+    // `raw` is provably a plain object here — TS just can't narrow `unknown`
+    // to `Record<string, unknown>` from a `typeof`/`null` check alone.
     const obj = raw as Record<string, unknown>;
     return AXES.every(axis => {
         const v = obj[axis];
@@ -133,6 +136,9 @@ export function parseJudgeVerdict(raw: string): JudgeVerdict | null {
         return null;
     }
     if (typeof parsed !== 'object' || parsed === null) return null;
+    // Same pattern as `isValidAxisScores` above: the preceding guard already
+    // rules out `null` and non-object `typeof`s, so this widen is just
+    // recovering the structural guarantee TS can't infer from that check.
     const obj = parsed as Record<string, unknown>;
     const { scoresA, scoresB, winner } = obj;
     if (

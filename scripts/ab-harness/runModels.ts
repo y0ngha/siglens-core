@@ -77,6 +77,11 @@ async function callGeminiOnce(
             systemInstruction: promptCase.system,
             temperature: 0,
             responseMimeType: 'application/json',
+            // Bridges the domain `ResponseJsonSchema` type to `@google/genai`'s
+            // `responseJsonSchema` field (typed loosely, effectively `unknown`,
+            // in that SDK). Safe because both sides treat it as an opaque
+            // JSON-schema object passed straight through to the API — this
+            // harness never inspects or mutates its shape.
             responseJsonSchema: promptCase.responseSchema as unknown,
         },
     });

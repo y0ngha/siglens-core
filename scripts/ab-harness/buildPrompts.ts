@@ -102,6 +102,11 @@ export function buildTechnicalCase(
         fixture.companyName,
         fixture.bars,
         indicators,
+        // `buildAnalysisPrompt` requires mutable `Skill[]` but never mutates
+        // it: it only reads via `selectSkills` (which itself returns a new
+        // name-sorted copy, per its own doc comment) and `.filter`/loop-push
+        // into fresh `skillGroups` arrays. The caller's `readonly Skill[]` is
+        // never written through, so the widen to mutable is safe here.
         skills as Skill[],
         fixture.timeframe,
         undefined,
@@ -126,6 +131,10 @@ export function buildNewsCase(
         fixture.companyName,
         fixture.articles,
         fixture.upcomingCalendar,
+        // Same widen as `buildTechnicalCase` above: the callee only reads
+        // the array (`filterNewsSkills` takes `readonly Skill[]` and
+        // returns a new filtered array via `.filter`), so the mutable
+        // widen never lets the callee write back into the caller's array.
         skills as Skill[],
         'equity'
     );
@@ -167,6 +176,10 @@ async function main(): Promise<void> {
     const outPath = resolve(args.out);
     const skillsPath = args.skills ? resolve(args.skills) : DEFAULT_SKILLS_PATH;
 
+    // The `mode !== 'full' && mode !== 'digest'` guard above throws on any
+    // other value, so by this point `mode` is provably one of the two
+    // `PromptMode` literals — TS just can't narrow a `string` to a literal
+    // union via inequality checks against string literals.
     const skills = await loadSkillCatalog(mode as PromptMode, skillsPath);
     console.log(
         `[ab-harness] loaded ${skills.length} skill(s) from ${skillsPath} (mode=${mode})`
