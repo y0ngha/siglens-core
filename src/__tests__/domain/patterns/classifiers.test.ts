@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { PivotPoint } from '@/domain/types';
 import { extractPivots } from '@/domain/patterns/pivots';
 import {
     classifyDoubleTripleTop,
@@ -388,6 +389,61 @@ describe('classifyFlagsAndPennants', () => {
 
         expect(classifyFlagsAndPennants(pivots, bars, 0)).toEqual([]);
     });
+
+    it('피벗이 0~1개뿐이면(평탄한 시세) 감지하지 않는다 (pivots.length < 2)', () => {
+        // A perfectly flat close series never retraces far enough to
+        // establish a swing direction, so extractPivots yields 0 pivots
+        // (even with includeProvisional) — buildFlagContext's
+        // `pivots.length < 2` guard rejects before touching bars.
+        const bars = makeBars(Array.from({ length: 10 }, () => 100));
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        expect(pivots).toHaveLength(0);
+
+        expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('consolidation 구간이 FLAG_CONSOLIDATION_MAX_BARS(30)를 초과하면 감지하지 않는다', () => {
+        // The last TRENDLINE_PIVOT_WINDOW(8) pivots span index 0 -> 35 (36
+        // bars), past FLAG_CONSOLIDATION_MAX_BARS(30) — rejected regardless
+        // of pole/channel geometry, which is never reached.
+        const pivots: PivotPoint[] = Array.from({ length: 8 }, (_, i) => ({
+            index: i * 5,
+            price: i % 2 === 0 ? 20 : 10,
+            kind: i % 2 === 0 ? 'high' : 'low',
+        }));
+        const bars = makeBars(Array.from({ length: 40 }, () => 15));
+
+        expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('consolidation이 bar 0 근처에서 시작해 pole을 위한 여유가 없으면 감지하지 않는다 (poleStartIndex >= consolidationStartIndex)', () => {
+        // Only 2 pivots, the first at index 0 — consolidationStartIndex is 0,
+        // so poleStartIndex (max(0, 0 - FLAG_POLE_LOOKBACK_BARS) = 0) is not
+        // strictly before it. There is no room for a preceding pole.
+        const pivots: PivotPoint[] = [
+            { index: 0, price: 20, kind: 'high' },
+            { index: 5, price: 10, kind: 'low' },
+        ];
+        const bars = makeBars(Array.from({ length: 10 }, () => 15));
+
+        expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('consolidation 채널 높이가 FLAG_CHANNEL_MAX_RANGE_ATR(3) * atr를 초과하면 감지하지 않는다 (경계값 초과, reject 방향)', () => {
+        // Same pole as the pennant boundary-pass test (90 -> 109 over 20
+        // bars), but the consolidation swings 106 -> 110 -> 106: channel
+        // range = 4, past FLAG_CHANNEL_MAX_RANGE_ATR(3) * atr(1) = 3 — the
+        // exact boundary is covered by the existing range=3 pass test above,
+        // this is the reject side just past it.
+        const poleValues = Array.from({ length: 20 }, (_, i) => 90 + i);
+        const consolidationValues = [106, 110, 106];
+        const bars = makeHLBars(
+            [...poleValues, ...consolidationValues].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
+    });
 });
 
 describe('classifyCurvaturePatterns', () => {
@@ -479,5 +535,82 @@ describe('classifyCurvaturePatterns', () => {
         const pivots = extractPivots(bars, ATR, { includeProvisional: true });
 
         expect(classifyCurvaturePatterns(pivots, bars, 0)).toEqual([]);
+    });
+
+    it('정점(vertex)이 구간 중앙 절반 밖(edge-hugging arc)이면 rounding_bottom을 감지하지 않는다', () => {
+        // Lows at (2,15.8),(4,9.8),(6,6.2),(8,5) lie exactly on the convex
+        // parabola y = 0.3*(x-8)^2 + 5 — a>0, but its vertex sits at x=8, the
+        // right EDGE of the [2,8] span, outside the required middle-half
+        // window [3.5, 6.5]. Depth (15.8-5=10.8) is well past the minimum,
+        // so this rejects on the vertex check specifically, not depth.
+        const bars = makeAlternatingPivotBars(
+            15,
+            [20, 15.8, 20, 9.8, 20, 6.2, 20, 5],
+            20
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows).toHaveLength(4);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('컵 깊이가 ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr 미만이면 rounding_bottom을 감지하지 않는다', () => {
+        // Lows at (2,10.45),(4,10.05),(6,10.05),(8,10.45) lie exactly on the
+        // shallow convex parabola y = 0.05*(x-5)^2 + 10 — vertex at x=5 sits
+        // well inside the middle-half window [3.5, 6.5], but depth
+        // (10.45-10.05=0.4) is below ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT(2) *
+        // atr(1) = 2. Rejects on the depth check specifically, not vertex.
+        const bars = makeAlternatingPivotBars(
+            15,
+            [20, 10.45, 20, 10.05, 20, 10.05, 20, 10.45],
+            20
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows).toHaveLength(4);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('마지막 저점이 컵의 우측 가장자리보다 낮지 않으면(핸들 없음, handleDepth <= 0) rounding_bottom으로 폴백한다', () => {
+        // Same cup as the textbook rounding_bottom case (lows at
+        // (2,10),(4,4),(6,2),(8,9)), plus a 5th low that continues UP past
+        // the cup's right-edge low (9) instead of pulling back down — there
+        // is no real handle (handleDepth = 9 - 15 = -6 <= 0), so the
+        // cup_and_handle branch is skipped and the classifier falls back to
+        // fitting a plain rounding_bottom over all 5 lows.
+        const bars = makeHLBars(
+            [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 15].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows).toHaveLength(5);
+
+        const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'rounding_bottom', startIndex: 2, endIndex: 10 },
+        ]);
+    });
+
+    it('핸들 되돌림이 CUP_HANDLE_MAX_DEPTH_RATIO * cup depth보다 깊으면 cup_and_handle 대신 rounding_bottom으로 폴백한다', () => {
+        // Same cup as the textbook case (depth=8, right-edge low=9), but the
+        // 5th low pulls back to 3: handleDepth = 9 - 3 = 6, past
+        // CUP_HANDLE_MAX_DEPTH_RATIO(0.5) * cup depth(8) = 4 — too deep to be
+        // a handle. Falls back to a plain rounding_bottom fit over all 5
+        // lows instead of cup_and_handle.
+        const bars = makeHLBars(
+            [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 3].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        const lows = pivots.filter(p => p.kind === 'low');
+        expect(lows).toHaveLength(5);
+
+        const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'rounding_bottom', startIndex: 2, endIndex: 10 },
+        ]);
     });
 });

@@ -157,3 +157,7 @@
 - Rule: FF Predictability / FF Coupling — do not discard a known value and reconstruct it from a derived index; if `tf` is available in the call context, thread it as a parameter to the callee
 - Context: Round 1 recommended finding — `poolEdge(timeframe, horizon, edges, labelSymbol)` internally computed `tf` from `horizon` even though the caller (`doAccumulate`) already had `tf` available. Fixed by threading `tf` as a parameter: `poolEdge(timeframe, tf, horizon, edges, labelSymbol)` and removing the internal re-derivation.
 
+## [PR #160 R4 | feat/chart-pattern-screener | 2026-07-03]
+- Violation: `CURVATURE_VERTEX_MID_LO` and `CURVATURE_VERTEX_MID_HI` in `src/domain/patterns/constants.ts` shared a single `/** @internal ... */` JSDoc block above the first declaration
+- Rule: MISTAKES.md §Documentation — TypeDoc attaches a JSDoc block only to the immediately-following declaration; a shared comment above two sibling `export const` statements silently leaves the second one undocumented in generated docs, even though the source reads as if both are covered
+- Context: PR #160 review round 4 suggestion — the shared block described both constants together ("the fraction-of-span range within which..."), but TypeDoc renders `CURVATURE_VERTEX_MID_HI` with no doc at all. Fixed by giving each constant its own `@internal` JSDoc block, mirroring the per-constant style used by every other constant in the file.

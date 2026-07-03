@@ -120,12 +120,20 @@ export const CUP_HANDLE_MAX_DEPTH_RATIO = 0.5;
 
 /**
  * @internal
- * Rounding bottom / cup & handle: the fraction-of-span range within which the
- * quadratic-fit vertex must fall to count as a genuine "bottom" rather than
- * an edge-hugging arc (a vertex right at the start/end of the window is a
+ * Rounding bottom / cup & handle: lower bound (fraction of span) within which
+ * the quadratic-fit vertex must fall to count as a genuine "bottom" rather
+ * than an edge-hugging arc (a vertex right at the start of the window is a
  * partial curve, not a rounded bottom shape).
  */
 export const CURVATURE_VERTEX_MID_LO = 0.25;
+
+/**
+ * @internal
+ * Rounding bottom / cup & handle: upper bound (fraction of span) within which
+ * the quadratic-fit vertex must fall to count as a genuine "bottom" rather
+ * than an edge-hugging arc (a vertex right at the end of the window is a
+ * partial curve, not a rounded bottom shape).
+ */
 export const CURVATURE_VERTEX_MID_HI = 0.75;
 
 /**

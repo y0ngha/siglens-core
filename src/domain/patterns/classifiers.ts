@@ -402,15 +402,29 @@ function buildFlagContext(
     bars: readonly Bar[],
     atr: number
 ): FlagContext | null {
+    // Defensive: `bars.length < 2` is unreachable via legitimate call paths —
+    // pivots are always extracted from these same bars (extractPivots itself
+    // requires bars.length >= 2 to emit any pivot), so pivots.length >= 2
+    // already implies bars.length >= 2. Kept in case a caller ever passes a
+    // mismatched pivots/bars pair directly.
     if (atr <= 0 || pivots.length < 2 || bars.length < 2) return null;
 
     const window = pivots.slice(-TRENDLINE_PIVOT_WINDOW);
+    // Defensive: pivots.length >= 2 is already guaranteed above and
+    // TRENDLINE_PIVOT_WINDOW >= 2, so `slice(-TRENDLINE_PIVOT_WINDOW)` always
+    // yields at least 2 elements — window.length < 2 cannot happen in
+    // practice.
     if (window.length < 2) return null;
 
     const consolidationStartIndex = window[0].index;
     const consolidationEndIndex = window[window.length - 1].index;
     const consolidationLength =
         consolidationEndIndex - consolidationStartIndex + 1;
+    // Defensive: pivots are strictly ascending by index (see extractPivots),
+    // so with window.length >= 2, consolidationEndIndex is always strictly
+    // greater than consolidationStartIndex — consolidationLength is always
+    // >= 2 in practice. The `> FLAG_CONSOLIDATION_MAX_BARS` half below is the
+    // real (reachable) rejection.
     if (
         consolidationLength < 2 ||
         consolidationLength > FLAG_CONSOLIDATION_MAX_BARS
@@ -431,6 +445,9 @@ function buildFlagContext(
         consolidationStartIndex,
         consolidationEndIndex + 1
     );
+    // Defensive: consolidationLength >= 2 (see above) and, in legitimate call
+    // paths, bars covers every index the pivots reference (pivots were
+    // extracted from these same bars), so this slice is never empty.
     if (consolidationBars.length === 0) return null;
     const range =
         Math.max(...consolidationBars.map(b => b.high)) -
