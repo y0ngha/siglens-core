@@ -11,7 +11,7 @@
  * Usage:
  *   GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in prompts-<mode>.json --out results-<mode>.json
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
@@ -27,7 +27,9 @@ import type { AnalysisTypeUnderTest, PromptCaseOutput } from './buildPrompts';
  */
 const DEFAULT_ANALYSIS_MODEL = 'gemini-2.5-flash-lite' as const;
 
-const RETRY_DELAY_MS = 2_000;
+/** Per-case retry budget: up to 4 attempts total, with backoff between attempts 1→2, 2→3, 3→4. */
+const MAX_ATTEMPTS = 4;
+const RETRY_BACKOFFS_MS = [15_000, 60_000, 180_000] as const;
 
 export interface NormalizedUsage {
     promptTokens: number;
@@ -89,21 +91,71 @@ async function callGeminiOnce(
     };
 }
 
-/** Retry exactly once on a transient failure (network blip, 5xx, etc.) — no infinite retry loop. */
+/**
+ * Whether a failure is a transient capacity/rate-limit error worth retrying
+ * (Gemini 503/UNAVAILABLE capacity spikes, 429 rate limiting). Anything else
+ * (bad request, auth, schema errors, etc.) is treated as non-retryable and
+ * aborts the run immediately.
+ */
+export function isRetryableError(error: unknown): boolean {
+    const status = (error as { status?: unknown } | undefined)?.status;
+    const code = (error as { code?: unknown } | undefined)?.code;
+    if (status === 503 || status === 429 || code === 503 || code === 429) {
+        return true;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return /\b503\b|UNAVAILABLE|\b429\b/i.test(message);
+}
+
+/**
+ * Retry up to `MAX_ATTEMPTS` total attempts on retryable errors (503/UNAVAILABLE/429),
+ * backing off `RETRY_BACKOFFS_MS` (15s/60s/180s) between attempts. Non-retryable
+ * errors abort immediately without waiting out the remaining budget.
+ */
 async function callGeminiWithRetry(
     client: GoogleGenAI,
     apiModelId: string,
     promptCase: PromptCaseOutput
 ): Promise<{ text: string; usage: NormalizedUsage }> {
-    try {
-        return await callGeminiOnce(client, apiModelId, promptCase);
-    } catch (error) {
-        console.warn(
-            `[runModels] ${promptCase.caseId}: first attempt failed (${String(error)}), retrying once...`
-        );
-        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-        return await callGeminiOnce(client, apiModelId, promptCase);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+            return await callGeminiOnce(client, apiModelId, promptCase);
+        } catch (error) {
+            const retryable = isRetryableError(error);
+            if (!retryable || attempt === MAX_ATTEMPTS) {
+                throw error;
+            }
+            const backoffMs = RETRY_BACKOFFS_MS[attempt - 1];
+            console.warn(
+                `[runModels] ${promptCase.caseId}: attempt ${attempt}/${MAX_ATTEMPTS} failed (${String(error)}), retrying in ${backoffMs}ms...`
+            );
+            await new Promise(r => setTimeout(r, backoffMs));
+        }
     }
+    // Unreachable — the loop above always returns or throws on its final iteration.
+    throw new Error(
+        `[runModels] ${promptCase.caseId}: retry loop exited unexpectedly`
+    );
+}
+
+/** Case ids already present in a loaded results file — used to skip finished work on resume. */
+export function filterUnfinishedCases(
+    cases: readonly PromptCaseOutput[],
+    existingResults: readonly ModelRunResult[]
+): PromptCaseOutput[] {
+    const doneIds = new Set(existingResults.map(r => r.caseId));
+    return cases.filter(c => !doneIds.has(c.caseId));
+}
+
+/** Atomic write: write to a `.tmp` sibling then rename over the target, so a crash mid-write never corrupts `outFile`. */
+function writeResultsAtomic(
+    outFile: string,
+    results: readonly ModelRunResult[]
+): void {
+    const resolvedOut = resolve(outFile);
+    const tmpFile = `${resolvedOut}.tmp`;
+    writeFileSync(tmpFile, JSON.stringify(results, null, 2) + '\n');
+    renameSync(tmpFile, resolvedOut);
 }
 
 async function main(): Promise<void> {
@@ -125,13 +177,22 @@ async function main(): Promise<void> {
     ) as PromptCaseOutput[];
     const mode = inferModeFromFilename(inFile);
 
+    const results: ModelRunResult[] = existsSync(resolve(outFile))
+        ? (JSON.parse(
+              readFileSync(resolve(outFile), 'utf-8')
+          ) as ModelRunResult[])
+        : [];
+    if (results.length > 0) {
+        console.log(`[runModels] resuming, ${results.length} done`);
+    }
+    const remainingCases = filterUnfinishedCases(cases, results);
+
     console.log(
-        `[runModels] ${cases.length} case(s), model=${modelSpec.apiModelId}, mode=${mode}`
+        `[runModels] ${remainingCases.length}/${cases.length} case(s) remaining, model=${modelSpec.apiModelId}, mode=${mode}`
     );
 
-    const results: ModelRunResult[] = [];
     // Sequential by design — see file header.
-    for (const c of cases) {
+    for (const c of remainingCases) {
         const start = Date.now();
         const { text, usage } = await callGeminiWithRetry(
             client,
@@ -148,12 +209,12 @@ async function main(): Promise<void> {
             latencyMs,
             promptChars: c.prompt.length,
         });
+        writeResultsAtomic(outFile, results);
         console.log(
             `[runModels] ${c.caseId}: ${latencyMs}ms, output=${usage.outputTokens} tok, cached=${usage.cachedTokens} tok`
         );
     }
 
-    writeFileSync(resolve(outFile), JSON.stringify(results, null, 2) + '\n');
     console.log(
         `\n[runModels] wrote ${results.length} result(s) to ${outFile}`
     );
