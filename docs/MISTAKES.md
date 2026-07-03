@@ -417,6 +417,15 @@ and have been removed from this file.
 5. Missing edge case coverage when refactoring or moving functions
    → Each module must test its own edge cases directly
 
+5.5. New conditional branches added without dedicated test cases
+   → When code introduces a new if/guard condition (edge check, retry path, type narrowing), each branch needs an explicit test case
+   → The test must directly assert the branch behavior; incidental exercising via other test cases is insufficient
+   → Applies to guard conditions (atr <= 0, span <= 0), sentinel checks, retry/fallback paths, and type-narrowing branches
+   ❌ classifyHeadAndShoulders adds atr <= 0 guard, but no dedicated test case (sibling classifiers have this, H&S doesn't)
+   ❌ Retry-window logic (-6,-1 pivot window) added but only exercised incidentally; never directly asserted
+   ✅ Add test: classifyHeadAndShoulders(hdsBars) with atr <= 0 and atr > 0 both cases
+   ✅ Add test: 6-pivot scenario where last-5-window fails but full-6-pivot window detects pattern (retry asserted)
+
 6. Test duplication — each it() must test exactly one unique behavior
 
 7. Provider pair must have symmetric error handling, test coverage, and naming

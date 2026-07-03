@@ -42,11 +42,6 @@
 - Context: kept `createDatabaseClient` as the explicit DB construction entrypoint while removing `getDatabaseClient`, `tryGetDatabaseClient`, `readDatabaseConfig`, `tryReadDatabaseConfig`, and `DatabaseClient` from `src/index.ts`
 
 
-## [PR #37 Round 2 | feat/8/user-tier-system | 2026-04-28]
-- Violation: `application/tier/types.ts` imported `UserTierRepository` from the deep `@/infrastructure/db/types` path while sibling files import via the `@/infrastructure/db` module index
-- Rule: FF Coupling — consumers should import from a module's public index, not its internal implementation files, so internal restructuring stays non-breaking
-- Context: switched the `UserTierRepository` import in `application/tier/types.ts` to `@/infrastructure/db`
-
 ## [PR #39 | refactor/16/redis-to-db-migration | 2026-04-28]
 - Violation: Redis cache update used read-modify-write merge after DB upsert, allowing concurrent writes to overwrite each other
 - Rule: Cache consistency for DB-backed data — after authoritative DB writes, invalidate aggregate cache keys instead of merging stale cache snapshots
@@ -106,19 +101,6 @@
 - Rule: Public API Smoke Tests — when wiring new public symbols through entrypoints, add basic assertions in corresponding .test.ts and .client.test.ts files to verify exports are present and callable
 - Context: Round 2 recommended findings — scoreToLabel, FEAR_GREED_LABEL_CUTOFFS, POC_WINDOW_DEFAULT were added to entrypoints but had no entrypoint smoke tests. Added 3 assertions to index.test.ts (scoreToLabel callability, CUTOFFS presence/type) and 3 to index.client.test.ts verifying all three symbols export correctly.
 
-## [Test Coverage Hardening Pass | main | 2026-05-29] — Round 1→2 approved
-- Violation: Vacuous/conditional test assertion in extractJsonWithRepair.test.ts wrapped key assertion inside if-guard
-- Rule: Test assertions must be deterministic and unconditional — assertions wrapped in if-guards silently skip when input does not match the guard condition, masking incomplete test coverage
-- Context: Round 1 required finding — test wrapped `expect(msg).toContain('near:')` in `if (/position\s+\d+/.test(msg))`, so inputs lacking position token silently skipped the assertion. Fixed by making the test deterministic: added separate case for no-position input asserting `near:` is absent, and position-bearing path is asserted by dedicated deterministic case.
-
-- Violation: JSDoc referenced call-site context instead of timeless role description
-- Rule: FF Readability — JSDoc must describe a function's stable role and contract, not its call-site context; "Exported for unit testing of X logic" becomes stale when call-sites change
-- Context: Round 1 recommended findings — two newly-exported `@internal` helpers had JSDoc reading "Exported for unit testing of the ... logic". Fixed by removing call-site reference and keeping role description only.
-
-- Violation: Untested branch after edge input — OBV NaN-input test stopped at the NaN bar and did not assert recovery on following finite-close bar
-- Rule: Edge-case test coverage — when testing edge input (NaN, null, empty), fixture must assert normal accumulation resumes after the edge case passes
-- Context: Round 1 recommended findings — OBV accumulator logic must recover after a NaN bar. Extended test fixture to assert normal accumulation continues on the next finite-close bar.
-
 ## [PR #106 | test/improve-coverage-hardening | 2026-05-29] — review comment fixes
 - Violation: Coverage threshold lowered in vitest.config.ts without updating the docs that mandate the target
 - Rule: Documentation Sync — when changing an enforced threshold/policy in config, every doc stating that policy must be updated in the same change, or config and docs silently diverge
@@ -165,8 +147,22 @@
   - Sub-principle: Consumer-instantiated config types — a type can be unused inside core yet consumers type their own constants/config exports with it (SectorGroupDef in consumer's SECTOR_GROUPS).
 - Promoted: YES — extend MISTAKES.md §9 with mandatory consumer cross-check procedure before removal/demotion of any public export.
 
-## [Phase 2 | worktree-feat+pro-indicators-phase2 | 2026-06-05] — Indicator validation framework & trigger helpers
-- Violation: `poolEdge` function in `scripts/validation/validateIndicators.ts` re-derived `tf` parameter from `horizon` via `TIMEFRAMES.find(...) ?? '1Day'` instead of using the authoritative `tf` already in scope at the call site
-- Rule: FF Predictability / FF Coupling — do not discard a known value and reconstruct it from a derived index; if `tf` is available in the call context, thread it as a parameter to the callee
-- Context: Round 1 recommended finding — `poolEdge(timeframe, horizon, edges, labelSymbol)` internally computed `tf` from `horizon` even though the caller (`doAccumulate`) already had `tf` available. Fixed by threading `tf` as a parameter: `poolEdge(timeframe, tf, horizon, edges, labelSymbol)` and removing the internal re-derivation.
+## [PR #160 R4 | feat/chart-pattern-screener | 2026-07-03]
+- Violation: `CURVATURE_VERTEX_MID_LO` and `CURVATURE_VERTEX_MID_HI` in `src/domain/patterns/constants.ts` shared a single `/** @internal ... */` JSDoc block above the first declaration
+- Rule: MISTAKES.md §Documentation — TypeDoc attaches a JSDoc block only to the immediately-following declaration; a shared comment above two sibling `export const` statements silently leaves the second one undocumented in generated docs, even though the source reads as if both are covered
+- Context: PR #160 review round 4 suggestion — the shared block described both constants together ("the fraction-of-span range within which..."), but TypeDoc renders `CURVATURE_VERTEX_MID_HI` with no doc at all. Fixed by giving each constant its own `@internal` JSDoc block, mirroring the per-constant style used by every other constant in the file.
 
+## [PR #160 R5 | feat/chart-pattern-screener | 2026-07-03]
+- Violation: `.sort()` used instead of `.toSorted()` in `screenChartPatterns.ts` (dedup/sort return) and in two test files (`fixtureDrift.test.ts`, `screenChartPatterns.test.ts`) — in-place mutation instead of returning a new array
+- Rule: MISTAKES.md Coding Paradigm #10 (`.sort()` mutates; use `.toSorted()`)
+- Context: PR #160 review round 5 blocker — recurrence of an already-documented rule across production code and test helpers; fixed by switching all four call sites to `.toSorted()`.
+
+## [PR #160 R5 | feat/chart-pattern-screener | 2026-07-03]
+- Violation: `'high' | 'low'` inline union literal repeated across `domain/types.ts` (`PivotPoint.kind`) and `domain/patterns/classifiers.ts` (`extremeKind`, `peakKind`, `troughKind` parameters/locals) instead of a shared named type
+- Rule: MISTAKES.md TypeScript #6 (union literals with 3+ occurrences must be extracted to a named type in `domain/types.ts`)
+- Context: PR #160 review round 5 blocker — introduced `PivotKind` type alias in `domain/types.ts`, re-exported (with `@internal` tag) from the `domain/patterns` barrel only (not `src/index.ts`, matching `PivotPoint`/`ChartPatternId`'s current visibility), and updated all four inline-union sites in `classifiers.ts` to reference it.
+
+## [PR #160 R5 | feat/chart-pattern-screener | 2026-07-03]
+- Violation: `classifiers.test.ts` and `pivots.test.ts` hardcoded boundary-threshold literals (`EXTREME_MATCH_ATR_MULT`'s `1.0`, `PIVOT_REVERSAL_ATR_MULT`'s `1.5`) instead of importing and deriving from the source constants
+- Rule: MISTAKES.md Tests #4 (boundary test constants must be imported from source, not redefined/hardcoded locally)
+- Context: PR #160 review round 5 blocker — added `EXTREME_MATCH_ATR_MULT` import to `classifiers.test.ts` and `PIVOT_REVERSAL_ATR_MULT` import + module-level `ATR` const to `pivots.test.ts`; converted the one executable-code literal (`.toBe(1)` → `EXTREME_MATCH_ATR_MULT * ATR`) and four exact-boundary fixture offsets (`12.5`, `8.5` ×2, `11.5`) to derive from `runningExtreme - PIVOT_REVERSAL_ATR_MULT * ATR`; left incidental fixture geometry (pole magnitudes, running-extreme values, gap-bar values) as literals per the non-tautological scope.

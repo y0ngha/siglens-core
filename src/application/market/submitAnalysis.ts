@@ -17,6 +17,7 @@ import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
+import { screenChartPatterns, type PatternCandidate } from '@/domain/patterns';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
@@ -27,6 +28,7 @@ import {
 import type {
     AnalysisResponse,
     AnalysisType,
+    Bar,
     FearGreedSnapshot,
     Timeframe,
 } from '@/domain/types';
@@ -111,6 +113,30 @@ function resolveSubmitAnalysisArgs(
                 ? fmpSymbolOrOptions
                 : {}),
     };
+}
+
+/**
+ * Observe-only: screen for chart patterns without ever failing the
+ * submission path. This is an allowed exception to the "don't swallow
+ * errors" rule (application/CLAUDE.md § Error propagation): the result is
+ * purely a logging side channel (see call site) that is not yet consumed by
+ * the prompt/dispatch, so a screener bug/exception must degrade to "no
+ * candidates" rather than block analysis submission. The error is still
+ * surfaced via `console.error`, matching the FearGreed-snapshot catch above.
+ * `atr === undefined` also means "no candidates" — the screener needs a
+ * scale reference and has nothing meaningful to compute without one.
+ */
+function observePatternCandidates(
+    bars: readonly Bar[],
+    atr: number | undefined
+): PatternCandidate[] {
+    if (atr === undefined) return [];
+    try {
+        return screenChartPatterns(bars, atr);
+    } catch (error) {
+        console.error('[PatternScreen] failed:', error);
+        return [];
+    }
 }
 
 /**
@@ -349,6 +375,26 @@ export async function submitAnalysis(
         atr,
         modelId: effectiveModelId,
     });
+
+    // Observe-only chart-pattern screening: screen for chart patterns and log
+    // candidates for later analysis. Not yet consumed by the prompt/dispatch
+    // below — purely a logging side channel to validate recall before it is
+    // wired into skill selection. See `observePatternCandidates` above
+    // for why its internal catch is an allowed exception to error propagation.
+    // The unconditional console.info below is temporary observation
+    // instrumentation for measuring the screener's miss-rate; it will be
+    // removed or converted to gated telemetry once the screener is wired
+    // into skill selection, and is a single-line info-level log with no PII.
+    const patternCandidates = observePatternCandidates(bars, atr);
+    console.info(
+        '[PatternScreen]',
+        JSON.stringify({
+            jobId,
+            symbol,
+            timeframe,
+            candidates: patternCandidates.map(c => c.id),
+        })
+    );
 
     const userApiKeyHeader: Record<string, string> =
         options.userApiKey !== undefined
