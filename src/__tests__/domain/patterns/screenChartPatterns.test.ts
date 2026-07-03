@@ -79,7 +79,7 @@ describe('screenChartPatterns — determinism, ordering, dedup', () => {
         );
 
         const ids = candidates.map(c => c.id);
-        const sortedIds = [...ids].sort((a, b) => a.localeCompare(b, 'en'));
+        const sortedIds = ids.toSorted((a, b) => a.localeCompare(b, 'en'));
         expect(ids).toEqual(sortedIds);
 
         expect(new Set(ids).size).toBe(ids.length);

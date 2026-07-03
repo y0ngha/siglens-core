@@ -4,5 +4,6 @@ export { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
 export type {
     ChartPatternId,
     PatternCandidate,
+    PivotKind,
     PivotPoint,
 } from '@/domain/types';

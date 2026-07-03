@@ -33,8 +33,8 @@ describe('fixture generator는 committed JSON과 drift가 없다', () => {
     );
 
     it('committed JSON 파일 5개 모두를 검증한다', () => {
-        expect(fixtures.map(f => f.file).sort()).toEqual(
-            Object.keys(COMMITTED_JSON).sort()
+        expect(fixtures.map(f => f.file).toSorted()).toEqual(
+            Object.keys(COMMITTED_JSON).toSorted()
         );
     });
 });

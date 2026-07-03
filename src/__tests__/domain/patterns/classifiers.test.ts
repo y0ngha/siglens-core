@@ -15,6 +15,7 @@ import {
     makeBars,
     makeHLBars,
 } from '@/__tests__/domain/patterns/helpers';
+import { EXTREME_MATCH_ATR_MULT } from '@/domain/patterns/constants';
 
 const ATR = 1;
 
@@ -62,7 +63,9 @@ describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
         const pivots = extractPivots(bars, ATR);
         const highs = pivots.filter(p => p.kind === 'high');
         expect(highs).toHaveLength(2);
-        expect(Math.abs(highs[0].price - highs[1].price)).toBe(1);
+        expect(Math.abs(highs[0].price - highs[1].price)).toBe(
+            EXTREME_MATCH_ATR_MULT * ATR
+        );
 
         const candidates = classifyDoubleTripleTop(pivots, bars, ATR);
 
@@ -125,7 +128,7 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
     });
 
     it('어깨 차이가 정확히 HS_SHOULDER_TOLERANCE * height 이면 감지한다 (느슨한 경계)', () => {
-        // LS=15, head=20, RS=18.5 → |LS-RS|=3.5 == 0.35 * (head-neckline=10).
+        // LS=15, head=20, RS=18.5 → |LS-RS|=3.5 == HS_SHOULDER_TOLERANCE(0.35) * (head-neckline=10).
         const bars = makeHLBars([
             [10, 10], // seed
             [15, 15], // LS candidate high
@@ -285,8 +288,9 @@ describe('classifyTrendlinePatterns', () => {
     });
 
     it('기울기가 정확히 FLAT_SLOPE_ATR_PER_BAR 이면 flat으로 판정한다 (느슨한 경계)', () => {
-        // atr=20 makes the normalized slope land bit-exactly on 0.05 (1/20)
-        // for both highs and lows — the inclusive boundary of "flat".
+        // atr=20 makes the normalized slope land bit-exactly on
+        // FLAT_SLOPE_ATR_PER_BAR(0.05) (1/20) for both highs and lows — the
+        // inclusive boundary of "flat".
         const atr = 20;
         const bars = makeAlternatingPivotBars(0, [100, 0, 102, 2], 100);
         const pivots = extractPivots(bars, atr);
@@ -441,6 +445,28 @@ describe('classifyFlagsAndPennants', () => {
             [...poleValues, ...consolidationValues].map(v => [v, v])
         );
         const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('pivots가 오름차순 index 불변식을 어기면 consolidationLength < 2 방어 분기에서 거부한다', () => {
+        // extractPivots always yields strictly-ascending indices, so this
+        // synthetic (descending-index) pivots array is impossible via any
+        // real call path — but PivotPoint's type does not enforce ordering,
+        // so it is type-valid input to the exported classifyFlagsAndPennants.
+        // window = pivots.slice(-8) keeps both entries (window.length === 2,
+        // clears the `window.length < 2` guard), but with
+        // consolidationStartIndex=5 > consolidationEndIndex=3,
+        // consolidationLength = 3 - 5 + 1 = -1, which is specifically the
+        // `consolidationLength < 2` half of the guard (not the
+        // `> FLAG_CONSOLIDATION_MAX_BARS` half, and not the
+        // `consolidationBars.length === 0` guard further down, since this
+        // guard returns null before that line is reached).
+        const pivots: PivotPoint[] = [
+            { index: 5, price: 10, kind: 'high' },
+            { index: 3, price: 8, kind: 'low' },
+        ];
+        const bars = makeBars(Array.from({ length: 10 }, () => 100));
 
         expect(classifyFlagsAndPennants(pivots, bars, ATR)).toEqual([]);
     });

@@ -66,5 +66,7 @@ export function screenChartPatterns(
         });
     }
 
-    return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id, 'en'));
+    return [...byId.values()].toSorted((a, b) =>
+        a.id.localeCompare(b.id, 'en')
+    );
 }

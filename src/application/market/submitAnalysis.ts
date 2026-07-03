@@ -381,6 +381,10 @@ export async function submitAnalysis(
     // below — purely a logging side channel to validate recall before it is
     // wired into skill selection. See `observePatternCandidates` above
     // for why its internal catch is an allowed exception to error propagation.
+    // The unconditional console.info below is temporary observation
+    // instrumentation for measuring the screener's miss-rate; it will be
+    // removed or converted to gated telemetry once the screener is wired
+    // into skill selection, and is a single-line info-level log with no PII.
     const patternCandidates = observePatternCandidates(bars, atr);
     console.info(
         '[PatternScreen]',

@@ -2,6 +2,7 @@ import type {
     Bar,
     ChartPatternId,
     PatternCandidate,
+    PivotKind,
     PivotPoint,
 } from '@/domain/types';
 import {
@@ -131,7 +132,7 @@ export type PatternClassifier = (
  * triple always implies a double (recall-biased: both skill docs relevant).
  */
 function extremeMatchClassifier(
-    extremeKind: 'high' | 'low',
+    extremeKind: PivotKind,
     doubleId: ChartPatternId,
     tripleId: ChartPatternId
 ): PatternClassifier {
@@ -200,10 +201,10 @@ export const classifyDoubleTripleBottom: PatternClassifier =
  * level within `HS_SHOULDER_TOLERANCE` of the head-to-neckline height.
  */
 function fivePivotHeadAndShouldersClassifier(
-    peakKind: 'high' | 'low',
+    peakKind: PivotKind,
     id: ChartPatternId
 ): PatternClassifier {
-    const troughKind: 'high' | 'low' = peakKind === 'high' ? 'low' : 'high';
+    const troughKind: PivotKind = peakKind === 'high' ? 'low' : 'high';
 
     return (pivots, _bars, atr) => {
         if (atr <= 0 || pivots.length < 5) return [];

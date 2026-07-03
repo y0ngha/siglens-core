@@ -3328,12 +3328,15 @@ export type ChartPatternId =
     | 'cup_and_handle'
     | 'rounding_bottom';
 
+/** @internal Swing direction of a confirmed pivot extreme. */
+export type PivotKind = 'high' | 'low';
+
 /** @internal A confirmed zigzag extreme — a local high or low that survived the ATR-relative reversal threshold. */
 export interface PivotPoint {
     /** bars 배열 인덱스. */
     index: number;
     price: number;
-    kind: 'high' | 'low';
+    kind: PivotKind;
 }
 
 /** @internal A pre-screener candidate hit — a coarse, recall-biased match for one pattern ID over a bar range. */
