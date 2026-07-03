@@ -1,5 +1,31 @@
 # Changelog
 
+# [0.28.0](https://github.com/y0ngha/siglens-core/compare/v0.27.0...v0.28.0) (2026-07-03)
+
+
+### Bug Fixes
+
+* **patterns:** add [@internal](https://github.com/internal) tags per MISTAKES 9.5 + epsilon-guard singular determinant ([cdade61](https://github.com/y0ngha/siglens-core/commit/cdade6118b1ed08ff9d6ce533e47ba596437bccd))
+* **patterns:** exception-isolate observe-only screener + jobId in log payload ([f10d3ca](https://github.com/y0ngha/siglens-core/commit/f10d3cad0ed0f2609ad998099b85045e542c0213))
+* **patterns:** PR review round 2 — cast/catch justifications, branch tests, types re-export, constants consolidation ([84f1e9c](https://github.com/y0ngha/siglens-core/commit/84f1e9c302552d12b13fc90b7396d7998c3c784d)), closes [#160](https://github.com/y0ngha/siglens-core/issues/160) [#7](https://github.com/y0ngha/siglens-core/issues/7)
+* **patterns:** PR review round 3 — timeless docs, H&S atr guard tests, epsilon constant ([176f495](https://github.com/y0ngha/siglens-core/commit/176f495e89cce1d4904da15ac94f37f24b44d760))
+* **patterns:** PR review round 4 — flag/curvature reject-path tests, defensive guard comments ([cdddc33](https://github.com/y0ngha/siglens-core/commit/cdddc33fe8b30e02f847c22952e30daa10028113))
+* **patterns:** PR review round 5 — toSorted, PivotKind alias, constant-derived test boundaries ([5b4bb09](https://github.com/y0ngha/siglens-core/commit/5b4bb095ea9c371b09e697777e45ec4b513362bf))
+
+
+### Features
+
+* **patterns:** add chart pattern screener types and tolerance constants ([ecc2866](https://github.com/y0ngha/siglens-core/commit/ecc28662be4f8aeb2a58814fdd4f4dc631d28c97))
+* **patterns:** ATR-relative zigzag pivot extraction ([6b48c50](https://github.com/y0ngha/siglens-core/commit/6b48c50ac6846654215ace11469020163fa8a7bc))
+* **patterns:** curvature classifiers (rounding bottom, cup and handle) ([cea3857](https://github.com/y0ngha/siglens-core/commit/cea3857d5447575610df5756f02b8692d1a0a7e9))
+* **patterns:** extreme-matching classifiers (double/triple top-bottom) ([8ff2d96](https://github.com/y0ngha/siglens-core/commit/8ff2d96027c12b0f23e83ce4b1bbcd8b2a8c2457))
+* **patterns:** five-pivot H&S classifiers ([95ee0df](https://github.com/y0ngha/siglens-core/commit/95ee0df7aed185c9a6fd06dc3dd16aa648382ac2))
+* **patterns:** flag/pennant classifiers ([b8d50ca](https://github.com/y0ngha/siglens-core/commit/b8d50ca39b8830af63ab85e82043329d5b430044))
+* **patterns:** observe-only screener logging in submitAnalysis ([eb22d52](https://github.com/y0ngha/siglens-core/commit/eb22d52b76e96c226801efee3a13a43e3b75c29a))
+* **patterns:** provisional trailing pivot option + pivot edge tests ([e9bb5f1](https://github.com/y0ngha/siglens-core/commit/e9bb5f1151d7229f668099bace2b3f09b75fcf2f))
+* **patterns:** screener facade with recall fixtures ([47f05d6](https://github.com/y0ngha/siglens-core/commit/47f05d692d3038476d4238164b10a0a0162120c9))
+* **patterns:** trendline-pair classifiers (triangles/wedges/rectangle) ([3d1fe77](https://github.com/y0ngha/siglens-core/commit/3d1fe773fe012baf07061291932da5ff55543cd0))
+
 # [0.26.0](https://github.com/y0ngha/siglens-core/compare/v0.25.0...v0.26.0) (2026-06-21)
 
 
