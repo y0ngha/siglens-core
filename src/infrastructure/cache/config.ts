@@ -185,7 +185,7 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -421,7 +421,7 @@ export function buildFundamentalCacheKey(
  *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -477,7 +477,7 @@ export function buildFinancialsCacheKey(
  *
  * @internal
  */
-export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /** @internal TTL for congressional-trade trend analysis cache results. Default: 24 hours. */
 export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
