@@ -22,6 +22,7 @@ import {
     CACHE_KEY_SCHEMA_VERSION,
     computeBarsEffectiveTtl,
     computeEffectiveTtl,
+    CONGRESS_PROMPT_TEMPLATE_VERSION,
     DEFAULT_ANALYSIS_MODEL_ID,
     FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
@@ -283,13 +284,15 @@ describe('buildFinancialsCacheKey', () => {
 describe('buildCongressTrendCacheKey', () => {
     it('skillFingerprint 미제공 시 base key', () => {
         expect(buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash')).toBe(
-            'v1:analysis:congress:AAPL:gemini-2.5-flash:p1'
+            `v1:analysis:congress:AAPL:gemini-2.5-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}`
         );
     });
     it('skillFingerprint 제공 시 suffix 추가', () => {
         expect(
             buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash', 'sk1')
-        ).toBe('v1:analysis:congress:AAPL:gemini-2.5-flash:p1:sk1');
+        ).toBe(
+            `v1:analysis:congress:AAPL:gemini-2.5-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}:sk1`
+        );
     });
 });
 
