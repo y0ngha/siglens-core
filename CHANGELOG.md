@@ -1,5 +1,20 @@
 # Changelog
 
+# [0.29.0](https://github.com/y0ngha/siglens-core/compare/v0.28.0...v0.29.0) (2026-07-03)
+
+
+### Bug Fixes
+
+* **harness:** integer-aware gate outlier rule (was zero-tolerance 0.25 on 1-5 scale) ([f8986f6](https://github.com/y0ngha/siglens-core/commit/f8986f6c7bd241c63b1fe90472b8f8b675688ab6))
+* **harness:** resumable runModels with incremental saves and stronger 503 backoff ([4491b2e](https://github.com/y0ngha/siglens-core/commit/4491b2e9dad5a06f45bea8af115dd3acb959a9b5))
+* **skills:** version-split rationale in config, error cause chain, shared digest fixture ([eb3f87c](https://github.com/y0ngha/siglens-core/commit/eb3f87c027022e62ac26d4b6cc946f0c6f9beefe))
+
+
+### Features
+
+* **harness:** A/B prompt quality harness (build/run/judge) with frozen fixtures ([0f3f96b](https://github.com/y0ngha/siglens-core/commit/0f3f96b940b972d9188fa4d2a716fb57c1525d80))
+* **skills:** loader injects PROMPT_DIGEST only, hard-fails on missing digest ([14f6f58](https://github.com/y0ngha/siglens-core/commit/14f6f58bada08ccfee17513d80ce86eed97543eb))
+
 # [0.28.0](https://github.com/y0ngha/siglens-core/compare/v0.27.0...v0.28.0) (2026-07-03)
 
 
