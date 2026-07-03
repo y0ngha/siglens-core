@@ -592,7 +592,8 @@ export class FileSkillsLoader implements SkillsProvider {
                     const reason =
                         error instanceof Error ? error.message : String(error);
                     throw new Error(
-                        `Failed to load skill file "${file}": ${reason}`
+                        `Failed to load skill file "${file}": ${reason}`,
+                        { cause: error }
                     );
                 }
             })

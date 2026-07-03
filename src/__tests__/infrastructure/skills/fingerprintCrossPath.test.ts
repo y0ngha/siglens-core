@@ -12,6 +12,7 @@ import {
     clearSkillsCache,
 } from '@/infrastructure/skills/loader';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
+import { withDigest } from '@/__tests__/infrastructure/skills/digestFixture';
 
 const mockReaddir = readdir as Mock;
 const mockReadFile = readFile as Mock;
@@ -22,10 +23,6 @@ const makeDirent = (name: string, isDir = false): Dirent =>
         isDirectory: () => isDir,
         isFile: () => !isDir,
     }) as unknown as Dirent;
-
-/** Append a well-formed `PROMPT_DIGEST` section to a fixture body. */
-const withDigest = (body: string, digestText = 'Digest text.') =>
-    `${body}\n<!-- PROMPT_DIGEST:START -->\n${digestText}\n<!-- PROMPT_DIGEST:END -->`;
 
 // A realistic mixed catalog: an always_on pattern, an event-gated indicator
 // guide (with token_cost), and a state-gated indicator guide. These are exactly

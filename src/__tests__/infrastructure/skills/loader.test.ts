@@ -15,17 +15,19 @@ import {
 } from '@/infrastructure/skills/loader';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import type { SkillCounts } from '@/domain/types';
+import {
+    withDigest as withDigestFixture,
+    ORIGINAL_BODY_SENTINEL,
+} from '@/__tests__/infrastructure/skills/digestFixture';
 
 const mockReaddir = readdir as Mock;
 const mockReadFile = readFile as Mock;
 
-// Sentinel placed only in the original (pre-digest) body, so tests can assert
-// `skill.content` is the digest ONLY and does not leak the full body text.
-const ORIGINAL_BODY_SENTINEL = 'ORIGINAL_BODY_SENTINEL_NOT_IN_DIGEST';
-
-/** Append a well-formed `PROMPT_DIGEST` section to a fixture body. */
-const withDigest = (body: string, digestText = 'Digest text.') =>
-    `${body}\n${ORIGINAL_BODY_SENTINEL}\n<!-- PROMPT_DIGEST:START -->\n${digestText}\n<!-- PROMPT_DIGEST:END -->`;
+// This suite's fixtures embed ORIGINAL_BODY_SENTINEL in every body (unlike
+// the shared helper's default), so tests can assert `skill.content` is the
+// digest ONLY and does not leak the full pre-digest body text.
+const withDigest = (body: string, digestText?: string) =>
+    withDigestFixture(`${body}\n${ORIGINAL_BODY_SENTINEL}`, digestText);
 
 const validFrontmatter = `---
 name: Test Skill

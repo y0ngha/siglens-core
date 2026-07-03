@@ -183,6 +183,12 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * moves automatically on any skill-frontmatter edit. Stage skill edits with that
  * fleet-wide cold-cache cost in mind.
  *
+ * @remarks
+ * **`p2` = PROMPT_DIGEST activation.** This version was bumped when
+ * `skill.content` switched from the full skill body to the condensed
+ * `PROMPT_DIGEST` section, since that changes the prompt bytes sent to the
+ * LLM and therefore must invalidate previously cached results.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p2' as const;
@@ -283,6 +289,13 @@ export function buildMacroBriefingCacheKey(
  * Bump this string whenever the economic-event prompt template changes in a way
  * that would make previously cached results stale. Old keys (e.g. `p1`) are
  * simply never looked up after a bump and naturally expire via TTL.
+ *
+ * @remarks
+ * **Deliberately NOT bumped for the `p2` PROMPT_DIGEST activation** (see
+ * {@link PROMPT_TEMPLATE_VERSION}'s remark). This prompt builder interpolates
+ * no `skill.content` into its prompt, so switching skills over to the digest
+ * body does not change this template's prompt bytes — bumping it would be
+ * no-op cache churn.
  *
  * @internal
  */
@@ -419,6 +432,11 @@ export function buildFundamentalCacheKey(
  * Bump this string whenever the financials system prompt or user prompt template changes
  * in a way that would make previously cached results stale.
  *
+ * @remarks
+ * **`p2` = PROMPT_DIGEST activation** (see {@link PROMPT_TEMPLATE_VERSION}'s
+ * remark) — `skill.content` switched from the full skill body to the
+ * condensed `PROMPT_DIGEST` section, changing this template's prompt bytes.
+ *
  * @internal
  */
 export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
@@ -474,6 +492,11 @@ export function buildFinancialsCacheKey(
  * congress analysis type so its prompt-template changes invalidate
  * independently. Bump whenever the congress system/user prompt template changes
  * in a way that would make previously cached results stale.
+ *
+ * @remarks
+ * **`p2` = PROMPT_DIGEST activation** (see {@link PROMPT_TEMPLATE_VERSION}'s
+ * remark) — `skill.content` switched from the full skill body to the
+ * condensed `PROMPT_DIGEST` section, changing this template's prompt bytes.
  *
  * @internal
  */
@@ -602,6 +625,13 @@ export function buildOverallCacheKey(
  * Bump this string whenever the indicator-translation prompt template changes
  * in a way that would make previously cached results stale. Old keys (e.g.
  * `p1`) are simply never looked up after a bump and naturally expire via TTL.
+ *
+ * @remarks
+ * **Deliberately NOT bumped for the `p2` PROMPT_DIGEST activation** (see
+ * {@link PROMPT_TEMPLATE_VERSION}'s remark). This prompt builder interpolates
+ * no `skill.content` into its prompt, so switching skills over to the digest
+ * body does not change this template's prompt bytes — bumping it would be
+ * no-op cache churn.
  *
  * @internal
  */
