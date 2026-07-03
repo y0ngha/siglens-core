@@ -58,7 +58,13 @@ describe('hashSkillCatalog', () => {
         );
     });
 
-    it('differs when tokenCost changes', () => {
+    it('differs when tokenCost changes — the digest auto-invalidation contract', () => {
+        // This is the mechanism that makes editing a skill's PROMPT_DIGEST
+        // self-invalidating: the loader hard-fails if a digest is missing, and
+        // the frontmatter's measured `token_cost` moves whenever the digest
+        // text is edited, so a digest change always changes `tokenCost` here
+        // and therefore always produces a new fingerprint — no separate cache
+        // bump is needed when only digest wording changes.
         const bumped = CATALOG_A.map(s =>
             s.name === 'RSI Guide' ? { ...s, tokenCost: 999 } : s
         );

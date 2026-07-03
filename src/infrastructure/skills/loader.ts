@@ -330,7 +330,57 @@ const parseUsageRoles = (raw: unknown): SkillUsageRole[] | undefined => {
     return USAGE_ROLE_ORDER.filter(r => seen.has(r));
 };
 
-const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
+/** Exact marker comments wrapping a skill file's compressed prompt-facing digest. */
+const PROMPT_DIGEST_START = '<!-- PROMPT_DIGEST:START -->';
+const PROMPT_DIGEST_END = '<!-- PROMPT_DIGEST:END -->';
+
+/**
+ * Extract the trimmed PROMPT_DIGEST section from a skill's markdown body.
+ *
+ * Every skill file's body must carry a compressed prompt-facing digest,
+ * appended after the human-facing authoring content and wrapped in
+ * `<!-- PROMPT_DIGEST:START -->` / `<!-- PROMPT_DIGEST:END -->` marker
+ * comments. The loader injects ONLY this digest as `skill.content` — the
+ * surrounding body is authoring-only reference material and never reaches
+ * the LLM prompt.
+ *
+ * Unlike the rest of this loader (which fails open on malformed frontmatter,
+ * dropping only the offending field), a missing/malformed digest is a hard
+ * failure: a skill silently falling back to its full, uncompressed body would
+ * blow the prompt token budget the digest program committed to, so this must
+ * surface loudly (throw) rather than degrade silently.
+ *
+ * @throws {Error} mentioning `PROMPT_DIGEST` when the start marker is missing
+ *   or appears more than once, the end marker is missing, or the digest text
+ *   between the markers is empty (whitespace-only).
+ */
+const extractPromptDigest = (body: string): string => {
+    const startIdx = body.indexOf(PROMPT_DIGEST_START);
+    if (startIdx === -1) {
+        throw new Error(
+            `PROMPT_DIGEST start marker not found (expected "${PROMPT_DIGEST_START}")`
+        );
+    }
+    if (body.indexOf(PROMPT_DIGEST_START, startIdx + 1) !== -1) {
+        throw new Error(
+            `PROMPT_DIGEST start marker appears more than once (expected exactly one "${PROMPT_DIGEST_START}")`
+        );
+    }
+    const digestTextStart = startIdx + PROMPT_DIGEST_START.length;
+    const endIdx = body.indexOf(PROMPT_DIGEST_END, digestTextStart);
+    if (endIdx === -1) {
+        throw new Error(
+            `PROMPT_DIGEST end marker not found (expected "${PROMPT_DIGEST_END}")`
+        );
+    }
+    const digest = body.slice(digestTextStart, endIdx).trim();
+    if (digest === '') {
+        throw new Error('PROMPT_DIGEST section is empty');
+    }
+    return digest;
+};
+
+const toSkill = (data: Record<string, unknown>, body: string): Skill => ({
     name: String(data.name ?? ''),
     description: String(data.description ?? ''),
     type: isSkillType(data.type) ? data.type : undefined,
@@ -341,7 +391,7 @@ const toSkill = (data: Record<string, unknown>, content: string): Skill => ({
         : [],
     confidenceWeight:
         typeof data.confidence_weight === 'number' ? data.confidence_weight : 0,
-    content,
+    content: extractPromptDigest(body),
     display: parseSkillDisplay(data.display),
     gating: parseGating(data.gating),
     // Frontmatter is snake_case by repo convention (matching `confidence_weight`);
@@ -503,6 +553,13 @@ export async function countSkillFiles(): Promise<SkillCounts> {
  * downstream callers should treat the loader as best-effort and degrade
  * gracefully when a single skill file is malformed.
  *
+ * A file whose body is missing a well-formed `PROMPT_DIGEST` section is the
+ * one exception: {@link extractPromptDigest} throws, and `loadSkills()`
+ * rejects the whole load rather than silently injecting the full body or
+ * dropping the file — a missing digest means the token-budget contract for
+ * that skill is broken, so it must surface loudly. `loadSkillsCached` is the
+ * layer that turns that rejection into a graceful `skillsDegraded: true`.
+ *
  * @example
  * ```ts
  * const loader = new FileSkillsLoader();
@@ -526,7 +583,18 @@ export class FileSkillsLoader implements SkillsProvider {
                 const raw = await readFile(file, 'utf-8');
                 const parsed = parseFrontmatter(raw);
                 if (!parsed) return null;
-                return toSkill(parsed.data, parsed.content);
+                try {
+                    return toSkill(parsed.data, parsed.content);
+                } catch (error) {
+                    // extractPromptDigest hard-fails on a missing/malformed
+                    // PROMPT_DIGEST section; re-throw with the file path so
+                    // the offending skill file is identifiable in logs.
+                    const reason =
+                        error instanceof Error ? error.message : String(error);
+                    throw new Error(
+                        `Failed to load skill file "${file}": ${reason}`
+                    );
+                }
             })
         );
 

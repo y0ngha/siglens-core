@@ -19,6 +19,14 @@ import type { SkillCounts } from '@/domain/types';
 const mockReaddir = readdir as Mock;
 const mockReadFile = readFile as Mock;
 
+// Sentinel placed only in the original (pre-digest) body, so tests can assert
+// `skill.content` is the digest ONLY and does not leak the full body text.
+const ORIGINAL_BODY_SENTINEL = 'ORIGINAL_BODY_SENTINEL_NOT_IN_DIGEST';
+
+/** Append a well-formed `PROMPT_DIGEST` section to a fixture body. */
+const withDigest = (body: string, digestText = 'Digest text.') =>
+    `${body}\n${ORIGINAL_BODY_SENTINEL}\n<!-- PROMPT_DIGEST:START -->\n${digestText}\n<!-- PROMPT_DIGEST:END -->`;
+
 const validFrontmatter = `---
 name: Test Skill
 description: Test description
@@ -27,7 +35,7 @@ category: reversal_bullish
 indicators: [RSI, MACD]
 confidence_weight: 0.8
 ---
-Content here`;
+${withDigest('Content here', 'Test skill digest.')}`;
 
 const makeDirent = (name: string, isDir = false): Dirent =>
     ({
@@ -137,7 +145,7 @@ category: fundamental
 indicators: []
 confidence_weight: 0.8
 ---
-Focus on intrinsic value and margin of safety.`;
+${withDigest('Focus on intrinsic value and margin of safety.')}`;
 
             mockReaddir.mockResolvedValue([makeDirent('value-investing.md')]);
             mockReadFile.mockResolvedValue(fundamentalFrontmatter);
@@ -162,7 +170,7 @@ category: news
 indicators: []
 confidence_weight: 0.7
 ---
-Analyze market-moving news events and their impact on price.`;
+${withDigest('Analyze market-moving news events and their impact on price.')}`;
 
             mockReaddir.mockResolvedValue([makeDirent('event-driven.md')]);
             mockReadFile.mockResolvedValue(newsFrontmatter);
@@ -185,7 +193,7 @@ category: fundamental
 indicators: []
 confidence_weight: 0.9
 ---
-Focus on high-quality businesses with durable competitive advantages.`;
+${withDigest('Focus on high-quality businesses with durable competitive advantages.')}`;
 
             const technicalFrontmatter = `---
 name: Reversal Pattern
@@ -195,7 +203,7 @@ category: reversal_bullish
 indicators: [RSI]
 confidence_weight: 0.8
 ---
-Identifies bullish reversal setups.`;
+${withDigest('Identifies bullish reversal setups.')}`;
 
             mockReaddir.mockResolvedValue([
                 makeDirent('quality-investing.md'),
@@ -495,7 +503,7 @@ display:
     color: "#FF0000"
     label: 'RSI Line'
 ---
-Body content`;
+${withDigest('Body content')}`;
         mockReaddir.mockResolvedValue([makeDirent('display.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -525,7 +533,7 @@ display:
     show: true
     type: bogus
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('bad-type.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -542,7 +550,7 @@ description: d
 display:
   chart: just-a-string
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('chart-str.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -560,7 +568,7 @@ display:
     show: maybe
     type: line
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('bad-show.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -575,7 +583,7 @@ name: Display String
 description: d
 display: just-text
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('display-str.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -592,7 +600,7 @@ category: invalid_category
 indicators: not-an-array
 confidence_weight: high
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('minimal.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -614,7 +622,7 @@ description: d
 indicators: [ ]
 confidence_weight: 0.5
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('spaced.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -638,7 +646,7 @@ gating:
  tier: gated
 description: parsed after the dedent
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('mid-dedent.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -662,7 +670,7 @@ Body`;
 name: Edge YAML
 description: d
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('edge-yaml.md')]);
         mockReadFile.mockResolvedValue(fm);
 
@@ -691,7 +699,7 @@ indicators: [RSI]
 confidence_weight: 0.7
 ${usageRolesLine}
 ---
-Body content`;
+${withDigest('Body content')}`;
 
     it('valid [confirmation, signal] → usageRoles deep-equals [signal, confirmation] (canonical order)', async () => {
         const fm = indicatorGuideFm('usage_roles: [confirmation, signal]');
@@ -765,12 +773,131 @@ category: neutral
 indicators: [RSI]
 confidence_weight: 0.7
 ---
-Body content`;
+${withDigest('Body content')}`;
         mockReaddir.mockResolvedValue([makeDirent('usage-absent.md')]);
         mockReadFile.mockResolvedValue(fm);
 
         const skills = await new FileSkillsLoader().loadSkills();
 
         expect(skills[0].usageRoles).toBeUndefined();
+    });
+});
+
+// ─────────────────────────────────────────
+// PROMPT_DIGEST extraction — hard-fail on missing/malformed digest
+// ─────────────────────────────────────────
+
+describe('FileSkillsLoader — PROMPT_DIGEST extraction', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const digestSkillFm = (body: string) => `---
+name: Digest Skill
+description: Has a digest section
+type: indicator_guide
+category: neutral
+indicators: [RSI]
+confidence_weight: 0.7
+---
+${body}`;
+
+    it('injects ONLY the digest text as skill.content, not the full authoring body', async () => {
+        const fm = digestSkillFm(
+            withDigest('Full authoring body.', 'Compressed digest only.')
+        );
+        mockReaddir.mockResolvedValue([makeDirent('digest.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].content).toBe('Compressed digest only.');
+        expect(skills[0].content).not.toContain(ORIGINAL_BODY_SENTINEL);
+        expect(skills[0].content).not.toContain('Full authoring body.');
+    });
+
+    it('missing PROMPT_DIGEST section entirely → loadSkills rejects mentioning PROMPT_DIGEST', async () => {
+        const fm = digestSkillFm(
+            'Full authoring body with no digest section at all.'
+        );
+        mockReaddir.mockResolvedValue([makeDirent('no-digest.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        await expect(new FileSkillsLoader().loadSkills()).rejects.toThrow(
+            /PROMPT_DIGEST/
+        );
+    });
+
+    it('missing END marker → loadSkills rejects mentioning PROMPT_DIGEST', async () => {
+        const fm = digestSkillFm(
+            'Full authoring body.\n<!-- PROMPT_DIGEST:START -->\nDigest text with no end marker.'
+        );
+        mockReaddir.mockResolvedValue([makeDirent('no-end.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        await expect(new FileSkillsLoader().loadSkills()).rejects.toThrow(
+            /PROMPT_DIGEST/
+        );
+    });
+
+    it('duplicate START markers → loadSkills rejects mentioning PROMPT_DIGEST', async () => {
+        const fm = digestSkillFm(
+            [
+                'Full authoring body.',
+                '<!-- PROMPT_DIGEST:START -->',
+                'First digest attempt.',
+                '<!-- PROMPT_DIGEST:START -->',
+                'Second digest attempt.',
+                '<!-- PROMPT_DIGEST:END -->',
+            ].join('\n')
+        );
+        mockReaddir.mockResolvedValue([makeDirent('dup-start.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        await expect(new FileSkillsLoader().loadSkills()).rejects.toThrow(
+            /PROMPT_DIGEST/
+        );
+    });
+
+    it('empty digest (whitespace-only between markers) → loadSkills rejects mentioning PROMPT_DIGEST', async () => {
+        const fm = digestSkillFm(
+            'Full authoring body.\n<!-- PROMPT_DIGEST:START -->\n   \n<!-- PROMPT_DIGEST:END -->'
+        );
+        mockReaddir.mockResolvedValue([makeDirent('empty-digest.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        await expect(new FileSkillsLoader().loadSkills()).rejects.toThrow(
+            /PROMPT_DIGEST/
+        );
+    });
+
+    it('the rejection message identifies the offending file path', async () => {
+        const fm = digestSkillFm('No digest markers here.');
+        mockReaddir.mockResolvedValue([makeDirent('path-in-error.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        await expect(new FileSkillsLoader().loadSkills()).rejects.toThrow(
+            /path-in-error\.md/
+        );
+    });
+
+    it('token_cost frontmatter flows into skill.tokenCost alongside a valid digest', async () => {
+        const fm = `---
+name: Token Cost Skill
+description: Has a measured digest token cost
+type: indicator_guide
+category: neutral
+indicators: [RSI]
+confidence_weight: 0.7
+token_cost: 42
+---
+${withDigest('Full authoring body.', 'Compressed digest.')}`;
+        mockReaddir.mockResolvedValue([makeDirent('token-cost.md')]);
+        mockReadFile.mockResolvedValue(fm);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills[0].tokenCost).toBe(42);
+        expect(skills[0].content).toBe('Compressed digest.');
     });
 });

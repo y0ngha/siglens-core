@@ -23,6 +23,10 @@ const makeDirent = (name: string, isDir = false): Dirent =>
         isFile: () => !isDir,
     }) as unknown as Dirent;
 
+/** Append a well-formed `PROMPT_DIGEST` section to a fixture body. */
+const withDigest = (body: string, digestText = 'Digest text.') =>
+    `${body}\n<!-- PROMPT_DIGEST:START -->\n${digestText}\n<!-- PROMPT_DIGEST:END -->`;
+
 // A realistic mixed catalog: an always_on pattern, an event-gated indicator
 // guide (with token_cost), and a state-gated indicator guide. These are exactly
 // the fields hashSkillCatalog projects (name / gating / tokenCost).
@@ -36,7 +40,7 @@ confidence_weight: 0.9
 gating:
   tier: always_on
 ---
-Pattern body`;
+${withDigest('Pattern body')}`;
 
 const EVENT_GATED = `---
 name: RSI Guide
@@ -51,7 +55,7 @@ gating:
   triggers: [rsi_oversold, rsi_overbought]
 token_cost: 850
 ---
-RSI body`;
+${withDigest('RSI body')}`;
 
 const STATE_GATED = `---
 name: Bollinger Guide
@@ -70,7 +74,7 @@ gating:
     lo: 0.02
 token_cost: 600
 ---
-Bollinger body`;
+${withDigest('Bollinger body')}`;
 
 /**
  * C1 — determinism guard for the SHARED skill-catalog fingerprint.

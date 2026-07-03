@@ -17,6 +17,10 @@ const makeDirent = (name: string, isDir = false): Dirent =>
         isFile: () => !isDir,
     }) as unknown as Dirent;
 
+/** Append a well-formed `PROMPT_DIGEST` section to a fixture body. */
+const withDigest = (body: string, digestText = 'Digest text.') =>
+    `${body}\n<!-- PROMPT_DIGEST:START -->\n${digestText}\n<!-- PROMPT_DIGEST:END -->`;
+
 const eventGatedFrontmatter = `---
 name: RSI Guide
 description: RSI interpretation
@@ -30,7 +34,7 @@ gating:
   triggers: [rsi_oversold, rsi_overbought]
 token_cost: 850
 ---
-RSI body content`;
+${withDigest('RSI body content')}`;
 
 const stateGatedFrontmatter = `---
 name: Bollinger Guide
@@ -48,7 +52,7 @@ gating:
     hi: 0.98
     lo: 0.02
 ---
-Bollinger body content`;
+${withDigest('Bollinger body content')}`;
 
 const alwaysOnFrontmatter = `---
 name: Head and Shoulders
@@ -60,7 +64,7 @@ confidence_weight: 0.9
 gating:
   tier: always_on
 ---
-Pattern body content`;
+${withDigest('Pattern body content')}`;
 
 const untaggedFrontmatter = `---
 name: Legacy Skill
@@ -70,7 +74,7 @@ category: neutral
 indicators: []
 confidence_weight: 0.7
 ---
-Legacy body`;
+${withDigest('Legacy body')}`;
 
 describe('FileSkillsLoader gating frontmatter', () => {
     beforeEach(() => {
@@ -144,7 +148,7 @@ smc_full_guide: true
 gating:
   tier: always_on
 ---
-SMC body content`;
+${withDigest('SMC body content')}`;
         mockReaddir.mockResolvedValue([makeDirent('smc.md')]);
         mockReadFile.mockResolvedValue(smcGuide);
 
@@ -164,7 +168,7 @@ confidence_weight: 0.7
 gating:
   tier: sometimes
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('bad.md')]);
         mockReadFile.mockResolvedValue(invalidTier);
 
@@ -186,7 +190,7 @@ gating:
   tier: gated
   signal_kind: event
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('unreachable.md')]);
         mockReadFile.mockResolvedValue(gatedNoPath);
 
@@ -211,7 +215,7 @@ gating:
   signal_kind: momentum
   triggers: [rsi_oversold]
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('bad-signal-kind.md')]);
         mockReadFile.mockResolvedValue(badSignalKind);
 
@@ -239,7 +243,7 @@ gating:
     predicate: pctB
     hi: 0.98
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('bad-feature.md')]);
         mockReadFile.mockResolvedValue(badFeature);
 
@@ -266,7 +270,7 @@ gating:
     predicate: slope
     hi: 0.98
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('bad-predicate.md')]);
         mockReadFile.mockResolvedValue(badPredicate);
 
@@ -293,7 +297,7 @@ gating:
     feature: vwap
     predicate: level
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('no-bounds.md')]);
         mockReadFile.mockResolvedValue(noBounds);
 
@@ -324,7 +328,7 @@ indicators: []
 confidence_weight: 0.7
 token_cost: lots
 ---
-Body`;
+${withDigest('Body')}`;
         mockReaddir.mockResolvedValue([makeDirent('badtoken.md')]);
         mockReadFile.mockResolvedValue(badToken);
 
@@ -342,7 +346,7 @@ category: neutral
 indicators: []
 confidence_weight: 0.9
 ---
-First body`;
+${withDigest('First body')}`;
         const secondLoses = `---
 name: Duplicate
 description: second occurrence
@@ -351,7 +355,7 @@ category: neutral
 indicators: []
 confidence_weight: 0.1
 ---
-Second body`;
+${withDigest('Second body')}`;
         mockReaddir.mockResolvedValue([makeDirent('a.md'), makeDirent('b.md')]);
         mockReadFile
             .mockResolvedValueOnce(firstWins)
