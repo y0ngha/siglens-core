@@ -1,5 +1,4 @@
-import type { Bar } from '@/domain/types';
-import type { PivotPoint } from '@/domain/patterns/types';
+import type { Bar, PivotPoint } from '@/domain/types';
 import { PIVOT_REVERSAL_ATR_MULT } from '@/domain/patterns/constants';
 
 /**

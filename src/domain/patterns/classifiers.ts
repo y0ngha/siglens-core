@@ -1,10 +1,12 @@
-import type { Bar } from '@/domain/types';
 import type {
+    Bar,
     ChartPatternId,
     PatternCandidate,
     PivotPoint,
-} from '@/domain/patterns/types';
+} from '@/domain/types';
 import {
+    CURVATURE_VERTEX_MID_HI,
+    CURVATURE_VERTEX_MID_LO,
     CUP_HANDLE_MAX_DEPTH_RATIO,
     EXTREME_MATCH_ATR_MULT,
     FLAG_CHANNEL_MAX_RANGE_ATR,
@@ -14,6 +16,7 @@ import {
     FLAT_SLOPE_ATR_PER_BAR,
     HS_HEAD_MIN_ATR,
     HS_SHOULDER_TOLERANCE,
+    ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT,
     TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
 
@@ -315,6 +318,13 @@ function solve3x3(
 
     const withColumn = (col: 0 | 1 | 2): [number, number, number][] =>
         m.map((row, i) => {
+            // Cast exists because spreading a `readonly [number, number, number]`
+            // widens to `number[]` (TS cannot track that a spread of a
+            // fixed-length tuple preserves its length). Safe at runtime: `row`
+            // is always exactly 3 elements (it is one of `m`'s rows, which are
+            // themselves `readonly [number, number, number]`), so `[...row]`
+            // always yields a length-3 array — the annotation just restores
+            // the tuple type TS already guaranteed structurally.
             const replaced = [...row] as [number, number, number];
             replaced[col] = v[i];
             return replaced;
@@ -497,13 +507,6 @@ export const classifyFlagsAndPennants: PatternClassifier = (
 };
 
 // ─── Group 5: curvature (rounding bottom, cup & handle) ───────────────────
-
-/** Quadratic-fit vertex must sit within this fraction range of the [start,end] index span to count as a genuine "bottom", not an edge-hugging arc. */
-const CURVATURE_VERTEX_MID_LO = 0.25;
-const CURVATURE_VERTEX_MID_HI = 0.75;
-
-/** Minimum cup depth (rim - bottom), as an ATR multiple, per the design doc's literal "2*atr" rule. */
-const ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT = 2;
 
 interface RoundingFit {
     startIndex: number;

@@ -117,3 +117,21 @@ export const FLAG_CHANNEL_MAX_RANGE_ATR = 3.0;
  * handle, not a fresh downtrend.
  */
 export const CUP_HANDLE_MAX_DEPTH_RATIO = 0.5;
+
+/**
+ * @internal
+ * Rounding bottom / cup & handle: the fraction-of-span range within which the
+ * quadratic-fit vertex must fall to count as a genuine "bottom" rather than
+ * an edge-hugging arc (a vertex right at the start/end of the window is a
+ * partial curve, not a rounded bottom shape).
+ */
+export const CURVATURE_VERTEX_MID_LO = 0.25;
+export const CURVATURE_VERTEX_MID_HI = 0.75;
+
+/**
+ * @internal
+ * Rounding bottom: minimum cup depth (rim - bottom), as an ATR multiple, per
+ * the design doc's literal "2*atr" rule — shallower curves are treated as
+ * noise rather than a meaningful rounding-bottom formation.
+ */
+export const ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT = 2;

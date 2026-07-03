@@ -5,4 +5,4 @@ export type {
     ChartPatternId,
     PatternCandidate,
     PivotPoint,
-} from '@/domain/patterns/types';
+} from '@/domain/types';

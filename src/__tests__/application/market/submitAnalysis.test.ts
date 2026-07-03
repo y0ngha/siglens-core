@@ -24,6 +24,16 @@ vi.mock('@/domain/analysis/prompt', () => ({
 vi.mock('@/domain/indicators/fearGreed', () => ({
     computeFearGreedIndex: vi.fn(),
 }));
+// Real implementation by default (fixture bars are too sparse to match any
+// classifier anyway); individual tests override `screenChartPatterns` with
+// `mockImplementationOnce` to exercise the observe-only failure path.
+vi.mock('@/domain/patterns', async importOriginal => {
+    const actual = await importOriginal<typeof import('@/domain/patterns')>();
+    return {
+        ...actual,
+        screenChartPatterns: vi.fn(actual.screenChartPatterns),
+    };
+});
 
 import { submitAnalysis } from '@/application/market/submitAnalysis';
 import {
@@ -44,6 +54,7 @@ import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import { screenChartPatterns } from '@/domain/patterns';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 /** Fingerprint of the empty skill catalog the loader stub returns by default. */
@@ -56,6 +67,7 @@ const mockSetJobMeta = setJobMeta as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
 const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
+const mockScreenChartPatterns = screenChartPatterns as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -1430,6 +1442,64 @@ describe('submitAnalysis 함수는', () => {
             expect(consoleInfoSpy).toHaveBeenCalledWith(
                 '[PatternScreen]',
                 expect.any(String)
+            );
+            consoleInfoSpy.mockRestore();
+        });
+
+        it('스크리너가 throw해도 제출은 성공하고 실패를 로깅한다', async () => {
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            // atr must be defined for observePatternCandidates to actually
+            // invoke screenChartPatterns (see the atr-undefined test below).
+            mockFetchBarsWithIndicators.mockResolvedValueOnce({
+                ...mockBarsData,
+                indicators: { ...mockBarsData.indicators, atr: [null, 2.5, 3] },
+            });
+            mockScreenChartPatterns.mockImplementationOnce(() => {
+                throw new Error('classifier exploded');
+            });
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                '[PatternScreen] failed:',
+                expect.any(Error)
+            );
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('ATR이 없으면 스크리너를 호출하지 않고 candidates: [] 를 로깅한다', async () => {
+            const consoleInfoSpy = vi
+                .spyOn(console, 'info')
+                .mockImplementation(() => undefined);
+            mockFetchBarsWithIndicators.mockResolvedValueOnce({
+                ...mockBarsData,
+                indicators: { ...mockBarsData.indicators, atr: [null, null] },
+            });
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockScreenChartPatterns).not.toHaveBeenCalled();
+            expect(consoleInfoSpy).toHaveBeenCalledWith(
+                '[PatternScreen]',
+                expect.stringContaining('"candidates":[]')
             );
             consoleInfoSpy.mockRestore();
         });

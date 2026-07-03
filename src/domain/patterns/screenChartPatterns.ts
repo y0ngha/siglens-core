@@ -1,5 +1,4 @@
-import type { Bar } from '@/domain/types';
-import type { PatternCandidate } from '@/domain/patterns/types';
+import type { Bar, PatternCandidate } from '@/domain/types';
 import { extractPivots } from '@/domain/patterns/pivots';
 import { CLASSIFIERS } from '@/domain/patterns/classifiers';
 import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
@@ -55,6 +54,11 @@ export function screenChartPatterns(
 
     const byId = new Map<string, PatternCandidate>();
     for (const candidate of raw) {
+        // Defensive: no current classifier pair emits the same pattern id, so
+        // this first-wins branch is not exercised today. Kept because
+        // `CLASSIFIERS` is expected to grow (Phase 3), and a future pair
+        // overlapping on the same id should degrade to "keep the first hit"
+        // rather than silently overwrite it.
         if (byId.has(candidate.id)) continue;
         byId.set(candidate.id, {
             id: candidate.id,
