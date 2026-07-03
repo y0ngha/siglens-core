@@ -106,19 +106,6 @@
 - Rule: Public API Smoke Tests — when wiring new public symbols through entrypoints, add basic assertions in corresponding .test.ts and .client.test.ts files to verify exports are present and callable
 - Context: Round 2 recommended findings — scoreToLabel, FEAR_GREED_LABEL_CUTOFFS, POC_WINDOW_DEFAULT were added to entrypoints but had no entrypoint smoke tests. Added 3 assertions to index.test.ts (scoreToLabel callability, CUTOFFS presence/type) and 3 to index.client.test.ts verifying all three symbols export correctly.
 
-## [Test Coverage Hardening Pass | main | 2026-05-29] — Round 1→2 approved
-- Violation: Vacuous/conditional test assertion in extractJsonWithRepair.test.ts wrapped key assertion inside if-guard
-- Rule: Test assertions must be deterministic and unconditional — assertions wrapped in if-guards silently skip when input does not match the guard condition, masking incomplete test coverage
-- Context: Round 1 required finding — test wrapped `expect(msg).toContain('near:')` in `if (/position\s+\d+/.test(msg))`, so inputs lacking position token silently skipped the assertion. Fixed by making the test deterministic: added separate case for no-position input asserting `near:` is absent, and position-bearing path is asserted by dedicated deterministic case.
-
-- Violation: JSDoc referenced call-site context instead of timeless role description
-- Rule: FF Readability — JSDoc must describe a function's stable role and contract, not its call-site context; "Exported for unit testing of X logic" becomes stale when call-sites change
-- Context: Round 1 recommended findings — two newly-exported `@internal` helpers had JSDoc reading "Exported for unit testing of the ... logic". Fixed by removing call-site reference and keeping role description only.
-
-- Violation: Untested branch after edge input — OBV NaN-input test stopped at the NaN bar and did not assert recovery on following finite-close bar
-- Rule: Edge-case test coverage — when testing edge input (NaN, null, empty), fixture must assert normal accumulation resumes after the edge case passes
-- Context: Round 1 recommended findings — OBV accumulator logic must recover after a NaN bar. Extended test fixture to assert normal accumulation continues on the next finite-close bar.
-
 ## [PR #106 | test/improve-coverage-hardening | 2026-05-29] — review comment fixes
 - Violation: Coverage threshold lowered in vitest.config.ts without updating the docs that mandate the target
 - Rule: Documentation Sync — when changing an enforced threshold/policy in config, every doc stating that policy must be updated in the same change, or config and docs silently diverge

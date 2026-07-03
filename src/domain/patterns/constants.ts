@@ -135,3 +135,16 @@ export const CURVATURE_VERTEX_MID_HI = 0.75;
  * noise rather than a meaningful rounding-bottom formation.
  */
 export const ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT = 2;
+
+// ─── Linear-algebra helpers ─────────────────────────────────────────────────
+
+/**
+ * @internal
+ * `solve3x3`: determinant magnitude below which a 3x3 system is treated as
+ * singular rather than exactly zero. A near-singular matrix implies an
+ * unreliable/unstable fit (huge, noise-amplified coefficients), and rejecting
+ * it here is recall-safe — a garbage fit would just get rejected by the
+ * downstream shape checks anyway, so being slightly more conservative costs
+ * nothing.
+ */
+export const SINGULAR_MATRIX_DET_EPSILON = 1e-9;

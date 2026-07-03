@@ -17,6 +17,7 @@ import {
     HS_HEAD_MIN_ATR,
     HS_SHOULDER_TOLERANCE,
     ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT,
+    SINGULAR_MATRIX_DET_EPSILON,
     TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
 
@@ -98,7 +99,7 @@ function classifyHighLowSlopes(
  * interpretation wins — so classifiers return `[]` only when the geometry
  * genuinely does not fit, never as a tie-breaker.
  *
- * Callers (the Task-1.4 facade) are expected to pass pivots extracted with
+ * Callers (the screening facade) are expected to pass pivots extracted with
  * `includeProvisional: true` so classifiers can see the still-forming
  * extreme at the right edge of the chart — patterns must be recognizable in
  * what is on the chart *now*, not merely somewhere in history.
@@ -309,12 +310,8 @@ function solve3x3(
         rows[0][2] * (rows[1][0] * rows[2][1] - rows[1][1] * rows[2][0]);
 
     const determinant = det3(m);
-    // Epsilon rather than exact-zero: a near-singular matrix implies an
-    // unreliable/unstable fit (huge, noise-amplified coefficients), and
-    // rejecting it here is recall-safe — a garbage fit would just get
-    // rejected by the downstream shape checks anyway, so being slightly
-    // more conservative costs nothing.
-    if (Math.abs(determinant) < 1e-9) return null;
+    // Epsilon rather than exact-zero — see SINGULAR_MATRIX_DET_EPSILON JSDoc.
+    if (Math.abs(determinant) < SINGULAR_MATRIX_DET_EPSILON) return null;
 
     const withColumn = (col: 0 | 1 | 2): [number, number, number][] =>
         m.map((row, i) => {
@@ -533,6 +530,9 @@ function fitRoundingBottom(
     const startIndex = points[0].index;
     const endIndex = points[points.length - 1].index;
     const span = endIndex - startIndex;
+    // Defensive: pivots are strictly ascending by index and `points.length >= 4`
+    // is already guarded above, so `span` is always > 0 in practice. Kept as
+    // an explicit guard rather than an assumption baked into the division below.
     if (span <= 0) return null;
 
     const vertexX = -fit.b / (2 * fit.a);
@@ -610,7 +610,7 @@ export const classifyCurvaturePatterns: PatternClassifier = (
 
 /**
  * @internal
- * All pattern classifiers, one entry per detection group. The Task-1.4
+ * All pattern classifiers, one entry per detection group. The screening
  * facade runs pivots (extracted with `includeProvisional: true`) through
  * every classifier here and flattens the results.
  */

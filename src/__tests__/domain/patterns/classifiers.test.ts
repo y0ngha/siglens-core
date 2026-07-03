@@ -149,6 +149,61 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
             { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
     });
+
+    it('head_and_shoulders: atr가 0 이하이면 감지하지 않는다', () => {
+        const bars = makeBars([10, 15, 10, 20, 10, 15, 10]);
+        const pivots = extractPivots(bars, ATR);
+        expect(classifyHeadAndShoulders(pivots, bars, 0)).toEqual([]);
+        expect(classifyHeadAndShoulders(pivots, bars, -1)).toEqual([]);
+    });
+
+    it('inverse_head_and_shoulders: atr가 0 이하이면 감지하지 않는다', () => {
+        const bars = makeBars([20, 15, 20, 10, 20, 15, 20]);
+        const pivots = extractPivots(bars, ATR);
+        expect(classifyInverseHeadAndShoulders(pivots, bars, 0)).toEqual([]);
+        expect(classifyInverseHeadAndShoulders(pivots, bars, -1)).toEqual([]);
+    });
+
+    it('head_and_shoulders: 오른쪽 어깨 이후 피벗이 하나 더 생겨도 (-6,-1) 윈도우로 재시도해 감지한다', () => {
+        // 6 pivots: [LS=15, m1=10, head=20, m2=10, RS=15, extra=10]. The last-5
+        // window ([m1..extra] = low/high/low/high/low) does not start with a
+        // peak, so it fails; the classifier falls back to pivots.slice(-6,-1)
+        // (the original [LS..RS]), which is a valid head & shoulders.
+        const bars = makeAlternatingPivotBars(10, [15, 10, 20, 10, 15, 10], 15);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots).toHaveLength(6);
+
+        const lastFive = pivots.slice(-5);
+        expect(classifyHeadAndShoulders(lastFive, bars, ATR)).toEqual([]);
+
+        const candidates = classifyHeadAndShoulders(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
+        ]);
+    });
+
+    it('inverse_head_and_shoulders: 오른쪽 어깨 이후 피벗이 하나 더 생겨도 (-6,-1) 윈도우로 재시도해 감지한다', () => {
+        // 6 pivots: [LS=10, m1=15, head=5, m2=15, RS=10, extra=15]. The last-5
+        // window ([m1..extra] = high/low/high/low/high) does not start with a
+        // peak (low), so it fails; the classifier falls back to
+        // pivots.slice(-6,-1) (the original [LS..RS]), which is a valid
+        // inverse head & shoulders.
+        const bars = makeAlternatingPivotBars(15, [10, 15, 5, 15, 10, 15], 10);
+        const pivots = extractPivots(bars, ATR);
+        expect(pivots).toHaveLength(6);
+
+        const lastFive = pivots.slice(-5);
+        expect(classifyInverseHeadAndShoulders(lastFive, bars, ATR)).toEqual(
+            []
+        );
+
+        const candidates = classifyInverseHeadAndShoulders(pivots, bars, ATR);
+
+        expect(candidates).toEqual([
+            { id: 'inverse_head_and_shoulders', startIndex: 1, endIndex: 5 },
+        ]);
+    });
 });
 
 describe('classifyTrendlinePatterns', () => {

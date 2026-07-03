@@ -116,7 +116,7 @@ function resolveSubmitAnalysisArgs(
 }
 
 /**
- * Task 1.5 (observe-only): screen for chart patterns without ever failing the
+ * Observe-only: screen for chart patterns without ever failing the
  * submission path. This is an allowed exception to the "don't swallow
  * errors" rule (application/CLAUDE.md § Error propagation): the result is
  * purely a logging side channel (see call site) that is not yet consumed by
@@ -376,10 +376,10 @@ export async function submitAnalysis(
         modelId: effectiveModelId,
     });
 
-    // Task 1.5 (observe-only): screen for chart patterns and log candidates
-    // for later analysis. Not yet consumed by the prompt/dispatch below —
-    // purely a logging side channel to validate recall before Phase 3 wires
-    // it into AI skill-doc selection. See `observePatternCandidates` above
+    // Observe-only chart-pattern screening: screen for chart patterns and log
+    // candidates for later analysis. Not yet consumed by the prompt/dispatch
+    // below — purely a logging side channel to validate recall before it is
+    // wired into skill selection. See `observePatternCandidates` above
     // for why its internal catch is an allowed exception to error propagation.
     const patternCandidates = observePatternCandidates(bars, atr);
     console.info(

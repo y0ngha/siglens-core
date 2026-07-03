@@ -4,10 +4,9 @@ import { CLASSIFIERS } from '@/domain/patterns/classifiers';
 import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
 
 /**
- * @internal until re-exported from src/index.ts when Phase 3 wires screener into skill selection.
+ * @internal — not yet re-exported from src/index.ts.
  * The chart-pattern pre-screener facade — the single public entry point for
- * Task 1.5 (analysis-submission logging) and, later, Phase 3 (AI skill-doc
- * selection).
+ * analysis-submission observation logging and, later, AI skill-doc selection.
  *
  * Recall-biased by design (see {@link CLASSIFIERS} JSDoc): this is a coarse
  * pre-filter choosing which pattern skill docs are worth injecting into an AI
@@ -56,7 +55,7 @@ export function screenChartPatterns(
     for (const candidate of raw) {
         // Defensive: no current classifier pair emits the same pattern id, so
         // this first-wins branch is not exercised today. Kept because
-        // `CLASSIFIERS` is expected to grow (Phase 3), and a future pair
+        // `CLASSIFIERS` is expected to grow over time, and a future pair
         // overlapping on the same id should degrade to "keep the first hit"
         // rather than silently overwrite it.
         if (byId.has(candidate.id)) continue;
