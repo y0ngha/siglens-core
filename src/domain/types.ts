@@ -830,6 +830,14 @@ export interface SkillSelectionContext {
     /** Candle pattern names detected on the analyzed bars. */
     detectedCandles: readonly string[];
     /**
+     * Chart-pattern IDs surfaced by the pre-screener ({@link screenChartPatterns})
+     * for the analyzed bars — a third event-trigger source alongside `signals`
+     * and `detectedCandles` (see {@link ChartPatternId}). `[]` for chartless
+     * prompts (no bars in scope), when the screener finds nothing, or when ATR
+     * is unavailable/non-positive.
+     */
+    patternCandidates: readonly ChartPatternId[];
+    /**
      * Last close of the analyzed bars. Channel/band/VWAP state predicates need
      * the spot price, which `IndicatorResult` does not carry on its own.
      */

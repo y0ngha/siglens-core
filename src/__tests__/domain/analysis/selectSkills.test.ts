@@ -6,6 +6,7 @@ import {
 import type { PromptSkillContext } from '@/domain/analysis/skillWhitelist';
 import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
 import type {
+    ChartPatternId,
     IndicatorResult,
     Signal,
     SignalType,
@@ -25,6 +26,7 @@ const emptyIndicators = (): IndicatorResult => ({
 interface CtxOverrides {
     signalTypes?: readonly SignalType[];
     detectedCandles?: readonly string[];
+    patternCandidates?: readonly ChartPatternId[];
     timeframe?: Timeframe;
     indicators?: IndicatorResult;
     price?: number;
@@ -43,6 +45,7 @@ const makeCtx = (o: CtxOverrides = {}): SkillSelectionContext => ({
     signals: (o.signalTypes ?? []).map(signalOf),
     timeframe: o.timeframe ?? '1Day',
     detectedCandles: o.detectedCandles ?? [],
+    patternCandidates: o.patternCandidates ?? [],
     price: o.price ?? 100,
     atrPercent: o.atrPercent ?? 1,
 });
@@ -221,6 +224,31 @@ describe('selectSkills — candle-gated', () => {
     });
 });
 
+describe('selectSkills — pattern-candidate-gated', () => {
+    it('selects a pattern guide only when that pattern candidate is present', () => {
+        const doubleTop = eventSkill('double-top-guide', ['double_top'], {
+            type: 'pattern',
+        });
+        expect(
+            selectSkills(
+                [doubleTop],
+                makeCtx({ patternCandidates: ['double_top'] }),
+                'technical'
+            ).selected.length
+        ).toBe(1);
+        expect(
+            selectSkills(
+                [doubleTop],
+                makeCtx({ patternCandidates: ['bull_flag'] }),
+                'technical'
+            ).selected.length
+        ).toBe(0);
+        expect(
+            selectSkills([doubleTop], makeCtx(), 'technical').selected.length
+        ).toBe(0);
+    });
+});
+
 describe('selectSkills — fail-closed gating', () => {
     it('throws on an untagged skill that passes the whitelist', () => {
         expect(() =>
@@ -391,6 +419,20 @@ describe('selectSkills — relevance ordering', () => {
         expect(
             namesOf(selectSkills(skills, ctx, 'technical').selected)
         ).toEqual(['z-multi', 'a-single']);
+    });
+
+    it('counts pattern-candidate matches toward relevance the same as signals/candles', () => {
+        const skills = [
+            eventSkill('pattern-only', ['double_top']),
+            eventSkill('signal-and-pattern', ['rsi_oversold', 'double_top']),
+        ];
+        const ctx = makeCtx({
+            signalTypes: ['rsi_oversold'],
+            patternCandidates: ['double_top'],
+        });
+        expect(
+            namesOf(selectSkills(skills, ctx, 'technical').selected)
+        ).toEqual(['signal-and-pattern', 'pattern-only']);
     });
 
     it('scores a fired state-gated skill as 1 (ties with 1-match event skills, name tie-break)', () => {

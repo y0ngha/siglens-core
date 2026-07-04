@@ -36,6 +36,7 @@ export const NO_CHART_SELECTION_CONTEXT: SkillSelectionContext = Object.freeze({
     signals: [],
     timeframe: '1Day',
     detectedCandles: [],
+    patternCandidates: [],
     price: 0,
     atrPercent: 0,
 });
@@ -44,9 +45,11 @@ export const NO_CHART_SELECTION_CONTEXT: SkillSelectionContext = Object.freeze({
  * Deterministic relevance score of a *gated* skill for the given chart.
  *
  * - gated `event` → the number of currently-detected signals plus detected
- *   candle patterns that match any of the skill's `triggers`. Event triggers
- *   match signal events OR candle patterns — candle guides are gated on their
- *   appearance in the detection list, the candle equivalent of a signal event.
+ *   candle patterns plus pattern-screener candidates that match any of the
+ *   skill's `triggers`. Event triggers match signal events OR candle patterns
+ *   OR chart-pattern-screener candidates — candle guides and pattern skills
+ *   are gated on their appearance in the detection/candidate list, both the
+ *   candle/pattern equivalent of a signal event.
  * - gated `state` → `1` when the textbook `state` predicate is notable, else `0`.
  *
  * A score of `0` means the gate did not fire; a higher score ranks the skill
@@ -69,6 +72,9 @@ const relevanceScore = (
         }
         for (const candle of ctx.detectedCandles) {
             if (triggers.has(candle)) score += 1;
+        }
+        for (const patternId of ctx.patternCandidates) {
+            if (triggers.has(patternId)) score += 1;
         }
         return score;
     }

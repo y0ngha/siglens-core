@@ -78,6 +78,7 @@ const makeCtx = (o: CtxOverrides = {}): SkillSelectionContext => {
         signals: [],
         timeframe: o.timeframe ?? '1Day',
         detectedCandles: [],
+        patternCandidates: [],
         price,
         atrPercent: atrLast !== null && price > 0 ? (atrLast / price) * 100 : 0,
     };
@@ -99,6 +100,7 @@ const ctxWithIndicators = (
     signals: [],
     timeframe: '1Day',
     detectedCandles: [],
+    patternCandidates: [],
     price: 100,
     atrPercent: 1,
 });

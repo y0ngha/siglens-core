@@ -57,11 +57,13 @@ import {
 import { selectSkills } from '@/domain/analysis/selectSkills';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
+import { screenChartPatterns } from '@/domain/patterns';
 import type {
     AssetClass,
     CandlePatternEntry,
     AnalysisResponse,
     Bar,
+    ChartPatternId,
     FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
@@ -1541,6 +1543,29 @@ const collectDetectedCandleNames = (
     return [...new Set<string>(names)];
 };
 
+/**
+ * Chart-pattern IDs surfaced by the pre-screener for this chart, for the
+ * `patternCandidates` selection-context field. Guards `atr` unavailable/
+ * non-positive the same way {@link screenChartPatterns} itself does (`[]`),
+ * and additionally wraps the call defensively: a screener/classifier bug must
+ * degrade to "no candidates" rather than take down prompt building, mirroring
+ * `observePatternCandidates` in `submitAnalysis.ts`. Unlike that
+ * application-layer call, this domain function cannot `console.error` (domain
+ * is zero-I/O per `domain/CLAUDE.md`) — the application-layer observe-only log
+ * already surfaces screener failures, so no telemetry is duplicated here.
+ */
+const collectPatternCandidateIds = (
+    bars: readonly Bar[],
+    atr: number | null
+): ChartPatternId[] => {
+    if (atr === null || atr <= 0) return [];
+    try {
+        return screenChartPatterns(bars, atr).map(candidate => candidate.id);
+    } catch {
+        return [];
+    }
+};
+
 /** Build the pure, read-only selection context from data already in scope. */
 const buildSkillSelectionContext = (
     bars: Bar[],
@@ -1557,6 +1582,7 @@ const buildSkillSelectionContext = (
         signals: detectSignals(bars, indicators),
         timeframe,
         detectedCandles: collectDetectedCandleNames(candleEntries),
+        patternCandidates: collectPatternCandidateIds(bars, atr),
         price,
         atrPercent,
     };
