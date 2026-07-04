@@ -50,7 +50,7 @@ import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { extractJsonWithRepair } from '@/infrastructure/ai/extractJsonWithRepair';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { parseArgs } from './cliArgs';
+import { parseArgs, parsePositiveIntArg } from './cliArgs';
 import type { ModelRunResult } from './runModels';
 
 /**
@@ -1216,12 +1216,7 @@ function buildBatchReport(
 
 /** Parse and validate `--passes` (default 1, must be a positive integer). */
 function parsePassesArg(raw: string | undefined): number {
-    if (raw === undefined) return 1;
-    const passes = Number(raw);
-    if (!Number.isInteger(passes) || passes < 1) {
-        throw new Error(`--passes must be a positive integer (got "${raw}")`);
-    }
-    return passes;
+    return parsePositiveIntArg(raw, 'passes');
 }
 
 async function main(): Promise<void> {

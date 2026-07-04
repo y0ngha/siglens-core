@@ -23,7 +23,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { parseArgs } from './cliArgs';
+import { parseArgs, parsePositiveIntArg } from './cliArgs';
 import type { AnalysisTypeUnderTest, PromptCaseOutput } from './buildPrompts';
 
 /**
@@ -212,12 +212,7 @@ function writeResultsAtomic(
 
 /** Parse and validate `--samples` (default 1, must be a positive integer). */
 export function parseSamplesArg(raw: string | undefined): number {
-    if (raw === undefined) return 1;
-    const samples = Number(raw);
-    if (!Number.isInteger(samples) || samples < 1) {
-        throw new Error(`--samples must be a positive integer (got "${raw}")`);
-    }
-    return samples;
+    return parsePositiveIntArg(raw, 'samples');
 }
 
 async function main(): Promise<void> {

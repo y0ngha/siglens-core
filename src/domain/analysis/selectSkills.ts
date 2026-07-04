@@ -30,6 +30,13 @@ export interface SkillSelection {
  * gated skills can never fire against it (no signals, no candles, degenerate
  * price/indicators), which is the intended semantics — an event/state gate is
  * a *chart* condition, and a chartless prompt has no chart state to satisfy it.
+ *
+ * Public-API consequence: a `tier: 'gated'` skill tagged `category:
+ * 'fundamental'` or `category: 'news'` is a contradiction in terms — it can
+ * never be selected into those prompts, because this context has no signals/
+ * candles/state to satisfy any gate. Skills in these two categories must
+ * therefore be `always_on`; the current catalog's 6 fundamental/news skills
+ * all are.
  */
 export const NO_CHART_SELECTION_CONTEXT: SkillSelectionContext = Object.freeze({
     indicators: EMPTY_INDICATOR_RESULT,

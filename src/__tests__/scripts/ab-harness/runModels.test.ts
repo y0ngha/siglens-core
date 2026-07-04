@@ -119,19 +119,15 @@ describe('filterUnfinishedCases', () => {
     });
 });
 
+// Exhaustive validation is covered by `parsePositiveIntArg`'s own suite
+// (`cliArgs.test.ts`) — `parseSamplesArg` is now a thin `--samples`-flavored
+// wrapper over it. This smoke test only proves the delegation is wired up.
 describe('parseSamplesArg', () => {
-    it('defaults to 1 when unset', () => {
+    it('delegates to parsePositiveIntArg with flagName "samples"', () => {
         expect(parseSamplesArg(undefined)).toBe(1);
-    });
-
-    it('parses a valid positive integer string', () => {
         expect(parseSamplesArg('5')).toBe(5);
-    });
-
-    it('rejects zero, negative, and non-integer values (worst case)', () => {
-        expect(() => parseSamplesArg('0')).toThrow(/positive integer/);
-        expect(() => parseSamplesArg('-1')).toThrow(/positive integer/);
-        expect(() => parseSamplesArg('1.5')).toThrow(/positive integer/);
-        expect(() => parseSamplesArg('abc')).toThrow(/positive integer/);
+        expect(() => parseSamplesArg('0')).toThrow(
+            /--samples must be a positive integer/
+        );
     });
 });
