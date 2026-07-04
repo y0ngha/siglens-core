@@ -94,14 +94,33 @@ const parseYamlBlock = (lines: string[], baseIndent: number): YamlNode => {
         }
         // block kind
         const { key } = classified;
-        const childLines = lines.slice(i + 1).filter(childLine => {
-            const childTrimmed = childLine.trimStart();
-            if (childTrimmed === '') return true;
-            const childIndent = childLine.length - childTrimmed.length;
-            return childIndent > baseIndent;
-        });
+        // Find the CONTIGUOUS run of lines belonging to this block: blank
+        // lines and lines indented deeper than baseIndent, stopping at the
+        // first line that dedents back to baseIndent or shallower (a sibling
+        // top-level key, e.g. `gating:` after `display:`, or the end of the
+        // frontmatter). A plain `.filter()` over the whole remaining
+        // document is wrong here — it keeps ANY later line that happens to
+        // be indented deeper than baseIndent even after the block has
+        // ended, silently merging a sibling block's nested fields into this
+        // block and skipping the sibling key itself (see loader.ts fix
+        // commit "minimal YAML parser drops top-level keys after nested
+        // blocks" for the failure mode this caused with two-level nesting,
+        // e.g. `display: / chart:` followed by a top-level `gating:`).
+        let end = i + 1;
+        while (end < lines.length) {
+            const candidate = lines[end];
+            const candidateTrimmed = candidate.trimStart();
+            if (candidateTrimmed === '') {
+                end++;
+                continue;
+            }
+            const candidateIndent = candidate.length - candidateTrimmed.length;
+            if (candidateIndent <= baseIndent) break;
+            end++;
+        }
+        const childLines = lines.slice(i + 1, end);
         result[key] = parseYamlBlock(childLines, baseIndent + 2);
-        i += 1 + childLines.length;
+        i = end;
     }
     return result;
 };

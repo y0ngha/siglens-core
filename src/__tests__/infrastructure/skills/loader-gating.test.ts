@@ -381,6 +381,57 @@ ${withDigest('Body')}`;
         expect(skills[0].tokenCost).toBeUndefined();
     });
 
+    it('parses a top-level gating block that follows a two-level nested display block (BUG-repro: pattern skills with display.chart)', async () => {
+        // Mirrors real pattern-skill frontmatter (e.g. skills/patterns/ascending-triangle.md):
+        // a `display: / chart:` block (depth-2 nesting) precedes the top-level
+        // `gating:` sibling. The minimal YAML parser's block-child slicer must
+        // stop consuming lines at the first dedent back to baseIndent, or it
+        // wrongly absorbs `gating`'s own indented fields into `display`'s
+        // subtree and skips the `gating:` key entirely — leaving gating
+        // undefined even though the frontmatter is well-formed.
+        const displayThenGating = `---
+name: Ascending Triangle Guide
+description: Bullish continuation pattern
+type: pattern
+category: continuation_bullish
+pattern: ascending_triangle
+indicators: []
+confidence_weight: 0.75
+display:
+  chart:
+    show: true
+    type: line
+    color: "#26a69a"
+    label: "Resistance"
+gating:
+  tier: gated
+  signal_kind: event
+  triggers: [ascending_triangle]
+token_cost: 601
+---
+${withDigest('Body content')}`;
+        mockReaddir.mockResolvedValue([makeDirent('ascending-triangle.md')]);
+        mockReadFile.mockResolvedValue(displayThenGating);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills).toHaveLength(1);
+        expect(skills[0].display).toEqual({
+            chart: {
+                show: true,
+                type: 'line',
+                color: '#26a69a',
+                label: 'Resistance',
+            },
+        });
+        expect(skills[0].gating).toEqual({
+            tier: 'gated',
+            signalKind: 'event',
+            triggers: ['ascending_triangle'],
+        });
+        expect(skills[0].tokenCost).toBe(601);
+    });
+
     it('dedupes skills by name, keeping the first occurrence (stable)', async () => {
         const firstWins = `---
 name: Duplicate
