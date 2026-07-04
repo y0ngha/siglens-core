@@ -170,7 +170,7 @@ export function assignBlindLabelsForPass(
         : { aVariant: 'digest', bVariant: 'full' };
 }
 
-/** Separator used by {@link encodeCustomId}/{@link decodeCustomId} — chosen to never plausibly collide with a caseId (fixture ids are short kebab-case slugs). */
+/** Separator used by {@link encodeCustomId} — chosen to never plausibly collide with a caseId (fixture ids are short kebab-case slugs). */
 const CUSTOM_ID_SEP = '__';
 
 /**
@@ -178,9 +178,8 @@ const CUSTOM_ID_SEP = '__';
  * `custom_id` (used to match async batch results back to the request that
  * produced them — batch results arrive out of order). `caseId` is placed
  * first and unbounded in length; `sampleIndex`/`pass` are always the LAST two
- * `__`-delimited segments, so {@link decodeCustomId} can recover the exact
- * original `caseId` even in the (currently impossible, since fixture ids
- * don't contain `__`) case it embeds the separator itself.
+ * `__`-delimited segments. The batch path uses the full `custom_id` string
+ * directly as a Map key rather than decoding it back into its parts.
  */
 export function encodeCustomId(
     caseId: string,
@@ -188,36 +187,6 @@ export function encodeCustomId(
     pass: number
 ): string {
     return `${caseId}${CUSTOM_ID_SEP}s${sampleIndex}${CUSTOM_ID_SEP}p${pass}`;
-}
-
-export interface DecodedCustomId {
-    caseId: string;
-    sampleIndex: number;
-    pass: number;
-}
-
-/** Inverse of {@link encodeCustomId}. Throws on a malformed id (defensive — should never happen for ids this script itself generated). */
-export function decodeCustomId(customId: string): DecodedCustomId {
-    const parts = customId.split(CUSTOM_ID_SEP);
-    if (parts.length < 3) {
-        throw new Error(`malformed custom_id (too few segments): ${customId}`);
-    }
-    const passPart = parts[parts.length - 1];
-    const samplePart = parts[parts.length - 2];
-    const caseId = parts.slice(0, parts.length - 2).join(CUSTOM_ID_SEP);
-    if (!samplePart.startsWith('s') || !passPart.startsWith('p')) {
-        throw new Error(
-            `malformed custom_id (bad segment prefix): ${customId}`
-        );
-    }
-    const sampleIndex = Number(samplePart.slice(1));
-    const pass = Number(passPart.slice(1));
-    if (!Number.isInteger(sampleIndex) || !Number.isInteger(pass)) {
-        throw new Error(
-            `malformed custom_id (non-integer sampleIndex/pass): ${customId}`
-        );
-    }
-    return { caseId, sampleIndex, pass };
 }
 
 function isValidAxisScores(raw: unknown): raw is AxisScores {

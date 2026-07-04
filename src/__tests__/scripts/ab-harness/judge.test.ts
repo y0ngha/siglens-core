@@ -7,7 +7,6 @@ import {
     buildBatchRequests,
     buildCaseSamplePairs,
     buildJudgePrompt,
-    decodeCustomId,
     encodeCustomId,
     evaluateAggregatedGate,
     evaluateGate,
@@ -418,20 +417,17 @@ describe('evaluateGate', () => {
     });
 });
 
-describe('encodeCustomId / decodeCustomId', () => {
-    it('round-trips (caseId, sampleIndex, pass) exactly', () => {
+describe('encodeCustomId', () => {
+    it('produces the `caseId__s<sampleIndex>__p<pass>` format exactly', () => {
         const cases: Array<[string, number, number]> = [
             ['tech-trend', 0, 0],
             ['tech-pattern-doubletop', 2, 4],
             ['news-macro', 10, 0],
         ];
         for (const [caseId, sampleIndex, pass] of cases) {
-            const customId = encodeCustomId(caseId, sampleIndex, pass);
-            expect(decodeCustomId(customId)).toEqual({
-                caseId,
-                sampleIndex,
-                pass,
-            });
+            expect(encodeCustomId(caseId, sampleIndex, pass)).toBe(
+                `${caseId}__s${sampleIndex}__p${pass}`
+            );
         }
     });
 
@@ -443,15 +439,6 @@ describe('encodeCustomId / decodeCustomId', () => {
             encodeCustomId('tech-trend', 1, 1),
         ]);
         expect(ids.size).toBe(4);
-    });
-
-    it('throws on a malformed custom_id (worst case: corrupt/foreign batch result)', () => {
-        expect(() => decodeCustomId('not-a-valid-id')).toThrow(/malformed/);
-        expect(() => decodeCustomId('tech-trend__s0')).toThrow(/malformed/);
-        expect(() => decodeCustomId('tech-trend__x0__p0')).toThrow(/malformed/);
-        expect(() => decodeCustomId('tech-trend__s0__pNaN')).toThrow(
-            /malformed/
-        );
     });
 });
 
@@ -525,7 +512,7 @@ describe('buildCaseSamplePairs', () => {
 });
 
 describe('buildBatchRequests', () => {
-    it('builds one request per (pair, pass) with a unique custom_id decoding back to its (caseId, sampleIndex, pass)', () => {
+    it('builds one request per (pair, pass) with a unique custom_id in the `caseId__s<sampleIndex>__p<pass>` format', () => {
         const pairs = buildCaseSamplePairs(
             [makeResult('tech-trend', 'full', { sampleIndex: 0 })],
             [makeResult('tech-trend', 'digest', { sampleIndex: 0 })]
@@ -534,11 +521,7 @@ describe('buildBatchRequests', () => {
         expect(requests).toHaveLength(3);
         expect(requests.map(r => r.pass)).toEqual([0, 1, 2]);
         for (const request of requests) {
-            expect(decodeCustomId(request.customId)).toEqual({
-                caseId: 'tech-trend',
-                sampleIndex: 0,
-                pass: request.pass,
-            });
+            expect(request.customId).toBe(`tech-trend__s0__p${request.pass}`);
             expect(request.resultA.mode).toBe(request.blindLabels.aVariant);
             expect(request.resultB.mode).toBe(request.blindLabels.bVariant);
         }
