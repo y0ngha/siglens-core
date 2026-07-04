@@ -1,0 +1,173 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { calculateIndicators } from '@/domain/indicators';
+import type { Bar, Skill, SkillGating } from '@/domain/types';
+import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
+
+// ── Task 3.3: pattern-screener candidates wired into skill selection ────────
+// Covers the third event-trigger source (`patternCandidates`) added to
+// `SkillSelectionContext`: a real chart-pattern fixture firing a gated
+// pattern skill, the screener-throw exception-safety guarantee, and a
+// regression invariant that an all-`always_on` catalog's prompt bytes never
+// depend on what the screener finds (only gated skills can react to it).
+
+const TEST_SYMBOL = 'AAPL';
+const TEST_COMPANY = 'Apple Inc.';
+
+interface Fixture {
+    atr: number;
+    bars: Bar[];
+}
+
+const makeSkill = (overrides: Partial<Skill>): Skill => ({
+    name: 'Skill',
+    description: 'desc',
+    indicators: [],
+    confidenceWeight: 0.8,
+    content: '## Body\n- content',
+    ...overrides,
+});
+
+const alwaysOn: SkillGating = { tier: 'always_on' };
+const eventGated = (triggers: string[]): SkillGating => ({
+    tier: 'gated',
+    signalKind: 'event',
+    triggers,
+});
+
+afterEach(() => {
+    vi.doUnmock('@/domain/patterns');
+    vi.resetModules();
+});
+
+describe('buildAnalysisPrompt — pattern-candidate gating (real screener)', () => {
+    it('injects a pattern skill whose trigger matches a screener-detected pattern id, and only that one', () => {
+        const fixture = doubleTop as Fixture;
+        const indicators = calculateIndicators(fixture.bars);
+        const matching = makeSkill({
+            name: 'Double Top Guide',
+            type: 'pattern',
+            gating: eventGated(['double_top']),
+        });
+        const nonMatching = makeSkill({
+            name: 'Bull Flag Guide',
+            type: 'pattern',
+            gating: eventGated(['bull_flag']),
+        });
+
+        const out = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            fixture.bars,
+            indicators,
+            [matching, nonMatching],
+            '1Day'
+        );
+
+        expect(out).toContain('Double Top Guide');
+        expect(out).not.toContain('Bull Flag Guide');
+    });
+
+    it('excludes the pattern skill entirely when there are no bars (no candidates possible)', () => {
+        const skill = makeSkill({
+            name: 'Double Top Guide',
+            type: 'pattern',
+            gating: eventGated(['double_top']),
+        });
+        const out = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            [],
+            calculateIndicators([]),
+            [skill],
+            '1Day'
+        );
+        expect(out).not.toContain('Double Top Guide');
+    });
+});
+
+describe('buildAnalysisPrompt — pattern-screener exception safety', () => {
+    it('degrades patternCandidates to [] and still builds the prompt when the screener throws', async () => {
+        vi.resetModules();
+        vi.doMock('@/domain/patterns', () => ({
+            screenChartPatterns: () => {
+                throw new Error('boom: classifier bug');
+            },
+        }));
+
+        const { buildAnalysisPrompt: buildWithThrowingScreener } =
+            await import('@/domain/analysis/prompt');
+        const fixture = doubleTop as Fixture;
+        const indicators = calculateIndicators(fixture.bars);
+        const skill = makeSkill({
+            name: 'Double Top Guide',
+            type: 'pattern',
+            gating: eventGated(['double_top']),
+        });
+
+        let out = '';
+        expect(() => {
+            out = buildWithThrowingScreener(
+                TEST_SYMBOL,
+                TEST_COMPANY,
+                fixture.bars,
+                indicators,
+                [skill],
+                '1Day'
+            );
+        }).not.toThrow();
+        // patternCandidates degraded to [] — the gated pattern skill never fires.
+        expect(out).not.toContain('Double Top Guide');
+    });
+});
+
+describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_on catalog (regression)', () => {
+    it('produces byte-identical output whether or not the screener finds candidates', async () => {
+        const skills = [
+            makeSkill({ name: 'B Pattern', type: 'pattern', gating: alwaysOn }),
+            makeSkill({ name: 'A Pattern', type: 'pattern', gating: alwaysOn }),
+            makeSkill({
+                name: 'RSI Guide',
+                type: 'indicator_guide',
+                gating: alwaysOn,
+            }),
+        ];
+        const fixture = doubleTop as Fixture;
+        const indicators = calculateIndicators(fixture.bars);
+
+        vi.resetModules();
+        vi.doMock('@/domain/patterns', () => ({
+            screenChartPatterns: () => [],
+        }));
+        const { buildAnalysisPrompt: buildWithNoCandidates } =
+            await import('@/domain/analysis/prompt');
+        const withNoCandidates = buildWithNoCandidates(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            fixture.bars,
+            indicators,
+            skills,
+            '1Day'
+        );
+
+        vi.resetModules();
+        vi.doMock('@/domain/patterns', () => ({
+            screenChartPatterns: () => [
+                { id: 'double_top', startIndex: 0, endIndex: 1 },
+                { id: 'bull_flag', startIndex: 2, endIndex: 3 },
+            ],
+        }));
+        const { buildAnalysisPrompt: buildWithCandidates } =
+            await import('@/domain/analysis/prompt');
+        const withCandidates = buildWithCandidates(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            fixture.bars,
+            indicators,
+            skills,
+            '1Day'
+        );
+
+        expect(withCandidates).toBe(withNoCandidates);
+    });
+});

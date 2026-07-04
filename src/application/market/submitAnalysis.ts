@@ -118,13 +118,22 @@ function resolveSubmitAnalysisArgs(
 /**
  * Observe-only: screen for chart patterns without ever failing the
  * submission path. This is an allowed exception to the "don't swallow
- * errors" rule (application/CLAUDE.md § Error propagation): the result is
- * purely a logging side channel (see call site) that is not yet consumed by
- * the prompt/dispatch, so a screener bug/exception must degrade to "no
- * candidates" rather than block analysis submission. The error is still
- * surfaced via `console.error`, matching the FearGreed-snapshot catch above.
- * `atr === undefined` also means "no candidates" — the screener needs a
- * scale reference and has nothing meaningful to compute without one.
+ * errors" rule (application/CLAUDE.md § Error propagation): the result here
+ * is purely a logging side channel (see call site), so a screener
+ * bug/exception must degrade to "no candidates" rather than block analysis
+ * submission. The error is still surfaced via `console.error`, matching the
+ * FearGreed-snapshot catch above. `atr === undefined` also means "no
+ * candidates" — the screener needs a scale reference and has nothing
+ * meaningful to compute without one.
+ *
+ * Task 3.3: the screener is now also wired into skill selection — but
+ * internally, inside `buildAnalysisPrompt` (`buildSkillSelectionContext`
+ * recomputes its own candidates for gating). That internal computation is
+ * not exposed on `buildAnalysisPrompt`'s return value (a plain `string`), so
+ * this call remains a deliberate, isolated duplicate rather than a
+ * restructured builder API — the screener is cheap (a single pass over a
+ * bounded lookback window), so running it twice per submission is an
+ * acceptable cost for keeping this log independent of prompt internals.
  */
 function observePatternCandidates(
     bars: readonly Bar[],
@@ -377,14 +386,17 @@ export async function submitAnalysis(
     });
 
     // Observe-only chart-pattern screening: screen for chart patterns and log
-    // candidates for later analysis. Not yet consumed by the prompt/dispatch
-    // below — purely a logging side channel to validate recall before it is
-    // wired into skill selection. See `observePatternCandidates` above
-    // for why its internal catch is an allowed exception to error propagation.
-    // The unconditional console.info below is temporary observation
-    // instrumentation for measuring the screener's miss-rate; it will be
-    // removed or converted to gated telemetry once the screener is wired
-    // into skill selection, and is a single-line info-level log with no PII.
+    // candidates for later analysis. This log's own result is a deliberately
+    // isolated duplicate of the computation `buildAnalysisPrompt` now performs
+    // internally for skill-selection gating (Task 3.3) — see
+    // `observePatternCandidates` above for why keeping it a separate call
+    // (rather than threading the prompt builder's internal result back out)
+    // is the intended shape, and for why its internal catch is an allowed
+    // exception to error propagation. The unconditional console.info below is
+    // temporary observation instrumentation for measuring the screener's
+    // miss-rate; it will be removed or converted to gated telemetry once this
+    // dedicated observation phase is no longer needed, and is a single-line
+    // info-level log with no PII.
     const patternCandidates = observePatternCandidates(bars, atr);
     console.info(
         '[PatternScreen]',

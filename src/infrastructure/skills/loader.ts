@@ -94,14 +94,33 @@ const parseYamlBlock = (lines: string[], baseIndent: number): YamlNode => {
         }
         // block kind
         const { key } = classified;
-        const childLines = lines.slice(i + 1).filter(childLine => {
-            const childTrimmed = childLine.trimStart();
-            if (childTrimmed === '') return true;
-            const childIndent = childLine.length - childTrimmed.length;
-            return childIndent > baseIndent;
-        });
+        // Find the CONTIGUOUS run of lines belonging to this block: blank
+        // lines and lines indented deeper than baseIndent, stopping at the
+        // first line that dedents back to baseIndent or shallower (a sibling
+        // top-level key, e.g. `gating:` after `display:`, or the end of the
+        // frontmatter). A plain `.filter()` over the whole remaining
+        // document is wrong here — it keeps ANY later line that happens to
+        // be indented deeper than baseIndent even after the block has
+        // ended, silently merging a sibling block's nested fields into this
+        // block and skipping the sibling key itself (see loader.ts fix
+        // commit "minimal YAML parser drops top-level keys after nested
+        // blocks" for the failure mode this caused with two-level nesting,
+        // e.g. `display: / chart:` followed by a top-level `gating:`).
+        let end = i + 1;
+        while (end < lines.length) {
+            const candidate = lines[end];
+            const candidateTrimmed = candidate.trimStart();
+            if (candidateTrimmed === '') {
+                end++;
+                continue;
+            }
+            const candidateIndent = candidate.length - candidateTrimmed.length;
+            if (candidateIndent <= baseIndent) break;
+            end++;
+        }
+        const childLines = lines.slice(i + 1, end);
         result[key] = parseYamlBlock(childLines, baseIndent + 2);
-        i += 1 + childLines.length;
+        i = end;
     }
     return result;
 };
@@ -170,16 +189,45 @@ const SKILL_GATING_TIERS: readonly SkillGating['tier'][] = [
     'gated',
 ];
 const SIGNAL_KINDS: readonly SignalKind[] = ['event', 'state'];
-const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = [
-    'bollinger',
-    'keltner',
-    'williamsR',
-    'stochastic',
-    'stochRsi',
-    'donchian',
-    'vwap',
-    'buySellVolume',
-];
+/**
+ * Exhaustive runtime mirror of the {@link SkillStateFeature} union, encoded as
+ * a `Record<SkillStateFeature, true>` so the compiler rejects both a missing
+ * and an unknown key. This guard exists because the previous plain-array
+ * whitelist silently drifted: it listed only the 8 original Group-F features,
+ * so the 11 Phase-3 pro-indicator features (macdV … ewma) — all fully
+ * evaluated by `isStateNotable` and used by real skill files — were rejected
+ * here, downgrading those skills' gating to `undefined` (treated as untagged).
+ */
+const SKILL_STATE_FEATURE_FLAGS: Record<SkillStateFeature, true> = {
+    bollinger: true,
+    keltner: true,
+    williamsR: true,
+    stochastic: true,
+    stochRsi: true,
+    donchian: true,
+    vwap: true,
+    buySellVolume: true,
+    macdV: true,
+    connorsRsi: true,
+    forceIndex: true,
+    elderRay: true,
+    elderImpulse: true,
+    chandelier: true,
+    hurst: true,
+    varianceRatio: true,
+    regression: true,
+    yangZhang: true,
+    ewma: true,
+};
+// (a) SKILL_STATE_FEATURE_FLAGS is typed Record<SkillStateFeature, true> — a mapped
+// type the compiler enforces to cover exactly the SkillStateFeature union, no more,
+// no fewer keys. (b) Object.keys' generic-erased string[] return type is what forces
+// this cast; the guarantee that the runtime keys are exactly SkillStateFeature values
+// comes from the Record's exhaustive key type at the declaration site above, not from
+// inspecting the runtime value here.
+const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = Object.keys(
+    SKILL_STATE_FEATURE_FLAGS
+) as SkillStateFeature[];
 const SKILL_STATE_PREDICATE_KINDS: readonly SkillStatePredicateKind[] = [
     'pctB',
     'bandDistAtr',
@@ -229,9 +277,11 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
  * Frontmatter keys are snake_case (repo convention, matching `confidence_weight`):
  * `signal_kind` maps to the camelCase {@link SkillGating} `signalKind` field.
  *
- * Returns `undefined` (the loader's safe default — the skill is then treated as
- * untagged and the selector includes it fail-open) when the block is malformed
- * or unreachable:
+ * Returns `undefined` (the loader's safe default — the skill is then treated
+ * as untagged; the selector is fail-closed and throws on untagged skills that
+ * pass its whitelist, so a malformed block surfaces loudly at selection time
+ * rather than silently inflating the prompt) when the block is malformed or
+ * unreachable:
  * - `tier` not in {@link SKILL_GATING_TIERS};
  * - `tier: gated` with a missing/invalid `signal_kind`;
  * - `signal_kind: event` with no non-empty `triggers`;

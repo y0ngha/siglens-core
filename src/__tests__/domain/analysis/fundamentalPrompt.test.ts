@@ -95,6 +95,7 @@ const FUNDAMENTAL_SKILL_HIGH: Skill = {
     indicators: [],
     confidenceWeight: 0.5,
     content: 'Look for low P/E relative to peers and strong FCF yield.',
+    gating: { tier: 'always_on' },
 };
 
 /** A low-confidence fundamental skill — now included with a [Low Confidence] label (confidence is a display weight, not a gate). */
@@ -105,6 +106,7 @@ const FUNDAMENTAL_SKILL_LOW: Skill = {
     indicators: [],
     confidenceWeight: 0.4,
     content: 'Low confidence fundamental skill content.',
+    gating: { tier: 'always_on' },
 };
 
 /** A news category skill — must be filtered out (wrong category). */
@@ -115,6 +117,7 @@ const NEWS_SKILL: Skill = {
     indicators: [],
     confidenceWeight: 0.5,
     content: 'React to earnings surprises and macro events.',
+    gating: { tier: 'always_on' },
 };
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -259,6 +262,7 @@ describe('buildFundamentalAnalysisPrompt', () => {
                 indicators: [],
                 confidenceWeight: 0.3,
                 content: 'value body',
+                gating: { tier: 'always_on' as const },
             },
         ];
         const prompt = buildFundamentalAnalysisPrompt(

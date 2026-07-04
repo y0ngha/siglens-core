@@ -73,6 +73,44 @@ ANTHROPIC_API_KEY=... npx tsx scripts/ab-harness/judge.ts --a /tmp/results-full.
 (written by `runModels.ts`) determines which is `full` and which is
 `digest`, not the flag name or file name.
 
+## Noise-hardened final gate run (`--samples` / `--passes --batch`)
+
+For the final pre-merge gate, both a single model draw and a single judge
+call are noise sources. Two flags harden against that:
+
+```bash
+# 2'. Run each case N times (records `sampleIndex` 0..N-1 per caseId; caseId
+#     itself is never mangled). Resume keys on (caseId, sampleIndex), so a
+#     partial multi-sample run resumes exactly where it left off.
+GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in /tmp/prompts-full.json   --out /tmp/results-full.json   --samples 5
+GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in /tmp/prompts-digest.json --out /tmp/results-digest.json --samples 5
+
+# 3'. Judge every (caseId, sampleIndex) pair K times each, submitted as ONE
+#     Anthropic Message Batch (not K*cases sequential calls). Each pass uses
+#     a different deterministic blind A/B ordering, so a single judge call's
+#     position bias can't decide the outcome.
+ANTHROPIC_API_KEY=... npx tsx scripts/ab-harness/judge.ts --a /tmp/results-full.json --b /tmp/results-digest.json --out /tmp/report.md --passes 5 --batch
+```
+
+Aggregation (only active with `--batch`): per `(caseId, sampleIndex, axis)`,
+take the MEDIAN across the K passes' unblinded full/digest scores; per
+`(caseId, axis)`, take the MEAN across samples of those per-sample medians —
+this is the case's aggregated score. The overall per-axis mean gate check
+uses the mean of these aggregated per-case scores across cases. The
+integer-aware outlier rule (single-case >= 2-point drop hard-fails; a
+1-point drop is tolerated in at most one case per axis) is unchanged in
+spirit but now operates on the aggregated per-case scores, each first
+rounded to the nearest 0.5 (`roundToHalf`) before classification, since
+medians/means of 1-5 integers are no longer themselves integers.
+
+Without `--batch`, `--passes` is ignored, and the original sequential
+single-pass path (`--a`/`--b` without `--batch`) is functionally unchanged
+from before this feature — but it was never sample-aware, so if `--in`
+results happen to contain multiple `sampleIndex` values per `caseId`, it
+silently judges whichever sample appears LAST in the results array (not
+necessarily sample 0). Use `--batch` whenever `--samples > 1` was used to
+generate the results.
+
 ## Env vars
 
 | Var | Used by | Required |

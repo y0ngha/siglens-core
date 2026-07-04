@@ -126,6 +126,7 @@ describe('buildFinancialsAnalysisPrompt', () => {
                 confidenceWeight: 1,
                 content: 'FIN_SKILL_CONTENT',
                 category: 'fundamental',
+                gating: { tier: 'always_on' },
             },
             {
                 name: 'DropMe',
@@ -134,6 +135,7 @@ describe('buildFinancialsAnalysisPrompt', () => {
                 confidenceWeight: 1,
                 content: 'TECH_SKILL_CONTENT',
                 category: 'reversal_bullish',
+                gating: { tier: 'always_on' },
             },
         ] as unknown as Skill[];
         const p = buildFinancialsAnalysisPrompt(
@@ -179,6 +181,7 @@ describe('buildFinancialsAnalysisPrompt', () => {
                 confidenceWeight: 0.8,
                 content: 'FUND_CONTENT',
                 category: 'fundamental',
+                gating: { tier: 'always_on' },
             },
             {
                 name: 'NeutralSkill',
@@ -187,6 +190,7 @@ describe('buildFinancialsAnalysisPrompt', () => {
                 confidenceWeight: 1,
                 content: 'NEUTRAL_CONTENT',
                 category: 'neutral',
+                gating: { tier: 'always_on' },
             },
             {
                 name: 'NewsSkill',
@@ -195,6 +199,7 @@ describe('buildFinancialsAnalysisPrompt', () => {
                 confidenceWeight: 1,
                 content: 'NEWS_CONTENT',
                 category: 'news',
+                gating: { tier: 'always_on' },
             },
         ] as unknown as Skill[];
         const p = buildFinancialsAnalysisPrompt(

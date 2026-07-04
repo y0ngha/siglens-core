@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseArgs } from '../../../../scripts/ab-harness/cliArgs';
+import {
+    parseArgs,
+    parsePositiveIntArg,
+} from '../../../../scripts/ab-harness/cliArgs';
 
 describe('parseArgs', () => {
     it('parses --flag value pairs', () => {
@@ -28,5 +31,42 @@ describe('parseArgs', () => {
 
     it('returns an empty record for empty argv (worst case)', () => {
         expect(parseArgs([])).toEqual({});
+    });
+});
+
+// Shared by every ab-harness script with a repeat-count flag — was
+// duplicated as `parsePassesArg` (judge.ts) and `parseSamplesArg`
+// (runModels.ts) before being consolidated here.
+describe('parsePositiveIntArg', () => {
+    it('defaults to 1 when unset', () => {
+        expect(parsePositiveIntArg(undefined, 'passes')).toBe(1);
+    });
+
+    it('parses a valid positive integer string', () => {
+        expect(parsePositiveIntArg('5', 'passes')).toBe(5);
+    });
+
+    it('rejects zero, negative, and non-integer values (worst case)', () => {
+        expect(() => parsePositiveIntArg('0', 'passes')).toThrow(
+            /positive integer/
+        );
+        expect(() => parsePositiveIntArg('-1', 'passes')).toThrow(
+            /positive integer/
+        );
+        expect(() => parsePositiveIntArg('1.5', 'passes')).toThrow(
+            /positive integer/
+        );
+        expect(() => parsePositiveIntArg('abc', 'passes')).toThrow(
+            /positive integer/
+        );
+    });
+
+    it('interpolates the given flag name into both the flag reference and the invalid value in the error message', () => {
+        expect(() => parsePositiveIntArg('abc', 'samples')).toThrow(
+            /--samples must be a positive integer \(got "abc"\)/
+        );
+        expect(() => parsePositiveIntArg('abc', 'passes')).toThrow(
+            /--passes must be a positive integer \(got "abc"\)/
+        );
     });
 });

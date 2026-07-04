@@ -64,6 +64,7 @@ const NEWS_SKILL_HIGH: Skill = {
     confidenceWeight: 0.5,
     content:
         'Focus on catalyst events: earnings beats/misses, regulatory actions, M&A announcements.',
+    gating: { tier: 'always_on' },
 };
 
 /** A low-confidence news skill — now included with a [Low Confidence] label (confidence is a display weight, not a gate). */
@@ -74,6 +75,7 @@ const NEWS_SKILL_LOW: Skill = {
     indicators: [],
     confidenceWeight: 0.4,
     content: 'Low confidence news skill content.',
+    gating: { tier: 'always_on' },
 };
 
 const FUNDAMENTAL_SKILL: Skill = {
@@ -83,6 +85,7 @@ const FUNDAMENTAL_SKILL: Skill = {
     indicators: [],
     confidenceWeight: 0.5,
     content: 'Not a news skill — should be filtered out.',
+    gating: { tier: 'always_on' },
 };
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -217,6 +220,7 @@ describe('buildNewsAnalysisPrompt', () => {
                 indicators: [],
                 confidenceWeight: 0.3,
                 content: 'news body',
+                gating: { tier: 'always_on' as const },
             },
         ];
         const prompt = buildNewsAnalysisPrompt(

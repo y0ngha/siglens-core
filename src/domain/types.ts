@@ -674,8 +674,9 @@ export interface Skill {
     display?: SkillDisplay;
     /**
      * Dynamic-gating metadata parsed from the skill's frontmatter. When absent,
-     * the skill is treated as untagged and the skill selector includes it
-     * fail-open (never silently dropped).
+     * the skill is treated as untagged and the skill selector throws
+     * (fail-closed) when the skill passes the prompt-context whitelist — every
+     * shipped skill must carry an explicit gating block.
      */
     gating?: SkillGating;
     /**
@@ -828,6 +829,14 @@ export interface SkillSelectionContext {
     timeframe: Timeframe;
     /** Candle pattern names detected on the analyzed bars. */
     detectedCandles: readonly string[];
+    /**
+     * Chart-pattern IDs surfaced by the pre-screener ({@link screenChartPatterns})
+     * for the analyzed bars — a third event-trigger source alongside `signals`
+     * and `detectedCandles` (see {@link ChartPatternId}). `[]` for chartless
+     * prompts (no bars in scope), when the screener finds nothing, or when ATR
+     * is unavailable/non-positive.
+     */
+    patternCandidates: readonly ChartPatternId[];
     /**
      * Last close of the analyzed bars. Channel/band/VWAP state predicates need
      * the spot price, which `IndicatorResult` does not carry on its own.

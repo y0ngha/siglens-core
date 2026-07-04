@@ -28,6 +28,7 @@ import {
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
     NEWS_CACHE_TTL_SECONDS,
+    NEWS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
     PROMPT_TEMPLATE_VERSION,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
@@ -190,7 +191,7 @@ describe('new analysis cache keys', () => {
 
     it('buildNewsCacheKey same shape with version prefix', () => {
         expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:AAPL:gemini-2.5-pro:h2`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:AAPL:gemini-2.5-pro:${NEWS_PROMPT_TEMPLATE_VERSION}:h2`
         );
     });
 
@@ -328,7 +329,7 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
                 'abc123'
             )
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-2.5-flash:abc123`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-2.5-flash:${NEWS_PROMPT_TEMPLATE_VERSION}:abc123`
         );
     });
 });

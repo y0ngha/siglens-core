@@ -23,3 +23,23 @@ export function parseArgs(argv: readonly string[]): Record<string, string> {
     }
     return out;
 }
+
+/**
+ * Parse and validate a `--<flagName>` value as a positive integer, defaulting
+ * to `1` when unset. Shared by every `ab-harness` script that takes a
+ * repeat-count flag (`judge.ts --passes`, `runModels.ts --samples`) — both
+ * used to reimplement this exact validation independently.
+ */
+export function parsePositiveIntArg(
+    raw: string | undefined,
+    flagName: string
+): number {
+    if (raw === undefined) return 1;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1) {
+        throw new Error(
+            `--${flagName} must be a positive integer (got "${raw}")`
+        );
+    }
+    return value;
+}

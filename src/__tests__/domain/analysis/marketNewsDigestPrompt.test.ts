@@ -55,6 +55,7 @@ describe('buildMarketNewsDigestPrompt 함수는', () => {
             indicators: [],
             confidenceWeight: 0.5,
             content: 'MACRO_SKILL_BODY',
+            gating: { tier: 'always_on' },
         };
         const chartSkill: Skill = {
             name: 'rsi',
@@ -63,6 +64,7 @@ describe('buildMarketNewsDigestPrompt 함수는', () => {
             indicators: [],
             confidenceWeight: 0.5,
             content: 'CHART_SKILL_BODY',
+            gating: { tier: 'always_on' },
         };
         const prompt = buildMarketNewsDigestPrompt(
             '미국 일반',

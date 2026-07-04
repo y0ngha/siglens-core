@@ -57,11 +57,13 @@ import {
 import { selectSkills } from '@/domain/analysis/selectSkills';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
+import { screenChartPatterns } from '@/domain/patterns';
 import type {
     AssetClass,
     CandlePatternEntry,
     AnalysisResponse,
     Bar,
+    ChartPatternId,
     FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
@@ -1325,17 +1327,17 @@ const ANALYSIS_GUIDELINES = [
     '  - "enter": price near support + bullish confluence from 2+ categories + risk level not high',
     '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals)',
     '  - "avoid": price extended from support, strong resistance overhead, risk high, or bearish confluence dominates',
+    '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a risk:reward estimate — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
     '- Step 2 — Compute prices:',
-    '  - For "enter" and "wait": entryPrices, stopLoss, and takeProfitPrices are REQUIRED.',
-    '  - For "avoid": entryPrices must be [], takeProfitPrices must be [], and stopLoss must be omitted. Do not use null, 0, or made-up placeholder prices.',
-    '  - entryPrices: [low, high] range near support. Must match the entry text field exactly.',
-    '  - stopLoss: single number below nearest support. Must match the exit text field exactly.',
+    '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
+    '  - entryPrices: [low, high] range near support — the actionable zone for "enter"/"wait", or the contingent trigger zone for "avoid". Must match the entry text field exactly.',
+    '  - stopLoss: single number below nearest support (real or contingent). Must match the exit text field exactly.',
     '  - takeProfitPrices: ascending order (lowest first). Must match the exit text field exactly.',
     '- Step 3 — Write text fields in plain Korean:',
     '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
-    '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state that no long entry range is valid under the current data and explain why.',
-    '  - exit: for "enter" and "wait", provide take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry). For "avoid", do not invent exit prices; state that exit planning is not applicable without a valid long entry.',
-    '  - riskReward: for "enter" and "wait", provide a ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3"). For "avoid", state that risk/reward cannot be calculated because there is no valid long setup.',
+    '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state the conditional trigger explicitly (e.g. "OO 저항선을 거래량 동반 돌파 시") and give the contingent entry range tied to that trigger, using only a trigger level that is actually present in keyLevels — if none exists, say so instead of inventing one.',
+    '  - exit: for all three, provide take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry); for "avoid" frame these as applying once the contingent entry triggers. If a required reference level is missing from keyLevels/priceTargets, state that gap rather than guessing a number.',
+    '  - riskReward: for all three, provide a ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3") based on the (contingent) entry/exit prices for "avoid"; skip the ratio and note the missing input if entry/exit prices could not be grounded.',
     '- Step 3 formatting: each actionRecommendation text field must be readable markdown Korean. Use \\n\\n between context paragraphs, and use bullet lists for multiple prices or conditions.',
     '- Consistency: entryPrices, stopLoss, takeProfitPrices must numerically match the text in entry/exit fields — they are the same prices in structured form for chart rendering.',
     '',
@@ -1541,6 +1543,29 @@ const collectDetectedCandleNames = (
     return [...new Set<string>(names)];
 };
 
+/**
+ * Chart-pattern IDs surfaced by the pre-screener for this chart, for the
+ * `patternCandidates` selection-context field. Guards `atr` unavailable/
+ * non-positive the same way {@link screenChartPatterns} itself does (`[]`),
+ * and additionally wraps the call defensively: a screener/classifier bug must
+ * degrade to "no candidates" rather than take down prompt building, mirroring
+ * `observePatternCandidates` in `submitAnalysis.ts`. Unlike that
+ * application-layer call, this domain function cannot `console.error` (domain
+ * is zero-I/O per `domain/CLAUDE.md`) — the application-layer observe-only log
+ * already surfaces screener failures, so no telemetry is duplicated here.
+ */
+const collectPatternCandidateIds = (
+    bars: readonly Bar[],
+    atr: number | null
+): ChartPatternId[] => {
+    if (atr === null || atr <= 0) return [];
+    try {
+        return screenChartPatterns(bars, atr).map(candidate => candidate.id);
+    } catch {
+        return [];
+    }
+};
+
 /** Build the pure, read-only selection context from data already in scope. */
 const buildSkillSelectionContext = (
     bars: Bar[],
@@ -1557,6 +1582,7 @@ const buildSkillSelectionContext = (
         signals: detectSignals(bars, indicators),
         timeframe,
         detectedCandles: collectDetectedCandleNames(candleEntries),
+        patternCandidates: collectPatternCandidateIds(bars, atr),
         price,
         atrPercent,
     };
@@ -1578,12 +1604,14 @@ const buildSkillSelectionContext = (
  * advisory levels and structure per horizon), SMC structure, and per-skill
  * writing rules.
  *
- * Skills are dynamically gated by {@link selectSkills}: only those whose
- * frontmatter `gating` fires for this chart's state (detected signals, textbook
- * indicator states, detected candles) are injected; untagged skills fail open
- * (always included). Selected skills are name-sorted and grouped by `type`
- * (pattern, strategy, indicator_guide, candlestick, support_resistance,
- * regular). When ATR% is extreme for the timeframe, an always-on position-sizing
+ * Skills are dynamically gated by {@link selectSkills} in the `'technical'`
+ * prompt context: non-chart skills (category fundamental/news/congress) are
+ * whitelisted out, `always_on` skills form a stable name-sorted core block,
+ * and gated skills are injected only when their frontmatter `gating` fires for
+ * this chart's state (detected signals, textbook indicator states, detected
+ * candles), ordered by relevance. Untagged skills throw (fail-closed). The
+ * combined selection is grouped by `type` (pattern, strategy, indicator_guide,
+ * candlestick, support_resistance, regular). When ATR% is extreme for the timeframe, an always-on position-sizing
  * note is appended. The number of trend samples and recent bars varies per
  * `timeframe` via `PROMPT_CONFIG_BY_TIMEFRAME`.
  *
@@ -1617,20 +1645,26 @@ export function buildAnalysisPrompt(
     // detection pass runs a single time per prompt build.
     const candleEntries = detectCandlePatternEntries(bars);
 
-    // Dynamic gating (chart only): inject only the skills whose frontmatter
-    // gating fires for this chart's state. Untagged skills fail open (included).
-    // selectSkills already returns a name-sorted copy, so the static byName
-    // sort is no longer needed here.
+    // Dynamic gating (chart only): whitelist to chart skills, then inject the
+    // always_on core plus the gated skills whose frontmatter gating fires for
+    // this chart's state. Untagged skills throw (fail-closed). Core precedes
+    // the relevance-ordered fired skills, keeping the stable block first for
+    // the later stable/dynamic prompt-assembly phase.
     const selectionContext = buildSkillSelectionContext(
         bars,
         indicators,
         timeframe,
         candleEntries
     );
+    const { core, selected } = selectSkills(
+        skills,
+        selectionContext,
+        'technical'
+    );
     // The SMC full guide is never injected (fabrication source); it is replaced
     // by the deterministic SMC data section + a compressed concept note. Drop it
     // regardless of its gating tier before bucketing.
-    const activeSkills = selectSkills(skills, selectionContext).filter(
+    const activeSkills = [...core, ...selected].filter(
         skill => !isSmcGuideSkill(skill)
     );
 

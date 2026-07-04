@@ -122,7 +122,7 @@ describe('FileSkillsLoader gating frontmatter', () => {
         expect(skills[0].gating).toEqual({ tier: 'always_on' });
     });
 
-    it('leaves gating + tokenCost undefined for an untagged skill (fail-open)', async () => {
+    it('leaves gating + tokenCost undefined for an untagged skill (selector then fails closed)', async () => {
         mockReaddir.mockResolvedValue([makeDirent('legacy.md')]);
         mockReadFile.mockResolvedValue(untaggedFrontmatter);
 
@@ -221,6 +221,53 @@ ${withDigest('Body')}`;
         expect(skills).toHaveLength(1);
         expect(skills[0].gating).toBeUndefined();
     });
+
+    // Regression guard: the parse whitelist once listed only the 8 original
+    // Group-F features, so these Phase-3 pro-indicator features — all fully
+    // evaluated by isStateNotable and used by real skill files — were rejected
+    // and their skills silently degraded to untagged.
+    it.each([
+        'macdV',
+        'connorsRsi',
+        'forceIndex',
+        'elderRay',
+        'elderImpulse',
+        'chandelier',
+        'hurst',
+        'varianceRatio',
+        'regression',
+        'yangZhang',
+        'ewma',
+    ] as const)(
+        'parses a state gating block for the pro-indicator feature %s',
+        async feature => {
+            const proFeature = `---
+name: ${feature} Guide
+description: pro-indicator state gate
+type: indicator_guide
+category: neutral
+indicators: []
+confidence_weight: 0.8
+gating:
+  tier: gated
+  signal_kind: state
+  state:
+    feature: ${feature}
+    predicate: level
+---
+${withDigest('Body')}`;
+            mockReaddir.mockResolvedValue([makeDirent(`${feature}.md`)]);
+            mockReadFile.mockResolvedValue(proFeature);
+
+            const skills = await new FileSkillsLoader().loadSkills();
+
+            expect(skills[0].gating).toEqual({
+                tier: 'gated',
+                signalKind: 'state',
+                state: { feature, predicate: 'level' },
+            });
+        }
+    );
 
     it('drops a state block whose feature is unknown (parseStatePredicate reject)', async () => {
         // `feature: momentum` is not in SKILL_STATE_FEATURES — parseStatePredicate
@@ -332,6 +379,57 @@ ${withDigest('Body')}`;
         const skills = await new FileSkillsLoader().loadSkills();
 
         expect(skills[0].tokenCost).toBeUndefined();
+    });
+
+    it('parses a top-level gating block that follows a two-level nested display block (BUG-repro: pattern skills with display.chart)', async () => {
+        // Mirrors real pattern-skill frontmatter (e.g. skills/patterns/ascending-triangle.md):
+        // a `display: / chart:` block (depth-2 nesting) precedes the top-level
+        // `gating:` sibling. The minimal YAML parser's block-child slicer must
+        // stop consuming lines at the first dedent back to baseIndent, or it
+        // wrongly absorbs `gating`'s own indented fields into `display`'s
+        // subtree and skips the `gating:` key entirely — leaving gating
+        // undefined even though the frontmatter is well-formed.
+        const displayThenGating = `---
+name: Ascending Triangle Guide
+description: Bullish continuation pattern
+type: pattern
+category: continuation_bullish
+pattern: ascending_triangle
+indicators: []
+confidence_weight: 0.75
+display:
+  chart:
+    show: true
+    type: line
+    color: "#26a69a"
+    label: "Resistance"
+gating:
+  tier: gated
+  signal_kind: event
+  triggers: [ascending_triangle]
+token_cost: 601
+---
+${withDigest('Body content')}`;
+        mockReaddir.mockResolvedValue([makeDirent('ascending-triangle.md')]);
+        mockReadFile.mockResolvedValue(displayThenGating);
+
+        const skills = await new FileSkillsLoader().loadSkills();
+
+        expect(skills).toHaveLength(1);
+        expect(skills[0].display).toEqual({
+            chart: {
+                show: true,
+                type: 'line',
+                color: '#26a69a',
+                label: 'Resistance',
+            },
+        });
+        expect(skills[0].gating).toEqual({
+            tier: 'gated',
+            signalKind: 'event',
+            triggers: ['ascending_triangle'],
+        });
+        expect(skills[0].tokenCost).toBe(601);
     });
 
     it('dedupes skills by name, keeping the first occurrence (stable)', async () => {

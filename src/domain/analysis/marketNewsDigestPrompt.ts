@@ -1,11 +1,25 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    NO_CHART_SELECTION_CONTEXT,
+    selectSkills,
+} from '@/domain/analysis/selectSkills';
 import type { EnrichedNewsItem, Skill } from '@/domain/types';
 
-/** Filter skills to the news category. Confidence is a display weight, not an inclusion gate. */
-function filterNewsSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(s => s.category === 'news');
+/**
+ * Select the news-category skills via the shared selection engine (whitelist +
+ * fail-closed gating). `NO_CHART_SELECTION_CONTEXT` — this prompt has no
+ * chart, so only `always_on` skills can qualify. Confidence is a display
+ * weight, not an inclusion gate.
+ */
+function selectNewsSkills(skills: readonly Skill[]): Skill[] {
+    const { core, selected } = selectSkills(
+        skills,
+        NO_CHART_SELECTION_CONTEXT,
+        'news'
+    );
+    return [...core, ...selected];
 }
 
 /** Format a single enriched news item into a compact block for the prompt. */
@@ -38,7 +52,7 @@ export function buildMarketNewsDigestPrompt(
     news: ReadonlyArray<EnrichedNewsItem>,
     skills: readonly Skill[]
 ): string {
-    const qualifiedSkills = filterNewsSkills(skills);
+    const qualifiedSkills = selectNewsSkills(skills);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

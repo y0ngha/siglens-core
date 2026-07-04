@@ -1,6 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    NO_CHART_SELECTION_CONTEXT,
+    selectSkills,
+} from '@/domain/analysis/selectSkills';
 import type {
     CashFlowGrowthRow,
     FinancialGrowthRow,
@@ -14,9 +18,18 @@ import type {
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
-/** Filter skills to the fundamental category (same category as fundamentalPrompt). */
-function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(s => s.category === 'fundamental');
+/**
+ * Select the fundamental-category skills (same context as fundamentalPrompt)
+ * via the shared selection engine — whitelist + fail-closed gating, with the
+ * chartless context so only `always_on` skills qualify.
+ */
+function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
+    const { core, selected } = selectSkills(
+        skills,
+        NO_CHART_SELECTION_CONTEXT,
+        'fundamental'
+    );
+    return [...core, ...selected];
 }
 
 /** Format a large dollar value in billions, or 'N/A' for null/undefined. */
@@ -148,8 +161,10 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
  *
  * Accepts a normalized {@link FinancialsSnapshot}, a pre-computed
  * {@link FinancialsScorecard} (axis scores, grades, and signals), and a list of
- * loaded {@link Skill}s. Only skills with `category === 'fundamental'` are
- * injected; `confidenceWeight` is a display label, not an inclusion gate.
+ * loaded {@link Skill}s. Skills are routed through {@link selectSkills} in the
+ * `'fundamental'` prompt context (only `category === 'fundamental'` skills
+ * qualify; untagged ones throw fail-closed); `confidenceWeight` is a display
+ * label, not an inclusion gate.
  *
  * Returns a fully self-contained English prompt string; the JSON output schema
  * specifies Korean text for fields labelled `KO`.
@@ -166,7 +181,7 @@ export function buildFinancialsAnalysisPrompt(
     scorecard: FinancialsScorecard,
     skills: readonly Skill[]
 ): string {
-    const qualifiedSkills = filterFundamentalSkills(skills);
+    const qualifiedSkills = selectFundamentalSkills(skills);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills
