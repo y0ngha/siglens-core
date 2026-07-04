@@ -1219,12 +1219,12 @@ const ANALYSIS_INTENT_BLOCK = [
     '- Respond with a single JSON object. Its structure (field names, types, enums, nesting) is enforced by the response schema, so you do not need to restate it. For the fields listed under ## Field Content Guidance, follow the guidance there.',
 ].join('\n');
 
-// "provided in the data sections" (not "above") — this preface is assembled
-// into the stable prefix (spec §3.4), which precedes the per-call data
-// sections (indicators, SMC, Market Reference) in the final prompt, so a
-// spatial "above" would be backwards.
+// "provided above" — the Analysis Request preamble (this preface included)
+// lives at the END of `dynamic` (spec §3.4 / instruction-sandwiching fix), a
+// tail position after every per-call data section (indicators, SMC, Market
+// Reference), so a spatial "above" is accurate again.
 const FIELD_GUIDANCE_PREFACE =
-    'Use the exact numbers provided in the data sections rather than recomputing arithmetic, but treat the Market Reference as advisory context — not a mandate. Follow the content guidance below for the fields that need it:';
+    'Use the exact numbers provided above rather than recomputing arithmetic, but treat the Market Reference as advisory context — not a mandate. Follow the content guidance below for the fields that need it:';
 
 const buildFieldGuidanceBody = (): string =>
     [
@@ -1362,43 +1362,32 @@ const CRITICAL_RESPONSE_RULES = [
 ].join('\n');
 
 /**
- * Static preamble of the "## Analysis Request" section — the request header,
- * the critical-response rules, the generic ask sentence, and the (fully
- * static, catalog-only) field content guidance. None of this interpolates a
- * symbol, skill name, or any other per-call value, so it belongs in the
- * stable prefix (spec §3.4). The per-type writing-rule instructions (which
- * enumerate the active skill names for this call) are built separately by
- * {@link buildAnalysisRequestDynamic} and live in the dynamic suffix.
- */
-const buildAnalysisRequestStable = (): string =>
-    [
-        '## Analysis Request',
-        CRITICAL_RESPONSE_RULES,
-        'Based on the provided data, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
-        FIELD_GUIDANCE_PREFACE,
-        buildFieldGuidanceBody(),
-    ].join('\n');
-
-/**
- * Per-type writing-rule instructions (patternSummaries / strategyResults /
- * indicatorResults / candlePatterns / keyLevels / regular-skill enrichment),
- * each ending in an enumeration of the exact active skill names for that
- * type. Kept as one atomic dynamic block (not split further) because:
+ * Full "## Analysis Request" section — the request header, the
+ * critical-response rules, the generic ask sentence, the (fully static,
+ * catalog-only) field content guidance, AND the per-type writing-rule
+ * instructions (patternSummaries / strategyResults / indicatorResults /
+ * candlePatterns / keyLevels / regular-skill enrichment), each ending in an
+ * enumeration of the exact active skill names for that type.
  *
- * - the enumerated names are `core ∪ selected` — `selected` is chart-state
- *   dependent, so the enumeration can never be part of the byte-stable
- *   prefix;
- * - keeping each category's rule text immediately adjacent to its name list
- *   preserves prompt locality/quality (the instructions and the checklist
- *   they refer to are never more than a few lines apart), rather than
- *   splitting a header into the stable prefix and its list into the dynamic
- *   suffix, which would separate them by the entire market-data block.
+ * This entire block lives at the END of `dynamic` (spec §3.4 / the
+ * instruction-sandwiching fix — see the "Output-contract" comment above
+ * {@link buildAnalysisPrompt}'s `dynamicSections` assembly): an A/B test found
+ * that moving the static preamble into the byte-stable prefix (ahead of the
+ * chart-data block) degraded actionability, because the Contingent Plan
+ * Mandate and other output rules ended up many thousands of tokens behind the
+ * model's response. None of the static preamble interpolates a symbol, skill
+ * name, or other per-call value — it would be cacheable in isolation — but
+ * rule recency matters more here than that caching win, so the whole section
+ * stays one atomic unit at the tail rather than being split back into a
+ * stable/dynamic pair. The per-type instructions were never cacheable to
+ * begin with (`core ∪ selected` — `selected` is chart-state dependent), and
+ * keeping each category's rule text immediately adjacent to its name list
+ * preserves prompt locality/quality.
  *
  * @param patternSkills,strategySkills,... - `core ∪ selected` skills of each
- *   type (see {@link buildAnalysisPrompt}'s `combinedGroups`), matching the
- *   pre-split behavior exactly.
+ *   type (see {@link buildAnalysisPrompt}'s `combinedGroups`).
  */
-const buildAnalysisRequestDynamic = (
+const buildAnalysisRequest = (
     patternSkills: Skill[],
     strategySkills: Skill[],
     indicatorGuideSkills: Skill[],
@@ -1533,6 +1522,11 @@ const buildAnalysisRequestDynamic = (
             : '';
 
     return [
+        '## Analysis Request',
+        CRITICAL_RESPONSE_RULES,
+        'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
+        FIELD_GUIDANCE_PREFACE,
+        buildFieldGuidanceBody(),
         indicatorGuideInstruction,
         patternListInstruction,
         strategyInstruction,
@@ -1544,32 +1538,30 @@ const buildAnalysisRequestDynamic = (
         .join('\n');
 };
 
-// ── Output-contract recap (instruction sandwiching) ────────────────────────
-// The stable-first assembly split (spec §3.4) moved the bulk of the output
-// rules — including the Contingent Plan Mandate — into the byte-stable
-// prefix, ahead of the entire chart-data block. An A/B smoke test on that
+// ── Final reminder (instruction sandwiching) ───────────────────────────────
+// The full ## Analysis Request block (built above) already carries the
+// Contingent Plan Mandate and every other output rule, and it sits at the
+// very end of `dynamic` — immediately before the model responds — so rule
+// recency no longer depends on a recap. This block is a genuinely SHORT (3
+// bullets) tail reminder, not a restatement of the rules: an earlier design
+// moved the rules into the byte-stable prefix (ahead of the entire chart-data
+// block) and compensated with a long recap here; an A/B smoke test on that
 // ordering found actionability collapse (entry==target, null top-level plan
-// fields): by the time the model finishes reading the market data and writes
-// the response, the rules are many thousands of tokens behind it. This block
-// is a compact, timeless recap of those rules — not a new rule — placed as
-// the LAST section of `dynamic`, immediately before the model responds. It
-// keeps the byte-stable prefix cacheable (nothing here is per-call) while
-// restoring rule recency via "instruction sandwiching": critical rules at
-// both the start and the end of the prompt.
+// fields) because the rules were many thousands of tokens behind the
+// response by the time the model wrote it. Restoring the rules to the tail
+// (above) fixes the root cause, so this reminder only needs to catch the
+// handful of failure modes instruction-following models exhibit even with
+// rules right above them: forgetting grounding, skipping the contingent
+// plan, or malformed output.
 /**
  * @internal Exported so tests can pin that `dynamic` ends with this exact
  * block (order pin) and assert its content directly.
  */
-export const CONTRACT_RECAP = [
-    '## Output Contract Recap (final check before you respond)',
-    '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", derive a conditional plan from the keyLevels above.',
-    '  Populate entryPrices, stopLoss, and takeProfitPrices (never null, 0, or empty) whenever a supporting keyLevels value exists.',
-    '  Compute riskReward from those same prices; frame the plan as conditional on the stated trigger for "wait"/"avoid".',
-    '- Grounding: every price you cite must already appear in keyLevels or the market data above.',
-    '  Never invent, round, or extrapolate a level — if a component genuinely has no supporting data, state that gap explicitly instead of fabricating one.',
-    '- Sanity check: entryPrices must not equal takeProfitPrices; stopLoss must sit on the correct side of entry (below for a long).',
-    '  riskReward must be derived from the actual entry/stop/target numbers you wrote, not asserted independently.',
-    '- Respond with a single JSON object matching the schema; all Korean prose fields must use 존댓말.',
+export const FINAL_REMINDER = [
+    '## Final Reminder',
+    '- Grounding: only cite keyLevels/market-data numbers already stated above — never invent or extrapolate a price.',
+    '- Contingent Plan Mandate: even for "wait"/"avoid", populate entryPrices/stopLoss/takeProfitPrices from the nearest keyLevels.',
+    '- Respond with a single JSON object; all Korean prose fields must use 존댓말.',
 ].join('\n');
 
 // ── ATR-extreme sizing note (Tier-0 conditional promotion) ──────────────────
@@ -1705,7 +1697,7 @@ const SKILL_CONTENT_SECTION_ORDER: readonly SkillGroupKey[] = [
  * can therefore appear once in each half when both a core and a gated skill
  * of the same type are active for a given call, which is expected (the
  * digest-content sections are unified into checklists over in
- * {@link buildAnalysisRequestDynamic}, not here).
+ * {@link buildAnalysisRequest}, not here).
  */
 const buildSkillContentSections = (
     groups: Record<SkillGroupKey, Skill[]>
@@ -1727,26 +1719,30 @@ const buildSkillContentSections = (
  * `AnalysisResponse`, split into a stable/dynamic pair (spec §3.4,
  * {@link AssembledPrompt}) rather than a single string:
  *
- * - `stable` — the analysis-intent block, guidelines (incl. the
- *   contingent-plan mandate), the anti-fabrication guardrail, the static
- *   "## Analysis Request" preamble (critical response rules + field content
- *   guidance), and the `always_on` skill digests (`core`, name-sorted).
+ * - `stable` — KNOWLEDGE only: the analysis-intent block, guidelines (incl.
+ *   the contingent-plan mandate's textual description), the anti-fabrication
+ *   guardrail, and the `always_on` skill digests (`core`, name-sorted).
  *   Byte-identical across calls sharing the same `(analysisType, catalog)` —
- *   contains no symbol, timeframe data, or per-call value — so it can serve
- *   as a cacheable prefix at the worker/provider layer.
- * - `dynamic` — the symbol/company/asset-class framing, the timeframe
- *   section, all computed chart data (snapshot, long-term context, recent
- *   bars, regime/indicator/pro-indicator/SMC/market-reference sections),
- *   gated (`selected`) skill digests ordered by relevance, the tier/timeframe
- *   conditional notes (ATR-extreme sizing), the optional Fear & Greed
- *   section, the per-type writing-rule + active-skill-name request block, and
- *   — always last — {@link CONTRACT_RECAP}, a compact timeless recap of the
- *   Contingent Plan Mandate/grounding/sanity rules. That recap sits at the
- *   very end of `dynamic` (instruction sandwiching) so rule recency survives
- *   the stable-first ordering, which otherwise leaves the output rules many
- *   thousands of tokens behind the model's response (see its own comment).
+ *   contains no symbol, timeframe data, or per-call value, and critically no
+ *   output-format instructions either — so it can serve as a cacheable
+ *   prefix at the worker/provider layer without risking rule recency.
+ * - `dynamic` — everything else: the symbol/company/asset-class framing, the
+ *   timeframe section, all computed chart data (snapshot, long-term context,
+ *   recent bars, regime/indicator/pro-indicator/SMC/market-reference
+ *   sections), gated (`selected`) skill digests ordered by relevance, the
+ *   tier/timeframe conditional notes (ATR-extreme sizing), the optional Fear
+ *   & Greed section, then — reunited as one atomic tail block, see
+ *   {@link buildAnalysisRequest} — the FULL "## Analysis Request" section
+ *   (static output rules + the per-type writing-rule/active-skill-name
+ *   instructions), and finally {@link FINAL_REMINDER}, a short 3-line tail
+ *   reminder. An A/B smoke test found that moving the output rules into the
+ *   byte-stable prefix (ahead of the entire chart-data block) degraded
+ *   actionability (entry==target, null top-level plan fields): the rules
+ *   ended up many thousands of tokens behind the model's response. Restoring
+ *   them to the tail — their original position — fixes rule recency
+ *   directly, which is why `stable` no longer carries any output-format
+ *   content and the old long recap collapsed into a genuinely short reminder.
  *
-
  * Skills are gated by {@link selectSkills} in the `'technical'` prompt
  * context: non-chart skills (category fundamental/news/congress) are
  * whitelisted out, `always_on` skills form the stable name-sorted `core`
@@ -1817,8 +1813,8 @@ export function buildAnalysisPrompt(
     // The per-type writing-rule instructions need one checklist covering
     // BOTH buckets (the AI must judge every active skill of a type,
     // regardless of which half of the prompt its digest landed in) — see
-    // buildAnalysisRequestDynamic's doc comment for why this stays merged
-    // and atomic in the dynamic block.
+    // buildAnalysisRequest's doc comment for why this stays merged and
+    // atomic in the dynamic block.
     const combinedGroups = bucketSkillsByType([
         ...coreSkills,
         ...selectedSkills,
@@ -1834,7 +1830,11 @@ export function buildAnalysisPrompt(
             ? `This is a cryptocurrency trading 24/7 with no market open/close. There are no earnings, fundamentals, or analyst ratings — focus purely on price action, technical structure, volatility, and macro/liquidity context.`
             : `This is a publicly traded U.S. equity.`;
 
-    const requestDynamicPart = buildAnalysisRequestDynamic(
+    // Reunites the static output-rules preamble with the per-type
+    // writing-rule instructions into one atomic block (see its own doc
+    // comment) — this always renders the "## Analysis Request" header, so
+    // unlike the pre-fix `requestDynamicPart` it is never the empty string.
+    const analysisRequest = buildAnalysisRequest(
         combinedGroups.pattern,
         combinedGroups.strategy,
         combinedGroups.indicator_guide,
@@ -1847,7 +1847,6 @@ export function buildAnalysisPrompt(
         ANALYSIS_INTENT_BLOCK,
         ANALYSIS_GUIDELINES,
         ANTI_FABRICATION_GUARDRAIL,
-        buildAnalysisRequestStable(),
         ...buildSkillContentSections(coreGroups),
     ];
 
@@ -1869,11 +1868,12 @@ export function buildAnalysisPrompt(
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
-        ...(requestDynamicPart !== '' ? [requestDynamicPart] : []),
-        // Always last — see the "Output-contract recap" comment above
-        // CONTRACT_RECAP's definition for why this must stay the final
-        // dynamic section (instruction sandwiching / rule recency).
-        CONTRACT_RECAP,
+        // The full output-rules block, restored to its original tail
+        // position (see buildAnalysisRequest's doc comment for why).
+        analysisRequest,
+        // Always last — see FINAL_REMINDER's own comment for why this
+        // stays the final dynamic section.
+        FINAL_REMINDER,
     ];
 
     return {

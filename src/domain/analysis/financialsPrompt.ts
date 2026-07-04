@@ -24,19 +24,6 @@ import { formatNullableNumber as fmt } from './promptFormat';
  * via the shared selection engine — whitelist + fail-closed gating, with the
  * chartless context so only `always_on` skills qualify.
  */
-// Instruction sandwiching (see prompt.ts's CONTRACT_RECAP comment for the
-// full rationale): the Output Schema + Rules block lives in `stable`, ahead
-// of every data section. This compact, timeless recap — not a new rule,
-// just a distillation of the Rules above — is appended as the LAST line of
-// `dynamic` so rule recency survives regardless of how much data precedes it.
-/** @internal Exported so tests can pin that `dynamic` ends with this block. */
-export const FINANCIALS_CONTRACT_RECAP =
-    '## Output Contract Recap (final check before you respond)\n' +
-    '- Respond with the single JSON object per schema; every KO field must be Korean (존댓말).\n' +
-    '- axisAssessments must cover all 4 axes: growth, quality, solvency, cash.\n' +
-    '- Ground every assessment in the data above — never fabricate a metric or event; treat N/A as missing, not zero or negative.\n' +
-    '- overallSentiment must reflect the balance of all 4 axis sentiments.';
-
 function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
     const { core, selected } = selectSkills(
         skills,
@@ -174,18 +161,21 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
  * Build the financial-statement analysis LLM prompt, split into a
  * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}):
  *
- * - `stable`: role framing, the Data Boundary rules, the Financial Analysis
- *   Frameworks (Active Skills) section, and the Output Schema + Rules. The
- *   skill section is safe here because this builder's selection context is
+ * - `stable`: role framing, the Data Boundary rules, and the Financial
+ *   Analysis Frameworks (Active Skills) section. The skill section is safe
+ *   here because this builder's selection context is
  *   {@link NO_CHART_SELECTION_CONTEXT} (chartless) — only `always_on` skills
  *   can ever qualify (see {@link selectFundamentalSkills}), so the section is
  *   deterministic per skill catalog, never per call.
- * - `dynamic`: the specific "analyze this symbol" ask plus every data section
+ * - `dynamic`: the specific "analyze this symbol" ask, every data section
  *   (income statement, balance sheet, cash flow, the three growth sections,
- *   and the pre-computed scorecard summary) — all symbol-specific — ending in
- *   {@link FINANCIALS_CONTRACT_RECAP}, a compact timeless recap of the Output
- *   Schema Rules (which otherwise live only in `stable`, ahead of all data)
- *   so rule recency survives regardless of data length.
+ *   and the pre-computed scorecard summary), and — at the tail, after all
+ *   data — the Output Schema + Rules. An earlier design moved the Output
+ *   Schema + Rules into `stable` (ahead of every data section) and
+ *   compensated with a long recap at the end of `dynamic`; that recap was
+ *   masking the root cause (rule recency degrades when output rules sit far
+ *   from the data they must be grounded in), so the schema/rules moved back
+ *   to their original tail position and the recap was dropped outright.
  *
  * Accepts a normalized {@link FinancialsSnapshot}, a pre-computed
  * {@link FinancialsScorecard} (axis scores, grades, and signals), and a list of
@@ -245,27 +235,7 @@ export function buildFinancialsAnalysisPrompt(
 - Do not fabricate missing financial metrics, analyst grades, price targets, or macro catalysts.
 
 ## Financial Analysis Frameworks (Active Skills)
-${skillsSection}
-
-## Output Schema
-{
-  "overallConclusionKo": "한국어 한 단락 — 종합 결론",
-  "axisAssessments": [
-    {
-      "axis": "growth" | "quality" | "solvency" | "cash",
-      "sentiment": "bullish" | "neutral" | "bearish",
-      "rationaleKo": "한국어 한 단락 — 축별 평가"
-    }
-  ],
-  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"],
-  "overallSentiment": "bullish" | "neutral" | "bearish"
-}
-
-Rules:
-- Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
-- axisAssessments must include all 4 axes (growth, quality, solvency, cash) in any order.
-- overallSentiment must reflect the balance of all 4 axis sentiments.`;
+${skillsSection}`;
 
     const dynamic = `Analyze the financial data for ${symbol} across 4 axes — growth, quality, solvency, and cash.
 
@@ -291,7 +261,25 @@ ${formatCashFlowGrowthSection(snapshot.cashFlowGrowth)}
 - Composite: Grade ${composite.grade}, Score ${composite.score}/100 | ${composite.summaryKo}
 ${axisRows}
 
-${FINANCIALS_CONTRACT_RECAP}`;
+## Output Schema
+{
+  "overallConclusionKo": "한국어 한 단락 — 종합 결론",
+  "axisAssessments": [
+    {
+      "axis": "growth" | "quality" | "solvency" | "cash",
+      "sentiment": "bullish" | "neutral" | "bearish",
+      "rationaleKo": "한국어 한 단락 — 축별 평가"
+    }
+  ],
+  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"],
+  "overallSentiment": "bullish" | "neutral" | "bearish"
+}
+
+Rules:
+- Respond with valid JSON only. No markdown fences.
+- All KO fields must be written in Korean (존댓말).
+- axisAssessments must include all 4 axes (growth, quality, solvency, cash) in any order.
+- overallSentiment must reflect the balance of all 4 axis sentiments.`;
 
     return { stable, dynamic };
 }

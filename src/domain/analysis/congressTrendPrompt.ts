@@ -38,10 +38,17 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}): `stable` is role
  * framing, Data Boundary, the Domain Skills (Active) section — deterministic
  * per catalog since {@link filterCongressSkills} filters purely by category,
- * never by chart/symbol state — the IMPORTANT Caveats, Output Schema, and the
- * generic Rules; `dynamic` is the specific "analyze this symbol" ask plus the
- * Deterministic Trade Statistics + Recent Trades sections and the one Rules
- * bullet that names the provided net direction verbatim.
+ * never by chart/symbol state — and the IMPORTANT Caveats; `dynamic` is the
+ * specific "analyze this symbol" ask, the Deterministic Trade Statistics +
+ * Recent Trades sections, and — at the tail, after the data — the Output
+ * Schema and the Rules (the net-direction bullet is folded back into Rules
+ * as its final item, naming the provided net direction verbatim). Keeping
+ * the Output Schema + Rules at the tail — after the data they must be
+ * grounded in — matches the fix applied to every other split builder in
+ * this module (see prompt.ts's "Final reminder" comment for the full
+ * rationale): output rules lose recency when they sit ahead of the data,
+ * even though (as here) they contain zero interpolation and would otherwise
+ * be a perfectly cacheable stable prefix.
  *
  * Net direction is supplied **deterministically** via the `stats` argument
  * (count-based) — the LLM only produces prose interpretation. The prompt
@@ -84,21 +91,7 @@ ${skillsSection}
 ## IMPORTANT Caveats
 - Congressional disclosures are filed with a mandatory lag of up to ~45 days (sometimes longer). Trades shown may already be stale relative to current market conditions.
 - Amounts are coarse statutory ranges ($1K–$15K, $15K–$50K, …). Do NOT treat them as precise notional values.
-- This data provides sentiment context only — NOT a precise quantitative signal. Do not overstate its predictive power.
-
-## Output Schema
-Respond with a JSON object matching exactly:
-{
-  "summaryKo": "한국어 한 단락 — 의원 거래 동향 종합 요약",
-  "notableMembersKo": ["주목할 의원 또는 거래 설명 (한국어)", "..."],
-  "riskNoteKo": "한국어 — 공시 지연 및 데이터 한계 포함 리스크 주의사항",
-  "overallSentiment": "bullish" | "neutral" | "bearish"
-}
-
-Rules:
-- Respond with valid JSON only. No markdown fences.
-- All Ko fields must be written in Korean (존댓말).
-- overallSentiment must be one of: "bullish", "neutral", "bearish".`;
+- This data provides sentiment context only — NOT a precise quantitative signal. Do not overstate its predictive power.`;
 
     const dynamic = `Analyze the congressional trading disclosures for ${symbol}.
 
@@ -113,7 +106,20 @@ Amounts are disclosed as coarse dollar ranges, so statistics are COUNT-based —
 ## Recent Trades (newest first, max ${MAX_TRADES_IN_PROMPT})
 ${formatTrades(trades)}
 
-Base overallSentiment on the provided net direction (${stats.direction}), not your own count.`;
+## Output Schema
+Respond with a JSON object matching exactly:
+{
+  "summaryKo": "한국어 한 단락 — 의원 거래 동향 종합 요약",
+  "notableMembersKo": ["주목할 의원 또는 거래 설명 (한국어)", "..."],
+  "riskNoteKo": "한국어 — 공시 지연 및 데이터 한계 포함 리스크 주의사항",
+  "overallSentiment": "bullish" | "neutral" | "bearish"
+}
+
+Rules:
+- Respond with valid JSON only. No markdown fences.
+- All Ko fields must be written in Korean (존댓말).
+- overallSentiment must be one of: "bullish", "neutral", "bearish".
+- Base overallSentiment on the provided net direction (${stats.direction}), not your own count.`;
 
     return { stable, dynamic };
 }

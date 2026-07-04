@@ -20,19 +20,6 @@ import { formatNullableNumber as fmt } from './promptFormat';
  * chart, so only `always_on` skills can qualify. Confidence is a display
  * weight, not an inclusion gate.
  */
-// Instruction sandwiching (see prompt.ts's CONTRACT_RECAP comment for the
-// full rationale): the Output Schema + Allowed Values + Rules block lives in
-// `stable`, ahead of every data section. This compact, timeless recap — not
-// a new rule, just a distillation of the Rules above — is appended as the
-// LAST line of `dynamic` so rule recency survives regardless of article count.
-/** @internal Exported so tests can pin that `dynamic` ends with this block. */
-export const NEWS_CONTRACT_RECAP =
-    '## Output Contract Recap (final check before you respond)\n' +
-    '- Respond with the single JSON object per schema; every KO field must be Korean (존댓말).\n' +
-    '- overallSentiment must be exactly one of "bullish" | "neutral" | "bearish", reflecting only the provided news flow.\n' +
-    '- Ground every event in the articles/calendar above — never fabricate a catalyst, price, or price-movement causation.\n' +
-    '- If no articles or scheduled catalysts were provided, say so explicitly rather than inventing content.';
-
 function selectNewsSkills(skills: readonly Skill[]): Skill[] {
     const { core, selected } = selectSkills(
         skills,
@@ -81,18 +68,22 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * Build the AI news-analysis prompt, split into a stable/dynamic pair (spec
  * §3.4, {@link AssembledPrompt}):
  *
- * - `stable`: role framing, the Data Boundary rules, the News Analysis
- *   Frameworks (Active Skills) section, and the Output Schema + Allowed
- *   Values + Rules. The skill section is safe here because this builder's
- *   selection context is {@link NO_CHART_SELECTION_CONTEXT} (chartless) —
- *   only `always_on` skills can ever qualify (see {@link selectNewsSkills}),
- *   so the section is deterministic per skill catalog, never per call.
+ * - `stable`: role framing, the Data Boundary rules, and the News Analysis
+ *   Frameworks (Active Skills) section. The skill section is safe here
+ *   because this builder's selection context is
+ *   {@link NO_CHART_SELECTION_CONTEXT} (chartless) — only `always_on` skills
+ *   can ever qualify (see {@link selectNewsSkills}), so the section is
+ *   deterministic per skill catalog, never per call.
  * - `dynamic`: the specific "analyze this symbol's news flow" ask (including
- *   the asset-class framing sentence) plus the Recent News Articles and
- *   Upcoming/Recent Earnings Calendar sections — all symbol-specific — ending
- *   in {@link NEWS_CONTRACT_RECAP}, a compact timeless recap of the Output
- *   Schema Rules (which otherwise live only in `stable`, ahead of all data)
- *   so rule recency survives regardless of article count.
+ *   the asset-class framing sentence), the Recent News Articles and
+ *   Upcoming/Recent Earnings Calendar sections, and — at the tail, after all
+ *   data — the Output Schema + Allowed Values + Rules. An earlier design
+ *   moved the Output Schema + Rules into `stable` (ahead of every data
+ *   section) and compensated with a long recap at the end of `dynamic`; that
+ *   recap was masking the root cause (rule recency degrades when output
+ *   rules sit far from the data they must be grounded in), so the
+ *   schema/rules moved back to their original tail position and the recap
+ *   was dropped outright.
  *
  * Accepts enriched news items (each already tagged with a
  * {@link NewsCardAnalysis} via the flash-lite model), the upcoming earnings
@@ -192,7 +183,16 @@ export function buildNewsAnalysisPrompt(
 - No current price, price change, or volume data is provided in this prompt. Do not claim that news caused an actual price move unless explicit price-movement data is provided here.
 
 ## News Analysis Frameworks (Active Skills)
-${skillsSection}
+${skillsSection}`;
+
+    const dynamic = `Analyze the recent news flow for ${symbol} (${companyName}) using ONLY the provided article summaries, card metadata, and earnings calendar.
+${assetContext}
+
+## Recent News Articles (${news.length} items)
+${newsSection}
+
+## Upcoming / Recent Earnings Calendar
+${calendarSection}
 
 ## Output Schema
 {
@@ -215,22 +215,11 @@ Rules:
 - Respond with valid JSON only. No markdown fences.
 - All KO fields must be written in Korean (존댓말).
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
-- keyEventsKo should cover the 3–5 most market-moving events from the provided articles when enough articles exist.
+- keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
 - upcomingEventsKo should highlight scheduled catalysts (earnings, regulatory deadlines, etc.).
 - If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because no recent articles were provided.
 - If no scheduled catalysts are provided, return upcomingEventsKo: [].
 - overallSentiment reflects the net directional bias of the provided news flow only.`;
-
-    const dynamic = `Analyze the recent news flow for ${symbol} (${companyName}) using ONLY the provided article summaries, card metadata, and earnings calendar.
-${assetContext}
-
-## Recent News Articles (${news.length} items)
-${newsSection}
-
-## Upcoming / Recent Earnings Calendar
-${calendarSection}
-
-${NEWS_CONTRACT_RECAP}`;
 
     return { stable, dynamic };
 }

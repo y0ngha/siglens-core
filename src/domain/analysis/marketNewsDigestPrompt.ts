@@ -13,19 +13,6 @@ import type { AssembledPrompt, EnrichedNewsItem, Skill } from '@/domain/types';
  * chart, so only `always_on` skills can qualify. Confidence is a display
  * weight, not an inclusion gate.
  */
-// Instruction sandwiching (see prompt.ts's CONTRACT_RECAP comment for the
-// full rationale): the Output Schema + Allowed Values + Rules block lives in
-// `stable`, ahead of every data section. This compact, timeless recap — not
-// a new rule, just a distillation of the Rules above — is appended as the
-// LAST line of `dynamic` so rule recency survives regardless of article count.
-/** @internal Exported so tests can pin that `dynamic` ends with this block. */
-export const MARKET_NEWS_DIGEST_CONTRACT_RECAP =
-    '## Output Contract Recap (final check before you respond)\n' +
-    '- Respond with the single JSON object per schema; every KO field must be Korean (존댓말).\n' +
-    '- overallSentiment must be exactly one of "bullish" | "neutral" | "bearish", reflecting the category\'s aggregate news flow (not a single company).\n' +
-    '- Ground every event in the articles above — never fabricate a catalyst or price movement.\n' +
-    '- If no articles were provided, say so explicitly rather than inventing content.';
-
 function selectNewsSkills(skills: readonly Skill[]): Skill[] {
     const { core, selected } = selectSkills(
         skills,
@@ -52,15 +39,17 @@ function formatNewsItem(item: EnrichedNewsItem, index: number): string {
  *
  * Build the category-level market-news digest prompt, split into a
  * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}): `stable` is role
- * framing, Data Boundary, the News Analysis Frameworks (Active Skills)
+ * framing, Data Boundary, and the News Analysis Frameworks (Active Skills)
  * section — deterministic per catalog since this builder's selection context
  * is {@link NO_CHART_SELECTION_CONTEXT} (chartless), see
- * {@link selectNewsSkills} — and Output Schema/Allowed Values/Rules;
- * `dynamic` is the specific "summarise this category" ask plus the Recent
- * News Articles section, ending in {@link MARKET_NEWS_DIGEST_CONTRACT_RECAP},
- * a compact timeless recap of the Output Schema Rules (which otherwise live
- * only in `stable`, ahead of all data) so rule recency survives regardless of
- * article count.
+ * {@link selectNewsSkills}; `dynamic` is the specific "summarise this
+ * category" ask, the Recent News Articles section, and — at the tail, after
+ * the data — the Output Schema/Allowed Values/Rules. An earlier design moved
+ * the Output Schema/Rules into `stable` (ahead of the data) and compensated
+ * with a long recap at the end of `dynamic`; that recap was masking the root
+ * cause (rule recency degrades when output rules sit far from the data they
+ * must be grounded in), so the schema/rules moved back to their original
+ * tail position and the recap was dropped outright.
  *
  * Unlike buildNewsAnalysisPrompt (one company's news), this summarises the
  * market-wide flow of a single feed category. `categoryLabel` is the human
@@ -101,7 +90,12 @@ export function buildMarketNewsDigestPrompt(
 - Do not fabricate articles, catalysts, prices, or price movement. No price/volume data is provided here.
 
 ## News Analysis Frameworks (Active Skills)
-${skillsSection}
+${skillsSection}`;
+
+    const dynamic = `Summarise the recent market-wide news flow for the "${categoryLabel}" news category using ONLY the provided article summaries and card metadata.
+
+## Recent News Articles (${news.length} items)
+${newsSection}
 
 ## Output Schema
 {
@@ -123,13 +117,6 @@ Rules:
 - upcomingEventsKo should highlight scheduled catalysts mentioned in the articles; return [] if none.
 - If no recent news articles are provided, return keyEventsKo: [], upcomingEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that judgment is limited because no recent articles were provided.
 - overallSentiment reflects the net directional bias of the provided news flow only.`;
-
-    const dynamic = `Summarise the recent market-wide news flow for the "${categoryLabel}" news category using ONLY the provided article summaries and card metadata.
-
-## Recent News Articles (${news.length} items)
-${newsSection}
-
-${MARKET_NEWS_DIGEST_CONTRACT_RECAP}`;
 
     return { stable, dynamic };
 }

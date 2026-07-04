@@ -24,19 +24,6 @@ const PEER_METRIC_DECIMAL_PLACES = 1;
  * has no chart state to fire against). Confidence is a display weight, not an
  * inclusion gate.
  */
-// Instruction sandwiching (see prompt.ts's CONTRACT_RECAP comment for the
-// full rationale): the Output Schema + Rules block lives in `stable`, ahead
-// of every data section. This compact, timeless recap — not a new rule,
-// just a distillation of the Rules above — is appended as the LAST line of
-// `dynamic` so rule recency survives regardless of how much data precedes it.
-/** @internal Exported so tests can pin that `dynamic` ends with this block. */
-export const FUNDAMENTAL_CONTRACT_RECAP =
-    '## Output Contract Recap (final check before you respond)\n' +
-    '- Respond with the single JSON object per schema; every KO field must be Korean (존댓말).\n' +
-    '- categoryAssessments must cover all 5 categories: valuation, profitability, growth, health, futureDirection.\n' +
-    '- Ground every assessment in the data above — never fabricate a metric, price target, or event; treat N/A as missing, not zero or negative.\n' +
-    '- overallSentiment must reflect the balance of all 5 category sentiments.';
-
 function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
     const { core, selected } = selectSkills(
         skills,
@@ -96,18 +83,21 @@ function formatSectorDirection(
  * Build the AI fundamental-analysis prompt, split into a stable/dynamic pair
  * (spec §3.4, {@link AssembledPrompt}):
  *
- * - `stable`: role framing, the Data Boundary rules, the Fundamental Analysis
- *   Frameworks (Active Skills) section, and the Output Schema + Rules. The
- *   skill section is safe here because this builder's selection context is
+ * - `stable`: role framing, the Data Boundary rules, and the Fundamental
+ *   Analysis Frameworks (Active Skills) section. The skill section is safe
+ *   here because this builder's selection context is
  *   {@link NO_CHART_SELECTION_CONTEXT} (chartless) — only `always_on` skills
  *   can ever qualify (see {@link selectFundamentalSkills}), so the section is
  *   deterministic per skill catalog, never per call.
- * - `dynamic`: the specific "analyze this symbol" ask plus every data section
+ * - `dynamic`: the specific "analyze this symbol" ask, every data section
  *   (company profile, valuation, peers, profitability, growth, financial
- *   health, forward outlook, sector direction) — all symbol-specific — ending
- *   in {@link FUNDAMENTAL_CONTRACT_RECAP}, a compact timeless recap of the
- *   Output Schema Rules (which otherwise live only in `stable`, ahead of all
- *   data) so rule recency survives regardless of data length.
+ *   health, forward outlook, sector direction), and — at the tail, after all
+ *   data — the Output Schema + Rules. An earlier design moved the Output
+ *   Schema + Rules into `stable` (ahead of every data section) and
+ *   compensated with a long recap at the end of `dynamic`; that recap was
+ *   masking the root cause (rule recency degrades when output rules sit far
+ *   from the data they must be grounded in), so the schema/rules moved back
+ *   to their original tail position and the recap was dropped outright.
  *
  * Skills are routed through {@link selectSkills} in the `'fundamental'`
  * prompt context: only `category === 'fundamental'` skills qualify, untagged
@@ -169,27 +159,7 @@ export function buildFundamentalAnalysisPrompt(
 - No current stock price, stock price change, or stock volume data is provided in this prompt. Do not claim that fundamentals caused an actual stock price move unless explicit price-movement data is provided here.
 
 ## Fundamental Analysis Frameworks (Active Skills)
-${skillsSection}
-
-## Output Schema
-{
-  "overallConclusionKo": "한국어 한 단락 — 종합 결론",
-  "categoryAssessments": [
-    {
-      "category": "valuation" | "profitability" | "growth" | "health" | "futureDirection",
-      "sentiment": "bullish" | "neutral" | "bearish",
-      "rationaleKo": "한국어 한 단락 — 카테고리별 평가"
-    }
-  ],
-  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"],
-  "overallSentiment": "bullish" | "neutral" | "bearish"
-}
-
-Rules:
-- Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
-- categoryAssessments must include all 5 categories in any order.
-- overallSentiment must reflect the balance of all 5 category sentiments.`;
+${skillsSection}`;
 
     const dynamic = `Analyze the fundamental data for ${symbol} (${profile.companyName}).
 
@@ -241,7 +211,25 @@ ${peerLines}
 ## Sector Direction
 ${formatSectorDirection(sectorDirection)}
 
-${FUNDAMENTAL_CONTRACT_RECAP}`;
+## Output Schema
+{
+  "overallConclusionKo": "한국어 한 단락 — 종합 결론",
+  "categoryAssessments": [
+    {
+      "category": "valuation" | "profitability" | "growth" | "health" | "futureDirection",
+      "sentiment": "bullish" | "neutral" | "bearish",
+      "rationaleKo": "한국어 한 단락 — 카테고리별 평가"
+    }
+  ],
+  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"],
+  "overallSentiment": "bullish" | "neutral" | "bearish"
+}
+
+Rules:
+- Respond with valid JSON only. No markdown fences.
+- All KO fields must be written in Korean (존댓말).
+- categoryAssessments must include all 5 categories in any order.
+- overallSentiment must reflect the balance of all 5 category sentiments.`;
 
     return { stable, dynamic };
 }

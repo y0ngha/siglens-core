@@ -6,11 +6,17 @@ import { summarizeChainForLlm } from './summarizeChainForLlm';
 
 /**
  * Build the LLM prompt for options analysis, split into a stable/dynamic pair
- * (spec §3.4, {@link AssembledPrompt}): `stable` is the fully-static Output
- * Schema + Interpretation Guide (zero interpolation of any kind — this
- * builder uses no skills, per spec §3.2 "OPTIONS ... 스킬 도입 시 화이트리스트
- * 확장은 후속 과제"); `dynamic` is the role/intro line, current price, and
- * the per-expiration Key Metrics JSON. The prompt requests a JSON response
+ * (spec §3.4, {@link AssembledPrompt}): `stable` is empty — this builder uses
+ * no skills (per spec §3.2 "OPTIONS ... 스킬 도입 시 화이트리스트 확장은 후속
+ * 과제") and has no other catalog-level knowledge to cache; `dynamic` is the
+ * role/intro line, current price, the per-expiration Key Metrics JSON, and —
+ * at the tail, after the data — the Output Schema + Interpretation Guide.
+ * Keeping the output-format instructions at the tail — after the data they
+ * must be grounded in — matches the fix applied to every other split builder
+ * in this module (see prompt.ts's "Final reminder" comment for the full
+ * rationale): output rules lose recency when they sit ahead of the data,
+ * even though (as here) they contain zero interpolation and would otherwise
+ * be a perfectly cacheable stable prefix. The prompt requests a JSON response
  * matching RawOptionsAnalysisResponse (kept tolerant — normalize will fill in
  * any missing fields).
  *
@@ -36,7 +42,16 @@ export function buildOptionsAnalysisPrompt(
         summarizeChainForLlm(c, snapshot.underlyingPrice)
     );
 
-    const stable = [
+    const stable = '';
+
+    const dynamic = [
+        `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in Korean.`,
+        '',
+        `Current price: $${snapshot.underlyingPrice}`,
+        '',
+        '== Key Metrics by Expiration ==',
+        JSON.stringify(summaries, null, 2),
+        '',
         '== Output Schema ==',
         'Respond only with a JSON object matching the schema below. Do not include any other text.',
         '{',
@@ -66,15 +81,6 @@ export function buildOptionsAnalysisPrompt(
         '- topVolumeStrikes: the 3 strikes most actively traded today — read together with OI (accumulated bets) to spot price levels where the market is newly moving.',
         '- topOiBidAskSummary: bid/ask quotes (mid · spread) for the top OI strikes — a tight spread signals good liquidity at that price level.',
         '- Use a friendly but accurate Korean tone in the output. Keep ticker symbols in English as-is (e.g. AAPL).',
-    ].join('\n');
-
-    const dynamic = [
-        `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in Korean.`,
-        '',
-        `Current price: $${snapshot.underlyingPrice}`,
-        '',
-        '== Key Metrics by Expiration ==',
-        JSON.stringify(summaries, null, 2),
     ].join('\n');
 
     return { stable, dynamic };

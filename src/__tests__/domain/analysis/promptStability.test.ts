@@ -1,23 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnalysisPrompt, CONTRACT_RECAP } from '@/domain/analysis/prompt';
-import {
-    buildFundamentalAnalysisPrompt,
-    FUNDAMENTAL_CONTRACT_RECAP,
-} from '@/domain/analysis/fundamentalPrompt';
-import {
-    buildFinancialsAnalysisPrompt,
-    FINANCIALS_CONTRACT_RECAP,
-} from '@/domain/analysis/financialsPrompt';
+import { buildAnalysisPrompt, FINAL_REMINDER } from '@/domain/analysis/prompt';
+import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
+import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
-import {
-    buildNewsAnalysisPrompt,
-    NEWS_CONTRACT_RECAP,
-} from '@/domain/analysis/newsPrompt';
+import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
-import {
-    buildMarketNewsDigestPrompt,
-    MARKET_NEWS_DIGEST_CONTRACT_RECAP,
-} from '@/domain/analysis/marketNewsDigestPrompt';
+import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestPrompt';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
@@ -247,18 +235,22 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
         expect(combined).toContain('AAPL');
     });
 
-    // A/B smoke test on the stable-first ordering found actionability
-    // collapse (entry==target, null top-level plan fields): the Contingent
-    // Plan Mandate lives in `stable`, far ahead of the chart data the model
-    // reasons over. CONTRACT_RECAP is the instruction-sandwiching fix — a
-    // compact, timeless recap appended as the LAST section of `dynamic` so
-    // rule recency survives regardless of how much data precedes it. Pin the
-    // order directly: it must be the literal suffix of `dynamic`, after the
-    // per-type writing-rule/active-skill-name request block.
-    it('dynamic ends with CONTRACT_RECAP (instruction-sandwiching order pin)', () => {
+    // A/B smoke test on an earlier stable-first ordering found actionability
+    // collapse (entry==target, null top-level plan fields): the FULL output
+    // rules block (the static "## Analysis Request" preamble — critical
+    // response rules + field content guidance — reunited with the per-type
+    // writing-rule instructions) had been moved into `stable`, far ahead of
+    // the chart data the model reasons over. The fix restores that block to
+    // the tail of `dynamic` — its original position — so rule recency no
+    // longer depends on a recap; FINAL_REMINDER is a genuinely short 3-line
+    // tail reminder, not a restatement of the rules. Pin the order directly:
+    // FINAL_REMINDER must be the literal suffix of `dynamic`, the "##
+    // Analysis Request" block (incl. its Field Content Guidance) must
+    // precede it in `dynamic`, and neither may leak into `stable`.
+    it('dynamic ends with FINAL_REMINDER, with the full Analysis Request preceding it', () => {
         const bars = makeBars(60, 150);
         const indicators = calculateIndicators(bars);
-        const { dynamic } = buildAnalysisPrompt(
+        const { stable, dynamic } = buildAnalysisPrompt(
             'AAPL',
             'Apple Inc.',
             bars,
@@ -267,7 +259,27 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
             '1Day'
         );
 
-        expect(dynamic.endsWith(CONTRACT_RECAP)).toBe(true);
+        expect(dynamic.endsWith(FINAL_REMINDER)).toBe(true);
+        expect(dynamic).toContain('## Analysis Request');
+        // The Field Content Guidance BODY (not just the Analysis Intent
+        // block's textual reference to the section name, which legitimately
+        // stays in `stable`) is a reliable marker for the actual moved block.
+        expect(dynamic).toContain(
+            'Use the exact numbers provided above rather than recomputing arithmetic'
+        );
+        expect(dynamic.indexOf('## Analysis Request')).toBeLessThan(
+            dynamic.indexOf(FINAL_REMINDER)
+        );
+        // The output rules must NOT be in `stable` any more — that was the bug.
+        expect(stable).not.toContain('## Analysis Request');
+        expect(stable).not.toContain(
+            'Use the exact numbers provided above rather than recomputing arithmetic'
+        );
+        // Guidelines (incl. the Contingent Plan Mandate's textual description)
+        // legitimately stay in `stable` — only the output-format instructions
+        // that reference it (Analysis Request / Field Content Guidance) and
+        // FINAL_REMINDER's short recap of it belong at the dynamic tail.
+        expect(stable).toContain('Contingent Plan Mandate');
         expect(dynamic).toContain('Contingent Plan Mandate');
     });
 });
@@ -366,17 +378,27 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('Microsoft Corporation');
     });
 
-    // Mini-recap tail (instruction sandwiching): the Output Schema + Rules
-    // block lives only in `stable`, ahead of every data section. Pin that
-    // `dynamic` ends with the timeless recap so rule recency survives
-    // regardless of data length.
-    it('buildFundamentalAnalysisPrompt: dynamic ends with FUNDAMENTAL_CONTRACT_RECAP', () => {
-        const { dynamic } = buildFundamentalAnalysisPrompt(
+    // Rules-to-tail fix: the Output Schema + Rules block lives at the END of
+    // `dynamic` (after every data section), not in `stable` ahead of it — the
+    // long recap that used to compensate for the opposite ordering is gone.
+    // Pin: the rules block precedes the literal end, and `stable` no longer
+    // carries any output-format content.
+    it('buildFundamentalAnalysisPrompt: dynamic ends with the Rules block, which follows all data sections', () => {
+        const { stable, dynamic } = buildFundamentalAnalysisPrompt(
             'AAPL',
             makeFundamentalSnapshot('AAPL', 'Apple Inc.'),
             []
         );
-        expect(dynamic.endsWith(FUNDAMENTAL_CONTRACT_RECAP)).toBe(true);
+        expect(
+            dynamic.endsWith(
+                '- overallSentiment must reflect the balance of all 5 category sentiments.'
+            )
+        ).toBe(true);
+        expect(dynamic.indexOf('## Sector Direction')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('Rules:');
     });
 
     it('buildFinancialsAnalysisPrompt: stable is symbol invariant', () => {
@@ -398,15 +420,24 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('MSFT');
     });
 
-    it('buildFinancialsAnalysisPrompt: dynamic ends with FINANCIALS_CONTRACT_RECAP', () => {
+    it('buildFinancialsAnalysisPrompt: dynamic ends with the Rules block, which follows all data sections', () => {
         const scorecard = computeFinancialsScorecard(EMPTY_FINANCIALS);
-        const { dynamic } = buildFinancialsAnalysisPrompt(
+        const { stable, dynamic } = buildFinancialsAnalysisPrompt(
             'AAPL',
             EMPTY_FINANCIALS,
             scorecard,
             []
         );
-        expect(dynamic.endsWith(FINANCIALS_CONTRACT_RECAP)).toBe(true);
+        expect(
+            dynamic.endsWith(
+                '- overallSentiment must reflect the balance of all 4 axis sentiments.'
+            )
+        ).toBe(true);
+        expect(dynamic.indexOf('## Scorecard Summary')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('Rules:');
     });
 
     it('buildNewsAnalysisPrompt: stable is symbol invariant', () => {
@@ -417,9 +448,18 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('TSLA');
     });
 
-    it('buildNewsAnalysisPrompt: dynamic ends with NEWS_CONTRACT_RECAP', () => {
-        const { dynamic } = buildNewsAnalysisPrompt('AAPL', [], [], []);
-        expect(dynamic.endsWith(NEWS_CONTRACT_RECAP)).toBe(true);
+    it('buildNewsAnalysisPrompt: dynamic ends with the Rules block, which follows all data sections', () => {
+        const { stable, dynamic } = buildNewsAnalysisPrompt('AAPL', [], [], []);
+        expect(
+            dynamic.endsWith(
+                '- overallSentiment reflects the net directional bias of the provided news flow only.'
+            )
+        ).toBe(true);
+        expect(
+            dynamic.indexOf('## Upcoming / Recent Earnings Calendar')
+        ).toBeLessThan(dynamic.indexOf('## Output Schema'));
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('Rules:');
     });
 
     it('buildNewsCardAnalysisPrompt: stable is symbol/title invariant', () => {
@@ -451,13 +491,22 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('미국 원자재');
     });
 
-    it('buildMarketNewsDigestPrompt: dynamic ends with MARKET_NEWS_DIGEST_CONTRACT_RECAP', () => {
-        const { dynamic } = buildMarketNewsDigestPrompt(
+    it('buildMarketNewsDigestPrompt: dynamic ends with the Rules block, which follows all data sections', () => {
+        const { stable, dynamic } = buildMarketNewsDigestPrompt(
             '미국 암호화폐',
             [],
             []
         );
-        expect(dynamic.endsWith(MARKET_NEWS_DIGEST_CONTRACT_RECAP)).toBe(true);
+        expect(
+            dynamic.endsWith(
+                '- overallSentiment reflects the net directional bias of the provided news flow only.'
+            )
+        ).toBe(true);
+        expect(dynamic.indexOf('## Recent News Articles')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('Rules:');
     });
 
     it('buildOverallAnalysisPrompt: stable is symbol/company invariant', () => {
@@ -510,6 +559,59 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('TSLA');
     });
 
+    // Tiny-builder rules-to-tail pin: the Output Schema (the only part of
+    // this builder that was ever in `stable`) now lives at the tail of
+    // `dynamic`, after all four axis sections, alongside the Rules and
+    // Few-Shot blocks that were already there. `stable` carries no
+    // catalog-level content for this builder, so it is empty.
+    it('buildOverallAnalysisPrompt: stable is empty; Output Schema sits at the tail of dynamic, after axis data', () => {
+        const technical: AnalysisResponse = {
+            summary: 'technical summary',
+            trend: 'bearish',
+            indicatorResults: [],
+            riskLevel: 'high',
+            keyLevels: { support: [], resistance: [] },
+            priceTargets: {
+                bullish: { targets: [], condition: '' },
+                bearish: { targets: [], condition: '' },
+            },
+            patternSummaries: [],
+            strategyResults: [],
+            candlePatterns: [],
+            trendlines: [],
+        };
+        const fundamental: FundamentalAnalysisResponse = {
+            overallConclusionKo: 'conclusion',
+            categoryAssessments: [],
+            riskFactorsKo: [],
+            overallSentiment: 'neutral',
+        };
+        const news: NewsAnalysisResponse = {
+            currentDriverKo: 'driver',
+            keyEventsKo: [],
+            upcomingEventsKo: [],
+            overallSentiment: 'neutral',
+        };
+        const { stable, dynamic } = buildOverallAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            technical,
+            fundamental,
+            news,
+            '1Day'
+        );
+        expect(stable).toBe('');
+        expect(dynamic.indexOf('## Financials Scorecard')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(dynamic.indexOf('## Output Schema')).toBeLessThan(
+            dynamic.indexOf('Rules:')
+        );
+        expect(dynamic.indexOf('Rules:')).toBeLessThan(
+            dynamic.indexOf('## Few-Shot')
+        );
+    });
+
     it('buildCongressTrendPrompt: stable is symbol invariant', () => {
         const stats: CongressTradeStats = {
             buyCount: 3,
@@ -525,6 +627,38 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('AAPL');
         expect(a.stable).not.toContain('TSLA');
+    });
+
+    it('buildCongressTrendPrompt: dynamic ends with the Rules block, which follows Recent Trades', () => {
+        const stats: CongressTradeStats = {
+            buyCount: 3,
+            sellCount: 1,
+            unknownCount: 0,
+            direction: 'net_buying',
+            uniqueMembers: 2,
+            senateCount: 2,
+            houseCount: 2,
+        };
+        const { stable, dynamic } = buildCongressTrendPrompt(
+            'AAPL',
+            [],
+            stats,
+            []
+        );
+        expect(
+            dynamic.endsWith(
+                'Base overallSentiment on the provided net direction (net_buying), not your own count.'
+            )
+        ).toBe(true);
+        expect(dynamic.indexOf('## Recent Trades')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('Rules:');
+        // Domain Skills + Caveats are catalog-deterministic, so they legitimately
+        // stay in `stable` — only the Output Schema/Rules moved.
+        expect(stable).toContain('## Domain Skills (Active)');
+        expect(stable).toContain('## IMPORTANT Caveats');
     });
 
     it('buildMarketBriefingPrompt: stable is index/sector-data invariant', () => {
@@ -556,6 +690,25 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('Nasdaq 100');
     });
 
+    it('buildMarketBriefingPrompt: dynamic ends with the JSON schema, which follows the index/sector rows', () => {
+        const indices: MarketIndexData[] = [
+            {
+                symbol: 'GSPC',
+                fmpSymbol: '^GSPC',
+                displayName: 'S&P 500',
+                koreanName: '미국 대형주 500',
+                price: 5200.5,
+                changesPercentage: 0.45,
+            },
+        ];
+        const { stable, dynamic } = buildMarketBriefingPrompt(indices, []);
+        expect(dynamic.indexOf('섹터 등락률:')).toBeLessThan(
+            dynamic.indexOf('Schema (')
+        );
+        expect(dynamic.trimEnd().endsWith('}')).toBe(true);
+        expect(stable).not.toContain('Schema (');
+    });
+
     it('buildOptionsAnalysisPrompt: stable is symbol/company invariant', () => {
         // Note: the static Interpretation Guide text uses "AAPL" as its own
         // illustrative example (`e.g. AAPL`), so the per-call markers here
@@ -585,6 +738,30 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('ZZZZ');
         expect(a.stable).not.toContain('Globex Inc.');
+    });
+
+    // No skills, no other catalog-level knowledge (spec §3.2) — `stable` is
+    // empty, and the Output Schema + Interpretation Guide sit at the tail of
+    // `dynamic`, after the Key Metrics data.
+    it('buildOptionsAnalysisPrompt: stable is empty; Output Schema + Interpretation Guide sit at the tail of dynamic', () => {
+        const snapshot: OptionsSnapshot = {
+            symbol: 'ZZZZ',
+            underlyingPrice: 198,
+            capturedAt: '2026-05-14T16:00:00Z',
+            chains: [],
+        };
+        const { stable, dynamic } = buildOptionsAnalysisPrompt({
+            expirationDate: 'all',
+            companyName: 'Acme Corp.',
+            snapshot,
+        });
+        expect(stable).toBe('');
+        expect(dynamic.indexOf('== Key Metrics by Expiration ==')).toBeLessThan(
+            dynamic.indexOf('== Output Schema ==')
+        );
+        expect(dynamic.indexOf('== Output Schema ==')).toBeLessThan(
+            dynamic.indexOf('== Interpretation Guide ==')
+        );
     });
 
     it('buildMacroBriefingPrompt: stable is indicator/calendar-data invariant', () => {
@@ -625,6 +802,20 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('CPI Release');
     });
 
+    it('buildMacroBriefingPrompt: dynamic ends with the JSON schema, which follows the indicator/calendar data', () => {
+        const snap: EconomySnapshot = {
+            indicators: [],
+            treasury: null,
+            calendar: [],
+        };
+        const { stable, dynamic } = buildMacroBriefingPrompt(snap);
+        expect(dynamic.indexOf('임박 경제 이벤트')).toBeLessThan(
+            dynamic.indexOf('Schema (')
+        );
+        expect(dynamic.trimEnd().endsWith('}')).toBe(true);
+        expect(stable).not.toContain('Schema (');
+    });
+
     it('buildEconomicEventAnalysisPrompt: stable is event-name invariant', () => {
         // Note: the static few-shot block hardcodes its own illustrative
         // events ("CPI MoM", "Fed Rate Decision"), so the per-call markers
@@ -649,6 +840,25 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('Housing Starts');
     });
 
+    it('buildEconomicEventAnalysisPrompt: dynamic ends with the Few-shot examples, which follow the Event Details', () => {
+        const { stable, dynamic } = buildEconomicEventAnalysisPrompt({
+            impact: 'High',
+            actual: 0.2,
+            estimate: 0.3,
+            previous: 0.4,
+            unit: '%',
+            event: 'Retail Sales MoM',
+        });
+        expect(dynamic.indexOf('## Event Details')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(dynamic.indexOf('## Output Schema')).toBeLessThan(
+            dynamic.indexOf('## Few-shot examples')
+        );
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('## Few-shot examples');
+    });
+
     it('buildIndicatorTranslationPrompt: stable is indicator-name invariant', () => {
         // Note: the static few-shot block hardcodes its own illustrative
         // indicator names (Unemployment Claims, Core CPI MoM, Nonfarm
@@ -660,5 +870,19 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('Producer Price Index');
         expect(a.stable).not.toContain('Consumer Confidence Index');
+    });
+
+    it('buildIndicatorTranslationPrompt: dynamic ends with the Few-shot examples, which follow the Indicator Name', () => {
+        const { stable, dynamic } = buildIndicatorTranslationPrompt(
+            'Producer Price Index'
+        );
+        expect(dynamic.indexOf('## Indicator Name')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
+        expect(dynamic.indexOf('## Output Schema')).toBeLessThan(
+            dynamic.indexOf('## Few-shot examples')
+        );
+        expect(stable).not.toContain('## Output Schema');
+        expect(stable).not.toContain('## Few-shot examples');
     });
 });
