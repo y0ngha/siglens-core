@@ -67,7 +67,13 @@ describe('submitBriefing 함수는', () => {
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
-        mockBuildMarketBriefingPrompt.mockReturnValue('mock prompt');
+        // `buildMarketBriefingPrompt` returns `{ stable, dynamic }` (spec §3.4
+        // assembly split); the combined 'mock prompt' below matches
+        // production dispatch's `stable + '\n\n' + dynamic` join.
+        mockBuildMarketBriefingPrompt.mockReturnValue({
+            stable: 'mock',
+            dynamic: 'prompt',
+        });
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
     });
 
@@ -123,7 +129,10 @@ describe('submitBriefing 함수는', () => {
             const body = JSON.parse(init.body) as Record<string, unknown>;
             expect(body).toMatchObject({
                 jobId: expect.any(String),
-                prompt: 'mock prompt',
+                // Legacy combined field: stable + '\n\n' + dynamic (spec §3.4).
+                prompt: 'mock\n\nprompt',
+                promptStable: 'mock',
+                promptDynamic: 'prompt',
                 model: BRIEFING_MODEL_ID,
             });
             expect(body.seed).toBe(analysisSeed(body.prompt as string));

@@ -83,7 +83,12 @@ export async function submitIndicatorTranslation(
     }
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildIndicatorTranslationPrompt(normalizedName);
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildIndicatorTranslationPrompt(normalizedName);
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
     const jobId = crypto.randomUUID();
 
     // Persist the cache key in job meta so pollIndicatorTranslation writes the
@@ -110,6 +115,8 @@ export async function submitIndicatorTranslation(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             model: INDICATOR_TRANSLATION_MODEL_ID,
             seed: analysisSeed(prompt),
         }),

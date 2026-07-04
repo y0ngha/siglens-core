@@ -155,7 +155,12 @@ export async function submitCongressTrend(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const stats = summarizeCongressTrades(trades);
-    const prompt = buildCongressTrendPrompt(symbol, trades, stats, skills);
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildCongressTrendPrompt(symbol, trades, stats, skills);
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -174,6 +179,8 @@ export async function submitCongressTrend(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             seed: analysisSeed(prompt),
             model: modelId,
             tier,

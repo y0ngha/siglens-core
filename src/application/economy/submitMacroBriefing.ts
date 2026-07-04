@@ -79,7 +79,12 @@ export async function submitMacroBriefing(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
 
-    const prompt = buildMacroBriefingPrompt(data);
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildMacroBriefingPrompt(data);
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
     const jobId = crypto.randomUUID();
 
     // Persist the input-hashed cache key so pollMacroBriefing writes the result
@@ -106,6 +111,8 @@ export async function submitMacroBriefing(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             model: BRIEFING_MODEL_ID,
             seed: analysisSeed(prompt),
         }),

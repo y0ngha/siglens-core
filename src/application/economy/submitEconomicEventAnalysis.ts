@@ -104,7 +104,12 @@ export async function submitEconomicEventAnalysis(
     }
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildEconomicEventAnalysisPrompt(input);
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildEconomicEventAnalysisPrompt(input);
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
     const jobId = crypto.randomUUID();
 
     // Persist the cache key in job meta so pollEconomicEventAnalysis writes the
@@ -131,6 +136,8 @@ export async function submitEconomicEventAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             model: ECONOMIC_EVENT_MODEL_ID,
             seed: analysisSeed(prompt),
         }),

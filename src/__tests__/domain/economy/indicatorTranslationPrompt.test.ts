@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { buildIndicatorTranslationPrompt } from '@/domain/economy/indicatorTranslationPrompt';
+import { buildIndicatorTranslationPrompt as buildIndicatorTranslationPromptRaw } from '@/domain/economy/indicatorTranslationPrompt';
+
+// `buildIndicatorTranslationPrompt` now returns `{ stable, dynamic }` (spec
+// §3.4 assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildIndicatorTranslationPrompt = (
+    ...args: Parameters<typeof buildIndicatorTranslationPromptRaw>
+): string => {
+    const { stable, dynamic } = buildIndicatorTranslationPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 describe('buildIndicatorTranslationPrompt', () => {
     it('입력 이름을 프롬프트에 포함', () => {

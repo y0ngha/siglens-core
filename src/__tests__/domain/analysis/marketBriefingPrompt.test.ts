@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
+import { buildMarketBriefingPrompt as buildMarketBriefingPromptRaw } from '@/domain/analysis/marketBriefingPrompt';
 import type { MarketIndexData, MarketSectorData } from '@/domain/types';
+
+// `buildMarketBriefingPrompt` now returns `{ stable, dynamic }` (spec §3.4
+// assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildMarketBriefingPrompt = (
+    ...args: Parameters<typeof buildMarketBriefingPromptRaw>
+): string => {
+    const { stable, dynamic } = buildMarketBriefingPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const indices: MarketIndexData[] = [
     {
