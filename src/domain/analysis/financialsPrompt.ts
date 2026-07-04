@@ -24,6 +24,19 @@ import { formatNullableNumber as fmt } from './promptFormat';
  * via the shared selection engine — whitelist + fail-closed gating, with the
  * chartless context so only `always_on` skills qualify.
  */
+// Instruction sandwiching (see prompt.ts's CONTRACT_RECAP comment for the
+// full rationale): the Output Schema + Rules block lives in `stable`, ahead
+// of every data section. This compact, timeless recap — not a new rule,
+// just a distillation of the Rules above — is appended as the LAST line of
+// `dynamic` so rule recency survives regardless of how much data precedes it.
+/** @internal Exported so tests can pin that `dynamic` ends with this block. */
+export const FINANCIALS_CONTRACT_RECAP =
+    '## Output Contract Recap (final check before you respond)\n' +
+    '- Respond with the single JSON object per schema; every KO field must be Korean (존댓말).\n' +
+    '- axisAssessments must cover all 4 axes: growth, quality, solvency, cash.\n' +
+    '- Ground every assessment in the data above — never fabricate a metric or event; treat N/A as missing, not zero or negative.\n' +
+    '- overallSentiment must reflect the balance of all 4 axis sentiments.';
+
 function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
     const { core, selected } = selectSkills(
         skills,
@@ -169,7 +182,10 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
  *   deterministic per skill catalog, never per call.
  * - `dynamic`: the specific "analyze this symbol" ask plus every data section
  *   (income statement, balance sheet, cash flow, the three growth sections,
- *   and the pre-computed scorecard summary) — all symbol-specific.
+ *   and the pre-computed scorecard summary) — all symbol-specific — ending in
+ *   {@link FINANCIALS_CONTRACT_RECAP}, a compact timeless recap of the Output
+ *   Schema Rules (which otherwise live only in `stable`, ahead of all data)
+ *   so rule recency survives regardless of data length.
  *
  * Accepts a normalized {@link FinancialsSnapshot}, a pre-computed
  * {@link FinancialsScorecard} (axis scores, grades, and signals), and a list of
@@ -273,7 +289,9 @@ ${formatCashFlowGrowthSection(snapshot.cashFlowGrowth)}
 
 ## Scorecard Summary
 - Composite: Grade ${composite.grade}, Score ${composite.score}/100 | ${composite.summaryKo}
-${axisRows}`;
+${axisRows}
+
+${FINANCIALS_CONTRACT_RECAP}`;
 
     return { stable, dynamic };
 }

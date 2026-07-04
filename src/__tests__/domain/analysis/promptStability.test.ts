@@ -1,11 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
-import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
-import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
+import { buildAnalysisPrompt, CONTRACT_RECAP } from '@/domain/analysis/prompt';
+import {
+    buildFundamentalAnalysisPrompt,
+    FUNDAMENTAL_CONTRACT_RECAP,
+} from '@/domain/analysis/fundamentalPrompt';
+import {
+    buildFinancialsAnalysisPrompt,
+    FINANCIALS_CONTRACT_RECAP,
+} from '@/domain/analysis/financialsPrompt';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
-import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
+import {
+    buildNewsAnalysisPrompt,
+    NEWS_CONTRACT_RECAP,
+} from '@/domain/analysis/newsPrompt';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
-import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestPrompt';
+import {
+    buildMarketNewsDigestPrompt,
+    MARKET_NEWS_DIGEST_CONTRACT_RECAP,
+} from '@/domain/analysis/marketNewsDigestPrompt';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
@@ -234,6 +246,30 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
         expect(combined).toContain('## Analysis Intent');
         expect(combined).toContain('AAPL');
     });
+
+    // A/B smoke test on the stable-first ordering found actionability
+    // collapse (entry==target, null top-level plan fields): the Contingent
+    // Plan Mandate lives in `stable`, far ahead of the chart data the model
+    // reasons over. CONTRACT_RECAP is the instruction-sandwiching fix — a
+    // compact, timeless recap appended as the LAST section of `dynamic` so
+    // rule recency survives regardless of how much data precedes it. Pin the
+    // order directly: it must be the literal suffix of `dynamic`, after the
+    // per-type writing-rule/active-skill-name request block.
+    it('dynamic ends with CONTRACT_RECAP (instruction-sandwiching order pin)', () => {
+        const bars = makeBars(60, 150);
+        const indicators = calculateIndicators(bars);
+        const { dynamic } = buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            bars,
+            indicators,
+            [],
+            '1Day'
+        );
+
+        expect(dynamic.endsWith(CONTRACT_RECAP)).toBe(true);
+        expect(dynamic).toContain('Contingent Plan Mandate');
+    });
 });
 
 // Spec §3.4 / plan Task 4.2 Step 1 — only `buildAnalysisPrompt` (technical) had
@@ -330,6 +366,19 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('Microsoft Corporation');
     });
 
+    // Mini-recap tail (instruction sandwiching): the Output Schema + Rules
+    // block lives only in `stable`, ahead of every data section. Pin that
+    // `dynamic` ends with the timeless recap so rule recency survives
+    // regardless of data length.
+    it('buildFundamentalAnalysisPrompt: dynamic ends with FUNDAMENTAL_CONTRACT_RECAP', () => {
+        const { dynamic } = buildFundamentalAnalysisPrompt(
+            'AAPL',
+            makeFundamentalSnapshot('AAPL', 'Apple Inc.'),
+            []
+        );
+        expect(dynamic.endsWith(FUNDAMENTAL_CONTRACT_RECAP)).toBe(true);
+    });
+
     it('buildFinancialsAnalysisPrompt: stable is symbol invariant', () => {
         const scorecard = computeFinancialsScorecard(EMPTY_FINANCIALS);
         const a = buildFinancialsAnalysisPrompt(
@@ -349,12 +398,28 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('MSFT');
     });
 
+    it('buildFinancialsAnalysisPrompt: dynamic ends with FINANCIALS_CONTRACT_RECAP', () => {
+        const scorecard = computeFinancialsScorecard(EMPTY_FINANCIALS);
+        const { dynamic } = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            EMPTY_FINANCIALS,
+            scorecard,
+            []
+        );
+        expect(dynamic.endsWith(FINANCIALS_CONTRACT_RECAP)).toBe(true);
+    });
+
     it('buildNewsAnalysisPrompt: stable is symbol invariant', () => {
         const a = buildNewsAnalysisPrompt('AAPL', [], [], []);
         const b = buildNewsAnalysisPrompt('TSLA', [], [], []);
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('AAPL');
         expect(a.stable).not.toContain('TSLA');
+    });
+
+    it('buildNewsAnalysisPrompt: dynamic ends with NEWS_CONTRACT_RECAP', () => {
+        const { dynamic } = buildNewsAnalysisPrompt('AAPL', [], [], []);
+        expect(dynamic.endsWith(NEWS_CONTRACT_RECAP)).toBe(true);
     });
 
     it('buildNewsCardAnalysisPrompt: stable is symbol/title invariant', () => {
@@ -384,6 +449,15 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('미국 암호화폐');
         expect(a.stable).not.toContain('미국 원자재');
+    });
+
+    it('buildMarketNewsDigestPrompt: dynamic ends with MARKET_NEWS_DIGEST_CONTRACT_RECAP', () => {
+        const { dynamic } = buildMarketNewsDigestPrompt(
+            '미국 암호화폐',
+            [],
+            []
+        );
+        expect(dynamic.endsWith(MARKET_NEWS_DIGEST_CONTRACT_RECAP)).toBe(true);
     });
 
     it('buildOverallAnalysisPrompt: stable is symbol/company invariant', () => {

@@ -20,6 +20,19 @@ import { formatNullableNumber as fmt } from './promptFormat';
  * chart, so only `always_on` skills can qualify. Confidence is a display
  * weight, not an inclusion gate.
  */
+// Instruction sandwiching (see prompt.ts's CONTRACT_RECAP comment for the
+// full rationale): the Output Schema + Allowed Values + Rules block lives in
+// `stable`, ahead of every data section. This compact, timeless recap — not
+// a new rule, just a distillation of the Rules above — is appended as the
+// LAST line of `dynamic` so rule recency survives regardless of article count.
+/** @internal Exported so tests can pin that `dynamic` ends with this block. */
+export const NEWS_CONTRACT_RECAP =
+    '## Output Contract Recap (final check before you respond)\n' +
+    '- Respond with the single JSON object per schema; every KO field must be Korean (존댓말).\n' +
+    '- overallSentiment must be exactly one of "bullish" | "neutral" | "bearish", reflecting only the provided news flow.\n' +
+    '- Ground every event in the articles/calendar above — never fabricate a catalyst, price, or price-movement causation.\n' +
+    '- If no articles or scheduled catalysts were provided, say so explicitly rather than inventing content.';
+
 function selectNewsSkills(skills: readonly Skill[]): Skill[] {
     const { core, selected } = selectSkills(
         skills,
@@ -76,7 +89,10 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  *   so the section is deterministic per skill catalog, never per call.
  * - `dynamic`: the specific "analyze this symbol's news flow" ask (including
  *   the asset-class framing sentence) plus the Recent News Articles and
- *   Upcoming/Recent Earnings Calendar sections — all symbol-specific.
+ *   Upcoming/Recent Earnings Calendar sections — all symbol-specific — ending
+ *   in {@link NEWS_CONTRACT_RECAP}, a compact timeless recap of the Output
+ *   Schema Rules (which otherwise live only in `stable`, ahead of all data)
+ *   so rule recency survives regardless of article count.
  *
  * Accepts enriched news items (each already tagged with a
  * {@link NewsCardAnalysis} via the flash-lite model), the upcoming earnings
@@ -212,7 +228,9 @@ ${assetContext}
 ${newsSection}
 
 ## Upcoming / Recent Earnings Calendar
-${calendarSection}`;
+${calendarSection}
+
+${NEWS_CONTRACT_RECAP}`;
 
     return { stable, dynamic };
 }

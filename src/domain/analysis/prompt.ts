@@ -1544,6 +1544,34 @@ const buildAnalysisRequestDynamic = (
         .join('\n');
 };
 
+// ── Output-contract recap (instruction sandwiching) ────────────────────────
+// The stable-first assembly split (spec §3.4) moved the bulk of the output
+// rules — including the Contingent Plan Mandate — into the byte-stable
+// prefix, ahead of the entire chart-data block. An A/B smoke test on that
+// ordering found actionability collapse (entry==target, null top-level plan
+// fields): by the time the model finishes reading the market data and writes
+// the response, the rules are many thousands of tokens behind it. This block
+// is a compact, timeless recap of those rules — not a new rule — placed as
+// the LAST section of `dynamic`, immediately before the model responds. It
+// keeps the byte-stable prefix cacheable (nothing here is per-call) while
+// restoring rule recency via "instruction sandwiching": critical rules at
+// both the start and the end of the prompt.
+/**
+ * @internal Exported so tests can pin that `dynamic` ends with this exact
+ * block (order pin) and assert its content directly.
+ */
+export const CONTRACT_RECAP = [
+    '## Output Contract Recap (final check before you respond)',
+    '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", derive a conditional plan from the keyLevels above.',
+    '  Populate entryPrices, stopLoss, and takeProfitPrices (never null, 0, or empty) whenever a supporting keyLevels value exists.',
+    '  Compute riskReward from those same prices; frame the plan as conditional on the stated trigger for "wait"/"avoid".',
+    '- Grounding: every price you cite must already appear in keyLevels or the market data above.',
+    '  Never invent, round, or extrapolate a level — if a component genuinely has no supporting data, state that gap explicitly instead of fabricating one.',
+    '- Sanity check: entryPrices must not equal takeProfitPrices; stopLoss must sit on the correct side of entry (below for a long).',
+    '  riskReward must be derived from the actual entry/stop/target numbers you wrote, not asserted independently.',
+    '- Respond with a single JSON object matching the schema; all Korean prose fields must use 존댓말.',
+].join('\n');
+
 // ── ATR-extreme sizing note (Tier-0 conditional promotion) ──────────────────
 // When realized volatility is extreme, position-sizing context must never be
 // dropped — even if the gated sizing guide did not fire. The threshold is
@@ -1711,8 +1739,14 @@ const buildSkillContentSections = (
  *   bars, regime/indicator/pro-indicator/SMC/market-reference sections),
  *   gated (`selected`) skill digests ordered by relevance, the tier/timeframe
  *   conditional notes (ATR-extreme sizing), the optional Fear & Greed
- *   section, and the per-type writing-rule + active-skill-name request block.
+ *   section, the per-type writing-rule + active-skill-name request block, and
+ *   — always last — {@link CONTRACT_RECAP}, a compact timeless recap of the
+ *   Contingent Plan Mandate/grounding/sanity rules. That recap sits at the
+ *   very end of `dynamic` (instruction sandwiching) so rule recency survives
+ *   the stable-first ordering, which otherwise leaves the output rules many
+ *   thousands of tokens behind the model's response (see its own comment).
  *
+
  * Skills are gated by {@link selectSkills} in the `'technical'` prompt
  * context: non-chart skills (category fundamental/news/congress) are
  * whitelisted out, `always_on` skills form the stable name-sorted `core`
@@ -1836,6 +1870,10 @@ export function buildAnalysisPrompt(
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
         ...(requestDynamicPart !== '' ? [requestDynamicPart] : []),
+        // Always last — see the "Output-contract recap" comment above
+        // CONTRACT_RECAP's definition for why this must stay the final
+        // dynamic section (instruction sandwiching / rule recency).
+        CONTRACT_RECAP,
     ];
 
     return {
