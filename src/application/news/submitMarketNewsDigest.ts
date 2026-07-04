@@ -131,7 +131,12 @@ export async function submitMarketNewsDigest(
 
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildMarketNewsDigestPrompt(categoryLabel, news, skills);
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildMarketNewsDigestPrompt(categoryLabel, news, skills);
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -149,6 +154,8 @@ export async function submitMarketNewsDigest(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             seed: analysisSeed(prompt),
             model: modelId,
             tier: DEFAULT_TIER,

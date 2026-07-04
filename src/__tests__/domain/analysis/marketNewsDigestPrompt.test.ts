@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestPrompt';
+import { buildMarketNewsDigestPrompt as buildMarketNewsDigestPromptRaw } from '@/domain/analysis/marketNewsDigestPrompt';
 import type { EnrichedNewsItem, Skill } from '@/domain/types';
+
+// `buildMarketNewsDigestPrompt` now returns `{ stable, dynamic }` (spec §3.4
+// assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildMarketNewsDigestPrompt = (
+    ...args: Parameters<typeof buildMarketNewsDigestPromptRaw>
+): string => {
+    const { stable, dynamic } = buildMarketNewsDigestPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const ITEM: EnrichedNewsItem = {
     id: 'c1',
