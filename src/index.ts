@@ -516,6 +516,9 @@ export type {
     RegressionResult,
     CandlePattern,
     CandlePatternEntry,
+    // Chart-pattern pre-screener result types (domain/patterns, spec §3.3).
+    ChartPatternId,
+    PatternCandidate,
     CandlePatternSummary,
     ChartDisplayType,
     ChatLoadingPhase,

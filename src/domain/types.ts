@@ -3317,7 +3317,7 @@ export type {
 // than in a subfolder file re-exported from this module.
 // =============================================================================
 
-/** @internal 스크리너가 식별 가능한 차트 패턴 ID — skills/patterns/*.md 파일명과 1:1. */
+/** 스크리너가 식별 가능한 차트 패턴 ID — skills/patterns/*.md 파일명과 1:1. */
 export type ChartPatternId =
     | 'head_and_shoulders'
     | 'inverse_head_and_shoulders'
@@ -3348,7 +3348,7 @@ export interface PivotPoint {
     kind: PivotKind;
 }
 
-/** @internal A pre-screener candidate hit — a coarse, recall-biased match for one pattern ID over a bar range. */
+/** A pre-screener candidate hit — a coarse, recall-biased match for one pattern ID over a bar range. */
 export interface PatternCandidate {
     id: ChartPatternId;
     /** 판정에 사용된 피벗들의 bar 인덱스 범위. */
