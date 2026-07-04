@@ -62,9 +62,9 @@ describe('buildIndicatorTranslationCacheKey (production path)', () => {
         process.env = originalEnv;
     });
 
-    it('올바른 키 형식 반환 (v1:translation:indicator:<hash>:p1)', async () => {
+    it('올바른 키 형식 반환 (v1:translation:indicator:<hash>:p2)', async () => {
         const key = await getCacheKeyForName('Core PCE Price Index YoY');
-        expect(key).toMatch(/^v1:translation:indicator:[0-9a-f]{16}:p1$/);
+        expect(key).toMatch(/^v1:translation:indicator:[0-9a-f]{16}:p2$/);
     });
 
     it('동일 이름 → 동일 캐시 키(결정적)', async () => {

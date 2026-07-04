@@ -197,9 +197,19 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * gating; the fundamental prompt's skills are now name-sorted by the shared
  * selector instead of catalog order.
  *
+ * @remarks
+ * **`p4` = stable/dynamic assembly split (spec §3.4).** Both `buildAnalysisPrompt`
+ * (technical) and `buildFundamentalAnalysisPrompt` now return
+ * `AssembledPrompt { stable, dynamic }` instead of a single string; the
+ * fingerprint only covers skill metadata (`{name, gating, tokenCost}`), so
+ * this assembly reorder (stable content — intent/guidelines/guardrail/
+ * always_on digests — now precedes the dynamic data sections, the inverse of
+ * the pre-split order) changes prompt bytes without changing that fingerprint,
+ * requiring a manual bump per the versioning policy (spec §4).
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -305,9 +315,16 @@ export function buildMacroBriefingCacheKey(
  * body does not change this template's prompt bytes — bumping it would be
  * no-op cache churn.
  *
+ * @remarks
+ * **`p2` = stable/dynamic assembly split (spec §3.4).**
+ * `buildEconomicEventAnalysisPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; the fully-static role framing/Data
+ * Boundary/Output Schema/Rules/few-shot examples moved into `stable` ahead of
+ * the per-event Event Details section, changing this template's prompt bytes.
+ *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
@@ -451,9 +468,17 @@ export function buildFundamentalCacheKey(
  * gating), so injected fundamental skills are name-sorted instead of catalog
  * order, changing this template's prompt bytes.
  *
+ * @remarks
+ * **`p4` = stable/dynamic assembly split (spec §3.4).**
+ * `buildFinancialsAnalysisPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; the always_on-only "Financial
+ * Analysis Frameworks" section moved into `stable` alongside Data
+ * Boundary/Output Schema/Rules, ahead of the per-symbol data sections,
+ * changing this template's prompt bytes.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -515,9 +540,17 @@ export function buildFinancialsCacheKey(
  * keeps its own private `category === 'congress'` filter and does not call
  * `selectSkills`, so its prompt bytes are unchanged.
  *
+ * @remarks
+ * **`p3` = stable/dynamic assembly split (spec §3.4).** `buildCongressTrendPrompt`
+ * now returns `AssembledPrompt { stable, dynamic }`; the catalog-deterministic
+ * "Domain Skills (Active)" section (filtered purely by category, never by
+ * chart/symbol state) moved into `stable` alongside role framing/Data
+ * Boundary/Caveats/Output Schema/Rules, ahead of the per-symbol trade data,
+ * changing this template's prompt bytes.
+ *
  * @internal
  */
-export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /** @internal TTL for congressional-trade trend analysis cache results. Default: 24 hours. */
 export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
@@ -590,9 +623,17 @@ export function buildCongressTrendCacheKey(
  * this template's prompt bytes. (There was an implicit unversioned "p1"
  * generation before this constant existed.)
  *
+ * @remarks
+ * **`p3` = stable/dynamic assembly split (spec §3.4).** Both
+ * `buildNewsAnalysisPrompt` and `buildMarketNewsDigestPrompt` now return
+ * `AssembledPrompt { stable, dynamic }`; the always_on-only "News Analysis
+ * Frameworks" section moved into `stable` alongside role framing/Data
+ * Boundary/Output Schema/Rules, ahead of the per-call article data, changing
+ * both templates' prompt bytes.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
@@ -693,9 +734,16 @@ export function buildOverallCacheKey(
  * body does not change this template's prompt bytes — bumping it would be
  * no-op cache churn.
  *
+ * @remarks
+ * **`p2` = stable/dynamic assembly split (spec §3.4).**
+ * `buildIndicatorTranslationPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; the fully-static role framing/Data
+ * Boundary/Output Schema/Rules/few-shot examples moved into `stable` ahead of
+ * the per-call Indicator Name section, changing this template's prompt bytes.
+ *
  * @internal
  */
-export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /** @internal Number of days an indicator translation result is kept in cache. */
 const INDICATOR_TRANSLATION_CACHE_TTL_DAYS = 30;

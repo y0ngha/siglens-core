@@ -74,9 +74,9 @@ describe('buildEconomicEventCacheKey (production path)', () => {
         process.env = originalEnv;
     });
 
-    it('올바른 키 형식 반환 (v1:analysis:economic-event:<hash>:p1)', async () => {
+    it('올바른 키 형식 반환 (v1:analysis:economic-event:<hash>:p2)', async () => {
         const key = await getCacheKeyForInput(BASE_INPUT);
-        expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p1$/);
+        expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p2$/);
     });
 
     it('동일 입력 → 동일 캐시 키(결정적)', async () => {
@@ -107,7 +107,7 @@ describe('buildEconomicEventCacheKey (production path)', () => {
 
     it('actual=null 이어도 결정적 해시를 가진 키 반환', async () => {
         const key = await getCacheKeyForInput({ ...BASE_INPUT, actual: null });
-        expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p1$/);
+        expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p2$/);
     });
 
     it('ECONOMIC_EVENT_CACHE_TTL이 양수(24h = SECONDS_PER_DAY)', () => {

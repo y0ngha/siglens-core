@@ -92,10 +92,10 @@ describe('submitEconomicEventAnalysis 함수는', () => {
         expect(body.seed).toBe(analysisSeed(body.prompt as string));
     });
 
-    it('캐시 키는 v1:analysis:economic-event:<hash>:p1 형식', async () => {
+    it('캐시 키는 v1:analysis:economic-event:<hash>:p2 형식', async () => {
         await submitEconomicEventAnalysis(BASE_INPUT);
         const key = mockCacheGet.mock.calls[0][0] as string;
-        expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p1$/);
+        expect(key).toMatch(/^v1:analysis:economic-event:[0-9a-f]{16}:p2$/);
     });
 
     it('동일 캐시 키를 job meta에 저장(read==write 보장)', async () => {
