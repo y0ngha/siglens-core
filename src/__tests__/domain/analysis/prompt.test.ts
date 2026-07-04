@@ -2787,10 +2787,7 @@ describe('prompt', () => {
         it('결정 트리 Step 2: 가격 계산 규칙이 포함된다', () => {
             expect(result).toContain('Step 2');
             expect(result).toContain(
-                'For "enter" and "wait": entryPrices, stopLoss, and takeProfitPrices are REQUIRED.'
-            );
-            expect(result).toContain(
-                'For "avoid": entryPrices must be [], takeProfitPrices must be [], and stopLoss must be omitted.'
+                'entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike.'
             );
         });
 
@@ -2798,11 +2795,22 @@ describe('prompt', () => {
             expect(result).toContain('Step 3');
             expect(result).toContain('positionAnalysis');
             expect(result).toContain(
-                'For "avoid", state that no long entry range is valid under the current data'
+                'For "avoid", state the conditional trigger explicitly'
             );
-            expect(result).toContain('For "avoid", do not invent exit prices');
             expect(result).toContain(
-                'For "avoid", state that risk/reward cannot be calculated'
+                'for "avoid" frame these as applying once the contingent entry triggers'
+            );
+            expect(result).toContain(
+                'based on the (contingent) entry/exit prices for "avoid"'
+            );
+        });
+
+        it('avoid/wait 판정에서도 keyLevels 기반 contingent 플랜을 강제한다', () => {
+            expect(result).toContain(
+                'ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels'
+            );
+            expect(result).toContain(
+                'Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist'
             );
         });
 
