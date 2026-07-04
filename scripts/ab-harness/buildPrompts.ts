@@ -97,7 +97,10 @@ export function buildTechnicalCase(
     skills: readonly Skill[]
 ): PromptCaseOutput {
     const indicators = calculateIndicators(fixture.bars);
-    const prompt = buildAnalysisPrompt(
+    // `buildAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4 assembly
+    // split); the harness sends the model the same combined string
+    // production dispatch builds as its `prompt` fallback field ('\n\n' join).
+    const { stable, dynamic } = buildAnalysisPrompt(
         fixture.symbol,
         fixture.companyName,
         fixture.bars,
@@ -112,6 +115,7 @@ export function buildTechnicalCase(
         undefined,
         'equity'
     );
+    const prompt = `${stable}\n\n${dynamic}`;
     return {
         caseId: fixture.caseId,
         analysisType: 'technical',

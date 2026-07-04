@@ -1568,6 +1568,34 @@ export interface PromptConfig {
 }
 
 /**
+ * Prompt-assembly output, split along the stable/dynamic caching boundary
+ * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`):
+ *
+ * - `stable` — depends only on `(analysisType, catalog fingerprint)` (and, for
+ *   builders with a low-cardinality framing axis, that axis too — e.g.
+ *   `assetClass`). Byte-identical across calls with the same catalog: never
+ *   contains a symbol, job id, timestamp, or any other per-call value. Safe to
+ *   use as a stable prefix for provider-side prompt caching (Claude
+ *   `cache_control`, Gemini implicit caching, OpenAI automatic caching).
+ * - `dynamic` — everything that varies call-to-call: the symbol/company
+ *   framing, fetched market/news/financial data, gated skill digests chosen
+ *   for this specific call, and the per-call request block.
+ *
+ * Dispatch (`application/*​/submit*.ts`) sends both fields to the worker
+ * alongside the legacy combined `prompt` field (`stable + '\n\n' + dynamic`,
+ * kept for one release as a fallback for a not-yet-upgraded worker) — see
+ * `application/CLAUDE.md`'s dispatch-contract note. `analysisSeed` is always
+ * computed over the combined string so the seed is identical on both the old
+ * and new code paths.
+ */
+export interface AssembledPrompt {
+    /** Byte-identical for the same `(analysisType, catalog fingerprint)` — never contains a symbol, job id, timestamp, or other per-call value. */
+    stable: string;
+    /** Per-call content: symbol/company framing, fetched data, gated skill digests, the request block. */
+    dynamic: string;
+}
+
+/**
  * @internal
  * LLM이 반환하는 원시 분석 응답.
  *

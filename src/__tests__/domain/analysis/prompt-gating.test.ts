@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    buildAnalysisPrompt,
+    buildAnalysisPrompt as buildAnalysisPromptRaw,
     ATR_EXTREME_PERCENT_DAILY,
     SMC_STRUCTURE_BREAK_RECENCY_BARS,
 } from '@/domain/analysis/prompt';
@@ -20,6 +20,15 @@ import type {
     Skill,
     SkillGating,
 } from '@/domain/types';
+
+// See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
+// return with a flattening wrapper (spec §3.4 assembly split).
+const buildAnalysisPrompt = (
+    ...args: Parameters<typeof buildAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const TEST_SYMBOL = 'AAPL';
 const TEST_COMPANY = 'Apple Inc.';

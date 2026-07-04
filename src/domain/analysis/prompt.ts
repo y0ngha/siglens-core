@@ -59,6 +59,7 @@ import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import { screenChartPatterns } from '@/domain/patterns';
 import type {
+    AssembledPrompt,
     AssetClass,
     CandlePatternEntry,
     AnalysisResponse,
@@ -794,6 +795,10 @@ const formatHorizonBlock = (
     ].join('\n');
 };
 
+// ANTI_FABRICATION_GUARDRAIL is stated once as a standalone stable-block line
+// (assembled in buildAnalysisPrompt) rather than repeated here — same
+// constant, single occurrence, SSOT (avoids duplicating it every call since
+// this section is otherwise dynamic/per-call).
 const formatMarketReferenceSection = (
     reference: MarketReference,
     timeframe: Timeframe
@@ -801,7 +806,6 @@ const formatMarketReferenceSection = (
     [
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
-        ANTI_FABRICATION_GUARDRAIL,
         formatHorizonBlock('short', reference.short, timeframe),
         formatHorizonBlock('medium', reference.medium, timeframe),
         formatHorizonBlock('long', reference.long, timeframe),
@@ -1215,8 +1219,12 @@ const ANALYSIS_INTENT_BLOCK = [
     '- Respond with a single JSON object. Its structure (field names, types, enums, nesting) is enforced by the response schema, so you do not need to restate it. For the fields listed under ## Field Content Guidance, follow the guidance there.',
 ].join('\n');
 
+// "provided in the data sections" (not "above") — this preface is assembled
+// into the stable prefix (spec §3.4), which precedes the per-call data
+// sections (indicators, SMC, Market Reference) in the final prompt, so a
+// spatial "above" would be backwards.
 const FIELD_GUIDANCE_PREFACE =
-    'Use the exact numbers provided above rather than recomputing arithmetic, but treat the Market Reference as advisory context — not a mandate. Follow the content guidance below for the fields that need it:';
+    'Use the exact numbers provided in the data sections rather than recomputing arithmetic, but treat the Market Reference as advisory context — not a mandate. Follow the content guidance below for the fields that need it:';
 
 const buildFieldGuidanceBody = (): string =>
     [
@@ -1353,7 +1361,44 @@ const CRITICAL_RESPONSE_RULES = [
     '- Unix timestamp values must be copied verbatim from the [ts:<number>] markers in the bar data.',
 ].join('\n');
 
-const buildAnalysisRequest = (
+/**
+ * Static preamble of the "## Analysis Request" section — the request header,
+ * the critical-response rules, the generic ask sentence, and the (fully
+ * static, catalog-only) field content guidance. None of this interpolates a
+ * symbol, skill name, or any other per-call value, so it belongs in the
+ * stable prefix (spec §3.4). The per-type writing-rule instructions (which
+ * enumerate the active skill names for this call) are built separately by
+ * {@link buildAnalysisRequestDynamic} and live in the dynamic suffix.
+ */
+const buildAnalysisRequestStable = (): string =>
+    [
+        '## Analysis Request',
+        CRITICAL_RESPONSE_RULES,
+        'Based on the provided data, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
+        FIELD_GUIDANCE_PREFACE,
+        buildFieldGuidanceBody(),
+    ].join('\n');
+
+/**
+ * Per-type writing-rule instructions (patternSummaries / strategyResults /
+ * indicatorResults / candlePatterns / keyLevels / regular-skill enrichment),
+ * each ending in an enumeration of the exact active skill names for that
+ * type. Kept as one atomic dynamic block (not split further) because:
+ *
+ * - the enumerated names are `core ∪ selected` — `selected` is chart-state
+ *   dependent, so the enumeration can never be part of the byte-stable
+ *   prefix;
+ * - keeping each category's rule text immediately adjacent to its name list
+ *   preserves prompt locality/quality (the instructions and the checklist
+ *   they refer to are never more than a few lines apart), rather than
+ *   splitting a header into the stable prefix and its list into the dynamic
+ *   suffix, which would separate them by the entire market-data block.
+ *
+ * @param patternSkills,strategySkills,... - `core ∪ selected` skills of each
+ *   type (see {@link buildAnalysisPrompt}'s `combinedGroups`), matching the
+ *   pre-split behavior exactly.
+ */
+const buildAnalysisRequestDynamic = (
     patternSkills: Skill[],
     strategySkills: Skill[],
     indicatorGuideSkills: Skill[],
@@ -1488,11 +1533,6 @@ const buildAnalysisRequest = (
             : '';
 
     return [
-        '## Analysis Request',
-        CRITICAL_RESPONSE_RULES,
-        'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
-        FIELD_GUIDANCE_PREFACE,
-        buildFieldGuidanceBody(),
         indicatorGuideInstruction,
         patternListInstruction,
         strategyInstruction,
@@ -1588,32 +1628,101 @@ const buildSkillSelectionContext = (
     };
 };
 
+const EMPTY_SKILL_GROUPS = (): Record<SkillGroupKey, Skill[]> => ({
+    pattern: [],
+    strategy: [],
+    indicator_guide: [],
+    candlestick: [],
+    support_resistance: [],
+    regular: [],
+});
+
+/** Bucket a flat skill list by `type` (untyped skills fall into `regular`). */
+const bucketSkillsByType = (
+    list: readonly Skill[]
+): Record<SkillGroupKey, Skill[]> => {
+    const groups = EMPTY_SKILL_GROUPS();
+    for (const skill of list) {
+        const key: SkillGroupKey = skill.type ?? 'regular';
+        groups[key].push(skill);
+    }
+    return groups;
+};
+
+const SKILL_CONTENT_SECTION_HEADER: Record<SkillGroupKey, string> = {
+    indicator_guide: '## Indicator Signal Guides',
+    pattern: '## Pattern Analysis',
+    candlestick: '## Candlestick Pattern Guides',
+    support_resistance: '## Support/Resistance Tool Guides',
+    strategy: '## Strategy Analysis',
+    regular: '## Active Skills',
+};
+
+// Rendering order for the digest-content sections — unchanged from the
+// pre-split single-block order (indicator guides, patterns, candlesticks,
+// support/resistance, strategy, regular).
+const SKILL_CONTENT_SECTION_ORDER: readonly SkillGroupKey[] = [
+    'indicator_guide',
+    'pattern',
+    'candlestick',
+    'support_resistance',
+    'strategy',
+    'regular',
+];
+
+/**
+ * Render one `## <Section>\n<skill blocks>` entry per non-empty type bucket,
+ * in {@link SKILL_CONTENT_SECTION_ORDER}. Shared by the stable pass (`core`
+ * buckets) and the dynamic pass (`selected` buckets) — the same header text
+ * can therefore appear once in each half when both a core and a gated skill
+ * of the same type are active for a given call, which is expected (the
+ * digest-content sections are unified into checklists over in
+ * {@link buildAnalysisRequestDynamic}, not here).
+ */
+const buildSkillContentSections = (
+    groups: Record<SkillGroupKey, Skill[]>
+): string[] =>
+    SKILL_CONTENT_SECTION_ORDER.flatMap(key => {
+        const skills = groups[key];
+        if (skills.length === 0) return [];
+        return [
+            `${SKILL_CONTENT_SECTION_HEADER[key]}\n${skills.map(buildSkillBlock).join('\n\n')}`,
+        ];
+    });
+
 /**
  * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
  *
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
- * Composes a fully-rendered English prompt that the worker LLM consumes to
- * produce an `AnalysisResponse`. Sections include analysis snapshot,
- * long-term context, recent bars with detected candle patterns, buy / sell
- * volume split, a market-regime & risk-context lens (Hurst / Variance Ratio /
- * regression R² + Yang-Zhang / EWMA volatility), every indicator value with
- * timeframe-aware trend labels, a pro-indicator confluence panel (MACD-V,
- * Connors RSI, Force Index, Elder-Ray, Elder Impulse, Bollinger %B, Chandelier
- * Exit) with measured-reliability annotations, market reference (deterministic
- * advisory levels and structure per horizon), SMC structure, and per-skill
- * writing rules.
+ * Composes the prompt the worker LLM consumes to produce an
+ * `AnalysisResponse`, split into a stable/dynamic pair (spec §3.4,
+ * {@link AssembledPrompt}) rather than a single string:
  *
- * Skills are dynamically gated by {@link selectSkills} in the `'technical'`
- * prompt context: non-chart skills (category fundamental/news/congress) are
- * whitelisted out, `always_on` skills form a stable name-sorted core block,
- * and gated skills are injected only when their frontmatter `gating` fires for
- * this chart's state (detected signals, textbook indicator states, detected
- * candles), ordered by relevance. Untagged skills throw (fail-closed). The
- * combined selection is grouped by `type` (pattern, strategy, indicator_guide,
- * candlestick, support_resistance, regular). When ATR% is extreme for the timeframe, an always-on position-sizing
- * note is appended. The number of trend samples and recent bars varies per
- * `timeframe` via `PROMPT_CONFIG_BY_TIMEFRAME`.
+ * - `stable` — the analysis-intent block, guidelines (incl. the
+ *   contingent-plan mandate), the anti-fabrication guardrail, the static
+ *   "## Analysis Request" preamble (critical response rules + field content
+ *   guidance), and the `always_on` skill digests (`core`, name-sorted).
+ *   Byte-identical across calls sharing the same `(analysisType, catalog)` —
+ *   contains no symbol, timeframe data, or per-call value — so it can serve
+ *   as a cacheable prefix at the worker/provider layer.
+ * - `dynamic` — the symbol/company/asset-class framing, the timeframe
+ *   section, all computed chart data (snapshot, long-term context, recent
+ *   bars, regime/indicator/pro-indicator/SMC/market-reference sections),
+ *   gated (`selected`) skill digests ordered by relevance, the tier/timeframe
+ *   conditional notes (ATR-extreme sizing), the optional Fear & Greed
+ *   section, and the per-type writing-rule + active-skill-name request block.
+ *
+ * Skills are gated by {@link selectSkills} in the `'technical'` prompt
+ * context: non-chart skills (category fundamental/news/congress) are
+ * whitelisted out, `always_on` skills form the stable name-sorted `core`
+ * block, and gated skills are injected into `selected` only when their
+ * frontmatter `gating` fires for this chart's state (detected signals,
+ * textbook indicator states, detected candles), ordered by relevance.
+ * Untagged skills throw (fail-closed). Both buckets are grouped by `type`
+ * (pattern, strategy, indicator_guide, candlestick, support_resistance,
+ * regular) independently, so a type's content can land in `stable` (its
+ * `core` members), `dynamic` (its `selected` members), both, or neither.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
  * @param companyName - Full English company name (e.g. `"Apple Inc."`).
@@ -1625,7 +1734,7 @@ const buildSkillSelectionContext = (
  * @param assetClass - Instrument asset class controlling prompt framing. `'crypto'` drops
  *   U.S. equity context (earnings, fundamentals, analyst ratings) and adds 24/7 market
  *   context. Defaults to `'equity'` for backward compatibility.
- * @returns The fully-rendered prompt string.
+ * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -1639,17 +1748,16 @@ export function buildAnalysisPrompt(
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot,
     assetClass: AssetClass = 'equity'
-): string {
+): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
     // detection pass runs a single time per prompt build.
     const candleEntries = detectCandlePatternEntries(bars);
 
-    // Dynamic gating (chart only): whitelist to chart skills, then inject the
-    // always_on core plus the gated skills whose frontmatter gating fires for
-    // this chart's state. Untagged skills throw (fail-closed). Core precedes
-    // the relevance-ordered fired skills, keeping the stable block first for
-    // the later stable/dynamic prompt-assembly phase.
+    // Dynamic gating (chart only): whitelist to chart skills, then split into
+    // `core` (always_on, catalog-only — byte-stable across calls) and
+    // `selected` (gated skills whose frontmatter fired for this chart's
+    // state — chart-dependent). Untagged skills throw (fail-closed).
     const selectionContext = buildSkillSelectionContext(
         bars,
         indicators,
@@ -1663,29 +1771,24 @@ export function buildAnalysisPrompt(
     );
     // The SMC full guide is never injected (fabrication source); it is replaced
     // by the deterministic SMC data section + a compressed concept note. Drop it
-    // regardless of its gating tier before bucketing.
-    const activeSkills = [...core, ...selected].filter(
-        skill => !isSmcGuideSkill(skill)
-    );
+    // regardless of its gating tier or which bucket it landed in.
+    const coreSkills = core.filter(skill => !isSmcGuideSkill(skill));
+    const selectedSkills = selected.filter(skill => !isSmcGuideSkill(skill));
 
-    const skillGroups: Record<SkillGroupKey, Skill[]> = {
-        pattern: [],
-        strategy: [],
-        indicator_guide: [],
-        candlestick: [],
-        support_resistance: [],
-        regular: [],
-    };
-    for (const skill of activeSkills) {
-        const key: SkillGroupKey = skill.type ?? 'regular';
-        skillGroups[key].push(skill);
-    }
-    const patternSkills = skillGroups.pattern;
-    const strategySkills = skillGroups.strategy;
-    const indicatorGuideSkills = skillGroups.indicator_guide;
-    const candlestickSkills = skillGroups.candlestick;
-    const supportResistanceSkills = skillGroups.support_resistance;
-    const regularSkills = skillGroups.regular;
+    // Bucketed independently (not merged first) so each type's `core`
+    // members can be rendered into the stable digest-content sections while
+    // its `selected` members render into the dynamic ones.
+    const coreGroups = bucketSkillsByType(coreSkills);
+    const selectedGroups = bucketSkillsByType(selectedSkills);
+    // The per-type writing-rule instructions need one checklist covering
+    // BOTH buckets (the AI must judge every active skill of a type,
+    // regardless of which half of the prompt its digest landed in) — see
+    // buildAnalysisRequestDynamic's doc comment for why this stays merged
+    // and atomic in the dynamic block.
+    const combinedGroups = bucketSkillsByType([
+        ...coreSkills,
+        ...selectedSkills,
+    ]);
 
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
 
@@ -1697,11 +1800,26 @@ export function buildAnalysisPrompt(
             ? `This is a cryptocurrency trading 24/7 with no market open/close. There are no earnings, fundamentals, or analyst ratings — focus purely on price action, technical structure, volatility, and macro/liquidity context.`
             : `This is a publicly traded U.S. equity.`;
 
-    const sections = [
-        `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
-        `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
+    const requestDynamicPart = buildAnalysisRequestDynamic(
+        combinedGroups.pattern,
+        combinedGroups.strategy,
+        combinedGroups.indicator_guide,
+        combinedGroups.candlestick,
+        combinedGroups.support_resistance,
+        combinedGroups.regular
+    );
+
+    const stableSections = [
         ANALYSIS_INTENT_BLOCK,
         ANALYSIS_GUIDELINES,
+        ANTI_FABRICATION_GUARDRAIL,
+        buildAnalysisRequestStable(),
+        ...buildSkillContentSections(coreGroups),
+    ];
+
+    const dynamicSections = [
+        `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
+        `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
         formatMarketSection(bars),
         formatLongTermContext(bars),
         formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),
@@ -1712,49 +1830,16 @@ export function buildAnalysisPrompt(
         formatSMCSection(indicators, bars),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(marketReference, timeframe),
-        ...(indicatorGuideSkills.length > 0
-            ? [
-                  `## Indicator Signal Guides\n${indicatorGuideSkills.map(buildSkillBlock).join('\n\n')}`,
-              ]
-            : []),
-        ...(patternSkills.length > 0
-            ? [
-                  `## Pattern Analysis\n${patternSkills.map(buildSkillBlock).join('\n\n')}`,
-              ]
-            : []),
-        ...(candlestickSkills.length > 0
-            ? [
-                  `## Candlestick Pattern Guides\n${candlestickSkills.map(buildSkillBlock).join('\n\n')}`,
-              ]
-            : []),
-        ...(supportResistanceSkills.length > 0
-            ? [
-                  `## Support/Resistance Tool Guides\n${supportResistanceSkills.map(buildSkillBlock).join('\n\n')}`,
-              ]
-            : []),
-        ...(strategySkills.length > 0
-            ? [
-                  `## Strategy Analysis\n${strategySkills.map(buildSkillBlock).join('\n\n')}`,
-              ]
-            : []),
-        ...(regularSkills.length > 0
-            ? [
-                  `## Active Skills\n${regularSkills.map(buildSkillBlock).join('\n\n')}`,
-              ]
-            : []),
+        ...buildSkillContentSections(selectedGroups),
         ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
-        buildAnalysisRequest(
-            patternSkills,
-            strategySkills,
-            indicatorGuideSkills,
-            candlestickSkills,
-            supportResistanceSkills,
-            regularSkills
-        ),
+        ...(requestDynamicPart !== '' ? [requestDynamicPart] : []),
     ];
 
-    return sections.join('\n\n');
+    return {
+        stable: stableSections.join('\n\n'),
+        dynamic: dynamicSections.join('\n\n'),
+    };
 }

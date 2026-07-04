@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { buildAnalysisPrompt as buildAnalysisPromptRaw } from '@/domain/analysis/prompt';
 import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
 import type { Bar } from '@/domain/types';
+
+// See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
+// return with a flattening wrapper (spec §3.4 assembly split).
+const buildAnalysisPrompt = (
+    ...args: Parameters<typeof buildAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const bars: Bar[] = []; // empty is fine; we assert framing text, not data sections
 const indicators = EMPTY_INDICATOR_RESULT;

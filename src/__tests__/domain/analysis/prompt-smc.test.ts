@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     ANTI_FABRICATION_GUARDRAIL,
-    buildAnalysisPrompt,
+    buildAnalysisPrompt as buildAnalysisPromptRaw,
     SMC_GUIDE_BLOCKED_NOTICE,
 } from '@/domain/analysis/prompt';
 import {
@@ -15,6 +15,15 @@ import type {
     SMCResult,
     SMCStructureBreak,
 } from '@/domain/types';
+
+// See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
+// return with a flattening wrapper (spec §3.4 assembly split).
+const buildAnalysisPrompt = (
+    ...args: Parameters<typeof buildAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const TEST_SYMBOL = 'AAPL';
 const TEST_COMPANY = 'Apple Inc.';

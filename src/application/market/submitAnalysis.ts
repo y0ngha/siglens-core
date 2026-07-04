@@ -362,16 +362,21 @@ export async function submitAnalysis(
             return null;
         });
 
-    const prompt = buildAnalysisPrompt(
-        symbol,
-        companyName,
-        bars,
-        indicators,
-        skills,
-        timeframe,
-        fearGreed ?? undefined,
-        options.assetClass ?? 'equity'
-    );
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildAnalysisPrompt(
+            symbol,
+            companyName,
+            bars,
+            indicators,
+            skills,
+            timeframe,
+            fearGreed ?? undefined,
+            options.assetClass ?? 'equity'
+        );
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
 
     const jobId = crypto.randomUUID();
     const lastClose = bars[bars.length - 1]?.close;
@@ -423,6 +428,8 @@ export async function submitAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             seed: analysisSeed(prompt),
             model: effectiveModelId,
             tier,

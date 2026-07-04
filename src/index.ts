@@ -492,6 +492,7 @@ export type {
     AnalysisSignal,
     AnalysisSignalType,
     AnalysisType,
+    AssembledPrompt,
     CurrentAnalysisContext,
     BacktestAiAnalysis,
     BacktestAiEntryRecommendation,
