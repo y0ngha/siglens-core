@@ -59,24 +59,27 @@ digest_hash: a1b2c3d4      # digest 생성 시점의 원본 본문 해시 (stale
 
 ### §3.2 선택 엔진 — 카테고리 필터 + fail-open 제거 + 관련성 정렬
 
-**타입별 카테고리 화이트리스트** (core 상수, `selectSkills` 앞단 적용):
+**타입별 화이트리스트** (core 상수 `SKILL_CONTEXT_WHITELIST`, `selectSkills` 앞단 적용):
 
-| 분석 타입 | 허용 카테고리 |
-|---|---|
-| TECHNICAL | `_core`, indicators, patterns, strategies, candlesticks, support-resistance |
-| FUNDAMENTAL / FINANCIALS | fundamental |
-| NEWS (ticker/card/digest) | news |
-| OPTIONS | 없음 — 옵션 프롬프트는 현재 스킬을 사용하지 않음(코드 확인). 스킬 도입 시 화이트리스트 확장은 후속 과제 |
-| OVERALL | 없음 — 하위 분석 요약만 소비(현행 유지) |
+| 분석 타입 (PromptSkillContext) | 필터 축 | 허용 값 |
+|---|---|---|
+| TECHNICAL (`'technical'`) | `Skill.type` (SkillType) | `pattern`, `indicator_guide`, `strategy`, `candlestick`, `support_resistance` + 방어적으로 `category ∈ {fundamental, news, congress}` 는 type과 무관하게 제외 |
+| FUNDAMENTAL / FINANCIALS (`'fundamental'`) | `Skill.category` (SkillCategory) | `fundamental` |
+| NEWS ticker/card/digest (`'news'`) | `Skill.category` (SkillCategory) | `news` |
+| OPTIONS | — | 없음 — 옵션 프롬프트는 현재 스킬을 사용하지 않음(코드 확인). 스킬 도입 시 화이트리스트 확장은 후속 과제 |
+| OVERALL | — | 없음 — 하위 분석 요약만 소비(현행 유지) |
+| CONGRESS | — | 화이트리스트 미적용 — congress 빌더는 기존 자체 `category === 'congress'` 필터 유지(congress 스킬 파일 미존재) |
 
-※ `_core` 2개(indicator-core, candle-primer)는 지표 임계값·캔들 프라이머, 즉 **차트 전용 콘텐츠**이므로 TECHNICAL에만 허용한다 — FUNDAMENTAL/NEWS에 넣으면 이 설계가 없애려는 무관 콘텐츠 주입을 재생산한다.
+> **정정 (2026-07-04, Task 3.2 구현 시)**: 이 표의 원안은 폴더명(`_core`, indicators, patterns, …)을 "허용 카테고리"로 기재했으나, 폴더 분류는 런타임 `Skill` 객체에 존재하지 않는다(로더는 폴더 위치를 저장하지 않음). 실제 `SkillCategory` 유니온은 방향 분류(`reversal_*`/`continuation_*`/`neutral`) + 도메인 3종(`fundamental`/`news`/`congress`)이고, **지표 스킬 37개는 `category` 자체가 없다** — category 축으로 TECHNICAL을 거르면 지표 가이드 전체가 탈락한다. 따라서 TECHNICAL은 `SkillType` 축(폴더 5종과 1:1 대응), FUNDAMENTAL/NEWS는 `SkillCategory` 축으로 확정한다. `_core` 2개(indicator-core=`indicator_guide`, candle-primer=`candlestick`)는 type 축에서 자연 포함되므로 별도 특례가 불필요하다.
+
+※ `_core` 2개(indicator-core, candle-primer)는 지표 임계값·캔들 프라이머, 즉 **차트 전용 콘텐츠**이므로 TECHNICAL에만 허용한다 — FUNDAMENTAL/NEWS에 넣으면 이 설계가 없애려는 무관 콘텐츠 주입을 재생산한다. (type 축 필터에서 두 파일의 `type`이 차트 타입이므로 자동 충족.)
 
 - **fail-open 제거**: `gating` 미태그 스킬은 로더 에러. 미태그 12개는 감사 후 전부 명시 태깅(지표 6개는 "해당 지표가 페이로드에 포함" 상태 게이트 후보, fundamental/news 6개는 카테고리 필터로 자동 해결 + 명시 태깅 병행).
 - **차트 패턴 스킬 17개 — 2단계 전환** (사용자 결정: 스크리너 최우선):
   1. 프리스크리너(§3.3) 구현·검증 완료 전: always_on 유지 + digest 압축(105KB → ~25KB).
   2. 스크리너 검증(재현율) 통과 후: **gated로 강등**, 스크리너 후보가 트리거. always_on에는 17개 패턴의 한 줄 인덱스(이름 + 모양 시그니처, 총 ~2KB)를 남겨 미탐 안전판으로 삼는다.
 - **관련성 정렬**: 게이트 통과 스킬을 결정적 점수(발화 트리거 수 + `detectSignals` 신호 강도)로 정렬해 관련도 높은 스킬이 데이터 섹션 가까이 배치. 상한 없음, 순서만.
-- **결과 구조**: `selectSkills(skills, ctx)` → `{ core: Skill[], selected: Skill[] }` — `core`(always_on, 정렬 고정)는 stable prefix로, `selected`(발화분, 관련성 정렬)는 dynamic suffix로.
+- **결과 구조**: `selectSkills(skills, ctx, promptContext)` → `{ core: Skill[], selected: Skill[] }` — `core`(always_on, 이름순 고정)는 stable prefix로, `selected`(발화분, 관련성 정렬: 트리거 매치 수 desc → 이름 asc)는 dynamic suffix로. 차트 없는 빌더(fundamental/financials/news)는 `NO_CHART_SELECTION_CONTEXT`를 전달 — always_on만 발화 가능.
 
 ### §3.3 차트 패턴 프리스크리너 (`core/src/domain/patterns/`)
 
