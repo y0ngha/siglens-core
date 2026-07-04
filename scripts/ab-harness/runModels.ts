@@ -9,7 +9,15 @@
  * provider rate limits and this harness should not amplify them.
  *
  * Usage:
- *   GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in prompts-<mode>.json --out results-<mode>.json
+ *   GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in prompts-<mode>.json --out results-<mode>.json [--samples N]
+ *
+ * `--samples N` (default 1) runs every case N times, recording each run's
+ * `sampleIndex` (0..N-1) alongside the unchanged `caseId` — a noise-hardening
+ * measure for the final gate run: `judge.ts --batch` later medians across
+ * these samples before aggregating, so a single unlucky model draw can't
+ * flip a case's verdict. Resume (via `--out`, loaded if it already exists)
+ * keys on the `(caseId, sampleIndex)` pair, not `caseId` alone, so a partial
+ * multi-sample run resumes exactly where it left off.
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -46,6 +54,15 @@ export interface ModelRunResult {
     latencyMs: number;
     /** `prompt.length` from the source case — carried through so `judge.ts` can report size without re-reading the prompts file. */
     promptChars: number;
+    /**
+     * Which of the `--samples N` repeats of this SAME `caseId` this result is
+     * (0..N-1) — `caseId` is never mangled to encode this, so pre-existing
+     * single-sample results files (and any code keying purely on `caseId`)
+     * stay meaningful. Always present (default-run `--samples 1` still
+     * writes `sampleIndex: 0`) so downstream consumers never have to
+     * special-case an absent field.
+     */
+    sampleIndex: number;
 }
 
 function requireGeminiApiKey(): string {
@@ -143,13 +160,43 @@ async function callGeminiWithRetry(
     );
 }
 
-/** Case ids already present in a loaded results file — used to skip finished work on resume. */
+/** One `(case, sampleIndex)` unit of work still left to run. */
+export interface PendingSample {
+    promptCase: PromptCaseOutput;
+    sampleIndex: number;
+}
+
+/** `(caseId, sampleIndex)` key shared by {@link PendingSample} planning and existing-results resume lookup. */
+function sampleKey(caseId: string, sampleIndex: number): string {
+    return `${caseId}::${sampleIndex}`;
+}
+
+/**
+ * Expands `cases` into every `(case, sampleIndex)` unit of work for the
+ * requested `samples` count (0..samples-1 per case — `caseId` itself is
+ * never mangled, only `sampleIndex` varies), then drops any unit already
+ * present in `existingResults` — keyed on `(caseId, sampleIndex)`, not
+ * `caseId` alone, so a resumed multi-sample run only re-does the specific
+ * samples it hadn't finished. `r.sampleIndex ?? 0` tolerates loading an
+ * older results file written before this field existed (implicitly sample 0).
+ */
 export function filterUnfinishedCases(
     cases: readonly PromptCaseOutput[],
-    existingResults: readonly ModelRunResult[]
-): PromptCaseOutput[] {
-    const doneIds = new Set(existingResults.map(r => r.caseId));
-    return cases.filter(c => !doneIds.has(c.caseId));
+    existingResults: readonly ModelRunResult[],
+    samples = 1
+): PendingSample[] {
+    const doneKeys = new Set(
+        existingResults.map(r => sampleKey(r.caseId, r.sampleIndex ?? 0))
+    );
+    const pending: PendingSample[] = [];
+    for (const promptCase of cases) {
+        for (let sampleIndex = 0; sampleIndex < samples; sampleIndex++) {
+            if (!doneKeys.has(sampleKey(promptCase.caseId, sampleIndex))) {
+                pending.push({ promptCase, sampleIndex });
+            }
+        }
+    }
+    return pending;
 }
 
 /** Atomic write: write to a `.tmp` sibling then rename over the target, so a crash mid-write never corrupts `outFile`. */
@@ -163,15 +210,26 @@ function writeResultsAtomic(
     renameSync(tmpFile, resolvedOut);
 }
 
+/** Parse and validate `--samples` (default 1, must be a positive integer). */
+export function parseSamplesArg(raw: string | undefined): number {
+    if (raw === undefined) return 1;
+    const samples = Number(raw);
+    if (!Number.isInteger(samples) || samples < 1) {
+        throw new Error(`--samples must be a positive integer (got "${raw}")`);
+    }
+    return samples;
+}
+
 async function main(): Promise<void> {
     const args = parseArgs(process.argv.slice(2));
     const inFile = args.in;
     const outFile = args.out;
     if (!inFile || !outFile) {
         throw new Error(
-            'Usage: runModels.ts --in prompts-<mode>.json --out results-<mode>.json'
+            'Usage: runModels.ts --in prompts-<mode>.json --out results-<mode>.json [--samples N]'
         );
     }
+    const samples = parseSamplesArg(args.samples);
 
     const apiKey = requireGeminiApiKey();
     const modelSpec = MODEL_SPECS[DEFAULT_ANALYSIS_MODEL];
@@ -190,14 +248,14 @@ async function main(): Promise<void> {
     if (results.length > 0) {
         console.log(`[runModels] resuming, ${results.length} done`);
     }
-    const remainingCases = filterUnfinishedCases(cases, results);
+    const remaining = filterUnfinishedCases(cases, results, samples);
 
     console.log(
-        `[runModels] ${remainingCases.length}/${cases.length} case(s) remaining, model=${modelSpec.apiModelId}, mode=${mode}`
+        `[runModels] ${remaining.length}/${cases.length * samples} (case, sample) unit(s) remaining, model=${modelSpec.apiModelId}, mode=${mode}, samples=${samples}`
     );
 
     // Sequential by design — see file header.
-    for (const c of remainingCases) {
+    for (const { promptCase: c, sampleIndex } of remaining) {
         const start = Date.now();
         const { text, usage } = await callGeminiWithRetry(
             client,
@@ -213,10 +271,11 @@ async function main(): Promise<void> {
             usage,
             latencyMs,
             promptChars: c.prompt.length,
+            sampleIndex,
         });
         writeResultsAtomic(outFile, results);
         console.log(
-            `[runModels] ${c.caseId}: ${latencyMs}ms, output=${usage.outputTokens} tok, cached=${usage.cachedTokens} tok`
+            `[runModels] ${c.caseId} (sample ${sampleIndex}): ${latencyMs}ms, output=${usage.outputTokens} tok, cached=${usage.cachedTokens} tok`
         );
     }
 

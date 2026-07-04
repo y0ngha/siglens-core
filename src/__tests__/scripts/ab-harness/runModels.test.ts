@@ -4,6 +4,7 @@ import {
     filterUnfinishedCases,
     inferModeFromFilename,
     isRetryableError,
+    parseSamplesArg,
     type ModelRunResult,
 } from '../../../../scripts/ab-harness/runModels';
 
@@ -56,7 +57,7 @@ describe('filterUnfinishedCases', () => {
             prompt: 'p',
         }) as unknown as PromptCaseOutput;
 
-    const makeResult = (caseId: string): ModelRunResult => ({
+    const makeResult = (caseId: string, sampleIndex = 0): ModelRunResult => ({
         caseId,
         mode: 'digest',
         analysisType: 'technical',
@@ -64,23 +65,73 @@ describe('filterUnfinishedCases', () => {
         usage: { promptTokens: 0, cachedTokens: 0, outputTokens: 0 },
         latencyMs: 1,
         promptChars: 1,
+        sampleIndex,
     });
 
-    it('returns all cases when no results exist yet', () => {
+    it('returns all cases (as sampleIndex 0 pending units) when no results exist yet', () => {
         const cases = [makeCase('a'), makeCase('b')];
-        expect(filterUnfinishedCases(cases, [])).toEqual(cases);
+        expect(filterUnfinishedCases(cases, [])).toEqual([
+            { promptCase: cases[0], sampleIndex: 0 },
+            { promptCase: cases[1], sampleIndex: 0 },
+        ]);
     });
 
     it('skips caseIds already present in existing results', () => {
         const cases = [makeCase('a'), makeCase('b'), makeCase('c')];
         const existing = [makeResult('a'), makeResult('c')];
         const remaining = filterUnfinishedCases(cases, existing);
-        expect(remaining.map(c => c.caseId)).toEqual(['b']);
+        expect(remaining.map(c => c.promptCase.caseId)).toEqual(['b']);
     });
 
     it('returns an empty array when every case is already done (worst case)', () => {
         const cases = [makeCase('a'), makeCase('b')];
         const existing = [makeResult('a'), makeResult('b')];
         expect(filterUnfinishedCases(cases, existing)).toEqual([]);
+    });
+
+    it('keys resume on (caseId, sampleIndex): with samples=3, only the missing sampleIndex for a partially-done case remains', () => {
+        const cases = [makeCase('a'), makeCase('b')];
+        // "a" has samples 0 and 2 done, but NOT 1 — sample-aware resume must
+        // re-run exactly sample 1 for "a", not skip it (caseId-only keying
+        // would wrongly treat "a" as fully done) and not re-run 0/2.
+        const existing = [makeResult('a', 0), makeResult('a', 2)];
+        const remaining = filterUnfinishedCases(cases, existing, 3);
+        expect(remaining).toEqual([
+            { promptCase: cases[0], sampleIndex: 1 },
+            { promptCase: cases[1], sampleIndex: 0 },
+            { promptCase: cases[1], sampleIndex: 1 },
+            { promptCase: cases[1], sampleIndex: 2 },
+        ]);
+    });
+
+    it('treats a result missing sampleIndex as sample 0 (back-compat with pre-multi-sample results files)', () => {
+        const cases = [makeCase('a')];
+        const legacyResult = {
+            caseId: 'a',
+            mode: 'digest',
+            analysisType: 'technical',
+            resultText: '{}',
+            usage: { promptTokens: 0, cachedTokens: 0, outputTokens: 0 },
+            latencyMs: 1,
+            promptChars: 1,
+        } as unknown as ModelRunResult;
+        expect(filterUnfinishedCases(cases, [legacyResult], 1)).toEqual([]);
+    });
+});
+
+describe('parseSamplesArg', () => {
+    it('defaults to 1 when unset', () => {
+        expect(parseSamplesArg(undefined)).toBe(1);
+    });
+
+    it('parses a valid positive integer string', () => {
+        expect(parseSamplesArg('5')).toBe(5);
+    });
+
+    it('rejects zero, negative, and non-integer values (worst case)', () => {
+        expect(() => parseSamplesArg('0')).toThrow(/positive integer/);
+        expect(() => parseSamplesArg('-1')).toThrow(/positive integer/);
+        expect(() => parseSamplesArg('1.5')).toThrow(/positive integer/);
+        expect(() => parseSamplesArg('abc')).toThrow(/positive integer/);
     });
 });
