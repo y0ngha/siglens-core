@@ -219,6 +219,12 @@ const SKILL_STATE_FEATURE_FLAGS: Record<SkillStateFeature, true> = {
     yangZhang: true,
     ewma: true,
 };
+// (a) SKILL_STATE_FEATURE_FLAGS is typed Record<SkillStateFeature, true> — a mapped
+// type the compiler enforces to cover exactly the SkillStateFeature union, no more,
+// no fewer keys. (b) Object.keys' generic-erased string[] return type is what forces
+// this cast; the guarantee that the runtime keys are exactly SkillStateFeature values
+// comes from the Record's exhaustive key type at the declaration site above, not from
+// inspecting the runtime value here.
 const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = Object.keys(
     SKILL_STATE_FEATURE_FLAGS
 ) as SkillStateFeature[];

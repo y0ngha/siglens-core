@@ -870,8 +870,8 @@ describe('evaluateAggregatedGate', () => {
             },
         ];
         const gateOver = evaluateAggregatedGate(meansJustUnder, justOver);
-        // roundToHalf(4.26 - 3) = roundToHalf(1.26) = 1.5 -> neither exactly 1 nor >= 2 -> counts as neither bucket.
-        expect(gateOver.perAxis.actionability.onePointDropCount).toBe(0);
+        // roundToHalf(4.26 - 3) = roundToHalf(1.26) = 1.5 -> falls in [1, GATE_OUTLIER_DROP) -> counts as a one-point drop.
+        expect(gateOver.perAxis.actionability.onePointDropCount).toBe(1);
         expect(gateOver.perAxis.actionability.twoPointDropCount).toBe(0);
     });
 });

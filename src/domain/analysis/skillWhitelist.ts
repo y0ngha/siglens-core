@@ -41,6 +41,15 @@ const NON_CHART_CATEGORIES: readonly SkillCategory[] = [
 
 /**
  * @internal
+ * A per-context whitelist rule: which axis of a {@link Skill} to filter on
+ * (`type` or `category`), and the allowed values on that axis.
+ */
+type WhitelistRule =
+    | { readonly axis: 'type'; readonly allow: readonly SkillType[] }
+    | { readonly axis: 'category'; readonly allow: readonly SkillCategory[] };
+
+/**
+ * @internal
  * Per-context whitelist rule. The two axes reflect how the catalog is actually
  * tagged (the design doc's original folder-name table has no runtime
  * counterpart — folder location is never stored on {@link Skill}):
@@ -55,14 +64,7 @@ const NON_CHART_CATEGORIES: readonly SkillCategory[] = [
  *   by `category`, exactly as the existing prompt-builder filters did.
  */
 export const SKILL_CONTEXT_WHITELIST: Readonly<
-    Record<
-        PromptSkillContext,
-        | { readonly axis: 'type'; readonly allow: readonly SkillType[] }
-        | {
-              readonly axis: 'category';
-              readonly allow: readonly SkillCategory[];
-          }
-    >
+    Record<PromptSkillContext, WhitelistRule>
 > = {
     technical: { axis: 'type', allow: TECHNICAL_SKILL_TYPES },
     fundamental: { axis: 'category', allow: ['fundamental'] },

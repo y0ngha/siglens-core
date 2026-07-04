@@ -568,12 +568,40 @@ export function buildCongressTrendCacheKey(
 }
 
 /**
- * Build the Redis key for a cached market-news category digest.
- * Format: `{version}:analysis:market-news:${category}:${modelId}:${inputHash}`.
+ * Prompt-template version for the news analysis and market-news-digest cache
+ * keys.
  *
- * Keyed by `category` (the {@link NewsFeedCategory} bucket), `modelId`, and
- * `inputHash` (a deterministic hash of the article IDs and skill fingerprint)
- * so different feed categories, models, and article sets cache independently.
+ * Parallel to {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} /
+ * {@link CONGRESS_PROMPT_TEMPLATE_VERSION} but shared by BOTH
+ * {@link buildNewsCacheKey} and {@link buildMarketNewsDigestCacheKey} — the
+ * two builders route skills through the same `newsPrompt` /
+ * `marketNewsDigestPrompt` template family, so their prompt-template changes
+ * invalidate together.
+ *
+ * Bump this string whenever the news or market-news-digest system prompt or
+ * user prompt template changes in a way that would make previously cached
+ * results stale.
+ *
+ * @remarks
+ * **`p2` = selection-engine activation** — the news and market-news-digest
+ * builders now route skills through the shared `selectSkills` (whitelist +
+ * fail-closed gating), so injected news skills are name-sorted via the
+ * selection engine instead of whatever ordering existed before, changing
+ * this template's prompt bytes. (There was an implicit unversioned "p1"
+ * generation before this constant existed.)
+ *
+ * @internal
+ */
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+
+/**
+ * Build the Redis key for a cached market-news category digest.
+ * Format: `{version}:analysis:market-news:${category}:${modelId}:${promptVersion}:${inputHash}`.
+ *
+ * Keyed by `category` (the {@link NewsFeedCategory} bucket), `modelId`,
+ * {@link NEWS_PROMPT_TEMPLATE_VERSION}, and `inputHash` (a deterministic hash
+ * of the article IDs and skill fingerprint) so different feed categories,
+ * models, prompt-template generations, and article sets cache independently.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
  *   inside `submitMarketNewsDigest`. Do not depend on this function from outside
@@ -582,19 +610,28 @@ export function buildCongressTrendCacheKey(
  * @param modelId   - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
  * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * buildMarketNewsDigestCacheKey('crypto', 'gemini-2.5-flash', 'abc123');
+ * // → 'v1:analysis:market-news:crypto:gemini-2.5-flash:p2:abc123'
+ * ```
  */
 export function buildMarketNewsDigestCacheKey(
     category: NewsFeedCategory,
     modelId: string,
     inputHash: string
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}`;
 }
 
 /**
  * Build the Redis key for a cached news analysis result.
  *
- * Format: `analysis:news:<symbol>:<modelId>:<inputHash>`.
+ * Format: `{version}:analysis:news:<symbol>:<modelId>:<promptVersion>:<inputHash>`.
+ *
+ * Uses {@link NEWS_PROMPT_TEMPLATE_VERSION} so the news prompt-template
+ * generation can be invalidated independently of the other analysis types.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
  *   inside `submitNewsAnalysis`. Do not depend on this function from outside
@@ -603,13 +640,19 @@ export function buildMarketNewsDigestCacheKey(
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
  * @returns The cache key.
+ *
+ * @example
+ * ```ts
+ * buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2');
+ * // → 'v1:analysis:news:AAPL:gemini-2.5-pro:p2:h2'
+ * ```
  */
 export function buildNewsCacheKey(
     symbol: string,
     modelId: string,
     inputHash: string
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}`;
 }
 
 /**

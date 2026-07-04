@@ -42,7 +42,7 @@
  * axis) now operates on these aggregated per-case scores too, but since
  * medians/means of 1-5 integers are no longer themselves integers, the drop
  * is first rounded to the nearest 0.5 (`roundToHalf`) before being classified
- * as a ">= 2" or "== 1" drop — see `evaluateAggregatedGate`.
+ * as a ">= 2" or ">= 1 (but < 2)" drop — see `evaluateAggregatedGate`.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -63,6 +63,14 @@ const RETRY_DELAY_MS = 2_000;
 
 /** How often to poll `batches.retrieve` while waiting for a Message Batch to finish (spec: every 30s). */
 const BATCH_POLL_INTERVAL_MS = 30_000;
+
+/**
+ * Max consecutive `batches.retrieve` poll failures tolerated before
+ * {@link pollBatchUntilEnded} gives up and rethrows — batches can take hours,
+ * so a single transient blip must not abort the whole run, but a truly
+ * persistent outage still needs to surface and fail it.
+ */
+const MAX_CONSECUTIVE_POLL_FAILURES = 10;
 
 const AXES = [
     'dataGroundedness',
@@ -540,13 +548,53 @@ async function submitJudgeBatch(
     return batch.id;
 }
 
-/** Poll `batches.retrieve` every {@link BATCH_POLL_INTERVAL_MS} until `processing_status === 'ended'`. */
+/**
+ * Poll `batches.retrieve` every {@link BATCH_POLL_INTERVAL_MS} until
+ * `processing_status === 'ended'`.
+ *
+ * Resilient to transient poll failures: batches can take hours, so a single
+ * network blip, 429, or 5xx from `batches.retrieve` must not abort the whole
+ * run. A non-transient `APIError` (4xx other than 429 — auth/validation,
+ * retrying is pointless) is rethrown immediately. Any other error (network
+ * error, 429, 5xx, or an error we can't classify) is logged and the loop
+ * retries after the usual poll interval, tracking a consecutive-failure
+ * counter (reset on any successful retrieve) that is rethrown once it
+ * reaches {@link MAX_CONSECUTIVE_POLL_FAILURES} — so a truly persistent
+ * outage still surfaces and fails the run instead of polling forever.
+ */
 async function pollBatchUntilEnded(
     client: Anthropic,
     batchId: string
 ): Promise<Anthropic.Messages.MessageBatch> {
+    let consecutiveFailures = 0;
     for (;;) {
-        const batch = await client.messages.batches.retrieve(batchId);
+        let batch: Anthropic.Messages.MessageBatch;
+        try {
+            batch = await client.messages.batches.retrieve(batchId);
+            consecutiveFailures = 0;
+        } catch (error) {
+            // Non-transient: a 4xx (other than 429 rate-limit) means retrying
+            // is pointless — auth/validation errors won't resolve themselves.
+            if (
+                error instanceof Anthropic.APIError &&
+                typeof error.status === 'number' &&
+                error.status >= 400 &&
+                error.status < 500 &&
+                error.status !== 429
+            ) {
+                throw error;
+            }
+            consecutiveFailures++;
+            console.warn(
+                `[judge] batch ${batchId}: poll failed (consecutive failure ${consecutiveFailures}/${MAX_CONSECUTIVE_POLL_FAILURES}):`,
+                error
+            );
+            if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+                throw error;
+            }
+            await new Promise(r => setTimeout(r, BATCH_POLL_INTERVAL_MS));
+            continue;
+        }
         console.log(
             `[judge] batch ${batchId}: status=${batch.processing_status}, counts=${JSON.stringify(batch.request_counts)}`
         );
@@ -949,7 +997,10 @@ export function roundToHalf(n: number): number {
  * "one point on a 1-5 scale" granularity while remaining meaningful on
  * continuous aggregated input — a rounded drop of `1.0` is still "about a
  * single point", `2.0`+ is still "about two or more points, a real
- * regression".
+ * regression". The one-point bucket is `>= 1` (not `=== 1`): a 1.5 rounded
+ * drop is a real, non-negligible regression that must land in the
+ * one-point bucket rather than falling through uncounted between the two
+ * buckets.
  */
 export function evaluateAggregatedGate(
     means: VariantAxisMeans,
@@ -967,8 +1018,14 @@ export function evaluateAggregatedGate(
         let onePointDropCount = 0;
         for (const { axes } of aggregates) {
             const drop = roundToHalf(axes[axis].full - axes[axis].digest);
+            // Buckets must be exhaustive and non-overlapping over the real
+            // 0.5-quantized domain: roundToHalf can produce 1.5, which is
+            // neither >= GATE_OUTLIER_DROP (2) nor === 1 — an `=== 1` check
+            // would silently drop it from both buckets. `>= 1` (with the
+            // `< GATE_OUTLIER_DROP` upper bound already implied by the
+            // preceding `if`) correctly counts it as a one-point-bucket drop.
             if (drop >= GATE_OUTLIER_DROP) twoPointDropCount++;
-            else if (drop === 1) onePointDropCount++;
+            else if (drop >= 1) onePointDropCount++;
         }
         const outlierOk =
             twoPointDropCount === 0 &&
@@ -1147,7 +1204,7 @@ function buildBatchReport(
     lines.push('## Pass/fail logic (batch, aggregated)');
     lines.push('');
     lines.push(
-        `Per axis: PASS iff BOTH (1) mean floor — \`digest_mean >= full_mean - ${GATE_TOLERANCE}\` — over the per-case aggregated (median-of-passes, then mean-of-samples) scores — AND (2) integer-aware outlier rule applied to those SAME aggregated per-case scores, each first rounded to the nearest 0.5 (\`roundToHalf\`) since aggregation makes them non-integer: no case's rounded drop is >= ${GATE_OUTLIER_DROP}, AND at most ${MAX_TOLERATED_ONE_POINT_DROPS} case has a rounded drop of exactly 1.`
+        `Per axis: PASS iff BOTH (1) mean floor — \`digest_mean >= full_mean - ${GATE_TOLERANCE}\` — over the per-case aggregated (median-of-passes, then mean-of-samples) scores — AND (2) integer-aware outlier rule applied to those SAME aggregated per-case scores, each first rounded to the nearest 0.5 (\`roundToHalf\`) since aggregation makes them non-integer: no case's rounded drop is >= ${GATE_OUTLIER_DROP}, AND at most ${MAX_TOLERATED_ONE_POINT_DROPS} case has a rounded drop of 1 or more (but less than ${GATE_OUTLIER_DROP}).`
     );
     lines.push('Overall: PASS iff every axis passes.');
     lines.push('');
