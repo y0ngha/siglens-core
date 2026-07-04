@@ -158,12 +158,16 @@ const makeEngulfingBars = (): [Bar, Bar] => [
     },
 ];
 
+// Default fixture is always_on: selection is fail-closed, so every skill that
+// should reach the prompt must carry an explicit gating block. Tests that
+// exercise the fail-closed throw override `gating: undefined` explicitly.
 const makeSkill = (overrides?: Partial<Skill>): Skill => ({
     name: 'Test Skill',
     description: 'Test description',
     indicators: [],
     confidenceWeight: TEST_HIGH_CONFIDENCE,
     content: '## Analysis Criteria\n- Test content',
+    gating: { tier: 'always_on' },
     ...overrides,
 });
 
@@ -1120,13 +1124,29 @@ describe('prompt', () => {
         });
     });
 
-    describe('Skills 섹션 - gating (fail-open replaces confidence filter)', () => {
-        // selectSkills replaced the static confidenceWeight filter: untagged
-        // skills now fail open (always included, regardless of confidence), and
-        // exclusion happens only via frontmatter gating.
-        it('untagged low-confidence skill is included (fail-open)', () => {
+    describe('Skills 섹션 - gating (fail-closed replaces fail-open)', () => {
+        // selectSkills is fail-closed: an untagged chart skill throws instead
+        // of being silently included (or dropped). Confidence remains a display
+        // weight only — an always_on skill is included at any confidence.
+        it('throws on an untagged chart skill (fail-closed)', () => {
             const skill = makeSkill({
-                name: 'Untagged Low',
+                name: 'Untagged Legacy',
+                gating: undefined,
+            });
+            expect(() =>
+                buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    [],
+                    makeIndicators(),
+                    [skill]
+                )
+            ).toThrow(/gating/);
+        });
+
+        it('always_on low-confidence skill is included (confidence is not a gate)', () => {
+            const skill = makeSkill({
+                name: 'Tagged Low',
                 confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
             });
             const result = buildAnalysisPrompt(
@@ -1136,10 +1156,10 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            expect(result).toContain('Untagged Low');
+            expect(result).toContain('Tagged Low');
         });
 
-        it('untagged high-confidence skill is included', () => {
+        it('always_on high-confidence skill is included', () => {
             const skill = makeSkill({
                 name: 'Included Skill',
                 confidenceWeight: TEST_ABOVE_MIN_CONFIDENCE,
@@ -1346,6 +1366,7 @@ describe('prompt', () => {
                     confidenceWeight: 0.2,
                     content: 'macd-v body',
                     usageRoles: ['confirmation'] as SkillUsageRole[],
+                    gating: { tier: 'always_on' as const },
                 },
             ];
             const prompt = buildAnalysisPrompt(
@@ -1427,7 +1448,7 @@ describe('prompt', () => {
             expect(result).toContain('Double Bottom');
         });
 
-        it('untagged skill kept, gated-inactive skill dropped when mixed', () => {
+        it('always_on skill kept, gated-inactive skill dropped when mixed', () => {
             const skills = [
                 makeSkill({
                     name: 'Included Skill',

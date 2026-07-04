@@ -122,7 +122,7 @@ describe('FileSkillsLoader gating frontmatter', () => {
         expect(skills[0].gating).toEqual({ tier: 'always_on' });
     });
 
-    it('leaves gating + tokenCost undefined for an untagged skill (fail-open)', async () => {
+    it('leaves gating + tokenCost undefined for an untagged skill (selector then fails closed)', async () => {
         mockReaddir.mockResolvedValue([makeDirent('legacy.md')]);
         mockReadFile.mockResolvedValue(untaggedFrontmatter);
 
@@ -221,6 +221,53 @@ ${withDigest('Body')}`;
         expect(skills).toHaveLength(1);
         expect(skills[0].gating).toBeUndefined();
     });
+
+    // Regression guard: the parse whitelist once listed only the 8 original
+    // Group-F features, so these Phase-3 pro-indicator features — all fully
+    // evaluated by isStateNotable and used by real skill files — were rejected
+    // and their skills silently degraded to untagged.
+    it.each([
+        'macdV',
+        'connorsRsi',
+        'forceIndex',
+        'elderRay',
+        'elderImpulse',
+        'chandelier',
+        'hurst',
+        'varianceRatio',
+        'regression',
+        'yangZhang',
+        'ewma',
+    ] as const)(
+        'parses a state gating block for the pro-indicator feature %s',
+        async feature => {
+            const proFeature = `---
+name: ${feature} Guide
+description: pro-indicator state gate
+type: indicator_guide
+category: neutral
+indicators: []
+confidence_weight: 0.8
+gating:
+  tier: gated
+  signal_kind: state
+  state:
+    feature: ${feature}
+    predicate: level
+---
+${withDigest('Body')}`;
+            mockReaddir.mockResolvedValue([makeDirent(`${feature}.md`)]);
+            mockReadFile.mockResolvedValue(proFeature);
+
+            const skills = await new FileSkillsLoader().loadSkills();
+
+            expect(skills[0].gating).toEqual({
+                tier: 'gated',
+                signalKind: 'state',
+                state: { feature, predicate: 'level' },
+            });
+        }
+    );
 
     it('drops a state block whose feature is unknown (parseStatePredicate reject)', async () => {
         // `feature: momentum` is not in SKILL_STATE_FEATURES — parseStatePredicate

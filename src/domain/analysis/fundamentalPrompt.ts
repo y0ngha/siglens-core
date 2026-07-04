@@ -1,6 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    NO_CHART_SELECTION_CONTEXT,
+    selectSkills,
+} from '@/domain/analysis/selectSkills';
 import type {
     FundamentalSnapshot,
     GradesConsensus,
@@ -12,9 +16,20 @@ import { formatNullableNumber as fmt } from './promptFormat';
 
 const PEER_METRIC_DECIMAL_PLACES = 1;
 
-/** Filter skills to the fundamental category. Confidence is a display weight, not an inclusion gate. */
-function filterFundamentalSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(s => s.category === 'fundamental');
+/**
+ * Select the fundamental-category skills via the shared selection engine
+ * (whitelist + fail-closed gating). `NO_CHART_SELECTION_CONTEXT` — this prompt
+ * has no chart, so only `always_on` skills can qualify (a chart-gated skill
+ * has no chart state to fire against). Confidence is a display weight, not an
+ * inclusion gate.
+ */
+function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
+    const { core, selected } = selectSkills(
+        skills,
+        NO_CHART_SELECTION_CONTEXT,
+        'fundamental'
+    );
+    return [...core, ...selected];
 }
 
 /** Render analyst grade counts into a compact inline string. */
@@ -67,8 +82,11 @@ function formatSectorDirection(
  * Build the AI fundamental-analysis prompt.
  *
  * Accepts the normalised {@link FundamentalSnapshot} and a list of loaded
- * {@link Skill}s. Only skills with `category === 'fundamental'` are injected
- * into the prompt; `confidenceWeight` is a display label, not an inclusion gate.
+ * {@link Skill}s. Skills are routed through {@link selectSkills} in the
+ * `'fundamental'` prompt context: only `category === 'fundamental'` skills
+ * qualify, untagged ones throw (fail-closed), and `always_on` skills are
+ * injected name-sorted; `confidenceWeight` is a display label, not an
+ * inclusion gate.
  *
  * Returns a fully self-contained English prompt string; the JSON output schema
  * specifies Korean text for fields labelled `KO`.
@@ -94,7 +112,7 @@ export function buildFundamentalAnalysisPrompt(
         sectorDirection,
     } = snapshot;
 
-    const qualifiedSkills = filterFundamentalSkills(skills);
+    const qualifiedSkills = selectFundamentalSkills(skills);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

@@ -674,8 +674,9 @@ export interface Skill {
     display?: SkillDisplay;
     /**
      * Dynamic-gating metadata parsed from the skill's frontmatter. When absent,
-     * the skill is treated as untagged and the skill selector includes it
-     * fail-open (never silently dropped).
+     * the skill is treated as untagged and the skill selector throws
+     * (fail-closed) when the skill passes the prompt-context whitelist — every
+     * shipped skill must carry an explicit gating block.
      */
     gating?: SkillGating;
     /**

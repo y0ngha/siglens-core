@@ -170,16 +170,39 @@ const SKILL_GATING_TIERS: readonly SkillGating['tier'][] = [
     'gated',
 ];
 const SIGNAL_KINDS: readonly SignalKind[] = ['event', 'state'];
-const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = [
-    'bollinger',
-    'keltner',
-    'williamsR',
-    'stochastic',
-    'stochRsi',
-    'donchian',
-    'vwap',
-    'buySellVolume',
-];
+/**
+ * Exhaustive runtime mirror of the {@link SkillStateFeature} union, encoded as
+ * a `Record<SkillStateFeature, true>` so the compiler rejects both a missing
+ * and an unknown key. This guard exists because the previous plain-array
+ * whitelist silently drifted: it listed only the 8 original Group-F features,
+ * so the 11 Phase-3 pro-indicator features (macdV … ewma) — all fully
+ * evaluated by `isStateNotable` and used by real skill files — were rejected
+ * here, downgrading those skills' gating to `undefined` (treated as untagged).
+ */
+const SKILL_STATE_FEATURE_FLAGS: Record<SkillStateFeature, true> = {
+    bollinger: true,
+    keltner: true,
+    williamsR: true,
+    stochastic: true,
+    stochRsi: true,
+    donchian: true,
+    vwap: true,
+    buySellVolume: true,
+    macdV: true,
+    connorsRsi: true,
+    forceIndex: true,
+    elderRay: true,
+    elderImpulse: true,
+    chandelier: true,
+    hurst: true,
+    varianceRatio: true,
+    regression: true,
+    yangZhang: true,
+    ewma: true,
+};
+const SKILL_STATE_FEATURES: readonly SkillStateFeature[] = Object.keys(
+    SKILL_STATE_FEATURE_FLAGS
+) as SkillStateFeature[];
 const SKILL_STATE_PREDICATE_KINDS: readonly SkillStatePredicateKind[] = [
     'pctB',
     'bandDistAtr',
@@ -229,9 +252,11 @@ const parseStatePredicate = (raw: unknown): SkillStatePredicate | undefined => {
  * Frontmatter keys are snake_case (repo convention, matching `confidence_weight`):
  * `signal_kind` maps to the camelCase {@link SkillGating} `signalKind` field.
  *
- * Returns `undefined` (the loader's safe default — the skill is then treated as
- * untagged and the selector includes it fail-open) when the block is malformed
- * or unreachable:
+ * Returns `undefined` (the loader's safe default — the skill is then treated
+ * as untagged; the selector is fail-closed and throws on untagged skills that
+ * pass its whitelist, so a malformed block surfaces loudly at selection time
+ * rather than silently inflating the prompt) when the block is malformed or
+ * unreachable:
  * - `tier` not in {@link SKILL_GATING_TIERS};
  * - `tier: gated` with a missing/invalid `signal_kind`;
  * - `signal_kind: event` with no non-empty `triggers`;

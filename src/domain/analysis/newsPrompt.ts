@@ -1,6 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    NO_CHART_SELECTION_CONTEXT,
+    selectSkills,
+} from '@/domain/analysis/selectSkills';
 import type {
     AssetClass,
     EarningsCalendarItem,
@@ -9,9 +13,19 @@ import type {
 } from '@/domain/types';
 import { formatNullableNumber as fmt } from './promptFormat';
 
-/** Filter skills to the news category. Confidence is a display weight, not an inclusion gate. */
-function filterNewsSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(s => s.category === 'news');
+/**
+ * Select the news-category skills via the shared selection engine (whitelist +
+ * fail-closed gating). `NO_CHART_SELECTION_CONTEXT` — this prompt has no
+ * chart, so only `always_on` skills can qualify. Confidence is a display
+ * weight, not an inclusion gate.
+ */
+function selectNewsSkills(skills: readonly Skill[]): Skill[] {
+    const { core, selected } = selectSkills(
+        skills,
+        NO_CHART_SELECTION_CONTEXT,
+        'news'
+    );
+    return [...core, ...selected];
 }
 
 /** Format a single enriched news item into a compact block for the prompt. */
@@ -54,9 +68,11 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  *
  * Accepts enriched news items (each already tagged with a
  * {@link NewsCardAnalysis} via the flash-lite model), the upcoming earnings
- * calendar, and a list of loaded {@link Skill}s. Only skills with
- * `category === 'news'` are injected into the prompt; `confidenceWeight` is
- * a display label, not an inclusion gate.
+ * calendar, and a list of loaded {@link Skill}s. Skills are routed through
+ * {@link selectSkills} in the `'news'` prompt context: only
+ * `category === 'news'` skills qualify, untagged ones throw (fail-closed),
+ * and `always_on` skills are injected name-sorted; `confidenceWeight` is a
+ * display label, not an inclusion gate.
  *
  * Returns a fully self-contained English prompt string; the JSON output schema
  * specifies Korean text for fields labelled `KO`.
@@ -116,7 +132,7 @@ export function buildNewsAnalysisPrompt(
         typeof companyNameOrNews === 'string'
             ? (maybeSkills ?? [])
             : (calendarOrSkills as readonly Skill[]);
-    const qualifiedSkills = filterNewsSkills(skills);
+    const qualifiedSkills = selectNewsSkills(skills);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

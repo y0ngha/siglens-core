@@ -1578,12 +1578,14 @@ const buildSkillSelectionContext = (
  * advisory levels and structure per horizon), SMC structure, and per-skill
  * writing rules.
  *
- * Skills are dynamically gated by {@link selectSkills}: only those whose
- * frontmatter `gating` fires for this chart's state (detected signals, textbook
- * indicator states, detected candles) are injected; untagged skills fail open
- * (always included). Selected skills are name-sorted and grouped by `type`
- * (pattern, strategy, indicator_guide, candlestick, support_resistance,
- * regular). When ATR% is extreme for the timeframe, an always-on position-sizing
+ * Skills are dynamically gated by {@link selectSkills} in the `'technical'`
+ * prompt context: non-chart skills (category fundamental/news/congress) are
+ * whitelisted out, `always_on` skills form a stable name-sorted core block,
+ * and gated skills are injected only when their frontmatter `gating` fires for
+ * this chart's state (detected signals, textbook indicator states, detected
+ * candles), ordered by relevance. Untagged skills throw (fail-closed). The
+ * combined selection is grouped by `type` (pattern, strategy, indicator_guide,
+ * candlestick, support_resistance, regular). When ATR% is extreme for the timeframe, an always-on position-sizing
  * note is appended. The number of trend samples and recent bars varies per
  * `timeframe` via `PROMPT_CONFIG_BY_TIMEFRAME`.
  *
@@ -1617,20 +1619,26 @@ export function buildAnalysisPrompt(
     // detection pass runs a single time per prompt build.
     const candleEntries = detectCandlePatternEntries(bars);
 
-    // Dynamic gating (chart only): inject only the skills whose frontmatter
-    // gating fires for this chart's state. Untagged skills fail open (included).
-    // selectSkills already returns a name-sorted copy, so the static byName
-    // sort is no longer needed here.
+    // Dynamic gating (chart only): whitelist to chart skills, then inject the
+    // always_on core plus the gated skills whose frontmatter gating fires for
+    // this chart's state. Untagged skills throw (fail-closed). Core precedes
+    // the relevance-ordered fired skills, keeping the stable block first for
+    // the later stable/dynamic prompt-assembly phase.
     const selectionContext = buildSkillSelectionContext(
         bars,
         indicators,
         timeframe,
         candleEntries
     );
+    const { core, selected } = selectSkills(
+        skills,
+        selectionContext,
+        'technical'
+    );
     // The SMC full guide is never injected (fabrication source); it is replaced
     // by the deterministic SMC data section + a compressed concept note. Drop it
     // regardless of its gating tier before bucketing.
-    const activeSkills = selectSkills(skills, selectionContext).filter(
+    const activeSkills = [...core, ...selected].filter(
         skill => !isSmcGuideSkill(skill)
     );
 

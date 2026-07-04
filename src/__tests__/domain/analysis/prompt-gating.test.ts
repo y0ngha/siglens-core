@@ -119,14 +119,24 @@ describe('buildAnalysisPrompt gating (chart only)', () => {
         expect(out).toContain('RSI Guide');
     });
 
-    it('untagged skill fails open (included even at low confidenceWeight)', () => {
+    it('untagged chart skill throws (fail-closed)', () => {
         const skill = makeSkill({
             name: 'Legacy Untagged',
             type: 'pattern',
             confidenceWeight: 0.0,
         });
+        expect(() => build([skill], [], emptyIndicators())).toThrow(/gating/);
+    });
+
+    it('always_on skill is included even at zero confidenceWeight (confidence is not a gate)', () => {
+        const skill = makeSkill({
+            name: 'Zero Confidence Pattern',
+            type: 'pattern',
+            confidenceWeight: 0.0,
+            gating: alwaysOn,
+        });
         const out = build([skill], [], emptyIndicators());
-        expect(out).toContain('Legacy Untagged');
+        expect(out).toContain('Zero Confidence Pattern');
     });
 
     it('candle-gated skill loads only when that candle is detected', () => {
@@ -287,23 +297,31 @@ describe('SMC concept-note recency boundary', () => {
     });
 });
 
-describe('news / fundamental prompt builders are unaffected by gating', () => {
-    // Both carry a gated tag that the CHART selector would EXCLUDE (no signal
-    // fires). The news/fundamental builders filter by `category`, never by
-    // `gating`, so these must still appear.
+describe('news / fundamental prompt builders route through selectSkills', () => {
+    // The news/fundamental builders now use the shared selection engine with a
+    // chartless context: only always_on skills of the builder's own category
+    // qualify. A chart-event-gated skill can never fire (no chart state) and a
+    // cross-category skill is whitelisted out.
     const newsSkill = makeSkill({
         name: 'event-driven',
-        type: 'strategy',
+        type: undefined,
         category: 'news',
         confidenceWeight: 0.8,
-        gating: eventGated(['rsi_oversold']),
+        gating: alwaysOn,
     });
     const fundamentalSkill = makeSkill({
         name: 'value-investing',
-        type: 'strategy',
+        type: undefined,
         category: 'fundamental',
         confidenceWeight: 0.8,
-        gating: eventGated(['macd_bullish_cross']),
+        gating: alwaysOn,
+    });
+    const chartGatedNewsSkill = makeSkill({
+        name: 'gated-news-frame',
+        type: undefined,
+        category: 'news',
+        confidenceWeight: 0.8,
+        gating: eventGated(['rsi_oversold']),
     });
 
     const NEWS: EnrichedNewsItem = {
@@ -392,7 +410,7 @@ describe('news / fundamental prompt builders are unaffected by gating', () => {
         sectorDirection: { todayChangePct: 1.2, historical: [] },
     };
 
-    it('news prompt includes its category skill despite the gated tag', () => {
+    it('news prompt includes its always_on category skill and filters the fundamental one', () => {
         const out = buildNewsAnalysisPrompt(
             TEST_SYMBOL,
             TEST_COMPANY,
@@ -401,13 +419,27 @@ describe('news / fundamental prompt builders are unaffected by gating', () => {
             [newsSkill, fundamentalSkill]
         );
         expect(out).toContain('event-driven');
+        expect(out).not.toContain('value-investing');
     });
 
-    it('fundamental prompt includes its category skill despite the gated tag', () => {
+    it('fundamental prompt includes its always_on category skill and filters the news one', () => {
         const out = buildFundamentalAnalysisPrompt(TEST_SYMBOL, SNAPSHOT, [
             newsSkill,
             fundamentalSkill,
         ]);
         expect(out).toContain('value-investing');
+        expect(out).not.toContain('event-driven');
+    });
+
+    it('news prompt excludes a chart-event-gated news skill (no chart state to fire against)', () => {
+        const out = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            [NEWS],
+            [CALENDAR],
+            [newsSkill, chartGatedNewsSkill]
+        );
+        expect(out).toContain('event-driven');
+        expect(out).not.toContain('gated-news-frame');
     });
 });
