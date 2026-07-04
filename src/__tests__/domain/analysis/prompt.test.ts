@@ -2787,7 +2787,7 @@ describe('prompt', () => {
         it('결정 트리 Step 2: 가격 계산 규칙이 포함된다', () => {
             expect(result).toContain('Step 2');
             expect(result).toContain(
-                'entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike.'
+                'entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists.'
             );
         });
 
@@ -2812,6 +2812,11 @@ describe('prompt', () => {
             expect(result).toContain(
                 'Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist'
             );
+        });
+
+        it('contingent 플랜 강제와 함께 레벨 날조를 금지하는 grounding 제약이 포함된다', () => {
+            expect(result).toContain('never invent or extrapolate a level');
+            expect(result).toContain('an honest gap beats an invented number');
         });
 
         it('actionRecommendation 텍스트 필드를 문단과 목록으로 작성하도록 지시한다', () => {
