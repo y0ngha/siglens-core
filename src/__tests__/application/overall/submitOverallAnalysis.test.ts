@@ -10,7 +10,12 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/application/background');
 vi.mock('@/application/market/barsApi');
 vi.mock('@/domain/analysis/overallPrompt', () => ({
-    buildOverallAnalysisPrompt: vi.fn(() => 'mock-overall-prompt'),
+    // `buildOverallAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4
+    // assembly split).
+    buildOverallAnalysisPrompt: vi.fn(() => ({
+        stable: 'mock-overall-stable',
+        dynamic: 'mock-overall-dynamic',
+    })),
 }));
 vi.mock('@/domain/indicators/fearGreed', () => ({
     computeFearGreedIndex: vi.fn(),

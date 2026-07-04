@@ -4,8 +4,8 @@ import {
     ATR_EXTREME_PERCENT_DAILY,
     SMC_STRUCTURE_BREAK_RECENCY_BARS,
 } from '@/domain/analysis/prompt';
-import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
+import { buildNewsAnalysisPrompt as buildNewsAnalysisPromptRaw } from '@/domain/analysis/newsPrompt';
+import { buildFundamentalAnalysisPrompt as buildFundamentalAnalysisPromptRaw } from '@/domain/analysis/fundamentalPrompt';
 import { calculateIndicators } from '@/domain/indicators';
 import {
     EMPTY_INDICATOR_RESULT,
@@ -27,6 +27,35 @@ const buildAnalysisPrompt = (
     ...args: Parameters<typeof buildAnalysisPromptRaw>
 ): string => {
     const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
+
+// Same flattening treatment for the (chartless) news/fundamental builders
+// exercised later in this file. `buildNewsAnalysisPromptRaw` is overloaded
+// (4/5/6-arg forms); this file only ever calls the 5-arg
+// (symbol, companyName, news, calendar, skills) form, so the wrapper matches
+// that overload exactly rather than widening via `Parameters<>` (which
+// resolves to the last, 6-arg overload).
+const buildNewsAnalysisPrompt = (
+    symbol: string,
+    companyName: string,
+    news: ReadonlyArray<EnrichedNewsItem>,
+    upcomingCalendar: readonly EarningsCalendarItem[],
+    skills: readonly Skill[]
+): string => {
+    const { stable, dynamic } = buildNewsAnalysisPromptRaw(
+        symbol,
+        companyName,
+        news,
+        upcomingCalendar,
+        skills
+    );
+    return `${stable}\n\n${dynamic}`;
+};
+const buildFundamentalAnalysisPrompt = (
+    ...args: Parameters<typeof buildFundamentalAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildFundamentalAnalysisPromptRaw(...args);
     return `${stable}\n\n${dynamic}`;
 };
 

@@ -1,13 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import { buildChatPrompt } from '@/domain/chat/buildChatPrompt';
-import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
+import { buildNewsAnalysisPrompt as buildNewsAnalysisPromptRaw } from '@/domain/analysis/newsPrompt';
+import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/domain/analysis/overallPrompt';
 import type {
     AnalysisResponse,
     CurrentAnalysisContext,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
 } from '@/domain/types';
+
+// Both builders now return `{ stable, dynamic }` (spec §3.4 assembly split);
+// this file's call sites predate the split and assert against the single
+// legacy combined string (`stable + '\n\n' + dynamic`, exactly the string
+// dispatch still sends as the `prompt` fallback field).
+const buildNewsAnalysisPrompt = (
+    ...args: Parameters<typeof buildNewsAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildNewsAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
+const buildOverallAnalysisPrompt = (
+    ...args: Parameters<typeof buildOverallAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildOverallAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 // ─── Shared fixtures ────────────────────────────────────────────────────────
 
@@ -193,12 +210,17 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
             null,
             'equity'
         );
-        // The very first line of the prompt must use the equity role.
-        const firstLine = prompt.split('\n')[0] ?? '';
-        expect(firstLine).toContain('senior equity analyst');
-        expect(firstLine).toContain('four-axis data');
-        expect(firstLine).not.toContain('senior markets analyst');
-        expect(firstLine).not.toContain('available-axis');
+        // The role/opener line must use the equity role. Post assembly-split
+        // (spec §3.4), the stable Output Schema block now precedes the
+        // dynamic role line in the combined prompt, so this locates the
+        // opener line by content rather than assuming index 0 (the inverse
+        // of the pre-split order — see promptStability.test.ts).
+        const openerLine =
+            prompt.split('\n').find(line => line.startsWith('You are a')) ?? '';
+        expect(openerLine).toContain('senior equity analyst');
+        expect(openerLine).toContain('four-axis data');
+        expect(openerLine).not.toContain('senior markets analyst');
+        expect(openerLine).not.toContain('available-axis');
     });
 
     it('crypto: role line uses neutral "senior markets analyst" and "available-axis data" — no equity-analyst or four-axis in the opener', () => {
@@ -215,11 +237,12 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
             null,
             'crypto'
         );
-        const firstLine = prompt.split('\n')[0] ?? '';
-        expect(firstLine).toContain('senior markets analyst');
-        expect(firstLine).toContain('available-axis data');
-        expect(firstLine).not.toContain('senior equity analyst');
-        expect(firstLine).not.toContain('four-axis data');
+        const openerLine =
+            prompt.split('\n').find(line => line.startsWith('You are a')) ?? '';
+        expect(openerLine).toContain('senior markets analyst');
+        expect(openerLine).toContain('available-axis data');
+        expect(openerLine).not.toContain('senior equity analyst');
+        expect(openerLine).not.toContain('four-axis data');
         // The crypto branch must be internally consistent: no "four-axis data"
         // wording anywhere (R2 round-2 fix — the Data Boundary line previously
         // hardcoded "four-axis data", contradicting the crypto opener).

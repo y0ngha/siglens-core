@@ -336,19 +336,24 @@ export async function submitOverallAnalysis(
         });
 
     const optionsOiStale = options.optionsOiStale ?? false;
-    const prompt = buildOverallAnalysisPrompt(
-        symbol,
-        companyName,
-        deps.technical,
-        deps.fundamental,
-        deps.news,
-        timeframe,
-        fearGreed ?? undefined,
-        deps.options,
-        optionsOiStale,
-        options.financialsScorecard,
-        options.assetClass ?? 'equity'
-    );
+    const { stable: promptStable, dynamic: promptDynamic } =
+        buildOverallAnalysisPrompt(
+            symbol,
+            companyName,
+            deps.technical,
+            deps.fundamental,
+            deps.news,
+            timeframe,
+            fearGreed ?? undefined,
+            deps.options,
+            optionsOiStale,
+            options.financialsScorecard,
+            options.assetClass ?? 'equity'
+        );
+    // Legacy combined string — kept as the `prompt` fallback field for one
+    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
+    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
+    const prompt = `${promptStable}\n\n${promptDynamic}`;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -376,6 +381,8 @@ export async function submitOverallAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
+            promptStable,
+            promptDynamic,
             seed: analysisSeed(prompt),
             model: modelId,
             tier,

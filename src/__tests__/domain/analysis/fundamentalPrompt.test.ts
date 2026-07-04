@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
+import { buildFundamentalAnalysisPrompt as buildFundamentalAnalysisPromptRaw } from '@/domain/analysis/fundamentalPrompt';
 import type { FundamentalSnapshot, Skill } from '@/domain/types';
+
+// `buildFundamentalAnalysisPrompt` now returns `{ stable, dynamic }` (spec
+// §3.4 assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildFundamentalAnalysisPrompt = (
+    ...args: Parameters<typeof buildFundamentalAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildFundamentalAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 

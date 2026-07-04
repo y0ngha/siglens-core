@@ -130,7 +130,10 @@ export function buildNewsCase(
     fixture: NewsFixture,
     skills: readonly Skill[]
 ): PromptCaseOutput {
-    const prompt = buildNewsAnalysisPrompt(
+    // `buildNewsAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4
+    // assembly split); the harness sends the model the same combined string
+    // production dispatch builds as its `prompt` fallback field ('\n\n' join).
+    const { stable, dynamic } = buildNewsAnalysisPrompt(
         fixture.symbol,
         fixture.companyName,
         fixture.articles,
@@ -142,6 +145,7 @@ export function buildNewsCase(
         skills as Skill[],
         'equity'
     );
+    const prompt = `${stable}\n\n${dynamic}`;
     return {
         caseId: fixture.caseId,
         analysisType: 'news',
