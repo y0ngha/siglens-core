@@ -1,5 +1,23 @@
 # Changelog
 
+# [0.30.0](https://github.com/y0ngha/siglens-core/compare/v0.29.0...v0.30.0) (2026-07-04)
+
+
+### Bug Fixes
+
+* **analysis:** grounding constraint on contingent-plan mandate — no invented levels ([57c024e](https://github.com/y0ngha/siglens-core/commit/57c024e1c3336062a526e8deed03dbbdb2e77866))
+* **analysis:** mandate contingent level-plan assembly even on wait/avoid verdicts ([bceba23](https://github.com/y0ngha/siglens-core/commit/bceba23fce15a2be3f6674c21b9032e1062e3428))
+* **analysis:** PR review round 1 — news template version, gate bucket fix, poll resilience, review nits ([d76e1b7](https://github.com/y0ngha/siglens-core/commit/d76e1b7011d0c420fb1c7c5e0917085e1774e084))
+* **analysis:** PR review round 2 — skillWhitelist tests, shared CLI arg parser, non-chart gating docs ([9a95c15](https://github.com/y0ngha/siglens-core/commit/9a95c1520333947d4b57dae61aafe6b239130f66))
+* **skills:** minimal YAML parser drops top-level keys after nested blocks — parse depth correctly ([c9a3755](https://github.com/y0ngha/siglens-core/commit/c9a3755d0eb8c5863b40ff8ec09ac3a88aad731f))
+
+
+### Features
+
+* **analysis:** category whitelist + fail-closed gating + relevance-ordered selection ([24d820f](https://github.com/y0ngha/siglens-core/commit/24d820fa8a3e908a9430b65adbace9533cf23cc4)), closes [siglens#671](https://github.com/siglens/issues/671)
+* **analysis:** pattern-screener candidates as skill selection triggers ([11853a7](https://github.com/y0ngha/siglens-core/commit/11853a7994a4329ec286ae402bd66245695aaaef))
+* **harness:** multi-sample runs + batched multi-pass judging with median aggregation ([403cdb9](https://github.com/y0ngha/siglens-core/commit/403cdb960c185d327623531bb69d7aacd05fe470))
+
 # [0.29.0](https://github.com/y0ngha/siglens-core/compare/v0.28.0...v0.29.0) (2026-07-03)
 
 
