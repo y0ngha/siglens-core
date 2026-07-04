@@ -189,9 +189,17 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * `PROMPT_DIGEST` section, since that changes the prompt bytes sent to the
  * LLM and therefore must invalidate previously cached results.
  *
+ * @remarks
+ * **`p3` = selection-engine activation (spec §3.2).** This constant covers the
+ * technical AND fundamental keys, and both templates' bytes change: the
+ * technical prompt gains the category/type whitelist, the core/selected split
+ * (always_on core first, fired skills relevance-ordered after), and fail-closed
+ * gating; the fundamental prompt's skills are now name-sorted by the shared
+ * selector instead of catalog order.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -437,9 +445,15 @@ export function buildFundamentalCacheKey(
  * remark) — `skill.content` switched from the full skill body to the
  * condensed `PROMPT_DIGEST` section, changing this template's prompt bytes.
  *
+ * @remarks
+ * **`p3` = selection-engine activation (spec §3.2)** — the financials builder
+ * now routes skills through the shared selector (whitelist + fail-closed
+ * gating), so injected fundamental skills are name-sorted instead of catalog
+ * order, changing this template's prompt bytes.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -497,6 +511,9 @@ export function buildFinancialsCacheKey(
  * **`p2` = PROMPT_DIGEST activation** (see {@link PROMPT_TEMPLATE_VERSION}'s
  * remark) — `skill.content` switched from the full skill body to the
  * condensed `PROMPT_DIGEST` section, changing this template's prompt bytes.
+ * Intentionally NOT bumped for the §3.2 selection engine: the congress builder
+ * keeps its own private `category === 'congress'` filter and does not call
+ * `selectSkills`, so its prompt bytes are unchanged.
  *
  * @internal
  */
