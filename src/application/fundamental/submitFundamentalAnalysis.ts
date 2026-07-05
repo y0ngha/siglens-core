@@ -257,12 +257,18 @@ export async function submitFundamentalAnalysis(
     const { snapshot, skills, skillsDegraded } = providerData;
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const { stable: promptStable, dynamic: promptDynamic } =
-        buildFundamentalAnalysisPrompt(symbol, snapshot, skills);
-    // Legacy combined string — kept as the `prompt` fallback field for one
-    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
-    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
-    const prompt = `${promptStable}\n\n${promptDynamic}`;
+    const { stable, dynamic } = buildFundamentalAnalysisPrompt(
+        symbol,
+        snapshot,
+        skills
+    );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt.
+    const system = stable
+        ? `${FUNDAMENTAL_SYSTEM_PROMPT}\n\n${stable}`
+        : FUNDAMENTAL_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -287,13 +293,11 @@ export async function submitFundamentalAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            promptStable,
-            promptDynamic,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'fundamental' satisfies AnalysisType,
-            system: FUNDAMENTAL_SYSTEM_PROMPT,
+            system,
             responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),

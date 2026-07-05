@@ -127,14 +127,18 @@ describe('submitBriefing 함수는', () => {
                 { body: string },
             ];
             const body = JSON.parse(init.body) as Record<string, unknown>;
+            // Design C: this builder has no skills catalog/system prompt, so
+            // `stable` (mocked non-empty here to prove it's intentionally
+            // dropped) is never folded anywhere — `prompt` is `dynamic` alone,
+            // and there's no promptStable/promptDynamic split on the body.
             expect(body).toMatchObject({
                 jobId: expect.any(String),
-                // Legacy combined field: stable + '\n\n' + dynamic (spec §3.4).
-                prompt: 'mock\n\nprompt',
-                promptStable: 'mock',
-                promptDynamic: 'prompt',
+                prompt: 'prompt',
                 model: BRIEFING_MODEL_ID,
             });
+            expect(body.promptStable).toBeUndefined();
+            expect(body.promptDynamic).toBeUndefined();
+            expect(body.system).toBeUndefined();
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
         });
 

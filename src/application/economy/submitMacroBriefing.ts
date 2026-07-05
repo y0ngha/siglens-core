@@ -79,12 +79,11 @@ export async function submitMacroBriefing(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
 
-    const { stable: promptStable, dynamic: promptDynamic } =
-        buildMacroBriefingPrompt(data);
-    // Legacy combined string — kept as the `prompt` fallback field for one
-    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
-    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
-    const prompt = `${promptStable}\n\n${promptDynamic}`;
+    // This builder has no skills catalog and no separate system prompt (the
+    // role framing lives in `dynamic` itself) — `stable` is always '' (spec
+    // §3.2/Design C), so there is nothing to fold; `prompt` is `dynamic` alone.
+    const { dynamic } = buildMacroBriefingPrompt(data);
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     // Persist the input-hashed cache key so pollMacroBriefing writes the result
@@ -111,8 +110,6 @@ export async function submitMacroBriefing(
         body: JSON.stringify({
             jobId,
             prompt,
-            promptStable,
-            promptDynamic,
             model: BRIEFING_MODEL_ID,
             seed: analysisSeed(prompt),
         }),

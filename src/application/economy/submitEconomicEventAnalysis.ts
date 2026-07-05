@@ -104,12 +104,11 @@ export async function submitEconomicEventAnalysis(
     }
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const { stable: promptStable, dynamic: promptDynamic } =
-        buildEconomicEventAnalysisPrompt(input);
-    // Legacy combined string — kept as the `prompt` fallback field for one
-    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
-    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
-    const prompt = `${promptStable}\n\n${promptDynamic}`;
+    // This builder has no skills catalog and no separate system prompt (the
+    // role framing lives in `dynamic` itself) — `stable` is always '' (spec
+    // §3.2/Design C), so there is nothing to fold; `prompt` is `dynamic` alone.
+    const { dynamic } = buildEconomicEventAnalysisPrompt(input);
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     // Persist the cache key in job meta so pollEconomicEventAnalysis writes the
@@ -136,8 +135,6 @@ export async function submitEconomicEventAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            promptStable,
-            promptDynamic,
             model: ECONOMIC_EVENT_MODEL_ID,
             seed: analysisSeed(prompt),
         }),

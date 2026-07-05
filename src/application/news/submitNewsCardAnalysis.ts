@@ -60,12 +60,15 @@ export async function submitNewsCardAnalysis(
 
     // Build prompt, enqueue job, fire-and-forget worker POST
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const { stable: promptStable, dynamic: promptDynamic } =
-        buildNewsCardAnalysisPrompt(item);
-    // Legacy combined string — kept as the `prompt` fallback field for one
-    // release so a not-yet-upgraded worker (pre PR4a) still works (spec
-    // §3.4's hard contract: join with EXACTLY '\n\n' for seed/legacy parity).
-    const prompt = `${promptStable}\n\n${promptDynamic}`;
+    const { stable, dynamic } = buildNewsCardAnalysisPrompt(item);
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt. This builder has no skills catalog, so `stable` is always ''
+    // and `system` stays the base persona unchanged.
+    const system = stable
+        ? `${NEWS_CARD_SYSTEM_PROMPT}\n\n${stable}`
+        : NEWS_CARD_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -82,13 +85,11 @@ export async function submitNewsCardAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            promptStable,
-            promptDynamic,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: NEWS_CARD_MODEL_ID,
             ...(thinkingBudget !== undefined && { thinkingBudget }),
             analysisType: 'newsCard' satisfies AnalysisType,
-            system: NEWS_CARD_SYSTEM_PROMPT,
+            system,
             responseSchema: NEWS_CARD_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS),

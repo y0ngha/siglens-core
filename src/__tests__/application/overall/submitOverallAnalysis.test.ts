@@ -189,7 +189,13 @@ describe('submitOverallAnalysis 함수는', () => {
         // Individual tests override with mockReturnValueOnce when they need
         // a deterministic snapshot.
         mockComputeFearGreedIndex.mockReturnValue(null);
-        mockBuildOverallAnalysisPrompt.mockReturnValue('mock-overall-prompt');
+        // Real `buildOverallAnalysisPrompt` returns `{ stable, dynamic }`
+        // (spec §3.4); `stable` is always '' for this builder (Design C), so
+        // the default mock mirrors that shape instead of a bare string.
+        mockBuildOverallAnalysisPrompt.mockReturnValue({
+            stable: '',
+            dynamic: 'mock-overall-prompt',
+        });
     });
 
     afterEach(() => {
@@ -957,8 +963,17 @@ describe('submitOverallAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.analysisType).toBe('overall');
+            // This builder has no skills catalog, so `stable` is always ''
+            // and `system` stays the bare persona unchanged (Design C).
             expect(body.system).toBe(OVERALL_SYSTEM_PROMPT);
-            expect(body.seed).toBe(analysisSeed(body.prompt as string));
+            expect(body.prompt).toBe('mock-overall-prompt');
+            expect(body.promptStable).toBeUndefined();
+            expect(body.promptDynamic).toBeUndefined();
+            expect(body.seed).toBe(
+                analysisSeed(
+                    `${body.system as string}\n\n${body.prompt as string}`
+                )
+            );
         });
 
         it('treats missing tier as DEFAULT_TIER (free) in worker POST body', async () => {
