@@ -226,7 +226,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `normalizeFinancialsAnalysisResponse` | `domain/analysis/normalizeFinancials.ts` |
 | `normalizeFinancialsSnapshot` | `domain/analysis/normalizeFinancialsSnapshot.ts` |
 
-> PR #163에서 `buildFinancialsAnalysisPrompt`가 `@internal` 전환 — `submitFinancialsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+> PR #163에서 `buildFinancialsAnalysisPrompt`가 `@internal` 전환 — `submitFinancialsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildFinancialsAnalysisPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **의회 거래 동향 분석 헬퍼 (3)**
 | Symbol | Source |
@@ -235,7 +235,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `summarizeCongressTrades` | `domain/analysis/summarizeCongressTrades.ts` |
 | `normalizeCongressTrendResponse` | `domain/analysis/normalizeCongressTrend.ts` |
 
-> PR #163에서 `buildCongressTrendPrompt`가 `@internal` 전환 — `submitCongressTrend` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+> PR #163에서 `buildCongressTrendPrompt`가 `@internal` 전환 — `submitCongressTrend` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildCongressTrendPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **거시경제 (economy) 헬퍼 (6)** — `/economy` 페이지가 FMP wire 응답을 도메인 타입으로 변환할 때 사용. 모두 pure하므로 `index.client.ts`에도 노출. (의도적 비공개: `buildMacroBriefingPrompt`와 `normalizeMacroBriefing`은 `@internal`로 유지 — financials와 달리 macro는 prompt/normalize 단계가 `submitMacroBriefing`/`pollMacroBriefing` use-case 내부에서만 호출되며 consumer가 부분 조합할 진입점이 없다. 향후 partial 사용처가 생기면 그때 노출 검토.)
 | Symbol | Source |
@@ -247,7 +247,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `normalizeEconomicEventAnalysis(raw)` — defensively normalizes a raw LLM string/object into a typed `EconomicEventAnalysis`. Returns a neutral default on any parse or normalization failure; never throws. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/normalizeEconomicEventAnalysis.ts` |
 | `normalizeIndicatorTranslation(raw)` — defensively normalizes a raw LLM string/object into a trimmed Korean name string. Returns `''` on any failure; never throws. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/normalizeIndicatorTranslation.ts` |
 
-> PR #163에서 `buildEconomicEventAnalysisPrompt`, `buildIndicatorTranslationPrompt`가 `@internal` 전환 — 각각 `submitEconomicEventAnalysis`/`submitIndicatorTranslation` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+> PR #163에서 `buildEconomicEventAnalysisPrompt`, `buildIndicatorTranslationPrompt`가 `@internal` 전환 — 각각 `submitEconomicEventAnalysis`/`submitIndicatorTranslation` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildEconomicEventAnalysisPrompt\|buildIndicatorTranslationPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **프롬프트 빌더 (1 + 1 상수)**
 | Symbol | Source |
@@ -255,7 +255,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
 
-> PR #163에서 `buildOptionsAnalysisPrompt`가 `@internal` 전환 — `submitOptionsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+> PR #163에서 `buildOptionsAnalysisPrompt`가 `@internal` 전환 — `submitOptionsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildOptionsAnalysisPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **옵션 분석 헬퍼 (4)**
 | Symbol | Source |

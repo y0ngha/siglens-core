@@ -1576,9 +1576,11 @@ export interface PromptConfig {
  *   catalog)` pair. Byte-identical across calls sharing the same catalog
  *   fingerprint: never contains a symbol, job id, timestamp, or any other
  *   per-call value — it only changes when the skill catalog fingerprint
- *   changes. Empty for builders whose catalog has no `always_on` skills for
- *   that prompt type (e.g. the economic-event and indicator-translation
- *   builders, which carry no skills at all).
+ *   changes. Non-empty for skill-bearing builders (technical, fundamental,
+ *   financials, congress, news) whenever the loaded catalog has `always_on`
+ *   skills for that context; `''` for builders that inject no skills at all
+ *   (options, market/macro briefing, economic-event, indicator-translation —
+ *   these never read the skill catalog and always return `stable: ''`).
  * - `dynamic` — everything else, in production order: the symbol/company
  *   framing, fetched market/news/financial data, gated skill digests chosen
  *   for this specific call, and the per-call request block.
@@ -1590,7 +1592,7 @@ export interface PromptConfig {
  * so the seed still reflects the full assembled content.
  */
 export interface AssembledPrompt {
-    /** `always_on` skill digests only — byte-stable per `(analysisType, catalog fingerprint)`; empty when the catalog has no `always_on` skills for this prompt type. Folded into the system prompt by dispatch. */
+    /** `always_on` skill digests only — byte-stable per `(analysisType, catalog fingerprint)`; non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) when the catalog has `always_on` skills, `''` for builders that inject no skills at all (options, market/macro briefing, economic-event, indicator-translation). Folded into the system prompt by dispatch. */
     stable: string;
     /** Everything else, in production order: symbol/company framing, fetched data, gated skill digests, the request block. Sent as `prompt` by dispatch. */
     dynamic: string;
