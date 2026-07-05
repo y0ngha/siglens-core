@@ -198,14 +198,17 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * selector instead of catalog order.
  *
  * @remarks
- * **`p4` = stable/dynamic assembly split (spec §3.4).** Both `buildAnalysisPrompt`
- * (technical) and `buildFundamentalAnalysisPrompt` now return
- * `AssembledPrompt { stable, dynamic }` instead of a single string; the
+ * **`p4` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** Both `buildAnalysisPrompt` (technical) and
+ * `buildFundamentalAnalysisPrompt` now return `AssembledPrompt { stable,
+ * dynamic }` instead of a single string; `stable` carries ONLY the
+ * `always_on` skill digests (moved out of the user prompt into the system
+ * prompt), and `dynamic` is the ENTIRE rest of the prompt in the same,
+ * unchanged production order — the intent/guidelines/guardrail sections and
+ * every other user-prompt section keep their original position. The
  * fingerprint only covers skill metadata (`{name, gating, tokenCost}`), so
- * this assembly reorder (stable content — intent/guidelines/guardrail/
- * always_on digests — now precedes the dynamic data sections, the inverse of
- * the pre-split order) changes prompt bytes without changing that fingerprint,
- * requiring a manual bump per the versioning policy (spec §4).
+ * relocating the skill digests changes prompt bytes without changing that
+ * fingerprint, requiring a manual bump per the versioning policy (spec §4).
  *
  * @internal
  */
@@ -316,15 +319,16 @@ export function buildMacroBriefingCacheKey(
  * no-op cache churn.
  *
  * @remarks
- * **`p2` = stable/dynamic assembly split (spec §3.4).**
- * `buildEconomicEventAnalysisPrompt` now returns
- * `AssembledPrompt { stable, dynamic }`; the fully-static role framing/Data
- * Boundary/Output Schema/Rules/few-shot examples moved into `stable` ahead of
- * the per-event Event Details section, changing this template's prompt bytes.
+ * **Deliberately NOT bumped for the stable/dynamic assembly split (spec
+ * §3.4).** `buildEconomicEventAnalysisPrompt` now returns `AssembledPrompt {
+ * stable, dynamic }` instead of a plain string, but this builder has no
+ * skills to relocate for Design C — `stable` is simply `''` and `dynamic` is
+ * byte-for-byte the same prompt text the plain-string version produced (only
+ * the return-type wrapper changed). Bumping would be no-op cache churn.
  *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p1' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
@@ -469,12 +473,13 @@ export function buildFundamentalCacheKey(
  * order, changing this template's prompt bytes.
  *
  * @remarks
- * **`p4` = stable/dynamic assembly split (spec §3.4).**
- * `buildFinancialsAnalysisPrompt` now returns
- * `AssembledPrompt { stable, dynamic }`; the always_on-only "Financial
- * Analysis Frameworks" section moved into `stable` alongside Data
- * Boundary/Output Schema/Rules, ahead of the per-symbol data sections,
- * changing this template's prompt bytes.
+ * **`p4` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** `buildFinancialsAnalysisPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; ONLY the always_on-only "Financial
+ * Analysis Frameworks" (Active Skills) section moved out of the user prompt
+ * into `stable` (relocated to the system prompt) — Data Boundary/Output
+ * Schema/Rules and every other section stay in `dynamic`, in the unchanged
+ * production order, changing this template's prompt bytes.
  *
  * @internal
  */
@@ -541,12 +546,14 @@ export function buildFinancialsCacheKey(
  * `selectSkills`, so its prompt bytes are unchanged.
  *
  * @remarks
- * **`p3` = stable/dynamic assembly split (spec §3.4).** `buildCongressTrendPrompt`
- * now returns `AssembledPrompt { stable, dynamic }`; the catalog-deterministic
+ * **`p3` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** `buildCongressTrendPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; ONLY the catalog-deterministic
  * "Domain Skills (Active)" section (filtered purely by category, never by
- * chart/symbol state) moved into `stable` alongside role framing/Data
- * Boundary/Caveats/Output Schema/Rules, ahead of the per-symbol trade data,
- * changing this template's prompt bytes.
+ * chart/symbol state) moved out of the user prompt into `stable` (relocated
+ * to the system prompt) — role framing/Data Boundary/Caveats/Output
+ * Schema/Rules and every other section stay in `dynamic`, in the unchanged
+ * production order, changing this template's prompt bytes.
  *
  * @internal
  */
@@ -624,12 +631,14 @@ export function buildCongressTrendCacheKey(
  * generation before this constant existed.)
  *
  * @remarks
- * **`p3` = stable/dynamic assembly split (spec §3.4).** Both
- * `buildNewsAnalysisPrompt` and `buildMarketNewsDigestPrompt` now return
- * `AssembledPrompt { stable, dynamic }`; the always_on-only "News Analysis
- * Frameworks" section moved into `stable` alongside role framing/Data
- * Boundary/Output Schema/Rules, ahead of the per-call article data, changing
- * both templates' prompt bytes.
+ * **`p3` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** Both `buildNewsAnalysisPrompt` and
+ * `buildMarketNewsDigestPrompt` now return `AssembledPrompt { stable,
+ * dynamic }`; ONLY the always_on-only "News Analysis Frameworks" (Active
+ * Skills) section moved out of the user prompt into `stable` (relocated to
+ * the system prompt) — role framing/Data Boundary/Output Schema/Rules and
+ * every other section stay in `dynamic`, in the unchanged production order,
+ * changing both templates' prompt bytes.
  *
  * @internal
  */
@@ -735,15 +744,16 @@ export function buildOverallCacheKey(
  * no-op cache churn.
  *
  * @remarks
- * **`p2` = stable/dynamic assembly split (spec §3.4).**
- * `buildIndicatorTranslationPrompt` now returns
- * `AssembledPrompt { stable, dynamic }`; the fully-static role framing/Data
- * Boundary/Output Schema/Rules/few-shot examples moved into `stable` ahead of
- * the per-call Indicator Name section, changing this template's prompt bytes.
+ * **Deliberately NOT bumped for the stable/dynamic assembly split (spec
+ * §3.4).** `buildIndicatorTranslationPrompt` now returns `AssembledPrompt {
+ * stable, dynamic }` instead of a plain string, but this builder has no
+ * skills to relocate for Design C — `stable` is simply `''` and `dynamic` is
+ * byte-for-byte the same prompt text the plain-string version produced (only
+ * the return-type wrapper changed). Bumping would be no-op cache churn.
  *
  * @internal
  */
-export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const INDICATOR_TRANSLATION_PROMPT_TEMPLATE_VERSION = 'p1' as const;
 
 /** @internal Number of days an indicator translation result is kept in cache. */
 const INDICATOR_TRANSLATION_CACHE_TTL_DAYS = 30;

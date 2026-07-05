@@ -219,40 +219,43 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `computeFearGreedHistory(bars, buySellVolume, options?)` — walk-forward 1-year score history. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/fearGreed/walkForward.ts` |
 | `scoreToLabel(score)` — map a 0..100 score to its 5-stage `FearGreedLabel`, using `FEAR_GREED_LABEL_CUTOFFS`. | `domain/indicators/fearGreed/composition.ts` |
 
-**재무제표 분석 헬퍼 (4)**
+**재무제표 분석 헬퍼 (3)**
 | Symbol | Source |
 |---|---|
 | `computeFinancialsScorecard` | `domain/analysis/financialsScorecard.ts` |
 | `normalizeFinancialsAnalysisResponse` | `domain/analysis/normalizeFinancials.ts` |
 | `normalizeFinancialsSnapshot` | `domain/analysis/normalizeFinancialsSnapshot.ts` |
-| `buildFinancialsAnalysisPrompt` | `domain/analysis/financialsPrompt.ts` |
 
-**의회 거래 동향 분석 헬퍼 (4)**
+> PR #163에서 `buildFinancialsAnalysisPrompt`가 `@internal` 전환 — `submitFinancialsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+
+**의회 거래 동향 분석 헬퍼 (3)**
 | Symbol | Source |
 |---|---|
 | `normalizeCongressTrades` | `domain/analysis/normalizeCongressTrades.ts` |
 | `summarizeCongressTrades` | `domain/analysis/summarizeCongressTrades.ts` |
-| `buildCongressTrendPrompt` | `domain/analysis/congressTrendPrompt.ts` |
 | `normalizeCongressTrendResponse` | `domain/analysis/normalizeCongressTrend.ts` |
 
-**거시경제 (economy) 헬퍼 (8)** — `/economy` 페이지가 FMP wire 응답을 도메인 타입으로 변환할 때 사용. 모두 pure하므로 `index.client.ts`에도 노출. (의도적 비공개: `buildMacroBriefingPrompt`와 `normalizeMacroBriefing`은 `@internal`로 유지 — financials와 달리 macro는 prompt/normalize 단계가 `submitMacroBriefing`/`pollMacroBriefing` use-case 내부에서만 호출되며 consumer가 부분 조합할 진입점이 없다. 향후 partial 사용처가 생기면 그때 노출 검토.)
+> PR #163에서 `buildCongressTrendPrompt`가 `@internal` 전환 — `submitCongressTrend` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+
+**거시경제 (economy) 헬퍼 (6)** — `/economy` 페이지가 FMP wire 응답을 도메인 타입으로 변환할 때 사용. 모두 pure하므로 `index.client.ts`에도 노출. (의도적 비공개: `buildMacroBriefingPrompt`와 `normalizeMacroBriefing`은 `@internal`로 유지 — financials와 달리 macro는 prompt/normalize 단계가 `submitMacroBriefing`/`pollMacroBriefing` use-case 내부에서만 호출되며 consumer가 부분 조합할 진입점이 없다. 향후 partial 사용처가 생기면 그때 노출 검토.)
 | Symbol | Source |
 |---|---|
 | `normalizeEconomicIndicatorSeries(name, raw, trendLength)` | `domain/economy/normalizeEconomicIndicators.ts` |
 | `normalizeTreasuryRates(raw)` | `domain/economy/normalizeTreasuryRates.ts` |
 | `computeYieldSpread(snap)` — 2s10s 스프레드(%p, 음수=역전). | `domain/economy/normalizeTreasuryRates.ts` |
 | `normalizeEconomicCalendar(raw)` — US 필터 + impact enum 강제 + 날짜 오름차순. | `domain/economy/normalizeEconomicCalendar.ts` |
-| `buildEconomicEventAnalysisPrompt(input)` — builds the English prompt for per-event economic-calendar AI analysis. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/economicEventPrompt.ts` |
 | `normalizeEconomicEventAnalysis(raw)` — defensively normalizes a raw LLM string/object into a typed `EconomicEventAnalysis`. Returns a neutral default on any parse or normalization failure; never throws. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/normalizeEconomicEventAnalysis.ts` |
-| `buildIndicatorTranslationPrompt(name)` — builds the English prompt for AI indicator-name translation. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/indicatorTranslationPrompt.ts` |
 | `normalizeIndicatorTranslation(raw)` — defensively normalizes a raw LLM string/object into a trimmed Korean name string. Returns `''` on any failure; never throws. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/normalizeIndicatorTranslation.ts` |
 
-**프롬프트 빌더 (2 + 1 상수)**
+> PR #163에서 `buildEconomicEventAnalysisPrompt`, `buildIndicatorTranslationPrompt`가 `@internal` 전환 — 각각 `submitEconomicEventAnalysis`/`submitIndicatorTranslation` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
+
+**프롬프트 빌더 (1 + 1 상수)**
 | Symbol | Source |
 |---|---|
-| `buildOptionsAnalysisPrompt` | `domain/options/optionsPrompt.ts` |
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
+
+> PR #163에서 `buildOptionsAnalysisPrompt`가 `@internal` 전환 — `submitOptionsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Non-breaking(외부 소비 없음).
 
 **옵션 분석 헬퍼 (4)**
 | Symbol | Source |
@@ -388,6 +391,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - 펀더멘털: `FundamentalAnalysisResponse`, `FundamentalCategoryAssessment`, `FundamentalCategory`, `FundamentalSentiment`, `FundamentalProfile`, `GradesEvent`, `GradesAction`. (PR6에서 `@internal` 전환 — 정규화 입력 타입 `FundamentalSnapshot`과 그 하위 `FundamentalValuation`/`FundamentalPeer`/`FundamentalProfitability`/`FundamentalGrowth`/`FundamentalHealth`/`FundamentalFutureDirection`/`FundamentalSectorDirection`/`SectorHistoricalPoint`/`GradesConsensus`/`PriceTargetConsensus`/`PriceTargetSummary`는 public 타입에서 도달 불가하고 consumer 미사용이라 internal화. public 응답 타입 `FundamentalAnalysisResponse`는 유지.)
 - 뉴스: `NewsAnalysisResponse`, `NewsCardAnalysis`, `NewsCategory`, `NewsFeedCategory`, `NewsItem`, `NewsSentiment`, `EnrichedNewsItem`, `EarningsCalendarItem`, `EarningsReport`.
 - 종합: `OverallAnalysisResponse`, `OverallScenario`, `OverallScenarioName`.
+- 차트 패턴 프리스크리너 (PR #163, additive): `ChartPatternId` (`skills/patterns/*.md` 파일명과 1:1인 스크리너 식별 차트 패턴 ID union), `PatternCandidate` (`{ id, startIndex, endIndex }` — 프리스크리너가 방출하는 coarse recall-biased 후보 매치). `domain/types.ts`에 정의. siglens 쪽 validator가 `ChartPatternId`에 대해 `satisfies` 타입 검증을 강화하기 위해 의도적으로 공개(breaking 아님, minor 추가).
 - Fear & Greed Index (per-stock):
     - `FearGreedLabel`, `FearGreedConfidence`, `FearGreedWarning`
     - `FearGreedFactorKey`, `FearGreedGroupName`

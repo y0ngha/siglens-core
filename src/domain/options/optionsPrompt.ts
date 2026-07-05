@@ -5,6 +5,8 @@ import type { BuildOptionsAnalysisPromptOptions } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
 
 /**
+ * @internal Builds the options-analysis LLM prompt.
+ *
  * Build the LLM prompt for options analysis, split into a stable/dynamic pair
  * (spec §3.4, {@link AssembledPrompt}): `stable` is empty — this builder uses
  * no skills (per spec §3.2 "OPTIONS ... 스킬 도입 시 화이트리스트 확장은 후속

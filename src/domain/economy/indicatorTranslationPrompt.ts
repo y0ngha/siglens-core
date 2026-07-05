@@ -3,6 +3,8 @@
 import type { AssembledPrompt } from '@/domain/types';
 
 /**
+ * @internal Builds the economic-indicator translation LLM prompt.
+ *
  * Builds the AI prompt for translating an English economic-indicator
  * base name into natural Korean as used in Korean financial media. No
  * skills, no other catalog-level knowledge (spec §3.2/Design C) — `stable`

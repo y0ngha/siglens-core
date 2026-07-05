@@ -1569,29 +1569,30 @@ export interface PromptConfig {
 
 /**
  * Prompt-assembly output, split along the stable/dynamic caching boundary
- * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`):
+ * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`)
+ * — Design C ("skills-to-system split"):
  *
- * - `stable` — depends only on `(analysisType, catalog fingerprint)` (and, for
- *   builders with a low-cardinality framing axis, that axis too — e.g.
- *   `assetClass`). Byte-identical across calls with the same catalog: never
- *   contains a symbol, job id, timestamp, or any other per-call value. Safe to
- *   use as a stable prefix for provider-side prompt caching (Claude
- *   `cache_control`, Gemini implicit caching, OpenAI automatic caching).
- * - `dynamic` — everything that varies call-to-call: the symbol/company
+ * - `stable` — ONLY the `always_on` skill digests for this `(analysisType,
+ *   catalog)` pair. Byte-identical across calls sharing the same catalog
+ *   fingerprint: never contains a symbol, job id, timestamp, or any other
+ *   per-call value — it only changes when the skill catalog fingerprint
+ *   changes. Empty for builders whose catalog has no `always_on` skills for
+ *   that prompt type (e.g. the economic-event and indicator-translation
+ *   builders, which carry no skills at all).
+ * - `dynamic` — everything else, in production order: the symbol/company
  *   framing, fetched market/news/financial data, gated skill digests chosen
  *   for this specific call, and the per-call request block.
  *
- * Dispatch (`application/*​/submit*.ts`) sends both fields to the worker
- * alongside the legacy combined `prompt` field (`stable + '\n\n' + dynamic`,
- * kept for one release as a fallback for a not-yet-upgraded worker) — see
- * `application/CLAUDE.md`'s dispatch-contract note. `analysisSeed` is always
- * computed over the combined string so the seed is identical on both the old
- * and new code paths.
+ * Dispatch (`application/*​/submit*.ts`) folds `stable` into the system
+ * prompt rather than sending a combined user prompt: `system = origSystem +
+ * stable`, `prompt = dynamic` — see `application/CLAUDE.md`'s
+ * dispatch-contract note. `analysisSeed` is computed over `system + prompt`
+ * so the seed still reflects the full assembled content.
  */
 export interface AssembledPrompt {
-    /** Byte-identical for the same `(analysisType, catalog fingerprint)` — never contains a symbol, job id, timestamp, or other per-call value. */
+    /** `always_on` skill digests only — byte-stable per `(analysisType, catalog fingerprint)`; empty when the catalog has no `always_on` skills for this prompt type. Folded into the system prompt by dispatch. */
     stable: string;
-    /** Per-call content: symbol/company framing, fetched data, gated skill digests, the request block. */
+    /** Everything else, in production order: symbol/company framing, fetched data, gated skill digests, the request block. Sent as `prompt` by dispatch. */
     dynamic: string;
 }
 

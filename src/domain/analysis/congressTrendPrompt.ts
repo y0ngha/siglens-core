@@ -34,6 +34,8 @@ function formatTrades(trades: readonly CongressTrade[]): string {
 }
 
 /**
+ * @internal Builds the congressional-trade trend LLM prompt.
+ *
  * Build the congressional-trade trend LLM prompt, split into a
  * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}) — Design C
  * ("skills-to-system split"): `stable` is ONLY the Domain Skills (Active)

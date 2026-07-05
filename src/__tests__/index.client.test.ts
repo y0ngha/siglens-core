@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
     AI_SYSTEM_PROMPT,
-    buildFinancialsAnalysisPrompt,
     computeFinancialsScorecard,
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
@@ -90,12 +89,18 @@ describe('browser public API exports', () => {
         expect(typeof computeFinancialsScorecard).toBe('function');
         expect(typeof normalizeFinancialsAnalysisResponse).toBe('function');
         expect(typeof normalizeFinancialsSnapshot).toBe('function');
-        expect(typeof buildFinancialsAnalysisPrompt).toBe('function');
 
         // Verify server-only use-cases are NOT present on the client barrel.
         expect('submitFinancialsAnalysis' in clientApi).toBe(false);
         expect('pollFinancialsAnalysis' in clientApi).toBe(false);
         expect('cancelFinancialsAnalysisJob' in clientApi).toBe(false);
+        // Reclassified as @internal (return type changed to AssembledPrompt) —
+        // must NOT be present on either public barrel.
+        expect('buildFinancialsAnalysisPrompt' in clientApi).toBe(false);
+        expect('buildCongressTrendPrompt' in clientApi).toBe(false);
+        expect('buildEconomicEventAnalysisPrompt' in clientApi).toBe(false);
+        expect('buildIndicatorTranslationPrompt' in clientApi).toBe(false);
+        expect('buildOptionsAnalysisPrompt' in clientApi).toBe(false);
 
         // Type-level assertions (compile-time only — void to suppress lint).
         const signalType: FinancialSignalType = 'margin_expansion';

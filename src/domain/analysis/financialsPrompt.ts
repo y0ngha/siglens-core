@@ -158,6 +158,8 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
 }
 
 /**
+ * @internal Builds the financial-statement analysis LLM prompt.
+ *
  * Build the financial-statement analysis LLM prompt, split into a
  * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}) — Design C
  * ("skills-to-system split"):

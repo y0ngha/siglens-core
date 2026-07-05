@@ -114,7 +114,7 @@ function composeCase(
     }
     return {
         system: systemPrompt,
-        prompt: `${stable}\n\n${dynamic}`,
+        prompt: stable ? `${stable}\n\n${dynamic}` : dynamic,
     };
 }
 

@@ -20,6 +20,8 @@ function withUnit(value: string, unit: string): string {
 }
 
 /**
+ * @internal Builds the per-event economic-calendar AI analysis prompt.
+ *
  * Builds the per-event economic-calendar AI analysis prompt. No skills, no
  * other catalog-level knowledge (spec §3.2/Design C) — `stable` is empty and
  * `dynamic` is the full prompt, byte-for-byte the same production order as
