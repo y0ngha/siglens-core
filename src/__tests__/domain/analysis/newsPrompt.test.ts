@@ -42,6 +42,11 @@ function buildNewsAnalysisPrompt(
               readonly Skill[],
           ]
 ): string {
+    // Both branches are intentionally identical: the `args.length === 4` guard
+    // narrows the union `args` to one concrete tuple so TS can resolve which
+    // overload of `buildNewsAnalysisPromptRaw` applies. Collapsing to a single
+    // `buildNewsAnalysisPromptRaw(...args)` call breaks with TS2556 (a spread
+    // of a union-typed rest tuple is not assignable to any single overload).
     const { stable, dynamic } =
         args.length === 4
             ? buildNewsAnalysisPromptRaw(...args)
