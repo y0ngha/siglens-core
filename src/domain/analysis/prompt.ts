@@ -1219,7 +1219,7 @@ const ANALYSIS_FIELD_GUIDANCE: Record<
 const ANALYSIS_INTENT_BLOCK = [
     '## Analysis Intent',
     '- Analyze the symbol below using ONLY the provided data. Do not fabricate prices, indicators, or patterns.',
-    '- Respond with a single JSON object. Its structure (field names, types, enums, nesting) is enforced by the response schema, so you do not need to restate it. For the fields listed under ## Field Content Guidance, follow the guidance there.',
+    '- Respond with a single JSON object. The response schema defines its structure (field names, types, enums, nesting) — follow it. A few critical field and enum requirements are additionally restated explicitly below; those MUST be honored regardless. For the fields listed under ## Field Content Guidance, follow the guidance there.',
 ].join('\n');
 
 // "provided above" — the Analysis Request preamble (this preface included)
@@ -1409,7 +1409,14 @@ const buildAnalysisRequest = (
                   '- **Do not include any patterns not listed below in patternSummaries.**',
                   '- **Do not include candle patterns (single/multi candle) in patternSummaries.** Candle patterns belong only in candlePatterns.',
                   '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match one of the pattern skill names from the list below.',
-                  '- The trend field is REQUIRED for every patternSummaries entry, including entries where detected is false. For not-detected patterns, use the pattern\'s inherent directional bias (e.g., head-and-shoulders → bearish, inverse head-and-shoulders → bullish, ascending wedge → bearish, descending wedge → bullish, double top → bearish, double bottom → bullish). Use "neutral" only when the pattern has no inherent bias. NEVER omit the trend field.',
+                  // Schema §3.5 dedup: the response schema's `required`
+                  // list only API-enforces this for the forced-tool providers
+                  // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
+                  // tool_choice: auto) is not schema-enforced and extractJsonWithRepair
+                  // fixes JSON syntax only, not shape — so the compact guard below is
+                  // retained as the natural-language backstop for that path.
+                  '- Every entry MUST include `trend` (bullish/bearish/neutral), including detected:false entries.',
+                  '- For not-detected patterns, set trend to the pattern\'s inherent directional bias (e.g., head-and-shoulders → bearish, inverse head-and-shoulders → bullish, ascending wedge → bearish, descending wedge → bullish, double top → bearish, double bottom → bullish); use "neutral" only when the pattern has no inherent bias.',
                   '',
                   '### patternLines Writing Rules',
                   '- patternLines is an optional field. Include it only when detected: true and the pattern has diagonal trendlines (e.g., wedge upper/lower trendlines, neckline).',
@@ -1435,9 +1442,15 @@ const buildAnalysisRequest = (
                   '- The summary field must use the structured markdown format with **label**: value lines.',
                   '- Put each **label**: value item on its own line. When moving from status/inputs to interpretation/trading implication, insert \\n\\n.',
                   '- Never return strategyResults[].summary as one sentence containing many "**label**:" fragments separated only by periods.',
-                  '- REQUIRED FIELDS (never omit any):',
+                  // Schema §3.5 dedup: the verbose "REQUIRED FIELDS
+                  // (never omit any)" header is dropped as pure scaffolding, but the
+                  // trend enum/never-omit clause is kept — TREND_SCHEMA's enum is only
+                  // API-enforced for forced-tool providers, not the thinking-Claude
+                  // (sonnet/opus, tool_choice: auto) path, which extractJsonWithRepair
+                  // cannot shape-check either. This clause is that path's guard.
+                  '- Field notes:',
                   '  1. strategyName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match one strategy skill name from the list below.',
-                  '  2. trend: one of "bullish", "bearish", "neutral". Set based on the skill\'s own analysis instructions. NEVER omit this field — if the analysis is inconclusive, use "neutral".',
+                  '  2. trend: every entry MUST include `trend` as one of bullish/bearish/neutral. Set based on the skill\'s own analysis instructions; use "neutral" when the analysis is inconclusive.',
                   "  3. summary: non-empty Korean markdown text following the skill's format.",
                   '',
                   'Strategy skill list to analyze:',
@@ -1452,12 +1465,18 @@ const buildAnalysisRequest = (
                   '### indicatorResults Writing Rules for Indicator Guides',
                   '- Use the Indicator Signal Guides above to interpret the current indicator values in ## Indicator Values.',
                   '- For each indicator guide, evaluate whether the current values meet any signal condition described in its Signal Interpretation section.',
-                  '- For every detected signal, add one entry to the indicatorResults array in the following exact format:',
-                  '    { "indicatorName": "<exact skill name from the list below>", "signals": [{ "type": "skill", "description": "<Korean explanation>", "strength": "moderate", "trend": "neutral" }] }',
+                  // Schema §3.5 dedup: the literal JSON entry skeleton
+                  // stays dropped — it only restated field names/nesting/types that
+                  // TECHNICAL_RESPONSE_SCHEMA already fully specifies. The `type` enum
+                  // rule is restored below (compact form): `enum: ['skill']` is only
+                  // API-enforced for forced-tool providers, not the thinking-Claude
+                  // (sonnet/opus, tool_choice: auto) path — extractJsonWithRepair fixes
+                  // JSON syntax only, not shape, so this is that path's guard.
+                  '- For every detected signal, add one entry to the indicatorResults array.',
                   '- CRITICAL RULES (never violate):',
                   '  1. indicatorName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST be a non-empty string — never use an empty string, a translated name, or a generic label.',
                   '  2. Each indicatorResults entry corresponds to EXACTLY ONE indicator guide. Never combine multiple indicators (e.g., "MACD and Bollinger") into one entry. Create separate entries for separate indicators.',
-                  '  3. The type field of each signal entry MUST be "skill". Never use any other value.',
+                  '  3. Each signal\'s `type` MUST be exactly "skill".',
                   '  4. The description field MUST be written in Korean and MUST include the indicator name and specific numeric condition (e.g., "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능").',
                   '- Signal strength calibration:',
                   '  - strong: value is in an extreme zone (e.g., RSI > 80 or < 20, Stochastic > 90 or < 10, CCI > +200 or < -200) OR multiple indicators confirm the same direction with high confluence',
