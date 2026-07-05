@@ -79,7 +79,11 @@ export async function submitMacroBriefing(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
 
-    const prompt = buildMacroBriefingPrompt(data);
+    // This builder has no skills catalog and no separate system prompt (the
+    // role framing lives in `dynamic` itself) — `stable` is always '' (spec
+    // §3.2/Design C), so there is nothing to fold; `prompt` is `dynamic` alone.
+    const { dynamic } = buildMacroBriefingPrompt(data);
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     // Persist the input-hashed cache key so pollMacroBriefing writes the result

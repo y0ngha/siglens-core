@@ -362,7 +362,7 @@ export async function submitAnalysis(
             return null;
         });
 
-    const prompt = buildAnalysisPrompt(
+    const { stable, dynamic } = buildAnalysisPrompt(
         symbol,
         companyName,
         bars,
@@ -372,6 +372,16 @@ export async function submitAnalysis(
         fearGreed ?? undefined,
         options.assetClass ?? 'equity'
     );
+    // Design C (A/B-gate validated): the always-on skill digest block
+    // (`stable`) folds into the SYSTEM prompt instead of leading the user
+    // prompt — Gemini/OpenAI/Claude all cache a stable system prefix, so this
+    // is what actually gets cached. `prompt` is the dynamic (per-call) half
+    // alone. `stable` is non-empty whenever skills are loaded; when empty,
+    // `system` is just the base persona unchanged.
+    const system = stable
+        ? `${AI_SYSTEM_PROMPT}\n\n${stable}`
+        : AI_SYSTEM_PROMPT;
+    const prompt = dynamic;
 
     const jobId = crypto.randomUUID();
     const lastClose = bars[bars.length - 1]?.close;
@@ -423,11 +433,13 @@ export async function submitAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            // Seed is deterministic over the FULL input the LLM sees: system
+            // (persona + folded skills) + prompt (dynamic).
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: effectiveModelId,
             tier,
             analysisType: 'technical' satisfies AnalysisType,
-            system: AI_SYSTEM_PROMPT,
+            system,
             responseSchema: TECHNICAL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),

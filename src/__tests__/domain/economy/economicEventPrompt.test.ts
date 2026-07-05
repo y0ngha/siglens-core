@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { buildEconomicEventAnalysisPrompt } from '@/domain/economy/economicEventPrompt';
+import { buildEconomicEventAnalysisPrompt as buildEconomicEventAnalysisPromptRaw } from '@/domain/economy/economicEventPrompt';
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
+
+// `buildEconomicEventAnalysisPrompt` now returns `{ stable, dynamic }` (spec
+// §3.4 assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildEconomicEventAnalysisPrompt = (
+    ...args: Parameters<typeof buildEconomicEventAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildEconomicEventAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const BASE_INPUT: EconomicEventAnalysisInput = {
     event: 'CPI MoM',

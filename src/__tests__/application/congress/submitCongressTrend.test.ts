@@ -246,8 +246,18 @@ describe('submitCongressTrend 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.analysisType).toBe('congress');
-            expect(body.system).toBe(CONGRESS_SYSTEM_PROMPT);
-            expect(body.seed).toBe(analysisSeed(body.prompt as string));
+            // Design C: the always-on skill digest (`stable`, non-empty for
+            // this builder) folds into the SYSTEM prompt.
+            const system = body.system as string;
+            expect(system.startsWith(CONGRESS_SYSTEM_PROMPT)).toBe(true);
+            expect(system.length).toBeGreaterThan(
+                CONGRESS_SYSTEM_PROMPT.length
+            );
+            expect(body.promptStable).toBeUndefined();
+            expect(body.promptDynamic).toBeUndefined();
+            expect(body.seed).toBe(
+                analysisSeed(`${system}\n\n${body.prompt as string}`)
+            );
             expect(body.responseSchema).toBeDefined();
             expect(body.tier).toBe(DEFAULT_TIER);
         });

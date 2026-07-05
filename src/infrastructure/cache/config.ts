@@ -197,9 +197,22 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * gating; the fundamental prompt's skills are now name-sorted by the shared
  * selector instead of catalog order.
  *
+ * @remarks
+ * **`p4` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** Both `buildAnalysisPrompt` (technical) and
+ * `buildFundamentalAnalysisPrompt` now return `AssembledPrompt { stable,
+ * dynamic }` instead of a single string; `stable` carries ONLY the
+ * `always_on` skill digests (moved out of the user prompt into the system
+ * prompt), and `dynamic` is the ENTIRE rest of the prompt in the same,
+ * unchanged production order — the intent/guidelines/guardrail sections and
+ * every other user-prompt section keep their original position. The
+ * fingerprint only covers skill metadata (`{name, gating, tokenCost}`), so
+ * relocating the skill digests changes prompt bytes without changing that
+ * fingerprint, requiring a manual bump per the versioning policy (spec §4).
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -304,6 +317,14 @@ export function buildMacroBriefingCacheKey(
  * no `skill.content` into its prompt, so switching skills over to the digest
  * body does not change this template's prompt bytes — bumping it would be
  * no-op cache churn.
+ *
+ * @remarks
+ * **Deliberately NOT bumped for the stable/dynamic assembly split (spec
+ * §3.4).** `buildEconomicEventAnalysisPrompt` now returns `AssembledPrompt {
+ * stable, dynamic }` instead of a plain string, but this builder has no
+ * skills to relocate for Design C — `stable` is simply `''` and `dynamic` is
+ * byte-for-byte the same prompt text the plain-string version produced (only
+ * the return-type wrapper changed). Bumping would be no-op cache churn.
  *
  * @internal
  */
@@ -451,9 +472,18 @@ export function buildFundamentalCacheKey(
  * gating), so injected fundamental skills are name-sorted instead of catalog
  * order, changing this template's prompt bytes.
  *
+ * @remarks
+ * **`p4` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** `buildFinancialsAnalysisPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; ONLY the always_on-only "Financial
+ * Analysis Frameworks" (Active Skills) section moved out of the user prompt
+ * into `stable` (relocated to the system prompt) — Data Boundary/Output
+ * Schema/Rules and every other section stay in `dynamic`, in the unchanged
+ * production order, changing this template's prompt bytes.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -515,9 +545,19 @@ export function buildFinancialsCacheKey(
  * keeps its own private `category === 'congress'` filter and does not call
  * `selectSkills`, so its prompt bytes are unchanged.
  *
+ * @remarks
+ * **`p3` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** `buildCongressTrendPrompt` now returns
+ * `AssembledPrompt { stable, dynamic }`; ONLY the catalog-deterministic
+ * "Domain Skills (Active)" section (filtered purely by category, never by
+ * chart/symbol state) moved out of the user prompt into `stable` (relocated
+ * to the system prompt) — role framing/Data Boundary/Caveats/Output
+ * Schema/Rules and every other section stay in `dynamic`, in the unchanged
+ * production order, changing this template's prompt bytes.
+ *
  * @internal
  */
-export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /** @internal TTL for congressional-trade trend analysis cache results. Default: 24 hours. */
 export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
@@ -590,9 +630,19 @@ export function buildCongressTrendCacheKey(
  * this template's prompt bytes. (There was an implicit unversioned "p1"
  * generation before this constant existed.)
  *
+ * @remarks
+ * **`p3` = stable/dynamic assembly split, Design C ("skills-to-system
+ * split", spec §3.4).** Both `buildNewsAnalysisPrompt` and
+ * `buildMarketNewsDigestPrompt` now return `AssembledPrompt { stable,
+ * dynamic }`; ONLY the always_on-only "News Analysis Frameworks" (Active
+ * Skills) section moved out of the user prompt into `stable` (relocated to
+ * the system prompt) — role framing/Data Boundary/Output Schema/Rules and
+ * every other section stay in `dynamic`, in the unchanged production order,
+ * changing both templates' prompt bytes.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
@@ -692,6 +742,14 @@ export function buildOverallCacheKey(
  * no `skill.content` into its prompt, so switching skills over to the digest
  * body does not change this template's prompt bytes — bumping it would be
  * no-op cache churn.
+ *
+ * @remarks
+ * **Deliberately NOT bumped for the stable/dynamic assembly split (spec
+ * §3.4).** `buildIndicatorTranslationPrompt` now returns `AssembledPrompt {
+ * stable, dynamic }` instead of a plain string, but this builder has no
+ * skills to relocate for Design C — `stable` is simply `''` and `dynamic` is
+ * byte-for-byte the same prompt text the plain-string version produced (only
+ * the return-type wrapper changed). Bumping would be no-op cache churn.
  *
  * @internal
  */

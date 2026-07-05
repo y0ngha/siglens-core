@@ -83,7 +83,11 @@ export async function submitIndicatorTranslation(
     }
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildIndicatorTranslationPrompt(normalizedName);
+    // This builder has no skills catalog and no separate system prompt (the
+    // role framing lives in `dynamic` itself) — `stable` is always '' (spec
+    // §3.2/Design C), so there is nothing to fold; `prompt` is `dynamic` alone.
+    const { dynamic } = buildIndicatorTranslationPrompt(normalizedName);
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     // Persist the cache key in job meta so pollIndicatorTranslation writes the

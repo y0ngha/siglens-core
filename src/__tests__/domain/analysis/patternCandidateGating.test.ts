@@ -1,8 +1,18 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { buildAnalysisPrompt as buildAnalysisPromptRaw } from '@/domain/analysis/prompt';
 import { calculateIndicators } from '@/domain/indicators';
-import type { Bar, Skill, SkillGating } from '@/domain/types';
+import type { AssembledPrompt, Bar, Skill, SkillGating } from '@/domain/types';
 import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
+
+// See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
+// return with a flattening wrapper (spec §3.4 assembly split). `flat` is
+// exposed separately for the dynamic `await import(...)` call sites below,
+// which bind directly to the real module export and bypass this shadow.
+const flat = ({ stable, dynamic }: AssembledPrompt): string =>
+    `${stable}\n\n${dynamic}`;
+const buildAnalysisPrompt = (
+    ...args: Parameters<typeof buildAnalysisPromptRaw>
+): string => flat(buildAnalysisPromptRaw(...args));
 
 // ── Task 3.3: pattern-screener candidates wired into skill selection ────────
 // Covers the third event-trigger source (`patternCandidates`) added to
@@ -107,13 +117,15 @@ describe('buildAnalysisPrompt — pattern-screener exception safety', () => {
 
         let out = '';
         expect(() => {
-            out = buildWithThrowingScreener(
-                TEST_SYMBOL,
-                TEST_COMPANY,
-                fixture.bars,
-                indicators,
-                [skill],
-                '1Day'
+            out = flat(
+                buildWithThrowingScreener(
+                    TEST_SYMBOL,
+                    TEST_COMPANY,
+                    fixture.bars,
+                    indicators,
+                    [skill],
+                    '1Day'
+                )
             );
         }).not.toThrow();
         // patternCandidates degraded to [] — the gated pattern skill never fires.
@@ -141,13 +153,15 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         }));
         const { buildAnalysisPrompt: buildWithNoCandidates } =
             await import('@/domain/analysis/prompt');
-        const withNoCandidates = buildWithNoCandidates(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            fixture.bars,
-            indicators,
-            skills,
-            '1Day'
+        const withNoCandidates = flat(
+            buildWithNoCandidates(
+                TEST_SYMBOL,
+                TEST_COMPANY,
+                fixture.bars,
+                indicators,
+                skills,
+                '1Day'
+            )
         );
 
         vi.resetModules();
@@ -159,13 +173,15 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         }));
         const { buildAnalysisPrompt: buildWithCandidates } =
             await import('@/domain/analysis/prompt');
-        const withCandidates = buildWithCandidates(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            fixture.bars,
-            indicators,
-            skills,
-            '1Day'
+        const withCandidates = flat(
+            buildWithCandidates(
+                TEST_SYMBOL,
+                TEST_COMPANY,
+                fixture.bars,
+                indicators,
+                skills,
+                '1Day'
+            )
         );
 
         expect(withCandidates).toBe(withNoCandidates);

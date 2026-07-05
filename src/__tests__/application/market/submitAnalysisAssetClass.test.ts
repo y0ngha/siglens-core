@@ -11,7 +11,11 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/application/market/barsApi');
 vi.mock('@/domain/analysis/prompt', () => ({
-    buildAnalysisPrompt: vi.fn(() => 'mock-prompt'),
+    // `buildAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4 assembly split).
+    buildAnalysisPrompt: vi.fn(() => ({
+        stable: 'mock-stable',
+        dynamic: 'mock-dynamic',
+    })),
 }));
 vi.mock('@/domain/indicators/fearGreed', () => ({
     computeFearGreedIndex: vi.fn(),

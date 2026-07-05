@@ -7,7 +7,6 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
-    buildFinancialsAnalysisPrompt,
     cancelFinancialsAnalysisJob,
     checkAnalysisLimit,
     checkChatbotLimit,
@@ -43,6 +42,7 @@ import {
     VALID_CHAT_MODELS,
     validateActionPrices,
 } from '@/index';
+import * as coreApi from '@/index';
 import { describe, expect, it } from 'vitest';
 
 describe('public API exports', () => {
@@ -129,10 +129,20 @@ describe('public API exports', () => {
         expect(typeof computeFinancialsScorecard).toBe('function');
         expect(typeof normalizeFinancialsAnalysisResponse).toBe('function');
         expect(typeof normalizeFinancialsSnapshot).toBe('function');
-        expect(typeof buildFinancialsAnalysisPrompt).toBe('function');
 
         // Compile-time check: FinancialSignalType must be exported.
         const signalType: FinancialSignalType = 'net_cash';
         void signalType;
+    });
+
+    it('does not export prompt builders reclassified as @internal', () => {
+        // Return type changed to AssembledPrompt; no external consumer calls
+        // these directly (only submit* use-cases do, via deep imports), so
+        // they were removed from the Tier 2 public barrel.
+        expect('buildFinancialsAnalysisPrompt' in coreApi).toBe(false);
+        expect('buildCongressTrendPrompt' in coreApi).toBe(false);
+        expect('buildEconomicEventAnalysisPrompt' in coreApi).toBe(false);
+        expect('buildIndicatorTranslationPrompt' in coreApi).toBe(false);
+        expect('buildOptionsAnalysisPrompt' in coreApi).toBe(false);
     });
 });

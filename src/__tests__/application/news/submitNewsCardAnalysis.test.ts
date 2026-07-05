@@ -160,9 +160,15 @@ describe('submitNewsCardAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(fetchBody.analysisType).toBe('newsCard');
+            // This builder has no skills catalog, so `stable` is always ''
+            // and `system` stays the bare persona unchanged (Design C).
             expect(fetchBody.system).toBe(NEWS_CARD_SYSTEM_PROMPT);
+            expect(fetchBody.promptStable).toBeUndefined();
+            expect(fetchBody.promptDynamic).toBeUndefined();
             expect(fetchBody.seed).toBe(
-                analysisSeed(fetchBody.prompt as string)
+                analysisSeed(
+                    `${fetchBody.system as string}\n\n${fetchBody.prompt as string}`
+                )
             );
         });
     });

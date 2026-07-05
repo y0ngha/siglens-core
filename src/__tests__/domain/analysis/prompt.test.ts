@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
-    buildAnalysisPrompt,
+    buildAnalysisPrompt as buildAnalysisPromptRaw,
     INDICATOR_VALUES_SECTION_HEADER,
     PRO_INDICATOR_SECTION_HEADER,
     PRO_RELIABILITY_NOTE,
@@ -55,6 +55,20 @@ import type {
     SMCResult,
     SqueezeMomentumResult,
 } from '@/domain/types';
+
+// `buildAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4 assembly
+// split) — this file's ~240 call sites predate the split and assert against
+// the single legacy combined string (`stable + '\n\n' + dynamic`, exactly the
+// string dispatch still sends as the `prompt` fallback field). Shadowing the
+// imported name with a flattening wrapper keeps every existing assertion
+// meaningful without rewriting each call site; the split itself is covered by
+// dedicated stable/dynamic invariant tests in `promptStability.test.ts`.
+const buildAnalysisPrompt = (
+    ...args: Parameters<typeof buildAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const TEST_SYMBOL = 'AAPL';
 const TEST_COMPANY_NAME = 'Apple Inc.';
@@ -3531,7 +3545,11 @@ describe('prompt', () => {
             expect(result).toContain('Analyze the symbol below');
         });
 
-        it('Analysis Intent 블록이 Timeframe 뒤에 위치한다', () => {
+        // Design C (spec §3.4, skills-to-system split): `dynamic` reproduces
+        // the ORIGINAL PRODUCTION ORDER faithfully — Timeframe precedes
+        // Analysis Intent, exactly as in v0.31 (pre-split), since only the
+        // always_on skill digests moved to `stable`.
+        it('Timeframe 섹션이 Analysis Intent 블록 앞에 위치한다 (production order)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3544,7 +3562,8 @@ describe('prompt', () => {
             const intentIndex = result.indexOf('## Analysis Intent');
 
             expect(timeframeIndex).toBeGreaterThanOrEqual(0);
-            expect(intentIndex).toBeGreaterThan(timeframeIndex);
+            expect(intentIndex).toBeGreaterThanOrEqual(0);
+            expect(timeframeIndex).toBeLessThan(intentIndex);
         });
 
         it('Analysis Intent 블록이 Indicator Values 섹션보다 앞에 위치한다', () => {

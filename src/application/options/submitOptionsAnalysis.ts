@@ -238,11 +238,19 @@ export async function submitOptionsAnalysis(
 
     // ── 5. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildOptionsAnalysisPrompt({
+    const { stable, dynamic } = buildOptionsAnalysisPrompt({
         expirationDate,
         companyName,
         snapshot: { ...snapshot, chains: usableChains },
     });
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt. This builder has no skills catalog, so `stable` is always ''
+    // and `system` stays the base persona unchanged.
+    const system = stable
+        ? `${OPTIONS_SYSTEM_PROMPT}\n\n${stable}`
+        : OPTIONS_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     // Mirror the fail-open posture of the cache.get block above — if the
@@ -276,11 +284,11 @@ export async function submitOptionsAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'options' satisfies AnalysisType,
-            system: OPTIONS_SYSTEM_PROMPT,
+            system,
             responseSchema: OPTIONS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS),

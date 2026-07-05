@@ -131,7 +131,18 @@ export async function submitMarketNewsDigest(
 
     // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildMarketNewsDigestPrompt(categoryLabel, news, skills);
+    const { stable, dynamic } = buildMarketNewsDigestPrompt(
+        categoryLabel,
+        news,
+        skills
+    );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt.
+    const system = stable
+        ? `${NEWS_SYSTEM_PROMPT}\n\n${stable}`
+        : NEWS_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -149,11 +160,11 @@ export async function submitMarketNewsDigest(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier: DEFAULT_TIER,
             analysisType: 'news' satisfies AnalysisType,
-            system: NEWS_SYSTEM_PROMPT,
+            system,
             responseSchema: NEWS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS),

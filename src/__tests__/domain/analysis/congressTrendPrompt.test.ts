@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
+import { buildCongressTrendPrompt as buildCongressTrendPromptRaw } from '@/domain/analysis/congressTrendPrompt';
 import type { CongressTrade, CongressTradeStats, Skill } from '@/domain/types';
+
+// `buildCongressTrendPrompt` now returns `{ stable, dynamic }` (spec §3.4
+// assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildCongressTrendPrompt = (
+    ...args: Parameters<typeof buildCongressTrendPromptRaw>
+): string => {
+    const { stable, dynamic } = buildCongressTrendPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const stats: CongressTradeStats = {
     buyCount: 3,

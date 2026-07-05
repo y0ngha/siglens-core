@@ -336,7 +336,7 @@ export async function submitOverallAnalysis(
         });
 
     const optionsOiStale = options.optionsOiStale ?? false;
-    const prompt = buildOverallAnalysisPrompt(
+    const { stable, dynamic } = buildOverallAnalysisPrompt(
         symbol,
         companyName,
         deps.technical,
@@ -349,6 +349,14 @@ export async function submitOverallAnalysis(
         options.financialsScorecard,
         options.assetClass ?? 'equity'
     );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt. This builder has no skills catalog, so `stable` is always ''
+    // and `system` stays the base persona unchanged.
+    const system = stable
+        ? `${OVERALL_SYSTEM_PROMPT}\n\n${stable}`
+        : OVERALL_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -376,11 +384,11 @@ export async function submitOverallAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'overall' satisfies AnalysisType,
-            system: OVERALL_SYSTEM_PROMPT,
+            system,
             responseSchema: OVERALL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),

@@ -1568,6 +1568,37 @@ export interface PromptConfig {
 }
 
 /**
+ * Prompt-assembly output, split along the stable/dynamic caching boundary
+ * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`)
+ * — Design C ("skills-to-system split"):
+ *
+ * - `stable` — ONLY the `always_on` skill digests for this `(analysisType,
+ *   catalog)` pair. Byte-identical across calls sharing the same catalog
+ *   fingerprint: never contains a symbol, job id, timestamp, or any other
+ *   per-call value — it only changes when the skill catalog fingerprint
+ *   changes. Non-empty for skill-bearing builders (technical, fundamental,
+ *   financials, congress, news) whenever the loaded catalog has `always_on`
+ *   skills for that context; `''` for builders that inject no skills at all
+ *   (options, market/macro briefing, economic-event, indicator-translation —
+ *   these never read the skill catalog and always return `stable: ''`).
+ * - `dynamic` — everything else, in production order: the symbol/company
+ *   framing, fetched market/news/financial data, gated skill digests chosen
+ *   for this specific call, and the per-call request block.
+ *
+ * Dispatch (`application/*​/submit*.ts`) folds `stable` into the system
+ * prompt rather than sending a combined user prompt: `system = origSystem +
+ * stable`, `prompt = dynamic` — see `application/CLAUDE.md`'s
+ * dispatch-contract note. `analysisSeed` is computed over `system + prompt`
+ * so the seed still reflects the full assembled content.
+ */
+export interface AssembledPrompt {
+    /** The `always_on` skill-digest section — byte-stable per `(analysisType, catalog fingerprint)`. Non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) with the production catalog; `''` for no-skill builders (options, market/macro briefing, economic-event, indicator-translation), which never read the skill catalog. (Edge case: only `buildAnalysisPrompt` (technical) collapses to `''` when the catalog has no `always_on` skills; the other skill-bearing builders — fundamental/financials/congress/news/marketNewsDigest — always emit their skill-section wrapper header even with 0 skills.) Folded into the system prompt by dispatch. */
+    stable: string;
+    /** Everything else, in production order: symbol/company framing, fetched data, gated skill digests, the request block. Sent as `prompt` by dispatch. */
+    dynamic: string;
+}
+
+/**
  * @internal
  * LLM이 반환하는 원시 분석 응답.
  *
@@ -3317,7 +3348,7 @@ export type {
 // than in a subfolder file re-exported from this module.
 // =============================================================================
 
-/** @internal 스크리너가 식별 가능한 차트 패턴 ID — skills/patterns/*.md 파일명과 1:1. */
+/** 스크리너가 식별 가능한 차트 패턴 ID — skills/patterns/*.md 파일명과 1:1. */
 export type ChartPatternId =
     | 'head_and_shoulders'
     | 'inverse_head_and_shoulders'
@@ -3348,7 +3379,7 @@ export interface PivotPoint {
     kind: PivotKind;
 }
 
-/** @internal A pre-screener candidate hit — a coarse, recall-biased match for one pattern ID over a bar range. */
+/** A pre-screener candidate hit — a coarse, recall-biased match for one pattern ID over a bar range. */
 export interface PatternCandidate {
     id: ChartPatternId;
     /** 판정에 사용된 피벗들의 bar 인덱스 범위. */

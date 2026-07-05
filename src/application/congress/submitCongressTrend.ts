@@ -155,7 +155,19 @@ export async function submitCongressTrend(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const stats = summarizeCongressTrades(trades);
-    const prompt = buildCongressTrendPrompt(symbol, trades, stats, skills);
+    const { stable, dynamic } = buildCongressTrendPrompt(
+        symbol,
+        trades,
+        stats,
+        skills
+    );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt.
+    const system = stable
+        ? `${CONGRESS_SYSTEM_PROMPT}\n\n${stable}`
+        : CONGRESS_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -174,11 +186,11 @@ export async function submitCongressTrend(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'congress' satisfies AnalysisType,
-            system: CONGRESS_SYSTEM_PROMPT,
+            system,
             responseSchema: CONGRESS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_CONGRESS_TREND_TIMEOUT_MS),

@@ -1,10 +1,58 @@
 import { describe, it, expect } from 'vitest';
-import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
+import { buildNewsAnalysisPrompt as buildNewsAnalysisPromptRaw } from '@/domain/analysis/newsPrompt';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
     Skill,
 } from '@/domain/types';
+
+// `buildNewsAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
+// assembly split) — this file's call sites (both the 4-arg and 5-arg
+// overloads) predate the split and assert against the single legacy combined
+// string (`stable + '\n\n' + dynamic`, exactly the string dispatch still
+// sends as the `prompt` fallback field). The wrapper mirrors both overloads
+// explicitly rather than widening via `Parameters<>` (which would resolve to
+// only the last, 6-arg overload).
+function buildNewsAnalysisPrompt(
+    symbol: string,
+    news: ReadonlyArray<EnrichedNewsItem>,
+    upcomingCalendar: readonly EarningsCalendarItem[],
+    skills: readonly Skill[]
+): string;
+function buildNewsAnalysisPrompt(
+    symbol: string,
+    companyName: string,
+    news: ReadonlyArray<EnrichedNewsItem>,
+    upcomingCalendar: readonly EarningsCalendarItem[],
+    skills: readonly Skill[]
+): string;
+function buildNewsAnalysisPrompt(
+    ...args:
+        | [
+              string,
+              ReadonlyArray<EnrichedNewsItem>,
+              readonly EarningsCalendarItem[],
+              readonly Skill[],
+          ]
+        | [
+              string,
+              string,
+              ReadonlyArray<EnrichedNewsItem>,
+              readonly EarningsCalendarItem[],
+              readonly Skill[],
+          ]
+): string {
+    // Both branches are intentionally identical: the `args.length === 4` guard
+    // narrows the union `args` to one concrete tuple so TS can resolve which
+    // overload of `buildNewsAnalysisPromptRaw` applies. Collapsing to a single
+    // `buildNewsAnalysisPromptRaw(...args)` call breaks with TS2556 (a spread
+    // of a union-typed rest tuple is not assignable to any single overload).
+    const { stable, dynamic } =
+        args.length === 4
+            ? buildNewsAnalysisPromptRaw(...args)
+            : buildNewsAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+}
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 

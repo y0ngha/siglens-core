@@ -9,11 +9,19 @@
  * `judge.ts` ultimately compares.
  *
  * Usage:
- *   npx tsx scripts/ab-harness/buildPrompts.ts --mode <full|digest> --out <file.json> [--skills <path>]
+ *   npx tsx scripts/ab-harness/buildPrompts.ts --mode <full|digest> --out <file.json> [--skills <path>] [--fold-stable-into-system]
  *
  * `--skills` defaults to `../siglens-digests/skills` (sibling of this repo)
  * — see `README.md` for why, and pass e.g. `--skills ../siglens/skills` to
  * point at the real production skill catalog.
+ *
+ * `--fold-stable-into-system` models Design C's worker-side system
+ * composition (skills-to-system split, see `domain/analysis/prompt.ts`'s
+ * `buildAnalysisPrompt` doc comment): each case's `system` becomes the
+ * builder's original system prompt + `'\n\n'` + `stable` (the always_on
+ * skill digests), and `prompt` becomes `dynamic` alone — `stable` is never
+ * folded into `prompt`. Default (flag unset) behavior is unchanged: `system`
+ * is the plain system prompt and `prompt` is `stable + '\n\n' + dynamic`.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -87,17 +95,52 @@ function loadJsonFixture<T>(file: string): T {
 }
 
 /**
+ * Fold `stable` into the `system` message (Design C's worker-side
+ * composition) instead of the default `prompt: stable + '\n\n' + dynamic`.
+ * Shared by {@link buildTechnicalCase} and {@link buildNewsCase} so both
+ * follow the exact same folding contract.
+ */
+function composeCase(
+    systemPrompt: string,
+    stable: string,
+    dynamic: string,
+    foldStableIntoSystem: boolean
+): { system: string; prompt: string } {
+    if (foldStableIntoSystem) {
+        return {
+            system: stable ? `${systemPrompt}\n\n${stable}` : systemPrompt,
+            prompt: dynamic,
+        };
+    }
+    return {
+        system: systemPrompt,
+        prompt: stable ? `${stable}\n\n${dynamic}` : dynamic,
+    };
+}
+
+/**
  * Build the technical-analysis prompt case for one fixture. Indicators are
  * computed via the real `calculateIndicators` pipeline (the same one
  * `fetchBarsWithIndicators` uses in production) so the prompt is byte-for-byte
  * what `submitAnalysis` would have built from these bars.
+ *
+ * @param foldStableIntoSystem - When `true`, models Design C's worker-side
+ *   system composition: `system` becomes `AI_SYSTEM_PROMPT + '\n\n' +
+ *   stable`, and `prompt` is `dynamic` alone. Defaults to `false` (legacy
+ *   `prompt: stable + '\n\n' + dynamic` fallback).
  */
 export function buildTechnicalCase(
     fixture: TechnicalFixture,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    foldStableIntoSystem = false
 ): PromptCaseOutput {
     const indicators = calculateIndicators(fixture.bars);
-    const prompt = buildAnalysisPrompt(
+    // `buildAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4 assembly
+    // split); the harness sends the model the same combined string
+    // production dispatch builds as its `prompt` fallback field ('\n\n' join)
+    // — or, under `--fold-stable-into-system`, folds `stable` into `system`
+    // instead (see `composeCase`).
+    const { stable, dynamic } = buildAnalysisPrompt(
         fixture.symbol,
         fixture.companyName,
         fixture.bars,
@@ -112,21 +155,41 @@ export function buildTechnicalCase(
         undefined,
         'equity'
     );
+    const { system, prompt } = composeCase(
+        AI_SYSTEM_PROMPT,
+        stable,
+        dynamic,
+        foldStableIntoSystem
+    );
     return {
         caseId: fixture.caseId,
         analysisType: 'technical',
-        system: AI_SYSTEM_PROMPT,
+        system,
         prompt,
         responseSchema: TECHNICAL_RESPONSE_SCHEMA,
     };
 }
 
-/** Build the news-analysis prompt case for one fixture, via the same builder `submitNewsAnalysis` calls. */
+/**
+ * Build the news-analysis prompt case for one fixture, via the same builder
+ * `submitNewsAnalysis` calls.
+ *
+ * @param foldStableIntoSystem - When `true`, models Design C's worker-side
+ *   system composition: `system` becomes `NEWS_SYSTEM_PROMPT + '\n\n' +
+ *   stable`, and `prompt` is `dynamic` alone. Defaults to `false` (legacy
+ *   `prompt: stable + '\n\n' + dynamic` fallback).
+ */
 export function buildNewsCase(
     fixture: NewsFixture,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    foldStableIntoSystem = false
 ): PromptCaseOutput {
-    const prompt = buildNewsAnalysisPrompt(
+    // `buildNewsAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4
+    // assembly split); the harness sends the model the same combined string
+    // production dispatch builds as its `prompt` fallback field ('\n\n' join)
+    // — or, under `--fold-stable-into-system`, folds `stable` into `system`
+    // instead (see `composeCase`).
+    const { stable, dynamic } = buildNewsAnalysisPrompt(
         fixture.symbol,
         fixture.companyName,
         fixture.articles,
@@ -138,10 +201,16 @@ export function buildNewsCase(
         skills as Skill[],
         'equity'
     );
+    const { system, prompt } = composeCase(
+        NEWS_SYSTEM_PROMPT,
+        stable,
+        dynamic,
+        foldStableIntoSystem
+    );
     return {
         caseId: fixture.caseId,
         analysisType: 'news',
-        system: NEWS_SYSTEM_PROMPT,
+        system,
         prompt,
         responseSchema: NEWS_RESPONSE_SCHEMA,
     };
@@ -175,6 +244,10 @@ async function main(): Promise<void> {
     }
     const outPath = resolve(args.out);
     const skillsPath = args.skills ? resolve(args.skills) : DEFAULT_SKILLS_PATH;
+    // Boolean CLI flag: `parseArgs` stores a bare `--fold-stable-into-system`
+    // (no following value) as the string `'true'`; any other value is also
+    // treated as "set" (only an entirely absent key means unset/false).
+    const foldStableIntoSystem = args['fold-stable-into-system'] !== undefined;
 
     // The `mode !== 'full' && mode !== 'digest'` guard above throws on any
     // other value, so by this point `mode` is provably one of the two
@@ -182,14 +255,22 @@ async function main(): Promise<void> {
     // union via inequality checks against string literals.
     const skills = await loadSkillCatalog(mode as PromptMode, skillsPath);
     console.log(
-        `[ab-harness] loaded ${skills.length} skill(s) from ${skillsPath} (mode=${mode})`
+        `[ab-harness] loaded ${skills.length} skill(s) from ${skillsPath} (mode=${mode}, foldStableIntoSystem=${foldStableIntoSystem})`
     );
 
     const technicalCases = TECHNICAL_FIXTURE_FILES.map(file =>
-        buildTechnicalCase(loadJsonFixture<TechnicalFixture>(file), skills)
+        buildTechnicalCase(
+            loadJsonFixture<TechnicalFixture>(file),
+            skills,
+            foldStableIntoSystem
+        )
     );
     const newsCases = NEWS_FIXTURE_FILES.map(file =>
-        buildNewsCase(loadJsonFixture<NewsFixture>(file), skills)
+        buildNewsCase(
+            loadJsonFixture<NewsFixture>(file),
+            skills,
+            foldStableIntoSystem
+        )
     );
     const allCases = [...technicalCases, ...newsCases];
 

@@ -100,12 +100,10 @@ export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export { computeFinancialsScorecard } from './domain/analysis/financialsScorecard';
 export { normalizeFinancialsAnalysisResponse } from './domain/analysis/normalizeFinancials';
 export { normalizeFinancialsSnapshot } from './domain/analysis/normalizeFinancialsSnapshot';
-export { buildFinancialsAnalysisPrompt } from './domain/analysis/financialsPrompt';
 
 // Congress domain building blocks
 export { normalizeCongressTrades } from './domain/analysis/normalizeCongressTrades';
 export { summarizeCongressTrades } from './domain/analysis/summarizeCongressTrades';
-export { buildCongressTrendPrompt } from './domain/analysis/congressTrendPrompt';
 export { normalizeCongressTrendResponse } from './domain/analysis/normalizeCongressTrend';
 
 // Economy domain building blocks (normalization + 2s10s spread)
@@ -117,11 +115,9 @@ export {
 export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
 
 // Economy — per-event AI analysis domain building blocks
-export { buildEconomicEventAnalysisPrompt } from './domain/economy/economicEventPrompt';
 export { normalizeEconomicEventAnalysis } from './domain/economy/normalizeEconomicEventAnalysis';
 
 // Economy — indicator-name AI translation domain building blocks
-export { buildIndicatorTranslationPrompt } from './domain/economy/indicatorTranslationPrompt';
 export { normalizeIndicatorTranslation } from './domain/economy/normalizeIndicatorTranslation';
 
 // Model spec helpers
@@ -492,6 +488,7 @@ export type {
     AnalysisSignal,
     AnalysisSignalType,
     AnalysisType,
+    AssembledPrompt,
     CurrentAnalysisContext,
     BacktestAiAnalysis,
     BacktestAiEntryRecommendation,
@@ -516,6 +513,9 @@ export type {
     RegressionResult,
     CandlePattern,
     CandlePatternEntry,
+    // Chart-pattern pre-screener result types (domain/patterns, spec §3.3).
+    ChartPatternId,
+    PatternCandidate,
     CandlePatternSummary,
     ChartDisplayType,
     ChatLoadingPhase,
@@ -769,9 +769,6 @@ export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
 export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
 export { mapExpirationsToSlots } from './domain/options/expirationSlots';
-
-// Options analysis — normalize + prompt (use-case layer will add submit/poll in Phase 2)
-export { buildOptionsAnalysisPrompt } from './domain/options/optionsPrompt';
 
 // Options analysis — application use-cases (submit + poll, cache key builder)
 export {

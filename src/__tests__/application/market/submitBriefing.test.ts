@@ -67,7 +67,13 @@ describe('submitBriefing 함수는', () => {
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
-        mockBuildMarketBriefingPrompt.mockReturnValue('mock prompt');
+        // `buildMarketBriefingPrompt` returns `{ stable, dynamic }` (spec §3.4
+        // assembly split); the combined 'mock prompt' below matches
+        // production dispatch's `stable + '\n\n' + dynamic` join.
+        mockBuildMarketBriefingPrompt.mockReturnValue({
+            stable: 'mock',
+            dynamic: 'prompt',
+        });
         mockNormalizeMarketBriefing.mockReturnValue(mockBriefing);
     });
 
@@ -121,11 +127,18 @@ describe('submitBriefing 함수는', () => {
                 { body: string },
             ];
             const body = JSON.parse(init.body) as Record<string, unknown>;
+            // Design C: this builder has no skills catalog/system prompt, so
+            // `stable` (mocked non-empty here to prove it's intentionally
+            // dropped) is never folded anywhere — `prompt` is `dynamic` alone,
+            // and there's no promptStable/promptDynamic split on the body.
             expect(body).toMatchObject({
                 jobId: expect.any(String),
-                prompt: 'mock prompt',
+                prompt: 'prompt',
                 model: BRIEFING_MODEL_ID,
             });
+            expect(body.promptStable).toBeUndefined();
+            expect(body.promptDynamic).toBeUndefined();
+            expect(body.system).toBeUndefined();
             expect(body.seed).toBe(analysisSeed(body.prompt as string));
         });
 

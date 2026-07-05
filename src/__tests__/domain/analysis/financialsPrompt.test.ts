@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
+import { buildFinancialsAnalysisPrompt as buildFinancialsAnalysisPromptRaw } from '@/domain/analysis/financialsPrompt';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
 import type {
     CashFlowGrowthRow,
@@ -11,6 +11,17 @@ import type {
     FinancialGrowthRow,
     Skill,
 } from '@/domain/types';
+
+// `buildFinancialsAnalysisPrompt` now returns `{ stable, dynamic }` (spec
+// §3.4 assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildFinancialsAnalysisPrompt = (
+    ...args: Parameters<typeof buildFinancialsAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildFinancialsAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 const empty: FinancialsSnapshot = {
     income: [],

@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
+import { buildOptionsAnalysisPrompt as buildOptionsAnalysisPromptRaw } from '@/domain/options/optionsPrompt';
 import type { OptionsSnapshot } from '@/domain/options/types';
+
+// `buildOptionsAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
+// assembly split) — this file's call sites predate the split and assert
+// against the single legacy combined string (`stable + '\n\n' + dynamic`,
+// exactly the string dispatch still sends as the `prompt` fallback field).
+const buildOptionsAnalysisPrompt = (
+    ...args: Parameters<typeof buildOptionsAnalysisPromptRaw>
+): string => {
+    const { stable, dynamic } = buildOptionsAnalysisPromptRaw(...args);
+    return `${stable}\n\n${dynamic}`;
+};
 
 describe('buildOptionsAnalysisPrompt', () => {
     const snapshot: OptionsSnapshot = {

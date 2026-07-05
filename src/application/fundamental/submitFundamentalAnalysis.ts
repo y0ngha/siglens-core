@@ -257,7 +257,18 @@ export async function submitFundamentalAnalysis(
     const { snapshot, skills, skillsDegraded } = providerData;
 
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildFundamentalAnalysisPrompt(symbol, snapshot, skills);
+    const { stable, dynamic } = buildFundamentalAnalysisPrompt(
+        symbol,
+        snapshot,
+        skills
+    );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt.
+    const system = stable
+        ? `${FUNDAMENTAL_SYSTEM_PROMPT}\n\n${stable}`
+        : FUNDAMENTAL_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -282,11 +293,11 @@ export async function submitFundamentalAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'fundamental' satisfies AnalysisType,
-            system: FUNDAMENTAL_SYSTEM_PROMPT,
+            system,
             responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),

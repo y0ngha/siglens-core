@@ -19,7 +19,14 @@ vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/skills/loader');
 vi.mock('@/application/market/barsApi');
 vi.mock('@/domain/analysis/prompt', () => ({
-    buildAnalysisPrompt: vi.fn(() => 'mock-prompt'),
+    // `buildAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4 assembly
+    // split) — the two halves are joined with the same '\n\n' the production
+    // dispatch site uses, so `body.prompt`/`body.seed` assertions below stay
+    // meaningful.
+    buildAnalysisPrompt: vi.fn(() => ({
+        stable: 'mock-stable',
+        dynamic: 'mock-dynamic',
+    })),
 }));
 vi.mock('@/domain/indicators/fearGreed', () => ({
     computeFearGreedIndex: vi.fn(),
@@ -425,8 +432,18 @@ describe('submitAnalysis 함수는', () => {
             ) as Record<string, unknown>;
             expect(body.model).toBe(DEFAULT_ANALYSIS_MODEL_ID);
             expect(body.analysisType).toBe('technical');
-            expect(body.system).toBe(AI_SYSTEM_PROMPT);
-            expect(body.seed).toBe(analysisSeed(body.prompt as string));
+            // Design C: the always-on skill digest (`stable`) folds into the
+            // SYSTEM prompt; `prompt` is `dynamic` alone. No promptStable/
+            // promptDynamic split fields on the dispatch body.
+            expect(body.system).toBe(`${AI_SYSTEM_PROMPT}\n\nmock-stable`);
+            expect(body.prompt).toBe('mock-dynamic');
+            expect(body.promptStable).toBeUndefined();
+            expect(body.promptDynamic).toBeUndefined();
+            expect(body.seed).toBe(
+                analysisSeed(
+                    `${body.system as string}\n\n${body.prompt as string}`
+                )
+            );
         });
 
         it('cache miss 시 marketDataProvider를 주입하면 submitted를 반환한다', async () => {

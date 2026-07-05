@@ -83,6 +83,56 @@ describe('buildTechnicalCase', () => {
             expect(result.prompt.length).toBeGreaterThan(0);
         }
     });
+
+    // Design C's `--fold-stable-into-system` harness flag: models the
+    // worker-side system composition (`system = <original> + '\n\n' +
+    // stable`, `prompt = dynamic`), instead of the default legacy fallback
+    // (`prompt = stable + '\n\n' + dynamic`).
+    describe('foldStableIntoSystem', () => {
+        const ALWAYS_ON_SKILL: Skill[] = [
+            {
+                name: 'Always Pattern Guide',
+                description: 'desc',
+                indicators: [],
+                confidenceWeight: 0.8,
+                content: '## Body\n- content',
+                type: 'pattern',
+                gating: { tier: 'always_on' },
+            },
+        ];
+
+        it('default (unset): system is unchanged and prompt is stable + dynamic', () => {
+            const result = buildTechnicalCase(fixture, ALWAYS_ON_SKILL);
+            expect(result.system).toBe(AI_SYSTEM_PROMPT);
+            expect(result.prompt).toContain('### Always Pattern Guide');
+        });
+
+        it('enabled: folds stable into system and prompt becomes dynamic alone', () => {
+            const folded = buildTechnicalCase(fixture, ALWAYS_ON_SKILL, true);
+            const unfolded = buildTechnicalCase(
+                fixture,
+                ALWAYS_ON_SKILL,
+                false
+            );
+
+            // The always_on skill digest moves from `prompt` to `system`.
+            expect(folded.system).toContain(AI_SYSTEM_PROMPT);
+            expect(folded.system).toContain('### Always Pattern Guide');
+            expect(folded.prompt).not.toContain('### Always Pattern Guide');
+
+            // Folded system + prompt reproduces the same total content as the
+            // unfolded system + prompt (modulo where the boundary sits).
+            expect(`${folded.system}\n\n${folded.prompt}`).toBe(
+                `${unfolded.system}\n\n${unfolded.prompt}`
+            );
+        });
+
+        it('enabled with an empty stable: system falls back to the plain system prompt', () => {
+            const result = buildTechnicalCase(fixture, NO_SKILLS, true);
+            expect(result.system).toBe(AI_SYSTEM_PROMPT);
+            expect(result.prompt.length).toBeGreaterThan(0);
+        });
+    });
 });
 
 describe('buildNewsCase', () => {

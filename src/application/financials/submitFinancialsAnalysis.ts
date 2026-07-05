@@ -213,12 +213,19 @@ export async function submitFinancialsAnalysis(
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const scorecard = computeFinancialsScorecard(snapshot);
-    const prompt = buildFinancialsAnalysisPrompt(
+    const { stable, dynamic } = buildFinancialsAnalysisPrompt(
         symbol,
         snapshot,
         scorecard,
         skills
     );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
+    // prompt.
+    const system = stable
+        ? `${FINANCIALS_SYSTEM_PROMPT}\n\n${stable}`
+        : FINANCIALS_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -243,11 +250,11 @@ export async function submitFinancialsAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'financials' satisfies AnalysisType,
-            system: FINANCIALS_SYSTEM_PROMPT,
+            system,
             responseSchema: FINANCIALS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_FINANCIALS_ANALYSIS_TIMEOUT_MS),

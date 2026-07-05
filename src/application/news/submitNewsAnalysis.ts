@@ -185,7 +185,7 @@ export async function submitNewsAnalysis(
 
     // ── 4. Build prompt, enqueue job, fire-and-forget worker POST ──
     const { workerUrl, workerSecret } = readWorkerConfig();
-    const prompt = buildNewsAnalysisPrompt(
+    const { stable, dynamic } = buildNewsAnalysisPrompt(
         symbol,
         companyName,
         news,
@@ -193,6 +193,13 @@ export async function submitNewsAnalysis(
         skills,
         options.assetClass ?? 'equity'
     );
+    // Design C (A/B-gate validated): fold the always-on skill digest
+    // (`stable`) into the SYSTEM prompt — that's the block providers cache —
+    // and send `dynamic` alone as the user prompt.
+    const system = stable
+        ? `${NEWS_SYSTEM_PROMPT}\n\n${stable}`
+        : NEWS_SYSTEM_PROMPT;
+    const prompt = dynamic;
     const jobId = crypto.randomUUID();
 
     await setJobMeta(jobId, {
@@ -217,11 +224,11 @@ export async function submitNewsAnalysis(
         body: JSON.stringify({
             jobId,
             prompt,
-            seed: analysisSeed(prompt),
+            seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
             tier,
             analysisType: 'news' satisfies AnalysisType,
-            system: NEWS_SYSTEM_PROMPT,
+            system,
             responseSchema: NEWS_RESPONSE_SCHEMA,
         }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),

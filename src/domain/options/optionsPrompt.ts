@@ -1,24 +1,38 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import type { AssembledPrompt } from '@/domain/types';
 import type { BuildOptionsAnalysisPromptOptions } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
 
 /**
- * Build the LLM prompt for options analysis. The prompt requests a JSON
- * response matching RawOptionsAnalysisResponse (kept tolerant — normalize
- * will fill in any missing fields).
+ * @internal Builds the options-analysis LLM prompt.
+ *
+ * Build the LLM prompt for options analysis, split into a stable/dynamic pair
+ * (spec §3.4, {@link AssembledPrompt}): `stable` is empty — this builder uses
+ * no skills (per spec §3.2 "OPTIONS ... 스킬 도입 시 화이트리스트 확장은 후속
+ * 과제") and has no other catalog-level knowledge to cache; `dynamic` is the
+ * role/intro line, current price, the per-expiration Key Metrics JSON, and —
+ * at the tail, after the data — the Output Schema + Interpretation Guide.
+ * Keeping the output-format instructions at the tail — after the data they
+ * must be grounded in — matches the fix applied to every other split builder
+ * in this module (see prompt.ts's "Final reminder" comment for the full
+ * rationale): output rules lose recency when they sit ahead of the data,
+ * even though (as here) they contain zero interpolation and would otherwise
+ * be a perfectly cacheable stable prefix. The prompt requests a JSON response
+ * matching RawOptionsAnalysisResponse (kept tolerant — normalize will fill in
+ * any missing fields).
  *
  * The instructions are in English; the JSON output schema specifies Korean
  * text for the model's user-facing fields (summary, commentary, message).
  *
  * @param options - Target expiration, company display name, and the
  *   pre-fetched options snapshot.
- * @returns A multi-section prompt string ready to send to the LLM.
- *   Deterministic for a given input (no clocks, no random IDs).
+ * @returns `{ stable, dynamic }` ready to be sent to the LLM. Deterministic
+ *   for a given input (no clocks, no random IDs).
  */
 export function buildOptionsAnalysisPrompt(
     options: BuildOptionsAnalysisPromptOptions
-): string {
+): AssembledPrompt {
     const { expirationDate, companyName, snapshot } = options;
 
     const targetChains =
@@ -30,7 +44,9 @@ export function buildOptionsAnalysisPrompt(
         summarizeChainForLlm(c, snapshot.underlyingPrice)
     );
 
-    return [
+    const stable = '';
+
+    const dynamic = [
         `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in Korean.`,
         '',
         `Current price: $${snapshot.underlyingPrice}`,
@@ -68,4 +84,6 @@ export function buildOptionsAnalysisPrompt(
         '- topOiBidAskSummary: bid/ask quotes (mid · spread) for the top OI strikes — a tight spread signals good liquidity at that price level.',
         '- Use a friendly but accurate Korean tone in the output. Keep ticker symbols in English as-is (e.g. AAPL).',
     ].join('\n');
+
+    return { stable, dynamic };
 }

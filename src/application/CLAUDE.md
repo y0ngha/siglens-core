@@ -92,6 +92,19 @@ The general test-seam exception still applies: when a factory's return value is 
 singleton or otherwise hard to substitute at runtime, mock the factory module with
 `vi.mock` (see Testing).
 
+## Dispatch contract — prompt assembly (Design C)
+
+`submit*.ts` use-cases receive an `AssembledPrompt` (`{ stable, dynamic }`) from the
+domain builder and dispatch it as **two separate fields**, not one combined user prompt:
+
+- `system = AI_SYSTEM_PROMPT + '\n\n' + assembled.stable` (when `stable` is non-empty;
+  otherwise just `AI_SYSTEM_PROMPT`) — the `always_on` skill digests live in the
+  **system** prompt so providers (Gemini/OpenAI/Claude) cache the stable prefix.
+- `prompt = assembled.dynamic` — the per-call half (symbol framing, fetched data,
+  gated skills, request block).
+- `seed = analysisSeed(system + '\n\n' + prompt)` — computed over the full assembled
+  content so the cache seed still reflects both halves.
+
 ## Coding Rules
 
 **Define types in the module's `types.ts`**, not inside function files.

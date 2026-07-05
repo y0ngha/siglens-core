@@ -514,8 +514,16 @@ describe('submitOptionsAnalysis 함수는', () => {
             expect(body.model).toBe('gemini-2.5-flash');
             expect(body.tier).toBe('free');
             expect(body.analysisType).toBe('options');
+            // This builder has no skills catalog, so `stable` is always ''
+            // and `system` stays the bare persona unchanged (Design C).
             expect(body.system).toBe(OPTIONS_SYSTEM_PROMPT);
-            expect(body.seed).toBe(analysisSeed(body.prompt as string));
+            expect(body.promptStable).toBeUndefined();
+            expect(body.promptDynamic).toBeUndefined();
+            expect(body.seed).toBe(
+                analysisSeed(
+                    `${body.system as string}\n\n${body.prompt as string}`
+                )
+            );
         });
 
         it('setJobMeta가 실패해도 submitted를 반환한다 (fail-open)', async () => {
