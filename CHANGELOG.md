@@ -1,5 +1,24 @@
 # Changelog
 
+# [0.32.0](https://github.com/y0ngha/siglens-core/compare/v0.31.0...v0.32.0) (2026-07-05)
+
+
+### Bug Fixes
+
+* **analysis:** output-contract recap tail — instruction sandwiching to preserve rule recency under stable-first ordering ([e9c5c2c](https://github.com/y0ngha/siglens-core/commit/e9c5c2c71473e94bcb484d953b9914f6cad43a18))
+* **analysis:** PR review round 1 — builders [@internal](https://github.com/internal), design-C doc/comment accuracy, public-type docs ([cfc08ec](https://github.com/y0ngha/siglens-core/commit/cfc08ec5abdaecf62e71eda4dd2e0df99e0cdae7))
+* **analysis:** restore full output rules to prompt tail — stable carries knowledge only ([8074692](https://github.com/y0ngha/siglens-core/commit/80746923039b4ddeb382ac8df51347c40012f91c))
+
+
+### Features
+
+* **analysis:** design C — skills-to-system split, user prompt keeps production order ([d4decf8](https://github.com/y0ngha/siglens-core/commit/d4decf8585e3a480e3cea32381abcc12fc0d7aa6))
+* **analysis:** split buildAnalysisPrompt (technical) into stable/dynamic assembly ([987e718](https://github.com/y0ngha/siglens-core/commit/987e718746fae266d3aa885c5ee847d9802f05a5))
+* **analysis:** split congress/briefing/economy prompts into stable/dynamic assembly ([16e7b8c](https://github.com/y0ngha/siglens-core/commit/16e7b8c98e79377bd5d56545b1bb463b63e78714))
+* **analysis:** split fundamental/financials/news/overall prompts into stable/dynamic assembly ([a9a1207](https://github.com/y0ngha/siglens-core/commit/a9a12070bd32ce8d936a7e100b8a098af3d878f2))
+* **analysis:** split newsCard/marketNewsDigest/options prompts into stable/dynamic assembly ([33890e5](https://github.com/y0ngha/siglens-core/commit/33890e50c456dfc58b4f78746d3effdf66ce14fa))
+* **types:** export ChartPatternId publicly ([6dfdcef](https://github.com/y0ngha/siglens-core/commit/6dfdcef0400aa351b17490262f1840eb5e6aa750))
+
 # [0.31.0](https://github.com/y0ngha/siglens-core/compare/v0.30.0...v0.31.0) (2026-07-04)
 
 # [0.30.0](https://github.com/y0ngha/siglens-core/compare/v0.29.0...v0.30.0) (2026-07-04)
