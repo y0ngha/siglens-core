@@ -543,6 +543,34 @@ describe('classifyCurvaturePatterns', () => {
         expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
     });
 
+    it('저점 index가 특이(singular) 행렬을 만들면 solve3x3이 null을 반환해 감지하지 않는다', () => {
+        // extractPivots always yields strictly-ascending, distinct indices,
+        // so duplicate-index lows are impossible via any real call path —
+        // but PivotPoint's type does not enforce distinctness, so this is
+        // type-valid synthetic input to the exported classifyCurvaturePatterns
+        // (same technique as the descending-index defensive test above, for
+        // classifyFlagsAndPennants).
+        //
+        // Only 2 distinct x-values (2 and 8, each repeated) among the 4 lows
+        // collapse the quadratic normal-equations matrix's rank to <= 2,
+        // making its determinant exactly 0 — this is the singular-matrix
+        // guard inside solve3x3 (`Math.abs(determinant) <
+        // SINGULAR_MATRIX_DET_EPSILON`), which the collinear-points case
+        // above does NOT exercise (collinear points with distinct x still
+        // yield a non-singular system; that case instead rejects on
+        // `fit.a <= 0`). Here fitQuadratic/fitRoundingBottom must return
+        // null from the singular guard itself, not a NaN/Infinity fit.
+        const pivots: PivotPoint[] = [
+            { index: 2, price: 10, kind: 'low' },
+            { index: 2, price: 4, kind: 'low' },
+            { index: 8, price: 2, kind: 'low' },
+            { index: 8, price: 9, kind: 'low' },
+        ];
+        const bars = makeBars(Array.from({ length: 10 }, () => 100));
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
     it('저점이 4개 미만이면 감지하지 않는다', () => {
         const bars = makeAlternatingPivotBars(15, [20, 10, 20, 4], 20);
         const pivots = extractPivots(bars, ATR, { includeProvisional: true });
