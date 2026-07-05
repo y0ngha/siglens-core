@@ -1592,7 +1592,7 @@ export interface PromptConfig {
  * so the seed still reflects the full assembled content.
  */
 export interface AssembledPrompt {
-    /** `always_on` skill digests only — byte-stable per `(analysisType, catalog fingerprint)`; non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) when the catalog has `always_on` skills, `''` for builders that inject no skills at all (options, market/macro briefing, economic-event, indicator-translation). Folded into the system prompt by dispatch. */
+    /** The `always_on` skill-digest section — byte-stable per `(analysisType, catalog fingerprint)`. Non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) with the production catalog; `''` for no-skill builders (options, market/macro briefing, economic-event, indicator-translation), which never read the skill catalog. (Edge case: a skill-bearing builder given an empty catalog also yields `''` — not the normal contract.) Folded into the system prompt by dispatch. */
     stable: string;
     /** Everything else, in production order: symbol/company framing, fetched data, gated skill digests, the request block. Sent as `prompt` by dispatch. */
     dynamic: string;

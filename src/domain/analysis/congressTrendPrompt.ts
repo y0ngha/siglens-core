@@ -1,5 +1,6 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import type {
     AssembledPrompt,
     CongressTrade,
@@ -101,7 +102,7 @@ Amounts are disclosed as coarse dollar ranges, so statistics are COUNT-based —
 ## Recent Trades (newest first, max ${MAX_TRADES_IN_PROMPT})
 ${formatTrades(trades)}
 
-Core skill reference: provided in the system prompt.
+${CORE_SKILL_REFERENCE_POINTER}
 
 ## IMPORTANT Caveats
 - Congressional disclosures are filed with a mandatory lag of up to ~45 days (sometimes longer). Trades shown may already be stale relative to current market conditions.

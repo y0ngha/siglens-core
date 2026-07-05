@@ -1,6 +1,7 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
     NO_CHART_SELECTION_CONTEXT,
     selectSkills,
@@ -208,7 +209,7 @@ ${peerLines}
 ## Sector Direction
 ${formatSectorDirection(sectorDirection)}
 
-Core skill reference: provided in the system prompt.
+${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {

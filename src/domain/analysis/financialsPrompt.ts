@@ -1,6 +1,7 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
     NO_CHART_SELECTION_CONTEXT,
     selectSkills,
@@ -261,7 +262,7 @@ ${formatCashFlowGrowthSection(snapshot.cashFlowGrowth)}
 - Composite: Grade ${composite.grade}, Score ${composite.score}/100 | ${composite.summaryKo}
 ${axisRows}
 
-Core skill reference: provided in the system prompt.
+${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
