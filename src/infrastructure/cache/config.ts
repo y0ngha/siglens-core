@@ -210,9 +210,27 @@ export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
  * relocating the skill digests changes prompt bytes without changing that
  * fingerprint, requiring a manual bump per the versioning policy (spec §4).
  *
+ * @remarks
+ * **`p5` = output-rules prose dedup (spec §3.5), TECHNICAL ONLY this round.**
+ * `buildAnalysisRequest` (in `prompt.ts`, feeding `buildAnalysisPrompt`) drops
+ * several field-by-field prose enumerations that only restated what
+ * `TECHNICAL_RESPONSE_SCHEMA` already enforces (required-ness, the `"skill"`
+ * literal enum, the trend enum) — see that function's inline comments for the
+ * exact deleted/kept lines. Behavioral rules the schema cannot express (bias
+ * mapping for non-detected patterns, the neutral fallback, cross-field name
+ * matching, Korean/content constraints) and the minimal "respond with a single
+ * JSON object" directive are kept verbatim. `buildFundamentalAnalysisPrompt`
+ * has its own, separate output-rule prose (not shared with
+ * `buildAnalysisRequest`) and was NOT touched this round, so its bytes are
+ * unchanged — unlike `p3`/`p4`, which changed both templates. Bumping this
+ * shared constant still cold-starts the fundamental cache as a side effect of
+ * the shared invalidation axis; that is accepted per spec §4's "per-PR
+ * warm-cache cold start is acceptable" policy, not a sign that the
+ * fundamental template changed.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
