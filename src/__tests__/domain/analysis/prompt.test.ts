@@ -2493,7 +2493,7 @@ describe('prompt', () => {
             expect(result).toContain('- MACD Signal Guide');
         });
 
-        it('시그널 type을 "skill"로 강제하는 프로즈는 제거되었다 (스키마 enum이 이미 강제, §3.5 dedup)', () => {
+        it('시그널 type을 "skill"로 강제하는 압축 shape guard가 유지된다 (PR #164 review: non-forced thinking-Claude 경로 보호)', () => {
             const skill = makeSkill({
                 type: 'indicator_guide',
                 name: 'RSI Signal Guide',
@@ -2505,14 +2505,16 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            // TECHNICAL_RESPONSE_SCHEMA's `signals[].type` is `enum: ['skill']` —
-            // a single fixed value the schema already forces, so the prose
-            // restating it was pure schema-restatement and was dropped.
-            expect(result).not.toContain(
-                'The type field of each signal entry MUST be "skill"'
+            // TECHNICAL_RESPONSE_SCHEMA's `signals[].type` (`enum: ['skill']`) is
+            // only API-enforced for forced-tool providers (Gemini/OpenAI/haiku).
+            // The thinking-Claude path (sonnet/opus, tool_choice: auto) is not
+            // schema-enforced, and extractJsonWithRepair fixes JSON syntax only —
+            // not shape — so this compact guard is retained for that path.
+            expect(result).toContain(
+                'Each signal\'s `type` MUST be exactly "skill"'
             );
-            // The literal JSON entry skeleton (also pure schema-restatement) is
-            // gone too — the lead-in no longer promises an "exact format".
+            // The literal JSON entry skeleton (pure schema-restatement, adds no
+            // shape-enforcement beyond the compact guard above) stays gone.
             expect(result).not.toContain('in the following exact format');
         });
 
@@ -2703,7 +2705,7 @@ describe('prompt', () => {
     });
 
     describe('분석 요청 섹션 - patternSummaries trend 규칙', () => {
-        it('trend 필수 프로즈는 제거되었다 (schema required가 이미 강제, §3.5 dedup)', () => {
+        it('trend 필수 압축 shape guard가 유지된다 (PR #164 review: non-forced thinking-Claude 경로 보호)', () => {
             const skill = makeSkill({
                 type: 'pattern',
                 name: 'Head and Shoulders',
@@ -2715,11 +2717,15 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            // TECHNICAL_RESPONSE_SCHEMA's patternSummaries[] already lists
-            // `trend` in `required`, so restating "is REQUIRED ... NEVER omit"
-            // was pure schema-restatement — deleted. The behavioral bias
-            // mapping (which value to pick when not detected) stays; see the
-            // next test.
+            // The schema's `required` list for patternSummaries[] is only
+            // API-enforced for forced-tool providers (Gemini/OpenAI/haiku).
+            // The thinking-Claude path (sonnet/opus, tool_choice: auto) is not
+            // schema-enforced, and extractJsonWithRepair fixes JSON syntax only —
+            // not shape — so this compact guard is retained for that path. The
+            // original verbose phrasing stays deleted (pure schema-restatement).
+            expect(result).toContain(
+                'Every entry MUST include `trend` (bullish/bearish/neutral), including detected:false entries.'
+            );
             expect(result).not.toContain(
                 'trend field is REQUIRED for every patternSummaries entry'
             );
@@ -3055,7 +3061,7 @@ describe('prompt', () => {
             expect(result).toContain('Generic Theory Strategy');
         });
 
-        it('strategyInstruction의 trend는 neutral fallback(behavioral)을 유지하고 enum 나열(schema-restatement)은 제거한다', () => {
+        it('strategyInstruction의 trend는 압축 enum shape guard + neutral fallback(behavioral)을 유지한다 (PR #164 review)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3063,13 +3069,16 @@ describe('prompt', () => {
                 makeIndicators(),
                 [strategySkill]
             );
-            // "NEVER omit this field" restated TREND_SCHEMA's `required` — dropped.
-            expect(result).not.toContain('NEVER omit this field');
-            // "one of \"bullish\", \"bearish\", \"neutral\"" restated
-            // TREND_SCHEMA's enum verbatim — dropped.
-            expect(result).not.toContain(
-                'one of "bullish", "bearish", "neutral"'
+            // TREND_SCHEMA's enum/`required` is only API-enforced for
+            // forced-tool providers. The thinking-Claude path (sonnet/opus,
+            // tool_choice: auto) is not schema-enforced, and
+            // extractJsonWithRepair fixes JSON syntax only — not shape — so
+            // this compact guard is retained as that path's protection. The
+            // original verbose "NEVER omit this field" phrasing stays dropped.
+            expect(result).toContain(
+                'MUST include `trend` as one of bullish/bearish/neutral.'
             );
+            expect(result).not.toContain('NEVER omit this field');
             // The behavioral default (schema cannot express WHICH enum value to
             // pick when inconclusive) stays.
             expect(result).toContain('use "neutral"');
