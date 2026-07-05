@@ -795,10 +795,12 @@ const formatHorizonBlock = (
     ].join('\n');
 };
 
-// ANTI_FABRICATION_GUARDRAIL is stated once as a standalone stable-block line
-// (assembled in buildAnalysisPrompt) rather than repeated here — same
-// constant, single occurrence, SSOT (avoids duplicating it every call since
-// this section is otherwise dynamic/per-call).
+// Design C (skills-to-system split): only the always_on skill digests move to
+// the byte-stable prefix. ANTI_FABRICATION_GUARDRAIL carries no symbol/skill
+// content and would be cacheable in isolation, but restoring it to its
+// original production position (inline, once, right after the framing
+// sentence) keeps `dynamic` a faithful reproduction of the v0.31 section
+// order rather than introducing a new standalone stable line.
 const formatMarketReferenceSection = (
     reference: MarketReference,
     timeframe: Timeframe
@@ -806,6 +808,7 @@ const formatMarketReferenceSection = (
     [
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
+        ANTI_FABRICATION_GUARDRAIL,
         formatHorizonBlock('short', reference.short, timeframe),
         formatHorizonBlock('medium', reference.medium, timeframe),
         formatHorizonBlock('long', reference.long, timeframe),
@@ -1538,31 +1541,13 @@ const buildAnalysisRequest = (
         .join('\n');
 };
 
-// ── Final reminder (instruction sandwiching) ───────────────────────────────
-// The full ## Analysis Request block (built above) already carries the
-// Contingent Plan Mandate and every other output rule, and it sits at the
-// very end of `dynamic` — immediately before the model responds — so rule
-// recency no longer depends on a recap. This block is a genuinely SHORT (3
-// bullets) tail reminder, not a restatement of the rules: an earlier design
-// moved the rules into the byte-stable prefix (ahead of the entire chart-data
-// block) and compensated with a long recap here; an A/B smoke test on that
-// ordering found actionability collapse (entry==target, null top-level plan
-// fields) because the rules were many thousands of tokens behind the
-// response by the time the model wrote it. Restoring the rules to the tail
-// (above) fixes the root cause, so this reminder only needs to catch the
-// handful of failure modes instruction-following models exhibit even with
-// rules right above them: forgetting grounding, skipping the contingent
-// plan, or malformed output.
-/**
- * @internal Exported so tests can pin that `dynamic` ends with this exact
- * block (order pin) and assert its content directly.
- */
-export const FINAL_REMINDER = [
-    '## Final Reminder',
-    '- Grounding: only cite keyLevels/market-data numbers already stated above — never invent or extrapolate a price.',
-    '- Contingent Plan Mandate: even for "wait"/"avoid", populate entryPrices/stopLoss/takeProfitPrices from the nearest keyLevels.',
-    '- Respond with a single JSON object; all Korean prose fields must use 존댓말.',
-].join('\n');
+// Design C (skills-to-system split): FINAL_REMINDER is removed outright — it
+// existed only to recap the output rules when an earlier design had moved
+// them far ahead of the data (ahead of the chart-data block). Here, the full
+// "## Analysis Request" block (built above) already sits at the true tail of
+// `dynamic`, immediately before the model responds, exactly reproducing the
+// v0.31 production ordering; nothing was moved away from that tail position,
+// so no recap is needed.
 
 // ── ATR-extreme sizing note (Tier-0 conditional promotion) ──────────────────
 // When realized volatility is extreme, position-sizing context must never be
@@ -1711,37 +1696,55 @@ const buildSkillContentSections = (
     });
 
 /**
+ * @internal Design C (skills-to-system split) tail marker left in `dynamic`
+ * at the exact position the combined (core ∪ selected) skill-content block
+ * used to occupy in production order — right after the Market Reference
+ * section, before the gated (`selected`) skill digests. Only rendered when
+ * `core` actually moved digest content into `stable` (see
+ * {@link buildAnalysisPrompt}); when the catalog has no `always_on` skills
+ * for this call, `stable` is empty and there is nothing to point at.
+ */
+export const CORE_SKILL_REFERENCE_POINTER =
+    'Core skill reference: provided in the system prompt.';
+
+/**
  * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
  *
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
  * Composes the prompt the worker LLM consumes to produce an
  * `AnalysisResponse`, split into a stable/dynamic pair (spec §3.4,
- * {@link AssembledPrompt}) rather than a single string:
+ * {@link AssembledPrompt}) — Design C ("skills-to-system split") rather than
+ * the earlier stable-first designs:
  *
- * - `stable` — KNOWLEDGE only: the analysis-intent block, guidelines (incl.
- *   the contingent-plan mandate's textual description), the anti-fabrication
- *   guardrail, and the `always_on` skill digests (`core`, name-sorted).
- *   Byte-identical across calls sharing the same `(analysisType, catalog)` —
- *   contains no symbol, timeframe data, or per-call value, and critically no
- *   output-format instructions either — so it can serve as a cacheable
- *   prefix at the worker/provider layer without risking rule recency.
- * - `dynamic` — everything else: the symbol/company/asset-class framing, the
- *   timeframe section, all computed chart data (snapshot, long-term context,
- *   recent bars, regime/indicator/pro-indicator/SMC/market-reference
- *   sections), gated (`selected`) skill digests ordered by relevance, the
- *   tier/timeframe conditional notes (ATR-extreme sizing), the optional Fear
- *   & Greed section, then — reunited as one atomic tail block, see
- *   {@link buildAnalysisRequest} — the FULL "## Analysis Request" section
- *   (static output rules + the per-type writing-rule/active-skill-name
- *   instructions), and finally {@link FINAL_REMINDER}, a short 3-line tail
- *   reminder. An A/B smoke test found that moving the output rules into the
- *   byte-stable prefix (ahead of the entire chart-data block) degraded
- *   actionability (entry==target, null top-level plan fields): the rules
- *   ended up many thousands of tokens behind the model's response. Restoring
- *   them to the tail — their original position — fixes rule recency
- *   directly, which is why `stable` no longer carries any output-format
- *   content and the old long recap collapsed into a genuinely short reminder.
+ * - `stable` — ONLY the `always_on` skill digests (`core`, name-sorted,
+ *   grouped by type via {@link buildSkillContentSections}). Byte-identical
+ *   across calls sharing the same `(analysisType, catalog)` — contains no
+ *   symbol, timeframe data, or per-call value — so it can serve as a
+ *   cacheable request prefix at the worker/provider layer (folded into the
+ *   system message; see `scripts/ab-harness/buildPrompts.ts`'s
+ *   `--fold-stable-into-system`). Empty when the catalog has no `always_on`
+ *   skills for this prompt type.
+ * - `dynamic` — the ENTIRE rest of the prompt, in the ORIGINAL PRODUCTION
+ *   ORDER (v0.31, pre-split): symbol/company/asset-class framing, timeframe,
+ *   the analysis-intent block, guidelines (incl. the contingent-plan
+ *   mandate's textual description), all computed chart data (snapshot,
+ *   long-term context, recent bars, regime/indicator/pro-indicator/SMC
+ *   sections), the Market Reference section (with the anti-fabrication
+ *   guardrail inline, its original position), a one-line pointer
+ *   ({@link CORE_SKILL_REFERENCE_POINTER}) where the combined skill-content
+ *   block used to sit — replacing only the `core` digests that moved to
+ *   `stable` — the gated (`selected`) skill digests ordered by relevance,
+ *   the tier/timeframe conditional notes (ATR-extreme sizing), the optional
+ *   Fear & Greed section, and finally — at the true tail, exactly as in
+ *   production — the FULL "## Analysis Request" section (static output
+ *   rules + the per-type writing-rule/active-skill-name instructions, see
+ *   {@link buildAnalysisRequest}). Two prior orderings (stable-first output
+ *   rules, and a `FINAL_REMINDER` recap tail) both degraded actionability in
+ *   A/B smoke tests; Design C avoids the regression entirely by keeping the
+ *   user prompt's section order byte-for-byte identical to production and
+ *   moving ONLY the skill digests elsewhere — no recap tail is needed
+ *   because nothing was ever moved away from the tail.
  *
  * Skills are gated by {@link selectSkills} in the `'technical'` prompt
  * context: non-chart skills (category fundamental/news/congress) are
@@ -1752,7 +1755,11 @@ const buildSkillContentSections = (
  * Untagged skills throw (fail-closed). Both buckets are grouped by `type`
  * (pattern, strategy, indicator_guide, candlestick, support_resistance,
  * regular) independently, so a type's content can land in `stable` (its
- * `core` members), `dynamic` (its `selected` members), both, or neither.
+ * `core` members), `dynamic` (its `selected` members), both, or neither. The
+ * per-type writing-rule instructions in `buildAnalysisRequest` still cover
+ * `core ∪ selected` (`combinedGroups`) — the model must judge every active
+ * skill regardless of which half of the prompt (or which provider message)
+ * its digest physically landed in.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
  * @param companyName - Full English company name (e.g. `"Apple Inc."`).
@@ -1843,16 +1850,21 @@ export function buildAnalysisPrompt(
         combinedGroups.regular
     );
 
-    const stableSections = [
-        ANALYSIS_INTENT_BLOCK,
-        ANALYSIS_GUIDELINES,
-        ANTI_FABRICATION_GUARDRAIL,
-        ...buildSkillContentSections(coreGroups),
-    ];
+    // Design C: `stable` carries ONLY the always_on skill digests — nothing
+    // else moves out of the production order below.
+    const coreSkillSections = buildSkillContentSections(coreGroups);
+    const stableSections = coreSkillSections;
 
+    // Faithful reproduction of the v0.31 production section order (see
+    // `git show main:src/domain/analysis/prompt.ts`'s `sections` array),
+    // minus the combined skill-content block (now split: `core` digests live
+    // in `stable`, replaced here by a one-line pointer when non-empty;
+    // `selected` digests stay in `dynamic` at the same position).
     const dynamicSections = [
         `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
+        ANALYSIS_INTENT_BLOCK,
+        ANALYSIS_GUIDELINES,
         formatMarketSection(bars),
         formatLongTermContext(bars),
         formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),
@@ -1863,17 +1875,15 @@ export function buildAnalysisPrompt(
         formatSMCSection(indicators, bars),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(marketReference, timeframe),
+        ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),
         ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
-        // The full output-rules block, restored to its original tail
-        // position (see buildAnalysisRequest's doc comment for why).
+        // The full output-rules block — the true tail, exactly as in
+        // production (see buildAnalysisRequest's doc comment for why).
         analysisRequest,
-        // Always last — see FINAL_REMINDER's own comment for why this
-        // stays the final dynamic section.
-        FINAL_REMINDER,
     ];
 
     return {

@@ -3545,11 +3545,11 @@ describe('prompt', () => {
             expect(result).toContain('Analyze the symbol below');
         });
 
-        // Assembly-split reorder (spec §3.4): Analysis Intent is part of the
-        // stable prefix, Timeframe is part of the per-call dynamic suffix, and
-        // stable always precedes dynamic — so Intent now comes BEFORE
-        // Timeframe (the inverse of the pre-split single-block order).
-        it('Analysis Intent 블록이 Timeframe 앞에 위치한다 (stable prefix가 dynamic보다 앞)', () => {
+        // Design C (spec §3.4, skills-to-system split): `dynamic` reproduces
+        // the ORIGINAL PRODUCTION ORDER faithfully — Timeframe precedes
+        // Analysis Intent, exactly as in v0.31 (pre-split), since only the
+        // always_on skill digests moved to `stable`.
+        it('Timeframe 섹션이 Analysis Intent 블록 앞에 위치한다 (production order)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3563,7 +3563,7 @@ describe('prompt', () => {
 
             expect(timeframeIndex).toBeGreaterThanOrEqual(0);
             expect(intentIndex).toBeGreaterThanOrEqual(0);
-            expect(intentIndex).toBeLessThan(timeframeIndex);
+            expect(timeframeIndex).toBeLessThan(intentIndex);
         });
 
         it('Analysis Intent 블록이 Indicator Values 섹션보다 앞에 위치한다', () => {

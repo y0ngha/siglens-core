@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildAnalysisPrompt, FINAL_REMINDER } from '@/domain/analysis/prompt';
+import {
+    buildAnalysisPrompt,
+    CORE_SKILL_REFERENCE_POINTER,
+} from '@/domain/analysis/prompt';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
@@ -37,11 +40,17 @@ import type {
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
 import type { OptionsSnapshot } from '@/domain/options/types';
 
-// Spec §3.4 / plan Task 4.2 Step 1 — the assembly-split stability invariants:
-// `stable` depends only on (analysisType, catalog fingerprint), never on the
-// call's symbol/bars/timestamp, so it can serve as a byte-identical cacheable
-// prefix at the worker/provider layer. These tests pin that contract directly
-// against the shipped `{ stable, dynamic }` shape (no flattening wrapper).
+// Spec §3.4 / plan Task 4.2 Step 1 — Design C ("skills-to-system split"): the
+// assembly-split stability invariants. `stable` carries ONLY the always_on
+// skill digests (empty when the catalog has none for this call) and depends
+// only on (analysisType, catalog fingerprint), never on the call's
+// symbol/bars/timestamp, so it can serve as a byte-identical cacheable
+// system-message suffix at the worker/provider layer (see
+// `scripts/ab-harness/buildPrompts.ts`'s `--fold-stable-into-system`).
+// `dynamic` reproduces the ORIGINAL PRODUCTION (v0.31, pre-split) section
+// order faithfully — the user prompt's ordering never changed; only the
+// skill digests moved. These tests pin that contract directly against the
+// shipped `{ stable, dynamic }` shape (no flattening wrapper).
 
 const emptyIndicators = (): IndicatorResult => ({
     ...EMPTY_INDICATOR_RESULT,
@@ -218,12 +227,22 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
     it('combining stable + dynamic with exactly "\\n\\n" reproduces the legacy single-string prompt content', () => {
         const bars = makeBars(30, 100);
         const indicators = emptyIndicators();
+        // An always_on skill so `stable` is guaranteed non-empty for this
+        // assertion — with zero skills, `stable` legitimately collapses to
+        // `''` (see the dedicated empty-stable test below).
+        const skills = [
+            makeSkill({
+                name: 'Always Pattern',
+                type: 'pattern',
+                gating: alwaysOn,
+            }),
+        ];
         const { stable, dynamic } = buildAnalysisPrompt(
             'AAPL',
             'Apple Inc.',
             bars,
             indicators,
-            [],
+            skills,
             '1Day'
         );
         const combined = `${stable}\n\n${dynamic}`;
@@ -235,22 +254,14 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
         expect(combined).toContain('AAPL');
     });
 
-    // A/B smoke test on an earlier stable-first ordering found actionability
-    // collapse (entry==target, null top-level plan fields): the FULL output
-    // rules block (the static "## Analysis Request" preamble — critical
-    // response rules + field content guidance — reunited with the per-type
-    // writing-rule instructions) had been moved into `stable`, far ahead of
-    // the chart data the model reasons over. The fix restores that block to
-    // the tail of `dynamic` — its original position — so rule recency no
-    // longer depends on a recap; FINAL_REMINDER is a genuinely short 3-line
-    // tail reminder, not a restatement of the rules. Pin the order directly:
-    // FINAL_REMINDER must be the literal suffix of `dynamic`, the "##
-    // Analysis Request" block (incl. its Field Content Guidance) must
-    // precede it in `dynamic`, and neither may leak into `stable`.
-    it('dynamic ends with FINAL_REMINDER, with the full Analysis Request preceding it', () => {
-        const bars = makeBars(60, 150);
-        const indicators = calculateIndicators(bars);
-        const { stable, dynamic } = buildAnalysisPrompt(
+    // Design C: with no `always_on` skills in the catalog, `stable` has
+    // nothing to carry (only always_on skill digests ever live there) and
+    // legitimately collapses to the empty string — mirroring the
+    // already-established pattern in `overallPrompt`/`optionsPrompt`.
+    it('stable is the empty string when the catalog has no always_on skills', () => {
+        const bars = makeBars(30, 100);
+        const indicators = emptyIndicators();
+        const { stable } = buildAnalysisPrompt(
             'AAPL',
             'Apple Inc.',
             bars,
@@ -258,29 +269,78 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
             [],
             '1Day'
         );
+        expect(stable).toBe('');
+    });
 
-        expect(dynamic.endsWith(FINAL_REMINDER)).toBe(true);
+    // Design C ("skills-to-system split"): two prior orderings both degraded
+    // actionability in A/B smoke tests — (1) moving the output rules into
+    // `stable` ahead of the chart data, and (2) restoring the rules to the
+    // tail but appending a `FINAL_REMINDER` recap. This design avoids the
+    // regression differently: `dynamic` reproduces the ORIGINAL PRODUCTION
+    // (v0.31) section order byte-for-byte, so the full "## Analysis Request"
+    // block (critical response rules + field content guidance + per-type
+    // writing-rule instructions) already sits at the TRUE tail — nothing was
+    // ever moved away from it, so no recap is needed. Only the always_on
+    // skill digests moved out of `dynamic` (into `stable`), replaced by a
+    // one-line pointer at the exact spot they used to occupy.
+    it('dynamic ends with the full Analysis Request block (no recap needed) — production order preserved', () => {
+        const bars = makeBars(60, 150);
+        const indicators = calculateIndicators(bars);
+        const skills = [
+            makeSkill({
+                name: 'Always Pattern',
+                type: 'pattern',
+                gating: alwaysOn,
+            }),
+        ];
+        const { stable, dynamic } = buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            bars,
+            indicators,
+            skills,
+            '1Day'
+        );
+
         expect(dynamic).toContain('## Analysis Request');
         // The Field Content Guidance BODY (not just the Analysis Intent
-        // block's textual reference to the section name, which legitimately
-        // stays in `stable`) is a reliable marker for the actual moved block.
-        expect(dynamic).toContain(
-            'Use the exact numbers provided above rather than recomputing arithmetic'
+        // block's textual reference to the section name) is a reliable
+        // marker for the actual output-rules block.
+        const fieldGuidanceMarker =
+            'Use the exact numbers provided above rather than recomputing arithmetic';
+        expect(dynamic).toContain(fieldGuidanceMarker);
+        // The full Analysis Request block IS the tail of `dynamic` — nothing
+        // follows it (no FINAL_REMINDER-style recap in this design). With
+        // only a `pattern`-type always_on skill active, the last per-type
+        // instruction rendered is the patternSummaries Writing Rules' skill
+        // enumeration, ending in this skill's own name.
+        expect(dynamic.trimEnd().endsWith('- Always Pattern')).toBe(true);
+        // Timeframe/production-order markers precede the Analysis Request
+        // tail, exactly as in v0.31 (pre-split) production.
+        expect(dynamic.indexOf('Timeframe:')).toBeLessThan(
+            dynamic.indexOf('## Analysis Request')
         );
-        expect(dynamic.indexOf('## Analysis Request')).toBeLessThan(
-            dynamic.indexOf(FINAL_REMINDER)
+        // The one-line pointer replaces the always_on digest content at the
+        // exact spot the combined skill-content block used to occupy.
+        expect(dynamic).toContain(CORE_SKILL_REFERENCE_POINTER);
+        expect(dynamic.indexOf(CORE_SKILL_REFERENCE_POINTER)).toBeLessThan(
+            dynamic.indexOf('## Analysis Request')
         );
-        // The output rules must NOT be in `stable` any more — that was the bug.
+        // The digest CONTENT (the "### <name>" block) must not leak into
+        // `dynamic` for a core (always_on) skill — it belongs in `stable`.
+        expect(stable).toContain('### Always Pattern');
+        expect(dynamic).not.toContain('### Always Pattern');
+        // The output rules must NOT be in `stable` — `stable` carries ONLY
+        // the always_on skill digests in this design.
         expect(stable).not.toContain('## Analysis Request');
-        expect(stable).not.toContain(
-            'Use the exact numbers provided above rather than recomputing arithmetic'
-        );
-        // Guidelines (incl. the Contingent Plan Mandate's textual description)
-        // legitimately stay in `stable` — only the output-format instructions
-        // that reference it (Analysis Request / Field Content Guidance) and
-        // FINAL_REMINDER's short recap of it belong at the dynamic tail.
-        expect(stable).toContain('Contingent Plan Mandate');
+        expect(stable).not.toContain(fieldGuidanceMarker);
+        // Guidelines (incl. the Contingent Plan Mandate's textual
+        // description) and the anti-fabrication guardrail now live in
+        // `dynamic`, in their original production position — not `stable`.
         expect(dynamic).toContain('Contingent Plan Mandate');
+        expect(stable).not.toContain('Contingent Plan Mandate');
+        expect(dynamic).toContain('Anti-fabrication:');
+        expect(stable).not.toContain('Anti-fabrication:');
     });
 });
 
@@ -655,10 +715,19 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         );
         expect(stable).not.toContain('## Output Schema');
         expect(stable).not.toContain('Rules:');
-        // Domain Skills + Caveats are catalog-deterministic, so they legitimately
-        // stay in `stable` — only the Output Schema/Rules moved.
+        // Design C: `stable` carries ONLY the Domain Skills (Active) digest
+        // section — IMPORTANT Caveats returns to `dynamic`, in its original
+        // production position (right after the skill section, before Output
+        // Schema).
         expect(stable).toContain('## Domain Skills (Active)');
-        expect(stable).toContain('## IMPORTANT Caveats');
+        expect(stable).not.toContain('## IMPORTANT Caveats');
+        expect(dynamic).toContain('## IMPORTANT Caveats');
+        expect(dynamic.indexOf('## Recent Trades')).toBeLessThan(
+            dynamic.indexOf('## IMPORTANT Caveats')
+        );
+        expect(dynamic.indexOf('## IMPORTANT Caveats')).toBeLessThan(
+            dynamic.indexOf('## Output Schema')
+        );
     });
 
     it('buildMarketBriefingPrompt: stable is index/sector-data invariant', () => {
@@ -702,11 +771,17 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             },
         ];
         const { stable, dynamic } = buildMarketBriefingPrompt(indices, []);
-        expect(dynamic.indexOf('섹터 등락률:')).toBeLessThan(
-            dynamic.indexOf('Schema (')
+        // Design C: this builder has no skills (spec §3.2), so it was fully
+        // reverted to the exact v0.31 production order — the JSON schema
+        // precedes the index/sector data rows, which sit at the true tail.
+        expect(dynamic.indexOf('Schema (')).toBeLessThan(
+            dynamic.indexOf('주요 지수:')
         );
-        expect(dynamic.trimEnd().endsWith('}')).toBe(true);
-        expect(stable).not.toContain('Schema (');
+        expect(dynamic.indexOf('주요 지수:')).toBeLessThan(
+            dynamic.indexOf('섹터 등락률:')
+        );
+        expect(dynamic.trimEnd().endsWith('섹터 등락률:')).toBe(true);
+        expect(stable).toBe('');
     });
 
     it('buildOptionsAnalysisPrompt: stable is symbol/company invariant', () => {
@@ -809,11 +884,18 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             calendar: [],
         };
         const { stable, dynamic } = buildMacroBriefingPrompt(snap);
-        expect(dynamic.indexOf('임박 경제 이벤트')).toBeLessThan(
-            dynamic.indexOf('Schema (')
+        // Design C: this builder has no skills (spec §3.2), so it was fully
+        // reverted to the exact v0.31 production order — the JSON schema
+        // precedes the indicator/calendar data rows, which sit at the true
+        // tail.
+        expect(dynamic.indexOf('Schema (')).toBeLessThan(
+            dynamic.indexOf('## 경제지표')
         );
-        expect(dynamic.trimEnd().endsWith('}')).toBe(true);
-        expect(stable).not.toContain('Schema (');
+        expect(dynamic.indexOf('## 경제지표')).toBeLessThan(
+            dynamic.indexOf('임박 경제 이벤트')
+        );
+        expect(dynamic.trimEnd().endsWith('(없음)')).toBe(true);
+        expect(stable).toBe('');
     });
 
     it('buildEconomicEventAnalysisPrompt: stable is event-name invariant', () => {
