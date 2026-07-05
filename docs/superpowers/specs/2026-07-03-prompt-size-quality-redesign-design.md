@@ -128,8 +128,8 @@ interface AssembledPrompt {
 - **구조는 `responseSchema`만 담당**: 필드 존재·타입·enum을 프로즈로 반복하는 문장 삭제. 단 provider별 강제 수준이 다름(worker 코드 확인): Gemini `responseJsonSchema`·ChatGPT strict `json_schema`는 진짜 강제, **Claude는 `tool_choice: auto`로 유도일 뿐 강제가 아님**(`extractJsonWithRepair`가 존재하는 이유). 따라서 "SINGLE valid JSON object" 류 삭제는 **worker의 Claude 경로를 forced tool_choice로 전환한 뒤에만** 실행하고, 전환 전에는 최소 JSON 지시 1줄을 stable prefix에 잔류시킨다.
 - **프로즈 잔류분**: 스키마가 표현 못 하는 것만 — 존댓말·톤, 필드 간 의미 제약, 근거 인용 규칙. stable prefix로 이동.
 - `responseSchema`의 장황한 `description`도 압축(스키마도 입력 과금 대상).
-- **뉴스**: 기사 관련성·최신성 정렬 → 상위 K(기본 5)는 `bodyKo` 전문(기사당 상한 N자, 기본 3,000자), 나머지는 `summaryKo`만. 전문 포함 기사의 요약 중복 제거. K·N 상수 튜닝 가능, 뉴스 A/B 케이스로 검증.
-- 관련성 점수는 **결정적 규칙**으로 계획 단계에서 확정한다(임베딩 없음 — 예: 최신성 가중 + 본문 내 대상 티커 언급 빈도 + 소스 신뢰 가중). 같은 입력 → 같은 정렬이 캐시·재현성의 전제.
+- **뉴스**: ~~기사 관련성·최신성 정렬 → 상위 K(기본 5)는 `bodyKo` 전문(기사당 상한 N자, 기본 3,000자), 나머지는 `summaryKo`만.~~ → **드롭 (2026-07-05, Phase 5 구현 시 A/B 게이트 실패)**. 12기사 헤비-뉴스 스트레스 픽스처로 무제한(baseline) vs 캡(신규) 블라인드 A/B 결과 캡이 3축 모두 하락(근거성 −1.0, 실행성 −1.33, 이벤트해석깊이 −1.33; n=3 baseline 전승) — 3,000자 절단이 장문 기사 후반부의 결정 핵심 정보(재고 상각·캐파·차세대 램프 타이밍·베어 케이스)를 떨어뜨림. 실이득은 marginal(실 트래픽 뉴스는 본문이 짧아 캡 거의 미발동)이고 발동 시 품질 손실이 치명적이라 전면 드롭. `NEWS_PROMPT_TEMPLATE_VERSION` 불변(p3). **채택된 §3.5 잔여분 = 출력 프로즈 중복 제거(PART A)만** — 스키마 재진술 프로즈 삭제, 행동 규칙·최소 JSON 지시 잔류, `PROMPT_TEMPLATE_VERSION` p4→p5.
+- ~~관련성 점수는 결정적 규칙으로…~~ (뉴스 캡 드롭과 함께 무효)
 
 ### §3.6 품질 검증 하네스 + E2E 실증
 
