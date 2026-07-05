@@ -1861,6 +1861,38 @@ describe('prompt', () => {
         });
     });
 
+    describe('출력 규칙 — 최소 JSON 지시문 (spec §3.5, PR5a 제약)', () => {
+        // Worker forces the structured tool only for non-thinking models
+        // (haiku); thinking Claude (sonnet/opus) stays on `tool_choice: auto`
+        // and relies on prose + JSON repair to produce valid JSON. This one-line
+        // directive is therefore load-bearing for that path and must survive
+        // the §3.5 schema-restatement dedup even though the field-by-field
+        // enumeration prose around it was cut.
+        it('ANALYSIS_INTENT_BLOCK에 단일 JSON 객체 응답 지시문이 남아있다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain('Respond with a single JSON object');
+        });
+
+        it('## Analysis Request의 최종 요청문에도 단일 JSON 객체 응답 지시문이 남아있다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain(
+                'perform technical analysis and respond with a single JSON object'
+            );
+        });
+    });
+
     describe('candlePatterns 스키마', () => {
         it('candlePatterns 스키마 키가 프롬프트에 포함된다', () => {
             const result = buildAnalysisPrompt(
@@ -2461,7 +2493,7 @@ describe('prompt', () => {
             expect(result).toContain('- MACD Signal Guide');
         });
 
-        it('indicator_guide Writing Rules에 시그널 type을 "skill"로 사용하도록 지시한다', () => {
+        it('시그널 type을 "skill"로 강제하는 프로즈는 제거되었다 (스키마 enum이 이미 강제, §3.5 dedup)', () => {
             const skill = makeSkill({
                 type: 'indicator_guide',
                 name: 'RSI Signal Guide',
@@ -2473,9 +2505,15 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            expect(result).toContain(
+            // TECHNICAL_RESPONSE_SCHEMA's `signals[].type` is `enum: ['skill']` —
+            // a single fixed value the schema already forces, so the prose
+            // restating it was pure schema-restatement and was dropped.
+            expect(result).not.toContain(
                 'The type field of each signal entry MUST be "skill"'
             );
+            // The literal JSON entry skeleton (also pure schema-restatement) is
+            // gone too — the lead-in no longer promises an "exact format".
+            expect(result).not.toContain('in the following exact format');
         });
 
         it('indicator_guide Writing Rules에 description 필드 작성 형식 지시가 포함된다', () => {
@@ -2665,7 +2703,7 @@ describe('prompt', () => {
     });
 
     describe('분석 요청 섹션 - patternSummaries trend 규칙', () => {
-        it('detected: false일 때도 trend 필수임을 명시한다', () => {
+        it('trend 필수 프로즈는 제거되었다 (schema required가 이미 강제, §3.5 dedup)', () => {
             const skill = makeSkill({
                 type: 'pattern',
                 name: 'Head and Shoulders',
@@ -2677,12 +2715,15 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            expect(result).toContain(
+            // TECHNICAL_RESPONSE_SCHEMA's patternSummaries[] already lists
+            // `trend` in `required`, so restating "is REQUIRED ... NEVER omit"
+            // was pure schema-restatement — deleted. The behavioral bias
+            // mapping (which value to pick when not detected) stays; see the
+            // next test.
+            expect(result).not.toContain(
                 'trend field is REQUIRED for every patternSummaries entry'
             );
-            expect(result).toContain(
-                'including entries where detected is false'
-            );
+            expect(result).not.toContain('NEVER omit the trend field');
         });
 
         it('not-detected 패턴의 고유 방향 예시가 포함된다', () => {
@@ -2701,7 +2742,7 @@ describe('prompt', () => {
             expect(result).toContain('inverse head-and-shoulders → bullish');
         });
 
-        it('NEVER omit trend 지시가 포함된다', () => {
+        it('detected: false 패턴의 고유 방향 bias 매핑(behavioral rule)은 유지된다', () => {
             const skill = makeSkill({
                 type: 'pattern',
                 name: 'Head and Shoulders',
@@ -2713,7 +2754,15 @@ describe('prompt', () => {
                 makeIndicators(),
                 [skill]
             );
-            expect(result).toContain('NEVER omit the trend field');
+            // The schema cannot express WHICH trend value to assign for a
+            // not-detected pattern — that domain mapping is behavioral and
+            // stays even though the surrounding "is REQUIRED" prose was cut.
+            expect(result).toContain(
+                "set trend to the pattern's inherent directional bias"
+            );
+            expect(result).toContain(
+                'use "neutral" only when the pattern has no inherent bias'
+            );
         });
     });
 
@@ -3006,7 +3055,7 @@ describe('prompt', () => {
             expect(result).toContain('Generic Theory Strategy');
         });
 
-        it('strategyInstruction에 trend 필드 필수 + neutral fallback을 명시한다', () => {
+        it('strategyInstruction의 trend는 neutral fallback(behavioral)을 유지하고 enum 나열(schema-restatement)은 제거한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3014,11 +3063,19 @@ describe('prompt', () => {
                 makeIndicators(),
                 [strategySkill]
             );
-            expect(result).toContain('NEVER omit this field');
+            // "NEVER omit this field" restated TREND_SCHEMA's `required` — dropped.
+            expect(result).not.toContain('NEVER omit this field');
+            // "one of \"bullish\", \"bearish\", \"neutral\"" restated
+            // TREND_SCHEMA's enum verbatim — dropped.
+            expect(result).not.toContain(
+                'one of "bullish", "bearish", "neutral"'
+            );
+            // The behavioral default (schema cannot express WHICH enum value to
+            // pick when inconclusive) stays.
             expect(result).toContain('use "neutral"');
         });
 
-        it('strategyInstruction에 REQUIRED FIELDS 지시가 포함된다', () => {
+        it('strategyInstruction의 REQUIRED FIELDS 헤더(schema-restatement)는 제거되었다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3026,7 +3083,16 @@ describe('prompt', () => {
                 makeIndicators(),
                 [strategySkill]
             );
-            expect(result).toContain('REQUIRED FIELDS');
+            // strategyResults[] requires 5 fields (id, strategyName, trend,
+            // summary, confidenceWeight) in TECHNICAL_RESPONSE_SCHEMA — the
+            // "REQUIRED FIELDS (never omit any)" header only re-labelled 3 of
+            // them without adding behavioral content, so it was dropped.
+            expect(result).not.toContain('REQUIRED FIELDS');
+            // The per-field notes themselves (behavioral content) remain.
+            expect(result).toContain('Field notes:');
+            expect(result).toContain(
+                'follow the Name Field Matching rule in ## Analysis Guidelines'
+            );
         });
     });
 
