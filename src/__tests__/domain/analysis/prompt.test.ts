@@ -2493,7 +2493,7 @@ describe('prompt', () => {
             expect(result).toContain('- MACD Signal Guide');
         });
 
-        it('시그널 type을 "skill"로 강제하는 압축 shape guard가 유지된다 (PR #164 review: non-forced thinking-Claude 경로 보호)', () => {
+        it('시그널 type을 "skill"로 강제하는 압축 shape guard가 유지된다 (non-forced thinking-Claude 경로 보호)', () => {
             const skill = makeSkill({
                 type: 'indicator_guide',
                 name: 'RSI Signal Guide',
@@ -2705,7 +2705,7 @@ describe('prompt', () => {
     });
 
     describe('분석 요청 섹션 - patternSummaries trend 규칙', () => {
-        it('trend 필수 압축 shape guard가 유지된다 (PR #164 review: non-forced thinking-Claude 경로 보호)', () => {
+        it('trend 필수 압축 shape guard가 유지된다 (non-forced thinking-Claude 경로 보호)', () => {
             const skill = makeSkill({
                 type: 'pattern',
                 name: 'Head and Shoulders',
@@ -3061,7 +3061,7 @@ describe('prompt', () => {
             expect(result).toContain('Generic Theory Strategy');
         });
 
-        it('strategyInstruction의 trend는 압축 enum shape guard + neutral fallback(behavioral)을 유지한다 (PR #164 review)', () => {
+        it('strategyInstruction의 trend는 압축 enum shape guard + neutral fallback(behavioral)을 유지한다 (non-forced thinking-Claude 경로 보호)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,

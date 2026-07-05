@@ -1219,7 +1219,7 @@ const ANALYSIS_FIELD_GUIDANCE: Record<
 const ANALYSIS_INTENT_BLOCK = [
     '## Analysis Intent',
     '- Analyze the symbol below using ONLY the provided data. Do not fabricate prices, indicators, or patterns.',
-    '- Respond with a single JSON object. Its structure (field names, types, enums, nesting) is enforced by the response schema, so you do not need to restate it. For the fields listed under ## Field Content Guidance, follow the guidance there.',
+    '- Respond with a single JSON object. The response schema defines its structure (field names, types, enums, nesting) — follow it. A few critical field and enum requirements are additionally restated explicitly below; those MUST be honored regardless. For the fields listed under ## Field Content Guidance, follow the guidance there.',
 ].join('\n');
 
 // "provided above" — the Analysis Request preamble (this preface included)
@@ -1409,7 +1409,7 @@ const buildAnalysisRequest = (
                   '- **Do not include any patterns not listed below in patternSummaries.**',
                   '- **Do not include candle patterns (single/multi candle) in patternSummaries.** Candle patterns belong only in candlePatterns.',
                   '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match one of the pattern skill names from the list below.',
-                  // Schema §3.5 dedup (PR #164 review): the response schema's `required`
+                  // Schema §3.5 dedup: the response schema's `required`
                   // list only API-enforces this for the forced-tool providers
                   // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
                   // tool_choice: auto) is not schema-enforced and extractJsonWithRepair
@@ -1442,7 +1442,7 @@ const buildAnalysisRequest = (
                   '- The summary field must use the structured markdown format with **label**: value lines.',
                   '- Put each **label**: value item on its own line. When moving from status/inputs to interpretation/trading implication, insert \\n\\n.',
                   '- Never return strategyResults[].summary as one sentence containing many "**label**:" fragments separated only by periods.',
-                  // Schema §3.5 dedup (PR #164 review): the verbose "REQUIRED FIELDS
+                  // Schema §3.5 dedup: the verbose "REQUIRED FIELDS
                   // (never omit any)" header is dropped as pure scaffolding, but the
                   // trend enum/never-omit clause is kept — TREND_SCHEMA's enum is only
                   // API-enforced for forced-tool providers, not the thinking-Claude
@@ -1465,7 +1465,7 @@ const buildAnalysisRequest = (
                   '### indicatorResults Writing Rules for Indicator Guides',
                   '- Use the Indicator Signal Guides above to interpret the current indicator values in ## Indicator Values.',
                   '- For each indicator guide, evaluate whether the current values meet any signal condition described in its Signal Interpretation section.',
-                  // Schema §3.5 dedup (PR #164 review): the literal JSON entry skeleton
+                  // Schema §3.5 dedup: the literal JSON entry skeleton
                   // stays dropped — it only restated field names/nesting/types that
                   // TECHNICAL_RESPONSE_SCHEMA already fully specifies. The `type` enum
                   // rule is restored below (compact form): `enum: ['skill']` is only
