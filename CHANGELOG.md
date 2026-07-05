@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1](https://github.com/y0ngha/siglens-core/compare/v0.32.0...v0.32.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* **analysis:** retain compact field-shape guards for non-forced Claude path (PR review) ([53d9219](https://github.com/y0ngha/siglens-core/commit/53d921942a719af4df1ed7a2ec217c604e355ff2))
+
 # [0.32.0](https://github.com/y0ngha/siglens-core/compare/v0.31.0...v0.32.0) (2026-07-05)
 
 
