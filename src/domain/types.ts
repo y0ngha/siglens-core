@@ -1965,11 +1965,15 @@ export interface DeepSeekModelSpec extends BaseModelSpec {
     provider: 'deepseek';
     /**
      * Whether DeepSeek reasoning ("thinking") mode is enabled for this model.
-     * `true` maps to `thinking: { type: 'enabled' }` in the request; `false`
-     * maps to `thinking: { type: 'disabled' }`.
+     * `true` maps to `thinking: { type: 'enabled', reasoning_effort: 'high' }`
+     * in the request; `false` maps to `thinking: { type: 'disabled' }`.
      */
     thinking: boolean;
-    /** Sampling temperature (applied by the SDK caller in non-thinking mode). */
+    /**
+     * Sampling temperature. The SDK caller applies it ONLY in non-thinking mode
+     * (`thinking === false`); DeepSeek ignores temperature when reasoning is
+     * enabled, so callers must gate on {@link DeepSeekModelSpec.thinking}.
+     */
     temperature: number;
     /** DeepSeek uses the `thinking` toggle instead of a reasoning effort level. */
     effort?: undefined;
@@ -2010,10 +2014,16 @@ export function isReasoningModelSpec(
 
 /**
  * Narrows a `ModelSpec` to the sampling variants (`ClaudeSamplingModelSpec |
- * GeminiModelSpec | DeepSeekModelSpec`). Use this guard whenever you need to
- * read `spec.temperature` safely — every sampling variant carries a numeric
- * `temperature` field. (`thinkingBudget` is only present on the Claude/Gemini
- * sampling variants; DeepSeek narrows further via {@link isDeepSeekModel}.)
+ * GeminiModelSpec | DeepSeekModelSpec`). Every sampling variant carries a
+ * numeric `temperature` field, but this guard does NOT mean "temperature is
+ * always applied": it only partitions specs by `effort === undefined`.
+ *
+ * ⚠️ DeepSeek caveat: `deepseek-v4-pro` is a *thinking* model yet classifies as
+ * sampling here (it has no `effort`). DeepSeek ignores `temperature` when
+ * reasoning is enabled, so a caller that reads `spec.temperature` after this
+ * guard MUST additionally gate on `spec.provider === 'deepseek' && spec.thinking`
+ * (or narrow via {@link isDeepSeekModel}) before applying it. `thinkingBudget`
+ * is only present on the Claude/Gemini sampling variants.
  *
  * @param spec - The model spec to narrow.
  * @returns `true` when `spec` is a `ClaudeSamplingModelSpec`, `GeminiModelSpec`,
