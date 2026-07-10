@@ -5,6 +5,8 @@ export const GEMINI_2_5_FLASH_MODEL = 'gemini-2.5-flash';
 export const GEMINI_2_5_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 /** @internal Gemini 2.5 Pro premium model identifier (test fixture for premium-tier chat scenarios). */
 export const GEMINI_2_5_PRO_MODEL = 'gemini-2.5-pro';
+export const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
+export const DEEPSEEK_V4_PRO_MODEL = 'deepseek-v4-pro';
 
 /**
  * All valid chat models, derived from the default tier configuration at module

@@ -4,11 +4,13 @@ import {
     getThinkingBudgetSequence,
     isChatGPTModel,
     isClaudeModel,
+    isDeepSeekModel,
     isGeminiModel,
     MODEL_SPECS,
     THINKING_BUDGET_FALLBACK_STEPS,
     type ChatGPTModelId,
     type ClaudeModelId,
+    type DeepSeekModelId,
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
 import {
@@ -39,6 +41,8 @@ describe('MODEL_SPECS', () => {
             'gpt-5-mini',
             'gpt-5.4',
             'gpt-5.5',
+            'deepseek-v4-flash',
+            'deepseek-v4-pro',
         ];
         expect(Object.keys(MODEL_SPECS).toSorted()).toEqual(
             [...expected].toSorted()
@@ -47,7 +51,11 @@ describe('MODEL_SPECS', () => {
 
     it('uses temperature only for providers that support sampling temperature', () => {
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
-            if (spec.provider === 'gemini' || model === 'claude-haiku-4-5') {
+            if (
+                spec.provider === 'gemini' ||
+                spec.provider === 'deepseek' ||
+                model === 'claude-haiku-4-5'
+            ) {
                 expect('temperature' in spec, model).toBe(true);
                 if ('temperature' in spec) {
                     expect(spec.temperature, model).toBe(0);
@@ -135,6 +143,11 @@ describe('getProvider', () => {
         expect(getProvider('gpt-5-mini')).toBe('chatgpt');
         expect(getProvider('gpt-5.5')).toBe('chatgpt');
     });
+
+    it('routes DeepSeek models to the deepseek provider', () => {
+        expect(getProvider('deepseek-v4-flash')).toBe('deepseek');
+        expect(getProvider('deepseek-v4-pro')).toBe('deepseek');
+    });
 });
 
 describe('provider type guards', () => {
@@ -154,6 +167,14 @@ describe('provider type guards', () => {
         expect(isChatGPTModel('gpt-5.5')).toBe(true);
         expect(isChatGPTModel('claude-sonnet-4-6')).toBe(false);
         expect(isChatGPTModel('gemini-3-flash-preview')).toBe(false);
+    });
+
+    it('isDeepSeekModel matches only DeepSeek entries', () => {
+        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
+        expect(isDeepSeekModel('deepseek-v4-pro')).toBe(true);
+        expect(isDeepSeekModel('claude-sonnet-4-6')).toBe(false);
+        expect(isDeepSeekModel('gemini-3-flash-preview')).toBe(false);
+        expect(isDeepSeekModel('gpt-5.5')).toBe(false);
     });
 
     it('isClaudeModel narrows ActiveModelId to ClaudeModelId at the type level', () => {
@@ -185,6 +206,16 @@ describe('provider type guards', () => {
             expect(MODEL_SPECS[narrowed].provider).toBe('chatgpt');
         } else {
             throw new Error('expected gpt-5.5 to narrow to ChatGPT');
+        }
+    });
+
+    it('isDeepSeekModel narrows ActiveModelId to DeepSeekModelId at the type level', () => {
+        const model = 'deepseek-v4-flash' as ActiveModelId;
+        if (isDeepSeekModel(model)) {
+            const narrowed: DeepSeekModelId = model;
+            expect(MODEL_SPECS[narrowed].provider).toBe('deepseek');
+        } else {
+            throw new Error('expected deepseek-v4-flash to narrow to DeepSeek');
         }
     });
 });

@@ -47,6 +47,8 @@ const FREE_MODELS: readonly TierModel[] = [
     'gemini-2.5-flash-lite',
     'claude-haiku-4-5',
     'gpt-5-mini',
+    'deepseek-v4-flash',
+    'deepseek-v4-pro',
 ];
 const MEMBER_MODELS: readonly TierModel[] = [
     ...FREE_MODELS,

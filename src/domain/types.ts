@@ -1871,7 +1871,7 @@ export type TierInfoDepth =
     | 'confidence';
 
 /** AI provider that hosts a model. */
-export type AIProvider = 'claude' | 'gemini' | 'chatgpt';
+export type AIProvider = 'claude' | 'gemini' | 'chatgpt' | 'deepseek';
 
 /** Effort level shared by Claude adaptive thinking and ChatGPT reasoning. */
 export type EffortLevel = 'low' | 'medium' | 'high';
@@ -1953,6 +1953,31 @@ export interface ChatGPTModelSpec extends BaseModelSpec {
 }
 
 /**
+ * DeepSeek V4 model on the OpenAI-compatible chat/completions API.
+ *
+ * DeepSeek V4 models toggle reasoning via a `thinking` switch rather than a
+ * numeric budget or an effort level, so the boolean {@link DeepSeekModelSpec.thinking}
+ * flag drives the SDK request. Both thinking and non-thinking modes accept a
+ * sampling `temperature`; the SDK caller applies it in non-thinking mode.
+ */
+export interface DeepSeekModelSpec extends BaseModelSpec {
+    /** Provider that hosts the model (drives SDK selection). */
+    provider: 'deepseek';
+    /**
+     * Whether DeepSeek reasoning ("thinking") mode is enabled for this model.
+     * `true` maps to `thinking: { type: 'enabled' }` in the request; `false`
+     * maps to `thinking: { type: 'disabled' }`.
+     */
+    thinking: boolean;
+    /** Sampling temperature (applied by the SDK caller in non-thinking mode). */
+    temperature: number;
+    /** DeepSeek uses the `thinking` toggle instead of a reasoning effort level. */
+    effort?: undefined;
+    /** DeepSeek does not use Gemini-style numeric thinking budgets. */
+    thinkingBudget?: undefined;
+}
+
+/**
  * Per-model SDK call parameters.
  *
  * Single source of truth for everything an AI SDK caller (workers, server
@@ -1965,7 +1990,8 @@ export type ModelSpec =
     | ClaudeSamplingModelSpec
     | ClaudeReasoningModelSpec
     | GeminiModelSpec
-    | ChatGPTModelSpec;
+    | ChatGPTModelSpec
+    | DeepSeekModelSpec;
 
 /**
  * Narrows a `ModelSpec` to the reasoning variants (`ClaudeReasoningModelSpec |
@@ -1984,16 +2010,18 @@ export function isReasoningModelSpec(
 
 /**
  * Narrows a `ModelSpec` to the sampling variants (`ClaudeSamplingModelSpec |
- * GeminiModelSpec`). Use this guard whenever you need to read
- * `spec.temperature` or `spec.thinkingBudget` safely — both variants carry a
- * numeric `temperature` field and an explicit `thinkingBudget`.
+ * GeminiModelSpec | DeepSeekModelSpec`). Use this guard whenever you need to
+ * read `spec.temperature` safely — every sampling variant carries a numeric
+ * `temperature` field. (`thinkingBudget` is only present on the Claude/Gemini
+ * sampling variants; DeepSeek narrows further via {@link isDeepSeekModel}.)
  *
  * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeSamplingModelSpec` or `GeminiModelSpec`.
+ * @returns `true` when `spec` is a `ClaudeSamplingModelSpec`, `GeminiModelSpec`,
+ *   or `DeepSeekModelSpec`.
  */
 export function isSamplingModelSpec(
     spec: ModelSpec
-): spec is ClaudeSamplingModelSpec | GeminiModelSpec {
+): spec is ClaudeSamplingModelSpec | GeminiModelSpec | DeepSeekModelSpec {
     return spec.effort === undefined;
 }
 
@@ -2042,6 +2070,8 @@ export type TierModel =
     | 'gpt-5-mini'
     | 'gpt-5.4'
     | 'gpt-5.5'
+    | 'deepseek-v4-flash'
+    | 'deepseek-v4-pro'
     /** @deprecated Use `claude-sonnet-4-6` instead. Will be removed in the next major version. */
     | 'claude-sonnet-4'
     /** @deprecated Use `claude-opus-4-7` instead. Will be removed in the next major version. */
@@ -2241,7 +2271,7 @@ export type WaitUntil = (promise: Promise<unknown>) => void;
 // ─── LLM ──────────────────────────────────────────────────────────────────────
 
 /** Canonical API key provider identifier. Single source of truth for key storage routing. */
-export type LlmProvider = 'anthropic' | 'google' | 'openai';
+export type LlmProvider = 'anthropic' | 'google' | 'openai' | 'deepseek';
 
 // ─────────────────────────────────────────
 // Fundamental analysis

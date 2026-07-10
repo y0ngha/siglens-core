@@ -152,7 +152,7 @@ export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
  * sends it on the dispatch body; it is also folded into the briefing cache key
  * so a model change misses the old cache.
  */
-export const BRIEFING_MODEL_ID = 'gemini-2.5-flash-lite' as const;
+export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
 
 /**
  * Prompt-template version folded into the technical and fundamental analysis

@@ -10,6 +10,7 @@ const AI_PROVIDER_TO_LLM_PROVIDER: Record<AIProvider, LlmProvider> = {
     claude: 'anthropic',
     gemini: 'google',
     chatgpt: 'openai',
+    deepseek: 'deepseek',
 };
 
 /**
@@ -52,7 +53,10 @@ export function getProviderForModel(modelId: ModelId): LlmProvider {
     if (modelId.startsWith('gpt-')) {
         return 'openai';
     }
+    if (modelId.startsWith('deepseek-')) {
+        return 'deepseek';
+    }
     throw new Error(
-        `getProviderForModel: unknown modelId "${modelId}" — not present in MODEL_SPECS and prefix is not one of "claude-", "gemini-", "gpt-".`
+        `getProviderForModel: unknown modelId "${modelId}" — not present in MODEL_SPECS and prefix is not one of "claude-", "gemini-", "gpt-", "deepseek-".`
     );
 }
