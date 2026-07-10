@@ -21,6 +21,7 @@ const DEFAULT_TEMPERATURE = 0 as const;
  * - Claude sonnet/opus: adaptive thinking (`effort`), `budget_tokens`/temperature 미사용.
  * - Gemini: `thinkingBudget` 그대로 사용.
  * - GPT-5 series: `effort`로 Responses API `reasoning.effort` 지정, temperature 미지원.
+ * - DeepSeek V4: `thinking` boolean 토글(reasoning on/off), non-thinking 시 temperature 사용.
  */
 export const MODEL_SPECS = {
     'claude-haiku-4-5': {
@@ -155,7 +156,7 @@ export function getThinkingBudgetSequence(initial: number): readonly number[] {
  * Resolve the hosting provider for an active model identifier.
  *
  * Returns the internal {@link AIProvider} taxonomy (`'claude' | 'gemini' |
- * 'chatgpt'`) used by `MODEL_SPECS`. Use this when you need the human-facing
+ * 'chatgpt' | 'deepseek'`) used by `MODEL_SPECS`. Use this when you need the human-facing
  * provider family for an `ActiveModelId` that is guaranteed to exist in
  * `MODEL_SPECS` (e.g. UI labels, model selection screens).
  *

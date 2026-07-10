@@ -17,19 +17,20 @@ const AI_PROVIDER_TO_LLM_PROVIDER: Record<AIProvider, LlmProvider> = {
  * Resolve the LLM key-storage provider for any model identifier.
  *
  * Returns the SDK / key-storage provider taxonomy (`'anthropic' | 'google' |
- * 'openai'`) used by the LLM SDKs. Accepts the broader {@link ModelId} input
- * domain (including deprecated aliases not present in `MODEL_SPECS`).
+ * 'openai' | 'deepseek'`) used by the LLM SDKs. Accepts the broader
+ * {@link ModelId} input domain (including deprecated aliases not present in
+ * `MODEL_SPECS`).
  *
  * For the internal `MODEL_SPECS` provider taxonomy (`'claude' | 'gemini' |
- * 'chatgpt'`) limited to `ActiveModelId`, use `getProvider` from
+ * 'chatgpt' | 'deepseek'`) limited to `ActiveModelId`, use `getProvider` from
  * `domain/analysis/modelSpecs` instead. The two functions intentionally cover
  * different layers and accept different input domains; neither is a drop-in
  * replacement for the other.
  *
  * @param modelId - Any {@link ModelId}, including deprecated aliases whose
- *   prefix (`claude-`, `gemini-`, `gpt-`) is still recognized.
+ *   prefix (`claude-`, `gemini-`, `gpt-`, `deepseek-`) is still recognized.
  * @returns The {@link LlmProvider} that hosts the given model
- *   (`'anthropic'`, `'google'`, or `'openai'`).
+ *   (`'anthropic'`, `'google'`, `'openai'`, or `'deepseek'`).
  * @throws {Error} When `modelId` is not present in `MODEL_SPECS` and its
  *   prefix is not one of the recognized deprecated families. Previously
  *   such inputs silently fell through to `'openai'`, which masked typos
