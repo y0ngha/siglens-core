@@ -330,6 +330,15 @@ describe('isReasoningModelSpec', () => {
         expect(isReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(false);
     });
 
+    it('returns false for BOTH DeepSeek models — even the thinking `deepseek-v4-pro`, which toggles reasoning via `thinking` and has no `effort`', () => {
+        expect(isReasoningModelSpec(MODEL_SPECS['deepseek-v4-flash'])).toBe(
+            false
+        );
+        expect(isReasoningModelSpec(MODEL_SPECS['deepseek-v4-pro'])).toBe(
+            false
+        );
+    });
+
     it('narrows the type to ClaudeReasoningModelSpec | ChatGPTModelSpec and exposes effort as EffortLevel', () => {
         const spec: ModelSpec = MODEL_SPECS['claude-opus-4-7'];
         if (isReasoningModelSpec(spec)) {
@@ -366,6 +375,13 @@ describe('isSamplingModelSpec', () => {
 
     it('returns false for ChatGPT models', () => {
         expect(isSamplingModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(false);
+    });
+
+    it('returns true for BOTH DeepSeek models — INCLUDING the thinking `deepseek-v4-pro` (footgun: it has no `effort` so it classifies as sampling; callers MUST gate `temperature` on `spec.thinking`, not on this guard)', () => {
+        expect(isSamplingModelSpec(MODEL_SPECS['deepseek-v4-flash'])).toBe(
+            true
+        );
+        expect(isSamplingModelSpec(MODEL_SPECS['deepseek-v4-pro'])).toBe(true);
     });
 
     it('narrows the type to ClaudeSamplingModelSpec | GeminiModelSpec and exposes temperature as number', () => {
