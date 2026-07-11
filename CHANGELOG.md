@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.33.0](https://github.com/y0ngha/siglens-core/compare/v0.32.1...v0.33.0) (2026-07-11)
+
+
+### Features
+
+* add DeepSeek V4 provider and make it the default ([de841fe](https://github.com/y0ngha/siglens-core/commit/de841fe098cac4b30a11a67ba3bd0a3835fdd44b))
+
 ## [0.32.1](https://github.com/y0ngha/siglens-core/compare/v0.32.0...v0.32.1) (2026-07-05)
 
 
