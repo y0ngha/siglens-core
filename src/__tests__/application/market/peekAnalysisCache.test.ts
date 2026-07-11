@@ -90,6 +90,48 @@ describe('peekAnalysisCache 함수는', () => {
         );
     });
 
+    it('reasoning=true이면 :reason=on suffix가 붙은 키로 읽는다 (member-reasoning-toggle spec)', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-2.5-flash',
+            true
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-2.5-flash',
+                EMPTY_CATALOG_FP,
+                true
+            )
+        );
+    });
+
+    it('reasoning 미지정 시 기존 키(reasoning-off)와 동일한 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-2.5-flash'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-2.5-flash',
+                EMPTY_CATALOG_FP
+            )
+        );
+    });
+
     it('modelId 미지정 시 DEFAULT_ANALYSIS_MODEL_ID 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 

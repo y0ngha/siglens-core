@@ -475,6 +475,63 @@ describe('resolveOverallDependencies 함수는', () => {
             );
         });
 
+        it('top-level reasoning:true가 submitAnalysis(technical)에 전달된다 (member-reasoning-toggle spec Part A)', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(makeInputs({ reasoning: true }));
+
+            expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                expect.any(String),
+                false,
+                undefined,
+                expect.objectContaining({ reasoning: true })
+            );
+        });
+
+        it('technical.reasoning 축 override가 top-level reasoning보다 우선한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({
+                    reasoning: true,
+                    technical: { reasoning: false },
+                })
+            );
+
+            expect(mockSubmitAnalysis).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                expect.any(String),
+                false,
+                undefined,
+                expect.objectContaining({ reasoning: false })
+            );
+        });
+
         it('submitFundamentalAnalysis 에 symbol 과 modelId 가 올바르게 전달된다', async () => {
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'cached',
@@ -498,6 +555,27 @@ describe('resolveOverallDependencies 함수는', () => {
                     symbol: 'NVDA',
                     modelId: 'claude-sonnet-4-6',
                 })
+            );
+        });
+
+        it('top-level reasoning:true가 submitFundamentalAnalysis에 전달된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(makeInputs({ reasoning: true }));
+
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: true })
             );
         });
 
@@ -557,6 +635,27 @@ describe('resolveOverallDependencies 함수는', () => {
 
             expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
                 expect.objectContaining({ companyName: 'NVIDIA Corporation' })
+            );
+        });
+
+        it('top-level reasoning:true가 submitNewsAnalysis에 전달된다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(makeInputs({ reasoning: true }));
+
+            expect(mockSubmitNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: true })
             );
         });
 
@@ -1055,6 +1154,26 @@ describe('resolveOverallDependencies 함수는', () => {
                 status: 'cached',
                 result: cachedNews,
             });
+        });
+
+        it('top-level reasoning:true가 submitOptionsAnalysis에 전달된다', async () => {
+            mockSubmitOptionsAnalysis.mockResolvedValueOnce({
+                status: 'cached',
+                result: {
+                    summary: 'Options summary',
+                    perExpiration: [],
+                    signals: [],
+                    analyzedAt: '2099-01-01T00:00:00Z',
+                },
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({ optionsSnapshot: makeSnapshot(), reasoning: true })
+            );
+
+            expect(mockSubmitOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: true })
+            );
         });
 
         it('returns options: null when optionsSnapshot is undefined', async () => {

@@ -60,4 +60,15 @@ export interface JobMeta {
      * `isOpenInterestSnapshotStale + isUsOptionsRegularSession`.
      */
     optionsOiStale?: boolean;
+    /**
+     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * Stored at submit time so the poll step can rebuild the exact write-time
+     * cache key: `pollAnalysis` folds it back into {@link buildAnalysisCacheKey}
+     * (technical jobs recompute their key rather than storing a precomputed
+     * one), and `pollOverallAnalysis` folds it into the content-free
+     * `buildOverallPeekCacheKey` "latest" pointer. Other job types precompute
+     * `cacheKey` above (which already bakes reasoning in at submit time), so
+     * they don't need to read this field back.
+     */
+    reasoning?: boolean;
 }

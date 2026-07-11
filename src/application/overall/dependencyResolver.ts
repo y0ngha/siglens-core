@@ -175,6 +175,10 @@ export async function resolveOverallDependencies(
     const topLevelTier = inputs.tier;
     const topLevelUserApiKey = inputs.userApiKey;
     const topLevelSkipEnqueueIfMiss = inputs.skipEnqueueIfMiss;
+    // Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+    // Propagated to every axis the same way `modelId`/`userApiKey` are —
+    // axis-level `reasoning` (if set on the per-axis options) wins.
+    const topLevelReasoning = inputs.reasoning;
 
     // ── Strip per-axis `usage` when called from submitOverallAnalysis ──
     // Triple-counting prevention: if the caller forwards `usage` here, three
@@ -224,6 +228,7 @@ export async function resolveOverallDependencies(
                   expirationDate: optionsExpirationDate,
                   tier: topLevelTier ?? DEFAULT_TIER,
                   userApiKey: topLevelUserApiKey,
+                  reasoning: topLevelReasoning,
                   ...optionsAxisOptionsResolved,
                   skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                   force: effectiveAxisForce,
@@ -262,6 +267,7 @@ export async function resolveOverallDependencies(
               // Top-level fallbacks: axis-level values win because the spread comes last.
               tier: topLevelTier ?? DEFAULT_TIER,
               userApiKey: topLevelUserApiKey,
+              reasoning: topLevelReasoning,
               ...fundamentalAxisOptions,
               skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
               force: effectiveAxisForce,
@@ -281,6 +287,8 @@ export async function resolveOverallDependencies(
                     modelId: technicalAxisOptions.modelId ?? modelId,
                     userApiKey:
                         technicalAxisOptions.userApiKey ?? topLevelUserApiKey,
+                    reasoning:
+                        technicalAxisOptions.reasoning ?? topLevelReasoning,
                     tierContext:
                         technicalAxisOptions.tierContext ??
                         (topLevelTier !== undefined
@@ -299,6 +307,7 @@ export async function resolveOverallDependencies(
                 // Top-level fallbacks: axis-level values win because the spread comes last.
                 tier: topLevelTier ?? DEFAULT_TIER,
                 userApiKey: topLevelUserApiKey,
+                reasoning: topLevelReasoning,
                 ...newsAxisOptions,
                 skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                 force: effectiveAxisForce,

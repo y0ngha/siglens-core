@@ -88,6 +88,26 @@ describe('peekOverallAnalysisCache 함수는', () => {
         expect(result).toBeNull();
     });
 
+    it('reasoning=true이면 :reason=on peek 키로 읽는다 (member-reasoning-toggle spec)', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedOverall);
+
+        await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL, true);
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildOverallPeekCacheKey(SYMBOL, TIMEFRAME, MODEL, true)
+        );
+    });
+
+    it('reasoning 미지정 시 기존 peek 키(reasoning-off)와 동일한 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedOverall);
+
+        await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL);
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildOverallPeekCacheKey(SYMBOL, TIMEFRAME, MODEL)
+        );
+    });
+
     it('modelId 미지정 시 null을 반환한다 (읽기 시도 없음)', async () => {
         const result = await peekOverallAnalysisCache(
             SYMBOL,

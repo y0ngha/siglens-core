@@ -75,6 +75,14 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
      * the same re-analyze lever.
      */
     force?: boolean;
+    /**
+     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * `true` requests the model's default/spec reasoning depth; `false` or
+     * omitted requests the provider-minimized setting — the pre-toggle
+     * default. Folded into the cache key so ON and OFF results never
+     * collide; forwarded to the worker `/analyze` body only when `true`.
+     */
+    reasoning?: boolean;
 }
 
 /**

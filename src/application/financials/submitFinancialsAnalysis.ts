@@ -173,7 +173,8 @@ export async function submitFinancialsAnalysis(
         symbol,
         modelId,
         period,
-        hashSkillCatalog(fingerprintSkills)
+        hashSkillCatalog(fingerprintSkills),
+        options.reasoning
     );
     const cache = createCacheProvider();
 
@@ -256,6 +257,7 @@ export async function submitFinancialsAnalysis(
             analysisType: 'financials' satisfies AnalysisType,
             system,
             responseSchema: FINANCIALS_RESPONSE_SCHEMA,
+            ...(options.reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_FINANCIALS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

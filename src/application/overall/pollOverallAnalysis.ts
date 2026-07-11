@@ -143,10 +143,14 @@ export async function pollOverallAnalysis(
             );
 
             if (meta.symbol && meta.timeframe && meta.modelId) {
+                // Fold `meta.reasoning` (member-reasoning-toggle spec, Part A) —
+                // stored at submit time — so the "latest" peek pointer stays
+                // scoped per reasoning ON/OFF, matching the canonical write above.
                 const peekKey = buildOverallPeekCacheKey(
                     meta.symbol,
                     meta.timeframe,
-                    meta.modelId
+                    meta.modelId,
+                    meta.reasoning
                 );
                 fireAndForget(
                     cache

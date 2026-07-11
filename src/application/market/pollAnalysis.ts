@@ -139,12 +139,16 @@ export async function pollAnalysis(
                 // `skills` (the load that fed enrichAnalysisWithConfidence above)
                 // rather than calling the shared getSkillCatalogFingerprint
                 // helper, so the cached fingerprint always matches the catalog
-                // actually used to produce this result.
+                // actually used to produce this result. Also folds `meta.reasoning`
+                // (member-reasoning-toggle spec, Part A) — stored at submit time —
+                // so this write lands under the exact ON/OFF key `submitAnalysis`
+                // will read on the next request.
                 const cacheKey = buildAnalysisCacheKey(
                     meta.symbol,
                     meta.timeframe,
                     meta.modelId,
-                    hashSkillCatalog(skills)
+                    hashSkillCatalog(skills),
+                    meta.reasoning
                 );
                 const ttl = computeEffectiveTtl(meta.timeframe, now);
                 fireAndForget(

@@ -219,7 +219,8 @@ export async function submitFundamentalAnalysis(
     const cacheKey = buildFundamentalCacheKey(
         symbol,
         modelId,
-        hashSkillCatalog(fingerprintSkills)
+        hashSkillCatalog(fingerprintSkills),
+        options.reasoning
     );
     const cache = createCacheProvider();
 
@@ -299,6 +300,7 @@ export async function submitFundamentalAnalysis(
             analysisType: 'fundamental' satisfies AnalysisType,
             system,
             responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
+            ...(options.reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

@@ -800,6 +800,97 @@ describe('submitAnalysis 함수는', () => {
         });
     });
 
+    describe('reasoning 토글이 적용될 때 (member-reasoning-toggle spec Part A)', () => {
+        it('reasoning: true이면 Worker body에 reasoning: true를 포함하고 :reason=on 캐시 키로 조회한다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, reasoning: true }
+            );
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}:reason=on`
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBe(true);
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ reasoning: true })
+            );
+        });
+
+        it('reasoning을 생략하면 Worker body에 reasoning 필드가 없고 기존 캐시 키와 동일하다 (하위 호환)', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBeUndefined();
+        });
+
+        it('reasoning: false이면 Worker body에 reasoning 필드가 없다 (off는 keyless와 동일 취급)', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, reasoning: false }
+            );
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBeUndefined();
+        });
+
+        it('reasoning: true 캐시 히트 시 cached 상태를 반환한다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, reasoning: true }
+            );
+
+            expect(result.status).toBe('cached');
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}:reason=on`
+            );
+        });
+    });
+
     describe('fmpSymbol이 제공될 때', () => {
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);

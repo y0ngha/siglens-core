@@ -404,6 +404,79 @@ describe('submitOverallAnalysis 함수는', () => {
         });
     });
 
+    describe('reasoning 토글이 적용될 때 (member-reasoning-toggle spec Part A)', () => {
+        beforeEach(() => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'cached',
+                technical: cachedTechnical,
+                fundamental: cachedFundamental,
+                news: cachedNews,
+            });
+            mockCacheGet.mockResolvedValue(null);
+        });
+
+        it('reasoning: true이면 :reason=on 캐시 키로 조회하고 Worker body에 reasoning: true를 포함한다', async () => {
+            await submitOverallAnalysis(makeOptions({ reasoning: true }));
+
+            const onKey = mockCacheGet.mock.calls[0]?.[0] as string;
+            expect(onKey.endsWith(':reason=on')).toBe(true);
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBe(true);
+            expect(mockSetJobMeta).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ reasoning: true })
+            );
+        });
+
+        it('reasoning을 생략하면 기존 캐시 키와 동일하고 Worker body에 reasoning 필드가 없다 (하위 호환)', async () => {
+            await submitOverallAnalysis(makeOptions());
+            const offKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            mockCacheGet.mockClear();
+            mockFetch.mockClear();
+            await submitOverallAnalysis(makeOptions({ reasoning: true }));
+            const onKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            expect(onKey).not.toBe(offKey);
+            expect(onKey).toBe(`${offKey}:reason=on`);
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            // This call used reasoning:true, so body carries it — verifying
+            // the OFF call (previous `makeOptions()`) is the counterfactual:
+            expect(body.reasoning).toBe(true);
+        });
+
+        it('reasoning: false는 Worker body에 reasoning 필드가 없고 off 키와 동일하다', async () => {
+            await submitOverallAnalysis(makeOptions());
+            const legacyKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            mockCacheGet.mockClear();
+            mockFetch.mockClear();
+            await submitOverallAnalysis(makeOptions({ reasoning: false }));
+            const falseKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            expect(falseKey).toBe(legacyKey);
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBeUndefined();
+        });
+
+        it('reasoning을 resolveOverallDependencies 입력에 전달한다 (전 축 일괄 적용)', async () => {
+            await submitOverallAnalysis(makeOptions({ reasoning: true }));
+
+            expect(mockResolveOverallDependencies).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: true }),
+                expect.anything()
+            );
+        });
+    });
+
     describe('overall 캐시 키 안정성 (휘발성 필드 무시)', () => {
         it('technical.analyzedAt 만 다르면 동일한 캐시 키로 조회된다', async () => {
             // ── First call: technical has an analyzedAt timestamp ──

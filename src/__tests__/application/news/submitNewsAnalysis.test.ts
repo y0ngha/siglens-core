@@ -233,6 +233,53 @@ describe('submitNewsAnalysis 함수는', () => {
         });
     });
 
+    describe('reasoning 토글이 적용될 때 (member-reasoning-toggle spec Part A)', () => {
+        it('reasoning: true이면 :reason=on 캐시 키로 조회하고 Worker body에 reasoning: true를 포함한다', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+            });
+            const offKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            mockCacheGet.mockClear();
+            mockFetch.mockClear();
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                reasoning: true,
+            });
+            const onKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            expect(onKey).toBe(`${offKey}:reason=on`);
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBe(true);
+        });
+
+        it('reasoning을 생략하면 Worker body에 reasoning 필드가 없다 (하위 호환)', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+            });
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBeUndefined();
+        });
+    });
+
     describe('캐시 히트일 때', () => {
         it('cached 상태와 함께 결과를 반환한다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockCachedResult);

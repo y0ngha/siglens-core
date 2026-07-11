@@ -147,6 +147,21 @@ export function computeBarsEffectiveTtl(
 export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
+ * @internal Cache-key suffix for the per-request reasoning ("deep-thinking")
+ * toggle (member-reasoning-toggle spec, Part A). Reasoning ON and OFF produce
+ * materially different LLM output for the same inputs, so the two must never
+ * share a cache entry — but OFF must stay indistinguishable from the
+ * pre-toggle keyless behavior so existing cached entries and SSR peeks that
+ * omit `reasoning` keep hitting the same key. Only `true` appends a suffix;
+ * `false` and `undefined` are treated identically (no suffix), matching the
+ * existing `skillFingerprint`-style "append only when supplied" convention
+ * used throughout this file.
+ */
+function reasoningKeySuffix(reasoning?: boolean): string {
+    return reasoning === true ? ':reason=on' : '';
+}
+
+/**
  * @internal
  * Fixed model identifier for the market briefing. Core owns this choice and
  * sends it on the dispatch body; it is also folded into the briefing cache key
@@ -254,6 +269,10 @@ export const PROMPT_TEMPLATE_VERSION = 'p5' as const;
  *   so existing callers that do not pass a model remain backward-compatible.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix so reasoning
+ *   ON never collides with the OFF result; `false`/`undefined` produce the
+ *   exact same key as omitting the parameter entirely (backward compatible).
  * @returns The cache key.
  *
  * @example
@@ -262,18 +281,21 @@ export const PROMPT_TEMPLATE_VERSION = 'p5' as const;
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1'
  * const keyed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2');
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2'
+ * const reasoned = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true);
+ * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on'
  * ```
  */
 export function buildAnalysisCacheKey(
     symbol: string,
     timeframe: Timeframe,
     modelId = DEFAULT_ANALYSIS_MODEL_ID,
-    skillFingerprint?: string
+    skillFingerprint?: string,
+    reasoning?: boolean
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
-    return skillFingerprint !== undefined
-        ? `${base}:${skillFingerprint}`
-        : base;
+    const withFingerprint =
+        skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -456,17 +478,21 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param modelId - LLM model identifier.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ *   `undefined` produce the exact same key as omitting the parameter.
  * @returns The cache key.
  */
 export function buildFundamentalCacheKey(
     symbol: string,
     modelId: string,
-    skillFingerprint?: string
+    skillFingerprint?: string,
+    reasoning?: boolean
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
-    return skillFingerprint !== undefined
-        ? `${base}:${skillFingerprint}`
-        : base;
+    const withFingerprint =
+        skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -525,6 +551,9 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
  *   analyses cover different data and must not share a cache entry.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ *   `undefined` produce the exact same key as omitting the parameter.
  * @returns The cache key.
  *
  * @example
@@ -539,12 +568,13 @@ export function buildFinancialsCacheKey(
     symbol: string,
     modelId: string,
     period: StatementPeriod,
-    skillFingerprint?: string
+    skillFingerprint?: string,
+    reasoning?: boolean
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:financials:${symbol}:${period}:${modelId}:${FINANCIALS_PROMPT_TEMPLATE_VERSION}`;
-    return skillFingerprint !== undefined
-        ? `${base}:${skillFingerprint}`
-        : base;
+    const withFingerprint =
+        skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -604,6 +634,9 @@ export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param modelId - LLM model identifier.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ *   `undefined` produce the exact same key as omitting the parameter.
  * @returns The cache key.
  *
  * @example
@@ -617,12 +650,13 @@ export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 export function buildCongressTrendCacheKey(
     symbol: string,
     modelId: string,
-    skillFingerprint?: string
+    skillFingerprint?: string,
+    reasoning?: boolean
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:congress:${symbol}:${modelId}:${CONGRESS_PROMPT_TEMPLATE_VERSION}`;
-    return skillFingerprint !== undefined
-        ? `${base}:${skillFingerprint}`
-        : base;
+    const withFingerprint =
+        skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -707,6 +741,9 @@ export function buildMarketNewsDigestCacheKey(
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ *   `undefined` produce the exact same key as omitting the parameter.
  * @returns The cache key.
  *
  * @example
@@ -718,9 +755,10 @@ export function buildMarketNewsDigestCacheKey(
 export function buildNewsCacheKey(
     symbol: string,
     modelId: string,
-    inputHash: string
+    inputHash: string,
+    reasoning?: boolean
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -736,15 +774,19 @@ export function buildNewsCacheKey(
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the combined technical/fundamental/news inputs.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ *   `undefined` produce the exact same key as omitting the parameter.
  * @returns The cache key.
  */
 export function buildOverallCacheKey(
     symbol: string,
     timeframe: Timeframe,
     modelId: string,
-    inputHash: string
+    inputHash: string,
+    reasoning?: boolean
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -835,14 +877,20 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix so a
+ *   reasoning-ON overall analysis never overwrites the reasoning-OFF "latest"
+ *   pointer (or vice versa); `false`/`undefined` produce the exact same key
+ *   as omitting the parameter.
  * @returns The content-free peek cache key.
  */
 export function buildOverallPeekCacheKey(
     symbol: string,
     timeframe: Timeframe,
-    modelId: string
+    modelId: string,
+    reasoning?: boolean
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**
@@ -860,13 +908,17 @@ export function buildOverallPeekCacheKey(
  * @param modelId - LLM model identifier scoping the cache.
  * @param snapshotInputHash - Hash of the snapshot inputs — a fresher snapshot
  *   produces a different hash and therefore a new cache entry.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ *   `undefined` produce the exact same key as omitting the parameter.
  * @returns The cache key.
  */
 export function buildOptionsCacheKey(
     symbol: string,
     expirationDate: OptionsExpirationFilter,
     modelId: string,
-    snapshotInputHash: string
+    snapshotInputHash: string,
+    reasoning?: boolean
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}`;
 }
