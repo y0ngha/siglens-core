@@ -1,4 +1,4 @@
-import { GEMINI_2_5_FLASH_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
 import type {
     ChatActionResult,
     ChatErrorCode,
@@ -270,7 +270,7 @@ export async function requestChatCompletion(
     params: RequestChatCompletionParams,
     dependencies: RequestChatCompletionDependencies
 ): Promise<ChatActionResult> {
-    const model = params.model ?? GEMINI_2_5_FLASH_MODEL;
+    const model = params.model ?? DEEPSEEK_V4_FLASH_MODEL;
     const tierConfig = dependencies.tierConfig ?? TIER_CONFIG;
 
     const tierContext = params.tierContext ?? {

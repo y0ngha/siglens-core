@@ -21,6 +21,7 @@ const DEFAULT_TEMPERATURE = 0 as const;
  * - Claude sonnet/opus: adaptive thinking (`effort`), `budget_tokens`/temperature 미사용.
  * - Gemini: `thinkingBudget` 그대로 사용.
  * - GPT-5 series: `effort`로 Responses API `reasoning.effort` 지정, temperature 미지원.
+ * - DeepSeek V4: `thinking` boolean 토글(reasoning on/off), non-thinking 시 temperature 사용.
  */
 export const MODEL_SPECS = {
     'claude-haiku-4-5': {
@@ -95,6 +96,22 @@ export const MODEL_SPECS = {
         maxOutputTokens: 128_000,
         effort: 'high',
     },
+    'deepseek-v4-flash': {
+        provider: 'deepseek',
+        apiModelId: 'deepseek-v4-flash',
+        // DeepSeek V4 supports up to 384K (384 * 1024) output tokens.
+        maxOutputTokens: 393_216,
+        thinking: false,
+        temperature: DEFAULT_TEMPERATURE,
+    },
+    'deepseek-v4-pro': {
+        provider: 'deepseek',
+        apiModelId: 'deepseek-v4-pro',
+        // DeepSeek V4 supports up to 384K (384 * 1024) output tokens.
+        maxOutputTokens: 393_216,
+        thinking: true,
+        temperature: DEFAULT_TEMPERATURE,
+    },
 } as const satisfies Record<ActiveModelId, ModelSpec>;
 
 /**
@@ -139,7 +156,7 @@ export function getThinkingBudgetSequence(initial: number): readonly number[] {
  * Resolve the hosting provider for an active model identifier.
  *
  * Returns the internal {@link AIProvider} taxonomy (`'claude' | 'gemini' |
- * 'chatgpt'`) used by `MODEL_SPECS`. Use this when you need the human-facing
+ * 'chatgpt' | 'deepseek'`) used by `MODEL_SPECS`. Use this when you need the human-facing
  * provider family for an `ActiveModelId` that is guaranteed to exist in
  * `MODEL_SPECS` (e.g. UI labels, model selection screens).
  *
@@ -178,6 +195,13 @@ export type ChatGPTModelId = {
         : never;
 }[ActiveModelId];
 
+/** Active model identifiers hosted on DeepSeek. */
+export type DeepSeekModelId = {
+    [K in ActiveModelId]: (typeof MODEL_SPECS)[K]['provider'] extends 'deepseek'
+        ? K
+        : never;
+}[ActiveModelId];
+
 /**
  * Type predicate that narrows the model to the Claude-hosted subset.
  *
@@ -209,4 +233,17 @@ export function isGeminiModel(model: ActiveModelId): model is GeminiModelId {
  */
 export function isChatGPTModel(model: ActiveModelId): model is ChatGPTModelId {
     return MODEL_SPECS[model].provider === 'chatgpt';
+}
+
+/**
+ * Type predicate that narrows the model to the DeepSeek-hosted subset.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `true` (narrowing to {@link DeepSeekModelId}) when
+ *   `MODEL_SPECS[model].provider === 'deepseek'`.
+ */
+export function isDeepSeekModel(
+    model: ActiveModelId
+): model is DeepSeekModelId {
+    return MODEL_SPECS[model].provider === 'deepseek';
 }

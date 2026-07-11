@@ -21,6 +21,8 @@ const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
     'claude-haiku-4-5',
     'claude-opus-4-7',
     'claude-sonnet-4-6',
+    'deepseek-v4-flash',
+    'deepseek-v4-pro',
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
     'gemini-2.5-pro',
@@ -169,6 +171,15 @@ describe('tier', () => {
             );
         });
 
+        it('allows free-tier DeepSeek models (deepseek-v4-flash, deepseek-v4-pro)', () => {
+            expect(
+                isModelAllowed('free', 'deepseek-v4-flash', restrictedConfig)
+            ).toBe(true);
+            expect(
+                isModelAllowed('free', 'deepseek-v4-pro', restrictedConfig)
+            ).toBe(true);
+        });
+
         it('allows gpt-5.4 and gemini-3-flash-preview for member tier', () => {
             expect(isModelAllowed('member', 'gpt-5.4', restrictedConfig)).toBe(
                 true
@@ -294,6 +305,8 @@ describe('tier', () => {
             expect(isPremiumModel('gemini-2.5-flash-lite')).toBe(false);
             expect(isPremiumModel('claude-haiku-4-5')).toBe(false);
             expect(isPremiumModel('gpt-5-mini')).toBe(false);
+            expect(isPremiumModel('deepseek-v4-flash')).toBe(false);
+            expect(isPremiumModel('deepseek-v4-pro')).toBe(false);
         });
 
         it('returns true for member-only models', () => {
@@ -326,6 +339,8 @@ describe('tier', () => {
             expect(isFreeModel('gemini-2.5-flash-lite')).toBe(true);
             expect(isFreeModel('claude-haiku-4-5')).toBe(true);
             expect(isFreeModel('gpt-5-mini')).toBe(true);
+            expect(isFreeModel('deepseek-v4-flash')).toBe(true);
+            expect(isFreeModel('deepseek-v4-pro')).toBe(true);
         });
 
         it('returns false for member-only models', () => {

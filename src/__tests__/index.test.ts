@@ -13,6 +13,8 @@ import {
     clusterKeyLevels,
     computeFinancialsScorecard,
     createChatTokenStore,
+    DEEPSEEK_V4_FLASH_MODEL,
+    DEEPSEEK_V4_PRO_MODEL,
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
@@ -26,6 +28,7 @@ import {
     hashUsageIp,
     HIGH_CONFIDENCE_WEIGHT,
     isAllowed,
+    isDeepSeekModel,
     isInfoDepthAllowed,
     isModelAllowed,
     isTier,
@@ -119,7 +122,15 @@ describe('public API exports', () => {
         expect(typeof requestChatCompletion).toBe('function');
         expect(typeof createChatTokenStore).toBe('function');
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
+        expect(DEEPSEEK_V4_FLASH_MODEL).toBe('deepseek-v4-flash');
+        expect(DEEPSEEK_V4_PRO_MODEL).toBe('deepseek-v4-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
+        expect(VALID_CHAT_MODELS).toContain('deepseek-v4-flash');
+    });
+
+    it('exports the DeepSeek model type guard from package entrypoint', () => {
+        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
+        expect(isDeepSeekModel('gemini-2.5-flash')).toBe(false);
     });
 
     it('exports financials domain and application entrypoints', () => {

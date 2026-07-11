@@ -25,6 +25,8 @@ export { classifyTrend, detectSignals } from './domain/signals';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export {
+    DEEPSEEK_V4_FLASH_MODEL,
+    DEEPSEEK_V4_PRO_MODEL,
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
     VALID_CHAT_MODELS,
@@ -189,6 +191,7 @@ export {
     getThinkingBudgetSequence,
     isChatGPTModel,
     isClaudeModel,
+    isDeepSeekModel,
     isGeminiModel,
 } from './domain/analysis/modelSpecs';
 
@@ -266,6 +269,7 @@ export {
     MODEL_SPECS,
     type ChatGPTModelId,
     type ClaudeModelId,
+    type DeepSeekModelId,
     type GeminiModelId,
 } from './domain/analysis/modelSpecs';
 export type {
@@ -274,6 +278,7 @@ export type {
     ChatGPTModelSpec,
     ClaudeReasoningModelSpec,
     ClaudeSamplingModelSpec,
+    DeepSeekModelSpec,
     EffortLevel,
     GeminiModelSpec,
     ModelSpec,

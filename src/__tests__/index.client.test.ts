@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     AI_SYSTEM_PROMPT,
     computeFinancialsScorecard,
+    DEEPSEEK_V4_FLASH_MODEL,
+    DEEPSEEK_V4_PRO_MODEL,
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
     GEMINI_2_5_FLASH_MODEL,
@@ -10,6 +12,7 @@ import {
     getTierLimit,
     HIGH_CONFIDENCE_WEIGHT,
     isAllowed,
+    isDeepSeekModel,
     isInfoDepthAllowed,
     isModelAllowed,
     isTier,
@@ -46,7 +49,12 @@ describe('browser public API exports', () => {
 
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);
         expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
+        expect(DEEPSEEK_V4_FLASH_MODEL).toBe('deepseek-v4-flash');
+        expect(DEEPSEEK_V4_PRO_MODEL).toBe('deepseek-v4-pro');
         expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
+        expect(VALID_CHAT_MODELS).toContain('deepseek-v4-flash');
+        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
+        expect(isDeepSeekModel('gemini-2.5-flash')).toBe(false);
         expect(DEFAULT_TIER).toBe('free');
         expect(getAllowedModels('free')).toContain('claude-opus-4-7');
         expect(getAllowedTimeframes('free')).toContain('1Day');

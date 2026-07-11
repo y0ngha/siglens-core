@@ -1,4 +1,5 @@
 import {
+    DEEPSEEK_V4_FLASH_MODEL,
     GEMINI_2_5_FLASH_LITE_MODEL,
     GEMINI_2_5_FLASH_MODEL,
     GEMINI_2_5_PRO_MODEL,
@@ -43,9 +44,23 @@ const restrictedTierConfig: TierConfig = {
     timeframes: TIER_CONFIG.timeframes,
     infoDepth: TIER_CONFIG.infoDepth,
     models: {
-        free: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-        member: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
-        pro: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+        free: [
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+            'deepseek-v4-flash',
+        ],
+        member: [
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+            'gemini-2.5-pro',
+            'deepseek-v4-flash',
+        ],
+        pro: [
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+            'gemini-2.5-pro',
+            'deepseek-v4-flash',
+        ],
     },
     featureFlags: { enableTierRestrictions: true },
 };
@@ -422,14 +437,14 @@ describe('requestChatCompletion', () => {
         consoleWarn.mockRestore();
     });
 
-    it('uses the default Gemini chat model when no model is provided', async () => {
+    it('uses the default DeepSeek chat model when no model is provided', async () => {
         await requestChatCompletion(createParams(), {
             tokenStore,
             callAiProvider,
         });
 
         const firstCall = (callAiProvider as Mock).mock.calls[0]?.[0];
-        expect(firstCall).toMatchObject({ model: GEMINI_2_5_FLASH_MODEL });
+        expect(firstCall).toMatchObject({ model: DEEPSEEK_V4_FLASH_MODEL });
     });
 
     it('records member premium model usage after a successful response', async () => {

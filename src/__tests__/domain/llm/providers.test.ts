@@ -15,6 +15,10 @@ describe('getProviderForModel', () => {
         it('returns openai for gpt-5-mini', () => {
             expect(getProviderForModel('gpt-5-mini')).toBe('openai');
         });
+
+        it('returns deepseek for deepseek-v4-flash', () => {
+            expect(getProviderForModel('deepseek-v4-flash')).toBe('deepseek');
+        });
     });
 
     describe('deprecated models resolved via prefix fallback', () => {
@@ -33,6 +37,12 @@ describe('getProviderForModel', () => {
         it('returns openai for unknown gpt-prefixed model', () => {
             expect(getProviderForModel('gpt-4-turbo' as ModelId)).toBe(
                 'openai'
+            );
+        });
+
+        it('returns deepseek for unknown deepseek-prefixed model', () => {
+            expect(getProviderForModel('deepseek-foo' as ModelId)).toBe(
+                'deepseek'
             );
         });
     });

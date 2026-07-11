@@ -4,11 +4,13 @@ import {
     getThinkingBudgetSequence,
     isChatGPTModel,
     isClaudeModel,
+    isDeepSeekModel,
     isGeminiModel,
     MODEL_SPECS,
     THINKING_BUDGET_FALLBACK_STEPS,
     type ChatGPTModelId,
     type ClaudeModelId,
+    type DeepSeekModelId,
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
 import {
@@ -39,6 +41,8 @@ describe('MODEL_SPECS', () => {
             'gpt-5-mini',
             'gpt-5.4',
             'gpt-5.5',
+            'deepseek-v4-flash',
+            'deepseek-v4-pro',
         ];
         expect(Object.keys(MODEL_SPECS).toSorted()).toEqual(
             [...expected].toSorted()
@@ -47,7 +51,11 @@ describe('MODEL_SPECS', () => {
 
     it('uses temperature only for providers that support sampling temperature', () => {
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
-            if (spec.provider === 'gemini' || model === 'claude-haiku-4-5') {
+            if (
+                spec.provider === 'gemini' ||
+                spec.provider === 'deepseek' ||
+                model === 'claude-haiku-4-5'
+            ) {
                 expect('temperature' in spec, model).toBe(true);
                 if ('temperature' in spec) {
                     expect(spec.temperature, model).toBe(0);
@@ -117,6 +125,27 @@ describe('MODEL_SPECS', () => {
             expect(MODEL_SPECS[model].thinkingBudget, model).toBe(32_768);
         }
     });
+
+    it('toggles DeepSeek reasoning via the boolean `thinking` field — flash off, pro on', () => {
+        expect(MODEL_SPECS['deepseek-v4-flash'].thinking).toBe(false);
+        expect(MODEL_SPECS['deepseek-v4-pro'].thinking).toBe(true);
+    });
+
+    it('allows both DeepSeek models up to 393_216 max output tokens (384K, live-API-verified)', () => {
+        expect(MODEL_SPECS['deepseek-v4-flash'].maxOutputTokens).toBe(393_216);
+        expect(MODEL_SPECS['deepseek-v4-pro'].maxOutputTokens).toBe(393_216);
+    });
+
+    it('routes both DeepSeek models to the deepseek provider with apiModelId matching their key', () => {
+        expect(MODEL_SPECS['deepseek-v4-flash'].provider).toBe('deepseek');
+        expect(MODEL_SPECS['deepseek-v4-flash'].apiModelId).toBe(
+            'deepseek-v4-flash'
+        );
+        expect(MODEL_SPECS['deepseek-v4-pro'].provider).toBe('deepseek');
+        expect(MODEL_SPECS['deepseek-v4-pro'].apiModelId).toBe(
+            'deepseek-v4-pro'
+        );
+    });
 });
 
 describe('getProvider', () => {
@@ -134,6 +163,11 @@ describe('getProvider', () => {
     it('routes GPT models to the chatgpt provider', () => {
         expect(getProvider('gpt-5-mini')).toBe('chatgpt');
         expect(getProvider('gpt-5.5')).toBe('chatgpt');
+    });
+
+    it('routes DeepSeek models to the deepseek provider', () => {
+        expect(getProvider('deepseek-v4-flash')).toBe('deepseek');
+        expect(getProvider('deepseek-v4-pro')).toBe('deepseek');
     });
 });
 
@@ -154,6 +188,14 @@ describe('provider type guards', () => {
         expect(isChatGPTModel('gpt-5.5')).toBe(true);
         expect(isChatGPTModel('claude-sonnet-4-6')).toBe(false);
         expect(isChatGPTModel('gemini-3-flash-preview')).toBe(false);
+    });
+
+    it('isDeepSeekModel matches only DeepSeek entries', () => {
+        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
+        expect(isDeepSeekModel('deepseek-v4-pro')).toBe(true);
+        expect(isDeepSeekModel('claude-sonnet-4-6')).toBe(false);
+        expect(isDeepSeekModel('gemini-3-flash-preview')).toBe(false);
+        expect(isDeepSeekModel('gpt-5.5')).toBe(false);
     });
 
     it('isClaudeModel narrows ActiveModelId to ClaudeModelId at the type level', () => {
@@ -185,6 +227,16 @@ describe('provider type guards', () => {
             expect(MODEL_SPECS[narrowed].provider).toBe('chatgpt');
         } else {
             throw new Error('expected gpt-5.5 to narrow to ChatGPT');
+        }
+    });
+
+    it('isDeepSeekModel narrows ActiveModelId to DeepSeekModelId at the type level', () => {
+        const model = 'deepseek-v4-flash' as ActiveModelId;
+        if (isDeepSeekModel(model)) {
+            const narrowed: DeepSeekModelId = model;
+            expect(MODEL_SPECS[narrowed].provider).toBe('deepseek');
+        } else {
+            throw new Error('expected deepseek-v4-flash to narrow to DeepSeek');
         }
     });
 });
@@ -299,6 +351,15 @@ describe('isReasoningModelSpec', () => {
         expect(isReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(false);
     });
 
+    it('returns false for BOTH DeepSeek models — even the thinking `deepseek-v4-pro`, which toggles reasoning via `thinking` and has no `effort`', () => {
+        expect(isReasoningModelSpec(MODEL_SPECS['deepseek-v4-flash'])).toBe(
+            false
+        );
+        expect(isReasoningModelSpec(MODEL_SPECS['deepseek-v4-pro'])).toBe(
+            false
+        );
+    });
+
     it('narrows the type to ClaudeReasoningModelSpec | ChatGPTModelSpec and exposes effort as EffortLevel', () => {
         const spec: ModelSpec = MODEL_SPECS['claude-opus-4-7'];
         if (isReasoningModelSpec(spec)) {
@@ -335,6 +396,13 @@ describe('isSamplingModelSpec', () => {
 
     it('returns false for ChatGPT models', () => {
         expect(isSamplingModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(false);
+    });
+
+    it('returns true for BOTH DeepSeek models — INCLUDING the thinking `deepseek-v4-pro` (footgun: it has no `effort` so it classifies as sampling; callers MUST gate `temperature` on `spec.thinking`, not on this guard)', () => {
+        expect(isSamplingModelSpec(MODEL_SPECS['deepseek-v4-flash'])).toBe(
+            true
+        );
+        expect(isSamplingModelSpec(MODEL_SPECS['deepseek-v4-pro'])).toBe(true);
     });
 
     it('narrows the type to ClaudeSamplingModelSpec | GeminiModelSpec and exposes temperature as number', () => {
