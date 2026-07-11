@@ -125,6 +125,27 @@ describe('MODEL_SPECS', () => {
             expect(MODEL_SPECS[model].thinkingBudget, model).toBe(32_768);
         }
     });
+
+    it('toggles DeepSeek reasoning via the boolean `thinking` field — flash off, pro on', () => {
+        expect(MODEL_SPECS['deepseek-v4-flash'].thinking).toBe(false);
+        expect(MODEL_SPECS['deepseek-v4-pro'].thinking).toBe(true);
+    });
+
+    it('allows both DeepSeek models up to 393_216 max output tokens (384K, live-API-verified)', () => {
+        expect(MODEL_SPECS['deepseek-v4-flash'].maxOutputTokens).toBe(393_216);
+        expect(MODEL_SPECS['deepseek-v4-pro'].maxOutputTokens).toBe(393_216);
+    });
+
+    it('routes both DeepSeek models to the deepseek provider with apiModelId matching their key', () => {
+        expect(MODEL_SPECS['deepseek-v4-flash'].provider).toBe('deepseek');
+        expect(MODEL_SPECS['deepseek-v4-flash'].apiModelId).toBe(
+            'deepseek-v4-flash'
+        );
+        expect(MODEL_SPECS['deepseek-v4-pro'].provider).toBe('deepseek');
+        expect(MODEL_SPECS['deepseek-v4-pro'].apiModelId).toBe(
+            'deepseek-v4-pro'
+        );
+    });
 });
 
 describe('getProvider', () => {
