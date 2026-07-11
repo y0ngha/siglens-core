@@ -182,6 +182,8 @@ function observePatternCandidates(
  *   Pass `modelId` to scope the cache to a specific AI model identifier.
  *   Pass `marketDataProvider` when a cache miss is possible — it is required at
  *   the fetch site and omitting it on a cache miss will throw a clear runtime error.
+ *   Pass `reasoning: true` to request deep-thinking mode (member-reasoning-toggle
+ *   spec, Part A) — folded into the cache key and forwarded to the worker body.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
  *   see {@link SubmitAnalysisGatedResult}.
  *
@@ -299,7 +301,8 @@ export async function submitAnalysis(
         symbol,
         timeframe,
         effectiveModelId,
-        skillFingerprint
+        skillFingerprint,
+        options.reasoning
     );
 
     if (!force && cache !== null) {
@@ -393,6 +396,7 @@ export async function submitAnalysis(
         lastClose,
         atr,
         modelId: effectiveModelId,
+        reasoning: options.reasoning,
     });
 
     // Observe-only chart-pattern screening: screen for chart patterns and log
@@ -441,6 +445,7 @@ export async function submitAnalysis(
             analysisType: 'technical' satisfies AnalysisType,
             system,
             responseSchema: TECHNICAL_RESPONSE_SCHEMA,
+            ...(options.reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

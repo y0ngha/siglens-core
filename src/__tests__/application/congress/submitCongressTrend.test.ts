@@ -12,11 +12,18 @@ vi.mock('@/application/background');
 vi.mock('@/infrastructure/skills/loader');
 
 import { submitCongressTrend } from '@/application/congress/submitCongressTrend';
+import { buildCongressTrendCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+import {
+    analysisSeed,
+    hashSkillCatalog,
+} from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+
+/** Fingerprint of the empty skill catalog the loader stub returns by default. */
+const EMPTY_CATALOG_FP = hashSkillCatalog([]);
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -309,6 +316,45 @@ describe('submitCongressTrend 함수는', () => {
             }
             expect(mockSetJobMeta).not.toHaveBeenCalled();
             expect(mockFireAndForget).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('reasoning 토글이 적용될 때 (member-reasoning-toggle spec Part A)', () => {
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('reasoning: true이면 :reason=on 캐시 키로 조회하고 Worker body에 reasoning: true를 포함한다', async () => {
+            await submitCongressTrend({ ...BASE_OPTIONS, reasoning: true });
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                buildCongressTrendCacheKey(
+                    'AAPL',
+                    'gemini-2.5-flash',
+                    EMPTY_CATALOG_FP,
+                    true
+                )
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBe(true);
+        });
+
+        it('reasoning을 생략하면 기존 캐시 키와 동일하고 Worker body에 reasoning 필드가 없다', async () => {
+            await submitCongressTrend(BASE_OPTIONS);
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                buildCongressTrendCacheKey(
+                    'AAPL',
+                    'gemini-2.5-flash',
+                    EMPTY_CATALOG_FP
+                )
+            );
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBeUndefined();
         });
     });
 

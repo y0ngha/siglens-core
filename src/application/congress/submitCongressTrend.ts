@@ -114,7 +114,8 @@ export async function submitCongressTrend(
     const cacheKey = buildCongressTrendCacheKey(
         symbol,
         modelId,
-        hashSkillCatalog(skillsResult.skills)
+        hashSkillCatalog(skillsResult.skills),
+        options.reasoning
     );
     const cache = createCacheProvider();
 
@@ -192,6 +193,7 @@ export async function submitCongressTrend(
             analysisType: 'congress' satisfies AnalysisType,
             system,
             responseSchema: CONGRESS_RESPONSE_SCHEMA,
+            ...(options.reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_CONGRESS_TREND_TIMEOUT_MS),
     }).catch(error => {

@@ -65,6 +65,17 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * adds 24/7 context. Defaults to `'equity'` for backward compatibility.
      */
     assetClass?: AssetClass;
+    /**
+     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * `true` requests the model's default/spec reasoning depth; `false` or
+     * omitted requests the provider-minimized (worker-side) setting — the
+     * pre-toggle default. Folded into the cache key so ON and OFF results
+     * never collide (see {@link buildAnalysisCacheKey}); forwarded to the
+     * worker `/analyze` body only when `true`. Tier enforcement (free tier
+     * must not receive `true`) is the caller's responsibility — core forwards
+     * whatever value it is given.
+     */
+    reasoning?: boolean;
 }
 
 /**

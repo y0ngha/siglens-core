@@ -180,6 +180,33 @@ describe('pollOverallAnalysis 함수는', () => {
             );
         });
 
+        it('meta.reasoning=true이면 reason=on peek 키에 저장한다 (member-reasoning-toggle spec)', async () => {
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                reasoning: true,
+            });
+            mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+            await pollOverallAnalysis('job-reasoning-on');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                buildOverallPeekCacheKey(
+                    'AAPL',
+                    '1Day',
+                    'gemini-2.5-flash',
+                    true
+                ),
+                expect.objectContaining({ headlineKo: '3축 종합 분석 결과' }),
+                expect.any(Number)
+            );
+            // Must NOT also write under the reasoning-off peek key.
+            expect(mockCacheSet).not.toHaveBeenCalledWith(
+                buildOverallPeekCacheKey('AAPL', '1Day', 'gemini-2.5-flash'),
+                expect.anything(),
+                expect.any(Number)
+            );
+        });
+
         it('timeframe이 없으면 peek 키 저장을 건너뛴다 (canonical만 저장)', async () => {
             mockGetJobMeta.mockResolvedValueOnce({
                 symbol: 'AAPL',

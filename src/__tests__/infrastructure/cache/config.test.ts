@@ -15,6 +15,7 @@ import {
     buildFundamentalCacheKey,
     buildMarketNewsDigestCacheKey,
     buildNewsCacheKey,
+    buildOptionsCacheKey,
     buildOverallCacheKey,
     buildOverallPeekCacheKey,
     buildSectorSignalsCacheKey,
@@ -331,5 +332,181 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
         ).toBe(
             `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-2.5-flash:${NEWS_PROMPT_TEMPLATE_VERSION}:abc123`
         );
+    });
+});
+
+describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-toggle spec Part A)', () => {
+    it('buildAnalysisCacheKey: reasoning=true는 :reason=on suffix를 추가한다', () => {
+        const off = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash');
+        const on = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            true
+        );
+        expect(on).toBe(`${off}:reason=on`);
+        expect(on).not.toBe(off);
+    });
+
+    it('buildAnalysisCacheKey: reasoning=false/undefined는 기존 키와 완전히 동일하다', () => {
+        const legacy = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash'
+        );
+        expect(
+            buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash',
+                undefined,
+                false
+            )
+        ).toBe(legacy);
+        expect(
+            buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash',
+                undefined,
+                undefined
+            )
+        ).toBe(legacy);
+    });
+
+    it('buildAnalysisCacheKey: skillFingerprint와 reasoning이 함께 있으면 reason suffix가 맨 뒤에 붙는다', () => {
+        const key = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            'sk1',
+            true
+        );
+        expect(key).toBe(
+            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:sk1:reason=on`
+        );
+    });
+
+    it('buildFundamentalCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        expect(
+            buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', undefined, false)
+        ).toBe(legacy);
+        expect(
+            buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', undefined, true)
+        ).toBe(`${legacy}:reason=on`);
+    });
+
+    it('buildFinancialsCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildFinancialsCacheKey(
+            'AAPL',
+            'gemini-2.5-flash',
+            'annual'
+        );
+        expect(
+            buildFinancialsCacheKey(
+                'AAPL',
+                'gemini-2.5-flash',
+                'annual',
+                undefined,
+                false
+            )
+        ).toBe(legacy);
+        expect(
+            buildFinancialsCacheKey(
+                'AAPL',
+                'gemini-2.5-flash',
+                'annual',
+                undefined,
+                true
+            )
+        ).toBe(`${legacy}:reason=on`);
+    });
+
+    it('buildCongressTrendCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash');
+        expect(
+            buildCongressTrendCacheKey(
+                'AAPL',
+                'gemini-2.5-flash',
+                undefined,
+                false
+            )
+        ).toBe(legacy);
+        expect(
+            buildCongressTrendCacheKey(
+                'AAPL',
+                'gemini-2.5-flash',
+                undefined,
+                true
+            )
+        ).toBe(`${legacy}:reason=on`);
+    });
+
+    it('buildNewsCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2');
+        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2', false)).toBe(
+            legacy
+        );
+        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2', true)).toBe(
+            `${legacy}:reason=on`
+        );
+    });
+
+    it('buildOverallCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildOverallCacheKey(
+            'AAPL',
+            '5Min',
+            'gemini-2.5-pro',
+            'h3'
+        );
+        expect(
+            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3', false)
+        ).toBe(legacy);
+        expect(
+            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3', true)
+        ).toBe(`${legacy}:reason=on`);
+    });
+
+    it('buildOverallPeekCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildOverallPeekCacheKey(
+            'AAPL',
+            '5Min',
+            'gemini-2.5-pro'
+        );
+        expect(
+            buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-2.5-pro', false)
+        ).toBe(legacy);
+        expect(
+            buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-2.5-pro', true)
+        ).toBe(`${legacy}:reason=on`);
+    });
+
+    it('buildOptionsCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
+        const legacy = buildOptionsCacheKey(
+            'AAPL',
+            '2026-05-22',
+            'claude-haiku',
+            'abc123'
+        );
+        expect(
+            buildOptionsCacheKey(
+                'AAPL',
+                '2026-05-22',
+                'claude-haiku',
+                'abc123',
+                false
+            )
+        ).toBe(legacy);
+        expect(
+            buildOptionsCacheKey(
+                'AAPL',
+                '2026-05-22',
+                'claude-haiku',
+                'abc123',
+                true
+            )
+        ).toBe(`${legacy}:reason=on`);
     });
 });

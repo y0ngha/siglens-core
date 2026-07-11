@@ -153,6 +153,10 @@ export async function submitOverallAnalysis(
     const { symbol, companyName = symbol, timeframe, modelId } = options;
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
+    // Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A) —
+    // scoped uniformly across all four dependency axes AND this job's own
+    // overall-narrative AI call (mirrors how `modelId` propagates uniformly).
+    const reasoning = options.reasoning;
 
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
@@ -272,7 +276,8 @@ export async function submitOverallAnalysis(
         symbol,
         timeframe,
         modelId,
-        inputHash
+        inputHash,
+        reasoning
     );
     const cache = createCacheProvider();
 
@@ -367,6 +372,11 @@ export async function submitOverallAnalysis(
         // Echo back to pollOverallAnalysis so the normalizer can attach
         // `optionsOiStale: true` to the worker response.
         optionsOiStale,
+        // Echo back so pollOverallAnalysis can rebuild the reasoning-scoped
+        // peek key (buildOverallPeekCacheKey) — the canonical `cacheKey` above
+        // already bakes reasoning in, but the peek "latest" key is rebuilt
+        // separately from meta fields at poll time.
+        reasoning,
     });
 
     const userApiKeyHeader: Record<string, string> =
@@ -390,6 +400,7 @@ export async function submitOverallAnalysis(
             analysisType: 'overall' satisfies AnalysisType,
             system,
             responseSchema: OVERALL_RESPONSE_SCHEMA,
+            ...(reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

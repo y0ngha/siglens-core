@@ -76,6 +76,14 @@ export interface SubmitFinancialsAnalysisOptions extends BackgroundTaskOptions {
     period?: StatementPeriod;
     /** Number of fiscal periods to fetch per statement. Defaults to `5`. */
     limit?: number;
+    /**
+     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * `true` requests the model's default/spec reasoning depth; `false` or
+     * omitted requests the provider-minimized setting — the pre-toggle
+     * default. Folded into the cache key so ON and OFF results never
+     * collide; forwarded to the worker `/analyze` body only when `true`.
+     */
+    reasoning?: boolean;
 }
 
 /** The caller receives a cached analysis — no new job was created. */

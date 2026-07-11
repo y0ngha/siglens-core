@@ -58,6 +58,9 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier. The peek key is model-scoped; pass the
  *   same `modelId` the overall analysis was generated under.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) "latest"
+ *   pointer — the default every existing caller reads today.
  * @returns The cached {@link OverallAnalysisResponse} on a valid hit, or `null`
  *   on a miss / corrupt entry.
  *
@@ -79,14 +82,20 @@ export async function peekOverallAnalysisCache(
     symbol: string,
     _companyName: string,
     timeframe: Timeframe,
-    modelId?: ModelId
+    modelId?: ModelId,
+    reasoning?: boolean
 ): Promise<OverallAnalysisResponse | null> {
     if (modelId === undefined) return null;
 
     const cache = createCacheProvider();
     if (cache === null) return null;
 
-    const cacheKey = buildOverallPeekCacheKey(symbol, timeframe, modelId);
+    const cacheKey = buildOverallPeekCacheKey(
+        symbol,
+        timeframe,
+        modelId,
+        reasoning
+    );
 
     const cached = await cache
         .get<OverallAnalysisResponse>(cacheKey)

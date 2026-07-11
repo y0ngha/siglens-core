@@ -180,7 +180,8 @@ export async function submitOptionsAnalysis(
         symbol,
         expirationDate,
         modelId,
-        inputHash
+        inputHash,
+        options.reasoning
     );
     const cache = createCacheProvider();
 
@@ -290,6 +291,7 @@ export async function submitOptionsAnalysis(
             analysisType: 'options' satisfies AnalysisType,
             system,
             responseSchema: OPTIONS_RESPONSE_SCHEMA,
+            ...(options.reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_OPTIONS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

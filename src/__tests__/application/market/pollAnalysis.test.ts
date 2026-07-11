@@ -194,6 +194,41 @@ describe('pollAnalysis 함수는', () => {
             );
         });
 
+        it('meta.reasoning=true이면 :reason=on suffix가 붙은 캐시 키로 저장한다 (member-reasoning-toggle spec)', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                reasoning: true,
+            });
+
+            await pollAnalysis('job-cache-reasoning-on');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}:reason=on`,
+                expect.objectContaining({
+                    analyzedAt: '2025-01-15T12:00:00.000Z',
+                }),
+                3600
+            );
+        });
+
+        it('meta.reasoning이 없으면(undefined) 기존 키와 동일하게 저장한다 (backward compatible)', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({ ...mockMeta });
+
+            await pollAnalysis('job-cache-reasoning-unset');
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
+                expect.anything(),
+                3600
+            );
+        });
+
         it('meta에 modelId가 없으면 기본 모델 ID를 포함한 캐시 키로 저장한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));

@@ -590,6 +590,56 @@ describe('submitOptionsAnalysis 함수는', () => {
         });
     });
 
+    describe('reasoning 토글이 적용될 때 (member-reasoning-toggle spec Part A)', () => {
+        it('reasoning: true이면 :reason=on 캐시 키로 조회하고 Worker body에 reasoning: true를 포함한다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValue(null);
+
+            // First call without reasoning to capture the legacy (off) key.
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+            });
+            const offKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            mockCacheGet.mockClear();
+            mockFetch.mockClear();
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+                reasoning: true,
+            });
+            const onKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            expect(onKey).toBe(`${offKey}:reason=on`);
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBe(true);
+        });
+
+        it('reasoning을 생략하면 Worker body에 reasoning 필드가 없다 (하위 호환)', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitOptionsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                expirationDate: '2026-06-20',
+                snapshot: makeSnapshot(),
+            });
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as Record<string, unknown>;
+            expect(body.reasoning).toBeUndefined();
+        });
+    });
+
     // ── 3. BYOK required ──
     describe('BYOK가 필요한 경우', () => {
         it('tier가 member이고 premium 모델인데 userApiKey 없으면 key_error를 반환한다', async () => {

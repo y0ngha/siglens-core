@@ -158,7 +158,12 @@ export async function submitNewsAnalysis(
     const newsIds = news.map(n => n.id);
     const earningsDates = upcomingCalendar.map(c => c.earningsDate);
     const inputHash = hashNewsInput(newsIds, earningsDates, skills);
-    const cacheKey = buildNewsCacheKey(symbol, modelId, inputHash);
+    const cacheKey = buildNewsCacheKey(
+        symbol,
+        modelId,
+        inputHash,
+        options.reasoning
+    );
     const cache = createCacheProvider();
 
     if (!options.force && cache !== null) {
@@ -230,6 +235,7 @@ export async function submitNewsAnalysis(
             analysisType: 'news' satisfies AnalysisType,
             system,
             responseSchema: NEWS_RESPONSE_SCHEMA,
+            ...(options.reasoning === true && { reasoning: true }),
         }),
         signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
     }).catch(error => {

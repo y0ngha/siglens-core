@@ -68,6 +68,17 @@ export interface OverallDependencyInputs {
     timeframe: Timeframe;
     /** LLM model identifier scoped across all four axes. */
     modelId: ModelId;
+    /**
+     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A),
+     * scoped across all four axes AND the overall job's own AI call — mirrors
+     * how `modelId` propagates uniformly to every axis submit. Folded into
+     * {@link buildOverallCacheKey} (and the peek key) so overall's own ON/OFF
+     * results never collide. An axis-level `reasoning` override (set on
+     * `technical`/`fundamental`/`news`/`options`) takes precedence over this
+     * top-level value for that one axis, same override precedence as
+     * `userApiKey`.
+     */
+    reasoning?: boolean;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
     /**
@@ -141,6 +152,7 @@ export interface OverallDependencyInputs {
         | 'modelId'
         | 'userApiKey'
         | 'waitUntil'
+        | 'reasoning'
     > & {
         /** Forwarded to `submitAnalysis(... , force, ...)`. Defaults to `false`. */
         force?: boolean;
@@ -155,7 +167,13 @@ export interface OverallDependencyInputs {
      */
     fundamental?: Pick<
         SubmitFundamentalAnalysisOptions,
-        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
+        | 'tier'
+        | 'tierConfig'
+        | 'usage'
+        | 'now'
+        | 'waitUntil'
+        | 'userApiKey'
+        | 'reasoning'
     >;
     /**
      * Options forwarded verbatim to `submitNewsAnalysis`.
@@ -181,6 +199,7 @@ export interface OverallDependencyInputs {
               | 'now'
               | 'waitUntil'
               | 'userApiKey'
+              | 'reasoning'
           >
         | ReadonlyArray<EnrichedNewsItem>;
     /**
@@ -190,7 +209,13 @@ export interface OverallDependencyInputs {
      */
     newsOptions?: Pick<
         SubmitNewsAnalysisOptions,
-        'tier' | 'tierConfig' | 'usage' | 'now' | 'waitUntil' | 'userApiKey'
+        | 'tier'
+        | 'tierConfig'
+        | 'usage'
+        | 'now'
+        | 'waitUntil'
+        | 'userApiKey'
+        | 'reasoning'
     >;
 
     /**
@@ -213,7 +238,13 @@ export interface OverallDependencyInputs {
      */
     options?: Pick<
         SubmitOptionsAnalysisOptions,
-        'usage' | 'tier' | 'tierConfig' | 'modelId' | 'userApiKey' | 'waitUntil'
+        | 'usage'
+        | 'tier'
+        | 'tierConfig'
+        | 'modelId'
+        | 'userApiKey'
+        | 'waitUntil'
+        | 'reasoning'
     >;
 
     /**

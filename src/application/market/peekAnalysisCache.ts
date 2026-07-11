@@ -74,6 +74,9 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * @param modelId - LLM model identifier. Defaults to the internal
  *   `DEFAULT_ANALYSIS_MODEL_ID` — the same default `submitAnalysis`
  *   applies — so an un-modelled peek reads the same key the writer wrote.
+ * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
+ *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) key — the
+ *   default every existing caller reads today.
  * @returns The cached {@link AnalysisResponse} on a valid hit, or `null` on a
  *   miss / corrupt entry.
  *
@@ -89,18 +92,23 @@ export async function peekAnalysisCache(
     symbol: string,
     timeframe: Timeframe,
     _fmpSymbol?: string,
-    modelId?: ModelId
+    modelId?: ModelId,
+    reasoning?: boolean
 ): Promise<AnalysisResponse | null> {
     const cache = createCacheProvider();
     if (cache === null) return null;
 
     // Match the submit/poll write key by folding the same skill-catalog
-    // fingerprint (getSkillCatalogFingerprint is memoized, so this is a cheap read).
+    // fingerprint (getSkillCatalogFingerprint is memoized, so this is a cheap read)
+    // and the same reasoning toggle (member-reasoning-toggle spec, Part A) —
+    // an SSR peek that omits `reasoning` reads the same key as the pre-toggle
+    // behavior, matching the writer's default.
     const cacheKey = buildAnalysisCacheKey(
         symbol,
         timeframe,
         modelId ?? DEFAULT_ANALYSIS_MODEL_ID,
-        await getSkillCatalogFingerprint()
+        await getSkillCatalogFingerprint(),
+        reasoning
     );
 
     const cached = await cache
