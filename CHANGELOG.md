@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.34.0](https://github.com/y0ngha/siglens-core/compare/v0.33.0...v0.34.0) (2026-07-11)
+
+
+### Features
+
+* thread per-request reasoning toggle through analysis cache key ([ea8d7af](https://github.com/y0ngha/siglens-core/commit/ea8d7af4a682a5aa7b87e11f25452686639a776b))
+
 # [0.33.0](https://github.com/y0ngha/siglens-core/compare/v0.32.1...v0.33.0) (2026-07-11)
 
 
