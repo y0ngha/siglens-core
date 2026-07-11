@@ -579,6 +579,32 @@ describe('resolveOverallDependencies 함수는', () => {
             );
         });
 
+        it('fundamental.reasoning 축 override(spread 기반)가 top-level reasoning보다 우선한다', async () => {
+            mockSubmitAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedTechnical,
+            });
+            mockSubmitFundamentalAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedFundamental,
+            });
+            mockSubmitNewsAnalysis.mockResolvedValue({
+                status: 'cached',
+                result: cachedNews,
+            });
+
+            await resolveOverallDependencies(
+                makeInputs({
+                    reasoning: true,
+                    fundamental: { reasoning: false },
+                })
+            );
+
+            expect(mockSubmitFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: false })
+            );
+        });
+
         it('submitNewsAnalysis 에 news 와 upcomingCalendar 가 올바르게 전달된다', async () => {
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'cached',
