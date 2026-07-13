@@ -2,7 +2,7 @@ import { sampleSkillsForTier } from '@/domain/analysis/sampleSkillsForTier';
 import type { Skill, Tier } from '@/domain/types';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 
-/** @internal */
+/** @internal Result of tier-aware skill sampling: the capped skill list plus its catalog fingerprint. */
 export interface SkillSamplingPlan {
     skills: Skill[];
     fingerprint: string;
@@ -11,7 +11,7 @@ export interface SkillSamplingPlan {
 const samplingSeed = (parts: readonly string[]): string =>
     parts.map(part => JSON.stringify(part)).join('\u0000');
 
-/** @internal */
+/** @internal Sample skills for a tier and fingerprint the sampled set for cache-key derivation. */
 export function createSkillSamplingPlan(
     skills: readonly Skill[],
     tier: Tier,

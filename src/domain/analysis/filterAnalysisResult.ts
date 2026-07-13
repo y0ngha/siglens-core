@@ -143,8 +143,6 @@ function filterActionRecommendation(
 }
 
 /**
- * @internal Applies tier-based field masking.
- *
  * Filter an analysis response to the information depth available to a tier.
  *
  * Info-depth restrictions are ON by default through {@link TIER_CONFIG}

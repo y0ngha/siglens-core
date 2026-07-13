@@ -1,6 +1,7 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import { buildTimeframeNotAllowedError } from '@/application/market/types';
 import {
     analysisSeed,
     hashAnalysisInput,
@@ -24,7 +25,6 @@ import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import {
     DEFAULT_TIER,
-    getAllowedTimeframes,
     isTimeframeAllowed,
     requiresByokKey,
     TIER_CONFIG,
@@ -174,13 +174,7 @@ export async function submitOverallAnalysis(
         return {
             status: 'error',
             axis: 'technical',
-            error: {
-                code: 'timeframe_not_allowed',
-                message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
-                tier,
-                timeframe,
-                allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
-            },
+            error: buildTimeframeNotAllowedError(tier, timeframe, tierConfig),
         };
     }
 

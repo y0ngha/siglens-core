@@ -1,6 +1,7 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import { buildTimeframeNotAllowedError } from '@/application/market/types';
 import type {
     SubmitAnalysisGatedResult,
     SubmitAnalysisOptions,
@@ -22,7 +23,6 @@ import { screenChartPatterns, type PatternCandidate } from '@/domain/patterns';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
-    getAllowedTimeframes,
     isTimeframeAllowed,
     requiresByokKey,
 } from '@/domain/tier';
@@ -284,13 +284,7 @@ async function submitAnalysisWithVisibility(
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
         return {
             status: 'error',
-            error: {
-                code: 'timeframe_not_allowed',
-                message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
-                tier,
-                timeframe,
-                allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
-            },
+            error: buildTimeframeNotAllowedError(tier, timeframe, tierConfig),
         };
     }
 

@@ -82,16 +82,22 @@ export function sampleSkillsForTier(
 ): Skill[] {
     if (tier !== 'free') return [...skills];
 
-    // Immutable grouping: each step returns a new Map with a new array for the
-    // touched key, preserving original per-group insertion order without
-    // mutating any accumulator array in place (domain-layer no-mutation
-    // convention). `Map.groupBy` (ES2024) is not used because this project's
-    // tsconfig `lib` is pinned to `ES2023`.
-    const grouped = skills.reduce((groups, skill) => {
+    // Grouping via a local Map accumulator: `skills` (the input) is never
+    // mutated, and each group array is a freshly created local, mutated only
+    // within this loop, which is allowed under the domain "Performance
+    // Exceptions" (externally pure, no mutation of shared/input state). Preserves
+    // original per-group insertion order. `Map.groupBy` (ES2024) is not used
+    // because this project's tsconfig `lib` is pinned to `ES2023`.
+    const grouped = new Map<SkillGroupKey, Skill[]>();
+    for (const skill of skills) {
         const groupKey = groupKeyOf(skill);
-        const existing = groups.get(groupKey) ?? [];
-        return new Map(groups).set(groupKey, [...existing, skill]);
-    }, new Map<SkillGroupKey, Skill[]>());
+        const existing = grouped.get(groupKey);
+        if (existing) {
+            existing.push(skill);
+        } else {
+            grouped.set(groupKey, [skill]);
+        }
+    }
 
     return [...grouped.entries()]
         .toSorted(([left], [right]) => byStringEn(left, right))

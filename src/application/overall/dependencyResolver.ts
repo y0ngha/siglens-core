@@ -409,6 +409,18 @@ export async function resolveOverallDependencies(
     ) {
         return {
             kind: 'cached',
+            // Safe cast: `technicalResult` comes from `submitAnalysisForOverall`,
+            // which always calls `submitAnalysisWithVisibility` with
+            // responseVisibility: 'internal'. On the 'cached' branch that
+            // visibility skips `filterAnalysisResult` entirely and embeds the
+            // normalized (unfiltered) response directly, so `result` is always
+            // the full `AnalysisResponse` here, never the
+            // `FilteredAnalysisResponse` union member. The declared return type
+            // `SubmitAnalysisGatedResult` widens `result` to
+            // `AnalysisResponse | FilteredAnalysisResponse` for the public
+            // (non-internal) callers of `submitAnalysis`, so this cast narrows
+            // back to the guaranteed-unfiltered shape for the overall prompt
+            // composer.
             technical: technicalResult.result as AnalysisResponse,
             fundamental: fundamentalPayload,
             news: newsResult.result,

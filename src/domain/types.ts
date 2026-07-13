@@ -1508,8 +1508,10 @@ export interface AnalysisResponse {
 }
 
 /**
- * @internal
- * Analysis response after tier-based info-depth filtering.
+ * Analysis response after tier-based info-depth filtering: every field
+ * unavailable to the caller's tier is replaced with `null` (see
+ * {@link filterAnalysisResult}), so consumers can render locked paywall
+ * states without receiving hidden analysis content.
  */
 export interface FilteredAnalysisResponse {
     /** Korean multi-topic summary, or `null` when the summary fragment is locked. */
@@ -1539,8 +1541,10 @@ export interface FilteredAnalysisResponse {
 }
 
 /**
- * @internal
  * Tier-filtered analysis payload plus fragments that should render as locked.
+ * Returned by {@link filterAnalysisResult} and by cache-read paths
+ * (`peekAnalysisCache`, `submitAnalysis`'s cached branch) that apply the same
+ * tier gate.
  */
 export interface FilteredAnalysisResult {
     /** Filtered analysis data safe to expose to the current tier. */

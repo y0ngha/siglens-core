@@ -2,8 +2,11 @@ import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOve
 import type {
     ModelId,
     OverallAnalysisResponse,
+    Tier,
+    TierConfig,
     Timeframe,
 } from '@/domain/types';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import { buildOverallPeekCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 
@@ -61,8 +64,16 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) "latest"
  *   pointer — the default every existing caller reads today.
+ * @param tier - Caller's resolved subscription tier. Gates which timeframes may
+ *   be peeked, mirroring {@link peekAnalysisCache}'s tier gate (invariant 5): a
+ *   disallowed caller-tier/timeframe combination resolves to `null` before the
+ *   "latest" key is read, so a free/anon caller can never surface an
+ *   intraday overall analysis that a member/pro submitter generated. Defaults
+ *   to {@link DEFAULT_TIER}.
+ * @param tierConfig - Tier configuration override, mainly for tests and
+ *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
  * @returns The cached {@link OverallAnalysisResponse} on a valid hit, or `null`
- *   on a miss / corrupt entry.
+ *   on a miss / corrupt entry / disallowed caller-tier timeframe.
  *
  * @example
  * ```ts
@@ -83,8 +94,11 @@ export async function peekOverallAnalysisCache(
     _companyName: string,
     timeframe: Timeframe,
     modelId?: ModelId,
-    reasoning?: boolean
+    reasoning?: boolean,
+    tier: Tier = DEFAULT_TIER,
+    tierConfig: TierConfig = TIER_CONFIG
 ): Promise<OverallAnalysisResponse | null> {
+    if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
     if (modelId === undefined) return null;
 
     const cache = createCacheProvider();

@@ -15,6 +15,7 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
+import { getAllowedTimeframes } from '@/domain/tier';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 export type { UserApiKeyRequiredError };
@@ -116,6 +117,34 @@ export interface TierTimeframeAccessError {
 export interface TierGateErrorResult {
     status: 'error';
     error: TierTimeframeAccessError;
+}
+
+/**
+ * Build the {@link TierTimeframeAccessError} payload for a denied timeframe
+ * request. Shared by every submit use-case that runs the timeframe gate
+ * (`submitAnalysis`'s `submitAnalysisWithVisibility` and
+ * `submitOverallAnalysis`) so the error shape stays byte-identical across
+ * axes instead of being hand-duplicated at each call site.
+ *
+ * @param tier - Tier used for the access decision.
+ * @param timeframe - Timeframe requested by the caller.
+ * @param tierConfig - Tier configuration; defaults to {@link TIER_CONFIG} at
+ *   each call site (this helper takes it as a required parameter so callers
+ *   pass the same resolved config they used for the `isTimeframeAllowed` check).
+ * @returns The error payload to embed in a `{ status: 'error', error }` result.
+ */
+export function buildTimeframeNotAllowedError(
+    tier: Tier,
+    timeframe: Timeframe,
+    tierConfig: TierConfig
+): TierTimeframeAccessError {
+    return {
+        code: 'timeframe_not_allowed',
+        message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
+        tier,
+        timeframe,
+        allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
+    };
 }
 
 /**
