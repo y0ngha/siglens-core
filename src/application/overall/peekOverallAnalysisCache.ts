@@ -1,4 +1,5 @@
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
     ModelId,
     OverallAnalysisResponse,
@@ -6,7 +7,6 @@ import type {
     TierConfig,
     Timeframe,
 } from '@/domain/types';
-import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import { buildOverallPeekCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 

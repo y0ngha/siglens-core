@@ -5,8 +5,8 @@ import type {
     PollOverallAnalysisResult,
 } from '@/application/overall/types';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
-import type { OverallAnalysisResponse } from '@/domain/types';
 import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
+import type { OverallAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     buildOverallPeekCacheKey,
@@ -46,6 +46,17 @@ import {
  * intentionally NOT applied here: `OverallAnalysisResponse` is a synthesized
  * headline/bullet narrative with no per-field gated detail to mask, so there
  * is nothing for that filter to act on.
+ *
+ * **Pending-dependency polling:** the same caveat applies when a consumer
+ * polls a pending dependency job directly (e.g. `resolveOverallDependencies`
+ * returns `{ kind: 'pending', pendingJobs }` and the caller polls
+ * `pollAnalysis(pendingJobs.technical)` for the technical axis). The caller
+ * MUST pass the same resolved `tier` used for the original submission to
+ * whichever poll function it calls; otherwise that poll's caller-tier
+ * timeframe gate defaults to `DEFAULT_TIER` (free) and may return
+ * `{ status: 'error' }` for a legitimately-allowed intraday job. The cache
+ * write happens before the gate runs, so no data is lost, but the reported
+ * status would be misleading.
  *
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).

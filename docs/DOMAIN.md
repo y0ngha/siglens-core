@@ -143,12 +143,12 @@ export const TIER_CONFIG = {
   },
   timeframes: {
     free: ['1Day'],
-    member: ['1Day', '1Hour', '4Hour'],
+    member: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
     pro: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
   },
   infoDepth: {
     free: ['direction', 'summary'],
-    member: ['direction', 'summary', 'partial_detail'],
+    member: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
     pro: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
   },
   models: {
@@ -158,17 +158,31 @@ export const TIER_CONFIG = {
   },
   featureFlags: {
     enableTierRestrictions: false,
+    enableTimeframeRestrictions: true,
+    enableInfoDepthRestrictions: true,
   },
 };
 ```
 
-`enableTierRestrictions`가 `false`이면 `isAllowed`, `isTimeframeAllowed`,
-`isInfoDepthAllowed`, `isModelAllowed`는 항상 허용 결과를 반환하고
-`getAllowedTimeframes(tier)`는 전체 `Timeframe[]`을, `getAllowedModels`는 모든
-tier에 설정된 모델의 합집합을 반환한다. 플래그가 `true`이면 `TIER_CONFIG`의 각
-tier별 값만 허용하며, `submitAnalysis`는 요청자의 tier가 잠긴 타임프레임에 접근할
-때 `status: 'error'`와 `code: 'timeframe_not_allowed'`를 반환한다. 기본 제한값은
-모두 `Infinity`라서 초기 배포 상태는 fully open이다.
+free-tier analysis gating부터 `timeframes`/`infoDepth`는 `member`와 `pro`가 **동일**하다.
+둘 다 전체 타임프레임(`1Day`/`1Hour`/`4Hour`/`5Min`/`15Min`/`30Min`)과 전체 8단계
+정보 깊이(`direction`~`confidence`)에 접근한다. 오직 `free`만 `1Day` 단일 타임프레임과
+`direction`/`summary` 두 정보 깊이로 제한된다. member/pro의 차등은 이제 `models`
+(사용 가능 AI 모델 목록)에서만 존재하며, timeframes/infoDepth 두 축에서는 구분되지 않는다.
+
+타임프레임/정보-깊이 게이팅은 각각 전용 플래그 `enableTimeframeRestrictions`/
+`enableInfoDepthRestrictions`로 제어되며 **기본값이 `true`**다(free 티어의 `1Day`
+전용·`direction`/`summary` 전용 제한은 이번 기능의 제품 기본 동작이며 우발적
+잔재가 아님을 의미한다). 레거시 `enableTierRestrictions` 플래그는 모델 게이팅(`isModelAllowed`)과
+사용량 제한(`isAllowed`)에만 관여하고 기본값은 `false`(이번 출시에서 모델/사용량
+제한은 의도적으로 OFF)다. 개별 플래그가 `undefined`이면 `resolveRestrictionFlag`가
+`enableTierRestrictions`로 폴백한다(`domain/tier.ts`). 플래그가 꺼진 축은 `isAllowed`,
+`isTimeframeAllowed`, `isInfoDepthAllowed`, `isModelAllowed`가 항상 허용 결과를
+반환하고 `getAllowedTimeframes(tier)`는 전체 `Timeframe[]`을, `getAllowedModels`는
+모든 tier에 설정된 모델의 합집합을 반환한다. 켜진 축은 `TIER_CONFIG`의 각 tier별
+값만 허용하며, `submitAnalysis`는 요청자의 tier가 잠긴 타임프레임에 접근할 때
+`status: 'error'`와 `code: 'timeframe_not_allowed'`를 반환한다. `limits`(일일
+사용량 상한)는 모두 `Infinity`라서 usage 제한은 fully open이다.
 
 일일 사용량 제한은 `application/usage`의 `checkAnalysisLimit`와
 `checkChatbotLimit`에서 `UsageRepository.getUsageToday()` 결과와
@@ -1154,9 +1168,11 @@ interface AnalysisResponse {
 ### 티어별 분석 결과 필터링
 
 `filterAnalysisResult(result, tier)`는 `TIER_CONFIG.infoDepth[tier]`를 기준으로
-`AnalysisResponse`의 공개 가능한 조각만 남기는 순수 함수다. 기본 설정처럼
-`enableTierRestrictions`가 `false`이면 `{ result, lockedInfoDepth: [] }`를 반환하며
-원본 `result` 객체를 그대로 보존한다.
+`AnalysisResponse`의 공개 가능한 조각만 남기는 순수 함수다. 적용 여부는
+`enableInfoDepthRestrictions`(레거시 `enableTierRestrictions`로 폴백)로 결정되며,
+기본값은 `true`라서 free 티어는 기본 설정에서도 필터링된다. 이 플래그가 `false`인
+경우에만 `{ result, lockedInfoDepth: [] }`를 반환하며 원본 `result` 객체를 그대로
+보존한다.
 
 제한이 켜진 경우 허용되지 않은 필드는 `null`로 대체한다. 예외적으로
 `confidenceWeight`는 기존 숫자 타입을 유지하기 위해 `0`으로 대체한다. consumer는

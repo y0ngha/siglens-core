@@ -52,6 +52,15 @@ import { createSkillsProvider } from '@/infrastructure/skills/loader';
  * that submitted the job. A tier change or downgrade between submit and poll
  * must never leak an intraday result the current caller is not entitled to.
  *
+ * **Pending-dependency polling:** when a consumer polls this job as a pending
+ * dependency (e.g. `resolveOverallDependencies` returns `{ kind: 'pending',
+ * pendingJobs }` and the caller then calls `pollAnalysis(pendingJobs.technical)`
+ * directly), it MUST pass the same resolved `tier` used for the original
+ * submission. Otherwise the caller-tier timeframe gate above defaults to
+ * `DEFAULT_TIER` (free) and may return `{ status: 'error' }` for a
+ * legitimately-allowed intraday job. The cache write happens before this
+ * gate runs, so no data is lost, but the reported status would be misleading.
+ *
  * Cancel-after-poll: a successful {@link cancelAnalysisJob} call does NOT
  * immediately flip the job status. This function will keep returning
  * `processing` until the worker observes the cancel signal on its next
