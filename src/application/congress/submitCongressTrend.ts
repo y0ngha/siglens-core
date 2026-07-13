@@ -19,7 +19,10 @@ import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvid
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 import type {
     AnalysisType,
     CongressTrade,
@@ -106,7 +109,7 @@ export async function submitCongressTrend(
         'congress',
         symbol,
         modelId,
-        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        reasoningSeedPart(options.reasoning),
         tier,
     ]);
     const cacheKey = buildCongressTrendCacheKey(

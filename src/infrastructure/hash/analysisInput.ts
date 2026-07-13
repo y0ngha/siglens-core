@@ -26,6 +26,38 @@ export function hashAnalysisInput(serialized: string): string {
     return sha256Hex(serialized).slice(0, ANALYSIS_INPUT_HASH_LENGTH);
 }
 
+/** @internal Fields read from a {@link Skill} when hashing a prompt-skill set for a cache key. */
+interface NormalizedSkillForHash {
+    name: string;
+    content: string;
+    confidenceWeight: number;
+    category: NonNullable<Skill['category']> | null;
+    gating: NonNullable<Skill['gating']> | null;
+}
+
+/**
+ * @internal
+ * Normalize a skill list into the field set used to fingerprint prompt
+ * skills for cache-key hashing, sorted by `name` so the fingerprint is
+ * independent of input order.
+ *
+ * @param skills - Skills sampled for a prompt.
+ * @returns Normalized, name-sorted skill records ready for `JSON.stringify`.
+ */
+export function normalizeSkillsForHash(
+    skills: readonly Skill[]
+): NormalizedSkillForHash[] {
+    return skills
+        .map(s => ({
+            name: s.name,
+            content: s.content,
+            confidenceWeight: s.confidenceWeight,
+            category: s.category ?? null,
+            gating: s.gating ?? null,
+        }))
+        .toSorted((a, b) => a.name.localeCompare(b.name));
+}
+
 /**
  * @internal
  * Deterministic fingerprint of the **skill-selection metadata** of a catalog —

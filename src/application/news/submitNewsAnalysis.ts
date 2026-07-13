@@ -3,6 +3,7 @@ import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     analysisSeed,
     hashAnalysisInput,
+    normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
 import {
     buildUsageLimitError,
@@ -26,7 +27,10 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the news analysis job. */
@@ -58,17 +62,7 @@ function hashNewsInput(
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
     const sortedDates = earningsDates.toSorted().join(',');
-    const skillFingerprint = JSON.stringify(
-        skills
-            .map(s => ({
-                name: s.name,
-                content: s.content,
-                confidenceWeight: s.confidenceWeight,
-                category: s.category ?? null,
-                gating: s.gating ?? null,
-            }))
-            .toSorted((a, b) => a.name.localeCompare(b.name))
-    );
+    const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
     return hashAnalysisInput(
         `${tier}|${sortedIds}|${sortedDates}|${skillFingerprint}`
     );
@@ -171,7 +165,7 @@ export async function submitNewsAnalysis(
         'news',
         symbol,
         modelId,
-        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        reasoningSeedPart(options.reasoning),
         tier,
         'news-ids',
         ...newsIds.toSorted(),

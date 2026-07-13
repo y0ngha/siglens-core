@@ -26,7 +26,10 @@ import type { FinancialStatementsProvider } from '@/domain/ports/financialStatem
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 import type {
     AnalysisType,
     FinancialsAnalysisResponse,
@@ -165,7 +168,7 @@ export async function submitFinancialsAnalysis(
         modelId,
         period,
         String(limit),
-        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        reasoningSeedPart(options.reasoning),
         tier,
     ]);
     const cacheKey = buildFinancialsCacheKey(

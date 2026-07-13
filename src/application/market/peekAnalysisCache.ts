@@ -18,7 +18,10 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 
 /**
  * `true` when a normalized analysis carries no analytical content — i.e. an
@@ -126,7 +129,7 @@ export async function peekAnalysisCache(
         symbol,
         timeframe,
         effectiveModelId,
-        reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        reasoningSeedPart(reasoning),
         tier,
     ]);
 

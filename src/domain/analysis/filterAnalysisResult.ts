@@ -1,4 +1,4 @@
-import { TIER_CONFIG } from '@/domain/tier';
+import { resolveRestrictionFlag, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActionRecommendation,
     AnalysisResponse,
@@ -174,9 +174,10 @@ export function filterAnalysisResult(
     config: TierConfig = TIER_CONFIG
 ): FilteredAnalysisResult {
     const allowedDepth = config.infoDepth[tier];
-    const restrictionsEnabled =
-        config.featureFlags.enableInfoDepthRestrictions ??
-        config.featureFlags.enableTierRestrictions;
+    const restrictionsEnabled = resolveRestrictionFlag(
+        config.featureFlags.enableInfoDepthRestrictions,
+        config.featureFlags.enableTierRestrictions
+    );
     if (!restrictionsEnabled) {
         return { result, lockedInfoDepth: [] };
     }

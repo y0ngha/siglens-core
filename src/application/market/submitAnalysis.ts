@@ -42,7 +42,10 @@ import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const TIMEFRAMES: readonly Timeframe[] = [
@@ -259,8 +262,11 @@ export function submitAnalysisForOverall(
     );
 }
 
+/** Whether the caller receives a tier-filtered response or the full, unfiltered analysis. */
+type AnalysisResponseVisibility = 'public' | 'internal';
+
 async function submitAnalysisWithVisibility(
-    responseVisibility: 'public' | 'internal',
+    responseVisibility: AnalysisResponseVisibility,
     symbol: string,
     companyNameOrTimeframe: string,
     timeframeOrForce?: Timeframe | boolean,
@@ -329,7 +335,7 @@ async function submitAnalysisWithVisibility(
         symbol,
         timeframe,
         effectiveModelId,
-        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        reasoningSeedPart(options.reasoning),
         tier,
     ]);
 

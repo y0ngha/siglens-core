@@ -2,6 +2,7 @@ import { fireAndForget } from '@/application/background';
 import {
     analysisSeed,
     hashAnalysisInput,
+    normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
 import type {
     SubmitMarketNewsDigestOptions,
@@ -47,17 +48,7 @@ function hashMarketNewsDigestInput(
     skills: readonly Skill[]
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
-    const skillFingerprint = JSON.stringify(
-        skills
-            .map(s => ({
-                name: s.name,
-                content: s.content,
-                confidenceWeight: s.confidenceWeight,
-                category: s.category ?? null,
-                gating: s.gating ?? null,
-            }))
-            .toSorted((a, b) => a.name.localeCompare(b.name))
-    );
+    const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
     return hashAnalysisInput(`${tier}|${sortedIds}|${skillFingerprint}`);
 }
 

@@ -56,7 +56,23 @@ const PRO_MODELS: readonly TierModel[] = [
 /** Default tier assigned to unauthenticated or newly-created users. */
 export const DEFAULT_TIER: Tier = 'free';
 
-/** Central source of truth for tier limits and gated capabilities. */
+/**
+ * Central source of truth for tier limits and gated capabilities.
+ *
+ * `featureFlags` defaults, explained:
+ * - `enableTierRestrictions: false`: the legacy, coarse-grained flag stays
+ *   off because model gating and daily usage limits (see {@link isAllowed},
+ *   {@link getAllowedModels}) are intentionally OFF for this launch; every
+ *   tier can use every model with no usage cap.
+ * - `enableTimeframeRestrictions: true` and `enableInfoDepthRestrictions: true`
+ *   are ON by default because free-tier timeframe gating (1Day only) and
+ *   info-depth gating (direction/summary only) ARE the product default for
+ *   this feature; this is intended, not an accidental leftover.
+ * - The granular flags are the source of truth for their respective checks;
+ *   `enableTierRestrictions` is only consulted as the legacy fallback when a
+ *   granular flag is `undefined` (see {@link resolveRestrictionFlag} and its
+ *   use in `resolveAllowedTimeframes` / `resolveAllowedInfoDepths`).
+ */
 export const TIER_CONFIG = {
     limits: {
         analysisPerDay: { free: Infinity, member: Infinity, pro: Infinity },
@@ -84,13 +100,27 @@ export const TIER_CONFIG = {
     },
 } as const satisfies TierConfig;
 
+/**
+ * @internal Resolve a granular restriction flag, falling back to the legacy
+ * `enableTierRestrictions` flag when the granular flag is `undefined`.
+ */
+export function resolveRestrictionFlag(
+    specific: boolean | undefined,
+    legacy: boolean
+): boolean {
+    return specific ?? legacy;
+}
+
 function resolveAllowedTimeframes(
     tier: Tier,
     config: TierConfig
 ): readonly Timeframe[] {
     const { enableTierRestrictions, enableTimeframeRestrictions } =
         config.featureFlags;
-    const isRestricted = enableTimeframeRestrictions ?? enableTierRestrictions;
+    const isRestricted = resolveRestrictionFlag(
+        enableTimeframeRestrictions,
+        enableTierRestrictions
+    );
     return isRestricted ? config.timeframes[tier] : TIMEFRAMES;
 }
 
@@ -100,7 +130,10 @@ function resolveAllowedInfoDepths(
 ): readonly TierInfoDepth[] {
     const { enableInfoDepthRestrictions, enableTierRestrictions } =
         config.featureFlags;
-    const isRestricted = enableInfoDepthRestrictions ?? enableTierRestrictions;
+    const isRestricted = resolveRestrictionFlag(
+        enableInfoDepthRestrictions,
+        enableTierRestrictions
+    );
     return isRestricted ? config.infoDepth[tier] : PRO_INFO_DEPTH;
 }
 

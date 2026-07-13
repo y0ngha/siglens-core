@@ -8,6 +8,11 @@ export interface SkillSamplingPlan {
     fingerprint: string;
 }
 
+/** @internal Cache-key/sampling-seed part distinguishing reasoning-on from reasoning-off submissions. */
+export function reasoningSeedPart(reasoning?: boolean): string {
+    return reasoning === true ? 'reasoning-on' : 'reasoning-off';
+}
+
 const samplingSeed = (parts: readonly string[]): string =>
     parts.map(part => JSON.stringify(part)).join('\u0000');
 
