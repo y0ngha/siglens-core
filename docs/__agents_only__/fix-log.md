@@ -73,10 +73,6 @@
 - Rule: MISTAKES.md Documentation/JSDoc — deprecation notes must accurately describe the migration path; misleading guidance is worse than no guidance
 - Context: Suggestion S1 (round 3) — `GeminiPart` deprecation note "Use `ConversationTurn['text']` instead" would mislead consumers into replacing `{ text: string }` with `string`. Rewrote the JSDoc on both `src/index.ts` and `src/index.client.ts` to explain that `parts: GeminiPart[]` was flattened into `text: string` on `ConversationTurn` and that the type has no direct equivalent.
 
-- Violation: alphabetical import order broken — `@/domain/ports/aiProvider` placed AFTER `@/domain/types` even though `'ports'` < `'types'`
-- Rule: CONVENTIONS.md import ordering — within the same path-alias group, imports must be alphabetically sorted by full module path
-- Context: Suggestion S1 (round 4) — `src/application/chat/types.ts` had the same out-of-order pattern that was fixed in `requestChatCompletion.ts` during round 2 but was missed here. Moved `import type { CallAiProvider } from '@/domain/ports/aiProvider'` to precede the `@/domain/types` block. Lesson: when applying an ordering fix in one file, sweep the entire module/feature for the same pattern instead of relying on the reviewer to flag siblings one round at a time.
-
 - Violation: `@port` tag placed on file-level module JSDoc instead of the actual port interface/type JSDoc
 - Rule: domain/CLAUDE.md "Authoring rules" — "Tag the interface JSDoc with `@port` so adapters and reviewers can identify it"; the tag must annotate the port contract, not the module header
 - Context: Suggestion S2 (round 4) — `src/domain/ports/aiProvider.ts` had `@port` on the file-leading block comment, but the port contract is `CallAiProvider` at the bottom of the file. Tools / readers scanning for `@port` on type declarations (matching the `CacheProvider` example) would miss it. Moved the tag onto the `CallAiProvider` type JSDoc and kept the module-level prose as a plain header.
@@ -152,17 +148,3 @@
 - Rule: MISTAKES.md §Documentation — TypeDoc attaches a JSDoc block only to the immediately-following declaration; a shared comment above two sibling `export const` statements silently leaves the second one undocumented in generated docs, even though the source reads as if both are covered
 - Context: PR #160 review round 4 suggestion — the shared block described both constants together ("the fraction-of-span range within which..."), but TypeDoc renders `CURVATURE_VERTEX_MID_HI` with no doc at all. Fixed by giving each constant its own `@internal` JSDoc block, mirroring the per-constant style used by every other constant in the file.
 
-## [PR #160 R5 | feat/chart-pattern-screener | 2026-07-03]
-- Violation: `.sort()` used instead of `.toSorted()` in `screenChartPatterns.ts` (dedup/sort return) and in two test files (`fixtureDrift.test.ts`, `screenChartPatterns.test.ts`) — in-place mutation instead of returning a new array
-- Rule: MISTAKES.md Coding Paradigm #10 (`.sort()` mutates; use `.toSorted()`)
-- Context: PR #160 review round 5 blocker — recurrence of an already-documented rule across production code and test helpers; fixed by switching all four call sites to `.toSorted()`.
-
-## [PR #160 R5 | feat/chart-pattern-screener | 2026-07-03]
-- Violation: `'high' | 'low'` inline union literal repeated across `domain/types.ts` (`PivotPoint.kind`) and `domain/patterns/classifiers.ts` (`extremeKind`, `peakKind`, `troughKind` parameters/locals) instead of a shared named type
-- Rule: MISTAKES.md TypeScript #6 (union literals with 3+ occurrences must be extracted to a named type in `domain/types.ts`)
-- Context: PR #160 review round 5 blocker — introduced `PivotKind` type alias in `domain/types.ts`, re-exported (with `@internal` tag) from the `domain/patterns` barrel only (not `src/index.ts`, matching `PivotPoint`/`ChartPatternId`'s current visibility), and updated all four inline-union sites in `classifiers.ts` to reference it.
-
-## [PR #160 R5 | feat/chart-pattern-screener | 2026-07-03]
-- Violation: `classifiers.test.ts` and `pivots.test.ts` hardcoded boundary-threshold literals (`EXTREME_MATCH_ATR_MULT`'s `1.0`, `PIVOT_REVERSAL_ATR_MULT`'s `1.5`) instead of importing and deriving from the source constants
-- Rule: MISTAKES.md Tests #4 (boundary test constants must be imported from source, not redefined/hardcoded locally)
-- Context: PR #160 review round 5 blocker — added `EXTREME_MATCH_ATR_MULT` import to `classifiers.test.ts` and `PIVOT_REVERSAL_ATR_MULT` import + module-level `ATR` const to `pivots.test.ts`; converted the one executable-code literal (`.toBe(1)` → `EXTREME_MATCH_ATR_MULT * ATR`) and four exact-boundary fixture offsets (`12.5`, `8.5` ×2, `11.5`) to derive from `runningExtreme - PIVOT_REVERSAL_ATR_MULT * ATR`; left incidental fixture geometry (pole magnitudes, running-extreme values, gap-bar values) as literals per the non-tautological scope.

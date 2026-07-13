@@ -22,7 +22,13 @@ import { OVERALL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
-import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
+import {
+    DEFAULT_TIER,
+    getAllowedTimeframes,
+    isTimeframeAllowed,
+    requiresByokKey,
+    TIER_CONFIG,
+} from '@/domain/tier';
 import { buildOverallCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
@@ -161,7 +167,24 @@ export async function submitOverallAnalysis(
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
-    // ── 0. BYOK gate for overall job's own AI call ──
+    // ── 0. Timeframe gate ──
+    // Run before resolving the dependency axes because that resolver starts
+    // every axis concurrently, including nontechnical analysis jobs.
+    if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
+        return {
+            status: 'error',
+            axis: 'technical',
+            error: {
+                code: 'timeframe_not_allowed',
+                message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
+                tier,
+                timeframe,
+                allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
+            },
+        };
+    }
+
+    // ── 1. BYOK gate for overall job's own AI call ──
     // Sync, cheap check — fires first so we avoid an async DB call when the
     // request is blocked at the key level. Consistent with the other 3 submit
     // functions (market, fundamental, news) which also run BYOK before usage.
@@ -172,7 +195,7 @@ export async function submitOverallAnalysis(
         return buildUserApiKeyRequiredError(tier, modelId);
     }
 
-    // ── 0a. Overall-scoped usage limit check ──
+    // ── 2. Overall-scoped usage limit check ──
     // Owned at this layer (not per axis) so one overall request counts as
     // exactly one analysis. The dependency resolver drops `usage` from each
     // axis's forwarded options (see dropAxisUsage below) to prevent
@@ -193,7 +216,7 @@ export async function submitOverallAnalysis(
         }
     }
 
-    // ── 1. Resolve all three dependency axes in parallel ──
+    // ── 3. Resolve all three dependency axes in parallel ──
     // `dropAxisUsage: true` ensures axis submits never check or record usage
     // when invoked from overall — one overall call = one analysis recorded.
     const deps = await resolveOverallDependencies(options, {

@@ -3,6 +3,7 @@ import type { Mock } from 'vitest';
 import type {
     AnalysisResponse,
     FearGreedSnapshot,
+    Skill,
     TierConfig,
     Timeframe,
 } from '@/domain/types';
@@ -66,8 +67,8 @@ import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 /** Fingerprint of the empty skill catalog the loader stub returns by default. */
 const EMPTY_CATALOG_FP = hashSkillCatalog([]);
-/** Cache-key suffix every chart key now carries (prompt version + fingerprint). */
-const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:${EMPTY_CATALOG_FP}`;
+/** Default free-tier cache-key suffix: prompt version + tier + fingerprint. */
+const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:free:${EMPTY_CATALOG_FP}`;
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -164,9 +165,7 @@ describe('submitAnalysis 함수는', () => {
         (createSkillsProvider as Mock).mockReturnValue({
             loadSkills: mockLoadSkills,
         });
-        // submitAnalysis now fingerprints the `skills` it already loaded via
-        // hashSkillCatalog (no separate getSkillCatalogFingerprint call), so the
-        // empty-catalog mock here drives the expected EMPTY_CATALOG_FP key suffix.
+        // The empty catalog produces the same sampled fingerprint for every tier.
         (loadSkillsCached as Mock).mockResolvedValue({
             skills: [],
             skillsDegraded: false,
@@ -232,7 +231,53 @@ describe('submitAnalysis 함수는', () => {
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
-        it('제한이 꺼져 있으면 기본 free tier도 모든 타임프레임으로 요청할 수 있다', async () => {
+        it('기본 free tier는 5Min 요청 시 에러 결과를 반환한다', async () => {
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '5Min',
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result).toEqual({
+                status: 'error',
+                error: {
+                    code: 'timeframe_not_allowed',
+                    message: 'Timeframe 5Min is not available for free tier.',
+                    tier: 'free',
+                    timeframe: '5Min',
+                    allowedTimeframes: ['1Day'],
+                },
+            });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('기본 free tier는 1Day 요청을 제출할 수 있다', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Day',
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
+                mockSymbol,
+                '1Day',
+                undefined
+            );
+        });
+
+        it('member tier의 5Min 요청은 타임프레임 게이트에서 차단되지 않고 제출된다', async () => {
             mockCacheGet.mockResolvedValueOnce(null);
 
             const result = await submitAnalysis(
@@ -241,7 +286,38 @@ describe('submitAnalysis 함수는', () => {
                 '5Min',
                 false,
                 undefined,
-                { marketDataProvider: fakeProvider }
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'member' },
+                }
+            );
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
+                mockSymbol,
+                '5Min',
+                undefined
+            );
+            expect(mockFetch).toHaveBeenCalled();
+        });
+
+        it('legacy unrestricted custom config allows free tier to request 5Min', async () => {
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '5Min',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierConfig: {
+                        ...restrictedTierConfig,
+                        featureFlags: { enableTierRestrictions: false },
+                    },
+                }
             );
 
             expect(result.status).toBe('submitted');
@@ -266,7 +342,13 @@ describe('submitAnalysis 함수는', () => {
 
             expect(result.status).toBe('cached');
             if (result.status === 'cached') {
-                expect(result.result).toMatchObject(mockResult);
+                expect(result.result).toMatchObject({
+                    summary: mockResult.summary,
+                    trend: mockResult.trend,
+                    indicatorResults: null,
+                    keyLevels: null,
+                });
+                expect(result.lockedInfoDepth).toContain('partial_detail');
             }
             expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
             expect(mockFetch).not.toHaveBeenCalled();
@@ -360,7 +442,14 @@ describe('submitAnalysis 함수는', () => {
                 }
             );
 
-            expect(result).toEqual({ status: 'cached', result: mockResult });
+            expect(result).toMatchObject({
+                status: 'cached',
+                result: {
+                    summary: mockResult.summary,
+                    trend: mockResult.trend,
+                },
+                lockedInfoDepth: expect.arrayContaining(['partial_detail']),
+            });
             expect(consoleWarn).toHaveBeenCalledWith(
                 '[recordAnalysisUsageSafely] Failed to record analysis usage:',
                 expect.any(Error)
@@ -1052,6 +1141,61 @@ describe('submitAnalysis 함수는', () => {
                 expect.objectContaining({ atr: undefined })
             );
         });
+
+        it('sampled catalog is identical라도 tier-scoped cacheKey를 저장한다', async () => {
+            const skills: Skill[] = Array.from({ length: 2 }, (_, index) => ({
+                name: `pattern-${index}`,
+                description: `pattern-${index}`,
+                type: 'pattern',
+                indicators: [],
+                confidenceWeight: 1,
+                content: `pattern-${index}`,
+            }));
+            (loadSkillsCached as Mock).mockResolvedValue({
+                skills,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            const freeMeta = mockSetJobMeta.mock.calls.at(-1)?.[1] as {
+                cacheKey: string;
+            };
+            const freePromptSkills = mockBuildAnalysisPrompt.mock.calls.at(
+                -1
+            )?.[4] as Skill[];
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'member-1', tier: 'member' },
+                }
+            );
+            const memberMeta = mockSetJobMeta.mock.calls.at(-1)?.[1] as {
+                cacheKey: string;
+            };
+            const memberPromptSkills = mockBuildAnalysisPrompt.mock.calls.at(
+                -1
+            )?.[4] as Skill[];
+
+            expect(freePromptSkills).toHaveLength(2);
+            expect(memberPromptSkills).toHaveLength(2);
+            expect(freeMeta.cacheKey).not.toBe(memberMeta.cacheKey);
+            expect(freeMeta.cacheKey).toContain('free:');
+            expect(memberMeta.cacheKey).toContain('member:');
+        });
     });
 
     describe('submitAnalysis BYOK gate + tier forwarding', () => {
@@ -1262,7 +1406,10 @@ describe('submitAnalysis 함수는', () => {
                 '4Hour' as Timeframe,
                 false,
                 undefined,
-                { marketDataProvider: fakeProvider }
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'member' },
+                }
             );
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
@@ -1297,7 +1444,10 @@ describe('submitAnalysis 함수는', () => {
                 '4Hour' as Timeframe,
                 false,
                 undefined,
-                { marketDataProvider: fakeProvider }
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'member' },
+                }
             );
 
             expect(result.status).toBe('submitted');

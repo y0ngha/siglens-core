@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { CongressTrade } from '@/domain/types';
+import type { CongressTrade, Skill } from '@/domain/types';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import { normalizeCongressTrendResponse } from '@/domain/analysis/normalizeCongressTrend';
 import { CONGRESS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
@@ -21,9 +21,21 @@ import {
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 
 /** Fingerprint of the empty skill catalog the loader stub returns by default. */
-const EMPTY_CATALOG_FP = hashSkillCatalog([]);
+const EMPTY_CATALOG_FP = `free:${hashSkillCatalog([])}`;
+
+const makeCongressSkills = (): Skill[] =>
+    Array.from({ length: 4 }, (_, index) => ({
+        name: `congress-skill-${index}`,
+        description: `congress skill ${index}`,
+        category: 'congress',
+        indicators: [],
+        confidenceWeight: 1,
+        content: `congress-skill-content-${index}`,
+        gating: { tier: 'always_on' },
+    }));
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -355,6 +367,88 @@ describe('submitCongressTrend 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.reasoning).toBeUndefined();
+        });
+    });
+
+    describe('tier별 skill sampling이 적용될 때', () => {
+        it('free prompt는 정해진 sampled skills만 포함하고 member 캐시와 분리된다', async () => {
+            const skills = makeCongressSkills();
+            mockLoadSkillsCached.mockResolvedValue({
+                skills,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitCongressTrend({ ...BASE_OPTIONS, tier: 'free' });
+            const freeMeta = mockSetJobMeta.mock.calls.at(-1)?.[1] as {
+                cacheKey: string;
+            };
+            const freeSystem = JSON.parse(
+                mockFetch.mock.calls.at(-1)?.[1].body as string
+            ).system as string;
+
+            await submitCongressTrend({ ...BASE_OPTIONS, tier: 'member' });
+            const memberMeta = mockSetJobMeta.mock.calls.at(-1)?.[1] as {
+                cacheKey: string;
+            };
+            const memberSystem = JSON.parse(
+                mockFetch.mock.calls.at(-1)?.[1].body as string
+            ).system as string;
+
+            const freePlan = createSkillSamplingPlan(skills, 'free', [
+                'congress',
+                'AAPL',
+                'gemini-2.5-flash',
+                'reasoning-off',
+                'free',
+            ]);
+            const memberPlan = createSkillSamplingPlan(skills, 'member', [
+                'congress',
+                'AAPL',
+                'gemini-2.5-flash',
+                'reasoning-off',
+                'member',
+            ]);
+            const namesIn = (system: string): string[] =>
+                skills
+                    .filter(skill => system.includes(skill.content))
+                    .map(skill => skill.name)
+                    .toSorted();
+
+            expect(namesIn(freeSystem)).toEqual(
+                freePlan.skills.map(skill => skill.name).toSorted()
+            );
+            expect(namesIn(freeSystem)).toHaveLength(3);
+            expect(namesIn(memberSystem)).toEqual(
+                memberPlan.skills.map(skill => skill.name).toSorted()
+            );
+            expect(namesIn(memberSystem)).toHaveLength(4);
+            expect(freeMeta.cacheKey).toBe(
+                buildCongressTrendCacheKey(
+                    'AAPL',
+                    'gemini-2.5-flash',
+                    `free:${freePlan.fingerprint}`
+                )
+            );
+            expect(memberMeta.cacheKey).toBe(
+                buildCongressTrendCacheKey(
+                    'AAPL',
+                    'gemini-2.5-flash',
+                    `member:${memberPlan.fingerprint}`
+                )
+            );
+            expect(freeMeta.cacheKey).not.toBe(memberMeta.cacheKey);
+        });
+
+        it('identical sampled catalogs still use separate free and member cache keys', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitCongressTrend({ ...BASE_OPTIONS, tier: 'free' });
+            await submitCongressTrend({ ...BASE_OPTIONS, tier: 'member' });
+
+            expect(mockCacheGet.mock.calls[0]?.[0]).not.toBe(
+                mockCacheGet.mock.calls[1]?.[0]
+            );
         });
     });
 

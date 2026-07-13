@@ -1,4 +1,3 @@
-import { TIMEFRAMES } from '@/domain/constants/market';
 import type {
     FinancialSignalType,
     NewsTimeRange,
@@ -82,11 +81,13 @@ describe('public API exports', () => {
     it('exports tier gating helpers from package entrypoint', () => {
         expect(DEFAULT_TIER).toBe('free');
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
+        expect(TIER_CONFIG.featureFlags.enableTimeframeRestrictions).toBe(true);
+        expect(TIER_CONFIG.featureFlags.enableInfoDepthRestrictions).toBe(true);
         expect(isAllowed('free', 'analysisPerDay')).toBe(true);
-        expect(getAllowedTimeframes('free')).toEqual([...TIMEFRAMES]);
+        expect(getAllowedTimeframes('free')).toEqual(['1Day']);
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
-        expect(isTimeframeAllowed('free', '5Min')).toBe(true);
-        expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
+        expect(isTimeframeAllowed('free', '5Min')).toBe(false);
+        expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
         expect(isModelAllowed('free', 'claude-opus-4-7')).toBe(true);
         expect(getAllowedModels('free')).toContain('claude-opus-4-7');
         expect(isTier('member')).toBe(true);

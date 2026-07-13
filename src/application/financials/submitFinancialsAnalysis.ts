@@ -21,19 +21,16 @@ import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFinancialsCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    analysisSeed,
-    hashSkillCatalog,
-} from '@/infrastructure/hash/analysisInput';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FinancialStatementsProvider } from '@/domain/ports/financialStatementsProvider';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import type {
     AnalysisType,
     FinancialsAnalysisResponse,
     FinancialsSnapshot,
-    Skill,
     StatementPeriod,
 } from '@/domain/types';
 
@@ -49,8 +46,6 @@ type ProviderFetchResult =
     | {
           status: 'ok';
           snapshot: FinancialsSnapshot;
-          skills: readonly Skill[];
-          skillsDegraded: true | undefined;
       }
     | SubmitFinancialsAnalysisFetchError;
 
@@ -68,7 +63,6 @@ async function fetchProviderData(
             incomeGrowth,
             financialGrowth,
             cashFlowGrowth,
-            skillsResult,
         ] = await Promise.all([
             dataProvider.getIncomeStatements(symbol, period, limit),
             dataProvider.getBalanceSheets(symbol, period, limit),
@@ -76,7 +70,6 @@ async function fetchProviderData(
             dataProvider.getIncomeStatementGrowths(symbol, period, limit),
             dataProvider.getFinancialGrowths(symbol, period, limit),
             dataProvider.getCashFlowGrowths(symbol, period, limit),
-            loadSkillsCached(),
         ]);
 
         const snapshot = normalizeFinancialsSnapshot({
@@ -91,8 +84,6 @@ async function fetchProviderData(
         return {
             status: 'ok',
             snapshot,
-            skills: skillsResult.skills,
-            skillsDegraded: skillsResult.skillsDegraded ? true : undefined,
         };
     } catch (error) {
         console.error(
@@ -165,15 +156,23 @@ export async function submitFinancialsAnalysis(
         }
     }
 
-    // Fold the skill-catalog fingerprint into the key so a gating/frontmatter
-    // change busts the cache. loadSkillsCached is memoized, so the catalog
-    // fetchProviderData loads on a miss is the same one hashed here.
-    const { skills: fingerprintSkills } = await loadSkillsCached();
+    // Sample before prompt relevance filtering so the cache key and prompt use
+    // the same tier-specific skill catalog.
+    const skillsResult = await loadSkillsCached();
+    const skillSampling = createSkillSamplingPlan(skillsResult.skills, tier, [
+        'financials',
+        symbol,
+        modelId,
+        period,
+        String(limit),
+        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        tier,
+    ]);
     const cacheKey = buildFinancialsCacheKey(
         symbol,
         modelId,
         period,
-        hashSkillCatalog(fingerprintSkills),
+        `${tier}:${skillSampling.fingerprint}`,
         options.reasoning
     );
     const cache = createCacheProvider();
@@ -210,7 +209,7 @@ export async function submitFinancialsAnalysis(
         limit
     );
     if (providerData.status === 'error') return providerData;
-    const { snapshot, skills, skillsDegraded } = providerData;
+    const { snapshot } = providerData;
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const scorecard = computeFinancialsScorecard(snapshot);
@@ -218,7 +217,7 @@ export async function submitFinancialsAnalysis(
         symbol,
         snapshot,
         scorecard,
-        skills
+        skillSampling.skills
     );
     // Design C (A/B-gate validated): fold the always-on skill digest
     // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
@@ -233,7 +232,7 @@ export async function submitFinancialsAnalysis(
         symbol,
         modelId,
         cacheKey,
-        ...(skillsDegraded && { skillsDegraded }),
+        ...(skillsResult.skillsDegraded && { skillsDegraded: true }),
     });
 
     const userApiKeyHeader: Record<string, string> =

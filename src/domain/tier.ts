@@ -18,30 +18,19 @@ const TIER_VALUES = [
 const TIER_VALUE_STRINGS: readonly string[] = TIER_VALUES;
 
 const FREE_TIMEFRAMES: readonly Timeframe[] = ['1Day'];
-const MEMBER_TIMEFRAMES: readonly Timeframe[] = [
-    ...FREE_TIMEFRAMES,
-    '1Hour',
-    '4Hour',
-];
-const PRO_TIMEFRAMES: readonly Timeframe[] = [
-    ...MEMBER_TIMEFRAMES,
-    '5Min',
-    '15Min',
-    '30Min',
-];
+const MEMBER_TIMEFRAMES: readonly Timeframe[] = [...TIMEFRAMES];
+const PRO_TIMEFRAMES: readonly Timeframe[] = [...TIMEFRAMES];
 const FREE_INFO_DEPTH: readonly TierInfoDepth[] = ['direction', 'summary'];
-const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [
+const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
     ...FREE_INFO_DEPTH,
     'partial_detail',
-];
-const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
-    ...MEMBER_INFO_DEPTH,
     'full_detail',
     'entry',
     'stoploss',
     'target',
     'confidence',
 ];
+const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [...PRO_INFO_DEPTH];
 const FREE_MODELS: readonly TierModel[] = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
@@ -90,6 +79,8 @@ export const TIER_CONFIG = {
     },
     featureFlags: {
         enableTierRestrictions: false,
+        enableTimeframeRestrictions: true,
+        enableInfoDepthRestrictions: true,
     },
 } as const satisfies TierConfig;
 
@@ -97,18 +88,20 @@ function resolveAllowedTimeframes(
     tier: Tier,
     config: TierConfig
 ): readonly Timeframe[] {
-    return config.featureFlags.enableTierRestrictions
-        ? config.timeframes[tier]
-        : TIMEFRAMES;
+    const { enableTierRestrictions, enableTimeframeRestrictions } =
+        config.featureFlags;
+    const isRestricted = enableTimeframeRestrictions ?? enableTierRestrictions;
+    return isRestricted ? config.timeframes[tier] : TIMEFRAMES;
 }
 
 function resolveAllowedInfoDepths(
     tier: Tier,
     config: TierConfig
 ): readonly TierInfoDepth[] {
-    return config.featureFlags.enableTierRestrictions
-        ? config.infoDepth[tier]
-        : PRO_INFO_DEPTH;
+    const { enableInfoDepthRestrictions, enableTierRestrictions } =
+        config.featureFlags;
+    const isRestricted = enableInfoDepthRestrictions ?? enableTierRestrictions;
+    return isRestricted ? config.infoDepth[tier] : PRO_INFO_DEPTH;
 }
 
 function resolveAllowedModels(
@@ -164,7 +157,7 @@ export function getTierLimit(
  * Return the timeframes available to a tier.
  *
  * Always returns every known timeframe when
- * `config.featureFlags.enableTierRestrictions` is `false`.
+ * `config.featureFlags.enableTimeframeRestrictions` is `false`.
  *
  * @param tier - The user's subscription tier.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
@@ -212,7 +205,8 @@ export function getAllowedModels(
 /**
  * Return whether a timeframe is available to the tier.
  *
- * Always returns `true` when `config.featureFlags.enableTierRestrictions` is `false`.
+ * Always returns `true` when
+ * `config.featureFlags.enableTimeframeRestrictions` is `false`.
  *
  * @param tier - The user's subscription tier.
  * @param timeframe - The timeframe to check.
@@ -230,7 +224,8 @@ export function isTimeframeAllowed(
 /**
  * Return whether an AI detail fragment is available to the tier.
  *
- * Always returns `true` when `config.featureFlags.enableTierRestrictions` is `false`.
+ * Always returns `true` when
+ * `config.featureFlags.enableInfoDepthRestrictions` is `false`.
  *
  * @param tier - The user's subscription tier.
  * @param infoDepth - The detail fragment to check.

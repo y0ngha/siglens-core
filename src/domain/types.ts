@@ -1685,7 +1685,11 @@ export interface RawOverallAnalysisResponse {
 /** Outcome of {@link pollAnalysis}: still processing, finished, or errored. */
 export type PollAnalysisResult =
     | { status: 'processing' }
-    | { status: 'done'; result: AnalysisResponse }
+    | {
+          status: 'done';
+          result: AnalysisResponse | FilteredAnalysisResponse;
+          lockedInfoDepth: readonly TierInfoDepth[];
+      }
     | { status: 'error'; error: string };
 
 /** Definition of a sector-tracked stock (symbol + Korean name + parent sector). */
@@ -2124,6 +2128,10 @@ export type TierFeatureLimits = Record<
  */
 export interface TierFeatureFlags {
     enableTierRestrictions: boolean;
+    /** Enables tier-specific timeframe access. Falls back to the legacy global flag when omitted. */
+    enableTimeframeRestrictions?: boolean;
+    /** Enables tier-specific report information depth. Falls back to the legacy global flag when omitted. */
+    enableInfoDepthRestrictions?: boolean;
 }
 
 /**

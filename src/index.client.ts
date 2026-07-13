@@ -221,6 +221,7 @@ export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
+export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 
 // Dashboard helpers
 export {
@@ -463,6 +464,8 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
+    FilteredAnalysisResponse,
+    FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,

@@ -147,10 +147,13 @@ function filterActionRecommendation(
  *
  * Filter an analysis response to the information depth available to a tier.
  *
- * Restrictions are disabled by default through {@link TIER_CONFIG}; in that
- * mode the original result object is returned unchanged. When enabled, fields
- * unavailable to `tier` are replaced with `null` so consumers can render locked
- * paywall states without receiving hidden analysis content.
+ * Info-depth restrictions are ON by default through {@link TIER_CONFIG}
+ * (`enableInfoDepthRestrictions`), so free-tier responses are masked by
+ * default. The original result object is returned unchanged only when the
+ * resolved restriction flag is `false` (a legacy config with restrictions
+ * disabled). When restrictions are enabled, fields unavailable to `tier` are
+ * replaced with `null` so consumers can render locked paywall states without
+ * receiving hidden analysis content.
  *
  * @param result - Fully enriched analysis response.
  * @param tier - Subscription tier that controls field visibility.
@@ -173,7 +176,10 @@ export function filterAnalysisResult(
     config: TierConfig = TIER_CONFIG
 ): FilteredAnalysisResult {
     const allowedDepth = config.infoDepth[tier];
-    if (!config.featureFlags.enableTierRestrictions) {
+    const restrictionsEnabled =
+        config.featureFlags.enableInfoDepthRestrictions ??
+        config.featureFlags.enableTierRestrictions;
+    if (!restrictionsEnabled) {
         return { result, lockedInfoDepth: [] };
     }
 

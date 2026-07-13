@@ -57,7 +57,9 @@ describe('browser public API exports', () => {
         expect(isDeepSeekModel('gemini-2.5-flash')).toBe(false);
         expect(DEFAULT_TIER).toBe('free');
         expect(getAllowedModels('free')).toContain('claude-opus-4-7');
-        expect(getAllowedTimeframes('free')).toContain('1Day');
+        expect(getAllowedTimeframes('free')).toEqual(['1Day']);
+        expect(isTimeframeAllowed('free', '5Min')).toBe(false);
+        expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
         expect(isModelAllowed('free', modelId, tierConfig)).toBe(true);
         expect(HIGH_CONFIDENCE_WEIGHT).toBe(0.8);
         expect(typeof DEFAULT_TIER).toBe('string');

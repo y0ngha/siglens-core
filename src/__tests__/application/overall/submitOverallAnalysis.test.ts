@@ -931,6 +931,50 @@ describe('submitOverallAnalysis 함수는', () => {
         /** TierConfig where gemini-2.5-pro is premium (not in free list). */
         const testTierConfig = TEST_TIER_CONFIG;
 
+        it('blocks free 5Min before resolving dependency axes', async () => {
+            const result = await submitOverallAnalysis(
+                makeOptions({ timeframe: '5Min', tier: 'free' })
+            );
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'technical',
+                error: {
+                    code: 'timeframe_not_allowed',
+                    message: 'Timeframe 5Min is not available for free tier.',
+                    tier: 'free',
+                    timeframe: '5Min',
+                    allowedTimeframes: ['1Day'],
+                },
+            });
+            expect(mockResolveOverallDependencies).not.toHaveBeenCalled();
+            expect(fakeProvider.getBars).not.toHaveBeenCalled();
+            expect(minimalProvider.getProfile).not.toHaveBeenCalled();
+            expect(mockSetJobMeta).not.toHaveBeenCalled();
+            expect(mockFireAndForget).not.toHaveBeenCalled();
+        });
+
+        it('does not block member 5Min before resolving dependency axes', async () => {
+            mockResolveOverallDependencies.mockResolvedValue({
+                kind: 'pending',
+                pendingJobs: {
+                    technical: 'technical-job',
+                    fundamental: undefined,
+                    news: undefined,
+                },
+            });
+
+            const result = await submitOverallAnalysis(
+                makeOptions({ timeframe: '5Min', tier: 'member' })
+            );
+
+            expect(result.status).toBe('pending_dependencies');
+            expect(mockResolveOverallDependencies).toHaveBeenCalledWith(
+                expect.objectContaining({ timeframe: '5Min', tier: 'member' }),
+                { dropAxisUsage: true }
+            );
+        });
+
         it('returns key_error when non-pro tier + premium model + no userApiKey', async () => {
             const result = await submitOverallAnalysis(
                 makeOptions({

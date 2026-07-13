@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, RawAnalysisResponse } from '@/domain/types';
 import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
+import { TIER_CONFIG } from '@/domain/tier';
 
 vi.mock('@/infrastructure/jobs/queue');
 vi.mock('@/infrastructure/cache/redis');
@@ -25,10 +26,6 @@ vi.mock('@/infrastructure/cache/config', async () => {
 
 import { pollAnalysis } from '@/application/market/pollAnalysis';
 import {
-    DEFAULT_ANALYSIS_MODEL_ID,
-    PROMPT_TEMPLATE_VERSION,
-} from '@/infrastructure/cache/config';
-import {
     getJobStatus,
     getJobError,
     getJobResult,
@@ -36,13 +33,11 @@ import {
     cleanupJob,
 } from '@/infrastructure/jobs/queue';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import { createSkillsProvider } from '@/infrastructure/skills/loader';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 
-/** Suffix every chart cache key carries: prompt version + empty-catalog hash. */
-const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:${hashSkillCatalog([])}`;
+const CACHE_KEY = 'analysis:AAPL:1Day:gemini-2.5-flash:sampled-catalog';
 
 const mockGetJobStatus = getJobStatus as Mock;
 const mockGetJobError = getJobError as Mock;
@@ -81,6 +76,7 @@ const mockMeta = {
     atr: 2.5,
     skillsDegraded: false,
     modelId: 'gemini-2.5-flash',
+    cacheKey: CACHE_KEY,
 };
 
 describe('pollAnalysis 함수는', () => {
@@ -178,7 +174,7 @@ describe('pollAnalysis 함수는', () => {
             expect(mockCleanupJob).toHaveBeenCalled();
         });
 
-        it('meta가 있으면 모델 ID 포함 캐시 키로 저장한다', async () => {
+        it('submit 시 확정한 캐시 키로 저장한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
             mockGetJobResult.mockResolvedValueOnce(rawResult);
@@ -186,27 +182,89 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
+                CACHE_KEY,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
+                    keyLevels: rawResult.keyLevels,
                 }),
                 3600
             );
         });
 
-        it('meta.reasoning=true이면 :reason=on suffix가 붙은 캐시 키로 저장한다 (member-reasoning-toggle spec)', async () => {
+        it('caller tier로 응답을 필터링하고 submit-time tier를 무시한다', async () => {
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                tier: 'pro',
+            });
+
+            const result = await pollAnalysis('job-caller-tier', {
+                tier: 'free',
+                tierConfig: {
+                    ...TIER_CONFIG,
+                    featureFlags: { enableTierRestrictions: true },
+                },
+            });
+
+            expect(result).toMatchObject({
+                status: 'done',
+                result: { keyLevels: null },
+            });
+            if (result.status === 'done') {
+                expect(result.lockedInfoDepth).toContain('partial_detail');
+            }
+        });
+
+        it('tier 옵션을 생략하면 DEFAULT_TIER(free)로 응답을 필터링한다', async () => {
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                tier: 'pro',
+            });
+
+            const result = await pollAnalysis('job-omitted-tier');
+
+            expect(result).toMatchObject({
+                status: 'done',
+                result: { keyLevels: null, indicatorResults: null },
+            });
+            if (result.status === 'done') {
+                expect(result.lockedInfoDepth).toContain('partial_detail');
+            }
+        });
+
+        it('caller tier가 완료된 작업의 timeframe에 접근할 수 없으면 결과를 반환하지 않는다', async () => {
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                timeframe: '5Min',
+                tier: 'member',
+            });
+
+            const result = await pollAnalysis('job-revoked-timeframe', {
+                tier: 'free',
+            });
+
+            expect(result).toEqual({
+                status: 'error',
+                error: 'Timeframe 5Min is not available for free tier.',
+            });
+        });
+
+        it('reasoning이 켜진 제출의 확정 캐시 키를 유지한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
             mockGetJobResult.mockResolvedValueOnce(rawResult);
             mockGetJobMeta.mockResolvedValueOnce({
                 ...mockMeta,
                 reasoning: true,
+                cacheKey: `${CACHE_KEY}:reason=on`,
             });
 
             await pollAnalysis('job-cache-reasoning-on');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}:reason=on`,
+                `${CACHE_KEY}:reason=on`,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),
@@ -214,7 +272,7 @@ describe('pollAnalysis 함수는', () => {
             );
         });
 
-        it('meta.reasoning이 없으면(undefined) 기존 키와 동일하게 저장한다 (backward compatible)', async () => {
+        it('reasoning이 없는 제출도 확정 캐시 키로 저장한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
             mockGetJobResult.mockResolvedValueOnce(rawResult);
@@ -223,13 +281,13 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache-reasoning-unset');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
+                CACHE_KEY,
                 expect.anything(),
                 3600
             );
         });
 
-        it('meta에 modelId가 없으면 기본 모델 ID를 포함한 캐시 키로 저장한다', async () => {
+        it('meta의 modelId와 무관하게 확정 캐시 키로 저장한다', async () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2025-01-15T12:00:00.000Z'));
             mockGetJobResult.mockResolvedValueOnce(rawResult);
@@ -241,7 +299,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-cache-no-model');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`,
+                CACHE_KEY,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),
@@ -289,7 +347,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-poll-skills-fail');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
+                CACHE_KEY,
                 expect.objectContaining({ skillsDegraded: true }),
                 3600
             );
@@ -309,7 +367,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-poll-skills-ok');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
+                CACHE_KEY,
                 expect.objectContaining({ skillsDegraded: false }),
                 3600
             );
@@ -420,7 +478,7 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-real-analysis');
 
             expect(mockCacheSet).toHaveBeenCalledWith(
-                `analysis:AAPL:1Day:gemini-2.5-flash:${KEY_SUFFIX}`,
+                CACHE_KEY,
                 expect.objectContaining({
                     analyzedAt: '2025-01-15T12:00:00.000Z',
                 }),
@@ -463,6 +521,19 @@ describe('pollAnalysis 함수는', () => {
             await pollAnalysis('job-with-timeframe');
 
             expect(mockCacheSet).toHaveBeenCalled();
+        });
+
+        it('legacy meta에 cacheKey가 없으면 캐시 저장을 건너뛴다', async () => {
+            mockGetJobResult.mockResolvedValueOnce(rawResult);
+            mockGetJobMeta.mockResolvedValueOnce({
+                ...mockMeta,
+                cacheKey: undefined,
+            });
+
+            const result = await pollAnalysis('job-no-cache-key');
+
+            expect(result.status).toBe('done');
+            expect(mockCacheSet).not.toHaveBeenCalled();
         });
     });
 });

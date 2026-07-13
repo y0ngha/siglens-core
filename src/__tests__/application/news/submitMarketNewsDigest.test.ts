@@ -9,7 +9,8 @@ import { submitMarketNewsDigest } from '@/application/news/submitMarketNewsDiges
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
-import type { EnrichedNewsItem } from '@/domain/types';
+import type { EnrichedNewsItem, Skill } from '@/domain/types';
+import { DEFAULT_TIER } from '@/domain/tier';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -49,6 +50,19 @@ const mockCachedResult = {
     upcomingEventsKo: [],
     overallSentiment: 'neutral' as const,
 };
+
+function makeNewsSkill(name: string, type?: Skill['type']): Skill {
+    return {
+        name,
+        description: `${name} description`,
+        type,
+        category: 'news',
+        indicators: [],
+        confidenceWeight: 1,
+        content: `${name} content`,
+        gating: { tier: 'always_on' },
+    };
+}
 
 describe('submitMarketNewsDigest 함수는', () => {
     const originalEnv = process.env;
@@ -260,5 +274,70 @@ describe('submitMarketNewsDigest 함수는', () => {
                 cacheKey: expect.any(String),
             })
         );
+
+        const body = JSON.parse(
+            mockFetch.mock.calls[0][1].body as string
+        ) as Record<string, unknown>;
+        expect(body.tier).toBe(DEFAULT_TIER);
+    });
+
+    it('free tier는 selectSkills 전에 type 그룹과 regular 그룹을 각각 세 개로 제한한다', async () => {
+        const skills = [
+            ...Array.from({ length: 4 }, (_, index) =>
+                makeNewsSkill(`typed-news-${index}`, 'pattern')
+            ),
+            ...Array.from({ length: 4 }, (_, index) =>
+                makeNewsSkill(`regular-news-${index}`)
+            ),
+        ];
+        mockCacheGet.mockResolvedValue(null);
+
+        await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+            skills,
+            tier: 'free',
+        });
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body as string) as {
+            system: string;
+            tier: string;
+        };
+        expect(body.system.match(/### typed-news-\d/g)).toHaveLength(3);
+        expect(body.system.match(/### regular-news-\d/g)).toHaveLength(3);
+        expect(body.tier).toBe('free');
+    });
+
+    it('free와 member는 동일한 sampled skill set에서도 별도 캐시 키를 사용한다', async () => {
+        const skills = [
+            makeNewsSkill('shared-news-one'),
+            makeNewsSkill('shared-news-two'),
+        ];
+        mockCacheGet.mockResolvedValue(null);
+
+        await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+            skills,
+            tier: 'free',
+        });
+        const freeCacheKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+        mockCacheGet.mockClear();
+        await submitMarketNewsDigest({
+            category: 'crypto',
+            categoryLabel: '미국 암호화폐',
+            modelId: 'gemini-2.5-flash',
+            news: [ITEM],
+            skills,
+            tier: 'member',
+        });
+        const memberCacheKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+        expect(freeCacheKey).not.toBe(memberCacheKey);
     });
 });

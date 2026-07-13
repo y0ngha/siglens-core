@@ -14,19 +14,16 @@ import { DEFAULT_TIER } from '@/domain/tier';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildCongressTrendCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    analysisSeed,
-    hashSkillCatalog,
-} from '@/infrastructure/hash/analysisInput';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import type {
     AnalysisType,
     CongressTrade,
     CongressTrendResponse,
-    Skill,
 } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the congress trend analysis job. */
@@ -39,8 +36,6 @@ type ProviderFetchResult =
     | {
           status: 'ok';
           trades: CongressTrade[];
-          skills: readonly Skill[];
-          skillsDegraded: true | undefined;
       }
     | SubmitCongressTrendFetchError;
 
@@ -54,8 +49,7 @@ type ProviderFetchResult =
 async function fetchProviderData(
     dataProvider: CongressTradesProvider,
     symbol: string,
-    limit: number,
-    skillsResult: { skills: readonly Skill[]; skillsDegraded: boolean }
+    limit: number
 ): Promise<ProviderFetchResult> {
     try {
         const [senate, house] = await Promise.all([
@@ -68,8 +62,6 @@ async function fetchProviderData(
         return {
             status: 'ok',
             trades,
-            skills: skillsResult.skills,
-            skillsDegraded: skillsResult.skillsDegraded ? true : undefined,
         };
     } catch (error) {
         console.error('[submitCongressTrend] Provider fetch failed:', error);
@@ -107,14 +99,20 @@ export async function submitCongressTrend(
     const tier = options.tier ?? DEFAULT_TIER;
     const limit = options.limit ?? DEFAULT_LIMIT;
 
-    // Fold the skill-catalog fingerprint into the key so a gating/frontmatter
-    // change busts the cache. Load once and reuse for the provider-fetch path
-    // so we don't double-call the (memoized) skill loader.
+    // Sample before prompt relevance filtering so the cache key and prompt use
+    // the same tier-specific skill catalog.
     const skillsResult = await loadSkillsCached();
+    const skillSampling = createSkillSamplingPlan(skillsResult.skills, tier, [
+        'congress',
+        symbol,
+        modelId,
+        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        tier,
+    ]);
     const cacheKey = buildCongressTrendCacheKey(
         symbol,
         modelId,
-        hashSkillCatalog(skillsResult.skills),
+        `${tier}:${skillSampling.fingerprint}`,
         options.reasoning
     );
     const cache = createCacheProvider();
@@ -139,14 +137,9 @@ export async function submitCongressTrend(
         return { status: 'miss_no_trigger' };
     }
 
-    const providerData = await fetchProviderData(
-        dataProvider,
-        symbol,
-        limit,
-        skillsResult
-    );
+    const providerData = await fetchProviderData(dataProvider, symbol, limit);
     if (providerData.status === 'error') return providerData;
-    const { trades, skills, skillsDegraded } = providerData;
+    const { trades } = providerData;
 
     // Cost guard: a symbol with zero disclosures is normal, not an error. Skip
     // the job + LLM entirely so we never pay to "analyze nothing".
@@ -160,7 +153,7 @@ export async function submitCongressTrend(
         symbol,
         trades,
         stats,
-        skills
+        skillSampling.skills
     );
     // Design C (A/B-gate validated): fold the always-on skill digest
     // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
@@ -175,7 +168,7 @@ export async function submitCongressTrend(
         symbol,
         modelId,
         cacheKey,
-        ...(skillsDegraded && { skillsDegraded }),
+        ...(skillsResult.skillsDegraded && { skillsDegraded: true }),
     });
 
     const dispatch = fetch(`${workerUrl}/analyze`, {

@@ -106,7 +106,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 **특징**:
 - 도메인 + 인프라를 조합하는 비동기 함수.
 - consumer 입장에서 가장 자주 호출되는 함수 그룹.
-- 시그니처 변경은 semver major.
+- 시그니처 변경은 `1.0.0` 이후 semver major. 현재 `0.x` 개발 단계에서는
+  호환성 변경을 minor로 릴리스한다.
 
 ### Tier 2 — Domain Building Blocks
 
@@ -117,7 +118,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 **특징**:
 - 동기 순수 함수. 부작용 없음.
 - "여러 작은 함수를 묶어 한 번에 호출 가능한 단위"만 Tier 2에 포함.
-- 시그니처 변경은 semver major.
+- 시그니처 변경은 `1.0.0` 이후 semver major. 현재 `0.x` 개발 단계에서는
+  호환성 변경을 minor로 릴리스한다.
 
 ### Tier 3 — Infrastructure Factories & Config
 

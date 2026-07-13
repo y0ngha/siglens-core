@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { TierConfig } from '@/domain/types';
+import type { Skill, TierConfig } from '@/domain/types';
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER } from '@/domain/tier';
@@ -21,9 +21,21 @@ import {
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { fireAndForget } from '@/application/background';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 
 /** Fingerprint of the empty skill catalog the loader stub returns by default. */
-const EMPTY_CATALOG_FP = hashSkillCatalog([]);
+const EMPTY_CATALOG_FP = `free:${hashSkillCatalog([])}`;
+
+const makeFundamentalSkills = (): Skill[] =>
+    Array.from({ length: 4 }, (_, index) => ({
+        name: `fundamental-skill-${index}`,
+        description: `fundamental skill ${index}`,
+        category: 'fundamental',
+        indicators: [],
+        confidenceWeight: 1,
+        content: `fundamental-skill-content-${index}`,
+        gating: { tier: 'always_on' },
+    }));
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
@@ -519,6 +531,108 @@ describe('submitFundamentalAnalysis 함수는', () => {
                 mockFetch.mock.calls[0][1].body as string
             ) as Record<string, unknown>;
             expect(body.reasoning).toBeUndefined();
+        });
+    });
+
+    describe('tier별 skill sampling이 적용될 때', () => {
+        it('free prompt는 정해진 sampled skills만 포함하고 member 캐시와 분리된다', async () => {
+            const skills = makeFundamentalSkills();
+            mockLoadSkillsCached.mockResolvedValue({
+                skills,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tier: 'free',
+            });
+            const freeMeta = mockSetJobMeta.mock.calls.at(-1)?.[1] as {
+                cacheKey: string;
+            };
+            const freeSystem = JSON.parse(
+                mockFetch.mock.calls.at(-1)?.[1].body as string
+            ).system as string;
+
+            await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tier: 'member',
+            });
+            const memberMeta = mockSetJobMeta.mock.calls.at(-1)?.[1] as {
+                cacheKey: string;
+            };
+            const memberSystem = JSON.parse(
+                mockFetch.mock.calls.at(-1)?.[1].body as string
+            ).system as string;
+
+            const freePlan = createSkillSamplingPlan(skills, 'free', [
+                'fundamental',
+                'AAPL',
+                'gemini-2.5-flash',
+                'reasoning-off',
+                'free',
+            ]);
+            const memberPlan = createSkillSamplingPlan(skills, 'member', [
+                'fundamental',
+                'AAPL',
+                'gemini-2.5-flash',
+                'reasoning-off',
+                'member',
+            ]);
+            const namesIn = (system: string): string[] =>
+                skills
+                    .filter(skill => system.includes(skill.content))
+                    .map(skill => skill.name)
+                    .toSorted();
+
+            expect(namesIn(freeSystem)).toEqual(
+                freePlan.skills.map(skill => skill.name).toSorted()
+            );
+            expect(namesIn(freeSystem)).toHaveLength(3);
+            expect(namesIn(memberSystem)).toEqual(
+                memberPlan.skills.map(skill => skill.name).toSorted()
+            );
+            expect(namesIn(memberSystem)).toHaveLength(4);
+            expect(freeMeta.cacheKey).toBe(
+                buildFundamentalCacheKey(
+                    'AAPL',
+                    'gemini-2.5-flash',
+                    `free:${freePlan.fingerprint}`
+                )
+            );
+            expect(memberMeta.cacheKey).toBe(
+                buildFundamentalCacheKey(
+                    'AAPL',
+                    'gemini-2.5-flash',
+                    `member:${memberPlan.fingerprint}`
+                )
+            );
+            expect(freeMeta.cacheKey).not.toBe(memberMeta.cacheKey);
+        });
+
+        it('identical sampled catalogs still use separate free and member cache keys', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tier: 'free',
+            });
+            await submitFundamentalAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                dataProvider: mockDataProvider,
+                tier: 'member',
+            });
+
+            expect(mockCacheGet.mock.calls[0]?.[0]).not.toBe(
+                mockCacheGet.mock.calls[1]?.[0]
+            );
         });
     });
 

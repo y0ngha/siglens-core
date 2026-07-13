@@ -1,17 +1,15 @@
 import { cleanupInBackground, fireAndForget } from '@/application/background';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { PollAnalysisOptions } from '@/application/market/types';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import {
     enrichAnalysisWithConfidence,
     isFallbackAnalysis,
 } from '@/domain/analysis/confidence';
+import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type { PollAnalysisResult, Skill } from '@/domain/types';
-import {
-    buildAnalysisCacheKey,
-    computeEffectiveTtl,
-} from '@/infrastructure/cache/config';
+import { computeEffectiveTtl } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import {
     getJobError,
     getJobMeta,
@@ -64,7 +62,7 @@ import { createSkillsProvider } from '@/infrastructure/skills/loader';
  */
 export async function pollAnalysis(
     jobId: string,
-    options?: BackgroundTaskOptions
+    options?: PollAnalysisOptions
 ): Promise<PollAnalysisResult> {
     const status = await getJobStatus(jobId);
 
@@ -124,7 +122,11 @@ export async function pollAnalysis(
     const analyzedAt = now.toISOString();
     const result = { ...reconciled, analyzedAt };
 
-    if (meta && meta.symbol !== undefined && meta.timeframe !== undefined) {
+    if (
+        meta?.cacheKey !== undefined &&
+        meta.symbol !== undefined &&
+        meta.timeframe !== undefined
+    ) {
         if (isFallbackAnalysis(reconciled)) {
             console.warn(
                 '[Poll] Worker returned empty analysis; skipping cache write',
@@ -133,27 +135,10 @@ export async function pollAnalysis(
         } else {
             const cache = createCacheProvider();
             if (cache !== null) {
-                // Fold the same skill-catalog fingerprint the submit path used
-                // so this write lands under the exact key that path will read.
-                // Intentionally fingerprints this path's own provider-loaded
-                // `skills` (the load that fed enrichAnalysisWithConfidence above)
-                // rather than calling the shared getSkillCatalogFingerprint
-                // helper, so the cached fingerprint always matches the catalog
-                // actually used to produce this result. Also folds `meta.reasoning`
-                // (member-reasoning-toggle spec, Part A) — stored at submit time —
-                // so this write lands under the exact ON/OFF key `submitAnalysis`
-                // will read on the next request.
-                const cacheKey = buildAnalysisCacheKey(
-                    meta.symbol,
-                    meta.timeframe,
-                    meta.modelId,
-                    hashSkillCatalog(skills),
-                    meta.reasoning
-                );
                 const ttl = computeEffectiveTtl(meta.timeframe, now);
                 fireAndForget(
                     cache
-                        .set(cacheKey, { ...result, skillsDegraded }, ttl)
+                        .set(meta.cacheKey, { ...result, skillsDegraded }, ttl)
                         .catch(error =>
                             console.error('[Poll] Cache write failed:', error)
                         ),
@@ -165,5 +150,19 @@ export async function pollAnalysis(
 
     cleanupInBackground(jobId, '[Poll]', options);
 
-    return { status: 'done', result };
+    const callerTier = options?.tier ?? DEFAULT_TIER;
+    const callerTierConfig = options?.tierConfig ?? TIER_CONFIG;
+    if (
+        meta?.timeframe !== undefined &&
+        !isTimeframeAllowed(callerTier, meta.timeframe, callerTierConfig)
+    ) {
+        return {
+            status: 'error',
+            error: `Timeframe ${meta.timeframe} is not available for ${callerTier} tier.`,
+        };
+    }
+
+    const filtered = filterAnalysisResult(result, callerTier, callerTierConfig);
+
+    return { status: 'done', ...filtered };
 }

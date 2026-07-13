@@ -5,15 +5,16 @@ import type {
     NewsAnalysisResponse,
     NewsFeedCategory,
     Skill,
+    Tier,
 } from '@/domain/types';
 
 /**
  * Options for submitting a market-news category digest job.
  *
  * Unlike {@link SubmitNewsAnalysisOptions}, this variant has no symbol,
- * companyName, earnings calendar, tier, usage, or BYOK handling — the
- * category digest is a public, non-gated analysis of the market-wide news
- * flow for a single feed category.
+ * companyName, earnings calendar, usage, or BYOK handling. The category
+ * digest is a public analysis of the market-wide news flow for a single feed
+ * category with optional tier-aware skill sampling.
  */
 export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     /** Feed-category bucket (e.g. `'crypto'`, `'general'`). */
@@ -29,6 +30,8 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     news: ReadonlyArray<EnrichedNewsItem>;
     /** Skills to inject. Only `category === 'news'` entries are used. Defaults to `[]`. */
     skills?: readonly Skill[];
+    /** Resolved subscription tier. Defaults to the free tier when omitted. */
+    tier?: Tier;
     /**
      * When `true`, skip enqueueing a new job on cache miss and return
      * `{ status: 'miss_no_trigger' }`. Cache hits are unaffected.

@@ -119,6 +119,21 @@ and have been removed from this file.
     ✅ const CACHE_EXPIRY_HOUR_KST = 17; function computeSecondsUntilCacheExpiry() { ... }
     ✅ const PRICE_DECIMAL_FACTOR = 100; Math.round(rawPrice * PRICE_DECIMAL_FACTOR) / PRICE_DECIMAL_FACTOR
 
+13.5. Import statements within the same path-alias group not in alphabetical order
+    → Within a single import block from the same module/alias, imports must be alphabetically sorted by full path
+    → Inconsistent ordering violates CONVENTIONS.md style rules and creates ambiguity during review
+    ❌ import type { CallAiProvider } from '@/domain/ports/aiProvider';
+       import type { SomeType } from '@/domain/types';
+       // 'ports' should come after 'types' alphabetically, but placed before
+    ✅ import type { SomeType } from '@/domain/types';
+       import type { CallAiProvider } from '@/domain/ports/aiProvider';
+       // Correct: 'ports' < 'types' alphabetically
+    ✅ import { createClient } from '@/infrastructure/cache';
+       import { drizzle } from '@/infrastructure/db';
+       // Both infrastructure imports sorted: 'cache' < 'db'
+    → Recurring mistake (PR #92 R2→R4): was fixed in requestChatCompletion.ts (round 2) but reappeared in src/application/chat/types.ts (round 4).
+      When applying an import reordering fix in one file, sweep the entire feature/module for the same pattern instead of relying on reviewers to catch siblings one round at a time.
+
 14. Manual field-by-field object mapping instead of destructuring with rest operator
     → When filtering sensitive fields or unwanted properties, use destructuring with rest syntax
     → Manual mapping silently drops new fields added to the source interface (maintainability hole)

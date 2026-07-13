@@ -26,16 +26,17 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the news analysis job. */
 const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 
 /**
- * Derive a short deterministic hash of the news set, calendar, and active skills.
+ * Derive a short deterministic hash of the news set, calendar, tier, and sampled skills.
  *
  * Sorted news IDs joined with sorted earnings dates and a sorted skill
- * fingerprint (`name + content`), delegated to {@link hashAnalysisInput}.
+ * prompt-skill fingerprint, delegated to {@link hashAnalysisInput}.
  * Deterministic across re-runs with the same input regardless of original
  * ordering.
  *
@@ -45,23 +46,32 @@ const SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
  *
  * @param newsIds       - Array of news item IDs.
  * @param earningsDates - Array of earnings calendar date strings.
- * @param skills        - Skills loaded for the prompt; only `name` + `content`
- *   are used for the hash.
+ * @param tier          - Resolved tier used to sample the prompt skills.
+ * @param skills        - Sampled skills passed to the prompt builder.
  * @returns 16-character lowercase hex string.
  */
 function hashNewsInput(
     newsIds: readonly string[],
     earningsDates: readonly string[],
+    tier: string,
     skills: readonly Skill[]
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
     const sortedDates = earningsDates.toSorted().join(',');
     const skillFingerprint = JSON.stringify(
         skills
-            .map(s => ({ name: s.name, content: s.content }))
+            .map(s => ({
+                name: s.name,
+                content: s.content,
+                confidenceWeight: s.confidenceWeight,
+                category: s.category ?? null,
+                gating: s.gating ?? null,
+            }))
             .toSorted((a, b) => a.name.localeCompare(b.name))
     );
-    return hashAnalysisInput(`${sortedIds}|${sortedDates}|${skillFingerprint}`);
+    return hashAnalysisInput(
+        `${tier}|${sortedIds}|${sortedDates}|${skillFingerprint}`
+    );
 }
 
 /**
@@ -69,7 +79,7 @@ function hashNewsInput(
  *
  * Resolves to one of four outcomes:
  * - `cached`: a recent analysis is reused (keyed by `symbol` + `modelId` +
- *   an input hash of the sorted news IDs and earnings dates).
+ *   an input hash of the tier, sorted news IDs, earnings dates, and sampled skills).
  * - `submitted`: the prompt was built, a `jobId` was registered, and a
  *   fire-and-forget HTTP POST was sent to the configured worker. Poll the
  *   result with {@link pollNewsAnalysis}.
@@ -157,7 +167,23 @@ export async function submitNewsAnalysis(
     const { skills, skillsDegraded } = await loadSkillsCached();
     const newsIds = news.map(n => n.id);
     const earningsDates = upcomingCalendar.map(c => c.earningsDate);
-    const inputHash = hashNewsInput(newsIds, earningsDates, skills);
+    const skillSampling = createSkillSamplingPlan(skills, tier, [
+        'news',
+        symbol,
+        modelId,
+        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        tier,
+        'news-ids',
+        ...newsIds.toSorted(),
+        'earnings-dates',
+        ...earningsDates.toSorted(),
+    ]);
+    const inputHash = hashNewsInput(
+        newsIds,
+        earningsDates,
+        tier,
+        skillSampling.skills
+    );
     const cacheKey = buildNewsCacheKey(
         symbol,
         modelId,
@@ -195,7 +221,7 @@ export async function submitNewsAnalysis(
         companyName,
         news,
         upcomingCalendar,
-        skills,
+        skillSampling.skills,
         options.assetClass ?? 'equity'
     );
     // Design C (A/B-gate validated): fold the always-on skill digest

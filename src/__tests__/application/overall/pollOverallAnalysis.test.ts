@@ -299,6 +299,66 @@ describe('pollOverallAnalysis 함수는', () => {
             warnSpy.mockRestore();
         });
 
+        describe('caller-tier timeframe 게이트 (pollAnalysis 패리티)', () => {
+            it('free caller가 회원이 제출한 1Hour(인트라데이) job을 poll하면 error를 반환한다', async () => {
+                mockGetJobMeta.mockResolvedValueOnce({
+                    ...mockMeta,
+                    timeframe: '1Hour' as const,
+                });
+                mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+                const result = await pollOverallAnalysis('job-gate-free', {
+                    tier: 'free',
+                });
+
+                expect(result).toEqual({
+                    status: 'error',
+                    error: 'Timeframe 1Hour is not available for free tier.',
+                });
+            });
+
+            it('member caller가 1Hour job을 poll하면 done을 반환한다', async () => {
+                mockGetJobMeta.mockResolvedValueOnce({
+                    ...mockMeta,
+                    timeframe: '1Hour' as const,
+                });
+                mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+                const result = await pollOverallAnalysis('job-gate-member', {
+                    tier: 'member',
+                });
+
+                expect(result.status).toBe('done');
+            });
+
+            it('tier 옵션을 생략하면 DEFAULT_TIER(free)로 게이트를 적용해 1Hour job에 error를 반환한다', async () => {
+                mockGetJobMeta.mockResolvedValueOnce({
+                    ...mockMeta,
+                    timeframe: '1Hour' as const,
+                });
+                mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+                const result = await pollOverallAnalysis('job-gate-omitted');
+
+                expect(result).toEqual({
+                    status: 'error',
+                    error: 'Timeframe 1Hour is not available for free tier.',
+                });
+            });
+
+            it('1Day job은 tier 생략(=free)이어도 done을 반환한다 (일봉은 free 허용)', async () => {
+                mockGetJobMeta.mockResolvedValueOnce({
+                    ...mockMeta,
+                    timeframe: '1Day' as const,
+                });
+                mockGetJobResult.mockResolvedValueOnce(rawOverallJson);
+
+                const result = await pollOverallAnalysis('job-gate-daily');
+
+                expect(result.status).toBe('done');
+            });
+        });
+
         it('echoes meta.optionsOiStale onto response.optionsOiStale', async () => {
             // The stale-OI flag is captured at submit time and stashed in the
             // job meta so the normalizer can attach it to the worker response

@@ -21,19 +21,16 @@ import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import { MS_PER_MINUTE } from '@/domain/constants/time';
 import { buildFundamentalCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    analysisSeed,
-    hashSkillCatalog,
-} from '@/infrastructure/hash/analysisInput';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import type {
     AnalysisType,
     FundamentalAnalysisResponse,
     FundamentalSnapshot,
-    Skill,
 } from '@/domain/types';
 
 /** Maximum time to wait for the worker to accept the fundamental analysis job. */
@@ -43,8 +40,6 @@ type ProviderFetchResult =
     | {
           status: 'ok';
           snapshot: FundamentalSnapshot;
-          skills: readonly Skill[];
-          skillsDegraded: true | undefined;
       }
     | SubmitFundamentalAnalysisFetchError;
 
@@ -68,7 +63,6 @@ async function fetchProviderData(
             priceTargetSummary,
             earningsReport,
             sectorSnapshot,
-            skillsResult,
         ] = await Promise.all([
             dataProvider.getProfile(symbol),
             dataProvider.getKeyMetricsTtm(symbol),
@@ -85,7 +79,6 @@ async function fetchProviderData(
             dataProvider.getSectorPerformanceSnapshot(
                 occurredAt.toISOString().slice(0, ISO_DATE_PREFIX_LENGTH)
             ),
-            loadSkillsCached(),
         ]);
 
         if (profile === null) {
@@ -128,8 +121,6 @@ async function fetchProviderData(
         return {
             status: 'ok',
             snapshot,
-            skills: skillsResult.skills,
-            skillsDegraded: skillsResult.skillsDegraded ? true : undefined,
         };
     } catch (error) {
         console.error(
@@ -211,15 +202,20 @@ export async function submitFundamentalAnalysis(
         }
     }
 
-    // Fold the skill-catalog fingerprint into the key so a gating/frontmatter
-    // change busts the cache. Hash the loaded catalog directly (mirrors
-    // submitAnalysis.ts); loadSkillsCached is memoized, so the catalog
-    // fetchProviderData loads on a miss is the same one hashed here.
-    const { skills: fingerprintSkills } = await loadSkillsCached();
+    // Sample before prompt relevance filtering so the cache key and prompt use
+    // the same tier-specific skill catalog.
+    const skillsResult = await loadSkillsCached();
+    const skillSampling = createSkillSamplingPlan(skillsResult.skills, tier, [
+        'fundamental',
+        symbol,
+        modelId,
+        options.reasoning === true ? 'reasoning-on' : 'reasoning-off',
+        tier,
+    ]);
     const cacheKey = buildFundamentalCacheKey(
         symbol,
         modelId,
-        hashSkillCatalog(fingerprintSkills),
+        `${tier}:${skillSampling.fingerprint}`,
         options.reasoning
     );
     const cache = createCacheProvider();
@@ -255,13 +251,13 @@ export async function submitFundamentalAnalysis(
         occurredAt
     );
     if (providerData.status === 'error') return providerData;
-    const { snapshot, skills, skillsDegraded } = providerData;
+    const { snapshot } = providerData;
 
     const { workerUrl, workerSecret } = readWorkerConfig();
     const { stable, dynamic } = buildFundamentalAnalysisPrompt(
         symbol,
         snapshot,
-        skills
+        skillSampling.skills
     );
     // Design C (A/B-gate validated): fold the always-on skill digest
     // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
@@ -276,7 +272,7 @@ export async function submitFundamentalAnalysis(
         symbol,
         modelId,
         cacheKey,
-        ...(skillsDegraded && { skillsDegraded }),
+        ...(skillsResult.skillsDegraded && { skillsDegraded: true }),
     });
 
     const userApiKeyHeader: Record<string, string> =

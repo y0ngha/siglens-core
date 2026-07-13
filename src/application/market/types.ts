@@ -7,9 +7,11 @@ import type {
 import type {
     AnalysisResponse,
     AssetClass,
+    FilteredAnalysisResponse,
     ModelId,
     Tier,
     TierConfig,
+    TierInfoDepth,
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
@@ -79,6 +81,20 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
+ * Options controlling a public analysis poll response.
+ *
+ * The resolved caller tier is intentionally supplied at poll time: a job can
+ * outlive a tier change, and its submit-time tier must never determine what a
+ * later caller can read.
+ */
+export interface PollAnalysisOptions extends BackgroundTaskOptions {
+    /** Resolved tier of the caller receiving this poll response. */
+    tier?: Tier;
+    /** Tier policy used to filter this poll response. */
+    tierConfig?: TierConfig;
+}
+
+/**
  * Error returned when application tier gates block a timeframe request.
  */
 export interface TierTimeframeAccessError {
@@ -121,7 +137,11 @@ export interface SubmitAnalysisMissNoTrigger {
 
 /** Submit analysis outcome including application-level gate errors. */
 export type SubmitAnalysisGatedResult =
-    | { status: 'cached'; result: AnalysisResponse }
+    | {
+          status: 'cached';
+          result: AnalysisResponse | FilteredAnalysisResponse;
+          lockedInfoDepth: readonly TierInfoDepth[];
+      }
     | { status: 'submitted'; jobId: string }
     | SubmitAnalysisMissNoTrigger
     | SubmitAnalysisErrorResult;
