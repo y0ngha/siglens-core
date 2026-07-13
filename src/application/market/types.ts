@@ -4,6 +4,7 @@ import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
 } from '@/application/usage/types';
+import { getAllowedTimeframes } from '@/domain/tier';
 import type {
     AnalysisResponse,
     AssetClass,
@@ -15,7 +16,6 @@ import type {
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
-import { getAllowedTimeframes } from '@/domain/tier';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 export type { UserApiKeyRequiredError };
@@ -120,6 +120,25 @@ export interface TierGateErrorResult {
 }
 
 /**
+ * @internal
+ * Build the human-readable "timeframe not allowed" message shared by the
+ * submit-path {@link buildTimeframeNotAllowedError} and both poll paths
+ * (`pollAnalysis`, `pollOverallAnalysis`) so the wording never drifts between
+ * the three call sites that report the same denial.
+ *
+ * @param tier - Tier used for the access decision.
+ * @param timeframe - Timeframe requested by the caller.
+ * @returns The message string embedded in the timeframe-gate error/result.
+ */
+export function timeframeNotAllowedMessage(
+    tier: Tier,
+    timeframe: Timeframe
+): string {
+    return `Timeframe ${timeframe} is not available for ${tier} tier.`;
+}
+
+/**
+ * @internal
  * Build the {@link TierTimeframeAccessError} payload for a denied timeframe
  * request. Shared by every submit use-case that runs the timeframe gate
  * (`submitAnalysis`'s `submitAnalysisWithVisibility` and
@@ -140,7 +159,7 @@ export function buildTimeframeNotAllowedError(
 ): TierTimeframeAccessError {
     return {
         code: 'timeframe_not_allowed',
-        message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
+        message: timeframeNotAllowedMessage(tier, timeframe),
         tier,
         timeframe,
         allowedTimeframes: getAllowedTimeframes(tier, tierConfig),

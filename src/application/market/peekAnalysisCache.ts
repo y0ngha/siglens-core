@@ -3,6 +3,7 @@ import {
     normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
     AnalysisResponse,
     FilteredAnalysisResult,
@@ -11,7 +12,6 @@ import type {
     TierConfig,
     Timeframe,
 } from '@/domain/types';
-import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import {
     buildAnalysisCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
@@ -87,8 +87,15 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) key — the
  *   default every existing caller reads today.
+ * @param tier - Caller's resolved subscription tier. Gates which timeframes may
+ *   be peeked, mirroring {@link peekOverallAnalysisCache}'s tier gate (invariant 5): a
+ *   disallowed caller-tier/timeframe combination resolves to `null` before the
+ *   cache is even read, so a free/anon caller can never surface an intraday
+ *   analysis that a member/pro submitter generated. Defaults to {@link DEFAULT_TIER}.
+ * @param tierConfig - Tier configuration override, mainly for tests and
+ *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
  * @returns The tier-filtered cached response on a valid hit, or `null` on a
- *   miss / corrupt entry.
+ *   miss / corrupt entry / disallowed caller-tier timeframe.
  *
  * @example
  * ```ts

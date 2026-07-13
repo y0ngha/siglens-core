@@ -1,4 +1,5 @@
 import { cleanupInBackground, fireAndForget } from '@/application/background';
+import { timeframeNotAllowedMessage } from '@/application/market/types';
 import type {
     PollOverallAnalysisOptions,
     PollOverallAnalysisResult,
@@ -188,7 +189,7 @@ export async function pollOverallAnalysis(
     ) {
         return {
             status: 'error',
-            error: `Timeframe ${meta.timeframe} is not available for ${callerTier} tier.`,
+            error: timeframeNotAllowedMessage(callerTier, meta.timeframe),
         };
     }
 

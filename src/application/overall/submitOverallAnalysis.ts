@@ -260,7 +260,7 @@ export async function submitOverallAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    // ── 2. All four cached — hash combined inputs and check overall cache ──
+    // ── 4. All four cached: hash combined inputs and check overall cache ──
     // Strip volatile fields from each axis result before hashing so that
     // re-polling a stable analysis produces the same overall cache key.
     // - `analyzedAt` is set per poll on the technical axis (see pollAnalysis)
@@ -327,7 +327,7 @@ export async function submitOverallAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    // ── 3. Build prompt, enqueue job, fire-and-forget worker POST ──
+    // ── 5. Build prompt, enqueue job, fire-and-forget worker POST ──
 
     // Daily fearGreed snapshot — injected as the sentiment context for the overall prompt.
     // Computed directly from daily raw data rather than reusing the technical-axis

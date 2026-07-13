@@ -1,10 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
-import { buildTimeframeNotAllowedError } from '@/application/market/types';
-import type {
-    SubmitAnalysisGatedResult,
-    SubmitAnalysisOptions,
+import {
+    buildTimeframeNotAllowedError,
+    type SubmitAnalysisGatedResult,
+    type SubmitAnalysisOptions,
 } from '@/application/market/types';
 import {
     buildUsageLimitError,

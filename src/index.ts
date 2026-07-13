@@ -436,6 +436,7 @@ export type {
 } from './application/congress/types';
 export type {
     AnalysisUsageOptions,
+    PollAnalysisOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisMissNoTrigger,
     SubmitAnalysisOptions,
@@ -473,6 +474,7 @@ export type {
 } from './application/news/types';
 export type {
     OverallAxis,
+    PollOverallAnalysisOptions,
     PollOverallAnalysisResult,
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,

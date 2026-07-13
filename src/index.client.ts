@@ -346,10 +346,12 @@ export type {
     RequestChatCompletionDependencies,
 } from './application/chat/types';
 export type {
+    PollAnalysisOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisMissNoTrigger,
     UserApiKeyRequiredError,
 } from './application/market/types';
+export type { PollOverallAnalysisOptions } from './application/overall/types';
 export type {
     AnalysisLimitError,
     AnalysisLimitErrorCode,
