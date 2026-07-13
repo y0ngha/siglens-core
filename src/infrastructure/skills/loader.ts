@@ -15,7 +15,6 @@ import type {
     SignalKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
-import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import { USAGE_ROLE_ORDER } from '@/domain/analysis/confidenceLevel';
 import type { LoadSkillsCachedResult } from './types';
 
@@ -522,27 +521,6 @@ export async function loadSkillsCached(): Promise<LoadSkillsCachedResult> {
         _cachedSkillsDegraded = true;
     }
     return { skills: _cachedSkills, skillsDegraded: _cachedSkillsDegraded };
-}
-
-/**
- * Deterministic fingerprint of the cached skill catalog's selection metadata,
- * folded into the chart and fundamental cache keys.
- *
- * This is the single named source of the read/write key contract: every app
- * site that builds an analysis cache key derives the fingerprint through this
- * helper, so the submit (write) and peek (read) paths cannot drift. Because
- * {@link loadSkillsCached} is memoized, repeated calls reuse the loaded catalog.
- *
- * `pollAnalysis` is the intentional exception — it fingerprints its own
- * provider-loaded `skills` (the load that fed `enrichAnalysisWithConfidence`),
- * so the cached label always matches the data actually used by that path.
- *
- * @returns 16-character lowercase hex prefix of the SHA-256 digest.
- * @internal
- */
-export async function getSkillCatalogFingerprint(): Promise<string> {
-    const { skills } = await loadSkillsCached();
-    return hashSkillCatalog(skills);
 }
 
 /**

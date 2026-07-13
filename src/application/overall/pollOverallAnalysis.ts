@@ -35,12 +35,17 @@ import {
  *   {@link peekOverallAnalysisCache}. The peek key is written only when `meta`
  *   carries all of `symbol`, `timeframe`, and `modelId`.
  *
- * **Caller-tier timeframe gate:** mirrors {@link pollAnalysis}'s invariant 5.
- * The `done` path re-checks the *resolved caller tier* (from `options.tier`,
- * defaulting to `DEFAULT_TIER`) against `meta.timeframe` via
+ * **Caller-tier timeframe gate:** mirrors {@link pollAnalysis}'s invariant 5,
+ * but ONLY that timeframe gate, not `pollAnalysis`'s info-depth field
+ * filtering. The `done` path re-checks the *resolved caller tier* (from
+ * `options.tier`, defaulting to `DEFAULT_TIER`) against `meta.timeframe` via
  * {@link isTimeframeAllowed}, independent of the tier that submitted the job.
  * A tier change or downgrade between submit and poll must never leak an
- * intraday result the current caller is not entitled to.
+ * intraday result the current caller is not entitled to. `filterAnalysisResult`
+ * (per-field info-depth masking of `keyLevels` / `indicatorResults` / etc.) is
+ * intentionally NOT applied here: `OverallAnalysisResponse` is a synthesized
+ * headline/bullet narrative with no per-field gated detail to mask, so there
+ * is nothing for that filter to act on.
  *
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).

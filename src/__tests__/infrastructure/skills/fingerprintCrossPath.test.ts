@@ -8,9 +8,9 @@ import type { Dirent } from 'node:fs';
 import {
     createSkillsProvider,
     loadSkillsCached,
-    getSkillCatalogFingerprint,
     clearSkillsCache,
 } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import { withDigest } from '@/__tests__/infrastructure/skills/digestFixture';
 
@@ -76,16 +76,18 @@ ${withDigest('Bollinger body')}`;
 /**
  * C1 — determinism guard for the SHARED skill-catalog fingerprint.
  *
- * Every cache-key site funnels through the SAME single loader: `pollAnalysis`
- * (write path), `submitAnalysis` (write path), and `peekAnalysisCache` (read
- * path) all ultimately run `FileSkillsLoader.loadSkills()` — directly, or via
- * `loadSkillsCached()` / `getSkillCatalogFingerprint()`, which wrap that one
- * loader — and then `hashSkillCatalog`. Because there is only one loader and
- * one hash, this suite is NOT a cross-call-site drift guard: it cannot catch a
- * future edit that makes two production sites compute the fingerprint
- * differently, since the test re-derives both sides from that same shared
- * loader rather than from the production call sites themselves. (No production
- * site exposes a pure fingerprint helper to import and compare against, so a
+ * Every cache-key site funnels through the SAME single loader:
+ * `submitAnalysis` (write path) and `peekAnalysisCache` (read path) both call
+ * `loadSkillsCached()` to load the raw catalog, then tier-sample it through
+ * `createSkillSamplingPlan()` (which internally hashes the SAMPLED set via
+ * `hashSkillCatalog`). `pollAnalysis` is the intentional exception documented
+ * on `loadSkillsCached`: it fingerprints its own provider-loaded skills
+ * directly. Because there is only one loader, one sampler, and one hash, this
+ * suite is NOT a cross-call-site drift guard: it cannot catch a future edit
+ * that makes two production sites compute the fingerprint differently, since
+ * the test re-derives both sides from that same shared loader/sampler rather
+ * than from the production call sites themselves. (No production site
+ * exposes a pure fingerprint helper to import and compare against, so a
  * genuine parity assertion across sites is not available here.)
  *
  * What it DOES prove — and what would genuinely fail if regressed — is that the
@@ -95,7 +97,12 @@ ${withDigest('Bollinger body')}`;
  *     sorts by `name` (the falsifiable core of this suite);
  *   - dedupe + projection stability: the loader's by-`name` dedupe and the
  *     `name`/`gating`/`tokenCost` projection feed the hash consistently for the
- *     mixed `always_on` / event-gated / state-gated catalog below.
+ *     mixed `always_on` / event-gated / state-gated catalog below;
+ *   - the tier-sampling fingerprint (`createSkillSamplingPlan`, the composition
+ *     the real submit/peek paths use) is itself deterministic across two calls
+ *     with identical (skills, tier, seedParts) and equals `hashSkillCatalog`
+ *     of its own sampled set, so the read/write cache-key parity holds on the
+ *     tier-sampled fingerprint, not the raw unsampled catalog.
  *
  * The byte-identical assertions below therefore document that the read and
  * write paths share one deterministic fingerprint source — not that two
@@ -186,7 +193,7 @@ describe('C1: shared skill-catalog fingerprint determinism (order/dedupe/project
         expect(pollFingerprint).toBe(readFingerprint);
     });
 
-    it('the real peek entry point getSkillCatalogFingerprint matches a direct loader+hash', async () => {
+    it('createSkillSamplingPlan, the shared write/read tier-sampling step, is deterministic for identical (skills, tier, seedParts)', async () => {
         mockReaddir.mockResolvedValue([
             makeDirent('rsi.md'),
             makeDirent('bollinger.md'),
@@ -194,11 +201,14 @@ describe('C1: shared skill-catalog fingerprint determinism (order/dedupe/project
         mockReadFile
             .mockResolvedValueOnce(EVENT_GATED)
             .mockResolvedValueOnce(STATE_GATED);
-        // Reference value: a direct `loadSkills()` + `hashSkillCatalog`, the
-        // same composition the write paths use.
-        const directFingerprint = hashSkillCatalog(
-            await createSkillsProvider().loadSkills()
-        );
+        // Conceptual write path: submitAnalysis loads via loadSkillsCached()
+        // then tier-samples the loaded catalog.
+        const { skills: writeSkills } = await loadSkillsCached();
+        const writePlan = createSkillSamplingPlan(writeSkills, 'free', [
+            'technical',
+            'AAPL',
+            '1Day',
+        ]);
 
         clearSkillsCache();
         mockReaddir.mockResolvedValue([
@@ -208,14 +218,21 @@ describe('C1: shared skill-catalog fingerprint determinism (order/dedupe/project
         mockReadFile
             .mockResolvedValueOnce(EVENT_GATED)
             .mockResolvedValueOnce(STATE_GATED);
-        // This DOES exercise the real production peek entry point
-        // (`getSkillCatalogFingerprint`, the exact function peekAnalysisCache
-        // calls), pinning that its internal `loadSkillsCached` + `hashSkillCatalog`
-        // wiring stays equivalent to the direct composition above. It still does
-        // not compare against pollAnalysis's own in-line expression (which is not
-        // exported), so it is not a full cross-site parity check.
-        const peekFingerprint = await getSkillCatalogFingerprint();
+        // Conceptual read path: peekAnalysisCache loads via the same
+        // loadSkillsCached() then tier-samples with the same seed parts, so
+        // it must reproduce the exact write-path fingerprint.
+        const { skills: readSkills } = await loadSkillsCached();
+        const readPlan = createSkillSamplingPlan(readSkills, 'free', [
+            'technical',
+            'AAPL',
+            '1Day',
+        ]);
 
-        expect(peekFingerprint).toBe(directFingerprint);
+        expect(readPlan.fingerprint).toBe(writePlan.fingerprint);
+        // The plan's fingerprint is exactly hashSkillCatalog of the SAMPLED
+        // set (not the raw catalog), which is what createSkillSamplingPlan
+        // pins internally.
+        expect(writePlan.fingerprint).toBe(hashSkillCatalog(writePlan.skills));
+        expect(readPlan.fingerprint).toBe(hashSkillCatalog(readPlan.skills));
     });
 });

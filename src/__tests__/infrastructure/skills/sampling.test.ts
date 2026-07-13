@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import type { Skill, SkillType } from '@/domain/types';
 
@@ -112,5 +115,19 @@ describe('createSkillSamplingPlan 함수는', () => {
             expect(seedAB.fingerprint).not.toBe(seedSpaced.fingerprint);
             expect(seedAB.skills).not.toEqual(seedConcatenated.skills);
         });
+    });
+});
+
+describe('reasoningSeedPart 함수는', () => {
+    it("reasoning이 true이면 'reasoning-on'을 반환한다", () => {
+        expect(reasoningSeedPart(true)).toBe('reasoning-on');
+    });
+
+    it("reasoning이 false이면 'reasoning-off'를 반환한다", () => {
+        expect(reasoningSeedPart(false)).toBe('reasoning-off');
+    });
+
+    it("reasoning이 undefined이면 'reasoning-off'를 반환한다", () => {
+        expect(reasoningSeedPart(undefined)).toBe('reasoning-off');
     });
 });

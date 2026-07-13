@@ -65,11 +65,15 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) "latest"
  *   pointer — the default every existing caller reads today.
  * @param tier - Caller's resolved subscription tier. Gates which timeframes may
- *   be peeked, mirroring {@link peekAnalysisCache}'s tier gate (invariant 5): a
- *   disallowed caller-tier/timeframe combination resolves to `null` before the
- *   "latest" key is read, so a free/anon caller can never surface an
- *   intraday overall analysis that a member/pro submitter generated. Defaults
- *   to {@link DEFAULT_TIER}.
+ *   be peeked, mirroring {@link peekAnalysisCache}'s tier gate (invariant 5),
+ *   but ONLY that timeframe gate, not `peekAnalysisCache`'s info-depth field
+ *   filtering. A disallowed caller-tier/timeframe combination resolves to
+ *   `null` before the "latest" key is read, so a free/anon caller can never
+ *   surface an intraday overall analysis that a member/pro submitter
+ *   generated. `filterAnalysisResult` (per-field info-depth masking) is
+ *   intentionally NOT applied here: `OverallAnalysisResponse` is a synthesized
+ *   headline/bullet narrative with no per-field gated detail to mask, so there
+ *   is nothing for that filter to act on. Defaults to {@link DEFAULT_TIER}.
  * @param tierConfig - Tier configuration override, mainly for tests and
  *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
  * @returns The cached {@link OverallAnalysisResponse} on a valid hit, or `null`

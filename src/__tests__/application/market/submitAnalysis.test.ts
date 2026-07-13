@@ -43,7 +43,10 @@ vi.mock('@/domain/patterns', async importOriginal => {
     };
 });
 
-import { submitAnalysis } from '@/application/market/submitAnalysis';
+import {
+    submitAnalysis,
+    submitAnalysisForOverall,
+} from '@/application/market/submitAnalysis';
 import {
     DEFAULT_ANALYSIS_MODEL_ID,
     PROMPT_TEMPLATE_VERSION,
@@ -476,6 +479,45 @@ describe('submitAnalysis 함수는', () => {
                 undefined
             );
             expect(mockFetch).toHaveBeenCalled();
+        });
+    });
+
+    describe('submitAnalysisForOverall (internal visibility) 캐시 히트일 때', () => {
+        it('free tier 호출자여도 필터링 없이 전체 AnalysisResponse를 반환하고 lockedInfoDepth는 빈 배열이다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockResult);
+
+            const result = await submitAnalysisForOverall(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'free' },
+                }
+            );
+
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                // Unfiltered: gated fields stay populated instead of being
+                // nulled out by filterAnalysisResult, because the 'internal'
+                // response visibility branch (submitAnalysis.ts) bypasses
+                // paywall filtering for overall prompt composition.
+                expect(result.result.indicatorResults).not.toBeNull();
+                expect(result.result.indicatorResults).toEqual(
+                    mockResult.indicatorResults
+                );
+                expect(result.result.keyLevels).not.toBeNull();
+                expect(result.result.keyLevels).toEqual(mockResult.keyLevels);
+                expect(result.result).toMatchObject({
+                    summary: mockResult.summary,
+                    trend: mockResult.trend,
+                });
+                expect(result.lockedInfoDepth).toEqual([]);
+            }
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
         });
     });
 
