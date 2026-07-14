@@ -1,11 +1,19 @@
-import type { Skill, SkillType, Tier } from '@/domain/types';
+import type { Skill, SkillCategory, SkillType, Tier } from '@/domain/types';
 
 const FREE_TIER_GROUP_CAP = 3;
 const REGULAR_GROUP_KEY = 'regular';
 const FNV_OFFSET_BASIS = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
 
-type SkillGroupKey = SkillType | typeof REGULAR_GROUP_KEY;
+/**
+ * Technical skills (`type: 'pattern' | 'indicator_guide' | 'strategy' |
+ * 'candlestick' | 'support_resistance'`) always carry a `SkillType`, so they
+ * group by `type`. Fundamental/news/congress skills carry no `type` (only a
+ * `SkillCategory`), so they fall back to grouping by `category`. This keeps
+ * each of those categories independently capped instead of being merged into
+ * one shared bucket (see `groupKeyOf`).
+ */
+type SkillGroupKey = SkillType | SkillCategory | typeof REGULAR_GROUP_KEY;
 
 interface RankedSkill {
     skill: Skill;
@@ -15,8 +23,17 @@ interface RankedSkill {
 
 const byStringEn = (a: string, b: string): number => a.localeCompare(b, 'en');
 
+/**
+ * Every technical skill carries a `type`, so `skill.type ?? skill.category`
+ * resolves to `skill.type` for them (unchanged: <=3 per technical type).
+ * Fundamental/news/congress skills carry no `type`, only a `category`, so
+ * they fall back to `skill.category`, giving each of those categories its
+ * own <=3 cap. Without this fallback, all type-less skills would collapse
+ * into one shared `REGULAR_GROUP_KEY` bucket and a downstream per-category
+ * prompt filter (e.g. congress-only) could be starved to zero skills.
+ */
 const groupKeyOf = (skill: Skill): SkillGroupKey =>
-    skill.type ?? REGULAR_GROUP_KEY;
+    skill.type ?? skill.category ?? REGULAR_GROUP_KEY;
 
 const stableSerialize = (value: unknown): string => {
     if (Array.isArray(value)) {
@@ -73,7 +90,11 @@ const rankSkill = (
  * @internal
  *
  * Deterministically caps the free-tier catalog to at most three skills per
- * prompt-injection group before any later relevance filtering.
+ * prompt-injection group before any later relevance filtering. The group is
+ * `skill.type` for technical skills, or `skill.category` for the type-less
+ * fundamental/news/congress skills (see `groupKeyOf`), so each analysis kind
+ * is capped independently and a downstream category filter can never be
+ * starved to zero.
  */
 export function sampleSkillsForTier(
     skills: readonly Skill[],

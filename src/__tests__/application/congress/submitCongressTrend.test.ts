@@ -450,6 +450,86 @@ describe('submitCongressTrend 함수는', () => {
                 mockCacheGet.mock.calls[1]?.[0]
             );
         });
+
+        it('free tier never starves congress skills to zero when the loaded catalog mixes non-technical categories', async () => {
+            // Regression fixture for the sampleSkillsForTier "mixed catalog"
+            // bug: fundamental/news/congress skills all carry a `category`
+            // but no `type`. Before the fix, all three collapsed into one
+            // shared 'regular' bucket capped at 3 total, so this 12-skill
+            // catalog (4 per category) could sample zero congress skills
+            // into the prompt even though congressTrendPrompt only keeps
+            // `category === 'congress'` skills. With the fix, congress gets
+            // its own <=3 cap independent of fundamental/news.
+            const congressSkills = makeCongressSkills();
+            const fundamentalSkills: Skill[] = Array.from(
+                { length: 4 },
+                (_, index) => ({
+                    name: `fundamental-skill-${index}`,
+                    description: `fundamental skill ${index}`,
+                    category: 'fundamental',
+                    indicators: [],
+                    confidenceWeight: 1,
+                    content: `fundamental-skill-content-${index}`,
+                    gating: { tier: 'always_on' },
+                })
+            );
+            const newsSkills: Skill[] = Array.from(
+                { length: 4 },
+                (_, index) => ({
+                    name: `news-skill-${index}`,
+                    description: `news skill ${index}`,
+                    category: 'news',
+                    indicators: [],
+                    confidenceWeight: 1,
+                    content: `news-skill-content-${index}`,
+                    gating: { tier: 'always_on' },
+                })
+            );
+            const mixedSkills = [
+                ...congressSkills,
+                ...fundamentalSkills,
+                ...newsSkills,
+            ];
+            mockLoadSkillsCached.mockResolvedValue({
+                skills: mixedSkills,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitCongressTrend({ ...BASE_OPTIONS, tier: 'free' });
+
+            const body = JSON.parse(
+                mockFetch.mock.calls.at(-1)?.[1].body as string
+            ) as { system: string };
+            const congressNamesInPrompt = congressSkills
+                .filter(skill => body.system.includes(skill.content))
+                .map(skill => skill.name);
+
+            expect(congressNamesInPrompt.length).toBeGreaterThan(0);
+            expect(congressNamesInPrompt).toHaveLength(3);
+            // Fundamental/news content must never leak into the congress
+            // prompt (congressTrendPrompt filters by category, independent
+            // of this grouping fix).
+            expect(
+                [...fundamentalSkills, ...newsSkills].some(skill =>
+                    body.system.includes(skill.content)
+                )
+            ).toBe(false);
+
+            // Cross-check at the sampling-plan level, independent of prompt
+            // wiring: the free plan itself must retain 3 congress skills.
+            const freePlan = createSkillSamplingPlan(mixedSkills, 'free', [
+                'congress',
+                'AAPL',
+                'gemini-2.5-flash',
+                'reasoning-off',
+                'free',
+            ]);
+            expect(
+                freePlan.skills.filter(skill => skill.category === 'congress')
+                    .length
+            ).toBe(3);
+        });
     });
 
     describe('거래가 0건일 때', () => {

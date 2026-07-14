@@ -18,7 +18,7 @@ const SKILL_USAGE_ROLES = [
     'risk',
 ] as const;
 
-type GroupKey = SkillType | 'regular';
+type GroupKey = SkillType | SkillCategory | 'regular';
 
 const makeSkill = (
     name: string,
@@ -34,14 +34,17 @@ const makeSkill = (
     content: `${name} content`,
 });
 
-const makeGroup = (group: GroupKey): Skill[] =>
+/**
+ * `'regular'` is a real fallback group only for skills that carry neither a
+ * `type` nor a `category`; every other group here builds skills that carry
+ * exactly one `SkillType`. The multi-category (fundamental/news/congress)
+ * fallback-by-category scenario is covered separately, below, in
+ * `describe('free tier: non-technical categories', ...)`.
+ */
+const makeGroup = (group: SkillType | 'regular'): Skill[] =>
     Array.from({ length: 5 }, (_, index) =>
         group === 'regular'
-            ? makeSkill(
-                  `${group}-${index}`,
-                  undefined,
-                  index % 2 === 0 ? 'fundamental' : 'news'
-              )
+            ? makeSkill(`${group}-${index}`)
             : makeSkill(`${group}-${index}`, group)
     );
 
@@ -73,7 +76,8 @@ const stableSerialize = (value: unknown): string => {
 const identitiesOf = (skills: readonly Skill[]): string[] =>
     skills.map(stableSerialize);
 
-const groupOf = (skill: Skill): GroupKey => skill.type ?? 'regular';
+const groupOf = (skill: Skill): GroupKey =>
+    skill.type ?? skill.category ?? 'regular';
 
 describe('sampleSkillsForTier', () => {
     describe('free tier', () => {
@@ -182,6 +186,80 @@ describe('sampleSkillsForTier', () => {
                 sampleSkillsForTier(variants, 'free', 'seed-a')
             );
         });
+    });
+
+    describe('free tier: non-technical categories', () => {
+        /**
+         * Regression fixture for the "mixed catalog" bug: technical skills
+         * carry a `type`, but fundamental/news/congress skills carry only a
+         * `category`. Before the `groupKeyOf` fallback-to-category fix, ALL
+         * type-less skills (regardless of category) collapsed into one
+         * shared `'regular'` bucket, so the free-tier cap of 3 applied
+         * across fundamental+news+congress COMBINED rather than per
+         * category. A downstream per-category prompt filter (e.g.
+         * `congressTrendPrompt` keeping only `category === 'congress'`)
+         * could then be starved to zero congress skills even though 5 were
+         * loaded. This suite asserts each category is capped independently.
+         */
+        const TECHNICAL_TYPE: SkillType = 'indicator_guide';
+        const NON_TECHNICAL_CATEGORIES: readonly SkillCategory[] = [
+            'fundamental',
+            'news',
+            'congress',
+        ];
+
+        const makeCategorySkills = (category: SkillCategory): Skill[] =>
+            Array.from({ length: 5 }, (_, index) =>
+                makeSkill(`${category}-${index}`, undefined, category)
+            );
+
+        const mixedCatalog: Skill[] = [
+            ...Array.from({ length: 5 }, (_, index) =>
+                makeSkill(`technical-${index}`, TECHNICAL_TYPE)
+            ),
+            ...NON_TECHNICAL_CATEGORIES.flatMap(makeCategorySkills),
+        ];
+
+        it('caps the technical type group and each non-technical category independently at three, starving none', () => {
+            const sampled = sampleSkillsForTier(mixedCatalog, 'free', 'seed-a');
+
+            const countOf = (group: SkillType | SkillCategory): number =>
+                sampled.filter(skill => groupOf(skill) === group).length;
+
+            expect(countOf(TECHNICAL_TYPE)).toBe(3);
+            expect(countOf('fundamental')).toBe(3);
+            expect(countOf('news')).toBe(3);
+            expect(countOf('congress')).toBe(3);
+            expect(sampled).toHaveLength(12);
+        });
+
+        it('regression: congress is never starved to zero for a mixed non-technical catalog (would fail under the old shared-regular-bucket grouping)', () => {
+            const sampled = sampleSkillsForTier(mixedCatalog, 'free', 'seed-a');
+            const congressCount = sampled.filter(
+                skill => skill.category === 'congress'
+            ).length;
+
+            // Under the pre-fix `groupKeyOf` (`skill.type ?? 'regular'`), all
+            // 15 non-technical skills here (fundamental+news+congress) would
+            // share one 'regular' bucket capped at 3 total, so congress could
+            // easily land at 0. The fix caps congress in its own bucket.
+            expect(congressCount).toBeGreaterThan(0);
+            expect(congressCount).toBe(3);
+        });
+
+        it.each(['member', 'pro'] as const)(
+            'keeps the complete mixed catalog for the %s tier',
+            tier => {
+                const result = sampleSkillsForTier(
+                    mixedCatalog,
+                    tier,
+                    'seed-a'
+                );
+
+                expect(result).toEqual(mixedCatalog);
+                expect(result).not.toBe(mixedCatalog);
+            }
+        );
     });
 
     describe('member and pro tiers', () => {
