@@ -243,9 +243,21 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * warm-cache cold start is acceptable" policy, not a sign that the
  * fundamental template changed.
  *
+ * @remarks
+ * **`p6` = free-tier skill sampling (free-analysis-tier-gating spec).** The
+ * loaded skill catalog is now deterministically sampled per tier before
+ * assembly (`sampleSkillsForTier` via `createSkillSamplingPlan`): free-tier
+ * requests cap each skill-type group to at most 3 skills, changing which
+ * skills' digests reach both the technical AND fundamental prompts. Callers
+ * now pass `${tier}:${sampledSkillFingerprint}` as the `skillFingerprint`
+ * segment (see {@link buildAnalysisCacheKey} / {@link buildFundamentalCacheKey}),
+ * so free and non-free requests, and different sampled subsets, never share a
+ * cache entry. Bumped to invalidate warm caches carrying pre-tier-gating
+ * (unfiltered) content.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -525,9 +537,19 @@ export function buildFundamentalCacheKey(
  * Schema/Rules and every other section stay in `dynamic`, in the unchanged
  * production order, changing this template's prompt bytes.
  *
+ * @remarks
+ * **`p5` = free-tier skill sampling (free-analysis-tier-gating spec).** The
+ * financials builder now routes its loaded skills through
+ * `createSkillSamplingPlan` before assembly, capping each skill-type group to
+ * at most 3 skills for the free tier and changing this template's prompt
+ * bytes. The financials cache key now folds `${tier}:${sampledSkillFingerprint}`
+ * as its `skillFingerprint` segment (see {@link buildFinancialsCacheKey}),
+ * so free and non-free requests never share a cache entry. Bumped to
+ * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -603,9 +625,19 @@ export function buildFinancialsCacheKey(
  * Schema/Rules and every other section stay in `dynamic`, in the unchanged
  * production order, changing this template's prompt bytes.
  *
+ * @remarks
+ * **`p4` = free-tier skill sampling (free-analysis-tier-gating spec).** The
+ * congress builder now routes its loaded skills through
+ * `createSkillSamplingPlan` before assembly, capping each skill-type group to
+ * at most 3 skills for the free tier and changing this template's prompt
+ * bytes. The congress cache key now folds `${tier}:${sampledSkillFingerprint}`
+ * as its `skillFingerprint` segment (see {@link buildCongressTrendCacheKey}),
+ * so free and non-free requests never share a cache entry. Bumped to
+ * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
+ *
  * @internal
  */
-export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /** @internal TTL for congressional-trade trend analysis cache results. Default: 24 hours. */
 export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
@@ -692,9 +724,20 @@ export function buildCongressTrendCacheKey(
  * every other section stay in `dynamic`, in the unchanged production order,
  * changing both templates' prompt bytes.
  *
+ * @remarks
+ * **`p4` = free-tier skill sampling (free-analysis-tier-gating spec).** Both
+ * builders now route their loaded skills through `createSkillSamplingPlan`
+ * before assembly, capping each skill-type group to at most 3 skills for the
+ * free tier and changing both templates' prompt bytes. Since neither
+ * {@link buildNewsCacheKey} nor {@link buildMarketNewsDigestCacheKey} carries a
+ * separate `skillFingerprint` segment, `tier` and the sampled-skill
+ * fingerprint are instead folded into the `inputHash` these functions already
+ * take, so free and non-free requests never share a cache entry. Bumped to
+ * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.

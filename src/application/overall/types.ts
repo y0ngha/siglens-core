@@ -566,11 +566,28 @@ export type SubmitOverallAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
+ * Options controlling a public overall-analysis poll response.
+ *
+ * Mirrors {@link PollAnalysisOptions} (`@/application/market/types`): the
+ * resolved caller tier is intentionally supplied at poll time so a job can
+ * outlive a tier change, and its submit-time tier must never determine what
+ * a later caller can read.
+ */
+export interface PollOverallAnalysisOptions extends BackgroundTaskOptions {
+    /** Resolved tier of the caller receiving this poll response. */
+    tier?: Tier;
+    /** Tier policy used to gate this poll response's timeframe. */
+    tierConfig?: TierConfig;
+}
+
+/**
  * Outcome of {@link pollOverallAnalysis}: still processing, finished, or errored.
  *
  * - `processing` — the worker has not finished yet; caller should retry.
  * - `done` — the overall analysis is ready; result is embedded.
- * - `error` — the worker reported a failure or the payload could not be normalized.
+ * - `error`: the worker reported a failure, the payload could not be
+ *   normalized, or the caller tier is not allowed to access the job's
+ *   timeframe (parity with {@link pollAnalysis}'s caller-tier timeframe gate).
  */
 export type PollOverallAnalysisResult =
     | { status: 'processing' }

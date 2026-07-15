@@ -10,7 +10,7 @@ vi.mock('@/application/options/submitOptionsAnalysis');
 
 import { resolveOverallDependencies } from '@/application/overall/dependencyResolver';
 import type { OverallDependencyInputs } from '@/application/overall/types';
-import { submitAnalysis } from '@/application/market/submitAnalysis';
+import { submitAnalysisForOverall } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
@@ -27,7 +27,7 @@ import {
     minimalProvider,
 } from './fixtures';
 
-const mockSubmitAnalysis = submitAnalysis as Mock;
+const mockSubmitAnalysis = submitAnalysisForOverall as Mock;
 const mockSubmitFundamentalAnalysis = submitFundamentalAnalysis as Mock;
 const mockSubmitNewsAnalysis = submitNewsAnalysis as Mock;
 const mockSubmitOptionsAnalysis = submitOptionsAnalysis as Mock;
@@ -419,7 +419,7 @@ describe('resolveOverallDependencies 함수는', () => {
     });
 
     describe('inputs 전달 확인', () => {
-        it('submitAnalysis 에 symbol, timeframe 이 올바르게 전달된다', async () => {
+        it('internal technical helper에 symbol, timeframe 이 올바르게 전달된다', async () => {
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'cached',
                 result: cachedTechnical,
@@ -447,7 +447,7 @@ describe('resolveOverallDependencies 함수는', () => {
             );
         });
 
-        it('technical.userApiKey 가 submitAnalysis 에 전달된다', async () => {
+        it('technical.userApiKey 가 internal technical helper에 전달된다', async () => {
             mockSubmitAnalysis.mockResolvedValue({
                 status: 'cached',
                 result: cachedTechnical,

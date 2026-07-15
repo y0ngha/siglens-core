@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { AnalysisResponse, Timeframe } from '@/domain/types';
+import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
+import { TIER_CONFIG } from '@/domain/tier';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
@@ -12,10 +13,11 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
-import { getSkillCatalogFingerprint } from '@/infrastructure/skills/loader';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
+const mockLoadSkillsCached = loadSkillsCached as Mock;
 
 /** Empty-catalog fingerprint folded into the peek key. */
 const EMPTY_CATALOG_FP = hashSkillCatalog([]);
@@ -31,6 +33,10 @@ const mockCacheProvider = {
 
 const SYMBOL = 'AAPL';
 const TIMEFRAME: Timeframe = '1Day';
+const RESTRICTED_TIER_CONFIG: TierConfig = {
+    ...TIER_CONFIG,
+    featureFlags: { enableTierRestrictions: true },
+};
 
 /** A well-formed cached technical analysis payload. */
 const cachedResult: AnalysisResponse = {
@@ -54,20 +60,22 @@ describe('peekAnalysisCache 함수는', () => {
         vi.clearAllMocks();
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(null);
-        (getSkillCatalogFingerprint as Mock).mockResolvedValue(
-            EMPTY_CATALOG_FP
-        );
+        mockLoadSkillsCached.mockResolvedValue({
+            skills: [],
+            skillsDegraded: false,
+        });
     });
 
-    it('캐시 HIT이면 정규화된 분석 결과를 반환한다', async () => {
+    it('캐시 HIT이면 free-safe 분석 결과를 반환한다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 
         const result = await peekAnalysisCache(SYMBOL, TIMEFRAME);
 
         expect(result).not.toBeNull();
-        expect(result?.summary).toBe('강세 우위 기술적 분석');
-        expect(result?.trend).toBe('bullish');
-        expect(result?.keyLevels.support).toHaveLength(1);
+        expect(result?.result.summary).toBe('강세 우위 기술적 분석');
+        expect(result?.result.trend).toBe('bullish');
+        expect(result?.result.keyLevels).toBeNull();
+        expect(result?.lockedInfoDepth).toContain('partial_detail');
     });
 
     it('writer와 동일한 캐시 키로 읽는다', async () => {
@@ -85,7 +93,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-2.5-flash',
-                EMPTY_CATALOG_FP
+                `free:${EMPTY_CATALOG_FP}`
             )
         );
     });
@@ -106,7 +114,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-2.5-flash',
-                EMPTY_CATALOG_FP,
+                `free:${EMPTY_CATALOG_FP}`,
                 true
             )
         );
@@ -127,7 +135,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-2.5-flash',
-                EMPTY_CATALOG_FP
+                `free:${EMPTY_CATALOG_FP}`
             )
         );
     });
@@ -142,9 +150,50 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 DEFAULT_ANALYSIS_MODEL_ID,
-                EMPTY_CATALOG_FP
+                `free:${EMPTY_CATALOG_FP}`
             )
         );
+    });
+
+    it('same sampled catalog still isolates cache keys by tier', async () => {
+        await peekAnalysisCache(SYMBOL, TIMEFRAME);
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            undefined,
+            undefined,
+            'member'
+        );
+
+        const [freeKey] = mockCacheGet.mock.calls[0] as [string];
+        const [memberKey] = mockCacheGet.mock.calls[1] as [string];
+
+        expect(freeKey).not.toBe(memberKey);
+        expect(memberKey).toBe(
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                DEFAULT_ANALYSIS_MODEL_ID,
+                `member:${EMPTY_CATALOG_FP}`
+            )
+        );
+    });
+
+    it('returns null without reading cache when the tier disallows the timeframe', async () => {
+        const result = await peekAnalysisCache(
+            SYMBOL,
+            '5Min',
+            undefined,
+            undefined,
+            undefined,
+            'free',
+            RESTRICTED_TIER_CONFIG
+        );
+
+        expect(result).toBeNull();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+        expect(mockLoadSkillsCached).not.toHaveBeenCalled();
     });
 
     it('캐시 MISS이면 null을 반환한다', async () => {

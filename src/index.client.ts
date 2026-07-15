@@ -221,6 +221,7 @@ export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
+export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 
 // Dashboard helpers
 export {
@@ -345,10 +346,12 @@ export type {
     RequestChatCompletionDependencies,
 } from './application/chat/types';
 export type {
+    PollAnalysisOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisMissNoTrigger,
     UserApiKeyRequiredError,
 } from './application/market/types';
+export type { PollOverallAnalysisOptions } from './application/overall/types';
 export type {
     AnalysisLimitError,
     AnalysisLimitErrorCode,
@@ -463,6 +466,8 @@ export type {
     TrendDirection,
     PriceTrend,
     AnalysisResponse,
+    FilteredAnalysisResponse,
+    FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
     BacktestCase,

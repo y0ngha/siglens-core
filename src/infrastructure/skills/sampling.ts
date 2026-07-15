@@ -1,0 +1,34 @@
+import { sampleSkillsForTier } from '@/domain/analysis/sampleSkillsForTier';
+import type { Skill, Tier } from '@/domain/types';
+import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
+
+/** @internal Result of tier-aware skill sampling: the capped skill list plus its catalog fingerprint. */
+export interface SkillSamplingPlan {
+    skills: Skill[];
+    fingerprint: string;
+}
+
+/** @internal Cache-key/sampling-seed part distinguishing reasoning-on from reasoning-off submissions. */
+export function reasoningSeedPart(reasoning?: boolean): string {
+    return reasoning === true ? 'reasoning-on' : 'reasoning-off';
+}
+
+const samplingSeed = (parts: readonly string[]): string =>
+    parts.map(part => JSON.stringify(part)).join('\u0000');
+
+/** @internal Sample skills for a tier and fingerprint the sampled set for cache-key derivation. */
+export function createSkillSamplingPlan(
+    skills: readonly Skill[],
+    tier: Tier,
+    seedParts: readonly string[]
+): SkillSamplingPlan {
+    const sampledSkills = sampleSkillsForTier(
+        skills,
+        tier,
+        samplingSeed(seedParts)
+    );
+    return {
+        skills: sampledSkills,
+        fingerprint: hashSkillCatalog(sampledSkills),
+    };
+}

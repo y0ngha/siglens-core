@@ -41,6 +41,8 @@ const restrictedConfig: TierConfig = {
     },
     featureFlags: {
         enableTierRestrictions: true,
+        enableTimeframeRestrictions: true,
+        enableInfoDepthRestrictions: true,
     },
 };
 
@@ -50,13 +52,18 @@ describe('tier', () => {
         expect(TIER_CONFIG.limits.analysisPerDay.free).toBe(Infinity);
         expect(TIER_CONFIG.limits.chatbotPerDay.pro).toBe(Infinity);
         expect(TIER_CONFIG.featureFlags.enableTierRestrictions).toBe(false);
+        expect(TIER_CONFIG.featureFlags.enableTimeframeRestrictions).toBe(true);
+        expect(TIER_CONFIG.featureFlags.enableInfoDepthRestrictions).toBe(true);
     });
 
     describe('isAllowed', () => {
         it('allows usage-limited features when restrictions are disabled', () => {
             const config: TierConfig = {
                 ...restrictedConfig,
-                featureFlags: { enableTierRestrictions: false },
+                featureFlags: {
+                    ...restrictedConfig.featureFlags,
+                    enableTierRestrictions: false,
+                },
             };
 
             expect(isAllowed('free', 'analysisPerDay', config)).toBe(true);
@@ -89,10 +96,22 @@ describe('tier', () => {
     });
 
     describe('getAllowedTimeframes', () => {
-        it('returns every timeframe when restrictions are disabled', () => {
+        it('limits free tier to the daily timeframe', () => {
+            expect(getAllowedTimeframes('free')).toEqual(['1Day']);
+        });
+
+        it('returns every timeframe for member and pro tiers', () => {
+            expect(getAllowedTimeframes('member')).toEqual([...TIMEFRAMES]);
+            expect(getAllowedTimeframes('pro')).toEqual([...TIMEFRAMES]);
+        });
+
+        it('returns every timeframe when timeframe restrictions are disabled', () => {
             const config: TierConfig = {
                 ...restrictedConfig,
-                featureFlags: { enableTierRestrictions: false },
+                featureFlags: {
+                    ...restrictedConfig.featureFlags,
+                    enableTimeframeRestrictions: false,
+                },
             };
 
             expect(getAllowedTimeframes('free', config)).toEqual([
@@ -100,9 +119,29 @@ describe('tier', () => {
             ]);
         });
 
-        it('returns the configured timeframe list when restrictions are enabled', () => {
+        it('returns the configured timeframe list when timeframe restrictions are enabled', () => {
             expect(getAllowedTimeframes('member', restrictedConfig)).toEqual([
                 ...restrictedConfig.timeframes.member,
+            ]);
+        });
+
+        it('falls back to enabled legacy tier restrictions when the timeframe flag is omitted', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: true },
+            };
+
+            expect(getAllowedTimeframes('free', config)).toEqual(['1Day']);
+        });
+
+        it('falls back to disabled legacy tier restrictions when the timeframe flag is omitted', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: false },
+            };
+
+            expect(getAllowedTimeframes('free', config)).toEqual([
+                ...TIMEFRAMES,
             ]);
         });
     });
@@ -119,38 +158,85 @@ describe('tier', () => {
         });
     });
     describe('isTimeframeAllowed', () => {
-        it('allows all timeframes when restrictions are disabled', () => {
-            expect(isTimeframeAllowed('free', '5Min')).toBe(true);
+        it('limits free tier to the daily timeframe', () => {
+            expect(isTimeframeAllowed('free', '1Day')).toBe(true);
+            expect(isTimeframeAllowed('free', '1Hour')).toBe(false);
+            expect(isTimeframeAllowed('free', '5Min')).toBe(false);
         });
 
-        it('checks timeframes when restrictions are enabled', () => {
-            expect(isTimeframeAllowed('free', '1Day', restrictedConfig)).toBe(
-                true
-            );
-            expect(isTimeframeAllowed('free', '1Hour', restrictedConfig)).toBe(
-                false
-            );
+        it('allows all timeframes for member and pro tiers', () => {
+            expect(isTimeframeAllowed('member', '5Min')).toBe(true);
+            expect(isTimeframeAllowed('pro', '5Min')).toBe(true);
         });
     });
 
     describe('isInfoDepthAllowed', () => {
-        it('allows all info depth fragments when restrictions are disabled', () => {
-            expect(isInfoDepthAllowed('free', 'full_detail')).toBe(true);
+        it('limits report details for free tier', () => {
+            expect(isInfoDepthAllowed('free', 'direction')).toBe(true);
+            expect(isInfoDepthAllowed('free', 'summary')).toBe(true);
+            expect(isInfoDepthAllowed('free', 'partial_detail')).toBe(false);
+            expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
         });
 
-        it('checks info depth fragments when restrictions are enabled', () => {
-            expect(
-                isInfoDepthAllowed('member', 'partial_detail', restrictedConfig)
-            ).toBe(true);
-            expect(
-                isInfoDepthAllowed('member', 'entry', restrictedConfig)
-            ).toBe(false);
+        it('allows every report detail for member and pro tiers', () => {
+            expect(isInfoDepthAllowed('member', 'full_detail')).toBe(true);
+            expect(isInfoDepthAllowed('pro', 'entry')).toBe(true);
+        });
+
+        it('allows every detail when information-depth restrictions are disabled', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: {
+                    ...restrictedConfig.featureFlags,
+                    enableInfoDepthRestrictions: false,
+                },
+            };
+
+            expect(isInfoDepthAllowed('free', 'full_detail', config)).toBe(
+                true
+            );
+        });
+
+        it('falls back to enabled legacy tier restrictions when the information-depth flag is omitted', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: true },
+            };
+
+            expect(isInfoDepthAllowed('free', 'full_detail', config)).toBe(
+                false
+            );
+        });
+
+        it('falls back to disabled legacy tier restrictions when the information-depth flag is omitted', () => {
+            const config: TierConfig = {
+                ...restrictedConfig,
+                featureFlags: { enableTierRestrictions: false },
+            };
+
+            expect(isInfoDepthAllowed('free', 'full_detail', config)).toBe(
+                true
+            );
         });
     });
 
     describe('isModelAllowed', () => {
         it('allows all models when restrictions are disabled', () => {
             expect(isModelAllowed('free', 'claude-opus-4-7')).toBe(true);
+        });
+
+        it('ignores granular timeframe and information-depth restrictions', () => {
+            const config: TierConfig = {
+                ...TIER_CONFIG,
+                featureFlags: {
+                    ...TIER_CONFIG.featureFlags,
+                    enableTierRestrictions: false,
+                },
+            };
+
+            expect(isModelAllowed('free', 'claude-opus-4-7', config)).toBe(
+                true
+            );
         });
 
         it('checks models when restrictions are enabled', () => {
@@ -326,7 +412,10 @@ describe('tier', () => {
             // Build a config that flips the restriction flag on. Result must be identical.
             const restricted: TierConfig = {
                 ...TIER_CONFIG,
-                featureFlags: { enableTierRestrictions: true },
+                featureFlags: {
+                    ...TIER_CONFIG.featureFlags,
+                    enableTierRestrictions: true,
+                },
             };
             expect(isPremiumModel('gemini-2.5-flash', restricted)).toBe(false);
             expect(isPremiumModel('gemini-2.5-pro', restricted)).toBe(true);
@@ -371,7 +460,10 @@ describe('tier', () => {
         it('ignores enableTierRestrictions flag', () => {
             const restricted: TierConfig = {
                 ...TIER_CONFIG,
-                featureFlags: { enableTierRestrictions: true },
+                featureFlags: {
+                    ...TIER_CONFIG.featureFlags,
+                    enableTierRestrictions: true,
+                },
             };
             expect(isFreeModel('gemini-2.5-flash', restricted)).toBe(true);
             expect(isFreeModel('gemini-2.5-pro', restricted)).toBe(false);
@@ -396,7 +488,10 @@ describe('tier', () => {
         it('respects custom config', () => {
             const restricted: TierConfig = {
                 ...TIER_CONFIG,
-                featureFlags: { enableTierRestrictions: true },
+                featureFlags: {
+                    ...TIER_CONFIG.featureFlags,
+                    enableTierRestrictions: true,
+                },
             };
             expect(
                 requiresByokKey('member', 'gemini-2.5-pro', restricted)

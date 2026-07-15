@@ -2,6 +2,7 @@ import { fireAndForget } from '@/application/background';
 import {
     analysisSeed,
     hashAnalysisInput,
+    normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
 import type {
     SubmitMarketNewsDigestOptions,
@@ -17,6 +18,7 @@ import { buildMarketNewsDigestCacheKey } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import type { AnalysisType, NewsAnalysisResponse, Skill } from '@/domain/types';
 
 const LOG_TAG = '[SubmitMarketNewsDigest]' as const;
@@ -28,28 +30,26 @@ const LOG_TAG = '[SubmitMarketNewsDigest]' as const;
 const SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS = 30 * MS_PER_SECOND;
 
 /**
- * Derive a deterministic input hash from the news article IDs and skill fingerprint.
+ * Derive a deterministic input hash from the news article IDs, tier, and sampled skills.
  *
  * Mirrors the approach in {@link submitNewsAnalysis} but omits the earnings calendar
  * axis (no calendar for market-wide category digests). Skill fingerprint includes
- * each skill's `name` and `content` so that editing any injected skill busts the
+ * each prompt-relevant skill field so that editing any injected skill busts the
  * cache rather than serving a stale digest for the full TTL.
  *
  * @param newsIds - Sorted news item IDs.
- * @param skills  - Skills passed to the digest; only `name`+`content` are hashed.
+ * @param tier    - Resolved tier used to sample the prompt skills.
+ * @param skills  - Sampled skills passed to the digest prompt.
  * @returns 16-character lowercase hex string.
  */
 function hashMarketNewsDigestInput(
     newsIds: readonly string[],
+    tier: string,
     skills: readonly Skill[]
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
-    const skillFingerprint = JSON.stringify(
-        skills
-            .map(s => ({ name: s.name, content: s.content }))
-            .toSorted((a, b) => a.name.localeCompare(b.name))
-    );
-    return hashAnalysisInput(`${sortedIds}|${skillFingerprint}`);
+    const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
+    return hashAnalysisInput(`${tier}|${sortedIds}|${skillFingerprint}`);
 }
 
 /**
@@ -58,11 +58,13 @@ function hashMarketNewsDigestInput(
  * The category digest is the market-wide analog of {@link submitNewsAnalysis}:
  * same output shape ({@link NewsAnalysisResponse}), same worker/cache machinery,
  * but keyed by `category` instead of a symbol, and without symbol, companyName,
- * earnings calendar, tier, usage, or BYOK handling — it is a public, non-gated
- * analysis of the news flow for a single {@link NewsFeedCategory} feed bucket.
+ * earnings calendar, usage, or BYOK handling. It is a public analysis of the
+ * news flow for a single {@link NewsFeedCategory} feed bucket, with optional
+ * tier-aware skill sampling.
  *
  * Resolves to one of four outcomes:
- * - `cached`: a recent digest is reused (keyed by `category` + `modelId` + input hash).
+ * - `cached`: a recent digest is reused (keyed by `category` + `modelId` +
+ *   tier-aware input hash).
  * - `submitted`: the prompt was built, a `jobId` registered, and a fire-and-forget
  *   POST sent to the worker. Poll with {@link pollMarketNewsDigest}.
  * - `miss_no_trigger`: cache missed but `skipEnqueueIfMiss` is set; no worker call.
@@ -93,6 +95,7 @@ export async function submitMarketNewsDigest(
 ): Promise<SubmitMarketNewsDigestResult> {
     const { category, categoryLabel, modelId, news } = options;
     const skills = options.skills ?? [];
+    const tier = options.tier ?? DEFAULT_TIER;
 
     // ── 1. Empty news guard ──
     if (news.length === 0) {
@@ -101,7 +104,19 @@ export async function submitMarketNewsDigest(
 
     // ── 2. Hash (news IDs + skills) → build cache key → check cache ──
     const newsIds = news.map(n => n.id);
-    const inputHash = hashMarketNewsDigestInput(newsIds, skills);
+    const skillSampling = createSkillSamplingPlan(skills, tier, [
+        'market-news-digest',
+        category,
+        modelId,
+        tier,
+        'news-ids',
+        ...newsIds.toSorted(),
+    ]);
+    const inputHash = hashMarketNewsDigestInput(
+        newsIds,
+        tier,
+        skillSampling.skills
+    );
     const cacheKey = buildMarketNewsDigestCacheKey(
         category,
         modelId,
@@ -134,7 +149,7 @@ export async function submitMarketNewsDigest(
     const { stable, dynamic } = buildMarketNewsDigestPrompt(
         categoryLabel,
         news,
-        skills
+        skillSampling.skills
     );
     // Design C (A/B-gate validated): fold the always-on skill digest
     // (`stable`) into the SYSTEM prompt; send `dynamic` alone as the user
@@ -162,7 +177,7 @@ export async function submitMarketNewsDigest(
             prompt,
             seed: analysisSeed(`${system}\n\n${prompt}`),
             model: modelId,
-            tier: DEFAULT_TIER,
+            tier,
             analysisType: 'news' satisfies AnalysisType,
             system,
             responseSchema: NEWS_RESPONSE_SCHEMA,

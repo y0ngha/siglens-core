@@ -127,12 +127,27 @@ function expectFilteredResult(
 }
 
 describe('filterAnalysisResult', () => {
-    it('returns the original analysis when tier restrictions are disabled', () => {
+    it('returns the original analysis when info-depth restrictions are disabled', () => {
         const analysis = makeAnalysisResponse();
-        const filtered = filterAnalysisResult(analysis, 'free');
+        const filtered = filterAnalysisResult(analysis, 'free', {
+            ...TIER_CONFIG,
+            featureFlags: {
+                ...TIER_CONFIG.featureFlags,
+                enableInfoDepthRestrictions: false,
+            },
+        });
 
         expect(filtered.result).toBe(analysis);
         expect(filtered.lockedInfoDepth).toEqual([]);
+    });
+
+    it('applies the independently enabled default info-depth restriction', () => {
+        const filtered = filterAnalysisResult(makeAnalysisResponse(), 'free');
+        const result = expectFilteredResult(filtered);
+
+        expect(result.summary).toBe('요약');
+        expect(result.indicatorResults).toBeNull();
+        expect(filtered.lockedInfoDepth).toContain('partial_detail');
     });
 
     it('keeps only direction and summary for free tier when restrictions are enabled', () => {
@@ -169,7 +184,7 @@ describe('filterAnalysisResult', () => {
         ]);
     });
 
-    it('keeps partial details but locks full details for member tier', () => {
+    it('keeps the complete analysis for member tier', () => {
         const filtered = filterAnalysisResult(
             makeAnalysisResponse(),
             'member',
@@ -185,23 +200,16 @@ describe('filterAnalysisResult', () => {
             poc: { price: 110, reason: 'POC' },
         });
         expect(result.candlePatterns).toHaveLength(1);
-        expect(result.patternSummaries).toBeNull();
-        expect(result.strategyResults).toBeNull();
-        expect(result.trendlines).toBeNull();
-        expect(result.priceTargets).toBeNull();
-        expect(result.actionRecommendation).toEqual({
-            positionAnalysis: null,
-            entry: null,
-            exit: null,
-            riskReward: null,
-        });
-        expect(filtered.lockedInfoDepth).toEqual([
-            'full_detail',
-            'entry',
-            'stoploss',
-            'target',
-            'confidence',
-        ]);
+        expect(result.patternSummaries).toHaveLength(1);
+        expect(result.strategyResults).toHaveLength(1);
+        expect(result.trendlines).toHaveLength(1);
+        expect(result.priceTargets).toEqual(
+            makeAnalysisResponse().priceTargets
+        );
+        expect(result.actionRecommendation).toEqual(
+            makeAnalysisResponse().actionRecommendation ?? null
+        );
+        expect(filtered.lockedInfoDepth).toEqual([]);
     });
 
     it('keeps all analysis fields for pro tier', () => {

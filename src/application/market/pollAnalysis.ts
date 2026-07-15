@@ -1,17 +1,18 @@
 import { cleanupInBackground, fireAndForget } from '@/application/background';
-import type { BackgroundTaskOptions } from '@/application/types';
+import {
+    timeframeNotAllowedMessage,
+    type PollAnalysisOptions,
+} from '@/application/market/types';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import {
     enrichAnalysisWithConfidence,
     isFallbackAnalysis,
 } from '@/domain/analysis/confidence';
+import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type { PollAnalysisResult, Skill } from '@/domain/types';
-import {
-    buildAnalysisCacheKey,
-    computeEffectiveTtl,
-} from '@/infrastructure/cache/config';
+import { computeEffectiveTtl } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
 import {
     getJobError,
     getJobMeta,
@@ -25,10 +26,15 @@ import { createSkillsProvider } from '@/infrastructure/skills/loader';
  *
  * Returns one of three outcomes:
  * - `processing`: the worker has not finished yet. Caller should retry.
- * - `error`: the worker reported a failure or the result was missing.
+ * - `error`: the worker reported a failure, the result was missing, or the
+ *   caller tier is not allowed to access the job's timeframe (see the
+ *   caller-tier timeframe gate below).
  * - `done`: the result is ready. The raw worker response is enriched with
  *   skill-confidence weighting and reconciled against the latest close/ATR,
  *   then cached for the remaining timeframe-aware TTL before being returned.
+ *   The result is tier-filtered via {@link filterAnalysisResult}; fields the
+ *   caller's tier cannot see are stripped and their keys are surfaced on
+ *   `lockedInfoDepth` so the UI can render an upsell placeholder instead.
  *
  * When the worker returns an empty/malformed payload, the result is filled
  * with safe defaults and a Korean fallback summary, and the cache write is
@@ -40,6 +46,21 @@ import { createSkillsProvider } from '@/infrastructure/skills/loader';
  * value). Skill loading at poll time is best-effort, falling back to an empty
  * skill list if it fails.
  *
+ * **Caller-tier timeframe gate:** the `done` path re-checks the *resolved
+ * caller tier* (from `options.tier`, defaulting to `DEFAULT_TIER`) against
+ * `meta.timeframe` via {@link isTimeframeAllowed}, independent of the tier
+ * that submitted the job. A tier change or downgrade between submit and poll
+ * must never leak an intraday result the current caller is not entitled to.
+ *
+ * **Pending-dependency polling:** when a consumer polls this job as a pending
+ * dependency (e.g. `resolveOverallDependencies` returns `{ kind: 'pending',
+ * pendingJobs }` and the caller then calls `pollAnalysis(pendingJobs.technical)`
+ * directly), it MUST pass the same resolved `tier` used for the original
+ * submission. Otherwise the caller-tier timeframe gate above defaults to
+ * `DEFAULT_TIER` (free) and may return `{ status: 'error' }` for a
+ * legitimately-allowed intraday job. The cache write happens before this
+ * gate runs, so no data is lost, but the reported status would be misleading.
+ *
  * Cancel-after-poll: a successful {@link cancelAnalysisJob} call does NOT
  * immediately flip the job status. This function will keep returning
  * `processing` until the worker observes the cancel signal on its next
@@ -48,7 +69,8 @@ import { createSkillsProvider } from '@/infrastructure/skills/loader';
  *
  * @param jobId - The `jobId` returned by {@link submitAnalysis}.
  * @param options - Optional background-task hooks. Pass Vercel's `waitUntil`
- *   so Redis cleanup and cache writes can continue after the response.
+ *   so Redis cleanup and cache writes can continue after the response. Pass
+ *   `tier`/`tierConfig` to enforce the caller-tier timeframe gate described above.
  * @returns The current poll outcome — see {@link PollAnalysisResult}.
  *
  * @example
@@ -64,7 +86,7 @@ import { createSkillsProvider } from '@/infrastructure/skills/loader';
  */
 export async function pollAnalysis(
     jobId: string,
-    options?: BackgroundTaskOptions
+    options?: PollAnalysisOptions
 ): Promise<PollAnalysisResult> {
     const status = await getJobStatus(jobId);
 
@@ -124,7 +146,11 @@ export async function pollAnalysis(
     const analyzedAt = now.toISOString();
     const result = { ...reconciled, analyzedAt };
 
-    if (meta && meta.symbol !== undefined && meta.timeframe !== undefined) {
+    if (
+        meta?.cacheKey !== undefined &&
+        meta.symbol !== undefined &&
+        meta.timeframe !== undefined
+    ) {
         if (isFallbackAnalysis(reconciled)) {
             console.warn(
                 '[Poll] Worker returned empty analysis; skipping cache write',
@@ -133,27 +159,10 @@ export async function pollAnalysis(
         } else {
             const cache = createCacheProvider();
             if (cache !== null) {
-                // Fold the same skill-catalog fingerprint the submit path used
-                // so this write lands under the exact key that path will read.
-                // Intentionally fingerprints this path's own provider-loaded
-                // `skills` (the load that fed enrichAnalysisWithConfidence above)
-                // rather than calling the shared getSkillCatalogFingerprint
-                // helper, so the cached fingerprint always matches the catalog
-                // actually used to produce this result. Also folds `meta.reasoning`
-                // (member-reasoning-toggle spec, Part A) — stored at submit time —
-                // so this write lands under the exact ON/OFF key `submitAnalysis`
-                // will read on the next request.
-                const cacheKey = buildAnalysisCacheKey(
-                    meta.symbol,
-                    meta.timeframe,
-                    meta.modelId,
-                    hashSkillCatalog(skills),
-                    meta.reasoning
-                );
                 const ttl = computeEffectiveTtl(meta.timeframe, now);
                 fireAndForget(
                     cache
-                        .set(cacheKey, { ...result, skillsDegraded }, ttl)
+                        .set(meta.cacheKey, { ...result, skillsDegraded }, ttl)
                         .catch(error =>
                             console.error('[Poll] Cache write failed:', error)
                         ),
@@ -165,5 +174,19 @@ export async function pollAnalysis(
 
     cleanupInBackground(jobId, '[Poll]', options);
 
-    return { status: 'done', result };
+    const callerTier = options?.tier ?? DEFAULT_TIER;
+    const callerTierConfig = options?.tierConfig ?? TIER_CONFIG;
+    if (
+        meta?.timeframe !== undefined &&
+        !isTimeframeAllowed(callerTier, meta.timeframe, callerTierConfig)
+    ) {
+        return {
+            status: 'error',
+            error: timeframeNotAllowedMessage(callerTier, meta.timeframe),
+        };
+    }
+
+    const filtered = filterAnalysisResult(result, callerTier, callerTierConfig);
+
+    return { status: 'done', ...filtered };
 }

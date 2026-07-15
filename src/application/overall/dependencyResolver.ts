@@ -1,4 +1,4 @@
-import { submitAnalysis } from '@/application/market/submitAnalysis';
+import { submitAnalysisForOverall } from '@/application/market/submitAnalysis';
 import { submitFundamentalAnalysis } from '@/application/fundamental/submitFundamentalAnalysis';
 import { submitNewsAnalysis } from '@/application/news/submitNewsAnalysis';
 import { submitOptionsAnalysis } from '@/application/options/submitOptionsAnalysis';
@@ -10,6 +10,7 @@ import type {
     OverallDependencyInputs,
 } from '@/application/overall/types';
 import type {
+    AnalysisResponse,
     FundamentalAnalysisResponse,
     OptionsAnalysisResponse,
 } from '@/domain/types';
@@ -275,7 +276,7 @@ export async function resolveOverallDependencies(
 
     const [technicalResult, fundamentalResult, newsResult, optionsResult] =
         await Promise.all([
-            submitAnalysis(
+            submitAnalysisForOverall(
                 symbol,
                 companyName,
                 timeframe,
@@ -408,7 +409,19 @@ export async function resolveOverallDependencies(
     ) {
         return {
             kind: 'cached',
-            technical: technicalResult.result,
+            // Safe cast: `technicalResult` comes from `submitAnalysisForOverall`,
+            // which always calls `submitAnalysisWithVisibility` with
+            // responseVisibility: 'internal'. On the 'cached' branch that
+            // visibility skips `filterAnalysisResult` entirely and embeds the
+            // normalized (unfiltered) response directly, so `result` is always
+            // the full `AnalysisResponse` here, never the
+            // `FilteredAnalysisResponse` union member. The declared return type
+            // `SubmitAnalysisGatedResult` widens `result` to
+            // `AnalysisResponse | FilteredAnalysisResponse` for the public
+            // (non-internal) callers of `submitAnalysis`, so this cast narrows
+            // back to the guaranteed-unfiltered shape for the overall prompt
+            // composer.
+            technical: technicalResult.result as AnalysisResponse,
             fundamental: fundamentalPayload,
             news: newsResult.result,
             options: optionsPayload,

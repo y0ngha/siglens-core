@@ -5,7 +5,7 @@ export type JobStatus = 'processing' | 'done' | 'error';
 
 /**
  * @internal Per-job metadata stored alongside the result so {@link pollAnalysis} can
- * reconstruct cache keys and run domain-side reconciliation without fetching
+ * cache completed results and run domain-side reconciliation without fetching
  * the bars again.
  */
 export interface JobMeta {
@@ -47,9 +47,8 @@ export interface JobMeta {
     modelId?: string;
     /**
      * Pre-computed cache key stored at job submission time so the poll step
-     * can write the result without recomputing the key. Used by fundamental,
-     * news, overall, and market-briefing analysis jobs whose cache keys include
-     * an input hash.
+     * can write the result without recomputing it. Required when a key depends
+     * on request-scoped inputs such as a tier-sampled skill catalog.
      */
     cacheKey?: string;
     /**
@@ -62,13 +61,9 @@ export interface JobMeta {
     optionsOiStale?: boolean;
     /**
      * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
-     * Stored at submit time so the poll step can rebuild the exact write-time
-     * cache key: `pollAnalysis` folds it back into {@link buildAnalysisCacheKey}
-     * (technical jobs recompute their key rather than storing a precomputed
-     * one), and `pollOverallAnalysis` folds it into the content-free
-     * `buildOverallPeekCacheKey` "latest" pointer. Other job types precompute
-     * `cacheKey` above (which already bakes reasoning in at submit time), so
-     * they don't need to read this field back.
+     * Stored for the worker payload and any cache keys that include it. Analysis
+     * jobs persist the final cache key at submission time, so their poll paths
+     * do not recompute it from a potentially changed skill catalog.
      */
     reasoning?: boolean;
 }

@@ -18,30 +18,19 @@ const TIER_VALUES = [
 const TIER_VALUE_STRINGS: readonly string[] = TIER_VALUES;
 
 const FREE_TIMEFRAMES: readonly Timeframe[] = ['1Day'];
-const MEMBER_TIMEFRAMES: readonly Timeframe[] = [
-    ...FREE_TIMEFRAMES,
-    '1Hour',
-    '4Hour',
-];
-const PRO_TIMEFRAMES: readonly Timeframe[] = [
-    ...MEMBER_TIMEFRAMES,
-    '5Min',
-    '15Min',
-    '30Min',
-];
+const MEMBER_TIMEFRAMES: readonly Timeframe[] = [...TIMEFRAMES];
+const PRO_TIMEFRAMES: readonly Timeframe[] = [...TIMEFRAMES];
 const FREE_INFO_DEPTH: readonly TierInfoDepth[] = ['direction', 'summary'];
-const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [
+const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
     ...FREE_INFO_DEPTH,
     'partial_detail',
-];
-const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
-    ...MEMBER_INFO_DEPTH,
     'full_detail',
     'entry',
     'stoploss',
     'target',
     'confidence',
 ];
+const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [...PRO_INFO_DEPTH];
 const FREE_MODELS: readonly TierModel[] = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
@@ -67,7 +56,23 @@ const PRO_MODELS: readonly TierModel[] = [
 /** Default tier assigned to unauthenticated or newly-created users. */
 export const DEFAULT_TIER: Tier = 'free';
 
-/** Central source of truth for tier limits and gated capabilities. */
+/**
+ * Central source of truth for tier limits and gated capabilities.
+ *
+ * `featureFlags` defaults, explained:
+ * - `enableTierRestrictions: false`: the legacy, coarse-grained flag stays
+ *   off because model gating and daily usage limits (see {@link isAllowed},
+ *   {@link getAllowedModels}) are intentionally OFF for this launch; every
+ *   tier can use every model with no usage cap.
+ * - `enableTimeframeRestrictions: true` and `enableInfoDepthRestrictions: true`
+ *   are ON by default because free-tier timeframe gating (1Day only) and
+ *   info-depth gating (direction/summary only) ARE the product default for
+ *   this feature; this is intended, not an accidental leftover.
+ * - The granular flags are the source of truth for their respective checks;
+ *   `enableTierRestrictions` is only consulted as the legacy fallback when a
+ *   granular flag is `undefined` (see {@link resolveRestrictionFlag} and its
+ *   use in `resolveAllowedTimeframes` / `resolveAllowedInfoDepths`).
+ */
 export const TIER_CONFIG = {
     limits: {
         analysisPerDay: { free: Infinity, member: Infinity, pro: Infinity },
@@ -90,25 +95,46 @@ export const TIER_CONFIG = {
     },
     featureFlags: {
         enableTierRestrictions: false,
+        enableTimeframeRestrictions: true,
+        enableInfoDepthRestrictions: true,
     },
 } as const satisfies TierConfig;
+
+/**
+ * @internal Resolve a granular restriction flag, falling back to the legacy
+ * `enableTierRestrictions` flag when the granular flag is `undefined`.
+ */
+export function resolveRestrictionFlag(
+    specific: boolean | undefined,
+    legacy: boolean
+): boolean {
+    return specific ?? legacy;
+}
 
 function resolveAllowedTimeframes(
     tier: Tier,
     config: TierConfig
 ): readonly Timeframe[] {
-    return config.featureFlags.enableTierRestrictions
-        ? config.timeframes[tier]
-        : TIMEFRAMES;
+    const { enableTierRestrictions, enableTimeframeRestrictions } =
+        config.featureFlags;
+    const isRestricted = resolveRestrictionFlag(
+        enableTimeframeRestrictions,
+        enableTierRestrictions
+    );
+    return isRestricted ? config.timeframes[tier] : TIMEFRAMES;
 }
 
 function resolveAllowedInfoDepths(
     tier: Tier,
     config: TierConfig
 ): readonly TierInfoDepth[] {
-    return config.featureFlags.enableTierRestrictions
-        ? config.infoDepth[tier]
-        : PRO_INFO_DEPTH;
+    const { enableInfoDepthRestrictions, enableTierRestrictions } =
+        config.featureFlags;
+    const isRestricted = resolveRestrictionFlag(
+        enableInfoDepthRestrictions,
+        enableTierRestrictions
+    );
+    return isRestricted ? config.infoDepth[tier] : PRO_INFO_DEPTH;
 }
 
 function resolveAllowedModels(
@@ -164,7 +190,7 @@ export function getTierLimit(
  * Return the timeframes available to a tier.
  *
  * Always returns every known timeframe when
- * `config.featureFlags.enableTierRestrictions` is `false`.
+ * `config.featureFlags.enableTimeframeRestrictions` is `false`.
  *
  * @param tier - The user's subscription tier.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
@@ -212,7 +238,8 @@ export function getAllowedModels(
 /**
  * Return whether a timeframe is available to the tier.
  *
- * Always returns `true` when `config.featureFlags.enableTierRestrictions` is `false`.
+ * Always returns `true` when
+ * `config.featureFlags.enableTimeframeRestrictions` is `false`.
  *
  * @param tier - The user's subscription tier.
  * @param timeframe - The timeframe to check.
@@ -230,7 +257,8 @@ export function isTimeframeAllowed(
 /**
  * Return whether an AI detail fragment is available to the tier.
  *
- * Always returns `true` when `config.featureFlags.enableTierRestrictions` is `false`.
+ * Always returns `true` when
+ * `config.featureFlags.enableInfoDepthRestrictions` is `false`.
  *
  * @param tier - The user's subscription tier.
  * @param infoDepth - The detail fragment to check.

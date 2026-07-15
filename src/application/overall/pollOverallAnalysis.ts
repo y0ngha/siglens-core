@@ -1,7 +1,11 @@
 import { cleanupInBackground, fireAndForget } from '@/application/background';
-import type { BackgroundTaskOptions } from '@/application/types';
-import type { PollOverallAnalysisResult } from '@/application/overall/types';
+import { timeframeNotAllowedMessage } from '@/application/market/types';
+import type {
+    PollOverallAnalysisOptions,
+    PollOverallAnalysisResult,
+} from '@/application/overall/types';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type { OverallAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
@@ -21,14 +25,38 @@ import {
  *
  * Returns one of three outcomes:
  * - `processing`: the worker has not finished yet. Caller should retry.
- * - `error`: the worker reported a failure, the result was missing, or the
- *   payload could not be normalized.
+ * - `error`: the worker reported a failure, the result was missing, the
+ *   payload could not be normalized, or the caller tier is not allowed to
+ *   access the job's timeframe (see the caller-tier timeframe gate below).
  * - `done`: the result is ready. The raw worker response is normalized via
  *   {@link normalizeOverallAnalysisResponse} and cached under two keys: the
  *   pre-computed `cacheKey` (exact-input canonical key) and the content-free
  *   peek key ({@link buildOverallPeekCacheKey}) for zero-cost SSR surfacing via
  *   {@link peekOverallAnalysisCache}. The peek key is written only when `meta`
  *   carries all of `symbol`, `timeframe`, and `modelId`.
+ *
+ * **Caller-tier timeframe gate:** mirrors {@link pollAnalysis}'s invariant 5,
+ * but ONLY that timeframe gate, not `pollAnalysis`'s info-depth field
+ * filtering. The `done` path re-checks the *resolved caller tier* (from
+ * `options.tier`, defaulting to `DEFAULT_TIER`) against `meta.timeframe` via
+ * {@link isTimeframeAllowed}, independent of the tier that submitted the job.
+ * A tier change or downgrade between submit and poll must never leak an
+ * intraday result the current caller is not entitled to. `filterAnalysisResult`
+ * (per-field info-depth masking of `keyLevels` / `indicatorResults` / etc.) is
+ * intentionally NOT applied here: `OverallAnalysisResponse` is a synthesized
+ * headline/bullet narrative with no per-field gated detail to mask, so there
+ * is nothing for that filter to act on.
+ *
+ * **Pending-dependency polling:** the same caveat applies when a consumer
+ * polls a pending dependency job directly (e.g. `resolveOverallDependencies`
+ * returns `{ kind: 'pending', pendingJobs }` and the caller polls
+ * `pollAnalysis(pendingJobs.technical)` for the technical axis). The caller
+ * MUST pass the same resolved `tier` used for the original submission to
+ * whichever poll function it calls; otherwise that poll's caller-tier
+ * timeframe gate defaults to `DEFAULT_TIER` (free) and may return
+ * `{ status: 'error' }` for a legitimately-allowed intraday job. The cache
+ * write happens before the gate runs, so no data is lost, but the reported
+ * status would be misleading.
  *
  * On `error` and `done`, the job's Redis state is cleaned up via `cleanupJob`
  * (best-effort — cleanup failures are logged but do not affect the return value).
@@ -68,7 +96,7 @@ import {
  */
 export async function pollOverallAnalysis(
     jobId: string,
-    options?: BackgroundTaskOptions
+    options?: PollOverallAnalysisOptions
 ): Promise<PollOverallAnalysisResult> {
     const status = await getJobStatus(jobId);
 
@@ -168,6 +196,18 @@ export async function pollOverallAnalysis(
     }
 
     cleanupInBackground(jobId, '[PollOverall]', options);
+
+    const callerTier = options?.tier ?? DEFAULT_TIER;
+    const callerTierConfig = options?.tierConfig ?? TIER_CONFIG;
+    if (
+        meta?.timeframe !== undefined &&
+        !isTimeframeAllowed(callerTier, meta.timeframe, callerTierConfig)
+    ) {
+        return {
+            status: 'error',
+            error: timeframeNotAllowedMessage(callerTier, meta.timeframe),
+        };
+    }
 
     return { status: 'done', result };
 }

@@ -17,6 +17,7 @@ import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     EnrichedNewsItem,
     EarningsCalendarItem,
+    Skill,
     TierConfig,
 } from '@/domain/types';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
@@ -67,6 +68,19 @@ function makeEarningsCalendarItem(earningsDate: string): EarningsCalendarItem {
         revenueActual: null,
         revenueEstimated: 90_000_000_000,
         lastUpdated: '2026-05-01',
+    };
+}
+
+function makeNewsSkill(name: string, type?: Skill['type']): Skill {
+    return {
+        name,
+        description: `${name} description`,
+        type,
+        category: 'news',
+        indicators: [],
+        confidenceWeight: 1,
+        content: `${name} content`,
+        gating: { tier: 'always_on' },
     };
 }
 
@@ -543,6 +557,63 @@ describe('submitNewsAnalysis 함수는', () => {
 
             expect(firstCallMeta?.cacheKey).toBeDefined();
             expect(firstCallMeta?.cacheKey).toBe(secondCallMeta?.cacheKey);
+        });
+
+        it('tier가 같지 않으면 동일한 sampled skill set도 별도 캐시 키를 사용한다', async () => {
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                tier: 'free',
+            });
+            const freeCacheKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            mockCacheGet.mockClear();
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                tier: 'member',
+            });
+            const memberCacheKey = mockCacheGet.mock.calls[0]?.[0] as string;
+
+            expect(freeCacheKey).not.toBe(memberCacheKey);
+        });
+    });
+
+    describe('free tier skill sampling', () => {
+        it('selectSkills 전에 type 그룹과 regular 그룹을 각각 세 개로 제한한다', async () => {
+            const skills = [
+                ...Array.from({ length: 4 }, (_, index) =>
+                    makeNewsSkill(`typed-news-${index}`, 'pattern')
+                ),
+                ...Array.from({ length: 4 }, (_, index) =>
+                    makeNewsSkill(`regular-news-${index}`)
+                ),
+            ];
+            mockLoadSkillsCached.mockResolvedValueOnce({
+                skills,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockResolvedValue(null);
+
+            await submitNewsAnalysis({
+                symbol: 'AAPL',
+                modelId: 'gemini-2.5-flash',
+                news: [singleNewsItem],
+                upcomingCalendar: [singleCalendarItem],
+                tier: 'free',
+            });
+
+            const body = JSON.parse(
+                mockFetch.mock.calls[0][1].body as string
+            ) as { system: string };
+            expect(body.system.match(/### typed-news-\d/g)).toHaveLength(3);
+            expect(body.system.match(/### regular-news-\d/g)).toHaveLength(3);
         });
     });
 

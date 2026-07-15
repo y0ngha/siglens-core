@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { ModelId, Timeframe } from '@/domain/types';
+import type { ModelId, Tier, Timeframe } from '@/domain/types';
 
 vi.mock('@/infrastructure/cache/redis');
 
@@ -103,6 +103,70 @@ describe('peekOverallAnalysisCache 함수는', () => {
 
         await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL);
 
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildOverallPeekCacheKey(SYMBOL, TIMEFRAME, MODEL)
+        );
+    });
+
+    it('free 티어(기본값) + intraday 타임프레임이면 캐시를 읽지 않고 null을 반환한다', async () => {
+        const result = await peekOverallAnalysisCache(
+            SYMBOL,
+            COMPANY,
+            '1Hour',
+            MODEL
+        );
+
+        expect(result).toBeNull();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+    });
+
+    it('free 티어를 명시해도 intraday 타임프레임이면 캐시를 읽지 않고 null을 반환한다', async () => {
+        const explicitFreeTier: Tier = 'free';
+        const result = await peekOverallAnalysisCache(
+            SYMBOL,
+            COMPANY,
+            '1Hour',
+            MODEL,
+            undefined,
+            explicitFreeTier
+        );
+
+        expect(result).toBeNull();
+        expect(mockCacheGet).not.toHaveBeenCalled();
+    });
+
+    it('member 티어 + intraday 타임프레임이면 정상적으로 캐시를 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedOverall);
+
+        const memberTier: Tier = 'member';
+        const result = await peekOverallAnalysisCache(
+            SYMBOL,
+            COMPANY,
+            '1Hour',
+            MODEL,
+            undefined,
+            memberTier
+        );
+
+        expect(result).not.toBeNull();
+        expect(result?.headlineKo).toBe('3축 종합 분석 결과');
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildOverallPeekCacheKey(SYMBOL, '1Hour', MODEL)
+        );
+    });
+
+    it('free 티어 + 1Day 타임프레임이면 정상적으로 캐시를 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedOverall);
+
+        const result = await peekOverallAnalysisCache(
+            SYMBOL,
+            COMPANY,
+            TIMEFRAME,
+            MODEL
+        );
+
+        expect(result).not.toBeNull();
+        expect(result?.headlineKo).toBe('3축 종합 분석 결과');
         expect(mockCacheGet).toHaveBeenCalledWith(
             buildOverallPeekCacheKey(SYMBOL, TIMEFRAME, MODEL)
         );

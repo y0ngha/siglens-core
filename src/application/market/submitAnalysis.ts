@@ -1,9 +1,10 @@
 import { fireAndForget } from '@/application/background';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
-import type {
-    SubmitAnalysisGatedResult,
-    SubmitAnalysisOptions,
+import {
+    buildTimeframeNotAllowedError,
+    type SubmitAnalysisGatedResult,
+    type SubmitAnalysisOptions,
 } from '@/application/market/types';
 import {
     buildUsageLimitError,
@@ -11,6 +12,7 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { normalizeCachedAnalysisResponse } from '@/domain/analysis/confidence';
+import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
@@ -21,7 +23,6 @@ import { screenChartPatterns, type PatternCandidate } from '@/domain/patterns';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
-    getAllowedTimeframes,
     isTimeframeAllowed,
     requiresByokKey,
 } from '@/domain/tier';
@@ -37,13 +38,14 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    analysisSeed,
-    hashSkillCatalog,
-} from '@/infrastructure/hash/analysisInput';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { setJobMeta } from '@/infrastructure/jobs/queue';
 import { readWorkerConfig } from '@/infrastructure/market/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 
 const SUBMIT_ANALYSIS_TIMEOUT_MS = 5 * MS_PER_MINUTE;
 const TIMEFRAMES: readonly Timeframe[] = [
@@ -221,7 +223,50 @@ export async function submitAnalysis(
     fmpSymbol?: string,
     options?: SubmitAnalysisOptions
 ): Promise<SubmitAnalysisGatedResult>;
-export async function submitAnalysis(
+export function submitAnalysis(
+    symbol: string,
+    companyNameOrTimeframe: string,
+    timeframeOrForce?: Timeframe | boolean,
+    forceOrFmpSymbol?: boolean | string,
+    fmpSymbolOrOptions?: string | SubmitAnalysisOptions,
+    maybeOptions?: SubmitAnalysisOptions
+): Promise<SubmitAnalysisGatedResult> {
+    return submitAnalysisWithVisibility(
+        'public',
+        symbol,
+        companyNameOrTimeframe,
+        timeframeOrForce,
+        forceOrFmpSymbol,
+        fmpSymbolOrOptions,
+        maybeOptions
+    );
+}
+
+/** @internal Full technical responses are reserved for overall prompt composition. */
+export function submitAnalysisForOverall(
+    symbol: string,
+    companyName: string,
+    timeframe: Timeframe,
+    force?: boolean,
+    fmpSymbol?: string,
+    options?: SubmitAnalysisOptions
+): Promise<SubmitAnalysisGatedResult> {
+    return submitAnalysisWithVisibility(
+        'internal',
+        symbol,
+        companyName,
+        timeframe,
+        force,
+        fmpSymbol,
+        options
+    );
+}
+
+/** Whether the caller receives a tier-filtered response or the full, unfiltered analysis. */
+type AnalysisResponseVisibility = 'public' | 'internal';
+
+async function submitAnalysisWithVisibility(
+    responseVisibility: AnalysisResponseVisibility,
     symbol: string,
     companyNameOrTimeframe: string,
     timeframeOrForce?: Timeframe | boolean,
@@ -245,13 +290,7 @@ export async function submitAnalysis(
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) {
         return {
             status: 'error',
-            error: {
-                code: 'timeframe_not_allowed',
-                message: `Timeframe ${timeframe} is not available for ${tier} tier.`,
-                tier,
-                timeframe,
-                allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
-            },
+            error: buildTimeframeNotAllowedError(tier, timeframe, tierConfig),
         };
     }
 
@@ -288,20 +327,24 @@ export async function submitAnalysis(
         }
     }
 
-    // Load the skill catalog up front: `skills` feeds the prompt builder and
-    // `skillsDegraded` is recorded on the job meta. The cache-key fingerprint is
-    // hashed directly from the `skills` already in hand (same hashSkillCatalog the
-    // shared helper uses), so the write key here matches what the poll/peek read
-    // paths reproduce without re-invoking the loader.
+    // Load and sample the catalog before relevance filtering so the cache key,
+    // prompt, and later peek all use the same tier-specific skill set.
     const { skills, skillsDegraded } = await loadSkillsCached();
-    const skillFingerprint = hashSkillCatalog(skills);
+    const skillSampling = createSkillSamplingPlan(skills, tier, [
+        'technical',
+        symbol,
+        timeframe,
+        effectiveModelId,
+        reasoningSeedPart(options.reasoning),
+        tier,
+    ]);
 
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(
         symbol,
         timeframe,
         effectiveModelId,
-        skillFingerprint,
+        `${tier}:${skillSampling.fingerprint}`,
         options.reasoning
     );
 
@@ -309,13 +352,17 @@ export async function submitAnalysis(
         try {
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
-                const result = normalizeCachedAnalysisResponse(cached);
+                const normalized = normalizeCachedAnalysisResponse(cached);
+                const filtered =
+                    responseVisibility === 'internal'
+                        ? { result: normalized, lockedInfoDepth: [] as const }
+                        : filterAnalysisResult(normalized, tier, tierConfig);
                 await recordAnalysisUsageSafely(
                     usage,
                     effectiveModelId,
                     usageOccurredAt
                 );
-                return { status: 'cached', result };
+                return { status: 'cached', ...filtered };
             }
         } catch (error) {
             console.error('[Submit] Cache read failed:', error);
@@ -370,7 +417,7 @@ export async function submitAnalysis(
         companyName,
         bars,
         indicators,
-        skills,
+        skillSampling.skills,
         timeframe,
         fearGreed ?? undefined,
         options.assetClass ?? 'equity'
@@ -397,6 +444,7 @@ export async function submitAnalysis(
         atr,
         modelId: effectiveModelId,
         reasoning: options.reasoning,
+        cacheKey,
     });
 
     // Observe-only chart-pattern screening: screen for chart patterns and log

@@ -4,12 +4,15 @@ import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
 } from '@/application/usage/types';
+import { getAllowedTimeframes } from '@/domain/tier';
 import type {
     AnalysisResponse,
     AssetClass,
+    FilteredAnalysisResponse,
     ModelId,
     Tier,
     TierConfig,
+    TierInfoDepth,
     Timeframe,
     UserTierContext,
 } from '@/domain/types';
@@ -79,6 +82,20 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
+ * Options controlling a public analysis poll response.
+ *
+ * The resolved caller tier is intentionally supplied at poll time: a job can
+ * outlive a tier change, and its submit-time tier must never determine what a
+ * later caller can read.
+ */
+export interface PollAnalysisOptions extends BackgroundTaskOptions {
+    /** Resolved tier of the caller receiving this poll response. */
+    tier?: Tier;
+    /** Tier policy used to filter this poll response. */
+    tierConfig?: TierConfig;
+}
+
+/**
  * Error returned when application tier gates block a timeframe request.
  */
 export interface TierTimeframeAccessError {
@@ -103,6 +120,53 @@ export interface TierGateErrorResult {
 }
 
 /**
+ * @internal
+ * Build the human-readable "timeframe not allowed" message shared by the
+ * submit-path {@link buildTimeframeNotAllowedError} and both poll paths
+ * (`pollAnalysis`, `pollOverallAnalysis`) so the wording never drifts between
+ * the three call sites that report the same denial.
+ *
+ * @param tier - Tier used for the access decision.
+ * @param timeframe - Timeframe requested by the caller.
+ * @returns The message string embedded in the timeframe-gate error/result.
+ */
+export function timeframeNotAllowedMessage(
+    tier: Tier,
+    timeframe: Timeframe
+): string {
+    return `Timeframe ${timeframe} is not available for ${tier} tier.`;
+}
+
+/**
+ * @internal
+ * Build the {@link TierTimeframeAccessError} payload for a denied timeframe
+ * request. Shared by every submit use-case that runs the timeframe gate
+ * (`submitAnalysis`'s `submitAnalysisWithVisibility` and
+ * `submitOverallAnalysis`) so the error shape stays byte-identical across
+ * axes instead of being hand-duplicated at each call site.
+ *
+ * @param tier - Tier used for the access decision.
+ * @param timeframe - Timeframe requested by the caller.
+ * @param tierConfig - Tier configuration; defaults to {@link TIER_CONFIG} at
+ *   each call site (this helper takes it as a required parameter so callers
+ *   pass the same resolved config they used for the `isTimeframeAllowed` check).
+ * @returns The error payload to embed in a `{ status: 'error', error }` result.
+ */
+export function buildTimeframeNotAllowedError(
+    tier: Tier,
+    timeframe: Timeframe,
+    tierConfig: TierConfig
+): TierTimeframeAccessError {
+    return {
+        code: 'timeframe_not_allowed',
+        message: timeframeNotAllowedMessage(tier, timeframe),
+        tier,
+        timeframe,
+        allowedTimeframes: getAllowedTimeframes(tier, tierConfig),
+    };
+}
+
+/**
  * Analysis error result: usage limit exceeded, tier timeframe denied, or BYOK key required.
  */
 export type SubmitAnalysisErrorResult =
@@ -121,7 +185,11 @@ export interface SubmitAnalysisMissNoTrigger {
 
 /** Submit analysis outcome including application-level gate errors. */
 export type SubmitAnalysisGatedResult =
-    | { status: 'cached'; result: AnalysisResponse }
+    | {
+          status: 'cached';
+          result: AnalysisResponse | FilteredAnalysisResponse;
+          lockedInfoDepth: readonly TierInfoDepth[];
+      }
     | { status: 'submitted'; jobId: string }
     | SubmitAnalysisMissNoTrigger
     | SubmitAnalysisErrorResult;

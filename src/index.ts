@@ -153,6 +153,7 @@ export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
+export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
     clusterKeyLevels,
     validateKeyLevels,
@@ -435,6 +436,7 @@ export type {
 } from './application/congress/types';
 export type {
     AnalysisUsageOptions,
+    PollAnalysisOptions,
     SubmitAnalysisGatedResult,
     SubmitAnalysisMissNoTrigger,
     SubmitAnalysisOptions,
@@ -472,6 +474,7 @@ export type {
 } from './application/news/types';
 export type {
     OverallAxis,
+    PollOverallAnalysisOptions,
     PollOverallAnalysisResult,
     SubmitOverallAnalysisOptions,
     SubmitOverallAnalysisResult,
@@ -490,6 +493,8 @@ export type {
 export type {
     ActionRecommendation,
     AnalysisResponse,
+    FilteredAnalysisResponse,
+    FilteredAnalysisResult,
     AnalysisSignal,
     AnalysisSignalType,
     AnalysisType,

@@ -2,13 +2,26 @@ import {
     EMPTY_ANALYSIS_FALLBACK_SUMMARY,
     normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
-import type { AnalysisResponse, ModelId, Timeframe } from '@/domain/types';
+import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
+import type {
+    AnalysisResponse,
+    FilteredAnalysisResult,
+    ModelId,
+    Tier,
+    TierConfig,
+    Timeframe,
+} from '@/domain/types';
 import {
     buildAnalysisCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { getSkillCatalogFingerprint } from '@/infrastructure/skills/loader';
+import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 
 /**
  * `true` when a normalized analysis carries no analytical content — i.e. an
@@ -77,13 +90,20 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) key — the
  *   default every existing caller reads today.
- * @returns The cached {@link AnalysisResponse} on a valid hit, or `null` on a
- *   miss / corrupt entry.
+ * @param tier - Caller's resolved subscription tier. Gates which timeframes may
+ *   be peeked, mirroring {@link peekOverallAnalysisCache}'s tier gate (invariant 5): a
+ *   disallowed caller-tier/timeframe combination resolves to `null` before the
+ *   cache is even read, so a free/anon caller can never surface an intraday
+ *   analysis that a member/pro submitter generated. Defaults to {@link DEFAULT_TIER}.
+ * @param tierConfig - Tier configuration override, mainly for tests and
+ *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
+ * @returns The tier-filtered cached response on a valid hit, or `null` on a
+ *   miss / corrupt entry / disallowed caller-tier timeframe.
  *
  * @example
  * ```ts
  * const cached = await peekAnalysisCache('AAPL', '1Day');
- * if (cached !== null) return cached; // serve in SSR at zero cost
+ * if (cached !== null) return cached.result; // serve in SSR at zero cost
  * ```
  *
  * @see submitAnalysis
@@ -93,21 +113,31 @@ export async function peekAnalysisCache(
     timeframe: Timeframe,
     _fmpSymbol?: string,
     modelId?: ModelId,
-    reasoning?: boolean
-): Promise<AnalysisResponse | null> {
+    reasoning?: boolean,
+    tier: Tier = DEFAULT_TIER,
+    tierConfig: TierConfig = TIER_CONFIG
+): Promise<FilteredAnalysisResult | null> {
+    if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
+
     const cache = createCacheProvider();
     if (cache === null) return null;
 
-    // Match the submit/poll write key by folding the same skill-catalog
-    // fingerprint (getSkillCatalogFingerprint is memoized, so this is a cheap read)
-    // and the same reasoning toggle (member-reasoning-toggle spec, Part A) —
-    // an SSR peek that omits `reasoning` reads the same key as the pre-toggle
-    // behavior, matching the writer's default.
+    const effectiveModelId = modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
+    const { skills } = await loadSkillsCached();
+    const skillSampling = createSkillSamplingPlan(skills, tier, [
+        'technical',
+        symbol,
+        timeframe,
+        effectiveModelId,
+        reasoningSeedPart(reasoning),
+        tier,
+    ]);
+
     const cacheKey = buildAnalysisCacheKey(
         symbol,
         timeframe,
-        modelId ?? DEFAULT_ANALYSIS_MODEL_ID,
-        await getSkillCatalogFingerprint(),
+        effectiveModelId,
+        `${tier}:${skillSampling.fingerprint}`,
         reasoning
     );
 
@@ -125,7 +155,7 @@ export async function peekAnalysisCache(
         // returns null, so a corrupt/empty payload becomes a content-free
         // shape — treat that as a miss instead of serving an empty body.
         if (isEmptyAnalysis(result)) return null;
-        return result;
+        return filterAnalysisResult(result, tier, tierConfig);
     } catch (error) {
         // Corrupt string payload (e.g. invalid JSON) — normalizeCachedAnalysisResponse
         // can throw via extractJsonFromLlmResponse. Surface as a miss.
