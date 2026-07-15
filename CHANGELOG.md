@@ -1,5 +1,19 @@
 # Changelog
 
+# [0.35.0](https://github.com/y0ngha/siglens-core/compare/v0.34.0...v0.35.0) (2026-07-15)
+
+
+### Bug Fixes
+
+* free-tier skill sampling grouped by `skill.type ?? 'regular'`, but fundamental/news/congress skills are type-less (only technical skills carry a type), so they collapsed into one shared group capped to 3 for free — a downstream per-category prompt filter could then be starved to zero. Fix: group by `skill.type ?? skill.category ?? 'regular'` so each non-technical category is capped independently (<=3 each); technical behavior unchanged (technical skills always have a type). Added domain mixed-catalog + starvation regression tests and congress/fundamental integration starvation tests. Note member/pro fingerprints unchanged; free keys self-invalidate via the tier-scoped fingerprint. Tests 3679 pass, coverage 99.52%. ([6732129](https://github.com/y0ngha/siglens-core/commit/6732129cc319ce6e21281122824fedbdab2ee656))
+* import ordering, JSDoc, public exports, and helper extraction ([d63f986](https://github.com/y0ngha/siglens-core/commit/d63f98680f9427798119b6cf789bb46c8389e391))
+* PUBLIC_API/DOMAIN docs 동기화 및 tier 관련 import/JSDoc 개선 ([0eeeb3b](https://github.com/y0ngha/siglens-core/commit/0eeeb3ba8cd84e3311dfccadc95f0f69084f9269))
+
+
+### Features
+
+* free-tier analysis gating ([8802b7e](https://github.com/y0ngha/siglens-core/commit/8802b7eb3cb38fa1d332563ceaf84c51c533c586))
+
 # [0.34.0](https://github.com/y0ngha/siglens-core/compare/v0.33.0...v0.34.0) (2026-07-11)
 
 
