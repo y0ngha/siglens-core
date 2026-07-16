@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.36.0](https://github.com/y0ngha/siglens-core/compare/v0.35.0...v0.36.0) (2026-07-16)
+
+
+### Features
+
+* **tier:** expose sampled skill detections to free tier ([2b06564](https://github.com/y0ngha/siglens-core/commit/2b065641e1a020dc380456e819cc305a282a9025))
+
 # [0.35.0](https://github.com/y0ngha/siglens-core/compare/v0.34.0...v0.35.0) (2026-07-15)
 
 
