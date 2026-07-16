@@ -29,6 +29,26 @@ const customRestrictedConfig: TierConfig = {
     },
 };
 
+// `full_detail` is granted (and partial_detail/entry/stoploss/target/
+// confidence) but `skill_detection` is deliberately omitted, so this
+// config isolates the deny branch of the skill_detection gate itself.
+const denySkillDetectionConfig: TierConfig = {
+    ...restrictedConfig,
+    infoDepth: {
+        ...restrictedConfig.infoDepth,
+        member: [
+            'direction',
+            'summary',
+            'partial_detail',
+            'full_detail',
+            'entry',
+            'stoploss',
+            'target',
+            'confidence',
+        ],
+    },
+};
+
 const makeAnalysisResponse = (
     overrides: Partial<AnalysisResponse> = {}
 ): AnalysisResponse => ({
@@ -303,6 +323,23 @@ describe('filterAnalysisResult', () => {
             },
         });
         expect(filtered.lockedInfoDepth).toEqual(['confidence']);
+    });
+
+    it('masks patternSummaries and strategyResults to null when skill_detection is not allowed', () => {
+        // Guards that the gate is `skill_detection`, not `full_detail`: this
+        // config grants full_detail (plus partial_detail/entry/stoploss/
+        // target/confidence) but omits skill_detection, so a future revert
+        // that re-gates on `allowFullDetail` would leak these fields and
+        // fail this test.
+        const filtered = filterAnalysisResult(
+            makeAnalysisResponse(),
+            'member',
+            denySkillDetectionConfig
+        );
+        const result = expectFilteredResult(filtered);
+
+        expect(result.patternSummaries).toBeNull();
+        expect(result.strategyResults).toBeNull();
     });
 
     it('filters action recommendations with missing optional fields', () => {
