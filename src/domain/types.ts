@@ -1871,6 +1871,14 @@ export type TierLimitedFeature = 'analysisPerDay' | 'chatbotPerDay';
 export type TierInfoDepth =
     | 'direction'
     | 'summary'
+    // Visibility of the sampled catalogue skills' detection output: chart
+    // pattern summaries (patternSummaries) and strategy results
+    // (strategyResults). Granted to free so a non-member sees the <=3-per-group
+    // skills their analysis already ran with. Excludes candlePatterns, which
+    // come from a deterministic bar-level detector (not the sampled skill
+    // catalogue) and so stay partial_detail/member-only, alongside the deeper
+    // full_detail fragments (trendlines, position analysis).
+    | 'skill_detection'
     | 'partial_detail'
     | 'full_detail'
     | 'entry'
