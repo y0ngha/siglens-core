@@ -19,6 +19,7 @@ const customRestrictedConfig: TierConfig = {
         member: [
             'direction',
             'summary',
+            'skill_detection',
             'partial_detail',
             'full_detail',
             'entry',
@@ -150,7 +151,7 @@ describe('filterAnalysisResult', () => {
         expect(filtered.lockedInfoDepth).toContain('partial_detail');
     });
 
-    it('keeps only direction and summary for free tier when restrictions are enabled', () => {
+    it('keeps direction, summary, and sampled skill detections for free tier when restrictions are enabled', () => {
         const filtered = filterAnalysisResult(
             makeAnalysisResponse(),
             'free',
@@ -164,8 +165,31 @@ describe('filterAnalysisResult', () => {
         expect(result.riskLevel).toBeNull();
         expect(result.keyLevels).toBeNull();
         expect(result.priceTargets).toBeNull();
-        expect(result.patternSummaries).toBeNull();
-        expect(result.strategyResults).toBeNull();
+        // Free now sees the detection output of its <=3-per-group sampled
+        // skills. confidenceWeight is a separate paid ('confidence') fragment,
+        // so it is masked to 0 while the pattern/strategy itself is visible.
+        expect(result.patternSummaries).toEqual([
+            {
+                id: 'pattern_0',
+                patternName: 'double_bottom',
+                skillName: 'Double Bottom',
+                detected: true,
+                trend: 'bullish',
+                summary: '패턴 요약',
+                confidenceWeight: 0,
+            },
+        ]);
+        expect(result.strategyResults).toEqual([
+            {
+                id: 'strategy_0',
+                strategyName: 'Momentum',
+                trend: 'bullish',
+                summary: '전략 요약',
+                confidenceWeight: 0,
+            },
+        ]);
+        // candlePatterns (partial_detail) and trendlines (full_detail) stay
+        // member-only.
         expect(result.candlePatterns).toBeNull();
         expect(result.trendlines).toBeNull();
         expect(result.actionRecommendation).toEqual({
@@ -365,6 +389,7 @@ describe('filterAnalysisResult', () => {
         expect(filtered.lockedInfoDepth).toEqual([
             'direction',
             'summary',
+            'skill_detection',
             'partial_detail',
             'full_detail',
             'entry',

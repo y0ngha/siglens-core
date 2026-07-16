@@ -184,6 +184,7 @@ export function filterAnalysisResult(
 
     const allowDirection = isDepthAllowed(allowedDepth, 'direction');
     const allowSummary = isDepthAllowed(allowedDepth, 'summary');
+    const allowSkillDetection = isDepthAllowed(allowedDepth, 'skill_detection');
     const allowPartialDetail = isDepthAllowed(allowedDepth, 'partial_detail');
     const allowFullDetail = isDepthAllowed(allowedDepth, 'full_detail');
     const allowTarget = isDepthAllowed(allowedDepth, 'target');
@@ -196,7 +197,7 @@ export function filterAnalysisResult(
         riskLevel: allowPartialDetail ? result.riskLevel : null,
         keyLevels: allowPartialDetail ? result.keyLevels : null,
         priceTargets: allowTarget ? result.priceTargets : null,
-        patternSummaries: allowFullDetail
+        patternSummaries: allowSkillDetection
             ? result.patternSummaries.map(pattern => ({
                   ...pattern,
                   confidenceWeight: allowConfidence
@@ -204,7 +205,7 @@ export function filterAnalysisResult(
                       : 0,
               }))
             : null,
-        strategyResults: allowFullDetail
+        strategyResults: allowSkillDetection
             ? result.strategyResults.map(strategy => ({
                   ...strategy,
                   confidenceWeight: allowConfidence

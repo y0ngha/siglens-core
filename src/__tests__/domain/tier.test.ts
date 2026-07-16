@@ -178,8 +178,18 @@ describe('tier', () => {
             expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
         });
 
+        it('grants skill-detection output to free tier so its sampled skills stay visible', () => {
+            // Free runs analysis with <=3 skills per group (createSkillSamplingPlan)
+            // and now sees that limited detection output, while the deeper
+            // full_detail fragments remain member-only.
+            expect(isInfoDepthAllowed('free', 'skill_detection')).toBe(true);
+            expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
+        });
+
         it('allows every report detail for member and pro tiers', () => {
+            expect(isInfoDepthAllowed('member', 'skill_detection')).toBe(true);
             expect(isInfoDepthAllowed('member', 'full_detail')).toBe(true);
+            expect(isInfoDepthAllowed('pro', 'skill_detection')).toBe(true);
             expect(isInfoDepthAllowed('pro', 'entry')).toBe(true);
         });
 

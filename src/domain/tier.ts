@@ -20,7 +20,15 @@ const TIER_VALUE_STRINGS: readonly string[] = TIER_VALUES;
 const FREE_TIMEFRAMES: readonly Timeframe[] = ['1Day'];
 const MEMBER_TIMEFRAMES: readonly Timeframe[] = [...TIMEFRAMES];
 const PRO_TIMEFRAMES: readonly Timeframe[] = [...TIMEFRAMES];
-const FREE_INFO_DEPTH: readonly TierInfoDepth[] = ['direction', 'summary'];
+const FREE_INFO_DEPTH: readonly TierInfoDepth[] = [
+    'direction',
+    'summary',
+    // Free sees the detection output of the skills its analysis already ran
+    // with. Skill sampling caps free to <=3 skills per prompt-injection group
+    // (see createSkillSamplingPlan), so this exposes only that limited set; the
+    // signup nudge invites members to unlock the full skill catalogue.
+    'skill_detection',
+];
 const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
     ...FREE_INFO_DEPTH,
     'partial_detail',

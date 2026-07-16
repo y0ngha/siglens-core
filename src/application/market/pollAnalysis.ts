@@ -186,6 +186,16 @@ export async function pollAnalysis(
         };
     }
 
+    // Filtering by the CALLER tier is safe now that `skill_detection` exposes
+    // patternSummaries/strategyResults to free. The security boundary is that
+    // jobs are tier-bound: a submission's cache key is `${tier}:${fingerprint}`
+    // and its jobId is a random UUID handed back only to that submitter, so a
+    // genuine free user can never obtain a higher tier's job and thus never its
+    // uncapped skill set. The `callerTier` filter is a display-entitlement pass
+    // layered on top, not the boundary; even on the documented tier-passthrough
+    // footgun (a caller omitting `tier` defaults to free) the mismatch only
+    // filters a job's OWN result strictly more restrictively, so it cannot
+    // surface skills the caller was not already entitled to.
     const filtered = filterAnalysisResult(result, callerTier, callerTierConfig);
 
     return { status: 'done', ...filtered };
