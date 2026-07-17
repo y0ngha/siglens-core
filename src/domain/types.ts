@@ -23,6 +23,24 @@ export type MarketSessionStatus = EtSessionStatus;
 export type AssetClass = 'equity' | 'crypto';
 
 /**
+ * Coarse unrealized profit/loss band for a member's holding in a symbol
+ * (personalized-analysis-by-position-bucket spec, Subsystem C).
+ *
+ * Deliberately a 5-level qualitative band — not a raw return percentage or
+ * average price — so the value is safe to fold into the shared analysis
+ * cache key and prompt without leaking a per-member number: members in the
+ * same band share both the cache entry and the prompt hint. See
+ * {@link bucketizePosition} (pure derivation) and `positionKeySuffix` /
+ * `buildAnalysisCacheKey` (cache-key composition) in `infrastructure/cache/config.ts`.
+ */
+export type PositionBucket =
+    | 'deep-profit'
+    | 'profit'
+    | 'near-breakeven'
+    | 'loss'
+    | 'deep-loss';
+
+/**
  * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
  * `scheduled` = a regional regular session (US ET today, KST later).
  * Pure data so callers can branch without per-market code.
