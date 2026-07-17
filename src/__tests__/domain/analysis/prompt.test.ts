@@ -4420,6 +4420,82 @@ describe('prompt', () => {
         });
     });
 
+    describe('buildAnalysisPrompt — position bucket hint (personalized-analysis-by-position-bucket spec, Subsystem C)', () => {
+        it('omits the position hint section when positionBucket is not provided', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(prompt).not.toContain('참고: 이 사용자는');
+        });
+
+        it.each([
+            ['deep-profit', '깊은 수익'],
+            ['profit', '수익'],
+            ['near-breakeven', '본전 부근'],
+            ['loss', '손실'],
+            ['deep-loss', '깊은 손실'],
+        ] as const)(
+            'includes the Korean hint for bucket %s (%s) when positionBucket is provided',
+            (bucket, koreanLabel) => {
+                const prompt = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    [],
+                    makeIndicators(),
+                    [],
+                    '1Day',
+                    undefined,
+                    'equity',
+                    bucket
+                );
+                expect(prompt).toContain('참고: 이 사용자는');
+                expect(prompt).toContain(koreanLabel);
+            }
+        );
+
+        it('places the hint in `dynamic` only — `stable` never carries it', () => {
+            const { stable, dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                'profit'
+            );
+            expect(dynamic).toContain('참고: 이 사용자는');
+            expect(stable).not.toContain('참고: 이 사용자는');
+        });
+
+        it('`stable` is byte-identical whether or not positionBucket is provided', () => {
+            const withoutBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            const withBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                'deep-loss'
+            );
+            expect(withBucket.stable).toBe(withoutBucket.stable);
+        });
+    });
+
     describe('Market Reference section', () => {
         const MR_PRICE = 100;
         const makeMarketReferenceBars = (): Bar[] =>

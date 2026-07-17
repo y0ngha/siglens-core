@@ -71,6 +71,7 @@ import type {
     ImpulseColor,
     IndicatorResult,
     MarketReference,
+    PositionBucket,
     PromptConfig,
     ReferenceLevel,
     Skill,
@@ -86,6 +87,7 @@ import type {
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
+import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 
 type SkillGroupKey = SkillType | 'regular';
@@ -1790,6 +1792,15 @@ export const CORE_SKILL_REFERENCE_POINTER =
  * @param assetClass - Instrument asset class controlling prompt framing. `'crypto'` drops
  *   U.S. equity context (earnings, fundamentals, analyst ratings) and adds 24/7 market
  *   context. Defaults to `'equity'` for backward compatibility.
+ * @param positionBucket - Member position-bucket hint
+ *   (personalized-analysis-by-position-bucket spec, Subsystem C). When
+ *   provided, a single neutral Korean reference line naming the member's
+ *   coarse unrealized-P&L band is appended via
+ *   {@link formatPositionHintSection} — into `dynamic` only, never `stable`,
+ *   since a per-member value must not pollute the byte-cached stable
+ *   system-prompt prefix shared across every caller. Omit for the base
+ *   (no-bucket) analysis; see {@link buildAnalysisCacheKey}'s `positionBucket`
+ *   param for the matching cache-key axis.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
@@ -1803,7 +1814,8 @@ export function buildAnalysisPrompt(
     skills: Skill[] = [],
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot,
-    assetClass: AssetClass = 'equity'
+    assetClass: AssetClass = 'equity',
+    positionBucket?: PositionBucket
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1900,6 +1912,7 @@ export function buildAnalysisPrompt(
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
+        ...(positionBucket ? [formatPositionHintSection(positionBucket)] : []),
         // The full output-rules block — the true tail, exactly as in
         // production (see buildAnalysisRequest's doc comment for why).
         analysisRequest,

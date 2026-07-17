@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
-import { TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
@@ -136,6 +136,78 @@ describe('peekAnalysisCache 함수는', () => {
                 TIMEFRAME,
                 'gemini-2.5-flash',
                 `free:${EMPTY_CATALOG_FP}`
+            )
+        );
+    });
+
+    it('positionBucket이 있으면 :pos=<bucket> suffix가 붙은 키로 읽는다 (personalized-analysis-by-position-bucket spec)', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-2.5-flash',
+            undefined,
+            DEFAULT_TIER,
+            TIER_CONFIG,
+            'profit'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-2.5-flash',
+                `free:${EMPTY_CATALOG_FP}`,
+                undefined,
+                'profit'
+            )
+        );
+    });
+
+    it('positionBucket 미지정 시 기존(레거시) 키와 동일하다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-2.5-flash'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-2.5-flash',
+                `free:${EMPTY_CATALOG_FP}`
+            )
+        );
+    });
+
+    it('reasoning과 positionBucket이 함께 있으면 writer(submitAnalysis)와 동일한 순서로 합성된 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-2.5-flash',
+            true,
+            DEFAULT_TIER,
+            TIER_CONFIG,
+            'deep-loss'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-2.5-flash',
+                `free:${EMPTY_CATALOG_FP}`,
+                true,
+                'deep-loss'
             )
         );
     });
