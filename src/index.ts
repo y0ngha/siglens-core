@@ -159,6 +159,11 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
+// Position bucket — pure P&L-band bucketizer + its domain type. Consumers
+// (siglens server action) compute the bucket, then pass the finished enum to
+// submitAnalysis; the cache-key/prompt wiring stays internal.
+export { bucketizePosition } from './domain/analysis/positionBucket';
+export type { PositionBucket } from './domain/types';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
