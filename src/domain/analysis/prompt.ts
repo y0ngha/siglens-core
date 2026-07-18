@@ -1912,7 +1912,16 @@ export function buildAnalysisPrompt(
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
-        ...(positionBucket ? [formatPositionHintSection(positionBucket)] : []),
+        // `formatPositionHintSection` returns '' when `positionBucket` doesn't
+        // resolve to a known label (defensive guard against a runtime value
+        // outside the `PositionBucket` union) — only push a non-empty hint so
+        // an unrecognized bucket doesn't inject a stray blank entry that
+        // would double up the `\n\n` separator on join below.
+        ...(positionBucket
+            ? [formatPositionHintSection(positionBucket)].filter(
+                  hint => hint !== ''
+              )
+            : []),
         // The full output-rules block — the true tail, exactly as in
         // production (see buildAnalysisRequest's doc comment for why).
         analysisRequest,

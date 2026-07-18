@@ -50,6 +50,7 @@ import type {
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
+    PositionBucket,
     Skill,
     SkillUsageRole,
     SMCResult,
@@ -4493,6 +4494,41 @@ describe('prompt', () => {
                 'deep-loss'
             );
             expect(withBucket.stable).toBe(withoutBucket.stable);
+        });
+
+        it('omits the hint and injects no stray blank section when positionBucket is an out-of-union runtime value', () => {
+            // Simulates a corrupt/stale value crossing a boundary TypeScript
+            // can't guard (e.g. JSON) — `formatPositionHintSection` returns
+            // `''` defensively, and `buildAnalysisPrompt` must not push that
+            // empty string into `dynamicSections` (which would double up the
+            // `\n\n` join separator).
+            const invalidBucket = 'unknown-bucket' as unknown as PositionBucket;
+            const withInvalidBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                invalidBucket
+            );
+            const withoutBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(withInvalidBucket.dynamic).not.toContain(
+                '참고: 이 사용자는'
+            );
+            expect(withInvalidBucket.dynamic).not.toContain('undefined');
+            // Byte-identical to the no-bucket dynamic section confirms no
+            // stray empty entry (and its extra `\n\n` join separator) was
+            // injected for the out-of-union bucket value.
+            expect(withInvalidBucket.dynamic).toBe(withoutBucket.dynamic);
         });
     });
 

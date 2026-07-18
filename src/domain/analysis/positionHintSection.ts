@@ -40,8 +40,15 @@ const POSITION_BUCKET_LABEL_KO: Record<PositionBucket, string> = {
  * prefix that's shared across every caller regardless of holding.
  *
  * @param bucket - The member's position bucket.
- * @returns The formatted hint line.
+ * @returns The formatted hint line, or `''` when `bucket` doesn't resolve to
+ *   a known {@link POSITION_BUCKET_LABEL_KO} entry (e.g. a runtime value
+ *   outside the `PositionBucket` union) — defensive guard against emitting a
+ *   literal `'undefined'` into a user-facing prompt. Callers must treat an
+ *   empty string as "no hint" and skip it rather than pushing it as a
+ *   section (see {@link buildAnalysisPrompt}'s dynamic-section assembly).
  */
 export function formatPositionHintSection(bucket: PositionBucket): string {
-    return `참고: 이 사용자는 현재 이 종목에서 '${POSITION_BUCKET_LABEL_KO[bucket]}' 구간에 있습니다.`;
+    const label = POSITION_BUCKET_LABEL_KO[bucket];
+    if (label === undefined) return '';
+    return `참고: 이 사용자는 현재 이 종목에서 '${label}' 구간에 있습니다.`;
 }

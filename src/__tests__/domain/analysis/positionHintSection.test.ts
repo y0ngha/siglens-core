@@ -38,4 +38,14 @@ describe('formatPositionHintSection', () => {
         expect(out).toContain('참고');
         expect(out).toContain('구간');
     });
+
+    it('returns an empty string for a bucket value outside the PositionBucket union instead of injecting "undefined"', () => {
+        // Runtime defensive guard: TypeScript can't catch a bad value crossing
+        // a JSON boundary (e.g. a stale/corrupt cache entry or a caller bug),
+        // so simulate that with a cast past the type system.
+        const invalidBucket = 'unknown-bucket' as unknown as PositionBucket;
+        const out = formatPositionHintSection(invalidBucket);
+        expect(out).toBe('');
+        expect(out).not.toContain('undefined');
+    });
 });
