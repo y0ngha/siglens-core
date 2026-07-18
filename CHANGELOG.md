@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.39.0](https://github.com/y0ngha/siglens-core/compare/v0.38.0...v0.39.0) (2026-07-18)
+
+
+### Features
+
+* **analysis:** pure-Korean output rule + holder-consistent position framing — bump prompt to p8 ([0d21dd8](https://github.com/y0ngha/siglens-core/commit/0d21dd866cbc10e2323efc8b70907e2d80507535))
+
 # [0.38.0](https://github.com/y0ngha/siglens-core/compare/v0.37.0...v0.38.0) (2026-07-18)
 
 
