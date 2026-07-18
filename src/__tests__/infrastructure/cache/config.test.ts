@@ -592,12 +592,16 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         );
     });
 
-    it('PROMPT_TEMPLATE_VERSION은 position hint의 position-management 재구성으로 p7로 bump된다', () => {
+    it('PROMPT_TEMPLATE_VERSION은 pure-Korean 규칙 + holder-consistent 재구성으로 p8로 bump된다', () => {
         // The hint's *introduction* did not bump the version (it only appended a
-        // brand-new `:pos=<bucket>` namespace). Reframing the hint text to an
-        // instructive position-management perspective DOES change the technical
-        // prompt bytes for every bucketed request, so warm entries carrying the
-        // old passive line must be invalidated — hence p7.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p7');
+        // brand-new `:pos=<bucket>` namespace). p7 reframed the hint to an
+        // instructive position-management perspective. p8 ships two more
+        // technical-prompt byte changes: (1) the STRICT pure-Hangul (no-한자)
+        // output-language rule in buildAnalysisRequest, which changes bytes for
+        // EVERY request, and (2) the holder-consistent reframe of
+        // formatPositionHintSection (explicit holder opener, management as the
+        // primary frame). Warm entries carrying the old bytes must be
+        // invalidated — hence p8.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p8');
     });
 });

@@ -47,11 +47,14 @@ const POSITION_BUCKET_MGMT_KO: Record<PositionBucket, string> = {
  * @internal Formats the member position-bucket hint section; not part of the
  * public API (personalized-analysis-by-position-bucket spec, Subsystem C).
  *
- * Emits an **instructive** position-management framing: it tells the model the
- * member is ALREADY HOLDING this symbol in the given band and to orient the
- * analysis conclusion and trading-strategy (진입/청산/리스크) sections toward
- * *managing that position* (보유 지속 / 부분 익절 / 추가매수·물타기 / 손절 규율
- * 시나리오) rather than toward a fresh would-be-buyer entry.
+ * Emits an **instructive, holder-consistent** position-management framing: it
+ * tells the model to treat the reader AS the holder in this band THROUGHOUT the
+ * analysis (the member is ALREADY HOLDING this symbol in the given band), to
+ * open the conclusion and trading-strategy (진입/청산/리스크) sections from an
+ * explicit holder opener ("현재 '<band>' 구간에 계신 보유자 관점에서"), and to make
+ * *managing that position* (보유 지속 / 부분 익절 / 추가매수 / 손절 규율 시나리오) the
+ * PRIMARY frame. New-entrant commentary, if any, must stay brief and secondary
+ * — never presented as co-equal / parallel to the holding perspective.
  *
  * **This is a deliberate, product-approved relaxation of the prior
  * non-instructive design.** The earlier version injected a single passive
@@ -89,5 +92,5 @@ export function formatPositionHintSection(bucket: PositionBucket): string {
     const label = POSITION_BUCKET_LABEL_KO[bucket];
     const mgmt = POSITION_BUCKET_MGMT_KO[bucket];
     if (label === undefined || mgmt === undefined) return '';
-    return `이 사용자는 이 종목을 이미 보유 중이며 현재 '${label}' 구간입니다. 신규 진입자 관점이 아니라 ${mgmt}에서, 분석 결론과 매매 전략(진입/청산/리스크)을 보유 포지션 관리 관점으로 서술하세요. 단, 특정 보유 규모·금액을 가정하지 말고 일반적 시나리오로 서술하며, 최종 판단과 책임은 사용자에게 있음을 전제로 하세요.`;
+    return `이 사용자는 이 종목을 이미 보유 중이며 현재 '${label}' 구간에 있는 보유자입니다. 신규 진입자가 아니라 이 사용자를 '${label}' 구간의 보유자로 간주하고, 분석 전반을 ${mgmt}을 중심으로 서술하세요. 분석 결론과 매매 전략(진입/청산/리스크) 섹션은 "현재 '${label}' 구간에 계신 보유자 관점에서"로 시작하고, 보유 지속·부분 익절·추가매수·손절 규율 등 보유 포지션 관리를 가장 중요한 관점으로 다루세요. 신규 진입자 관점은 필요할 때만 짧게 보조로 언급하고, 보유자 관점과 대등하게 병렬로 서술하지 마세요. 단, 특정 보유 규모·금액을 가정하지 말고 일반적 시나리오로 서술하며, 특정 사용자에게 특정 행동을 지시하지 말고, 최종 판단과 책임은 사용자에게 있음을 전제로 하세요.`;
 }

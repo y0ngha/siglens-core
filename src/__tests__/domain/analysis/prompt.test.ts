@@ -2119,6 +2119,30 @@ describe('prompt', () => {
             expect(koreanInstructionIndex).toBeGreaterThanOrEqual(0);
             expect(guidanceBodyIndex).toBeGreaterThan(koreanInstructionIndex);
         });
+
+        it('순수 한글(no-한자) 출력 규칙이 기술적 분석 프롬프트에 포함된다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            // STRICT pure-Hangul rule forbidding 한자/Chinese-character leakage
+            // (observed issue: e.g. "附近" instead of "부근").
+            expect(result).toContain('pure Hangul');
+            expect(result).toContain('한자(漢字)');
+            // Concrete correction examples travel with the rule so the model has
+            // a worked pattern (附近 → 부근).
+            expect(result).toContain('附近');
+            expect(result).toContain('부근');
+            // The no-한자 rule sits with the Korean output-language directive,
+            // ahead of the field-guidance body.
+            const ruleIndex = result.indexOf('pure Hangul');
+            const guidanceBodyIndex = result.indexOf('- summary:');
+            expect(ruleIndex).toBeGreaterThanOrEqual(0);
+            expect(guidanceBodyIndex).toBeGreaterThan(ruleIndex);
+        });
     });
 
     describe('캔들 패턴 레이블', () => {

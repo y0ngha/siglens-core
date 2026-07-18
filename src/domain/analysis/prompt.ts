@@ -1549,6 +1549,7 @@ const buildAnalysisRequest = (
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
         'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
+        'Output language rule (STRICT): every Korean text field must be written in pure Hangul (한글) only — NEVER mix in 한자(漢字)/Chinese characters. Write every Sino-Korean word in Hangul (e.g. write "부근" not "附近", "매도" not "賣渡", "이익 실현" not "利益實現"). This applies to all prose fields (summary, keyLevels reasoning, actionRecommendation, strategyResults, candlePatterns, patternSummaries, etc.).',
         FIELD_GUIDANCE_PREFACE,
         buildFieldGuidanceBody(),
         indicatorGuideInstruction,

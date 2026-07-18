@@ -297,9 +297,27 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * lever to only the `:pos=*` namespace). Still bucket-qualitative (no digits)
  * and disclaimer-safe — see `positionHintSection.ts`.
  *
+ * @remarks
+ * **`p8` = pure-Korean output rule + holder-consistent position framing.** Two
+ * technical-prompt byte changes ship together: (1) `buildAnalysisRequest` (in
+ * `prompt.ts`) gains a STRICT output-language rule forbidding 한자(漢字)/Chinese
+ * characters in Korean prose (all fields must be pure Hangul), fixing observed
+ * Sino-Korean 한자 leakage (e.g. `附近` → `부근`); and (2)
+ * `formatPositionHintSection` is reframed from the p7 parallel "보유자는… /
+ * 신규 진입자는…" hedge to a holder-CONSISTENT framing — the reader is treated
+ * as the holder throughout, the conclusion/strategy leads with an explicit
+ * holder opener ("현재 '<구간>' 구간에 계신 보유자 관점에서"), and position
+ * management is the primary frame with new-entrant commentary demoted to brief
+ * secondary. Rule (1) changes the technical prompt bytes for EVERY request (not
+ * just bucketed ones); rule (2) changes them for bucketed requests. The bump is
+ * shared by the technical AND fundamental cache keys AND the SSR peek path, so
+ * warm entries carrying the old bytes are invalidated fleet-wide; that re-warm
+ * is accepted per the versioning policy. Still bucket-qualitative (no digits)
+ * and disclaimer-safe — see `positionHintSection.ts`.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p7' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p8' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

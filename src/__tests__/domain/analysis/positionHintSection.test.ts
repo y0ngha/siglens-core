@@ -47,12 +47,33 @@ describe('formatPositionHintSection', () => {
         }
     });
 
+    it('is holder-consistent: leads with an explicit holder opener and makes management the primary frame (not a co-equal holder/new-entry hedge)', () => {
+        for (const [bucket, koreanLabel] of cases) {
+            const out = formatPositionHintSection(bucket);
+            // Explicit holder opener the conclusion/strategy must start from,
+            // interpolating this band's label.
+            expect(out).toContain(
+                `현재 '${koreanLabel}' 구간에 계신 보유자 관점에서`
+            );
+            // The reader is treated AS the holder throughout — the band's
+            // position-management vocabulary is the primary lens.
+            expect(out).toContain('보유 포지션 관리');
+            expect(out).toContain('가장 중요한 관점');
+            // New-entrant commentary is demoted to brief/secondary and must NOT
+            // be presented in parallel with the holding perspective.
+            expect(out).toContain('보조');
+            expect(out).toContain('병렬로 서술하지');
+        }
+    });
+
     it('keeps the disclaimer-safe envelope: general-scenario framing, no assumed holding size, user owns the final call', () => {
         const out = formatPositionHintSection('profit');
         // Scenario/perspective framing (not a specific-user command)...
         expect(out).toContain('일반적 시나리오');
         // ...explicitly not assuming a specific holding size/amount...
         expect(out).toContain('가정하지');
+        // ...never commanding a specific action to a specific user...
+        expect(out).toContain('특정 사용자에게 특정 행동을 지시하지');
         // ...and the final judgment/responsibility stays with the user.
         expect(out).toContain('책임은 사용자');
     });
