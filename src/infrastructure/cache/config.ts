@@ -273,21 +273,33 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * (unfiltered) content.
  *
  * @remarks
- * **Deliberately NOT bumped for the member position-bucket hint**
- * (personalized-analysis-by-position-bucket spec, Subsystem C). A bucketed
- * request appends a distinct `:pos=<bucket>` segment (see
+ * **`p6` did NOT bump for the member position-bucket hint's *introduction***
+ * (personalized-analysis-by-position-bucket spec, Subsystem C). When the hint
+ * was first added it only *appended* a distinct `:pos=<bucket>` segment (see
  * {@link buildAnalysisCacheKey} / `positionKeySuffix`) that was never written
- * before, so it lands on a brand-new key namespace — no previously-cached
- * entry becomes stale, and the no-bucket path is byte-identical to the
- * pre-feature key. This constant is shared by the technical AND fundamental
- * cache keys AND the SSR peek path, so bumping it would needlessly cold-start
- * the entire warm cache (every symbol/timeframe/model, anonymous included)
- * for zero correctness gain — mirroring the `ECONOMIC_EVENT_...` /
- * `INDICATOR_TRANSLATION_...` "deliberately NOT bumped" precedents below.
+ * before, so it landed on a brand-new key namespace — no previously-cached
+ * entry became stale, and the no-bucket path stayed byte-identical to the
+ * pre-feature key. Bumping then would have needlessly cold-started the entire
+ * warm cache (every symbol/timeframe/model, anonymous included) for zero
+ * correctness gain.
+ *
+ * @remarks
+ * **`p7` = position-hint reframed to position-management (Subsystem C
+ * follow-up).** `formatPositionHintSection` was strengthened from a single
+ * passive "참고: … 구간에 있습니다." reference line into an instructive holder /
+ * position-management framing (보유자 관점 — 보유 지속 / 부분 익절 / 추가매수 / 손절
+ * 규율 시나리오). This changes the technical prompt's bytes for EVERY bucketed
+ * request, so — unlike the hint's introduction above — warm bucketed entries
+ * carrying the old passive line MUST be invalidated. The bump is shared by the
+ * technical AND fundamental cache keys AND the SSR peek path, so it also
+ * cold-starts non-bucketed and fundamental entries as a side effect; that
+ * fleet-wide re-warm is accepted per the versioning policy (no way to scope the
+ * lever to only the `:pos=*` namespace). Still bucket-qualitative (no digits)
+ * and disclaimer-safe — see `positionHintSection.ts`.
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p6' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p7' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

@@ -592,7 +592,12 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         );
     });
 
-    it('PROMPT_TEMPLATE_VERSION은 position bucket 도입으로 인해 변경되지 않는다 (new-key isolation)', () => {
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p6');
+    it('PROMPT_TEMPLATE_VERSION은 position hint의 position-management 재구성으로 p7로 bump된다', () => {
+        // The hint's *introduction* did not bump the version (it only appended a
+        // brand-new `:pos=<bucket>` namespace). Reframing the hint text to an
+        // instructive position-management perspective DOES change the technical
+        // prompt bytes for every bucketed request, so warm entries carrying the
+        // old passive line must be invalidated — hence p7.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p7');
     });
 });

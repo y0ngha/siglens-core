@@ -19,24 +19,42 @@ describe('formatPositionHintSection', () => {
         }
     );
 
-    it('is qualitative and neutral: never contains a numeric figure', () => {
+    it('is bucket-qualitative: never contains a numeric figure (load-bearing safety guard)', () => {
         for (const [bucket] of cases) {
             const out = formatPositionHintSection(bucket);
             expect(out).not.toMatch(/\d/);
         }
     });
 
-    it('never mentions raw average price, quantity, or an action instruction', () => {
+    it('never emits a raw average price, quantity, or amount — only the qualitative band (load-bearing privacy/cache guard)', () => {
+        // The band strips price/quantity/amount at the source; the emitted hint
+        // must never reintroduce any of them, even though it now DOES use
+        // position-management verbs (익절/손절/추가매수/보유) intentionally.
         for (const [bucket] of cases) {
             const out = formatPositionHintSection(bucket);
-            expect(out).not.toMatch(/평단|평균단가|수량|매수|매도|손절|익절/);
+            expect(out).not.toMatch(/평단|평균단가|수량/);
         }
     });
 
-    it('states the band as reference context (참고), not an instruction to the model', () => {
+    it('is instructive and orients the analysis to holder position management (deliberate, product-approved reframing)', () => {
+        for (const [bucket] of cases) {
+            const out = formatPositionHintSection(bucket);
+            // Holder (not fresh-entry) perspective, oriented to managing the
+            // position rather than a passive "참고" reference line.
+            expect(out).toContain('보유');
+            expect(out).toContain('관점');
+            expect(out).toContain('구간');
+        }
+    });
+
+    it('keeps the disclaimer-safe envelope: general-scenario framing, no assumed holding size, user owns the final call', () => {
         const out = formatPositionHintSection('profit');
-        expect(out).toContain('참고');
-        expect(out).toContain('구간');
+        // Scenario/perspective framing (not a specific-user command)...
+        expect(out).toContain('일반적 시나리오');
+        // ...explicitly not assuming a specific holding size/amount...
+        expect(out).toContain('가정하지');
+        // ...and the final judgment/responsibility stays with the user.
+        expect(out).toContain('책임은 사용자');
     });
 
     it('returns an empty string for a bucket value outside the PositionBucket union instead of injecting "undefined"', () => {

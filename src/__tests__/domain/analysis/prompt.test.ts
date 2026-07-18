@@ -4430,7 +4430,9 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(prompt).not.toContain('참고: 이 사용자는');
+            expect(prompt).not.toContain(
+                '이 사용자는 이 종목을 이미 보유 중이며'
+            );
         });
 
         it.each([
@@ -4453,7 +4455,9 @@ describe('prompt', () => {
                     'equity',
                     bucket
                 );
-                expect(prompt).toContain('참고: 이 사용자는');
+                expect(prompt).toContain(
+                    '이 사용자는 이 종목을 이미 보유 중이며'
+                );
                 expect(prompt).toContain(koreanLabel);
             }
         );
@@ -4470,8 +4474,10 @@ describe('prompt', () => {
                 'equity',
                 'profit'
             );
-            expect(dynamic).toContain('참고: 이 사용자는');
-            expect(stable).not.toContain('참고: 이 사용자는');
+            expect(dynamic).toContain('이 사용자는 이 종목을 이미 보유 중이며');
+            expect(stable).not.toContain(
+                '이 사용자는 이 종목을 이미 보유 중이며'
+            );
         });
 
         it('`stable` is byte-identical whether or not positionBucket is provided', () => {
@@ -4522,7 +4528,7 @@ describe('prompt', () => {
                 []
             );
             expect(withInvalidBucket.dynamic).not.toContain(
-                '참고: 이 사용자는'
+                '이 사용자는 이 종목을 이미 보유 중이며'
             );
             expect(withInvalidBucket.dynamic).not.toContain('undefined');
             // Byte-identical to the no-bucket dynamic section confirms no
