@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.38.0](https://github.com/y0ngha/siglens-core/compare/v0.37.0...v0.38.0) (2026-07-18)
+
+
+### Features
+
+* **analysis:** position hint frames analysis for a holder (position management) — bump prompt to p7 ([fbc61d1](https://github.com/y0ngha/siglens-core/commit/fbc61d1a451fc8bdc46c25660ebb778c5e85435a))
+
 # [0.37.0](https://github.com/y0ngha/siglens-core/compare/v0.36.0...v0.37.0) (2026-07-18)
 
 
