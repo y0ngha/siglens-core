@@ -1886,6 +1886,15 @@ export function buildAnalysisPrompt(
     const coreSkillSections = buildSkillContentSections(coreGroups);
     const stableSections = coreSkillSections;
 
+    // `formatPositionHintSection` returns '' when `positionBucket` doesn't
+    // resolve to a known label (defensive guard against a runtime value
+    // outside the `PositionBucket` union) — computed once here so the
+    // section array below can filter on the result directly instead of
+    // building-then-filtering a throwaway array.
+    const positionHint = positionBucket
+        ? formatPositionHintSection(positionBucket)
+        : '';
+
     // Faithful reproduction of the v0.31 production section order (see
     // `git show main:src/domain/analysis/prompt.ts`'s `sections` array),
     // minus the combined skill-content block (now split: `core` digests live
@@ -1912,16 +1921,10 @@ export function buildAnalysisPrompt(
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
-        // `formatPositionHintSection` returns '' when `positionBucket` doesn't
-        // resolve to a known label (defensive guard against a runtime value
-        // outside the `PositionBucket` union) — only push a non-empty hint so
-        // an unrecognized bucket doesn't inject a stray blank entry that
-        // would double up the `\n\n` separator on join below.
-        ...(positionBucket
-            ? [formatPositionHintSection(positionBucket)].filter(
-                  hint => hint !== ''
-              )
-            : []),
+        // Only push a non-empty hint so an unrecognized bucket (empty
+        // `positionHint`) doesn't inject a stray blank entry that would
+        // double up the `\n\n` separator on join below.
+        ...(positionHint !== '' ? [positionHint] : []),
         // The full output-rules block — the true tail, exactly as in
         // production (see buildAnalysisRequest's doc comment for why).
         analysisRequest,

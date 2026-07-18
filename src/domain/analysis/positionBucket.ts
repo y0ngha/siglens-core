@@ -27,6 +27,12 @@ const NEAR_BREAKEVEN_THRESHOLD = 0.05;
  * @returns The bucket, or `null` when either input is non-positive or
  *   non-finite (a bucket cannot be derived — callers should fall back to the
  *   legacy no-bucket cache key and prompt).
+ *
+ * @example
+ * ```ts
+ * bucketizePosition(100, 125); // r = 0.25 → 'deep-profit'
+ * bucketizePosition(100, 80); // r = -0.20 → 'deep-loss'
+ * ```
  */
 export function bucketizePosition(
     avgPrice: number,

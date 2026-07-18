@@ -162,6 +162,19 @@ export { computeMarketReference } from './domain/analysis/marketReference';
 // Position bucket — pure P&L-band bucketizer + its domain type. Consumers
 // (siglens server action) compute the bucket, then pass the finished enum to
 // submitAnalysis; the cache-key/prompt wiring stays internal.
+//
+// Intentionally NOT mirrored to `index.client.ts` (documented exclusion,
+// same "document instead of mirror" precedent as `buildMacroBriefingPrompt`/
+// `normalizeMacroBriefing` — see docs/PUBLIC_API.md's economy-helpers Tier 2
+// entry). Unlike those two, the reason here isn't "no partial-consumption
+// entry point" — it's a trust boundary: `bucketizePosition`'s inputs include
+// the member's average cost basis, which the personalized-analysis-by-
+// position-bucket spec (Subsystem C) requires to be read server-side only
+// (see this function's own JSDoc). Exposing the bucketizer on the browser
+// entrypoint would hand consumers exactly the tool to compute a
+// client-supplied/spoofed bucket and poison the shared analysis cache with
+// it. `PositionBucket` (the type) stays server-only too, since its only
+// legitimate producer is this function.
 export { bucketizePosition } from './domain/analysis/positionBucket';
 export type { PositionBucket } from './domain/types';
 
