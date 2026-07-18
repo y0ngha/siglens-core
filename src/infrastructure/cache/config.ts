@@ -3,6 +3,7 @@ import type {
     MarketSessionSpec,
     NewsFeedCategory,
     OptionsExpirationFilter,
+    PositionBucket,
     StatementPeriod,
     Timeframe,
 } from '@/domain/types';
@@ -162,6 +163,22 @@ function reasoningKeySuffix(reasoning?: boolean): string {
 }
 
 /**
+ * @internal Cache-key suffix for the member position-bucket hint
+ * (personalized-analysis-by-position-bucket spec, Subsystem C). A member's
+ * unrealized-P&L band (see {@link PositionBucket} / `bucketizePosition`)
+ * personalizes the prompt, so a bucketed request must never share a cache
+ * entry with the base (no-bucket) request or with a different bucket — but
+ * omitting the bucket must stay indistinguishable from the pre-feature
+ * keyless behavior so existing cached entries and SSR peeks that omit
+ * `positionBucket` keep hitting the same key. Only a defined bucket appends a
+ * suffix; `undefined` is a no-op, matching the `reasoningKeySuffix` "append
+ * only when supplied" convention.
+ */
+function positionKeySuffix(bucket?: PositionBucket): string {
+    return bucket ? `:pos=${bucket}` : '';
+}
+
+/**
  * @internal
  * Fixed model identifier for the market briefing. Core owns this choice and
  * sends it on the dispatch body; it is also folded into the briefing cache key
@@ -255,6 +272,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * cache entry. Bumped to invalidate warm caches carrying pre-tier-gating
  * (unfiltered) content.
  *
+ * @remarks
+ * **Deliberately NOT bumped for the member position-bucket hint**
+ * (personalized-analysis-by-position-bucket spec, Subsystem C). A bucketed
+ * request appends a distinct `:pos=<bucket>` segment (see
+ * {@link buildAnalysisCacheKey} / `positionKeySuffix`) that was never written
+ * before, so it lands on a brand-new key namespace — no previously-cached
+ * entry becomes stale, and the no-bucket path is byte-identical to the
+ * pre-feature key. This constant is shared by the technical AND fundamental
+ * cache keys AND the SSR peek path, so bumping it would needlessly cold-start
+ * the entire warm cache (every symbol/timeframe/model, anonymous included)
+ * for zero correctness gain — mirroring the `ECONOMIC_EVENT_...` /
+ * `INDICATOR_TRANSLATION_...` "deliberately NOT bumped" precedents below.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p6' as const;
@@ -285,6 +315,14 @@ export const PROMPT_TEMPLATE_VERSION = 'p6' as const;
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix so reasoning
  *   ON never collides with the OFF result; `false`/`undefined` produce the
  *   exact same key as omitting the parameter entirely (backward compatible).
+ * @param positionBucket - Member position-bucket hint
+ *   (personalized-analysis-by-position-bucket spec, Subsystem C). When
+ *   supplied, appends a distinct `:pos=<bucket>` suffix AFTER the reasoning
+ *   suffix so each bucket (and the base/no-bucket request) reads/writes a
+ *   distinct cache entry; `undefined` produces the exact same key as omitting
+ *   the parameter entirely (backward compatible — this is the v1 scope: only
+ *   the technical/chart analysis key composes this axis, see the spec's
+ *   cross-repo split).
  * @returns The cache key.
  *
  * @example
@@ -295,6 +333,8 @@ export const PROMPT_TEMPLATE_VERSION = 'p6' as const;
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2'
  * const reasoned = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true);
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on'
+ * const bucketed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true, 'profit');
+ * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on:pos=profit'
  * ```
  */
 export function buildAnalysisCacheKey(
@@ -302,12 +342,13 @@ export function buildAnalysisCacheKey(
     timeframe: Timeframe,
     modelId = DEFAULT_ANALYSIS_MODEL_ID,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    positionBucket?: PositionBucket
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}`;
 }
 
 /**

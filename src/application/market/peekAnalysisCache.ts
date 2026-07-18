@@ -8,6 +8,7 @@ import type {
     AnalysisResponse,
     FilteredAnalysisResult,
     ModelId,
+    PositionBucket,
     Tier,
     TierConfig,
     Timeframe,
@@ -97,6 +98,13 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *   analysis that a member/pro submitter generated. Defaults to {@link DEFAULT_TIER}.
  * @param tierConfig - Tier configuration override, mainly for tests and
  *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
+ * @param positionBucket - Member position-bucket hint
+ *   (personalized-analysis-by-position-bucket spec, Subsystem C). Must be
+ *   passed IDENTICALLY to how the writer (`submitAnalysis`) derived it so
+ *   peek and submit read/write the same cache entry. Pass `undefined` for
+ *   the anonymous/SSR no-bucket path, which keeps the cache key byte-identical
+ *   to the legacy (pre-position-bucket) key — the default every existing
+ *   caller reads today.
  * @returns The tier-filtered cached response on a valid hit, or `null` on a
  *   miss / corrupt entry / disallowed caller-tier timeframe.
  *
@@ -115,7 +123,8 @@ export async function peekAnalysisCache(
     modelId?: ModelId,
     reasoning?: boolean,
     tier: Tier = DEFAULT_TIER,
-    tierConfig: TierConfig = TIER_CONFIG
+    tierConfig: TierConfig = TIER_CONFIG,
+    positionBucket?: PositionBucket
 ): Promise<FilteredAnalysisResult | null> {
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
 
@@ -138,7 +147,8 @@ export async function peekAnalysisCache(
         timeframe,
         effectiveModelId,
         `${tier}:${skillSampling.fingerprint}`,
-        reasoning
+        reasoning,
+        positionBucket
     );
 
     const cached = await cache

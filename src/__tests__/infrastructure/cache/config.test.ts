@@ -37,6 +37,7 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
+import type { PositionBucket } from '@/domain/types';
 import { describe, expect, it } from 'vitest';
 
 describe('cache config constants', () => {
@@ -508,5 +509,90 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
                 true
             )
         ).toBe(`${legacy}:reason=on`);
+    });
+});
+
+describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-by-position-bucket spec, Subsystem C)', () => {
+    it('buildAnalysisCacheKey: positionBucket 미지정 시 기존(레거시) 키와 byte-identical하다', () => {
+        const legacy = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash'
+        );
+        expect(legacy).toBe(
+            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
+        );
+        expect(
+            buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash',
+                undefined,
+                undefined,
+                undefined
+            )
+        ).toBe(legacy);
+    });
+
+    it('buildAnalysisCacheKey: 각 버킷마다 :pos=<bucket> suffix가 붙고 서로 구별된다', () => {
+        const legacy = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash'
+        );
+        const buckets: PositionBucket[] = [
+            'deep-profit',
+            'profit',
+            'near-breakeven',
+            'loss',
+            'deep-loss',
+        ];
+        const keys = buckets.map(bucket =>
+            buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash',
+                undefined,
+                undefined,
+                bucket
+            )
+        );
+        keys.forEach((key, i) => {
+            expect(key).toBe(`${legacy}:pos=${buckets[i]}`);
+        });
+        // All five keys are pairwise distinct (and distinct from the legacy key).
+        expect(new Set([legacy, ...keys]).size).toBe(keys.length + 1);
+    });
+
+    it('buildAnalysisCacheKey: reasoning과 positionBucket이 함께 있으면 :reason=on 다음에 :pos=<bucket>이 붙는다', () => {
+        const key = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            'sk1',
+            true,
+            'profit'
+        );
+        expect(key).toBe(
+            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:sk1:reason=on:pos=profit`
+        );
+    });
+
+    it('buildAnalysisCacheKey: reasoning 없이 positionBucket만 있으면 :pos=<bucket>만 붙는다', () => {
+        const key = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            undefined,
+            'deep-loss'
+        );
+        expect(key).toBe(
+            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:pos=deep-loss`
+        );
+    });
+
+    it('PROMPT_TEMPLATE_VERSION은 position bucket 도입으로 인해 변경되지 않는다 (new-key isolation)', () => {
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p6');
     });
 });

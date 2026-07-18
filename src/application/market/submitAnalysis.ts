@@ -186,6 +186,10 @@ function observePatternCandidates(
  *   the fetch site and omitting it on a cache miss will throw a clear runtime error.
  *   Pass `reasoning: true` to request deep-thinking mode (member-reasoning-toggle
  *   spec, Part A) — folded into the cache key and forwarded to the worker body.
+ *   Pass `positionBucket` to personalize the analysis for a member's holding
+ *   (personalized-analysis-by-position-bucket spec, Subsystem C) — a finished
+ *   bucket enum folded into the cache key and prompt hint; never the raw
+ *   average price, and never joined into the skill-sampling seed.
  * @returns Either a cached analysis or a freshly submitted job descriptor —
  *   see {@link SubmitAnalysisGatedResult}.
  *
@@ -345,7 +349,8 @@ async function submitAnalysisWithVisibility(
         timeframe,
         effectiveModelId,
         `${tier}:${skillSampling.fingerprint}`,
-        options.reasoning
+        options.reasoning,
+        options.positionBucket
     );
 
     if (!force && cache !== null) {
@@ -420,7 +425,8 @@ async function submitAnalysisWithVisibility(
         skillSampling.skills,
         timeframe,
         fearGreed ?? undefined,
-        options.assetClass ?? 'equity'
+        options.assetClass ?? 'equity',
+        options.positionBucket
     );
     // Design C (A/B-gate validated): the always-on skill digest block
     // (`stable`) folds into the SYSTEM prompt instead of leading the user

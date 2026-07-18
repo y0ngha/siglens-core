@@ -42,6 +42,22 @@ vi.mock('@/domain/patterns', async importOriginal => {
         screenChartPatterns: vi.fn(actual.screenChartPatterns),
     };
 });
+// Wraps (does not replace) the real skill-sampling plan so
+// `createSkillSamplingPlan`'s `seedParts` argument can be asserted on —
+// needed to verify `options.positionBucket` never joins the sampling seed
+// (personalized-analysis-by-position-bucket spec, Subsystem C: the bucket
+// must change the cache key + prompt hint only, never which skills are
+// sampled).
+vi.mock('@/infrastructure/skills/sampling', async importOriginal => {
+    const actual =
+        await importOriginal<
+            typeof import('@/infrastructure/skills/sampling')
+        >();
+    return {
+        ...actual,
+        createSkillSamplingPlan: vi.fn(actual.createSkillSamplingPlan),
+    };
+});
 
 import {
     submitAnalysis,
@@ -66,6 +82,7 @@ import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { screenChartPatterns } from '@/domain/patterns';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 /** Fingerprint of the empty skill catalog the loader stub returns by default. */
@@ -79,6 +96,7 @@ const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
 const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
 const mockScreenChartPatterns = screenChartPatterns as Mock;
+const mockCreateSkillSamplingPlan = createSkillSamplingPlan as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -1022,6 +1040,160 @@ describe('submitAnalysis 함수는', () => {
         });
     });
 
+    describe('positionBucket이 적용될 때 (personalized-analysis-by-position-bucket spec Subsystem C)', () => {
+        it('positionBucket이 있으면 :pos=<bucket> suffix가 붙은 캐시 키로 조회한다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, positionBucket: 'profit' }
+            );
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}:pos=profit`
+            );
+        });
+
+        it('positionBucket을 생략하면 기존 캐시 키와 완전히 동일하다 (하위 호환)', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}`
+            );
+        });
+
+        it('reasoning과 positionBucket이 함께 있으면 :reason=on 다음에 :pos=<bucket>이 붙는다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    reasoning: true,
+                    positionBucket: 'deep-loss',
+                }
+            );
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                `analysis:AAPL:1Day:${DEFAULT_ANALYSIS_MODEL_ID}:${KEY_SUFFIX}:reason=on:pos=deep-loss`
+            );
+        });
+
+        it('buildAnalysisPrompt에 positionBucket을 그대로 전달한다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    positionBucket: 'near-breakeven',
+                }
+            );
+
+            expect(mockBuildAnalysisPrompt).toHaveBeenCalledWith(
+                mockSymbol,
+                mockCompanyName,
+                mockBarsData.bars,
+                mockBarsData.indicators,
+                [],
+                mockTimeframe,
+                undefined,
+                'equity',
+                'near-breakeven'
+            );
+        });
+
+        it('positionBucket을 생략하면 buildAnalysisPrompt의 positionBucket 인자는 undefined이다', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet.mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockBuildAnalysisPrompt).toHaveBeenCalledWith(
+                mockSymbol,
+                mockCompanyName,
+                mockBarsData.bars,
+                mockBarsData.indicators,
+                [],
+                mockTimeframe,
+                undefined,
+                'equity',
+                undefined
+            );
+        });
+
+        it('positionBucket은 skill-sampling seed에 영향을 주지 않는다 (샘플링 시드 불변)', async () => {
+            mockCacheGet.mockReset();
+            mockCacheGet
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(null);
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            const seedPartsWithoutBucket =
+                mockCreateSkillSamplingPlan.mock.calls[0]?.[2];
+
+            mockCreateSkillSamplingPlan.mockClear();
+
+            await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    positionBucket: 'deep-profit',
+                }
+            );
+            const seedPartsWithBucket =
+                mockCreateSkillSamplingPlan.mock.calls[0]?.[2];
+
+            expect(seedPartsWithBucket).toEqual(seedPartsWithoutBucket);
+            expect(JSON.stringify(seedPartsWithBucket)).not.toContain(
+                'deep-profit'
+            );
+        });
+    });
+
     describe('fmpSymbol이 제공될 때', () => {
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);
@@ -1437,8 +1609,12 @@ describe('submitAnalysis 함수는', () => {
             // to an options object, replace args[6] with args[0].fearGreed.
             const seventh = args[6];
             expect(seventh).toBe(mockSnapshot);
-            // crypto phase adds an 8th arg (assetClass, defaulting to 'equity').
-            expect(args.length).toBe(8);
+            // crypto phase added an 8th arg (assetClass, defaulting to 'equity');
+            // the position-bucket hint (personalized-analysis-by-position-bucket
+            // spec, Subsystem C) adds a 9th arg (positionBucket), undefined here
+            // since this call omits `options.positionBucket`.
+            expect(args.length).toBe(9);
+            expect(args[8]).toBeUndefined();
         });
 
         it('1Day가 아닌 타임프레임이면 일봉 데이터를 추가로 fetch한다', async () => {

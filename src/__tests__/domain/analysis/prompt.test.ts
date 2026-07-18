@@ -50,6 +50,7 @@ import type {
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
+    PositionBucket,
     Skill,
     SkillUsageRole,
     SMCResult,
@@ -4417,6 +4418,117 @@ describe('prompt', () => {
             expect(prompt).toContain(
                 'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
             );
+        });
+    });
+
+    describe('buildAnalysisPrompt — position bucket hint (personalized-analysis-by-position-bucket spec, Subsystem C)', () => {
+        it('omits the position hint section when positionBucket is not provided', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(prompt).not.toContain('참고: 이 사용자는');
+        });
+
+        it.each([
+            ['deep-profit', '깊은 수익'],
+            ['profit', '수익'],
+            ['near-breakeven', '본전 부근'],
+            ['loss', '손실'],
+            ['deep-loss', '깊은 손실'],
+        ] as const)(
+            'includes the Korean hint for bucket %s (%s) when positionBucket is provided',
+            (bucket, koreanLabel) => {
+                const prompt = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    [],
+                    makeIndicators(),
+                    [],
+                    '1Day',
+                    undefined,
+                    'equity',
+                    bucket
+                );
+                expect(prompt).toContain('참고: 이 사용자는');
+                expect(prompt).toContain(koreanLabel);
+            }
+        );
+
+        it('places the hint in `dynamic` only — `stable` never carries it', () => {
+            const { stable, dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                'profit'
+            );
+            expect(dynamic).toContain('참고: 이 사용자는');
+            expect(stable).not.toContain('참고: 이 사용자는');
+        });
+
+        it('`stable` is byte-identical whether or not positionBucket is provided', () => {
+            const withoutBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            const withBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                'deep-loss'
+            );
+            expect(withBucket.stable).toBe(withoutBucket.stable);
+        });
+
+        it('omits the hint and injects no stray blank section when positionBucket is an out-of-union runtime value', () => {
+            // Simulates a corrupt/stale value crossing a boundary TypeScript
+            // can't guard (e.g. JSON) — `formatPositionHintSection` returns
+            // `''` defensively, and `buildAnalysisPrompt` must not push that
+            // empty string into `dynamicSections` (which would double up the
+            // `\n\n` join separator).
+            const invalidBucket = 'unknown-bucket' as unknown as PositionBucket;
+            const withInvalidBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                invalidBucket
+            );
+            const withoutBucket = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(withInvalidBucket.dynamic).not.toContain(
+                '참고: 이 사용자는'
+            );
+            expect(withInvalidBucket.dynamic).not.toContain('undefined');
+            // Byte-identical to the no-bucket dynamic section confirms no
+            // stray empty entry (and its extra `\n\n` join separator) was
+            // injected for the out-of-union bucket value.
+            expect(withInvalidBucket.dynamic).toBe(withoutBucket.dynamic);
         });
     });
 
