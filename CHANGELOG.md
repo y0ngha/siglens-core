@@ -1,5 +1,19 @@
 # Changelog
 
+# [0.37.0](https://github.com/y0ngha/siglens-core/compare/v0.36.0...v0.37.0) (2026-07-18)
+
+
+### Bug Fixes
+
+* address PR review — PUBLIC_API sync, JSDoc symbol, defensive hint ([f7a1d49](https://github.com/y0ngha/siglens-core/commit/f7a1d4912d98144dfceaf32970e3c83acadbc85f)), closes [#7](https://github.com/y0ngha/siglens-core/issues/7)
+
+
+### Features
+
+* add PositionBucket type + bucketizePosition ([0b0bd7a](https://github.com/y0ngha/siglens-core/commit/0b0bd7a8bb9e088700a921102e641750c4d9c2c5))
+* export bucketizePosition + PositionBucket from public barrel ([6aa52d5](https://github.com/y0ngha/siglens-core/commit/6aa52d509cd36dbe279da73ee3d8b1dc6703fa16))
+* thread positionBucket into analysis cache key (no template-version bump) + prompt hint ([5d6ac7b](https://github.com/y0ngha/siglens-core/commit/5d6ac7b9a40d5ccf0e4c04ca3fba4c4562d314d6))
+
 # [0.36.0](https://github.com/y0ngha/siglens-core/compare/v0.35.0...v0.36.0) (2026-07-16)
 
 
