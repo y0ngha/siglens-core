@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.40.0](https://github.com/y0ngha/siglens-core/compare/v0.39.0...v0.40.0) (2026-07-31)
+
+
+### Features
+
+* 2026-07 LLM 모델 레지스트리 확장 ([e169ac9](https://github.com/y0ngha/siglens-core/commit/e169ac9473dc008c6d6c37c46493d88e9e473722))
+
 # [0.39.0](https://github.com/y0ngha/siglens-core/compare/v0.38.0...v0.39.0) (2026-07-18)
 
 
