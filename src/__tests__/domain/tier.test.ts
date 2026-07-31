@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     DEFAULT_TIER,
@@ -17,22 +18,9 @@ import {
 } from '@/domain/tier';
 import type { ModelId, TierConfig } from '@/domain/types';
 
-const ALL_CONFIGURED_MODELS: readonly ModelId[] = [
-    'claude-haiku-4-5',
-    'claude-opus-4-7',
-    'claude-sonnet-4-6',
-    'deepseek-v4-flash',
-    'deepseek-v4-pro',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-pro',
-    'gemini-3-flash-preview',
-    'gemini-3.1-pro-preview',
-    'gpt-5-mini',
-    'gpt-5.4',
-    'gpt-5.5',
-];
-
+// 전체 모델 로스터를 여기에 하드코딩하지 않는다 — 명시적 로스터 트립와이어는
+// modelSpecs.test.ts('covers every active model identifier exactly once')가 소유하고,
+// 이 파일은 그 로스터를 MODEL_SPECS에서 도출해 tier 배치만 검증한다.
 const restrictedConfig: TierConfig = {
     ...TIER_CONFIG,
     limits: {
@@ -147,8 +135,18 @@ describe('tier', () => {
     });
 
     describe('getAllowedModels', () => {
-        it('returns every configured model when restrictions are disabled', () => {
-            expect(getAllowedModels('free')).toEqual(ALL_CONFIGURED_MODELS);
+        // 두 가지를 한 번에 고정한다.
+        // (1) restrictions가 꺼져 있으면 tier와 무관하게 전체 목록을 정렬해 돌려준다.
+        // (2) 그 전체 목록 = MODEL_SPECS의 모든 ActiveModelId. MODEL_SPECS는
+        //     `satisfies Record<ActiveModelId, ModelSpec>`로 컴파일러가 누락을 잡지만
+        //     tier 목록은 평범한 리터럴 배열이라, 모델을 추가하면서 tier.ts만 빠뜨려도
+        //     타입 체크는 통과한다 — 그 모델은 어떤 등급에서도 선택 불가능한 유령이 된다.
+        // 로스터를 여기에 다시 하드코딩하지 않고 MODEL_SPECS에서 도출하는 이유는,
+        // 명시적 로스터 트립와이어를 modelSpecs.test.ts가 이미 소유하고 있어서다.
+        it('returns every model in MODEL_SPECS when restrictions are disabled', () => {
+            expect(getAllowedModels('free')).toEqual(
+                Object.keys(MODEL_SPECS).toSorted()
+            );
         });
 
         it('returns tier-specific models in sorted order when restrictions are enabled', () => {
@@ -359,6 +357,44 @@ describe('tier', () => {
             ).toBe(false);
         });
 
+        // isPremiumModel/requiresByokKey는 free 목록 밖이기만 하면 통과하므로
+        // member/pro 배치 자체는 검증하지 못한다. 아래 두 테스트가 배치를 고정한다 —
+        // claude-opus-5를 MEMBER_MODELS로 옮기면 반드시 실패해야 한다.
+        it('places the 2026-07 member-tier models in member but not free', () => {
+            for (const model of [
+                'claude-sonnet-5',
+                'gpt-5.6-terra',
+                'gemini-3.6-flash',
+                'gemini-3.5-flash-lite',
+            ] as const) {
+                expect(
+                    isModelAllowed('member', model, restrictedConfig),
+                    model
+                ).toBe(true);
+                expect(
+                    isModelAllowed('free', model, restrictedConfig),
+                    model
+                ).toBe(false);
+            }
+        });
+
+        it('places the 2026-07 flagships in pro only', () => {
+            for (const model of ['claude-opus-5', 'gpt-5.6-sol'] as const) {
+                expect(
+                    isModelAllowed('pro', model, restrictedConfig),
+                    model
+                ).toBe(true);
+                expect(
+                    isModelAllowed('member', model, restrictedConfig),
+                    model
+                ).toBe(false);
+                expect(
+                    isModelAllowed('free', model, restrictedConfig),
+                    model
+                ).toBe(false);
+            }
+        });
+
         it('rejects deprecated model identifiers (claude-sonnet-4, claude-opus-4) for all tiers', () => {
             expect(
                 isModelAllowed('free', 'claude-sonnet-4', restrictedConfig)
@@ -408,14 +444,20 @@ describe('tier', () => {
         it('returns true for member-only models', () => {
             expect(isPremiumModel('gemini-2.5-pro')).toBe(true);
             expect(isPremiumModel('gemini-3-flash-preview')).toBe(true);
+            expect(isPremiumModel('gemini-3.5-flash-lite')).toBe(true);
+            expect(isPremiumModel('gemini-3.6-flash')).toBe(true);
             expect(isPremiumModel('claude-sonnet-4-6')).toBe(true);
+            expect(isPremiumModel('claude-sonnet-5')).toBe(true);
             expect(isPremiumModel('gpt-5.4')).toBe(true);
+            expect(isPremiumModel('gpt-5.6-terra')).toBe(true);
         });
 
         it('returns true for pro-only models', () => {
             expect(isPremiumModel('gemini-3.1-pro-preview')).toBe(true);
             expect(isPremiumModel('claude-opus-4-7')).toBe(true);
+            expect(isPremiumModel('claude-opus-5')).toBe(true);
             expect(isPremiumModel('gpt-5.5')).toBe(true);
+            expect(isPremiumModel('gpt-5.6-sol')).toBe(true);
         });
 
         it('ignores enableTierRestrictions flag', () => {
@@ -493,6 +535,22 @@ describe('tier', () => {
         it('returns true for non-pro tier on premium models', () => {
             expect(requiresByokKey('member', 'gemini-2.5-pro')).toBe(true);
             expect(requiresByokKey('free', 'gemini-2.5-pro')).toBe(true);
+        });
+
+        it('gates the 2026-07 model generation behind BYOK for non-pro tiers', () => {
+            const latest: readonly ModelId[] = [
+                'claude-opus-5',
+                'claude-sonnet-5',
+                'gpt-5.6-sol',
+                'gpt-5.6-terra',
+                'gemini-3.6-flash',
+                'gemini-3.5-flash-lite',
+            ];
+            for (const model of latest) {
+                expect(requiresByokKey('free', model), model).toBe(true);
+                expect(requiresByokKey('member', model), model).toBe(true);
+                expect(requiresByokKey('pro', model), model).toBe(false);
+            }
         });
 
         it('respects custom config', () => {

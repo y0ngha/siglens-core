@@ -12,16 +12,28 @@ const DEFAULT_TEMPERATURE = 0 as const;
 /**
  * Per-model AI SDK call parameters keyed by {@link ActiveModelId}.
  *
- * Single source of truth for AI SDK callers (workers, server actions, UI).
- * Adding a new model is a one-row change here followed by a core publish — all
- * downstream callers pick it up automatically on upgrade.
+ * Single source of truth for AI SDK **call parameters** — workers, server
+ * actions, and the UI all look this up directly.
+ *
+ * Adding a model is not a one-line change. Three sites must change together
+ * for the model to actually reach consumers:
+ * 1. The `TierModel` union (`domain/types.ts`) — omitting it makes the
+ *    `satisfies` clause below fail to compile.
+ * 2. A row in this map — omitting it also fails the `satisfies` clause above.
+ * 3. The tier placement in `TIER_CONFIG.models` (`domain/tier.ts`) — **this is
+ *    the one site the compiler does not catch.** Omitting it produces a
+ *    model that `getAllowedModels` never returns, so no tier can select it
+ *    (the coverage assertion in `tier.test.ts` guards this).
+ *
+ * After that, a core publish is required; consumers pick it up on a version
+ * bump.
  *
  * Notes:
- * - Claude haiku: thinking 미지원 (`thinkingBudget: 0`), temperature 사용.
- * - Claude sonnet/opus: adaptive thinking (`effort`), `budget_tokens`/temperature 미사용.
- * - Gemini: `thinkingBudget` 그대로 사용.
- * - GPT-5 series: `effort`로 Responses API `reasoning.effort` 지정, temperature 미지원.
- * - DeepSeek V4: `thinking` boolean 토글(reasoning on/off), non-thinking 시 temperature 사용.
+ * - Claude haiku: no thinking support (`thinkingBudget: 0`), uses temperature.
+ * - Claude sonnet/opus: adaptive thinking via `effort`; no `budget_tokens`/temperature.
+ * - Gemini: uses `thinkingBudget` as-is.
+ * - GPT-5 series: maps `effort` to the Responses API `reasoning.effort`; does not accept temperature.
+ * - DeepSeek V4: toggles reasoning with a boolean `thinking`; uses temperature only when non-thinking.
  */
 export const MODEL_SPECS = {
     'claude-haiku-4-5': {
@@ -40,6 +52,27 @@ export const MODEL_SPECS = {
     'claude-opus-4-7': {
         provider: 'claude',
         apiModelId: 'claude-opus-4-7',
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    // The Claude 5 generation's `claude-sonnet-5` / `claude-opus-5` ids are
+    // themselves the complete model id Anthropic documents — appending a
+    // dated snapshot suffix 404s (unlike older models such as
+    // `claude-haiku-4-5-20251001`, which do have dated ids). The "no alias"
+    // rule in the GPT-5.6 comment below targets routing aliases that resolve
+    // to one of several models (`gpt-5.6` → sol); these ids are not that.
+    'claude-sonnet-5': {
+        provider: 'claude',
+        apiModelId: 'claude-sonnet-5',
+        // Sonnet 5 has adaptive thinking on by default, and thinking tokens
+        // share the max_tokens budget. Reusing Sonnet 4.6's baseline (64K)
+        // risks truncation, so we request the model ceiling (128K) instead.
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    'claude-opus-5': {
+        provider: 'claude',
+        apiModelId: 'claude-opus-5',
         maxOutputTokens: 128_000,
         effort: 'high',
     },
@@ -78,6 +111,27 @@ export const MODEL_SPECS = {
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
     },
+    // Gemini thinking budgets split by how a model is used, not by
+    // flash-vs-pro. The 2.5-generation flash/flash-lite models are cheap
+    // helper models, so they get 8K; generation-3+ flash is Gemini's primary
+    // reasoning line (3.6 Flash is the current GA top flash), so it gets the
+    // same 32K as pro.
+    'gemini-3.5-flash-lite': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.5-flash-lite',
+        maxOutputTokens: 65_536,
+        // flash-lite is the high-volume, low-latency line — same 8K budget as 2.5 flash-lite.
+        thinkingBudget: 8_192,
+        temperature: DEFAULT_TEMPERATURE,
+    },
+    'gemini-3.6-flash': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.6-flash',
+        maxOutputTokens: 65_536,
+        // Generation-3 primary flash line — same 32K budget as gemini-3-flash-preview.
+        thinkingBudget: 32_768,
+        temperature: DEFAULT_TEMPERATURE,
+    },
     'gpt-5-mini': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5-mini',
@@ -93,6 +147,22 @@ export const MODEL_SPECS = {
     'gpt-5.5': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.5',
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    // The GPT-5.6 family pins explicit variant ids instead of the `gpt-5.6`
+    // alias (which routes to sol), because a provider can silently repoint
+    // an alias, and this repo binds analysis cache keys and response
+    // characteristics to the model id.
+    'gpt-5.6-terra': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-5.6-terra',
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    'gpt-5.6-sol': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-5.6-sol',
         maxOutputTokens: 128_000,
         effort: 'high',
     },

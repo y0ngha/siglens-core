@@ -33,14 +33,20 @@ describe('MODEL_SPECS', () => {
             'claude-haiku-4-5',
             'claude-sonnet-4-6',
             'claude-opus-4-7',
+            'claude-sonnet-5',
+            'claude-opus-5',
             'gemini-2.5-flash',
             'gemini-2.5-flash-lite',
             'gemini-2.5-pro',
             'gemini-3-flash-preview',
             'gemini-3.1-pro-preview',
+            'gemini-3.5-flash-lite',
+            'gemini-3.6-flash',
             'gpt-5-mini',
             'gpt-5.4',
             'gpt-5.5',
+            'gpt-5.6-terra',
+            'gpt-5.6-sol',
             'deepseek-v4-flash',
             'deepseek-v4-pro',
         ];
@@ -70,6 +76,10 @@ describe('MODEL_SPECS', () => {
         expect(MODEL_SPECS['claude-haiku-4-5'].maxOutputTokens).toBe(64_000);
         expect(MODEL_SPECS['claude-sonnet-4-6'].maxOutputTokens).toBe(64_000);
         expect(MODEL_SPECS['claude-opus-4-7'].maxOutputTokens).toBe(128_000);
+        // Sonnet 5는 4.6과 달리 128K를 요청한다 — adaptive thinking이 기본 ON이라
+        // 64K로는 thinking + 응답이 함께 잘릴 수 있다.
+        expect(MODEL_SPECS['claude-sonnet-5'].maxOutputTokens).toBe(128_000);
+        expect(MODEL_SPECS['claude-opus-5'].maxOutputTokens).toBe(128_000);
     });
 
     it('uses 65_536 max output tokens for every Gemini model', () => {
@@ -102,27 +112,49 @@ describe('MODEL_SPECS', () => {
         expect(MODEL_SPECS['gpt-5-mini'].effort).toBe('medium');
         expect(MODEL_SPECS['gpt-5.4'].effort).toBe('high');
         expect(MODEL_SPECS['gpt-5.5'].effort).toBe('high');
+        expect(MODEL_SPECS['claude-sonnet-5'].effort).toBe('high');
+        expect(MODEL_SPECS['claude-opus-5'].effort).toBe('high');
+        expect(MODEL_SPECS['gpt-5.6-terra'].effort).toBe('high');
+        expect(MODEL_SPECS['gpt-5.6-sol'].effort).toBe('high');
     });
 
     it('does not include temperature on GPT reasoning model specs', () => {
         expect('temperature' in MODEL_SPECS['gpt-5-mini']).toBe(false);
         expect('temperature' in MODEL_SPECS['gpt-5.4']).toBe(false);
         expect('temperature' in MODEL_SPECS['gpt-5.5']).toBe(false);
+        expect('temperature' in MODEL_SPECS['gpt-5.6-terra']).toBe(false);
+        expect('temperature' in MODEL_SPECS['gpt-5.6-sol']).toBe(false);
     });
 
-    it('keeps gemini-2.5-flash and gemini-2.5-flash-lite at the documented 8_192 thinking budget', () => {
-        expect(MODEL_SPECS['gemini-2.5-flash'].thinkingBudget).toBe(8_192);
-        expect(MODEL_SPECS['gemini-2.5-flash-lite'].thinkingBudget).toBe(8_192);
+    // 아래 두 테스트는 Gemini 모델 전체를 8_192 그룹과 그 여집합으로 분할한다.
+    // 여집합은 하드코딩이 아니라 도출되므로 32_768이 사실상 기본값이 된다:
+    // 새 Gemini 모델을 LOW_BUDGET_GEMINI에 넣지 않은 채 추가하면 자동으로 여집합에
+    // 들어가고, 그 예산이 32_768이 아니면 두 번째 테스트가 실패한다. 즉 "32_768이
+    // 아닌 예산은 반드시 명시적으로 분류해야 한다"가 이 쌍이 보장하는 불변식이다.
+    const LOW_BUDGET_GEMINI: readonly ActiveModelId[] = [
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-3.5-flash-lite',
+    ];
+
+    it('keeps the low-budget Gemini line at the documented 8_192 thinking budget', () => {
+        for (const model of LOW_BUDGET_GEMINI) {
+            expect(MODEL_SPECS[model], model).toMatchObject({
+                provider: 'gemini',
+                thinkingBudget: 8_192,
+            });
+        }
     });
 
-    it('uses 32_768 thinking budget for the remaining Gemini models', () => {
-        const otherGemini = [
-            'gemini-2.5-pro',
-            'gemini-3-flash-preview',
-            'gemini-3.1-pro-preview',
-        ] as const;
-        for (const model of otherGemini) {
-            expect(MODEL_SPECS[model].thinkingBudget, model).toBe(32_768);
+    it('uses 32_768 thinking budget for every remaining Gemini model', () => {
+        const remaining = Object.entries(MODEL_SPECS).filter(
+            ([model, spec]) =>
+                spec.provider === 'gemini' &&
+                !LOW_BUDGET_GEMINI.includes(model as ActiveModelId)
+        );
+        expect(remaining.length).toBeGreaterThan(0);
+        for (const [model, spec] of remaining) {
+            expect(spec, model).toMatchObject({ thinkingBudget: 32_768 });
         }
     });
 
