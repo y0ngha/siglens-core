@@ -151,11 +151,12 @@ export const TIER_CONFIG = {
     member: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
     pro: ['direction', 'summary', 'partial_detail', 'full_detail', 'entry', 'stoploss', 'target', 'confidence'],
   },
-  models: {
-    free: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-    member: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4'],
-    pro: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'claude-sonnet-4', 'claude-opus-4'],
-  },
+  // 실제 목록은 모델이 추가될 때마다 바뀐다 — 여기 인라인하면 반드시 드리프트하므로
+  // `src/domain/tier.ts`의 FREE_MODELS / MEMBER_MODELS / PRO_MODELS를 참조할 것.
+  // 구조: free ⊂ member ⊂ pro (member/pro는 각각 하위 목록을 spread한다).
+  // free = siglens가 서버 키로 요금을 대납하는 모델. 그 밖은 전부 프리미엄이며
+  // pro가 아닌 등급은 BYOK 키가 있어야 호출된다(`isPremiumModel`/`requiresByokKey`).
+  models: { free: [/* ... */], member: [/* ... */], pro: [/* ... */] },
   featureFlags: {
     enableTierRestrictions: false,
     enableTimeframeRestrictions: true,

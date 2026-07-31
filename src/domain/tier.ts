@@ -47,18 +47,32 @@ const FREE_MODELS: readonly TierModel[] = [
     'deepseek-v4-flash',
     'deepseek-v4-pro',
 ];
+// 프리미엄(= free 목록 밖) 모델은 pro가 아닌 등급에서 BYOK 키가 있어야 호출된다
+// (`isPremiumModel` → siglens `resolveTierAndByok`).
+//
+// free 목록은 "siglens가 서버 키로 요금을 대납하는 모델"이지 "싼 모델"이 아니다.
+// 그래서 신규 세대는 저비용 라인(예: gemini-3.5-flash-lite)이라도 free에 넣지 않고
+// member 이상 + 사용자 키로만 연다 — 대납 범위를 세대 단위로 고정해 두어야
+// 모델이 늘어날 때마다 서버 비용이 따라 늘지 않는다. free 승격은 비용 실측 후
+// 별도 결정 사항이다.
 const MEMBER_MODELS: readonly TierModel[] = [
     ...FREE_MODELS,
     'gemini-2.5-pro',
     'gemini-3-flash-preview',
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
     'claude-sonnet-4-6',
+    'claude-sonnet-5',
     'gpt-5.4',
+    'gpt-5.6-terra',
 ];
 const PRO_MODELS: readonly TierModel[] = [
     ...MEMBER_MODELS,
     'gemini-3.1-pro-preview',
     'claude-opus-4-7',
+    'claude-opus-5',
     'gpt-5.5',
+    'gpt-5.6-sol',
 ];
 
 /** Default tier assigned to unauthenticated or newly-created users. */

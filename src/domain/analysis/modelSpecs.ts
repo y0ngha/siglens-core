@@ -12,9 +12,17 @@ const DEFAULT_TEMPERATURE = 0 as const;
 /**
  * Per-model AI SDK call parameters keyed by {@link ActiveModelId}.
  *
- * Single source of truth for AI SDK callers (workers, server actions, UI).
- * Adding a new model is a one-row change here followed by a core publish — all
- * downstream callers pick it up automatically on upgrade.
+ * Single source of truth for AI SDK **call parameters** — workers, server
+ * actions, UI 모두 여기서 직접 lookup한다.
+ *
+ * 다만 모델 추가는 한 줄로 끝나지 않는다. 세 곳을 함께 고쳐야 소비처에 노출된다:
+ * 1. `TierModel` union (`domain/types.ts`) — 없으면 아래 `satisfies`가 컴파일 에러.
+ * 2. 이 맵의 한 행 — 없으면 위 `satisfies`가 컴파일 에러.
+ * 3. `TIER_CONFIG.models`의 티어 배치 (`domain/tier.ts`) — **여기만 컴파일러가
+ *    잡아 주지 않는다.** 빠뜨리면 `getAllowedModels`가 돌려주지 않아 어떤 등급에서도
+ *    선택할 수 없는 유령 모델이 된다 (tier.test.ts의 커버리지 단언이 감시한다).
+ *
+ * 그 뒤 core publish → 소비처는 버전 범프만으로 자동으로 인식한다.
  *
  * Notes:
  * - Claude haiku: thinking 미지원 (`thinkingBudget: 0`), temperature 사용.
@@ -40,6 +48,26 @@ export const MODEL_SPECS = {
     'claude-opus-4-7': {
         provider: 'claude',
         apiModelId: 'claude-opus-4-7',
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    // Claude 5 세대의 `claude-sonnet-5` / `claude-opus-5`는 그 자체가 Anthropic이
+    // 문서화한 완전한 모델 id다 — 뒤에 날짜 스냅샷을 붙이면 404가 난다
+    // (`claude-haiku-4-5-20251001`처럼 dated id가 존재하는 구세대와 다르다).
+    // 아래 GPT-5.6 주석의 "alias 금지"는 여러 모델로 라우팅되는 alias(`gpt-5.6` →
+    // sol)를 가리키며, 단일 모델을 지칭하는 이 id들은 해당하지 않는다.
+    'claude-sonnet-5': {
+        provider: 'claude',
+        apiModelId: 'claude-sonnet-5',
+        // Sonnet 5는 adaptive thinking이 기본 ON이고 thinking 토큰이 max_tokens
+        // 예산을 함께 소비한다. Sonnet 4.6 기준(64K)을 그대로 쓰면 응답이 잘릴 수
+        // 있어 모델 상한(128K)을 그대로 요청한다.
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    'claude-opus-5': {
+        provider: 'claude',
+        apiModelId: 'claude-opus-5',
         maxOutputTokens: 128_000,
         effort: 'high',
     },
@@ -78,6 +106,26 @@ export const MODEL_SPECS = {
         thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
     },
+    // Gemini thinking budget은 "flash냐 pro냐"가 아니라 "그 모델을 얕은 추론용으로
+    // 쓰느냐 깊은 추론용으로 쓰느냐"로 나뉜다. 2.5 세대의 flash/flash-lite는 값싼
+    // 보조 모델이라 8K, 3 세대 이후 flash는 Gemini의 주력 추론 라인(3.6 Flash가
+    // 현행 GA 최상위 flash)이라 pro와 같은 32K를 준다.
+    'gemini-3.5-flash-lite': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.5-flash-lite',
+        maxOutputTokens: 65_536,
+        // flash-lite는 고volume 저지연 라인 — 2.5 flash-lite와 동일한 8K 예산.
+        thinkingBudget: 8_192,
+        temperature: DEFAULT_TEMPERATURE,
+    },
+    'gemini-3.6-flash': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.6-flash',
+        maxOutputTokens: 65_536,
+        // 3 세대 flash 주력 라인 — gemini-3-flash-preview와 동일한 32K 예산.
+        thinkingBudget: 32_768,
+        temperature: DEFAULT_TEMPERATURE,
+    },
     'gpt-5-mini': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5-mini',
@@ -93,6 +141,21 @@ export const MODEL_SPECS = {
     'gpt-5.5': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.5',
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    // GPT-5.6 계열은 `gpt-5.6` alias(→ sol) 대신 변형을 명시적으로 고정한다.
+    // alias는 OpenAI가 라우팅 대상을 바꾸면 조용히 동작이 바뀌므로, 캐시 키와
+    // 응답 특성이 모델 id에 묶여 있는 이 레포에서는 pinned id가 안전하다.
+    'gpt-5.6-terra': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-5.6-terra',
+        maxOutputTokens: 128_000,
+        effort: 'high',
+    },
+    'gpt-5.6-sol': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-5.6-sol',
         maxOutputTokens: 128_000,
         effort: 'high',
     },
