@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     buildUsageLimitError,
@@ -283,31 +284,31 @@ export async function submitFundamentalAnalysis(
             ? { 'X-AI-API-KEY': options.userApiKey }
             : {};
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
-            ...userApiKeyHeader,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+                ...userApiKeyHeader,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: modelId,
+                tier,
+                analysisType: 'fundamental' satisfies AnalysisType,
+                system,
+                responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
+                ...(options.reasoning === true && { reasoning: true }),
+            }),
+            signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: modelId,
-            tier,
-            analysisType: 'fundamental' satisfies AnalysisType,
-            system,
-            responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
-            ...(options.reasoning === true && { reasoning: true }),
-        }),
-        signal: AbortSignal.timeout(SUBMIT_FUNDAMENTAL_ANALYSIS_TIMEOUT_MS),
-    }).catch(error => {
-        console.error(
-            '[submitFundamentalAnalysis] Worker request failed:',
-            error
-        );
-    });
+        jobId,
+        '[submitFundamentalAnalysis]'
+    );
     fireAndForget(dispatch, options);
 
     await recordAnalysisUsageSafely(usage, modelId, occurredAt);

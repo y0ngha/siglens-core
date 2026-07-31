@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import { buildIndicatorTranslationPrompt } from '@/domain/economy/indicatorTranslationPrompt';
@@ -105,25 +106,25 @@ export async function submitIndicatorTranslation(
         );
     }
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                model: INDICATOR_TRANSLATION_MODEL_ID,
+                seed: analysisSeed(prompt),
+            }),
+            signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            model: INDICATOR_TRANSLATION_MODEL_ID,
-            seed: analysisSeed(prompt),
-        }),
-        signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
-    }).catch(error => {
-        console.error(
-            '[IndicatorTranslation/Submit] Worker request failed:',
-            error
-        );
-    });
+        jobId,
+        '[IndicatorTranslation/Submit]'
+    );
     fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };

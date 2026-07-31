@@ -331,6 +331,51 @@ describe('submitCongressTrend 함수는', () => {
         });
     });
 
+    describe('BYOK 헤더 전달이', () => {
+        beforeEach(() => {
+            mockCacheGet.mockResolvedValueOnce(null);
+        });
+
+        it('userApiKey가 제공되면 X-AI-API-KEY 헤더를 포함해서 워커에 전달한다', async () => {
+            const result = await submitCongressTrend({
+                ...BASE_OPTIONS,
+                userApiKey: 'usr-key',
+            });
+
+            expect(result.status).toBe('submitted');
+            expect(mockFetch).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    headers: expect.objectContaining({
+                        'X-AI-API-KEY': 'usr-key',
+                    }),
+                })
+            );
+        });
+
+        it('userApiKey가 없으면 X-AI-API-KEY 헤더를 포함하지 않는다', async () => {
+            const result = await submitCongressTrend(BASE_OPTIONS);
+
+            expect(result.status).toBe('submitted');
+            const fetchCall = mockFetch.mock.calls[0][1] as {
+                headers: Record<string, string>;
+            };
+            expect(fetchCall.headers['X-AI-API-KEY']).toBeUndefined();
+        });
+
+        it('congress는 tier gating 없이 userApiKey 유무와 무관하게 항상 진행한다', async () => {
+            // Congress has no BYOK gate (unlike submitAnalysis/submitFinancialsAnalysis):
+            // a premium-model request without a key must NOT be blocked.
+            const result = await submitCongressTrend({
+                ...BASE_OPTIONS,
+                modelId: 'gemini-2.5-pro',
+                tier: 'member',
+            });
+
+            expect(result.status).toBe('submitted');
+        });
+    });
+
     describe('reasoning 토글이 적용될 때 (member-reasoning-toggle spec Part A)', () => {
         beforeEach(() => {
             mockCacheGet.mockResolvedValueOnce(null);

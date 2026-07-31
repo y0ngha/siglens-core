@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { buildMacroBriefingPrompt } from '@/domain/economy/macroBriefingPrompt';
 import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
@@ -101,22 +102,25 @@ export async function submitMacroBriefing(
         );
     }
 
-    const dispatch = fetch(`${workerUrl}/briefing`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/briefing`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                model: BRIEFING_MODEL_ID,
+                seed: analysisSeed(prompt),
+            }),
+            signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            model: BRIEFING_MODEL_ID,
-            seed: analysisSeed(prompt),
-        }),
-        signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
-    }).catch(error => {
-        console.error('[MacroBriefing/Submit] Worker request failed:', error);
-    });
+        jobId,
+        '[MacroBriefing/Submit]'
+    );
     fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };

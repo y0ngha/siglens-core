@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import type {
     SubmitCongressTrendOptions,
     SubmitCongressTrendResult,
@@ -76,7 +77,11 @@ async function fetchProviderData(
  * Submit a congressional-trade trend analysis job for the given symbol.
  *
  * Mirrors {@link submitFinancialsAnalysis} but **simpler** — congress data is
- * fully public, so there is no usage-limit check and no BYOK gate. Resolves to:
+ * fully public, so there is no usage-limit check and no BYOK *gate* (a
+ * premium-model request is never blocked for lacking a key). An optional
+ * BYOK key is still accepted and forwarded to the worker as the
+ * `X-AI-API-KEY` header — see {@link SubmitCongressTrendOptions.userApiKey}.
+ * Resolves to:
  * - `cached`: a recent analysis is reused (keyed by `symbol` + `modelId` +
  *   skill fingerprint). The Redis check happens before any provider fetch.
  * - `no_trades`: senate + house fetch + normalize yielded zero trades. No job
@@ -89,9 +94,11 @@ async function fetchProviderData(
  * - `error`: the data provider threw (`code: 'fetch_failed'`).
  *
  * The job meta carries only the AI text identity (`symbol`/`modelId`/`cacheKey`).
- * The worker payload always carries {@link DEFAULT_TIER}.
+ * The worker payload always carries a `tier`: the caller-supplied
+ * {@link SubmitCongressTrendOptions.tier}, or {@link DEFAULT_TIER} when
+ * `tier` is omitted.
  *
- * @param options - Symbol, model, provider, and optional tier/skip/limit config.
+ * @param options - Symbol, model, provider, and optional tier/skip/limit/BYOK-key config.
  * @returns The submission outcome.
  * @see pollCongressTrend - Polls the worker for the result of a `submitted` job.
  */
@@ -174,27 +181,36 @@ export async function submitCongressTrend(
         ...(skillsResult.skillsDegraded && { skillsDegraded: true }),
     });
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
+    const userApiKeyHeader: Record<string, string> =
+        options.userApiKey !== undefined
+            ? { 'X-AI-API-KEY': options.userApiKey }
+            : {};
+
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+                ...userApiKeyHeader,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: modelId,
+                tier,
+                analysisType: 'congress' satisfies AnalysisType,
+                system,
+                responseSchema: CONGRESS_RESPONSE_SCHEMA,
+                ...(options.reasoning === true && { reasoning: true }),
+            }),
+            signal: AbortSignal.timeout(SUBMIT_CONGRESS_TREND_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: modelId,
-            tier,
-            analysisType: 'congress' satisfies AnalysisType,
-            system,
-            responseSchema: CONGRESS_RESPONSE_SCHEMA,
-            ...(options.reasoning === true && { reasoning: true }),
-        }),
-        signal: AbortSignal.timeout(SUBMIT_CONGRESS_TREND_TIMEOUT_MS),
-    }).catch(error => {
-        console.error('[submitCongressTrend] Worker request failed:', error);
-    });
+        jobId,
+        '[submitCongressTrend]'
+    );
     fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };

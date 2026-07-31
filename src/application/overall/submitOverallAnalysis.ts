@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { buildTimeframeNotAllowedError } from '@/application/market/types';
@@ -401,28 +402,31 @@ export async function submitOverallAnalysis(
             ? { 'X-AI-API-KEY': options.userApiKey }
             : {};
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
-            ...userApiKeyHeader,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+                ...userApiKeyHeader,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: modelId,
+                tier,
+                analysisType: 'overall' satisfies AnalysisType,
+                system,
+                responseSchema: OVERALL_RESPONSE_SCHEMA,
+                ...(reasoning === true && { reasoning: true }),
+            }),
+            signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: modelId,
-            tier,
-            analysisType: 'overall' satisfies AnalysisType,
-            system,
-            responseSchema: OVERALL_RESPONSE_SCHEMA,
-            ...(reasoning === true && { reasoning: true }),
-        }),
-        signal: AbortSignal.timeout(SUBMIT_OVERALL_ANALYSIS_TIMEOUT_MS),
-    }).catch(error => {
-        console.error('[submitOverallAnalysis] Worker request failed:', error);
-    });
+        jobId,
+        '[submitOverallAnalysis]'
+    );
     fireAndForget(dispatch, options);
 
     await recordAnalysisUsageSafely(usage, modelId, occurredAt);

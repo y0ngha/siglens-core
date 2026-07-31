@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import type { BackgroundTaskOptions } from '@/application/types';
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
@@ -106,22 +107,25 @@ export async function submitBriefing(
     }
 
     // fire-and-forget: serverless 환경에선 options.waitUntil로 응답 후 promise 종료 보장.
-    const dispatch = fetch(`${workerUrl}/briefing`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/briefing`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                model: BRIEFING_MODEL_ID,
+                seed: analysisSeed(prompt),
+            }),
+            signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            model: BRIEFING_MODEL_ID,
-            seed: analysisSeed(prompt),
-        }),
-        signal: AbortSignal.timeout(FETCH_DEFAULT_TIME_OUT),
-    }).catch(error => {
-        console.error('[Briefing/Submit] Worker request failed:', error);
-    });
+        jobId,
+        '[Briefing/Submit]'
+    );
     fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };

@@ -10,8 +10,18 @@ import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
  * Options controlling congressional-trade trend analysis submission.
  *
  * Congress data is fully public, so — unlike the financials submit options —
- * there is NO `usage` / `now` / `userApiKey` field: no daily-limit check and no
- * BYOK gate apply. The worker payload always carries {@link DEFAULT_TIER}.
+ * there is NO `usage` / `now` field: no daily-limit check applies. The
+ * worker payload always carries a `tier`: the caller-supplied
+ * {@link SubmitCongressTrendOptions.tier}, or {@link DEFAULT_TIER} when
+ * `tier` is omitted.
+ *
+ * `userApiKey` IS present here, unlike the "no usage/now" fields above: a
+ * member who registered their own provider key must be able to route
+ * congress analysis through a premium model too, even though congress data
+ * itself needs no usage-limit or tier gate. Core does not gate on it (no
+ * BYOK-required check the way `submitAnalysis` has one) — tier gating for
+ * `modelId` stays the caller's (siglens) responsibility, same as the rest of
+ * this options type.
  */
 export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
@@ -47,6 +57,14 @@ export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * BYOK API key. When provided, forwarded to the worker as the
+     * `X-AI-API-KEY` header — the same mechanism every other submit use-case
+     * uses (`submitAnalysis`, `submitFinancialsAnalysis`, etc.). Core does
+     * not gate on tier/model here (see the type-level doc above); the caller
+     * decides when a key is required.
+     */
+    userApiKey?: string;
 }
 
 /** The caller receives a cached analysis — no new job was created. */

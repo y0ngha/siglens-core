@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import type {
     SubmitNewsCardAnalysisOptions,
     SubmitNewsCardAnalysisResult,
@@ -76,26 +77,29 @@ export async function submitNewsCardAnalysis(
         modelId: NEWS_CARD_MODEL_ID,
     });
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: NEWS_CARD_MODEL_ID,
+                ...(thinkingBudget !== undefined && { thinkingBudget }),
+                analysisType: 'newsCard' satisfies AnalysisType,
+                system,
+                responseSchema: NEWS_CARD_RESPONSE_SCHEMA,
+            }),
+            signal: AbortSignal.timeout(SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: NEWS_CARD_MODEL_ID,
-            ...(thinkingBudget !== undefined && { thinkingBudget }),
-            analysisType: 'newsCard' satisfies AnalysisType,
-            system,
-            responseSchema: NEWS_CARD_RESPONSE_SCHEMA,
-        }),
-        signal: AbortSignal.timeout(SUBMIT_NEWS_CARD_ANALYSIS_TIMEOUT_MS),
-    }).catch(error => {
-        console.error('[submitNewsCardAnalysis] Worker request failed:', error);
-    });
+        jobId,
+        '[submitNewsCardAnalysis]'
+    );
     fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };
