@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import {
     analysisSeed,
     hashAnalysisInput,
@@ -166,26 +167,29 @@ export async function submitMarketNewsDigest(
         cacheKey,
     });
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: modelId,
+                tier,
+                analysisType: 'news' satisfies AnalysisType,
+                system,
+                responseSchema: NEWS_RESPONSE_SCHEMA,
+            }),
+            signal: AbortSignal.timeout(SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: modelId,
-            tier,
-            analysisType: 'news' satisfies AnalysisType,
-            system,
-            responseSchema: NEWS_RESPONSE_SCHEMA,
-        }),
-        signal: AbortSignal.timeout(SUBMIT_MARKET_NEWS_DIGEST_TIMEOUT_MS),
-    }).catch(error => {
-        console.error(LOG_TAG, 'Worker request failed:', error);
-    });
+        jobId,
+        LOG_TAG
+    );
     fireAndForget(dispatch, options);
 
     return { status: 'submitted', jobId };

@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
@@ -168,9 +169,14 @@ function observePatternCandidates(
  *
  * Skill loading is best-effort — if it fails, the analysis proceeds with
  * `skillsDegraded: true` recorded on the job meta so consumers can warn the
- * user. The worker call uses a 5-minute `AbortSignal.timeout`; failures are
- * logged but do not propagate to the caller (the job stays in `processing`
- * until it times out naturally).
+ * user. The worker call uses a 5-minute `AbortSignal.timeout` and is
+ * dispatched through {@link dispatchWorkerJob}: a non-2xx response or a
+ * network-level `fetch` rejection is logged AND written as a terminal job
+ * error (the same `error` state a worker itself writes on a mid-job
+ * failure), so `pollAnalysis` reports the failure instead of the job
+ * spinning in `processing` forever. Dispatch itself is still
+ * fire-and-forget — this function returns `{ status: 'submitted', jobId }`
+ * before the dispatch settles.
  *
  * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
  * @param timeframe - Bar resolution literal (`"5Min" | "15Min" | ... | "1Day"`).
@@ -481,30 +487,33 @@ async function submitAnalysisWithVisibility(
             ? { 'X-AI-API-KEY': options.userApiKey }
             : {};
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
-            ...userApiKeyHeader,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+                ...userApiKeyHeader,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                // Seed is deterministic over the FULL input the LLM sees: system
+                // (persona + folded skills) + prompt (dynamic).
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: effectiveModelId,
+                tier,
+                analysisType: 'technical' satisfies AnalysisType,
+                system,
+                responseSchema: TECHNICAL_RESPONSE_SCHEMA,
+                ...(options.reasoning === true && { reasoning: true }),
+            }),
+            signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            // Seed is deterministic over the FULL input the LLM sees: system
-            // (persona + folded skills) + prompt (dynamic).
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: effectiveModelId,
-            tier,
-            analysisType: 'technical' satisfies AnalysisType,
-            system,
-            responseSchema: TECHNICAL_RESPONSE_SCHEMA,
-            ...(options.reasoning === true && { reasoning: true }),
-        }),
-        signal: AbortSignal.timeout(SUBMIT_ANALYSIS_TIMEOUT_MS),
-    }).catch(error => {
-        console.error('[Submit] Worker request failed:', error);
-    });
+        jobId,
+        '[Submit]'
+    );
     fireAndForget(dispatch, options);
 
     await recordAnalysisUsageSafely(usage, effectiveModelId, usageOccurredAt);

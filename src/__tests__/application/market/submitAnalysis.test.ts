@@ -72,7 +72,12 @@ import {
     analysisSeed,
     hashSkillCatalog,
 } from '@/infrastructure/hash/analysisInput';
-import { setJobMeta } from '@/infrastructure/jobs/queue';
+import {
+    getJobStatus,
+    setJobError,
+    setJobMeta,
+    setJobStatus,
+} from '@/infrastructure/jobs/queue';
 import {
     createSkillsProvider,
     loadSkillsCached,
@@ -92,6 +97,9 @@ const KEY_SUFFIX = `${PROMPT_TEMPLATE_VERSION}:free:${EMPTY_CATALOG_FP}`;
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockSetJobMeta = setJobMeta as Mock;
+const mockGetJobStatus = getJobStatus as Mock;
+const mockSetJobStatus = setJobStatus as Mock;
+const mockSetJobError = setJobError as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
 const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
@@ -194,6 +202,11 @@ describe('submitAnalysis 함수는', () => {
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockLoadSkills.mockResolvedValue([]);
         mockSetJobMeta.mockResolvedValue(undefined);
+        // Default: no prior job status (dispatchWorkerJob's clobber guard
+        // reads this before writing an error state — see workerDispatch.ts).
+        mockGetJobStatus.mockResolvedValue(null);
+        mockSetJobStatus.mockResolvedValue(undefined);
+        mockSetJobError.mockResolvedValue(undefined);
         mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
         mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
         // Default fearGreed compute → null (matches real behavior on the
@@ -1890,6 +1903,51 @@ describe('submitAnalysis 함수는', () => {
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[Submit] Worker request failed:',
                 expect.any(Error)
+            );
+            consoleSpy.mockRestore();
+        });
+
+        it('워커가 400을 반환하면 반환된 jobId의 job이 error 상태로 기록된다 — dispatchWorkerJob 배선 + jobId 일치 검증', async () => {
+            // Pins the wiring between submitAnalysis and dispatchWorkerJob:
+            // this is the only test in the suite that would fail if
+            // submitAnalysis regressed to a raw `fetch(...).catch(...)`
+            // (dropping the response.ok check) or passed the wrong jobId
+            // into dispatchWorkerJob — every other test here only asserts
+            // `result.status`, not the job-store writes.
+            const consoleSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockResolvedValue(null);
+            mockFetch.mockResolvedValueOnce(
+                new Response(JSON.stringify({ error: 'invalid model' }), {
+                    status: 400,
+                })
+            );
+            const pending: Promise<unknown>[] = [];
+            const waitUntil = (p: Promise<unknown>) => {
+                pending.push(p);
+            };
+
+            const result = await submitAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, waitUntil }
+            );
+
+            await Promise.all(pending);
+
+            expect(result.status).toBe('submitted');
+            if (result.status !== 'submitted') return;
+            expect(mockSetJobError).toHaveBeenCalledWith(
+                result.jobId,
+                expect.stringContaining('400')
+            );
+            expect(mockSetJobStatus).toHaveBeenCalledWith(
+                result.jobId,
+                'error'
             );
             consoleSpy.mockRestore();
         });

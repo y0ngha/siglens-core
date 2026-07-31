@@ -1,4 +1,5 @@
 import { fireAndForget } from '@/application/background';
+import { dispatchWorkerJob } from '@/application/workerDispatch';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     analysisSeed,
@@ -239,28 +240,31 @@ export async function submitNewsAnalysis(
             ? { 'X-AI-API-KEY': options.userApiKey }
             : {};
 
-    const dispatch = fetch(`${workerUrl}/analyze`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Worker-Secret': workerSecret,
-            ...userApiKeyHeader,
+    const dispatch = dispatchWorkerJob(
+        `${workerUrl}/analyze`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Worker-Secret': workerSecret,
+                ...userApiKeyHeader,
+            },
+            body: JSON.stringify({
+                jobId,
+                prompt,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                model: modelId,
+                tier,
+                analysisType: 'news' satisfies AnalysisType,
+                system,
+                responseSchema: NEWS_RESPONSE_SCHEMA,
+                ...(options.reasoning === true && { reasoning: true }),
+            }),
+            signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
         },
-        body: JSON.stringify({
-            jobId,
-            prompt,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            model: modelId,
-            tier,
-            analysisType: 'news' satisfies AnalysisType,
-            system,
-            responseSchema: NEWS_RESPONSE_SCHEMA,
-            ...(options.reasoning === true && { reasoning: true }),
-        }),
-        signal: AbortSignal.timeout(SUBMIT_NEWS_ANALYSIS_TIMEOUT_MS),
-    }).catch(error => {
-        console.error('[submitNewsAnalysis] Worker request failed:', error);
-    });
+        jobId,
+        '[submitNewsAnalysis]'
+    );
     fireAndForget(dispatch, options);
 
     await recordAnalysisUsageSafely(usage, modelId, occurredAt);
