@@ -1,5 +1,13 @@
 # Changelog
 
+# [0.41.0](https://github.com/y0ngha/siglens-core/compare/v0.40.0...v0.41.0) (2026-07-31)
+
+
+### Bug Fixes
+
+* 워커 디스패치 에러 처리 및 폴링 무한 루프 개선 ([7a3924f](https://github.com/y0ngha/siglens-core/commit/7a3924f7ffc3ba62727d1e1693bb8939f1f4306c))
+* 의회 트렌드 분석 사용자 BYOK 키 지원 ([0316e7a](https://github.com/y0ngha/siglens-core/commit/0316e7a9ffa1da7c8265907333d1e040fd1cfdf9))
+
 # [0.40.0](https://github.com/y0ngha/siglens-core/compare/v0.39.0...v0.40.0) (2026-07-31)
 
 
