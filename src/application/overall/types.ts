@@ -562,6 +562,60 @@ export type SubmitOverallAnalysisResult =
     | SubmitOverallAnalysisApiKeyRequiredError;
 
 // ─────────────────────────────────────────
+// Run (direct, non-queued)
+// ─────────────────────────────────────────
+
+/**
+ * Options for a `runOverallAnalysis` call — the direct (non-queued) successor
+ * to the `submitOverallAnalysis` + `pollOverallAnalysis` pair.
+ *
+ * Extends {@link SubmitOverallAnalysisOptions} with a cancellation signal so a
+ * dropped connection aborts the entire dependency tree (technical, fundamental,
+ * news, options) AND the overall LLM call in one shot. The signal is threaded
+ * through to every axis's `run*` function and to `callAnalysisAi`.
+ */
+export interface RunOverallAnalysisOptions extends SubmitOverallAnalysisOptions {
+    /**
+     * Cancellation signal. When the client disconnects, all four dependency
+     * `run*` calls and the overall `callAnalysisAi` call are aborted via
+     * the same signal, so no in-flight LLM call leaks after the request ends.
+     */
+    signal?: AbortSignal;
+}
+
+/**
+ * Overall analysis completed successfully — result is the normalized response.
+ */
+export interface RunOverallAnalysisDone {
+    status: 'done';
+    result: OverallAnalysisResponse;
+}
+
+/**
+ * Union of all possible outcomes from {@link runOverallAnalysis}.
+ *
+ * - `cached` — a recent overall analysis exists in the cache; result embedded.
+ * - `done` — all four dependency axes resolved and the overall LLM completed;
+ *   result embedded. Unlike the queued path, `pending_dependencies` and
+ *   `submitted` can never occur — the dependencies are awaited server-side.
+ * - `miss_no_trigger` — `skipEnqueueIfMiss` was set and at least one axis
+ *   (or the overall cache) missed.
+ * - `error` — a dependency axis or the overall gate returned an error.
+ * - `limit_error` — the overall-scoped daily limit was exceeded.
+ * - `key_error` — BYOK API key required for the requested model.
+ *
+ * LLM-level failures (provider errors, network, AbortError) propagate as
+ * thrown exceptions so the SSE handler can map them to appropriate HTTP responses.
+ */
+export type RunOverallAnalysisResult =
+    | SubmitOverallAnalysisCached
+    | RunOverallAnalysisDone
+    | SubmitOverallAnalysisMissNoTrigger
+    | SubmitOverallAnalysisError
+    | SubmitOverallAnalysisLimitError
+    | SubmitOverallAnalysisApiKeyRequiredError;
+
+// ─────────────────────────────────────────
 // Poll
 // ─────────────────────────────────────────
 

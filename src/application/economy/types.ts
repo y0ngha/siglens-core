@@ -175,3 +175,81 @@ export type PollIndicatorTranslationResult =
     | PollIndicatorTranslationProcessing
     | PollIndicatorTranslationError
     | PollIndicatorTranslationDone;
+
+// ─────────────────────────────────────────
+// Run (direct-await replacements for Submit + Poll)
+// ─────────────────────────────────────────
+
+/**
+ * Options for a `runMacroBriefing` call — the direct (non-queued) successor to
+ * the `submitMacroBriefing` + `pollMacroBriefing` pair.
+ */
+export interface RunMacroBriefingOptions {
+    /**
+     * Cancellation signal. When provided, forwarded to `callBriefingAi` so a
+     * dropped connection aborts the underlying AI provider request.
+     */
+    signal?: AbortSignal;
+}
+
+/**
+ * Result of a `runMacroBriefing` call.
+ *
+ * - `cached`: a recent briefing was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ *
+ * LLM-level failures propagate as thrown exceptions.
+ */
+export type RunMacroBriefingResult =
+    | { status: 'cached'; briefing: MacroBriefingResponse; generatedAt: string }
+    | { status: 'done'; briefing: MacroBriefingResponse; generatedAt: string };
+
+/**
+ * Options for a `runEconomicEventAnalysis` call — the direct (non-queued)
+ * successor to the `submitEconomicEventAnalysis` + `pollEconomicEventAnalysis` pair.
+ */
+export interface RunEconomicEventAnalysisOptions {
+    /**
+     * Cancellation signal. When provided, forwarded to `callAnalysisAi` so a
+     * dropped connection aborts the underlying AI provider request.
+     */
+    signal?: AbortSignal;
+}
+
+/**
+ * Result of a `runEconomicEventAnalysis` call.
+ *
+ * - `cached`: a recent analysis was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ *
+ * LLM-level failures propagate as thrown exceptions.
+ */
+export type RunEconomicEventAnalysisResult =
+    | { status: 'cached'; result: EconomicEventAnalysis }
+    | { status: 'done'; result: EconomicEventAnalysis };
+
+/**
+ * Options for a `runIndicatorTranslation` call — the direct (non-queued)
+ * successor to the `submitIndicatorTranslation` + `pollIndicatorTranslation` pair.
+ */
+export interface RunIndicatorTranslationOptions {
+    /**
+     * Cancellation signal. When provided, forwarded to `callAnalysisAi` so a
+     * dropped connection aborts the underlying AI provider request.
+     */
+    signal?: AbortSignal;
+}
+
+/**
+ * Result of a `runIndicatorTranslation` call.
+ *
+ * - `cached`: a recent translation was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the Korean name is ready. An empty `nameKo`
+ *   (`''`) signals that the LLM returned garbage — callers should fall back to
+ *   the original English name.
+ *
+ * LLM-level failures propagate as thrown exceptions.
+ */
+export type RunIndicatorTranslationResult =
+    | { status: 'cached'; nameKo: string }
+    | { status: 'done'; nameKo: string };

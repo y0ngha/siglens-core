@@ -1,0 +1,450 @@
+import OpenAI from 'openai';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { callDeepSeek } from '@/infrastructure/ai/providers/deepseek';
+import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
+
+const mockCreate = vi.hoisted(() => vi.fn());
+
+vi.mock('openai', () => ({
+    __esModule: true,
+    default: vi.fn((options: unknown) => ({
+        __options: options,
+        chat: {
+            completions: {
+                create: mockCreate,
+            },
+        },
+    })),
+}));
+
+const mockedOpenAI = vi.mocked(OpenAI);
+
+const FLASH_MODEL: DeepSeekModelId = 'deepseek-v4-flash'; // thinking: false
+const PRO_MODEL: DeepSeekModelId = 'deepseek-v4-pro'; // thinking: true
+
+// DeepSeek is called in STREAMING mode, so the SDK's `create` resolves to an
+// async iterable of chat-completion chunks. These helpers build fresh streams
+// (async iterables are single-use — a shared instance would be exhausted after
+// the first consumption).
+interface Chunk {
+    choices: Array<{
+        delta?: { content?: string };
+        finish_reason?: string | null;
+    }>;
+    usage?: unknown;
+}
+
+function toStream(chunks: Chunk[]): AsyncIterable<Chunk> {
+    return {
+        async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+                yield chunk;
+            }
+        },
+    };
+}
+
+/**
+ * Build a streamed response: an optional content-delta chunk, a finish_reason
+ * chunk, and an optional final usage-only chunk (choices empty) — mirroring how
+ * DeepSeek streams with `stream_options.include_usage: true`.
+ */
+function stream(
+    content: string,
+    finishReason = 'stop',
+    usage?: unknown
+): AsyncIterable<Chunk> {
+    const chunks: Chunk[] = [];
+    if (content) {
+        chunks.push({
+            choices: [{ delta: { content }, finish_reason: null }],
+        });
+    }
+    chunks.push({ choices: [{ delta: {}, finish_reason: finishReason }] });
+    if (usage) {
+        chunks.push({ choices: [], usage });
+    }
+    return toStream(chunks);
+}
+
+function successStream(usage?: unknown): AsyncIterable<Chunk> {
+    return stream('analysis result', 'stop', usage);
+}
+
+describe('callDeepSeek', () => {
+    beforeEach(() => {
+        mockCreate.mockClear();
+        mockedOpenAI.mockClear();
+    });
+
+    it('returns aggregated streamed content from a stop-finished response', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        const result = await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+        });
+
+        expect(result).toBe('analysis result');
+    });
+
+    it('aggregates multiple content deltas into the full response', async () => {
+        mockCreate.mockResolvedValueOnce(
+            toStream([
+                {
+                    choices: [
+                        { delta: { content: 'part-1 ' }, finish_reason: null },
+                    ],
+                },
+                {
+                    choices: [
+                        { delta: { content: 'part-2' }, finish_reason: null },
+                    ],
+                },
+                { choices: [{ delta: {}, finish_reason: 'stop' }] },
+            ])
+        );
+
+        const result = await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+        });
+
+        expect(result).toBe('part-1 part-2');
+    });
+
+    it('constructs the client with the DeepSeek baseURL', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        // Unique apiKey — clientCache is module-scoped and persists across
+        // tests in this file, so a shared key would hit the cache and skip
+        // the `new OpenAI(...)` constructor call this test asserts on.
+        await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key-for-baseurl-assertion',
+        });
+
+        expect(mockedOpenAI).toHaveBeenCalledWith({
+            apiKey: 'key-for-baseurl-assertion',
+            baseURL: 'https://api.deepseek.com',
+        });
+    });
+
+    it('streams with include_usage and passes create params correctly (non-thinking model)', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+        const call = mockCreate.mock.calls[0][0];
+        expect(call.model).toBe('deepseek-v4-flash');
+        expect(call.messages).toEqual([
+            { role: 'system', content: AI_SYSTEM_PROMPT },
+            { role: 'user', content: 'prompt' },
+        ]);
+        expect(call.max_tokens).toBe(393216);
+        expect(call.response_format).toEqual({ type: 'json_object' });
+        expect(call.thinking).toEqual({ type: 'disabled' });
+        expect(call.temperature).toBe(0);
+        // Streaming is mandatory (avoids DeepSeek's ~50-60s non-streaming
+        // connection termination on long analysis outputs).
+        expect(call.stream).toBe(true);
+        expect(call.stream_options).toEqual({ include_usage: true });
+    });
+
+    it('passes a system message as a role:system entry when provided', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+            system: 'custom system',
+        });
+
+        const call = mockCreate.mock.calls[0][0];
+        expect(call.messages).toEqual([
+            { role: 'system', content: 'custom system' },
+            { role: 'user', content: 'prompt' },
+        ]);
+    });
+
+    it('falls back to AI_SYSTEM_PROMPT when no system prompt is provided', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+        const call = mockCreate.mock.calls[0][0];
+        expect(call.messages).toEqual([
+            { role: 'system', content: AI_SYSTEM_PROMPT },
+            { role: 'user', content: 'prompt' },
+        ]);
+    });
+
+    it('enables thinking with reasoning_effort=high for a thinking model and omits temperature', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        await callDeepSeek('prompt', { model: PRO_MODEL, apiKey: 'key' });
+
+        const call = mockCreate.mock.calls[0][0];
+        expect(call.thinking).toEqual({
+            type: 'enabled',
+            reasoning_effort: 'high',
+        });
+        expect(call).not.toHaveProperty('temperature');
+    });
+
+    it('disables thinking for a non-thinking model and applies temperature', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+        const call = mockCreate.mock.calls[0][0];
+        expect(call.thinking).toEqual({ type: 'disabled' });
+        expect(call.temperature).toBe(0);
+    });
+
+    // Reasoning toggle (spec §A.2): options.thinking overrides spec.thinking.
+    describe('thinking override (reasoning toggle)', () => {
+        it('thinking:true forces thinking enabled even for a spec-thinking:false model', async () => {
+            mockCreate.mockResolvedValueOnce(successStream());
+
+            await callDeepSeek('prompt', {
+                model: FLASH_MODEL, // spec.thinking: false
+                apiKey: 'key',
+                thinking: true,
+            });
+
+            const call = mockCreate.mock.calls[0][0];
+            expect(call.thinking).toEqual({
+                type: 'enabled',
+                reasoning_effort: 'high',
+            });
+            expect(call).not.toHaveProperty('temperature');
+        });
+
+        it('thinking:false disables thinking even for a spec-thinking:true model', async () => {
+            mockCreate.mockResolvedValueOnce(successStream());
+
+            await callDeepSeek('prompt', {
+                model: PRO_MODEL, // spec.thinking: true
+                apiKey: 'key',
+                thinking: false,
+            });
+
+            const call = mockCreate.mock.calls[0][0];
+            expect(call.thinking).toEqual({ type: 'disabled' });
+            expect(call.temperature).toBe(0);
+        });
+
+        it('omitted thinking falls back to spec.thinking (true model)', async () => {
+            mockCreate.mockResolvedValueOnce(successStream());
+
+            await callDeepSeek('prompt', { model: PRO_MODEL, apiKey: 'key' });
+
+            const call = mockCreate.mock.calls[0][0];
+            expect(call.thinking).toEqual({
+                type: 'enabled',
+                reasoning_effort: 'high',
+            });
+            expect(call).not.toHaveProperty('temperature');
+        });
+
+        it('omitted thinking falls back to spec.thinking (false model)', async () => {
+            mockCreate.mockResolvedValueOnce(successStream());
+
+            await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+            const call = mockCreate.mock.calls[0][0];
+            expect(call.thinking).toEqual({ type: 'disabled' });
+            expect(call.temperature).toBe(0);
+        });
+    });
+
+    it('does not use responseSchema to constrain output (json_object mode always, no json_schema)', async () => {
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        const schema = { type: 'object', properties: {} };
+        await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+            responseSchema: schema,
+        });
+
+        const call = mockCreate.mock.calls[0][0];
+        expect(call.response_format).toEqual({ type: 'json_object' });
+    });
+
+    it('throws non-retryable error when finish_reason is length (max tokens)', async () => {
+        mockCreate.mockResolvedValueOnce(stream('', 'length'));
+
+        const promise = callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+        });
+
+        await expect(promise).rejects.toThrow(/output token limit/);
+        await expect(promise).rejects.not.toMatchObject({ retryable: true });
+    });
+
+    it('throws non-retryable error when finish_reason is content_filter', async () => {
+        mockCreate.mockResolvedValueOnce(stream('', 'content_filter'));
+
+        const promise = callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+        });
+
+        await expect(promise).rejects.toThrow(/content filter/);
+        await expect(promise).rejects.not.toMatchObject({ retryable: true });
+    });
+
+    it('throws retryable error when finish_reason is stop but content is empty (documented DeepSeek quirk)', async () => {
+        mockCreate.mockResolvedValueOnce(stream('', 'stop'));
+
+        await expect(
+            callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' })
+        ).rejects.toMatchObject({ retryable: true });
+    });
+
+    it('throws retryable error for an unexpected finish_reason (tool_calls)', async () => {
+        mockCreate.mockResolvedValueOnce(stream('', 'tool_calls'));
+
+        await expect(
+            callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' })
+        ).rejects.toMatchObject({ retryable: true });
+    });
+
+    it('propagates abort from external signal to underlying SDK call', async () => {
+        let receivedSignal: AbortSignal | undefined;
+        mockCreate.mockImplementationOnce(
+            async (_params: unknown, options: { signal?: AbortSignal }) => {
+                receivedSignal = options?.signal;
+                externalController.abort();
+                return successStream();
+            }
+        );
+
+        const externalController = new AbortController();
+        await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+            signal: externalController.signal,
+        });
+
+        expect(receivedSignal).toBeDefined();
+        expect(receivedSignal!.aborted).toBe(true);
+    });
+
+    it('reuses cached client across calls with the same apiKey', async () => {
+        mockedOpenAI.mockClear();
+        mockCreate.mockImplementation(() => Promise.resolve(successStream()));
+
+        await callDeepSeek('prompt1', {
+            model: FLASH_MODEL,
+            apiKey: 'shared-key',
+        });
+        await callDeepSeek('prompt2', {
+            model: FLASH_MODEL,
+            apiKey: 'shared-key',
+        });
+
+        expect(mockedOpenAI.mock.calls.length).toBeLessThanOrEqual(1);
+    });
+
+    it('throws for an unknown model before making any SDK call', async () => {
+        // Runtime guard: MODEL_SPECS[model] is undefined for a bogus id. Cast
+        // past the compile-time DeepSeekModelId type to exercise the throw.
+        await expect(
+            callDeepSeek('prompt', {
+                model: 'bogus-model' as DeepSeekModelId,
+                apiKey: 'key',
+            })
+        ).rejects.toThrow('[DeepSeek] Unknown model: bogus-model');
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('aborts the request after DEEPSEEK_TIMEOUT_MS via the internal timeout', async () => {
+        vi.useFakeTimers();
+        try {
+            let capturedSignal: AbortSignal | undefined;
+            mockCreate.mockImplementationOnce(
+                (_params: unknown, options: { signal: AbortSignal }) => {
+                    capturedSignal = options.signal;
+                    // Never resolves on its own — only the internal timeout's
+                    // controller.abort() can settle it.
+                    return new Promise((_resolve, reject) => {
+                        options.signal.addEventListener(
+                            'abort',
+                            () => reject(new Error('aborted by timeout')),
+                            { once: true }
+                        );
+                    });
+                }
+            );
+
+            const promise = callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'timeout-key',
+            });
+            const assertion =
+                expect(promise).rejects.toThrow('aborted by timeout');
+
+            // 1h internal timeout fires → controller.abort() → SDK signal aborts.
+            vi.advanceTimersByTime(3600_000);
+
+            await assertion;
+            expect(capturedSignal?.aborted).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('callDeepSeek — usage telemetry', () => {
+    beforeEach(() => {
+        mockCreate.mockClear();
+    });
+
+    it('logs normalized [Usage] from the final streamed usage chunk when jobId is provided', async () => {
+        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+        mockCreate.mockResolvedValueOnce(
+            successStream({
+                prompt_tokens: 500,
+                completion_tokens: 80,
+                total_tokens: 580,
+            })
+        );
+
+        await callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+            jobId: 'job-789',
+        });
+
+        expect(infoSpy).toHaveBeenCalledTimes(1);
+        const [tag, payload] = infoSpy.mock.calls[0];
+        expect(tag).toBe('[Usage]');
+        expect(JSON.parse(payload as string)).toMatchObject({
+            jobId: 'job-789',
+            model: FLASH_MODEL,
+            promptTokens: 500,
+            cachedTokens: 0,
+            cacheWriteTokens: 0,
+            outputTokens: 80,
+        });
+
+        infoSpy.mockRestore();
+    });
+
+    it('does not log usage when jobId is omitted', async () => {
+        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+        mockCreate.mockResolvedValueOnce(successStream());
+
+        await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+        expect(infoSpy).not.toHaveBeenCalled();
+        infoSpy.mockRestore();
+    });
+});

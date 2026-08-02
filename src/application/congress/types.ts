@@ -65,6 +65,14 @@ export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
      * decides when a key is required.
      */
     userApiKey?: string;
+    /**
+     * Cancellation signal for the in-flight LLM call (used by `runCongressTrend`).
+     * When provided, passed through to `callAnalysisAi` so a dropped connection
+     * can abort the underlying AI provider request.
+     *
+     * Has no effect on `submitCongressTrend` (the worker-based path).
+     */
+    signal?: AbortSignal;
 }
 
 /** The caller receives a cached analysis — no new job was created. */
@@ -121,3 +129,34 @@ export type PollCongressTrendResult =
     | { status: 'processing' }
     | { status: 'done'; result: CongressTrendResponse }
     | { status: 'error'; error: string };
+
+// ─────────────────────────────────────────
+// Run Congress Trend (direct-await, non-queued)
+// ─────────────────────────────────────────
+
+/** Result variant when the LLM completed and the congress analysis is ready. */
+export interface RunCongressTrendDone {
+    status: 'done';
+    result: CongressTrendResponse;
+}
+
+/**
+ * Result of a `runCongressTrend` call — the direct (non-queued) successor to
+ * the `submitCongressTrend` + `pollCongressTrend` pair.
+ *
+ * - `cached`: a recent analysis was found in the cache (non-empty summary).
+ * - `done`: the LLM completed and the result is ready.
+ * - `miss_no_trigger`: cache missed and `skipEnqueueIfMiss` was set.
+ * - `no_trades`: senate + house trades normalized to zero; LLM not called.
+ * - `error`: the data provider fetch failed (`code: 'fetch_failed'`).
+ *
+ * LLM-level failures propagate as thrown exceptions so the route handler
+ * can map them to appropriate HTTP responses. There is no BYOK gate in core —
+ * tier gating for `modelId` is the caller's responsibility.
+ */
+export type RunCongressTrendResult =
+    | SubmitCongressTrendCached
+    | RunCongressTrendDone
+    | SubmitCongressTrendMissNoTrigger
+    | SubmitCongressTrendNoTrades
+    | SubmitCongressTrendFetchError;

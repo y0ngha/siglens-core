@@ -3,32 +3,37 @@
 // =============================================================================
 // Use-case functions called directly from Server Actions / API handlers / workers.
 
+// Analysis AI provider — worker에서 승격된 LLM 호출 진입점
+export { callAnalysisAi } from './application/analysis/callAnalysisAi';
+export { callBriefingAi } from './application/analysis/callBriefingAi';
+export { resolveBriefingModel } from './application/analysis/briefingModel';
+export type { BriefingModelId } from './application/analysis/briefingModel';
+export type {
+    CallAnalysisAiOptions,
+    CallBriefingAiOptions,
+} from './application/analysis/types';
+export {
+    isModelAllowedForTier,
+    requiresUserApiKey,
+    shouldUseServerKey,
+} from './domain/keyRouting';
+
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';
-export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';
 export { peekAnalysisCache } from './application/market/peekAnalysisCache';
 export { peekBriefingCache } from './application/market/peekBriefingCache';
-export { pollAnalysis } from './application/market/pollAnalysis';
-export { pollBriefing } from './application/market/pollBriefing';
-export { submitAnalysis } from './application/market/submitAnalysis';
-export { submitBriefing } from './application/market/submitBriefing';
+export { runAnalysis } from './application/market/runAnalysis';
 
 // Dashboard
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
 // Economy (macro) briefing — mirrors market briefing for the /economy page
-export { submitMacroBriefing } from './application/economy/submitMacroBriefing';
-export { pollMacroBriefing } from './application/economy/pollMacroBriefing';
 export { peekMacroBriefingCache } from './application/economy/peekMacroBriefingCache';
 
 // Economy — per-event AI analysis (submit/poll worker-job pattern)
-export { submitEconomicEventAnalysis } from './application/economy/submitEconomicEventAnalysis';
-export { pollEconomicEventAnalysis } from './application/economy/pollEconomicEventAnalysis';
 
 // Economy — indicator-name AI translation (submit/poll worker-job pattern)
-export { submitIndicatorTranslation } from './application/economy/submitIndicatorTranslation';
-export { pollIndicatorTranslation } from './application/economy/pollIndicatorTranslation';
 
 // Application background-task options (used by market / dashboard use-cases)
 export type { BackgroundTaskOptions } from './application/types';
@@ -46,34 +51,17 @@ export { requestChatCompletion } from './application/chat/requestChatCompletion'
 export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 
 // Fundamental analysis use-cases
-export { cancelFundamentalAnalysisJob } from './application/fundamental/cancelFundamentalAnalysisJob';
-export { pollFundamentalAnalysis } from './application/fundamental/pollFundamentalAnalysis';
-export { submitFundamentalAnalysis } from './application/fundamental/submitFundamentalAnalysis';
+export { runFundamentalAnalysis } from './application/fundamental/runFundamentalAnalysis';
 
 // Financials analysis use-cases
-export { cancelFinancialsAnalysisJob } from './application/financials/cancelFinancialsAnalysisJob';
-export { pollFinancialsAnalysis } from './application/financials/pollFinancialsAnalysis';
-export { submitFinancialsAnalysis } from './application/financials/submitFinancialsAnalysis';
+export { runFinancialsAnalysis } from './application/financials/runFinancialsAnalysis';
 
 // Congress trend analysis use-cases
-export { cancelCongressTrendJob } from './application/congress/cancelCongressTrendJob';
-export { pollCongressTrend } from './application/congress/pollCongressTrend';
-export { submitCongressTrend } from './application/congress/submitCongressTrend';
 
 // News analysis use-cases
-export { cancelNewsAnalysisJob } from './application/news/cancelNewsAnalysisJob';
-export { pollMarketNewsDigest } from './application/news/pollMarketNewsDigest';
-export { pollNewsAnalysis } from './application/news/pollNewsAnalysis';
-export { pollNewsCardAnalysis } from './application/news/pollNewsCardAnalysis';
-export { submitMarketNewsDigest } from './application/news/submitMarketNewsDigest';
-export { submitNewsAnalysis } from './application/news/submitNewsAnalysis';
-export { submitNewsCardAnalysis } from './application/news/submitNewsCardAnalysis';
 
 // Overall analysis use-cases
-export { cancelOverallAnalysisJob } from './application/overall/cancelOverallAnalysisJob';
 export { peekOverallAnalysisCache } from './application/overall/peekOverallAnalysisCache';
-export { pollOverallAnalysis } from './application/overall/pollOverallAnalysis';
-export { submitOverallAnalysis } from './application/overall/submitOverallAnalysis';
 
 // =============================================================================
 // Tier 2 — Domain Building Blocks
@@ -283,7 +271,6 @@ export { readFmpConfig, tryReadFmpConfig } from './infrastructure/fmp/config';
 export { hashUsageIp } from './infrastructure/usage/hash';
 
 // Job queue (worker-side primitives)
-export { cancelJob } from './infrastructure/jobs/queue';
 
 // Reanalyze cooldown
 export {
@@ -424,6 +411,7 @@ export type {
     PollFundamentalAnalysisResult,
     SubmitFundamentalAnalysisApiKeyRequiredError,
     SubmitFundamentalAnalysisCached,
+    RunFundamentalAnalysisResult,
     SubmitFundamentalAnalysisFetchError,
     SubmitFundamentalAnalysisLimitError,
     SubmitFundamentalAnalysisMissNoTrigger,
@@ -433,6 +421,7 @@ export type {
 } from './application/fundamental/types';
 export type {
     PollFinancialsAnalysisResult,
+    RunFinancialsAnalysisResult,
     SubmitFinancialsAnalysisApiKeyRequiredError,
     SubmitFinancialsAnalysisCached,
     SubmitFinancialsAnalysisFetchError,
@@ -455,6 +444,7 @@ export type {
 export type {
     AnalysisUsageOptions,
     PollAnalysisOptions,
+    RunAnalysisResult,
     SubmitAnalysisGatedResult,
     SubmitAnalysisMissNoTrigger,
     SubmitAnalysisOptions,
@@ -798,22 +788,15 @@ export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
 export { mapExpirationsToSlots } from './domain/options/expirationSlots';
 
-// Options analysis — application use-cases (submit + poll, cache key builder)
-export {
-    submitOptionsAnalysis,
-    pollOptionsAnalysis,
-} from './application/options';
+// Options analysis — application use-cases (submit + poll + run, cache key builder)
+export { runOptionsAnalysis } from './application/options';
 export type {
     SubmitOptionsAnalysisOptions,
     SubmitOptionsAnalysisResult,
     SubmitOptionsAnalysisCached,
-    SubmitOptionsAnalysisSubmitted,
     SubmitOptionsAnalysisMissNoTrigger,
     SubmitOptionsAnalysisLimitError,
     SubmitOptionsAnalysisNoChainsError,
     SubmitOptionsAnalysisApiKeyRequiredError,
-    PollOptionsAnalysisResult,
-    PollOptionsAnalysisProcessing,
-    PollOptionsAnalysisDone,
-    PollOptionsAnalysisError,
+    RunOptionsAnalysisResult,
 } from './application/options';

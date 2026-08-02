@@ -76,6 +76,13 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * Cancellation signal for the in-flight LLM call (used by `runFundamentalAnalysis`).
+     * When provided, passed through to `callAnalysisAi` so a dropped connection
+     * can abort the underlying AI provider request. Has no effect on
+     * `submitFundamentalAnalysis` (the worker-based path does not accept a signal).
+     */
+    signal?: AbortSignal;
 }
 
 /**
@@ -145,3 +152,30 @@ export type PollFundamentalAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: FundamentalAnalysisResponse }
     | { status: 'error'; error: string };
+
+// ─────────────────────────────────────────
+// Run (direct, non-queued)
+// ─────────────────────────────────────────
+
+/**
+ * Result of a `runFundamentalAnalysis` call — the direct (non-queued) successor
+ * to the `submitFundamentalAnalysis` + `pollFundamentalAnalysis` pair.
+ *
+ * - `cached`: a recent analysis was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ * - `miss_no_trigger`: cache missed and `skipEnqueueIfMiss` was set; caller
+ *   should render a fallback.
+ * - `error`: a usage limit, BYOK gate, or provider fetch error denied the
+ *   request.
+ * - `key_error`: a BYOK API key is required for the requested model+tier combo.
+ *
+ * LLM-level failures (provider errors, network, abort) propagate as thrown
+ * exceptions so the caller can map them to appropriate HTTP responses.
+ */
+export type RunFundamentalAnalysisResult =
+    | SubmitFundamentalAnalysisCached
+    | { status: 'done'; result: FundamentalAnalysisResponse }
+    | SubmitFundamentalAnalysisMissNoTrigger
+    | SubmitFundamentalAnalysisLimitError
+    | SubmitFundamentalAnalysisFetchError
+    | SubmitFundamentalAnalysisApiKeyRequiredError;

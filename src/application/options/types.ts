@@ -83,6 +83,13 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * Cancellation signal for the in-flight LLM call (used by `runOptionsAnalysis`).
+     * When provided, passed through to `callAnalysisAi` so a dropped connection
+     * can abort the underlying AI provider request. Has no effect on
+     * `submitOptionsAnalysis` (the worker-based path does not accept a signal).
+     */
+    signal?: AbortSignal;
 }
 
 /**
@@ -180,3 +187,30 @@ export type PollOptionsAnalysisResult =
     | PollOptionsAnalysisProcessing
     | PollOptionsAnalysisDone
     | PollOptionsAnalysisError;
+
+// ─────────────────────────────────────────
+// Run (direct, non-queued)
+// ─────────────────────────────────────────
+
+/**
+ * Result of a `runOptionsAnalysis` call — the direct (non-queued) successor
+ * to the `submitOptionsAnalysis` + `pollOptionsAnalysis` pair.
+ *
+ * - `cached`: a recent analysis was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ * - `miss_no_trigger`: cache missed and `skipEnqueueIfMiss` was set; caller
+ *   should render a fallback.
+ * - `no_chains_error`: the snapshot has no usable options chains (graceful skip).
+ * - `limit_error`: the per-tier daily analysis limit was exceeded.
+ * - `key_error`: a BYOK API key is required for the requested model+tier combo.
+ *
+ * LLM-level failures (provider errors, network, abort) propagate as thrown
+ * exceptions so the caller can map them to appropriate HTTP responses.
+ */
+export type RunOptionsAnalysisResult =
+    | SubmitOptionsAnalysisCached
+    | { status: 'done'; result: OptionsAnalysisResponse }
+    | SubmitOptionsAnalysisMissNoTrigger
+    | SubmitOptionsAnalysisNoChainsError
+    | SubmitOptionsAnalysisLimitError
+    | SubmitOptionsAnalysisApiKeyRequiredError;

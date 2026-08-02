@@ -4,7 +4,3 @@ export type AcquireReanalyzeCooldownResult =
     | { ok: false; remainingMs: number };
 
 /** @internal Validated worker configuration (URL + shared secret). */
-export interface WorkerConfig {
-    workerUrl: string;
-    workerSecret: string;
-}
