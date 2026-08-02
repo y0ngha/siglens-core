@@ -90,6 +90,16 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * Cancellation signal for the in-flight LLM call (used by `runNewsAnalysis`).
+     * When provided, passed through to `callAnalysisAi` so a dropped connection
+     * can abort the underlying AI provider request rather than letting it run
+     * to completion against a gone client.
+     *
+     * Has no effect on `submitNewsAnalysis` (the worker-based path does not
+     * accept a signal).
+     */
+    signal?: AbortSignal;
 }
 
 /**
@@ -178,6 +188,14 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
      * When omitted the worker uses `MODEL_SPECS[model].thinkingBudget`.
      */
     thinkingBudget?: number;
+    /**
+     * Cancellation signal for the in-flight LLM call (used by `runNewsCardAnalysis`).
+     * When provided, passed through to `callAnalysisAi` so a dropped connection
+     * can abort the underlying AI provider request.
+     *
+     * Has no effect on `submitNewsCardAnalysis` (the worker-based path).
+     */
+    signal?: AbortSignal;
 }
 
 /**
@@ -206,3 +224,56 @@ export type PollNewsCardAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: NewsCardAnalysis }
     | { status: 'error'; error: string };
+
+// ─────────────────────────────────────────
+// Run News Analysis (direct-await, non-queued)
+// ─────────────────────────────────────────
+
+/**
+ * Result variant when the LLM completed and the news analysis is ready.
+ */
+export interface RunNewsAnalysisDone {
+    status: 'done';
+    result: NewsAnalysisResponse;
+}
+
+/**
+ * Result of a `runNewsAnalysis` call — the direct (non-queued) successor to the
+ * `submitNewsAnalysis` + `pollNewsAnalysis` pair.
+ *
+ * - `cached`: a recent analysis was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ * - `miss_no_trigger`: cache missed and `skipEnqueueIfMiss` was set.
+ * - `error`: a usage limit, BYOK gate, or empty-news guard denied the request.
+ * - `key_error`: a BYOK API key is required for the requested model+tier combo.
+ *
+ * LLM-level failures (provider errors, network, abort) propagate as thrown
+ * exceptions so the route handler can map them to appropriate HTTP responses.
+ */
+export type RunNewsAnalysisResult =
+    | SubmitNewsAnalysisCached
+    | RunNewsAnalysisDone
+    | SubmitNewsAnalysisMissNoTrigger
+    | SubmitNewsAnalysisNoNewsError
+    | SubmitNewsAnalysisLimitError
+    | SubmitNewsAnalysisApiKeyRequiredError;
+
+// ─────────────────────────────────────────
+// Run News Card Analysis (direct-await, non-queued)
+// ─────────────────────────────────────────
+
+/**
+ * Result of a `runNewsCardAnalysis` call — the direct (non-queued) successor
+ * to the `submitNewsCardAnalysis` + `pollNewsCardAnalysis` pair.
+ *
+ * Always `done` on success. LLM-level failures propagate as thrown exceptions
+ * so the caller can map them to appropriate HTTP responses. There are no tier
+ * or usage gates for per-card analysis.
+ *
+ * The caller is responsible for persisting the result via their own persistence
+ * layer — `runNewsCardAnalysis` does not write to a cache or DB.
+ */
+export type RunNewsCardAnalysisResult = {
+    status: 'done';
+    result: NewsCardAnalysis;
+};

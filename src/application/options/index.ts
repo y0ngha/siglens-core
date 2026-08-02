@@ -1,5 +1,6 @@
 export { submitOptionsAnalysis } from './submitOptionsAnalysis';
 export { pollOptionsAnalysis } from './pollOptionsAnalysis';
+export { runOptionsAnalysis } from './runOptionsAnalysis';
 export type {
     SubmitOptionsAnalysisOptions,
     SubmitOptionsAnalysisResult,
@@ -13,4 +14,5 @@ export type {
     PollOptionsAnalysisProcessing,
     PollOptionsAnalysisDone,
     PollOptionsAnalysisError,
+    RunOptionsAnalysisResult,
 } from './types';

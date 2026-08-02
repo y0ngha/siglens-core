@@ -45,6 +45,14 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
      * dispatching a worker job (preserves the bot cost guard).
      */
     force?: boolean;
+    /**
+     * Cancellation signal for the in-flight LLM call (used by `runMarketNewsDigest`).
+     * When provided, passed through to `callAnalysisAi` so a dropped connection
+     * can abort the underlying AI provider request.
+     *
+     * Has no effect on `submitMarketNewsDigest` (the worker-based path).
+     */
+    signal?: AbortSignal;
 }
 
 /** The caller receives a cached category digest — no new job was created. */
@@ -95,3 +103,32 @@ export type PollMarketNewsDigestResult =
     | PollMarketNewsDigestProcessing
     | PollMarketNewsDigestDone
     | PollMarketNewsDigestError;
+
+// ─────────────────────────────────────────
+// Run Market News Digest (direct-await, non-queued)
+// ─────────────────────────────────────────
+
+/** Result variant when the LLM completed and the digest is ready. */
+export interface RunMarketNewsDigestDone {
+    status: 'done';
+    result: NewsAnalysisResponse;
+}
+
+/**
+ * Result of a `runMarketNewsDigest` call — the direct (non-queued) successor
+ * to the `submitMarketNewsDigest` + `pollMarketNewsDigest` pair.
+ *
+ * - `cached`: a recent digest was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ * - `miss_no_trigger`: cache missed and `skipEnqueueIfMiss` was set.
+ * - `no_news`: the `news` array was empty; LLM was not called.
+ *
+ * LLM-level failures propagate as thrown exceptions. Unlike `pollMarketNewsDigest`,
+ * there is no `error` variant — normalization is applied to a validated JSON
+ * object from `callAnalysisAi`, so structural failures surface as thrown exceptions.
+ */
+export type RunMarketNewsDigestResult =
+    | SubmitMarketNewsDigestCached
+    | RunMarketNewsDigestDone
+    | SubmitMarketNewsDigestMissNoTrigger
+    | SubmitMarketNewsDigestNoNewsError;

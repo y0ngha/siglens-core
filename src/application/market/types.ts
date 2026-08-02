@@ -9,6 +9,7 @@ import type {
     AnalysisResponse,
     AssetClass,
     FilteredAnalysisResponse,
+    MarketBriefingResponse,
     ModelId,
     PositionBucket,
     Tier,
@@ -237,6 +238,35 @@ export type RunAnalysisResult =
       }
     | SubmitAnalysisMissNoTrigger
     | SubmitAnalysisErrorResult;
+
+/**
+ * Options for a `runBriefing` call — the direct (non-queued) successor to the
+ * `submitBriefing` + `pollBriefing` pair.
+ */
+export interface RunBriefingOptions {
+    /**
+     * Cancellation signal. When provided, forwarded to `callBriefingAi` so a
+     * dropped connection aborts the underlying AI provider request.
+     */
+    signal?: AbortSignal;
+}
+
+/**
+ * Result of a `runBriefing` call.
+ *
+ * - `cached`: a recent briefing was found in the cache and returned as-is.
+ * - `done`: the LLM completed and the result is ready.
+ *
+ * LLM-level failures (provider errors, network, abort) propagate as thrown
+ * exceptions.
+ */
+export type RunBriefingResult =
+    | {
+          status: 'cached';
+          briefing: MarketBriefingResponse;
+          generatedAt: string;
+      }
+    | { status: 'done'; briefing: MarketBriefingResponse; generatedAt: string };
 
 /** Submit analysis outcome including application-level gate errors. */
 export type SubmitAnalysisGatedResult =

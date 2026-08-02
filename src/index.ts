@@ -64,11 +64,13 @@ export { checkAnalysisLimit, checkChatbotLimit } from './application/usage';
 // Fundamental analysis use-cases
 export { cancelFundamentalAnalysisJob } from './application/fundamental/cancelFundamentalAnalysisJob';
 export { pollFundamentalAnalysis } from './application/fundamental/pollFundamentalAnalysis';
+export { runFundamentalAnalysis } from './application/fundamental/runFundamentalAnalysis';
 export { submitFundamentalAnalysis } from './application/fundamental/submitFundamentalAnalysis';
 
 // Financials analysis use-cases
 export { cancelFinancialsAnalysisJob } from './application/financials/cancelFinancialsAnalysisJob';
 export { pollFinancialsAnalysis } from './application/financials/pollFinancialsAnalysis';
+export { runFinancialsAnalysis } from './application/financials/runFinancialsAnalysis';
 export { submitFinancialsAnalysis } from './application/financials/submitFinancialsAnalysis';
 
 // Congress trend analysis use-cases
@@ -440,6 +442,7 @@ export type {
     PollFundamentalAnalysisResult,
     SubmitFundamentalAnalysisApiKeyRequiredError,
     SubmitFundamentalAnalysisCached,
+    RunFundamentalAnalysisResult,
     SubmitFundamentalAnalysisFetchError,
     SubmitFundamentalAnalysisLimitError,
     SubmitFundamentalAnalysisMissNoTrigger,
@@ -449,6 +452,7 @@ export type {
 } from './application/fundamental/types';
 export type {
     PollFinancialsAnalysisResult,
+    RunFinancialsAnalysisResult,
     SubmitFinancialsAnalysisApiKeyRequiredError,
     SubmitFinancialsAnalysisCached,
     SubmitFinancialsAnalysisFetchError,
@@ -815,10 +819,11 @@ export { aggregateOpenInterest } from './domain/options/aggregateOpenInterest';
 export { sanitizeOptionsChain } from './domain/options/sanitizeOptionsChain';
 export { mapExpirationsToSlots } from './domain/options/expirationSlots';
 
-// Options analysis — application use-cases (submit + poll, cache key builder)
+// Options analysis — application use-cases (submit + poll + run, cache key builder)
 export {
     submitOptionsAnalysis,
     pollOptionsAnalysis,
+    runOptionsAnalysis,
 } from './application/options';
 export type {
     SubmitOptionsAnalysisOptions,
@@ -833,4 +838,5 @@ export type {
     PollOptionsAnalysisProcessing,
     PollOptionsAnalysisDone,
     PollOptionsAnalysisError,
+    RunOptionsAnalysisResult,
 } from './application/options';
