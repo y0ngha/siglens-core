@@ -6,7 +6,7 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
-    cancelFinancialsAnalysisJob,
+    runFinancialsAnalysis,
     checkAnalysisLimit,
     checkChatbotLimit,
     clusterKeyLevels,
@@ -35,11 +35,9 @@ import {
     normalizeFinancialsAnalysisResponse,
     normalizeFinancialsSnapshot,
     POC_WINDOW_DEFAULT,
-    pollFinancialsAnalysis,
     requestChatCompletion,
     RSI_DEFAULT_PERIOD,
     scoreToLabel,
-    submitFinancialsAnalysis,
     TIER_CONFIG,
     VALID_CHAT_MODELS,
     validateActionPrices,
@@ -135,9 +133,7 @@ describe('public API exports', () => {
     });
 
     it('exports financials domain and application entrypoints', () => {
-        expect(typeof submitFinancialsAnalysis).toBe('function');
-        expect(typeof pollFinancialsAnalysis).toBe('function');
-        expect(typeof cancelFinancialsAnalysisJob).toBe('function');
+        expect(typeof runFinancialsAnalysis).toBe('function');
         expect(typeof computeFinancialsScorecard).toBe('function');
         expect(typeof normalizeFinancialsAnalysisResponse).toBe('function');
         expect(typeof normalizeFinancialsSnapshot).toBe('function');

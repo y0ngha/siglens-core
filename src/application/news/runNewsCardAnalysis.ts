@@ -1,6 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { NEWS_CARD_MODEL_ID } from '@/application/news/submitNewsCardAnalysis';
 import type {
     RunNewsCardAnalysisResult,
     SubmitNewsCardAnalysisOptions,
@@ -10,6 +9,14 @@ import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { NEWS_CARD_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+
+/**
+ * @internal
+ * Fixed model identifier for per-card news translation and sentiment analysis.
+ *
+ * 구 submitNewsCardAnalysis에서 이전 — job 큐 제거로 그 파일이 사라졌다.
+ */
+export const NEWS_CARD_MODEL_ID = 'gemini-2.5-flash-lite' as const;
 
 /**
  * Run a per-card news analysis end-to-end: build prompt → LLM call →
