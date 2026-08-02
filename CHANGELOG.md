@@ -1,5 +1,40 @@
 # Changelog
 
+# [0.42.0](https://github.com/y0ngha/siglens-core/compare/v0.41.0...v0.42.0) (2026-08-02)
+
+
+* refactor!: worker job 큐 레이어 삭제 ([cedb04f](https://github.com/y0ngha/siglens-core/commit/cedb04f81ed9e06d277feac4e6c4b77138a55d9f))
+
+
+### Bug Fixes
+
+* AI SDK를 dependencies로 이동 ([6017228](https://github.com/y0ngha/siglens-core/commit/60172286cc86655b1ec70b1d8479229c54e6b56b))
+* normalize가 자체 파싱하는 6곳의 중복 JSON.parse 제거 ([5019daf](https://github.com/y0ngha/siglens-core/commit/5019daf482fdec2585a3cca318aed59e3966bfad))
+
+
+### Features
+
+* 분석 in-flight 중복 제거 추가 ([3cb5d5a](https://github.com/y0ngha/siglens-core/commit/3cb5d5a487351439aa628c51ebf7dd5e6be09479))
+* 분석 provider 서버 키 리더 추가 ([41a3b80](https://github.com/y0ngha/siglens-core/commit/41a3b8055b7e2d7393ce9c4453884b159dd7ccf6))
+* 키 라우팅·브리핑 모델 해석을 core로 이동 ([6b0bf5f](https://github.com/y0ngha/siglens-core/commit/6b0bf5f8b185fe8aac3b502ade1c26f176aea9e3))
+* AI JSON 응답 정규화를 core로 이동 ([cc9223a](https://github.com/y0ngha/siglens-core/commit/cc9223a4d2c8f16514841ae6936916dd67090f9e))
+* callAnalysisAi/callBriefingAi 진입점 추가 ([196c69f](https://github.com/y0ngha/siglens-core/commit/196c69f0ab6aec76ad5f21065f719a932dd55db0))
+* fundamental/financials/options/news run* 추가 ([d1e338f](https://github.com/y0ngha/siglens-core/commit/d1e338fc673f76021d18843b99ac24354b8f2aa1))
+* LLM provider 어댑터 4종을 core로 이동 ([07ad7c9](https://github.com/y0ngha/siglens-core/commit/07ad7c99398c329bad37b8905332d6531c921a87))
+* news/congress run* 함수 추가 ([0494256](https://github.com/y0ngha/siglens-core/commit/0494256a467e2a16a021b72a00555501b79931c1))
+* overall/briefing/economy run* 추가 ([bb816a4](https://github.com/y0ngha/siglens-core/commit/bb816a496640f86ab9d32079b56614beff64f676))
+* provider별 재시도 래퍼를 core로 이동 ([a63e1c5](https://github.com/y0ngha/siglens-core/commit/a63e1c5e046f59e9167583da30602a4cb72757d5))
+* runAnalysis 추가 (submit+poll 통합) ([13897c7](https://github.com/y0ngha/siglens-core/commit/13897c784b4f0b86dad5cac7956dcaa4bfe8c57e))
+* worker의 재시도 루프를 core로 이동 ([db7f66c](https://github.com/y0ngha/siglens-core/commit/db7f66c7765805e0d623dc28825da3f4887ba0f0))
+* worker의 AI usage 정규화를 core로 이동 ([577cc52](https://github.com/y0ngha/siglens-core/commit/577cc5284d6efb6add4ba39d7f7d48112f7d602a))
+
+
+### BREAKING CHANGES
+
+* removes public API exports (submit*/poll*/cancel* functions) that consumers still import until they switch to run*.
+
+Tests: 4111 → 3459 (drop is deleted tests for deleted code, not lost coverage)
+
 # [0.41.0](https://github.com/y0ngha/siglens-core/compare/v0.40.0...v0.41.0) (2026-07-31)
 
 
