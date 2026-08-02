@@ -23,6 +23,21 @@ export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { peekAnalysisCache } from './application/market/peekAnalysisCache';
 export { peekBriefingCache } from './application/market/peekBriefingCache';
 export { runAnalysis } from './application/market/runAnalysis';
+export { runBriefing } from './application/market/runBriefing';
+
+// News analysis use-cases
+export { runNewsAnalysis } from './application/news/runNewsAnalysis';
+export { runNewsCardAnalysis } from './application/news/runNewsCardAnalysis';
+export { runMarketNewsDigest } from './application/news/runMarketNewsDigest';
+
+// Overall / congress
+export { runOverallAnalysis } from './application/overall/runOverallAnalysis';
+export { runCongressTrend } from './application/congress/runCongressTrend';
+
+// Economy use-cases
+export { runMacroBriefing } from './application/economy/runMacroBriefing';
+export { runEconomicEventAnalysis } from './application/economy/runEconomicEventAnalysis';
+export { runIndicatorTranslation } from './application/economy/runIndicatorTranslation';
 
 // Dashboard
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
