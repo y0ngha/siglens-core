@@ -1762,6 +1762,7 @@ __metadata:
     husky: "npm:^9.1.7"
     jsonrepair: "npm:^3.14.0"
     lint-staged: "npm:^17.0.5"
+    openai: "npm:6.35.0"
     prettier: "npm:^3.4.0"
     release-it: "npm:^19.2.4"
     tsc-alias: "npm:^1.8.10"
@@ -4309,6 +4310,23 @@ __metadata:
     is-inside-container: "npm:^1.0.0"
     wsl-utils: "npm:^0.1.0"
   checksum: 10c0/5a36d0c1fd2f74ce553beb427ca8b8494b623fc22c6132d0c1688f246a375e24584ea0b44c67133d9ab774fa69be8e12fbe1ff12504b1142bd960fb09671948f
+  languageName: node
+  linkType: hard
+
+"openai@npm:6.35.0":
+  version: 6.35.0
+  resolution: "openai@npm:6.35.0"
+  peerDependencies:
+    ws: ^8.18.0
+    zod: ^3.25 || ^4.0
+  peerDependenciesMeta:
+    ws:
+      optional: true
+    zod:
+      optional: true
+  bin:
+    openai: bin/cli
+  checksum: 10c0/b5be8c9c26b8991bc06e94d2de9ec046d7e8497f3828f8ff3cd7796cfd5e39e464a52afa2f4959003183e61a909c6ee261ca4380a61cb1f2e9a56629058314ed
   languageName: node
   linkType: hard
 

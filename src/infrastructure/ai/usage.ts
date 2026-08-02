@@ -96,7 +96,7 @@ export function extractGeminiUsage(
 /**
  * OpenAI usage shape.
  *
- * NOTE: chatgpt.ts calls the **Responses API** (`client.responses.create`),
+ * NOTE: providers/openai.ts calls the **Responses API** (`client.responses.create`),
  * whose `response.usage` (`OpenAI.Responses.ResponseUsage`) reports
  * `input_tokens` / `input_tokens_details.cached_tokens` / `output_tokens` —
  * *not* the Chat Completions shape (`prompt_tokens` /
@@ -130,7 +130,7 @@ export function extractOpenAIUsage(
 /**
  * DeepSeek `chat.completions` usage shape (classic OpenAI Chat Completions
  * shape — NOT the Responses API shape used by `extractOpenAIUsage`, since
- * `deepseek.ts` calls `chat.completions.create`, not `responses.create`).
+ * `providers/deepseek.ts` calls `chat.completions.create`, not `responses.create`).
  *
  * DeepSeek's context-caching reports cache hits/misses two ways: the
  * DeepSeek-specific top-level `prompt_cache_hit_tokens`/`prompt_cache_miss_tokens`
