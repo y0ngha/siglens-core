@@ -159,7 +159,11 @@ export async function runMarketNewsDigest(
     // ── 5. Inline post-processing (formerly in pollMarketNewsDigest) ──
     // Do not skip empty/sparse digest results — callers rely on the cached
     // entry being present even when sparse (mirrors pollMarketNewsDigest).
-    const result = normalizeNewsAnalysisResponse(JSON.parse(raw));
+    // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로
+    // 코드펜스 제거·파싱·garbage 방어를 스스로 수행한다. 앞에서 파싱하면 LLM이
+    // 비-JSON을 뱉었을 때 예외가 호출자까지 올라가 그 방어가 무력해진다
+    // (구 poll* 경로도 파싱하지 않고 그대로 넘겼다).
+    const result = normalizeNewsAnalysisResponse(raw);
 
     if (result.currentDriverKo === '' && result.keyEventsKo.length === 0) {
         console.warn(LOG_TAG, 'Empty digest; raw payload likely malformed', {
