@@ -7,6 +7,8 @@ import {
     buildTimeframeNotAllowedError,
     type RunAnalysisResult,
     type SubmitAnalysisOptions,
+    type SubmitAnalysisErrorResult,
+    type SubmitAnalysisMissNoTrigger,
 } from '@/application/market/types';
 import {
     buildUsageLimitError,
@@ -52,6 +54,28 @@ import {
 } from '@/infrastructure/skills/sampling';
 
 /**
+ * Result of `runAnalysisForOverall` — the internal (non-filtered) sibling of
+ * `runAnalysis` used by `runOverallAnalysis` to feed the full `AnalysisResponse`
+ * into the overall prompt builder.
+ *
+ * Unlike `RunAnalysisResult`, the `result` field is always the unfiltered
+ * `AnalysisResponse` — `filterAnalysisResult` is NOT called. This mirrors the
+ * `submitAnalysisForOverall` → `submitAnalysisWithVisibility('internal')` pattern
+ * from the queued path: the overall prompt builder accesses `tech.keyLevels.*`
+ * and similar fields directly, which would crash if those fields were null
+ * (as they are in `FilteredAnalysisResponse` for lower tiers).
+ *
+ * Tier-level access control for the overall analysis is therefore enforced at
+ * the overall layer (timeframe gate, usage gate, BYOK gate) rather than at the
+ * per-field filtering level — consistent with the queued predecessor.
+ */
+export type RunAnalysisForOverallResult =
+    | { status: 'cached'; result: AnalysisResponse }
+    | { status: 'done'; result: AnalysisResponse }
+    | SubmitAnalysisMissNoTrigger
+    | SubmitAnalysisErrorResult;
+
+/**
  * `options.modelId`가 없을 때 실제로 호출할 모델.
  *
  * `DEFAULT_ANALYSIS_MODEL_ID`('analysis-worker')는 **캐시 키 센티널이지 호출 가능한
@@ -69,35 +93,23 @@ import {
 const DEFAULT_RUN_ANALYSIS_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
 
 /**
- * Run a technical analysis end-to-end: tier gate → cache lookup → LLM call
- * → post-processing → cache write → tier-filtered return.
+ * Shared implementation for `runAnalysis` (public, filtered) and
+ * `runAnalysisForOverall` (internal, unfiltered).
  *
- * This is the direct (non-queued) replacement for the `submitAnalysis` +
- * `pollAnalysis` pair. The caller awaits a single promise; no job IDs, no
- * Redis meta, no polling loop.
- *
- * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
- * receive the same result.
- *
- * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)
- * so a dropped connection aborts the in-flight LLM call.
- *
- * @throws If `options.marketDataProvider` is absent on a cache miss, or if
- *   the AI provider call fails (network, 5xx, abort). Gate denials are
- *   returned as `{status:'error'}`, not thrown.
- *
- * @see submitAnalysis — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runAnalysis.
+ * `skipFilter = false` → applies `filterAnalysisResult` before returning
+ * (public API: caller receives the tier-appropriate field set).
+ * `skipFilter = true`  → returns the raw `AnalysisResponse` without filtering
+ * (internal API: `runOverallAnalysis` needs the full payload for its prompt builder).
  */
-export async function runAnalysis(
+async function runAnalysisImpl(
+    skipFilter: boolean,
     symbol: string,
     companyName: string,
     timeframe: Timeframe,
     force?: boolean,
     fmpSymbol?: string,
     options: SubmitAnalysisOptions = {}
-): Promise<RunAnalysisResult> {
+): Promise<RunAnalysisResult | RunAnalysisForOverallResult> {
     const tier = options.tierContext?.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
@@ -177,15 +189,18 @@ export async function runAnalysis(
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
                 const normalized = normalizeCachedAnalysisResponse(cached);
-                const filtered = filterAnalysisResult(
-                    normalized,
-                    tier,
-                    tierConfig
-                );
                 await recordAnalysisUsageSafely(
                     usage,
                     effectiveModelId,
                     usageOccurredAt
+                );
+                if (skipFilter) {
+                    return { status: 'cached', result: normalized };
+                }
+                const filtered = filterAnalysisResult(
+                    normalized,
+                    tier,
+                    tierConfig
                 );
                 return { status: 'cached', ...filtered };
             }
@@ -300,6 +315,84 @@ export async function runAnalysis(
 
     await recordAnalysisUsageSafely(usage, effectiveModelId, usageOccurredAt);
 
+    if (skipFilter) {
+        return { status: 'done', result };
+    }
     const filtered = filterAnalysisResult(result, tier, tierConfig);
     return { status: 'done', ...filtered };
+}
+
+/**
+ * Run a technical analysis end-to-end: tier gate → cache lookup → LLM call
+ * → post-processing → cache write → tier-filtered return.
+ *
+ * This is the direct (non-queued) replacement for the `submitAnalysis` +
+ * `pollAnalysis` pair. The caller awaits a single promise; no job IDs, no
+ * Redis meta, no polling loop.
+ *
+ * Concurrent calls for the same `cacheKey` are deduplicated via
+ * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * receive the same result.
+ *
+ * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)
+ * so a dropped connection aborts the in-flight LLM call.
+ *
+ * @throws If `options.marketDataProvider` is absent on a cache miss, or if
+ *   the AI provider call fails (network, 5xx, abort). Gate denials are
+ *   returned as `{status:'error'}`, not thrown.
+ *
+ * @see submitAnalysis — the queued predecessor; still exported for the
+ *   existing production path until siglens switches to runAnalysis.
+ */
+export async function runAnalysis(
+    symbol: string,
+    companyName: string,
+    timeframe: Timeframe,
+    force?: boolean,
+    fmpSymbol?: string,
+    options: SubmitAnalysisOptions = {}
+): Promise<RunAnalysisResult> {
+    return runAnalysisImpl(
+        false,
+        symbol,
+        companyName,
+        timeframe,
+        force,
+        fmpSymbol,
+        options
+    ) as Promise<RunAnalysisResult>;
+}
+
+/**
+ * Internal variant of {@link runAnalysis} for use by {@link runOverallAnalysis}.
+ *
+ * Identical to `runAnalysis` except that `filterAnalysisResult` is NOT applied —
+ * the caller always receives the full, unfiltered `AnalysisResponse`. This is
+ * required because `buildOverallAnalysisPrompt` accesses `tech.keyLevels.*`,
+ * `tech.indicatorResults`, and other fields that `FilteredAnalysisResponse` can
+ * set to `null` for lower tiers, causing a runtime crash.
+ *
+ * Mirrors the `submitAnalysisForOverall` → `submitAnalysisWithVisibility('internal')`
+ * pattern from the queued path.
+ *
+ * @see runAnalysis for the public (tier-filtered) variant.
+ * @see runOverallAnalysis for the only intended caller.
+ */
+export async function runAnalysisForOverall(
+    symbol: string,
+    companyName: string,
+    timeframe: Timeframe,
+    force?: boolean,
+    fmpSymbol?: string,
+    options: SubmitAnalysisOptions = {}
+): Promise<RunAnalysisForOverallResult> {
+    return runAnalysisImpl(
+        true,
+        symbol,
+        companyName,
+        timeframe,
+        force,
+        fmpSymbol,
+        options
+    ) as Promise<RunAnalysisForOverallResult>;
 }
