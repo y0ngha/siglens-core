@@ -3,6 +3,21 @@
 // =============================================================================
 // Use-case functions called directly from Server Actions / API handlers / workers.
 
+// Analysis AI provider — worker에서 승격된 LLM 호출 진입점
+export { callAnalysisAi } from './application/analysis/callAnalysisAi';
+export { callBriefingAi } from './application/analysis/callBriefingAi';
+export { resolveBriefingModel } from './application/analysis/briefingModel';
+export type { BriefingModelId } from './application/analysis/briefingModel';
+export type {
+    CallAnalysisAiOptions,
+    CallBriefingAiOptions,
+} from './application/analysis/types';
+export {
+    isModelAllowedForTier,
+    requiresUserApiKey,
+    shouldUseServerKey,
+} from './domain/keyRouting';
+
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { cancelAnalysisJob } from './application/market/cancelAnalysisJob';
