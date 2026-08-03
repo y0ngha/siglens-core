@@ -39,6 +39,21 @@ export { runMacroBriefing } from './application/economy/runMacroBriefing';
 export { runEconomicEventAnalysis } from './application/economy/runEconomicEventAnalysis';
 export { runIndicatorTranslation } from './application/economy/runIndicatorTranslation';
 
+// run* 결과 타입 — 소비자가 반환값을 좁힐 때 필요하다.
+export type { RunBriefingResult } from './application/market/types';
+export type { RunOverallAnalysisResult } from './application/overall/types';
+export type { RunCongressTrendResult } from './application/congress/types';
+export type {
+    RunNewsAnalysisResult,
+    RunNewsCardAnalysisResult,
+} from './application/news/types';
+export type { RunMarketNewsDigestResult } from './application/news/marketNewsDigestTypes';
+export type {
+    RunMacroBriefingResult,
+    RunEconomicEventAnalysisResult,
+    RunIndicatorTranslationResult,
+} from './application/economy/types';
+
 // Dashboard
 export { getMarketSummary } from './application/dashboard/getMarketSummary';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
