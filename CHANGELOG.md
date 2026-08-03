@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.2](https://github.com/y0ngha/siglens-core/compare/v0.42.1...v0.42.2) (2026-08-03)
+
+
+### Bug Fixes
+
+* run* 결과 타입 9개 export 추가 ([ac01db1](https://github.com/y0ngha/siglens-core/commit/ac01db1f2d7a9cdb81005f15de64f00eff9de2fe))
+
 ## [0.42.1](https://github.com/y0ngha/siglens-core/compare/v0.42.0...v0.42.1) (2026-08-02)
 
 
