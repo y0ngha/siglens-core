@@ -106,25 +106,61 @@ function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** 누적 지연이 abortIfCumulativeDelayReachesMs 이상이면 즉시 루프를 중단하고 AI_SERVER_UNSTABLE_CODE를 throw한다. */
+/**
+ * 재시도 루프 전체의 wall-clock 예산. `abortIfCumulativeDelayReachesMs`가 **sleep 시간만**
+ * 세는 것과 달리 이 예산은 `fn()` 실행시간까지 포함한다.
+ *
+ * 왜 둘 다 필요한가 — 2026-08-09 프로덕션 실측:
+ * `deepseek-v4-pro`가 PLTR(promptTokens 29k)에서 **248.5초** 만에 실패했는데,
+ * 그 시점 `cumulativeDelay`는 0이라 delay cap(30초)을 통과해 재시도가 시작됐다.
+ * 호출자(SSE 라우트)의 마감이 300초였으므로 두 번째 시도는 완주할 수 없었고,
+ * 대기 중이던 요청 4건이 한꺼번에 타임아웃으로 실패했다(core `dedupeInFlight`가
+ * 같은 캐시 키를 한 promise로 묶기 때문). 즉 **sleep 예산만으로는 느린 실패를 못 막는다.**
+ *
+ * 다음 시도의 소요시간은 직전 시도의 소요시간으로 추정한다 — 같은 프로바이더에
+ * 같은 프롬프트를 다시 보내므로 가장 가까운 근거다. 추정이 예산을 넘기면
+ * 재시도를 아예 시작하지 않는다: 248초를 태우고 죽은 호출은 "일시적 blip"이 아니라
+ * degrade된 프로바이더이고, 재시도해 봐야 비용과 사용자 대기만 두 배가 된다.
+ *
+ * 값(240초)은 **재시도가 정당한 최대 구간**이다 — 호출자 마감을 그대로 따라가지 않는다.
+ * 마감이 길어지면(예: 5분 → 10분) 그 여유는 "느린 첫 시도 하나를 완주시키는" 데 쓰여야지
+ * "248초 실패를 한 번 더 반복하는" 데 쓰일 것이 아니다. 따라서 마감을 늘려도 이 값은
+ * 그대로 두는 것이 기본이며, 특정 호출이 더 넉넉한 재시도를 정당화한다면 그 호출만
+ * `wallClockBudgetMs`로 개별 지정한다.
+ */
+export const RETRY_WALL_CLOCK_BUDGET_MS = 240_000;
+
+/**
+ * 두 가지 예산 중 하나라도 초과가 예상되면 루프를 중단하고 AI_SERVER_UNSTABLE_CODE를 throw한다:
+ * `abortIfCumulativeDelayReachesMs`(누적 sleep) / `wallClockBudgetMs`(fn 실행시간 포함 총 경과).
+ */
 export async function withRetry<T>(
     fn: () => Promise<T>,
     options: {
         maxAttempts: number;
         baseDelayMs: number;
         abortIfCumulativeDelayReachesMs?: number;
+        wallClockBudgetMs?: number;
     }
 ): Promise<T> {
-    const { maxAttempts, baseDelayMs, abortIfCumulativeDelayReachesMs } =
-        options;
+    const {
+        maxAttempts,
+        baseDelayMs,
+        abortIfCumulativeDelayReachesMs,
+        wallClockBudgetMs,
+    } = options;
     const delayLimit =
         abortIfCumulativeDelayReachesMs ?? RETRY_ALLOWABLE_TIME_MS;
+    const wallClockLimit = wallClockBudgetMs ?? RETRY_WALL_CLOCK_BUDGET_MS;
+    const startedAt = Date.now();
     let cumulativeDelay = 0;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const attemptStartedAt = Date.now();
         try {
             return await fn();
         } catch (error) {
+            const attemptMs = Date.now() - attemptStartedAt;
             const kind = classifyError(error);
 
             if (kind === 'none' || attempt === maxAttempts) {
@@ -146,6 +182,15 @@ export async function withRetry<T>(
                 break;
             }
 
+            // 다음 시도가 직전 시도만큼 걸린다고 보고, 그 완주분까지 예산 안에 들어오는지 본다.
+            const elapsed = Date.now() - startedAt;
+            if (elapsed + delay + attemptMs >= wallClockLimit) {
+                console.warn(
+                    `[Retry] Wall-clock budget would be exceeded (elapsed ${elapsed}ms + delay ${delay}ms + last attempt ${attemptMs}ms >= ${wallClockLimit}ms). Aborting retries.`
+                );
+                break;
+            }
+
             const label = kind === 'rate_limit' ? '429' : '5xx';
             console.warn(
                 `[Retry] Attempt ${attempt}/${maxAttempts} failed (${label}). Retrying in ${delay}ms...`,
@@ -155,6 +200,6 @@ export async function withRetry<T>(
             await sleep(delay);
         }
     }
-    // delay 한도 초과로 break된 경우에만 도달
+    // 두 예산(누적 delay / wall-clock) 중 하나를 초과해 break된 경우에만 도달
     throw new Error(AI_SERVER_UNSTABLE_CODE);
 }
