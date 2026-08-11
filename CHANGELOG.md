@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.3](https://github.com/y0ngha/siglens-core/compare/v0.42.2...v0.42.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **retry:** abort retries that cannot finish within the wall-clock budget ([c570f2e](https://github.com/y0ngha/siglens-core/commit/c570f2ec8b05307a2cef1a716c02726a9b070681))
+
 ## [0.42.2](https://github.com/y0ngha/siglens-core/compare/v0.42.1...v0.42.2) (2026-08-03)
 
 
