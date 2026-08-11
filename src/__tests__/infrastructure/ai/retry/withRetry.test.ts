@@ -315,6 +315,98 @@ describe('withRetry', () => {
         // 첫 backoff(1000)만 sleep, 두 번째에서 한도 초과로 break → fn은 2회 호출.
         expect(fn).toHaveBeenCalledTimes(2);
     });
+
+    /**
+     * wall-clock 예산 가드.
+     *
+     * `abortIfCumulativeDelayReachesMs`는 **sleep 시간만** 세므로 느린 실패를 못 막는다.
+     * 2026-08-09 프로덕션에서 `deepseek-v4-pro`가 248.5초 만에 실패했는데 그 시점
+     * 누적 delay는 0이라 delay cap(30s)을 통과해 재시도가 시작됐고, 호출자 마감(300초)을
+     * 넘겨 대기 중이던 4건이 한꺼번에 실패했다.
+     */
+    /** 지정한 시간만큼 fake time을 태우고 5xx로 죽는 호출. */
+    function slowFailure(durationMs: number): () => Promise<string> {
+        return async () => {
+            await new Promise(resolve => setTimeout(resolve, durationMs));
+            throw Object.assign(new Error('5xx'), { status: 503 });
+        };
+    }
+
+    it('does not start a retry when the previous attempt was slow enough to blow the budget', async () => {
+        // 250초 소요 후 실패 — 위 실측 재현. 기본 예산(240s)을 이미 넘겼다.
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockImplementation(slowFailure(250_000));
+
+        const settled = await flushRetries(
+            withRetry(fn, { maxAttempts: 5, baseDelayMs: AI_RETRY_DELAY_MS })
+        );
+
+        expect(settled.ok).toBe(false);
+        if (!settled.ok)
+            expect((settled.error as Error).message).toBe(
+                AI_SERVER_UNSTABLE_CODE
+            );
+        // 재시도를 시작조차 하지 않는다.
+        expect(fn).toHaveBeenCalledTimes(1);
+        // 누적 delay cap이 아니라 wall-clock 예산에서 끊겼음을 확인한다.
+        expect(console.warn).toHaveBeenCalledWith(
+            expect.stringContaining('Wall-clock budget would be exceeded')
+        );
+    });
+
+    it('still retries fast failures — the budget only blocks slow ones', async () => {
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockRejectedValueOnce({ status: 503 })
+            .mockResolvedValue('recovered');
+
+        const settled = await flushRetries(
+            withRetry(fn, { maxAttempts: 5, baseDelayMs: AI_RETRY_DELAY_MS })
+        );
+
+        expect(settled.ok).toBe(true);
+        if (settled.ok) expect(settled.value).toBe('recovered');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('aborts once repeated mid-length attempts accumulate past the budget', async () => {
+        // 60초짜리 실패는 개별로는 예산 안이지만, 반복되면 누적으로 넘긴다.
+        // 시도 4회(60s×4) + backoff(5+10+20) 후 다음 시도분까지 더하면 375s ≥ 300s.
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockImplementation(slowFailure(60_000));
+
+        const settled = await flushRetries(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: AI_RETRY_DELAY_MS,
+                wallClockBudgetMs: 300_000,
+            })
+        );
+
+        expect(settled.ok).toBe(false);
+        // maxAttempts(5)에 도달하기 전에 예산에서 끊긴다.
+        expect(fn).toHaveBeenCalledTimes(4);
+    });
+
+    it('honors an explicit wallClockBudgetMs over the default', async () => {
+        // 기본값(240s)이면 1회로 끝날 250초 실패를, 600s 예산에서는 한 번 더 시도한다.
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockImplementation(slowFailure(250_000));
+
+        const settled = await flushRetries(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: AI_RETRY_DELAY_MS,
+                wallClockBudgetMs: 600_000,
+            })
+        );
+
+        expect(settled.ok).toBe(false);
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
 });
 
 /**
