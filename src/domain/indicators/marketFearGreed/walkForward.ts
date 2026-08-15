@@ -29,11 +29,14 @@ function buildFactorTS(
  * Returns `null` when:
  * - the series share no common session,
  * - the latest session is still inside a factor warm-up window, or
- * - fewer than 10 earlier sessions are available to rank against.
+ * - fewer earlier sessions are available to rank against than
+ *   `FEAR_GREED_CONFIDENCE_THRESHOLDS.LIMITED`.
  *
  * @param input - One daily close series per semantic key. Roughly two years of
- *   history is the practical minimum: 125 sessions warm up the momentum window
- *   and another 60 are needed for `confidence: 'normal'`.
+ *   history is the practical minimum: `MARKET_FEAR_GREED_WINDOWS.MOMENTUM_MA`
+ *   sessions warm up the momentum window, and
+ *   `FEAR_GREED_CONFIDENCE_THRESHOLDS.NORMAL` more are needed before
+ *   `confidence` reaches `'normal'`.
  * @returns {MarketFearGreedSnapshot | null} The snapshot, or `null` when the data is insufficient.
  */
 export function computeMarketFearGreedIndex(
@@ -62,8 +65,8 @@ export function computeMarketFearGreedIndex(
  *
  * For each session `t` the distribution is the valid factor bundles in `[0, t)`,
  * so appending later sessions never changes an earlier point. Points inside the
- * warm-up window — or before 10 prior samples accumulate — carry
- * `score: null`, which the UI renders as a gap.
+ * warm-up window — or before `FEAR_GREED_CONFIDENCE_THRESHOLDS.LIMITED` prior
+ * samples accumulate — carry `score: null`, which the UI renders as a gap.
  *
  * @param input - One daily close series per semantic key.
  * @returns {MarketFearGreedHistoryPoint[]} One point per common session, ascending by date.
