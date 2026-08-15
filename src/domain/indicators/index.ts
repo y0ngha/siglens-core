@@ -82,6 +82,12 @@ export {
     scoreToLabel,
     POC_WINDOW_DEFAULT,
 } from './fearGreed';
+export {
+    computeMarketFearGreedIndex,
+    computeMarketFearGreedHistory,
+    MARKET_FEAR_GREED_SERIES_KEYS,
+    MARKET_FEAR_GREED_FACTOR_KEYS,
+} from './marketFearGreed';
 export * from './constants';
 export * from './utils';
 
