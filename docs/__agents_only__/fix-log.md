@@ -148,3 +148,28 @@
 - Rule: MISTAKES.md §Documentation — TypeDoc attaches a JSDoc block only to the immediately-following declaration; a shared comment above two sibling `export const` statements silently leaves the second one undocumented in generated docs, even though the source reads as if both are covered
 - Context: PR #160 review round 4 suggestion — the shared block described both constants together ("the fraction-of-span range within which..."), but TypeDoc renders `CURVATURE_VERTEX_MID_HI` with no doc at all. Fixed by giving each constant its own `@internal` JSDoc block, mirroring the per-constant style used by every other constant in the file.
 
+## [PR (feat/market-fear-greed) R1 | Market-wide Fear & Greed domain module | 2026-08-15]
+- Violation 1: `src/domain/indicators/marketFearGreed/composition.ts` — `export interface MarketComposition` exported without `/** @internal */` tag, not re-exported in `src/index.ts`
+  Rule: MISTAKES.md §9.5 — intermediate interfaces must carry `@internal` tag if not re-exported
+  Fixed in R2: deleted intermediate interface, returned `Omit<MarketFearGreedSnapshot, 'asOf'>` instead
+
+- Violation 2: `src/domain/indicators/marketFearGreed/align.ts` — three `as` casts with no comment explaining safety: `{} as Record<...>` ×2, `map.get(date) as number` ×1
+  Rule: MISTAKES.md §TypeScript 7 — `as` casts must include invariant comments at cast site
+  Fixed in R2: added invariant comments at each cast site
+
+- Violation 3: `src/domain/indicators/marketFearGreed/align.ts` — `input[key] ?? []` guard branch had no dedicated test
+  Rule: MISTAKES.md §Tests 5.5 — guard branches need dedicated test coverage
+  Fixed in R2: added test deleting one series key, asserts empty join; now 100% coverage
+
+- Violation 4 (RECOMMENDED): `types.ts` — inline `'normal' | 'limited'` union duplicated sibling's `Exclude<FearGreedConfidence, 'insufficient'>`
+  Rule: MISTAKES.md §TypeScript 6 — avoid duplicating named types; reuse instead
+  Fixed in R2: replaced with reuse of named type
+
+- Violation 5 (RECOMMENDED): `factors.ts` — `sma(closes.slice(0, t + 1), window)` allocated O(t) prefix copy per session → O(n²) history computation
+  Rule: Performance — avoid redundant allocations in hot loops
+  Fixed in R2: slice only the window, not prefix
+
+- Violation 6 (RECOMMENDED): `walkForward.ts` — `.map()` callback mutating outer `sample` array via `push`
+  Rule: CONVENTIONS.md array-mutation rule + FF 1-G viewpoint shift
+  Fixed in R2: rewrote as explicit `for` loop over pre-allocated array
+
