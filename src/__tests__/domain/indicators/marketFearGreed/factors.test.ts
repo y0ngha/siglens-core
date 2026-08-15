@@ -140,18 +140,38 @@ describe('computeMarketFactorsAtT', () => {
         expect(factors?.breadth).toBeCloseTo(0.03 - 0.01, 12);
     });
 
-    it('returns null when a moving-average base is non-positive', () => {
-        const zeroed = series({ sp500: constant(0) });
-
-        expect(computeMarketFactorsAtT(zeroed, LAST)).toBeNull();
+    it('returns null before the return window is populated', () => {
+        // `t` here is inside the 20-session return window, so `returnOver`
+        // reaches its `from < 0` guard rather than the moving-average guards.
+        expect(
+            computeMarketFactorsAtT(
+                series(),
+                MARKET_FEAR_GREED_WINDOWS.RETURN - 1
+            )
+        ).toBeNull();
     });
 
-    it('returns null when a return base is non-positive', () => {
+    it.each(['sp500', 'vix'] as const)(
+        'returns null when the %s moving-average base is non-positive',
+        key => {
+            expect(
+                computeMarketFactorsAtT(series({ [key]: constant(0) }), LAST)
+            ).toBeNull();
+        }
+    );
+
+    it.each([
+        'sp500',
+        'longTreasury',
+        'highYield',
+        'investmentGrade',
+        'equalWeight',
+    ] as const)('returns null when the %s return base is non-positive', key => {
         const closes = constant(100);
         closes[LAST - MARKET_FEAR_GREED_WINDOWS.RETURN] = 0;
 
         expect(
-            computeMarketFactorsAtT(series({ highYield: closes }), LAST)
+            computeMarketFactorsAtT(series({ [key]: closes }), LAST)
         ).toBeNull();
     });
 });
