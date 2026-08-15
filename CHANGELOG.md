@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.43.0](https://github.com/y0ngha/siglens-core/compare/v0.42.3...v0.43.0) (2026-08-15)
+
+
+### Features
+
+* 시장 공포탐욕지수(Market Fear & Greed Index) 도메인 모듈 구현 ([d19a812](https://github.com/y0ngha/siglens-core/commit/d19a8121f6815902ba2e4dd486155311f5279bb4))
+
 ## [0.42.3](https://github.com/y0ngha/siglens-core/compare/v0.42.2...v0.42.3) (2026-08-11)
 
 
