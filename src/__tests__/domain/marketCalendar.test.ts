@@ -7,6 +7,7 @@ import {
     isUsMarketHoliday,
     minutesUntilUsMarketClose,
     usMarketCloseMinute,
+    UNSCHEDULED_CLOSURES,
 } from '@/domain/marketCalendar';
 import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
 
@@ -18,6 +19,25 @@ import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
  * the table is what makes secondary sources disagree about July 3, 2026.
  */
 const PUBLISHED = {
+    2024: {
+        holidays: [
+            '01-01', // New Year's Day (Mon)
+            '01-15', // MLK Jr. Day
+            '02-19', // Washington's Birthday
+            '03-29', // Good Friday (Easter = Mar 31)
+            '05-27', // Memorial Day
+            '06-19', // Juneteenth (Wed)
+            '07-04', // Independence Day (Thu)
+            '09-02', // Labor Day
+            '11-28', // Thanksgiving
+            '12-25', // Christmas (Wed)
+        ],
+        earlyCloses: [
+            '07-03', // Wed — July 4 is a weekday
+            '11-29', // day after Thanksgiving
+            '12-24', // Tue — Christmas is a weekday
+        ],
+    },
     2025: {
         holidays: [
             '01-01', // New Year's Day (Wed)
@@ -96,13 +116,14 @@ function everyDayOf(year: number): string[] {
 }
 
 describe('marketCalendar — NYSE 발표 캘린더 대조', () => {
-    for (const year of [2025, 2026, 2027] as const) {
+    for (const year of [2024, 2025, 2026, 2027] as const) {
         const expected = PUBLISHED[year];
 
         it(`${year}: 전휴장 ${expected.holidays.length}일이 발표와 정확히 일치한다`, () => {
-            const computed = everyDayOf(year).filter(md =>
-                isUsMarketHoliday(etNoon(year, md))
-            );
+            const computed = everyDayOf(year)
+                .filter(md => isUsMarketHoliday(etNoon(year, md)))
+                // 예정 외 휴장은 발표 캘린더에 없다 — 별도 describe에서 검증한다.
+                .filter(md => !UNSCHEDULED_CLOSURES.has(`${year}-${md}`));
             expect(computed).toEqual([...expected.holidays]);
         });
 
@@ -247,5 +268,111 @@ describe('세션 판정 배선 — 캘린더가 실제로 적용된다', () => {
         expect(getEtSessionStatus(new Date('2026-11-28T17:00:00Z'))).toBe(
             'weekend'
         );
+    });
+});
+
+describe('예정 외 휴장 — 규칙이 아니라 목록', () => {
+    it('2025-01-09는 발표 캘린더에 없지만 실제로 폐장이었다 (카터 국가 애도의 날)', () => {
+        expect(isUsMarketHoliday(etNoon(2025, '01-09'))).toBe(true);
+        expect(isEtRegularSessionOpen(new Date('2025-01-09T17:00:00Z'))).toBe(
+            false
+        );
+    });
+
+    it('허리케인 샌디(2012)와 부시 애도일(2018)도 폐장으로 잡힌다', () => {
+        expect(isUsMarketHoliday(etNoon(2012, '10-29'))).toBe(true);
+        expect(isUsMarketHoliday(etNoon(2012, '10-30'))).toBe(true);
+        expect(isUsMarketHoliday(etNoon(2018, '12-05'))).toBe(true);
+    });
+
+    it('전후 거래일은 정상이다 — 목록이 과잉 적용되지 않는다', () => {
+        expect(isUsMarketHoliday(etNoon(2025, '01-08'))).toBe(false);
+        expect(isUsMarketHoliday(etNoon(2025, '01-10'))).toBe(false);
+    });
+});
+
+describe('구조적 백테스트 — 1990~2050', () => {
+    const YEARS = Array.from({ length: 61 }, (_, i) => 1990 + i);
+
+    it('휴장일이 주말에 오지 않는다', () => {
+        const offenders: string[] = [];
+        for (const year of YEARS) {
+            for (const md of everyDayOf(year)) {
+                const d = etNoon(year, md);
+                if (!isUsMarketHoliday(d)) continue;
+                if (UNSCHEDULED_CLOSURES.has(`${year}-${md}`)) continue;
+                const weekday = new Date(`${year}-${md}T12:00:00Z`).getUTCDay();
+                if (weekday === 0 || weekday === 6) {
+                    offenders.push(`${year}-${md}`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
+    it('반장도 주말에 오지 않고 휴장일과 겹치지 않는다', () => {
+        const offenders: string[] = [];
+        for (const year of YEARS) {
+            for (const md of everyDayOf(year)) {
+                const d = etNoon(year, md);
+                if (!isUsMarketEarlyClose(d)) continue;
+                const weekday = new Date(`${year}-${md}T12:00:00Z`).getUTCDay();
+                if (weekday === 0 || weekday === 6 || isUsMarketHoliday(d)) {
+                    offenders.push(`${year}-${md}`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
+    it('연간 휴장일 수가 규칙이 허용하는 범위 안이다', () => {
+        // Juneteenth 도입 전 9일, 도입 후 10일. 신정이 토요일인 해는 1일 줄어든다.
+        for (const year of YEARS) {
+            const count = everyDayOf(year).filter(
+                md =>
+                    isUsMarketHoliday(etNoon(year, md)) &&
+                    !UNSCHEDULED_CLOSURES.has(`${year}-${md}`)
+            ).length;
+            const base = year >= 2022 ? 10 : 9;
+            const newYearOnSaturday =
+                new Date(Date.UTC(year, 0, 1)).getUTCDay() === 6;
+            expect(count).toBe(base - (newYearOnSaturday ? 1 : 0));
+        }
+    });
+
+    it('반장은 매년 1~3일이며, 추수감사절 다음 날은 반드시 포함된다', () => {
+        for (const year of YEARS) {
+            const earlyCloses = everyDayOf(year).filter(md =>
+                isUsMarketEarlyClose(etNoon(year, md))
+            );
+            expect(earlyCloses.length).toBeGreaterThanOrEqual(1);
+            expect(earlyCloses.length).toBeLessThanOrEqual(3);
+            // 추수감사절 다음 날은 항상 금요일이라 어떤 해에도 빠지지 않는다.
+            const hasNovemberEarlyClose = earlyCloses.some(md =>
+                md.startsWith('11-')
+            );
+            expect(hasNovemberEarlyClose).toBe(true);
+        }
+    });
+
+    it('부활절은 3/22~4/25 범위를 벗어나지 않는다 (성금요일 = 그 −2일)', () => {
+        for (const year of YEARS) {
+            const goodFriday = everyDayOf(year).find(md => {
+                const [m, d] = md.split('-').map(Number);
+                // 3~4월 휴장일 중 금요일인 것 = 성금요일
+                if (m !== 3 && m !== 4) return false;
+                if (!isUsMarketHoliday(etNoon(year, md))) return false;
+                return (
+                    new Date(
+                        Date.UTC(year, (m as number) - 1, d)
+                    ).getUTCDay() === 5
+                );
+            });
+            expect(goodFriday).toBeDefined();
+            const [m, d] = (goodFriday as string).split('-').map(Number);
+            const dayOfYear = (m as number) * 100 + (d as number);
+            expect(dayOfYear).toBeGreaterThanOrEqual(320); // 3/20
+            expect(dayOfYear).toBeLessThanOrEqual(424); // 4/24
+        }
     });
 });

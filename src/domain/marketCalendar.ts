@@ -19,10 +19,13 @@ import {
  * 2027 — see `__tests__/domain/marketCalendar.test.ts`, which encodes that
  * calendar verbatim as the expected output.
  *
- * **Not covered: unscheduled closures** (9/11, national days of mourning,
- * Hurricane Sandy). Those are unknowable ahead of time by any means, occur a
- * handful of times per century, and are caught downstream — the broker rejects
- * orders on a closed market.
+ * **Unscheduled closures are a list, not a rule** — see {@link UNSCHEDULED_CLOSURES}.
+ * They are rarer than the scheduled calendar but not rare enough to ignore: the
+ * most recent was 2025-01-09 (national day of mourning for Jimmy Carter), and
+ * before that 2018-12-05, 2012-10-29/30, 2007-01-02, 2004-06-11, 2001-09-11..14.
+ * Roughly once every three to four years. No algorithm can derive them and no
+ * calendar API publishes them ahead of the announcement, so the only honest
+ * handling is a short literal list that gets one more entry when one is declared.
  */
 
 /** ET minutes-since-midnight of a regular close (16:00). */
@@ -38,6 +41,26 @@ export const EARLY_CLOSE_MINUTE = 13 * 60;
  * bars would skip a day the market actually traded.
  */
 const JUNETEENTH_FIRST_YEAR = 2022;
+
+/**
+ * Closures the exchange announced outside its published calendar, as
+ * `YYYY-MM-DD` in ET.
+ *
+ * Deliberately a literal list. These are declared days — a presidential funeral,
+ * a hurricane — with no derivable rule behind them, and they are announced days
+ * or hours ahead, which is later than any calendar API would help. A release
+ * every few years is the cost; the alternative is trading into a closed market
+ * or, worse, believing a stale feed that says the market is open.
+ *
+ * Entries in the past are kept so backtests over historical bars skip the same
+ * days the market did.
+ */
+export const UNSCHEDULED_CLOSURES: ReadonlySet<string> = new Set([
+    '2012-10-29', // Hurricane Sandy
+    '2012-10-30', // Hurricane Sandy
+    '2018-12-05', // National day of mourning — George H. W. Bush
+    '2025-01-09', // National day of mourning — Jimmy Carter
+]);
 
 /** @internal Calendar date in the exchange's local (ET) terms. */
 export interface EtCalendarDate {
@@ -260,6 +283,7 @@ function calendarFor(year: number): YearCalendar {
  */
 export function isUsMarketHoliday(now: Date): boolean {
     const { year, month, day } = etCalendarDate(now);
+    if (UNSCHEDULED_CLOSURES.has(`${year}-${key(month, day)}`)) return true;
     return calendarFor(year).holidays.has(key(month, day));
 }
 
@@ -271,6 +295,8 @@ export function isUsMarketHoliday(now: Date): boolean {
  */
 export function isUsMarketEarlyClose(now: Date): boolean {
     const { year, month, day } = etCalendarDate(now);
+    // 예정 외 휴장이 반장 예정일과 겹치면 휴장이 이긴다 (전휴장 > 반장).
+    if (UNSCHEDULED_CLOSURES.has(`${year}-${key(month, day)}`)) return false;
     return calendarFor(year).earlyCloses.has(key(month, day));
 }
 
