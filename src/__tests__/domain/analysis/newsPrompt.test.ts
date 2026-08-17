@@ -282,3 +282,63 @@ describe('buildNewsAnalysisPrompt', () => {
         expect(prompt).toContain('news body');
     });
 });
+
+describe('bodyTruncated propagation', () => {
+    const TRUNCATED_ITEM: EnrichedNewsItem = {
+        ...NEWS_ITEM_1,
+        bodyTruncated: true,
+    };
+
+    it('marks the excerpt inline next to the body it qualifies', () => {
+        // 항목이 20개까지 늘어나므로 별도 범례 줄로 두면 모델이 놓치기 쉽다.
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [TRUNCATED_ITEM],
+            [UPCOMING_EARNINGS],
+            [NEWS_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain('Body (KO) [EXCERPT — cut off]:');
+    });
+
+    it('tells the model to weigh an excerpt as weaker evidence', () => {
+        // 1단계에서 잘린 본문이 카드 요약을 거쳐 2단계로 그대로 전파된다.
+        // 2단계는 원문이 아니라 1단계의 해석을 받으므로 스스로 검증할 수 없다.
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [TRUNCATED_ITEM],
+            [UPCOMING_EARNINGS],
+            [NEWS_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain(
+            'Treat it as weaker evidence than a complete body'
+        );
+        expect(prompt).toContain(
+            "do not treat the fragment's opening framing as the article's conclusion"
+        );
+    });
+
+    it('does not mark items whose body is complete', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [NEWS_ITEM_1],
+            [UPCOMING_EARNINGS],
+            [NEWS_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain('Body (KO):');
+        expect(prompt).not.toContain('[EXCERPT — cut off]');
+    });
+
+    it('marks only the truncated item when a batch is mixed', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            [TRUNCATED_ITEM, NEWS_ITEM_2],
+            [UPCOMING_EARNINGS],
+            [NEWS_SKILL_HIGH]
+        );
+
+        expect(prompt.match(/\[EXCERPT — cut off\]/g)).toHaveLength(1);
+    });
+});

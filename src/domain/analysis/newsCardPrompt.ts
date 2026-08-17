@@ -32,7 +32,7 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
 export function buildNewsCardAnalysisPrompt(item: NewsItem): AssembledPrompt {
     const bodySection =
         item.bodyEn != null
-            ? `Body:\n${item.bodyEn}`
+            ? `Body${item.bodyTruncated ? ' (EXCERPT — cut off mid-article)' : ''}:\n${item.bodyEn}`
             : '(No article body available — analyse title only.)';
 
     // Absent means English — every feed that predates `sourceLanguage` was English.
@@ -45,6 +45,16 @@ export function buildNewsCardAnalysisPrompt(item: NewsItem): AssembledPrompt {
     const titleRule = isKorean
         ? '- titleKo: the article title is ALREADY Korean — copy it verbatim. Do not reword, shorten, or re-punctuate it.'
         : '- titleKo: natural Korean translation of the English title.';
+
+    /**
+     * Feeds hand back a lead fragment far more often than a full article, and the
+     * cut lands mid-sentence. The rules above ask for reported figures and guidance —
+     * demanding facts the excerpt no longer contains is what invites the model to
+     * supply them itself. This rule says: report the gap instead of filling it.
+     */
+    const truncationRule = item.bodyTruncated
+        ? "- The body above is an EXCERPT cut off mid-article — the rest was never provided. Summarise only what the excerpt actually states. Do not infer or invent figures, guidance, outcomes, or conclusions from the part you cannot see, and do not present the excerpt's opening framing as the article's conclusion. If the excerpt stops before the point is resolved, say so plainly in summaryKo rather than guessing."
+        : '';
 
     const bodyRule = isKorean
         ? '- bodyKo: the article body is ALREADY Korean — copy it verbatim; null if no body was provided.'
@@ -98,6 +108,7 @@ ${bodyRule}
 - Preserve important numbers and comparisons from the article body when they are material to the news implication.
 - If the title and body conflict, base summaryKo on the body and mention the tension only if it is explicit in the article.
 - If no body was provided, summaryKo may be shorter, but it must clearly state that the judgment is based only on the headline and avoid guessing missing details.
+${truncationRule}
 - sentiment must be exactly one of: "bullish", "neutral", "bearish".
 - category must be exactly one of: "earnings", "m_and_a", "guidance", "regulation", "macro", "product", "other".
 - priceImpact must be exactly one of: "high", "medium", "low", "negligible".

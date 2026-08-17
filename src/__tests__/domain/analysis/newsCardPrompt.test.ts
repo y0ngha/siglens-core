@@ -176,3 +176,71 @@ describe('sourceLanguage', () => {
         expect(explicit).toBe(implicit);
     });
 });
+
+describe('bodyTruncated', () => {
+    const TRUNCATED_ITEM: NewsItem = {
+        ...FULL_NEWS_ITEM,
+        bodyEn: 'Nvidia Corporation announced its next generation of AI-focused GPU chips on Monday, targeting enterprise data center',
+        bodyTruncated: true,
+    };
+
+    it('labels the body as an excerpt so the model knows text is missing', () => {
+        // 피드는 리드 문단만 주는 일이 잦고, 절단은 문장 중간에서 일어난다
+        // (실측: FMP news/stock 10건 중 8건, 네이버는 사실상 전부).
+        const prompt = buildNewsCardAnalysisPrompt(TRUNCATED_ITEM);
+
+        expect(prompt).toContain('EXCERPT — cut off mid-article');
+    });
+
+    it('forbids inventing what the excerpt does not state', () => {
+        // 프롬프트가 "보고된 수치·가이던스를 보존하라"고 요구하는데 잘려서 없는 정보라면,
+        // 모델이 스스로 채워 넣는 쪽으로 유인된다.
+        const prompt = buildNewsCardAnalysisPrompt(TRUNCATED_ITEM);
+
+        expect(prompt).toContain(
+            'Do not infer or invent figures, guidance, outcomes, or conclusions'
+        );
+        expect(prompt).toContain(
+            'say so plainly in summaryKo rather than guessing'
+        );
+    });
+
+    it('adds nothing when the body is complete', () => {
+        const prompt = buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM);
+
+        expect(prompt).not.toContain('EXCERPT');
+        expect(prompt).not.toContain('cut off mid-article');
+    });
+
+    it('leaves no dangling blank line when the rule is absent', () => {
+        // 빈 문자열 보간이 규칙 목록 한가운데에 빈 줄을 남기면 프롬프트 구조가 흐트러진다.
+        const prompt = buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM);
+
+        expect(prompt).not.toMatch(/\n[ \t]*\n[ \t]*\n/);
+    });
+
+    it('keeps the untruncated prompt byte-identical to the absent case', () => {
+        // `bodyTruncated`가 없던 기존 피드의 프롬프트가 조금도 바뀌면 안 된다.
+        const explicit = buildNewsCardAnalysisPrompt({
+            ...FULL_NEWS_ITEM,
+            bodyTruncated: false,
+        });
+        const implicit = buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM);
+
+        expect(explicit).toBe(implicit);
+    });
+
+    it('still applies when the article is Korean', () => {
+        // 네이버는 한국어이면서 동시에 잘려 있다 — 두 분기가 함께 걸려야 한다.
+        const prompt = buildNewsCardAnalysisPrompt({
+            ...FULL_NEWS_ITEM,
+            titleEn: '삼성전자, 3분기 영업이익 시장 기대 상회',
+            bodyEn: '삼성전자가 반도체 부문 회복에 힘입어',
+            sourceLanguage: 'ko',
+            bodyTruncated: true,
+        });
+
+        expect(prompt).toContain('EXCERPT — cut off mid-article');
+        expect(prompt).toContain('ALREADY Korean — copy it verbatim');
+    });
+});

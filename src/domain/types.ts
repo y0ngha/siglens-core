@@ -2736,6 +2736,24 @@ export interface NewsItem {
     /** Article body in its original language; `null` when the feed provides none. */
     bodyEn: string | null;
     /**
+     * `true` when {@link NewsItem.bodyEn} is a cut-off excerpt rather than the full article.
+     *
+     * News feeds routinely deliver a lead fragment instead of the whole piece — measured
+     * 2026-08-17: FMP `news/stock` returned 207–351 characters with 8 of 10 ending
+     * mid-sentence (`"…during the quarter. Apple makes"`), and Naver's `description`
+     * is a fixed ~120-character slice that always ends in an ellipsis.
+     *
+     * Without this flag the model reads a fragment as a complete article. That matters
+     * because the prompt asks it to preserve reported figures, growth rates, and
+     * guidance — information the cut removed. Being told to surface facts that are not
+     * there is exactly the setup that invites invention. Flagging the truncation lets
+     * the prompt ask for restraint instead.
+     *
+     * Omitted means "not known to be truncated", which preserves the behaviour of every
+     * feed that predates this field.
+     */
+    bodyTruncated?: boolean;
+    /**
      * Original language of the article. Defaults to `'en'` when omitted, which
      * preserves the behaviour of every feed that existed before this field.
      *
