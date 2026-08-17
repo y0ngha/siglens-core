@@ -224,3 +224,53 @@ describe('secondsUntilNextEtRegularOpen', () => {
         ).toBe(1170 * SECONDS_PER_MINUTE);
     });
 });
+
+describe('secondsUntilNextEtRegularOpen — 휴장일 건너뛰기', () => {
+    // 종전에는 주말만 건너뛰어서, 휴장일 전날 밤이면 "열리지도 않는 날의 09:30"까지로
+    // 잡혔다. 이 값이 캐시 TTL·백오프의 상한이라 짧게 잡히면 닫힌 시장에 재조회가 반복된다.
+
+    it('추수감사절 전날 마감 후 → 목요일(휴장)을 건너뛰고 금요일 개장까지', () => {
+        // 2026-11-25(수) 17:00 ET. 26일은 추수감사절 휴장 → 27일(금) 09:30이 다음 개장.
+        // 990분(수 17:00→목 09:30) + 1440분(하루) = 2430분.
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2026-11-25T22:00:00Z'))
+        ).toBe(2430 * SECONDS_PER_MINUTE);
+    });
+
+    it('휴장일 당일 아침에도 그날이 아니라 다음 거래일을 가리킨다', () => {
+        // 2026-11-26(목) 08:00 ET — 개장 전이지만 휴장일이다. 다음은 27일(금) 09:30.
+        // 90분 + 1440분 = 1530분.
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2026-11-26T13:00:00Z'))
+        ).toBe(1530 * SECONDS_PER_MINUTE);
+    });
+
+    it('휴장일이 금요일이면 주말까지 함께 건너뛴다', () => {
+        // 2026-07-02(목) 17:00 ET. 3일(금)은 독립기념일 관측 휴장, 4~5일 주말
+        // → 다음 개장은 6일(월) 09:30. 990분 + 3×1440분 = 5310분.
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2026-07-02T21:00:00Z'))
+        ).toBe(5310 * SECONDS_PER_MINUTE);
+    });
+
+    it('연속 휴장(성금요일 + 주말)도 건너뛴다', () => {
+        // 2026-04-02(목) 17:00 ET. 3일 성금요일 휴장, 4~5일 주말 → 6일(월) 09:30.
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2026-04-02T21:00:00Z'))
+        ).toBe(5310 * SECONDS_PER_MINUTE);
+    });
+
+    it('예정 외 휴장도 건너뛴다', () => {
+        // 2025-01-08(수) 17:00 ET. 9일은 카터 국가 애도의 날로 폐장 → 10일(금) 09:30.
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2025-01-08T22:00:00Z'))
+        ).toBe(2430 * SECONDS_PER_MINUTE);
+    });
+
+    it('반장은 거래일이므로 건너뛰지 않는다', () => {
+        // 2026-11-26(목, 휴장) 다음은 27일(금) 반장 — 열리기는 하므로 그날 09:30이 답이다.
+        expect(
+            secondsUntilNextEtRegularOpen(new Date('2026-11-26T13:00:00Z'))
+        ).toBe(1530 * SECONDS_PER_MINUTE);
+    });
+});
