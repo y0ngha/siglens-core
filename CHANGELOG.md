@@ -1,5 +1,7 @@
 # Changelog
 
+# [0.47.0](https://github.com/y0ngha/siglens-core/compare/v0.46.0...v0.47.0) (2026-08-17)
+
 ## [0.44.1](https://github.com/y0ngha/siglens-core/compare/v0.44.0...v0.44.1) (2026-08-17)
 
 
