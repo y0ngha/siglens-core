@@ -825,20 +825,29 @@ export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
  * @param category  - Feed-category bucket.
  * @param modelId   - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a
+ *   distinct `:reason=on` suffix; `false`/`undefined` produce the exact same
+ *   key as omitting the parameter, so entries written before the digest
+ *   accepted this option keep hitting. Mirrors {@link buildNewsCacheKey} —
+ *   reasoning materially changes the digest's output depth, so an on/off pair
+ *   must never share an entry.
  * @returns The cache key.
  *
  * @example
  * ```ts
- * buildMarketNewsDigestCacheKey('crypto', 'gemini-2.5-flash', 'abc123');
- * // → 'v1:analysis:market-news:crypto:gemini-2.5-flash:p2:abc123'
+ * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4-flash', 'abc123');
+ * // → 'v1:analysis:market-news:crypto:deepseek-v4-flash:p2:abc123'
+ * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4-flash', 'abc123', true);
+ * // → 'v1:analysis:market-news:crypto:deepseek-v4-flash:p2:abc123:reason=on'
  * ```
  */
 export function buildMarketNewsDigestCacheKey(
     category: NewsFeedCategory,
     modelId: string,
-    inputHash: string
+    inputHash: string,
+    reasoning?: boolean
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}`;
 }
 
 /**

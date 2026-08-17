@@ -33,6 +33,26 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     /** Resolved subscription tier. Defaults to the free tier when omitted. */
     tier?: Tier;
     /**
+     * Per-request deep-thinking toggle, forwarded to `callAnalysisAi`.
+     *
+     * `true` forces reasoning on even when `MODEL_SPECS[modelId].thinking` is
+     * `false` — that override is what lets the digest run reasoning on a cheap
+     * non-reasoning model (`deepseek-v4-flash`) instead of paying for a
+     * reasoning-tier model. `false` forces it off. Omitted preserves the
+     * model spec's own default.
+     *
+     * The digest synthesises a whole category feed (dozens of already-analyzed
+     * cards) into one narrative, which is where reasoning actually pays for
+     * itself — unlike the per-card path, which is a deterministic translation
+     * and stays off.
+     *
+     * Participates in the cache key (`:reason=on` suffix) and in the skill
+     * sampling seed, so an on/off pair never shares a cached digest. `false`
+     * and `undefined` key identically to omitting it, so entries written
+     * before this option existed still hit.
+     */
+    reasoning?: boolean;
+    /**
      * When `true`, skip enqueueing a new job on cache miss and return
      * `{ status: 'miss_no_trigger' }`. Cache hits are unaffected.
      * Intended for bot/crawler gating. Takes precedence over `force`.

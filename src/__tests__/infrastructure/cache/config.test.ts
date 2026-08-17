@@ -334,6 +334,34 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
             `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-2.5-flash:${NEWS_PROMPT_TEMPLATE_VERSION}:abc123`
         );
     });
+
+    it('reasoning=true는 :reason=on suffix를 추가하고, false/생략은 동일 키를 만든다', () => {
+        // 추론 on/off는 같은 기사 집합에서도 다이제스트 서술의 깊이를 바꾼다.
+        // 키가 갈리지 않으면 먼저 캐시를 채운 쪽이 TTL 동안 반대 모드
+        // 호출자의 결과까지 결정한다. `false`/`undefined`가 같은 키인 것은
+        // 이 옵션이 생기기 전에 쓰인 엔트리가 계속 히트하게 하기 위함이다.
+        const omitted = buildMarketNewsDigestCacheKey(
+            'crypto',
+            'deepseek-v4-flash',
+            'abc123'
+        );
+        const off = buildMarketNewsDigestCacheKey(
+            'crypto',
+            'deepseek-v4-flash',
+            'abc123',
+            false
+        );
+        const on = buildMarketNewsDigestCacheKey(
+            'crypto',
+            'deepseek-v4-flash',
+            'abc123',
+            true
+        );
+
+        expect(off).toBe(omitted);
+        expect(on).toBe(`${omitted}:reason=on`);
+        expect(on).not.toBe(omitted);
+    });
 });
 
 describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-toggle spec Part A)', () => {

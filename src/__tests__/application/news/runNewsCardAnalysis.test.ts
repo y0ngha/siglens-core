@@ -3,8 +3,12 @@ import type { Mock } from 'vitest';
 
 vi.mock('@/application/analysis/callAnalysisAi');
 
-import { runNewsCardAnalysis } from '@/application/news/runNewsCardAnalysis';
+import {
+    NEWS_CARD_MODEL_ID,
+    runNewsCardAnalysis,
+} from '@/application/news/runNewsCardAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
+import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import type { NewsItem } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
@@ -61,23 +65,28 @@ describe('runNewsCardAnalysis', () => {
             );
         });
 
-        it('thinkingBudget을 callAnalysisAi에 전달한다', async () => {
-            await runNewsCardAnalysis({
-                item: testNewsItem,
-                thinkingBudget: 0,
-            });
-
-            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
-                expect.objectContaining({ thinkingBudget: 0 })
-            );
-        });
-
-        it('thinkingBudget을 생략하면 callAnalysisAi에 undefined로 전달된다', async () => {
+        it('추론을 항상 끈 채로 callAnalysisAi를 호출한다', async () => {
+            // 호출자가 정할 수 있는 값이 아니라 이 use-case의 고정 정책이다:
+            // 번역 + 라벨링은 결정적 변환이라 추론 이득이 없다. `reasoning`은
+            // 모델 스펙을 오버라이드하므로, NEWS_CARD_MODEL_ID가 thinking
+            // 모델로 바뀌어도 이 단언이 그 회귀를 잡는다(구 `thinkingBudget: 0`은
+            // DeepSeek 분기에서 무시되므로 같은 보호를 못 한다).
             await runNewsCardAnalysis({ item: testNewsItem });
 
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
-                expect.objectContaining({ thinkingBudget: undefined })
+                expect.objectContaining({ reasoning: false })
             );
+        });
+
+        it('고정 모델은 DeepSeek non-thinking 라인이다', async () => {
+            // NEWS_CARD_MODEL_ID를 리터럴로 재선언하지 않고 실제 호출 인자를
+            // 본다 — 상수만 바꾸고 정책 주석을 안 고치는 드리프트를 잡는다.
+            await runNewsCardAnalysis({ item: testNewsItem });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ model: NEWS_CARD_MODEL_ID })
+            );
+            expect(MODEL_SPECS[NEWS_CARD_MODEL_ID].provider).toBe('deepseek');
         });
     });
 

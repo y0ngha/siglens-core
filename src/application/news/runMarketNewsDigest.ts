@@ -26,7 +26,10 @@ import {
     hashAnalysisInput,
     normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import {
+    createSkillSamplingPlan,
+    reasoningSeedPart,
+} from '@/infrastructure/skills/sampling';
 
 const LOG_TAG = '[RunMarketNewsDigest]' as const;
 
@@ -90,6 +93,7 @@ export async function runMarketNewsDigest(
         'market-news-digest',
         category,
         modelId,
+        reasoningSeedPart(options.reasoning),
         tier,
         'news-ids',
         ...newsIds.toSorted(),
@@ -99,10 +103,16 @@ export async function runMarketNewsDigest(
         tier,
         skillSampling.skills
     );
+    // `reasoning`은 캐시 키에 반드시 들어가야 한다 — 추론 on/off는 같은 기사
+    // 집합에서도 결과 깊이를 바꾸므로, 빠뜨리면 먼저 캐시를 채운 쪽이 TTL 동안
+    // 반대 모드 호출자의 결과까지 결정해버린다(runNewsAnalysis의 buildNewsCacheKey와
+    // 동일한 이유). `false`/`undefined`는 접미사를 붙이지 않으므로 이 옵션이
+    // 생기기 전에 쓰인 엔트리는 그대로 히트한다.
     const cacheKey = buildMarketNewsDigestCacheKey(
         category,
         modelId,
-        inputHash
+        inputHash,
+        options.reasoning
     );
     const cache = createCacheProvider();
 
@@ -152,6 +162,12 @@ export async function runMarketNewsDigest(
             system,
             responseSchema: NEWS_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),
+            // 호출자가 정하지 않으면 모델 스펙 기본값을 그대로 둔다
+            // (`callAnalysisAi`는 `reasoning === undefined`를 "개입 안 함"으로
+            // 취급). siglens는 `true`를 넘겨, 스펙상 non-thinking인
+            // deepseek-v4-flash에서도 추론을 켠다 — 카테고리 피드 전체를 하나의
+            // 서술로 합성하는 작업이라 추론 이득이 실제로 나오는 유일한 뉴스 경로다.
+            reasoning: options.reasoning,
             correlationId: `${category}:market-news-digest`,
         })
     );

@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
 import type {
     RunEconomicEventAnalysisOptions,
     RunEconomicEventAnalysisResult,
@@ -23,11 +23,11 @@ import {
  * @internal Fixed model identifier for economic-event analysis.
  *
  * A short structured classification task (sentiment + two Korean sentences):
- * flash-lite is the right cost/latency trade-off, mirroring news-card analysis.
- * Mirrors the constant in `submitEconomicEventAnalysis.ts` — kept local so the
- * run path is self-contained.
+ * a cheap non-reasoning model is the right cost/latency trade-off, mirroring
+ * news-card analysis. Mirrors the constant in `submitEconomicEventAnalysis.ts`
+ * — kept local so the run path is self-contained.
  */
-const ECONOMIC_EVENT_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
+const ECONOMIC_EVENT_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
 
 /**
  * Build a deterministic hash of the economic-event input for cache-key use.
@@ -61,7 +61,7 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `gemini-2.5-flash-lite` (short structured classification task).
+ * `deepseek-v4-flash` with reasoning off (short structured classification task).
  *
  * Economic-event analysis has no usage gate — no tier, no BYOK, no quota check
  * or record. The analysis is public-economy data, same as congress trade analysis.
@@ -113,6 +113,10 @@ export async function runEconomicEventAnalysis(
             model: ECONOMIC_EVENT_MODEL,
             signal: options?.signal,
             seed: analysisSeed(prompt),
+            // 짧은 구조화 분류(sentiment + 두 문장)라 추론 이득이 없다.
+            // 모델 스펙을 오버라이드하므로 ECONOMIC_EVENT_MODEL이 thinking
+            // 모델로 바뀌어도 이 경로는 꺼진 상태를 유지한다.
+            reasoning: false,
             correlationId: `economic-event:${input.event}`,
         })
     );
