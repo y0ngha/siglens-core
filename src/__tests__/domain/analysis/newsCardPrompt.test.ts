@@ -115,3 +115,64 @@ describe('buildNewsCardAnalysisPrompt', () => {
         );
     });
 });
+
+describe('sourceLanguage', () => {
+    const KOREAN_NEWS_ITEM: NewsItem = {
+        id: 'news-kr-001',
+        symbol: '005930.KS',
+        source: '네이버뉴스',
+        url: 'https://news.example.com/article/1',
+        publishedAt: '2026-08-17T01:30:00Z',
+        titleEn: '삼성전자, 3분기 영업이익 시장 기대 상회',
+        bodyEn: '삼성전자가 반도체 부문 회복에 힘입어 시장 예상을 웃도는 실적을 냈다.',
+        sourceLanguage: 'ko',
+    };
+
+    it('drops the translation instruction for Korean-language articles', () => {
+        // 한국어를 한국어로 "번역"시키면 토큰을 낭비하고, 모델이 이미 정확한 제목을
+        // 조용히 고쳐 쓸 여지를 준다.
+        const prompt = buildNewsCardAnalysisPrompt(KOREAN_NEWS_ITEM);
+
+        expect(prompt).toContain('You are a financial news classifier.');
+        expect(prompt).not.toContain('translator');
+        expect(prompt).not.toContain('natural Korean translation');
+    });
+
+    it('tells the model to copy Korean title and body verbatim', () => {
+        const prompt = buildNewsCardAnalysisPrompt(KOREAN_NEWS_ITEM);
+
+        expect(prompt).toContain('ALREADY Korean — copy it verbatim');
+        expect(prompt).toContain('Do not reword, shorten, or re-punctuate it.');
+    });
+
+    it('still asks for summary and classification — the analytical work remains', () => {
+        const prompt = buildNewsCardAnalysisPrompt(KOREAN_NEWS_ITEM);
+
+        expect(prompt).toContain('summaryKo');
+        expect(prompt).toContain('sentiment');
+        expect(prompt).toContain('category');
+        expect(prompt).toContain('priceImpact');
+    });
+
+    it('keeps the English translation path when sourceLanguage is absent', () => {
+        // `sourceLanguage`가 없는 기존 피드는 전부 영문이었다 — 동작이 바뀌면 안 된다.
+        const prompt = buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM);
+
+        expect(prompt).toContain(
+            'You are a financial news translator and classifier.'
+        );
+        expect(prompt).toContain(
+            'natural Korean translation of the English title.'
+        );
+    });
+
+    it("treats an explicit 'en' exactly like the absent case", () => {
+        const explicit = buildNewsCardAnalysisPrompt({
+            ...FULL_NEWS_ITEM,
+            sourceLanguage: 'en',
+        });
+        const implicit = buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM);
+
+        expect(explicit).toBe(implicit);
+    });
+});

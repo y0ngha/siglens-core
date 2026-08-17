@@ -2708,6 +2708,15 @@ export type NewsFeedCategory =
     | 'forex'
     | 'articles';
 
+/**
+ * Language the article body is written in.
+ *
+ * Drives whether the news-card prompt asks for a Korean translation. Feeds that
+ * already deliver Korean text (e.g. domestic KRX coverage) must not be
+ * re-translated — see {@link NewsItem.sourceLanguage}.
+ */
+export type NewsSourceLanguage = 'en' | 'ko';
+
 /** Raw news article fetched from the data provider before translation or analysis. */
 export interface NewsItem {
     id: string;
@@ -2715,8 +2724,27 @@ export interface NewsItem {
     source: string;
     url: string;
     publishedAt: string; // ISO
+    /**
+     * Article title in its original language.
+     *
+     * The `En` suffix is historical — the field held English text back when every
+     * feed was English. It now carries whatever language {@link NewsItem.sourceLanguage}
+     * declares. Renaming it would ripple through the consumer's DB schema, so the
+     * name stays and this note carries the meaning.
+     */
     titleEn: string;
+    /** Article body in its original language; `null` when the feed provides none. */
     bodyEn: string | null;
+    /**
+     * Original language of the article. Defaults to `'en'` when omitted, which
+     * preserves the behaviour of every feed that existed before this field.
+     *
+     * Set `'ko'` for domestic Korean feeds. The news-card prompt then skips the
+     * translation step and reuses the original text verbatim — asking a model to
+     * "translate Korean to Korean" wastes tokens and, worse, invites it to
+     * silently rewrite headlines that were already correct.
+     */
+    sourceLanguage?: NewsSourceLanguage;
 }
 
 /**
