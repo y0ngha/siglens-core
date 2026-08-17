@@ -5,6 +5,7 @@ import {
     MARKET_CLOSE_HOUR,
     MARKET_CLOSE_MINUTE,
 } from '@/domain/constants/time';
+import { usMarketCloseMinute } from '@/domain/marketCalendar';
 
 /**
  * US NYSE regular session: 09:30–16:00 ET, Mon–Fri.
@@ -21,6 +22,9 @@ export const US_EQUITY_SESSION: MarketSessionSpec = {
     openMinute: MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE,
     closeMinute: MARKET_CLOSE_HOUR * 60 + MARKET_CLOSE_MINUTE,
     weekendDays: [0, 6],
+    // NYSE 휴장일·반장은 규칙으로 계산된다 — `marketCalendar.ts` 참조. 이게 없으면
+    // 추수감사절에도 정규장으로 판정하고, 13:00 반장 뒤 3시간을 개장으로 읽는다.
+    closeMinuteFor: usMarketCloseMinute,
 };
 
 /** Crypto: trades 24/7. */
@@ -118,7 +122,10 @@ export function getSessionStatus(
         spec.timeZone
     );
     if (spec.weekendDays.includes(weekdayIndex)) return 'weekend';
-    if (spec.openMinute <= minutesOfDay && minutesOfDay < spec.closeMinute) {
+    // 거래소 캘린더가 있으면 그날의 실제 마감이 스펙의 기본 마감을 이긴다.
+    // `0`은 휴장 — 어떤 시각도 개장 구간에 들지 않는다.
+    const closeMinute = spec.closeMinuteFor?.(now) ?? spec.closeMinute;
+    if (spec.openMinute <= minutesOfDay && minutesOfDay < closeMinute) {
         return 'open';
     }
     return 'closed';

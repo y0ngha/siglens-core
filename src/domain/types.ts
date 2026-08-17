@@ -60,6 +60,16 @@ export type MarketSessionSpec =
           closeMinute: number;
           /** Local weekday indexes treated as weekend (0 = Sun … 6 = Sat). */
           weekendDays: readonly number[];
+          /**
+           * Optional exchange calendar: per-day close override.
+           *
+           * Returns the close minute for the local calendar day containing the
+           * instant, or `0` when the exchange is closed that day (a holiday).
+           * Omit it and the session is a pure weekday schedule — which is what
+           * NYSE specs used to be, and why a half day read as open for the three
+           * hours after the 13:00 bell.
+           */
+          closeMinuteFor?: (now: Date) => number;
       };
 
 /** Definition of a market index tracked by the dashboard. */

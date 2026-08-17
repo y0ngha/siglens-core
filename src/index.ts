@@ -239,6 +239,16 @@ export {
     getSessionStatus,
     isRegularSessionOpen,
 } from './domain/session';
+
+// NYSE 거래소 캘린더 — 휴장일·반장을 계산으로 판정한다 (외부 API 없음).
+export {
+    EARLY_CLOSE_MINUTE,
+    REGULAR_CLOSE_MINUTE,
+    isUsMarketEarlyClose,
+    isUsMarketHoliday,
+    minutesUntilUsMarketClose,
+    usMarketCloseMinute,
+} from './domain/marketCalendar';
 export type { AssetClass, MarketSessionSpec } from './domain/types';
 
 // Economy (macro) domain types — /economy page snapshot + briefing
