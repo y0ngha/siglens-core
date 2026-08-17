@@ -12,6 +12,7 @@ import {
     isRegularSessionOpen,
     localSessionParts,
 } from '@/domain/session';
+import { etCalendarDate, isUsTradingDay } from '@/domain/marketCalendar';
 import type { EtSessionStatus } from '@/domain/types';
 
 export function parseNumberOrDefault(
@@ -92,36 +93,51 @@ export function isEtRegularSessionOpen(now: Date): boolean {
     return isRegularSessionOpen(US_EQUITY_SESSION, now);
 }
 
-/** @internal 주어진 ET 요일 인덱스(0=일~6=토) 기준 다음 평일까지의 일수. 주말은 건너뛴다. */
-function daysToNextWeekday(fromWeekdayIndex: number): number {
-    let offset = 1;
-    let wd = (fromWeekdayIndex + 1) % 7;
-    while (wd === 0 || wd === 6) {
-        offset += 1;
-        wd = (wd + 1) % 7;
-    }
-    return offset;
-}
+/**
+ * @internal 연휴를 건너뛰기 위한 탐색 상한(일).
+ *
+ * NYSE에서 가장 긴 연속 휴장은 주말 + 인접 휴일 조합이라 나흘을 넘지 않는다
+ * (예: 성금요일 금 + 토 + 일). 예정 외 휴장이 며칠 붙어도(2012 샌디 2일) 여유가 있다.
+ * 무한 루프 방지용 상한이지 도메인 규칙이 아니다.
+ */
+const MAX_CLOSURE_LOOKAHEAD_DAYS = 10;
 
-/** @internal 다음 뉴욕 정규장 개장(09:30 ET)까지 남은 초를 반환한다. */
+/**
+ * @internal 다음 뉴욕 정규장 개장(09:30 ET)까지 남은 초를 반환한다.
+ *
+ * 휴장일을 건너뛴다. 종전에는 주말만 건너뛰어서, 예컨대 목요일이 추수감사절일 때
+ * "내일 09:30"을 답했지만 그 목요일은 아예 열리지 않았다. 이 값이 캐시 TTL·백오프의
+ * 상한으로 쓰이므로, 짧게 잡히면 열리지도 않은 시장을 향해 재조회가 반복된다.
+ */
 export function secondsUntilNextEtRegularOpen(now: Date): number {
     // US_EQUITY_SESSION is a 'scheduled' spec — the kind guard lets TypeScript
     // narrow to the branch that carries timeZone and openMinute.
     if (US_EQUITY_SESSION.kind !== 'scheduled') return 0;
-    const { weekdayIndex, minutesOfDay } = localSessionParts(
-        now,
-        US_EQUITY_SESSION.timeZone
-    );
-    const isWeekday = weekdayIndex >= 1 && weekdayIndex <= 5;
+    const { minutesOfDay } = localSessionParts(now, US_EQUITY_SESSION.timeZone);
+    const base = etCalendarDate(now);
 
-    const dayOffset =
-        isWeekday && minutesOfDay < US_EQUITY_SESSION.openMinute
-            ? 0
-            : daysToNextWeekday(weekdayIndex);
+    // 오늘 개장 전이면 오늘부터, 아니면 내일부터 찾는다.
+    const start = minutesOfDay < US_EQUITY_SESSION.openMinute ? 0 : 1;
 
-    const minutesUntilOpen =
-        dayOffset * MINUTES_PER_DAY +
-        US_EQUITY_SESSION.openMinute -
-        minutesOfDay;
-    return minutesUntilOpen * SECONDS_PER_MINUTE - now.getUTCSeconds();
+    for (
+        let offset = start;
+        offset <= start + MAX_CLOSURE_LOOKAHEAD_DAYS;
+        offset++
+    ) {
+        // 17:00 UTC로 탐침한다 — EST(정오)든 EDT(13시)든 한낮이라 의도한 ET 날짜를
+        // 가리킨다. 자정 근처를 찍으면 DST 전환일에 날짜가 하루 밀릴 수 있다.
+        const probe = new Date(
+            Date.UTC(base.year, base.month - 1, base.day + offset, 17)
+        );
+        if (!isUsTradingDay(probe)) continue;
+
+        // 하루를 1440분으로 세는 것은 종전과 같다. DST 전환일에 한 시간 어긋나지만
+        // 이 값의 용도가 TTL·백오프라 정확한 타임스탬프가 필요하지 않다.
+        const minutesUntilOpen =
+            offset * MINUTES_PER_DAY +
+            US_EQUITY_SESSION.openMinute -
+            minutesOfDay;
+        return minutesUntilOpen * SECONDS_PER_MINUTE - now.getUTCSeconds();
+    }
+    return 0;
 }

@@ -300,6 +300,23 @@ export function isUsMarketHoliday(now: Date): boolean {
 }
 
 /**
+ * Whether the U.S. equity market trades at all on the ET calendar day containing
+ * `now` — i.e. a weekday that is not a holiday.
+ *
+ * "Not a weekend" and "not a holiday" are asked together far more often than
+ * separately (next-open backoff, EOD date rewinds, prewarm boundaries), and
+ * splitting them is how a caller ends up skipping only Saturdays and Sundays.
+ *
+ * @param now - The instant to test.
+ * @returns `true` when the exchange opens that day, half day included.
+ */
+export function isUsTradingDay(now: Date): boolean {
+    const { weekday } = etCalendarDate(now);
+    if (weekday === 0 || weekday === 6) return false;
+    return !isUsMarketHoliday(now);
+}
+
+/**
  * Whether the ET calendar day containing `now` is a 1:00 p.m. half day.
  *
  * @param now - The instant to test.

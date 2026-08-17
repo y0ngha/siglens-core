@@ -246,6 +246,7 @@ export {
     REGULAR_CLOSE_MINUTE,
     isUsMarketEarlyClose,
     isUsMarketHoliday,
+    isUsTradingDay,
     minutesUntilUsMarketClose,
     usMarketCloseMinute,
 } from './domain/marketCalendar';
