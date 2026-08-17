@@ -52,8 +52,20 @@ const JUNETEENTH_FIRST_YEAR = 2022;
  * every few years is the cost; the alternative is trading into a closed market
  * or, worse, believing a stale feed that says the market is open.
  *
- * Entries in the past are kept so backtests over historical bars skip the same
- * days the market did.
+ * **This list can only ever be right about the past.** That is not a defect to
+ * fix but a boundary to respect, and it decides where each caller should look:
+ *
+ * - *Backtests and scheduling* — this list is the answer. Past entries make a
+ *   run over historical bars skip the same days the market did.
+ * - *Placing a real order* — the broker is the answer. It rejects orders on a
+ *   closed market whether or not this list knows about the day, which is why a
+ *   stale entry here cannot cause a trade into a closed market.
+ *
+ * The residual cost of a missing entry is therefore wasted work, not a bad
+ * trade: analysis jobs burn one day of quota on a market that never opened.
+ * At roughly one unscheduled closure every three to four years that is cheaper
+ * than any mechanism to detect them, all of which would have to be live and
+ * could fail in the far more expensive direction.
  */
 export const UNSCHEDULED_CLOSURES: ReadonlySet<string> = new Set([
     '2012-10-29', // Hurricane Sandy
