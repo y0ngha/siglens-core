@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.1](https://github.com/y0ngha/siglens-core/compare/v0.44.0...v0.44.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* 다음 개장 계산이 휴장일을 건너뛴다 ([#177](https://github.com/y0ngha/siglens-core/issues/177)) ([7116436](https://github.com/y0ngha/siglens-core/commit/7116436294a3dad45e8876e53b1b9493bcdfab18))
+
 # [0.44.0](https://github.com/y0ngha/siglens-core/compare/v0.43.0...v0.44.0) (2026-08-17)
 
 
