@@ -10,6 +10,10 @@ import {
     UNSCHEDULED_CLOSURES,
 } from '@/domain/marketCalendar';
 import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
+import {
+    ACTUAL_CLOSED_WEEKDAYS,
+    ACTUAL_RANGE,
+} from './__fixtures__/nyseActualClosedDays';
 
 /**
  * Expected values are the NYSE Group / ICE published calendar, transcribed
@@ -374,5 +378,71 @@ describe('구조적 백테스트 — 1990~2050', () => {
             expect(dayOfYear).toBeGreaterThanOrEqual(320); // 3/20
             expect(dayOfYear).toBeLessThanOrEqual(424); // 4/24
         }
+    });
+});
+
+describe('실데이터 대조 — FMP 일봉으로 뽑은 실제 거래일 (2015~2026)', () => {
+    const actualClosed = new Set(ACTUAL_CLOSED_WEEKDAYS);
+
+    /** 구간 안의 모든 평일을 `YYYY-MM-DD`로. */
+    function weekdaysInRange(): string[] {
+        const out: string[] = [];
+        const end = new Date(`${ACTUAL_RANGE.to}T00:00:00Z`);
+        for (
+            let d = new Date(`${ACTUAL_RANGE.from}T00:00:00Z`);
+            d <= end;
+            d.setUTCDate(d.getUTCDate() + 1)
+        ) {
+            const wd = d.getUTCDay();
+            if (wd === 0 || wd === 6) continue;
+            out.push(d.toISOString().slice(0, 10));
+        }
+        return out;
+    }
+
+    it('계산한 휴장일이 실제 거래 없던 날과 정확히 일치한다', () => {
+        const missed: string[] = []; // 실제로 닫혔는데 열렸다고 판정
+        const overcalled: string[] = []; // 실제로 열렸는데 닫혔다고 판정
+
+        for (const iso of weekdaysInRange()) {
+            // 정오 ET. 날짜만 보는 판정이라 시각은 구간 안이기만 하면 된다.
+            const at = new Date(`${iso}T17:00:00Z`);
+            const computed = isUsMarketHoliday(at);
+            const actual = actualClosed.has(iso);
+            if (actual && !computed) missed.push(iso);
+            if (!actual && computed) overcalled.push(iso);
+        }
+
+        expect({ missed, overcalled }).toEqual({ missed: [], overcalled: [] });
+    });
+
+    it('구간 안 거래일 수가 실데이터와 같다', () => {
+        const computedTradingDays = weekdaysInRange().filter(
+            iso => !isUsMarketHoliday(new Date(`${iso}T17:00:00Z`))
+        ).length;
+        const actualTradingDays = weekdaysInRange().length - actualClosed.size;
+        expect(computedTradingDays).toBe(actualTradingDays);
+    });
+
+    it('실데이터가 신정 토요일 미관측을 뒷받침한다', () => {
+        // 2022-01-01은 토요일. 앞 금요일(2021-12-31)도 실제로 거래일이었다.
+        expect(actualClosed.has('2021-12-31')).toBe(false);
+        expect(isUsMarketHoliday(new Date('2021-12-31T17:00:00Z'))).toBe(false);
+    });
+
+    it('실데이터가 2026-07-03 전휴장을 뒷받침한다', () => {
+        // 7/4가 토요일이라 7/3이 관측 휴장이다 — 반장이 아니다.
+        expect(actualClosed.has('2026-07-03')).toBe(true);
+        expect(isUsMarketHoliday(new Date('2026-07-03T17:00:00Z'))).toBe(true);
+        expect(isUsMarketEarlyClose(new Date('2026-07-03T17:00:00Z'))).toBe(
+            false
+        );
+    });
+
+    it('실데이터가 Juneteenth 2022년 도입을 뒷받침한다', () => {
+        // 2021-06-18(금)은 거래일이었고, 2022-06-20(월, 6/19 일요일의 관측일)은 휴장이다.
+        expect(actualClosed.has('2021-06-18')).toBe(false);
+        expect(actualClosed.has('2022-06-20')).toBe(true);
+        expect(isUsMarketHoliday(new Date('2022-06-20T17:00:00Z'))).toBe(true);
     });
 });
