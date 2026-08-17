@@ -120,6 +120,28 @@ describe('runMarketNewsDigest', () => {
             );
         });
 
+        it('reasoning을 callAnalysisAi에 그대로 전달한다', async () => {
+            // `true`는 모델 스펙을 오버라이드한다 — 스펙상 non-thinking인
+            // deepseek-v4-flash에서도 추론이 켜져야 한다(그래야 추론 티어
+            // 모델 값을 치르지 않고 다이제스트 품질을 유지한다).
+            await runMarketNewsDigest({ ...baseArgs(), reasoning: true });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: true })
+            );
+        });
+
+        it('reasoning을 생략하면 undefined로 전달해 모델 스펙 기본값을 보존한다', async () => {
+            // `callAnalysisAi`는 `reasoning === undefined`를 "개입 안 함"으로
+            // 취급한다. 여기서 false로 강등하면 호출자가 스펙 기본값을 고를
+            // 방법이 사라진다.
+            await runMarketNewsDigest(baseArgs());
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: undefined })
+            );
+        });
+
         it('결과를 NEWS_CACHE_TTL_SECONDS로 캐시에 기록한다', async () => {
             await runMarketNewsDigest(baseArgs());
 

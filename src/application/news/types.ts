@@ -180,15 +180,6 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     /** The raw news item to analyze. */
     item: NewsItem;
     /**
-     * Override for the model's default thinking budget (tokens).
-     * Pass `0` to disable extended thinking entirely — recommended for
-     * translation and sentiment classification tasks where chain-of-thought
-     * adds latency and cost without a quality benefit.
-     *
-     * When omitted the worker uses `MODEL_SPECS[model].thinkingBudget`.
-     */
-    thinkingBudget?: number;
-    /**
      * Cancellation signal for the in-flight LLM call (used by `runNewsCardAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
      * can abort the underlying AI provider request.

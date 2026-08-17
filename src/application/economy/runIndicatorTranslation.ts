@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
 import type {
     RunIndicatorTranslationOptions,
     RunIndicatorTranslationResult,
@@ -21,11 +21,12 @@ import {
 /**
  * @internal Fixed model identifier for indicator name translation.
  *
- * Translation is a short one-field task (single Korean string): flash-lite is
- * the right cost/latency trade-off. Mirrors the constant in
- * `submitIndicatorTranslation.ts` — kept local so the run path is self-contained.
+ * Translation is a short one-field task (single Korean string): a cheap
+ * non-reasoning model is the right cost/latency trade-off. Mirrors the
+ * constant in `submitIndicatorTranslation.ts` — kept local so the run path is
+ * self-contained.
  */
-const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
+const INDICATOR_TRANSLATION_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
 
 /**
  * Run an indicator-name AI translation end-to-end: cache lookup → LLM call →
@@ -37,7 +38,7 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `gemini-2.5-flash-lite` (single Korean string output).
+ * `deepseek-v4-flash` with reasoning off (single Korean string output).
  *
  * Indicator translation has no usage gate — no tier, no BYOK, no quota check.
  *
@@ -92,6 +93,10 @@ export async function runIndicatorTranslation(
             model: INDICATOR_TRANSLATION_MODEL,
             signal: options?.signal,
             seed: analysisSeed(prompt),
+            // 지표명 한 줄 번역 — 사실상 사전 조회다. 추론은 지연·출력 토큰만
+            // 늘린다. 모델 스펙을 오버라이드하므로 INDICATOR_TRANSLATION_MODEL이
+            // thinking 모델로 바뀌어도 이 경로는 꺼진 상태를 유지한다.
+            reasoning: false,
             correlationId: `indicator-translation:${normalizedName}`,
         })
     );

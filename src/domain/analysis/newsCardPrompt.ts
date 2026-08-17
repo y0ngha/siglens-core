@@ -5,7 +5,7 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
 /**
  * @internal Builds the per-news-card LLM prompt.
  *
- * Build the per-card news analysis prompt for the flash-lite model. No
+ * Build the per-card news analysis prompt for the fixed news-card model. No
  * skills, no other catalog-level knowledge (spec §3.2/Design C) — `stable`
  * is empty and `dynamic` is the full prompt, byte-for-byte the same
  * production order as before the assembly split (v0.31).
@@ -22,12 +22,18 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  * correct. Classification and `summaryKo` still run — those are the parts that
  * carry analytical value.
  *
- * Intended for high-volume batch calls using `gemini-2.5-flash-lite` where
- * latency and cost per card are critical. No skill injection needed — the task
- * is purely translation + classification, not market interpretation.
+ * Intended for high-volume calls on a cheap non-reasoning model (today
+ * `deepseek-v4-flash` — see NEWS_CARD_MODEL_ID) where latency and cost per card
+ * are critical. No skill injection needed — the task is purely translation +
+ * classification, not market interpretation.
+ *
+ * The Output Schema and Allowed Values blocks below are the ONLY field contract
+ * on the DeepSeek path — that adapter ignores `responseSchema` and sends
+ * `response_format: { type: 'json_object' }`. Keep them in sync with
+ * NEWS_CARD_RESPONSE_SCHEMA and normalizeNewsCardAnalysis.
  *
  * @param item - The raw news article to analyse.
- * @returns `{ stable, dynamic }` ready to be dispatched to the flash-lite LLM.
+ * @returns `{ stable, dynamic }` ready to be dispatched to the news-card LLM.
  */
 export function buildNewsCardAnalysisPrompt(item: NewsItem): AssembledPrompt {
     const bodySection =

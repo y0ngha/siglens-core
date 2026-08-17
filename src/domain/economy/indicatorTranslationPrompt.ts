@@ -19,7 +19,7 @@ import type { AssembledPrompt } from '@/domain/types';
  * (전년比/전월比/전분기比) if present in the input name.
  *
  * @param normalizedName - English indicator base name (e.g. `"Core PCE Price Index YoY"`).
- * @returns `{ stable, dynamic }` ready to be sent to the flash-lite LLM.
+ * @returns `{ stable, dynamic }` ready to be sent to the translation LLM.
  */
 export function buildIndicatorTranslationPrompt(
     normalizedName: string

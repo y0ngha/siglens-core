@@ -8,7 +8,9 @@ import { runEconomicEventAnalysis } from '@/application/economy/runEconomicEvent
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { ECONOMIC_EVENT_CACHE_TTL } from '@/infrastructure/cache/config';
+import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
+import type { ActiveModelId } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -80,6 +82,24 @@ describe('runEconomicEventAnalysis', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
                 expect.objectContaining({ signal: controller.signal })
             );
+        });
+
+        it('추론을 끈 채로 DeepSeek non-thinking 모델을 호출한다', async () => {
+            // 호출자가 정할 수 있는 값이 아니라 이 use-case의 고정 정책이다.
+            // `reasoning: false`는 모델 스펙을 오버라이드하므로,
+            // ECONOMIC_EVENT_MODEL이 나중에 thinking 모델로 바뀌어도 이 경로는
+            // 꺼진 상태를 유지해야 한다 — 이 단언이 그 회귀를 잡는다.
+            await runEconomicEventAnalysis(CPI_INPUT);
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: false })
+            );
+            // 모델 상수를 리터럴로 재선언하지 않고 실제 호출 인자를 본다 —
+            // 상수만 바꾸고 정책 주석을 안 고치는 드리프트를 잡는다.
+            const { model } = mockCallAnalysisAi.mock.calls[0][0] as {
+                model: ActiveModelId;
+            };
+            expect(MODEL_SPECS[model].provider).toBe('deepseek');
         });
 
         it('결과를 ECONOMIC_EVENT_CACHE_TTL로 캐시에 기록한다', async () => {

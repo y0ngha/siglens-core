@@ -27,7 +27,7 @@ function withUnit(value: string, unit: string): string {
  * `dynamic` is the full prompt, byte-for-byte the same production order as
  * before the assembly split (v0.31).
  *
- * Constructs an English prompt for the flash-lite model that asks for a
+ * Constructs an English prompt for the fixed economic-event model that asks for a
  * structured JSON response containing sentiment, a Korean summary of the
  * release, and a Korean market-interpretation commentary.
  *
@@ -36,7 +36,7 @@ function withUnit(value: string, unit: string): string {
  * instructions and never fabricating missing figures.
  *
  * @param input - The announced economic event data to analyse.
- * @returns `{ stable, dynamic }` ready to be sent to the flash-lite LLM.
+ * @returns `{ stable, dynamic }` ready to be sent to the translation LLM.
  */
 export function buildEconomicEventAnalysisPrompt(
     input: EconomicEventAnalysisInput

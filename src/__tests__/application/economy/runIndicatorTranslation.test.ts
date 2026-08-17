@@ -8,6 +8,8 @@ import { runIndicatorTranslation } from '@/application/economy/runIndicatorTrans
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { INDICATOR_TRANSLATION_CACHE_TTL } from '@/infrastructure/cache/config';
+import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import type { ActiveModelId } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -73,6 +75,23 @@ describe('runIndicatorTranslation', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
                 expect.objectContaining({ signal: controller.signal })
             );
+        });
+
+        it('추론을 끈 채로 DeepSeek non-thinking 모델을 호출한다', async () => {
+            // 지표명 한 줄 번역은 사실상 사전 조회다 — 이 use-case의 고정
+            // 정책이며 호출자가 바꿀 수 없다. `reasoning: false`는 모델 스펙을
+            // 오버라이드하므로 INDICATOR_TRANSLATION_MODEL이 thinking 모델로
+            // 바뀌어도 이 경로는 꺼진 상태를 유지해야 한다.
+            await runIndicatorTranslation('cpi_mom');
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ reasoning: false })
+            );
+            // 모델 상수를 리터럴로 재선언하지 않고 실제 호출 인자를 본다.
+            const { model } = mockCallAnalysisAi.mock.calls[0][0] as {
+                model: ActiveModelId;
+            };
+            expect(MODEL_SPECS[model].provider).toBe('deepseek');
         });
 
         it('결과를 { nameKo } envelope으로 INDICATOR_TRANSLATION_CACHE_TTL에 기��한다', async () => {

@@ -692,6 +692,16 @@ and have been removed from this file.
    ❌ SubmitAnalysisOptions.tierConfig and AnalysisUsageOptions.tierConfig both accepted; outer/inner could differ
    ✅ Accept tierConfig once at the entry point; pass it into all downstream helpers
    → Prevents hidden inconsistencies between gating decisions that should use the same config
+
+2. Model/feature-affecting options not included in cache key or seed generation
+   → Options that change model output behavior (reasoning: true/false, skipEnqueueIfMiss, etc.) must be folded into cache key construction and skill-sampling seed
+   → Failure to include such options causes cache collision: on/off pair collides on one cache entry, first caller decides output depth/behavior for all subsequent calls until TTL expiry
+   → Check sibling functions in the same module for established patterns: if runNewsAnalysis uses buildNewsCacheKey(..., reasoning), runMarketNewsDigest must use the same pattern
+   ❌ callAnalysisAi(prompt, { reasoning }) passed without buildNewsCacheKey(..., reasoning) or reasoningSeedPart(reasoning)
+   ❌ submitAnalysis(..., skipEnqueueIfMiss) forwarded to submitFundamentalAnalysis() without including the flag in sub-call options
+   ✅ buildNewsCacheKey(..., reasoning) + reasoningSeedPart(options.reasoning) to ensure output depth is deterministic per reasoning setting
+   ✅ Move skipEnqueueIfMiss onto resolver input type; force it into all three sub-axis option objects in resolver
+   → Recurring mistake (PR #85, refactor/deepseek-model-reasoning): established patterns in sibling functions not copied; new code silently adds collision-prone options without seed/key inclusion
 ```
 
 ---
