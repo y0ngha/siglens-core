@@ -245,6 +245,16 @@ export {
     getSessionStatus,
     isRegularSessionOpen,
 } from './domain/session';
+
+// NYSE 거래소 캘린더 — 순수 계산이라 브라우저에서도 그대로 쓴다 (네트워크 호출 없음).
+export {
+    EARLY_CLOSE_MINUTE,
+    REGULAR_CLOSE_MINUTE,
+    isUsMarketEarlyClose,
+    isUsMarketHoliday,
+    minutesUntilUsMarketClose,
+    usMarketCloseMinute,
+} from './domain/marketCalendar';
 export type {
     AssetClass,
     EtSessionStatus,
