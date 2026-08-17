@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.44.0](https://github.com/y0ngha/siglens-core/compare/v0.43.0...v0.44.0) (2026-08-17)
+
+
+### Features
+
+* NYSE 휴장일·반장 캘린더를 계산으로 판정 ([#175](https://github.com/y0ngha/siglens-core/issues/175)) ([c5c66c3](https://github.com/y0ngha/siglens-core/commit/c5c66c383578398afa738b0f969ddf022193668e))
+
 # [0.43.0](https://github.com/y0ngha/siglens-core/compare/v0.42.3...v0.43.0) (2026-08-15)
 
 
