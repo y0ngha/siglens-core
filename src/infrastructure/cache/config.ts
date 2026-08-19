@@ -435,23 +435,30 @@ export function buildMacroBriefingCacheKey(
  * simply never looked up after a bump and naturally expire via TTL.
  *
  * @remarks
- * **Deliberately NOT bumped for the `p2` PROMPT_DIGEST activation** (see
- * {@link PROMPT_TEMPLATE_VERSION}'s remark). This prompt builder interpolates
- * no `skill.content` into its prompt, so switching skills over to the digest
- * body does not change this template's prompt bytes — bumping it would be
- * no-op cache churn.
+ * **`p2` → `p3` (2026-08-19): sentiment 규칙·few-shot·정밀도.** 라벨 규칙이
+ * `actual − estimate`의 부호가 아니라 발표의 경제적 의미를 보도록 바뀌었고(옛 규칙은
+ * `bearish: … OR …` 비대칭 때문에 금리 인하 서프라이즈와 낮은 CPI를 bearish로
+ * 붙였다), few-shot이 반전 지표·`bearish` 라벨·`estimate` 없음까지 덮도록 교체됐으며,
+ * 발표치가 2자리 반올림 없이 게시된 자릿수로 들어간다(`4.415`가 `4.42`로 나가던 문제).
+ * `p2` 엔트리는 옛 라벨 규칙의 산물이라 서빙하면 안 된다.
  *
  * @remarks
- * **Deliberately NOT bumped for the stable/dynamic assembly split (spec
- * §3.4).** `buildEconomicEventAnalysisPrompt` now returns `AssembledPrompt {
- * stable, dynamic }` instead of a plain string, but this builder has no
- * skills to relocate for Design C — `stable` is simply `''` and `dynamic` is
- * byte-for-byte the same prompt text the plain-string version produced (only
- * the return-type wrapper changed). Bumping would be no-op cache churn.
+ * **`p1` → `p2` (2026-08-19): region.** The prompt gained a `Region` line, a
+ * rule forbidding a United States / Federal Reserve / USD assumption, and a
+ * second few-shot in another economy; `region` also entered
+ * `hashEconomicEventInput`. Entries cached under `p1` were produced by a
+ * US-assuming prompt, so they must not be served — that is what the bump buys.
+ *
+ * @remarks
+ * Two earlier changes deliberately did **not** bump this constant, and the
+ * reasoning still holds for them: the `PROMPT_DIGEST` activation (this builder
+ * interpolates no `skill.content`) and the stable/dynamic assembly split (spec
+ * §3.4 — `stable` is `''` and `dynamic` is byte-identical to the previous
+ * plain-string prompt). Both were no-op cache churn; this one is not.
  *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
@@ -480,14 +487,14 @@ export const ECONOMIC_EVENT_CACHE_TTL = SECONDS_PER_DAY;
  * @example
  * ```ts
  * buildEconomicEventCacheKey(hashAnalysisInput(JSON.stringify(input)));
- * // → 'v1:analysis:economic-event:deadbeefdeadbeef:p1'
+ * // → 'v1:analysis:economic-event:deadbeefdeadbeef:p3'
  * ```
  *
  * Note: In production, `inputHash` is derived via `hashEconomicEventInput(input)`
  * — NOT `hashAnalysisInput(JSON.stringify(input))`. `hashEconomicEventInput`
- * serializes fields in a FIXED order (event → impact → actual → estimate →
- * previous → unit) to guarantee a deterministic hash regardless of insertion
- * order. Raw `JSON.stringify` is insertion-order-dependent and must not be used
+ * serializes fields in a FIXED order (region → event → impact → actual →
+ * estimate → previous → unit) to guarantee a deterministic hash regardless of
+ * insertion order. Raw `JSON.stringify` is insertion-order-dependent and must not be used
  * directly to construct this key.
  */
 export function buildEconomicEventCacheKey(inputHash: string): string {

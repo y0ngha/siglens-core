@@ -48,6 +48,11 @@ const MARKET_DATA: MarketSummaryData = {
     sectors: [],
 };
 
+const US_CONTEXT = {
+    marketLabel: '미국 증시',
+    volatility: { label: 'VIX', level: 18.3 },
+} as const;
+
 describe('runBriefing', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -70,7 +75,7 @@ describe('runBriefing', () => {
                 generatedAt: '2026-08-02T10:00:00.000Z',
             });
 
-            const result = await runBriefing(MARKET_DATA);
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
 
             expect(result.status).toBe('cached');
             expect(mockCallBriefingAi).not.toHaveBeenCalled();
@@ -83,7 +88,7 @@ describe('runBriefing', () => {
                 generatedAt,
             });
 
-            const result = await runBriefing(MARKET_DATA);
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
 
             if (result.status === 'cached') {
                 expect(result.generatedAt).toBe(generatedAt);
@@ -93,7 +98,7 @@ describe('runBriefing', () => {
 
     describe('cache miss → LLM', () => {
         it('callBriefingAi를 1회 호출하고 done을 반환한다', async () => {
-            const result = await runBriefing(MARKET_DATA);
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
 
             expect(mockCallBriefingAi).toHaveBeenCalledTimes(1);
             expect(result.status).toBe('done');
@@ -102,7 +107,9 @@ describe('runBriefing', () => {
         it('signal을 callBriefingAi에 그대로 전달한다', async () => {
             const controller = new AbortController();
 
-            await runBriefing(MARKET_DATA, { signal: controller.signal });
+            await runBriefing(MARKET_DATA, US_CONTEXT, {
+                signal: controller.signal,
+            });
 
             expect(mockCallBriefingAi).toHaveBeenCalledWith(
                 expect.objectContaining({ signal: controller.signal })
@@ -110,7 +117,7 @@ describe('runBriefing', () => {
         });
 
         it('결과를 MARKET_BRIEFING_CACHE_TTL로 캐시에 기록한다', async () => {
-            await runBriefing(MARKET_DATA);
+            await runBriefing(MARKET_DATA, US_CONTEXT);
 
             expect(mockCacheSet).toHaveBeenCalledWith(
                 expect.any(String),
@@ -127,7 +134,7 @@ describe('runBriefing', () => {
         it('cache provider null이면 조회 건너뛰고 LLM을 호출한다', async () => {
             mockCreateCacheProvider.mockReturnValueOnce(null);
 
-            const result = await runBriefing(MARKET_DATA);
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
 
             expect(result.status).toBe('done');
             expect(mockCacheGet).not.toHaveBeenCalled();
@@ -145,8 +152,8 @@ describe('runBriefing', () => {
             );
 
             const both = Promise.all([
-                runBriefing(MARKET_DATA),
-                runBriefing(MARKET_DATA),
+                runBriefing(MARKET_DATA, US_CONTEXT),
+                runBriefing(MARKET_DATA, US_CONTEXT),
             ]);
 
             resolveAi(JSON.stringify(mockBriefingRaw));
@@ -155,6 +162,51 @@ describe('runBriefing', () => {
             expect(mockCallBriefingAi).toHaveBeenCalledTimes(1);
             expect(a.status).toBe('done');
             expect(b.status).toBe('done');
+        });
+    });
+
+    /**
+     * `runBriefing`이 호출자의 context를 프롬프트까지 넘기는지 확인한다.
+     *
+     * 이 단언이 없으면 빌더 호출부를 하드코딩 리터럴로 바꿔도 스위트가 초록으로
+     * 남는다 — 프롬프트 빌더 테스트는 빌더가 context를 지킨다는 것만 증명하고,
+     * 캐시 키 테스트는 region이 해시에 닿는다는 것만 증명한다.
+     */
+    describe('context 전달', () => {
+        it('marketLabel이 프롬프트에 실린다', async () => {
+            await runBriefing(MARKET_DATA, {
+                marketLabel: '한국 증시',
+                volatility: null,
+            });
+
+            const { prompt } = mockCallBriefingAi.mock.calls.at(-1)![0] as {
+                prompt: string;
+            };
+            expect(prompt).toContain('한국 증시');
+        });
+
+        it('volatility: null이면 변동성 스키마가 빠진다', async () => {
+            await runBriefing(MARKET_DATA, {
+                marketLabel: '한국 증시',
+                volatility: null,
+            });
+
+            const { prompt } = mockCallBriefingAi.mock.calls.at(-1)![0] as {
+                prompt: string;
+            };
+            expect(prompt).not.toContain('"volatilityAnalysis": {');
+        });
+
+        it('volatility가 있으면 그 값이 프롬프트에 박힌다', async () => {
+            await runBriefing(MARKET_DATA, {
+                marketLabel: '미국 증시',
+                volatility: { label: 'VIX', level: 21.7 },
+            });
+
+            const { prompt } = mockCallBriefingAi.mock.calls.at(-1)![0] as {
+                prompt: string;
+            };
+            expect(prompt).toContain('"vixLevel": 21.7');
         });
     });
 });

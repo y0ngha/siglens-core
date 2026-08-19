@@ -7,7 +7,7 @@ import type {
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import type { MarketSummaryData } from '@/domain/types';
+import type { MarketBriefingContext, MarketSummaryData } from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
     buildBriefingCacheKey,
@@ -38,13 +38,16 @@ import { hashBriefingInput } from './briefingInputHash';
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
- * @throws If the AI provider call fails (network, 5xx, AbortError).
+ * `context` names the market and carries its volatility reading, if any — the
+ * prompt refuses to ask for a volatility number the caller did not supply.
+ * The cache key needs no extra axis for it: `hashBriefingInput` already hashes
+ * the tickers and quotes, which differ per market by construction.
  *
- * @see submitBriefing — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runBriefing.
+ * @throws {Error} If the AI provider call fails (network, 5xx, AbortError).
  */
 export async function runBriefing(
     data: MarketSummaryData,
+    context: MarketBriefingContext,
     options?: RunBriefingOptions
 ): Promise<RunBriefingResult> {
     const now = new Date();
@@ -74,7 +77,11 @@ export async function runBriefing(
 
     // This builder has no skills catalog and no separate system prompt —
     // `stable` is always '' (Design C), so `prompt` is `dynamic` alone.
-    const { dynamic } = buildMarketBriefingPrompt(data.indices, data.sectors);
+    const { dynamic } = buildMarketBriefingPrompt(
+        data.indices,
+        data.sectors,
+        context
+    );
     const prompt = dynamic;
 
     const raw = await dedupeInFlight(cacheKey, () =>

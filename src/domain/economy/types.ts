@@ -38,11 +38,11 @@ export interface TreasuryRateSnapshot {
     year10: number | null;
 }
 
-/** Single US economic-calendar event (post-filter). */
+/** Single economic-calendar event (post-filter). The country is the caller's filter, not a property of this type. */
 export interface EconomicCalendarEvent {
     /** Event datetime verbatim from FMP (`YYYY-MM-DD HH:mm:ss`). */
     date: string;
-    /** Event name as provided by FMP (e.g. `'Fed Rate Decision'`). */
+    /** Event name as provided by FMP (e.g. `'Interest Rate Decision'`). */
     event: string;
     /** Market impact classification. */
     impact: CalendarImpact;
@@ -62,7 +62,7 @@ export interface EconomySnapshot {
     indicators: EconomicIndicatorSeries[];
     /** Latest treasury yields; `null` when the rates response is empty/unavailable. */
     treasury: TreasuryRateSnapshot | null;
-    /** Upcoming US events, ascending by date. */
+    /** Upcoming events for the requested country, ascending by date. */
     calendar: EconomicCalendarEvent[];
 }
 
@@ -102,6 +102,20 @@ export interface MacroBriefingResponse {
  * signal for the LLM's market-implication assessment.
  */
 export interface EconomicEventAnalysisInput {
+    /**
+     * Which economy the release belongs to, as a display label
+     * (e.g. `'미국'`, `'한국'`).
+     *
+     * **Required, and deliberately not defaulted.** Many event names carry no
+     * country (`'Interest Rate Decision'`, `'CPI YoY'`), so without this the
+     * model falls back on its priors and narrates a Bank of Korea decision in
+     * Federal Reserve terms. A default of `'미국'` would reintroduce exactly
+     * that failure silently, which is why the field is mandatory.
+     *
+     * It also enters the analysis cache key — the same event name with the same
+     * figures in two economies must not share one cached interpretation.
+     */
+    region: string;
     /** Event name as provided by FMP (e.g. `'CPI MoM'`). */
     event: string;
     /** Market impact classification of the event. */
@@ -129,7 +143,8 @@ export interface EconomicEventAnalysis {
      * Market-implication sentiment for the release.
      *
      * - `bullish`: data supports risk assets / rate-cut expectations.
-     * - `bearish`: data implies risk-off / hawkish pressure on rates/USD.
+     * - `bearish`: data implies risk-off / hawkish pressure on the region's
+     *   rates or its own currency.
      * - `neutral`: release in line with estimates or signals are mixed.
      */
     sentiment: NewsSentiment;
@@ -140,7 +155,8 @@ export interface EconomicEventAnalysis {
     summaryKo: string;
     /**
      * Korean (존댓말) market-interpretation commentary: what the release
-     * implies for risk assets, interest rates, or USD direction.
+     * implies for the region's risk assets, interest rates, or its own
+     * currency — never another economy's.
      */
     interpretationKo: string;
 }

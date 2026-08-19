@@ -689,6 +689,7 @@ export type {
     SwingStructureState,
     MarketRegime,
     MACDResult,
+    MarketBriefingContext,
     MarketBriefingResponse,
     NewsAnalysisResponse,
     NewsCardAnalysis,

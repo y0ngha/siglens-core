@@ -36,6 +36,7 @@ const mockCachedResult = {
 };
 
 const CPI_INPUT: EconomicEventAnalysisInput = {
+    region: '미국',
     event: 'CPI MoM',
     impact: 'High',
     actual: 0.1,
@@ -171,5 +172,30 @@ describe('runEconomicEventAnalysis', () => {
             expect(a.status).toBe('done');
             expect(b.status).toBe('done');
         });
+    });
+
+    /**
+     * `Interest Rate Decision`은 한국·미국에서 문자열이 같고 수치도 우연히 겹칠 수
+     * 있다. region이 해시에 없으면 미국 해설이 한국 이벤트에 캐시 히트되어
+     * 프롬프트를 고친 의미가 사라진다.
+     */
+    it('region이 다르면 캐시 키가 갈린다', async () => {
+        mockCacheGet.mockResolvedValue(null);
+
+        const base = {
+            event: 'Interest Rate Decision',
+            impact: 'High' as const,
+            actual: 2.75,
+            estimate: 2.75,
+            previous: 2.75,
+            unit: '%',
+        };
+
+        await runEconomicEventAnalysis({ ...base, region: '미국' });
+        await runEconomicEventAnalysis({ ...base, region: '한국' });
+
+        const keys = mockCacheGet.mock.calls.map(c => c[0] as string);
+        expect(keys).toHaveLength(2);
+        expect(keys[0]).not.toBe(keys[1]);
     });
 });
