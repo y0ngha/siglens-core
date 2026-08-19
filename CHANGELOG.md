@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.47.1](https://github.com/y0ngha/siglens-core/compare/v0.47.0...v0.47.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **cache:** 시장 브리핑 캐시 키에 프롬프트 버전·컨텍스트 축 추가 ([5344b90](https://github.com/y0ngha/siglens-core/commit/5344b90df35f0dd8210cd0913a63a7bc5e36237a))
+* **prompt:** 시장 브리핑·경제 발표 프롬프트의 미국 전제 제거 ([6b4834d](https://github.com/y0ngha/siglens-core/commit/6b4834da0e52f641a86c481478000f578d3d5bf9))
+
 # [0.47.0](https://github.com/y0ngha/siglens-core/compare/v0.46.0...v0.47.0) (2026-08-17)
 
 ## [0.44.1](https://github.com/y0ngha/siglens-core/compare/v0.44.0...v0.44.1) (2026-08-17)
