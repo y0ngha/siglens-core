@@ -7,7 +7,7 @@ import type {
 import { buildMarketBriefingPrompt } from '@/domain/analysis/marketBriefingPrompt';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import type { MarketSummaryData } from '@/domain/types';
+import type { MarketBriefingContext, MarketSummaryData } from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
     buildBriefingCacheKey,
@@ -38,18 +38,22 @@ import { hashBriefingInput } from './briefingInputHash';
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
- * @throws If the AI provider call fails (network, 5xx, AbortError).
+ * `context` names the market and carries its volatility reading, if any — the
+ * prompt refuses to ask for a volatility number the caller did not supply. It is
+ * folded into `hashBriefingInput`, because it changes the prompt: two calls with
+ * identical quotes but a different market label — or with the volatility reading
+ * present in one and absent in the other — must not share a cached briefing.
  *
- * @see submitBriefing — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runBriefing.
+ * @throws {Error} If the AI provider call fails (network, 5xx, AbortError).
  */
 export async function runBriefing(
     data: MarketSummaryData,
+    context: MarketBriefingContext,
     options?: RunBriefingOptions
 ): Promise<RunBriefingResult> {
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-    const inputHash = hashBriefingInput(data.indices, data.sectors);
+    const inputHash = hashBriefingInput(data.indices, data.sectors, context);
     const cacheKey = buildBriefingCacheKey(
         dateHour,
         BRIEFING_MODEL_ID,
@@ -74,7 +78,11 @@ export async function runBriefing(
 
     // This builder has no skills catalog and no separate system prompt —
     // `stable` is always '' (Design C), so `prompt` is `dynamic` alone.
-    const { dynamic } = buildMarketBriefingPrompt(data.indices, data.sectors);
+    const { dynamic } = buildMarketBriefingPrompt(
+        data.indices,
+        data.sectors,
+        context
+    );
     const prompt = dynamic;
 
     const raw = await dedupeInFlight(cacheKey, () =>

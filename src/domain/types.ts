@@ -141,9 +141,16 @@ export interface MarketSummaryData {
  * Sector ranking + descriptive commentary fragment of a market briefing.
  */
 export interface MarketBriefingSectorAnalysis {
-    /** Leading sector ETF tickers, ordered by relative strength. */
+    /**
+     * Leading sector **display names** (Korean), ordered by relative strength.
+     *
+     * The prompt requires these to be copied verbatim from the sector rows it
+     * was given, so they are always names the caller actually passed in — not
+     * tickers, and never a sector from another market. Display-only: nothing
+     * keys off these strings.
+     */
     leadingSectors: string[];
-    /** Lagging sector ETF tickers, ordered by relative weakness. */
+    /** Lagging sector display names, ordered by relative weakness. Same rule. */
     laggingSectors: string[];
     /** Korean prose describing the rotation between leaders and laggards. */
     performanceDescription: string;
@@ -159,6 +166,32 @@ export interface MarketBriefingVolatilityAnalysis {
     description: string;
 }
 
+/**
+ * Which market a briefing describes, plus the volatility reading (if any) the
+ * caller can supply for it.
+ *
+ * **Why the caller owns this.** This library knows economic roles, not
+ * exchanges: it has no idea whether the rows it was handed are S&P sectors or
+ * KOSPI sectors, and no idea whether a volatility index exists for them. Before
+ * this type existed the prompt hardcoded US framing — a `'XLK'` ticker example
+ * and a mandatory "VIX 지수 값" field — so a Korean summary came back with US
+ * tickers and an invented VIX number. The model was doing what it was asked:
+ * the schema demanded a field the input never contained.
+ *
+ * `volatility: null` removes the volatility block from the prompt entirely
+ * rather than asking for a value nobody supplied.
+ */
+export interface MarketBriefingContext {
+    /** Market name for the prompt framing, e.g. `'미국 증시'`, `'한국 증시'`. */
+    marketLabel: string;
+    /**
+     * The market's volatility index reading, or `null` when it has none the
+     * caller can source. Never ask the model to produce this number — it is
+     * given, not inferred.
+     */
+    volatility: { label: string; level: number } | null;
+}
+
 /** Normalized AI market briefing. Always present in `done` poll outcomes. */
 export interface MarketBriefingResponse {
     /** One-sentence Korean overall-market summary. */
@@ -167,7 +200,16 @@ export interface MarketBriefingResponse {
     dominantThemes: string[];
     /** Sector leaders/laggards and a short narrative. */
     sectorAnalysis: MarketBriefingSectorAnalysis;
-    /** VIX level + volatility commentary. */
+    /**
+     * Volatility level + commentary.
+     *
+     * When the caller passed {@link MarketBriefingContext.volatility} as `null`
+     * — the market has no volatility index to source — the prompt omits the key
+     * entirely and this normalizes to `{ vixLevel: undefined, description: '' }`.
+     * That is indistinguishable from "the model returned nothing", so a consumer
+     * that wants to explain *why* the section is empty must look at the context
+     * it supplied, not at this field.
+     */
     volatilityAnalysis: MarketBriefingVolatilityAnalysis;
     /** Risk-on / risk-off / neutral verdict in Korean. */
     riskSentiment: string;

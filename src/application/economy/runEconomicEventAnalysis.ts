@@ -24,7 +24,7 @@ import {
  *
  * A short structured classification task (sentiment + two Korean sentences):
  * a cheap non-reasoning model is the right cost/latency trade-off, mirroring
- * news-card analysis. Mirrors the constant in `submitEconomicEventAnalysis.ts`
+ * news-card analysis.
  * — kept local so the run path is self-contained.
  */
 const ECONOMIC_EVENT_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
@@ -32,15 +32,19 @@ const ECONOMIC_EVENT_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
 /**
  * Build a deterministic hash of the economic-event input for cache-key use.
  *
- * Serializes fields in a FIXED order (event → impact → actual → estimate →
- * previous → unit) to guarantee a deterministic hash regardless of insertion
- * order. Mirrors the private `hashEconomicEventInput` in `submitEconomicEventAnalysis.ts`.
+ * Serializes fields in a FIXED order (region → event → impact → actual →
+ * estimate → previous → unit) so the hash does not depend on the caller's
+ * property insertion order.
  *
  * @internal
  */
 function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
     return hashAnalysisInput(
         JSON.stringify({
+            // 국가가 이름에 없는 발표(`Interest Rate Decision`, `CPI YoY`)는 두
+            // 경제권에서 문자열이 완전히 같다. region이 키에 없으면 미국 해설이
+            // 한국 이벤트에 그대로 캐시 히트되어, 프롬프트를 고친 의미가 사라진다.
+            region: input.region,
             event: input.event,
             impact: input.impact,
             actual: input.actual,
@@ -72,10 +76,8 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
- * @throws If the AI provider call fails (network, 5xx, AbortError).
+ * @throws {Error} If the AI provider call fails (network, 5xx, AbortError).
  *
- * @see submitEconomicEventAnalysis — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runEconomicEventAnalysis.
  */
 export async function runEconomicEventAnalysis(
     input: EconomicEventAnalysisInput,

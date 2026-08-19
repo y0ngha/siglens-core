@@ -1,5 +1,38 @@
 # Fix Log
 
+## [feat/prompt-region-context | 2026-08-19] — 프롬프트 지역 전제 제거 (R1~R6, approved)
+
+- Violation 1: 프로그래밍 치환을 **확인 없이 완료 보고** — 6라운드에 걸쳐 5회
+  Rule: MISTAKES.md §Documentation Sync 3 / §Coding Paradigm 6.5 — 편집 후 grep 카운트로 적용 여부를 확인하기 전에는 완료로 보고하지 않는다
+  Context: 매번 같은 메커니즘이었다. prettier가 대상 문자열을 여러 줄로 재포맷한 뒤, 한 줄짜리 옛 문자열로 치환을 시도해 조용히 0건 매치. 대상: `config.ts` 해시 필드목록, `@see submitEconomicEventAnalysis`(2회), 중복 테스트 제거, malformed 분기 단언 추가. 전부 리뷰어가 잡았고, 그중 한 번은 리뷰어가 스크래치패드에 직접 변이를 주입해 "당신의 변이 검증 주장은 성립하지 않는다"고 반박했다 — 맞았다.
+  Fixed: R6까지 전부 적용 + 이후 편집은 grep 카운트로 확인
+
+- Violation 2: 부재 단언을 **그것이 들어갈 수 없는 앵커**에 걸어 항상 참
+  Rule: MISTAKES.md §Tests 13.5 — 무언가의 부재를 단언하기 전에 그 앵커가 그것을 담을 수 있음을 먼저 증명한다
+  Context: few-shot 가드가 `Input:` 줄에 `not.toContain('한국은행')`을 걸었는데, `Input:` 줄에는 구조상 `interpretationKo`가 없다. 예시 내용과 무관하게 통과.
+  Fixed: `fewShotOutputFor()`로 그 예시 자신의 `Output:` 줄에 단언
+
+- Violation 3: 위치 조회 헬퍼가 **앞으로 훑어** 삭제된 대상이 이웃으로 조용히 해석됨
+  Rule: MISTAKES.md §Tests 13.5 — 위치 기반 조회는 기대 위치만 읽고 아니면 throw
+  Context: `lines.slice(i+1).find(l => l.startsWith('Output: '))`는 그 예시의 Output만 지워졌을 때 다음 예시의 Output을 돌려줬다. 없애려던 "항상 참" 단언이 되살아난다.
+  Fixed: `lines[i + 1]`만 읽고 형식이 아니면 throw
+
+- Violation 4: 프롬프트가 **자기 few-shot과 모순**
+  Rule: MISTAKES.md §Coding Paradigm 6.5 — 지시문과 예시가 어긋나면 예시가 이긴다. LLM은 산문 규칙보다 시연을 따르므로 규칙이 무력화된다
+  Context: `interpretationKo` 규칙이 "통화정책 발표일 때만 중앙은행 명시"라고 했는데 미국·한국 CPI few-shot이 둘 다 연준/한국은행을 명시했다. CPI는 통계청 발표다.
+  Fixed: 게이트를 "정책 경로에 닿는 발표(정책 결정·물가·고용)"로 넓혀 예시와 정합
+
+- Violation 5: 프롬프트가 **거짓을 사실로 단정**
+  Rule: 프롬프트는 모델에게 사실 주장을 한다 — 코드처럼 검증할 것
+  Context: "설문 데이터는 중앙은행 발표가 아니다"라고 썼는데 한국은행이 소비자심리지수(CCSI)·기업경기실사지수(BSI)를 발표한다. 비-미국 귀속을 바로잡으려는 프롬프트가 정작 그 시장의 참인 귀속을 막고 있었다.
+  Fixed: 소유권 단정 삭제, "전달 경로가 발행 주체보다 독자에게 중요하다"로
+
+- Violation 6: 규칙의 **불리언 구조가 의도를 뒤집음**
+  Rule: 두 분기가 서로 다른 접속사를 쓰면 실제 입력을 양쪽에 통과시켜 볼 것
+  Context: `bullish: beats estimate AND …` / `bearish: misses estimate OR …`. `AND`가 거른 것을 `OR`가 전부 삼켜, 금리 인하 서프라이즈와 예상보다 낮은 CPI가 bearish로 분류됐다. 프로덕션 입력(한국은행 금리 결정, KR CPI, GDP)으로 확인.
+  Fixed: 부호가 아니라 경제적 의미로 판단하도록 재작성 + 반전 지표군 명시
+
+
 ## [PR #102 | feat/bars-cache-ttl | 2026-05-28] — Oscillation resolution
 - Symbol: `secondsUntilNextEtRegularOpen` `Math.max(1, ...)` guard
 - R1 (review-agent): suggested wrapping in `Math.max(1, ...)` for a defensive min-1s TTL → applied.

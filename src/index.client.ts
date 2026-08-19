@@ -536,6 +536,7 @@ export type {
     ChatSession,
     MarketIndexData,
     MarketSectorData,
+    MarketBriefingContext,
     MarketBriefingResponse,
     MarketBriefingSectorAnalysis,
     MarketBriefingVolatilityAnalysis,

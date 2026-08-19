@@ -86,6 +86,11 @@ const makeSkill = (overrides: Partial<Skill>): Skill => ({
     ...overrides,
 });
 
+const BRIEFING_CONTEXT = {
+    marketLabel: '미국 증시',
+    volatility: { label: 'VIX', level: 18.3 },
+} as const;
+
 describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec §3.4)', () => {
     it('stable part is byte-identical across symbols/bars and contains no per-call values', () => {
         const skills = [
@@ -752,8 +757,16 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             },
         ];
         const sectors: MarketSectorData[] = [];
-        const a = buildMarketBriefingPrompt(indicesA, sectors);
-        const b = buildMarketBriefingPrompt(indicesB, sectors);
+        const a = buildMarketBriefingPrompt(
+            indicesA,
+            sectors,
+            BRIEFING_CONTEXT
+        );
+        const b = buildMarketBriefingPrompt(
+            indicesB,
+            sectors,
+            BRIEFING_CONTEXT
+        );
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('S&P 500');
         expect(a.stable).not.toContain('Nasdaq 100');
@@ -770,7 +783,11 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
                 changesPercentage: 0.45,
             },
         ];
-        const { stable, dynamic } = buildMarketBriefingPrompt(indices, []);
+        const { stable, dynamic } = buildMarketBriefingPrompt(
+            indices,
+            [],
+            BRIEFING_CONTEXT
+        );
         // Design C: this builder has no skills (spec §3.2), so it was fully
         // reverted to the exact v0.31 production order — the JSON schema
         // precedes the index/sector data rows, which sit at the true tail.
@@ -900,9 +917,10 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
 
     it('buildEconomicEventAnalysisPrompt: stable is event-name invariant', () => {
         // Note: the static few-shot block hardcodes its own illustrative
-        // events ("CPI MoM", "Fed Rate Decision"), so the per-call markers
+        // events ("CPI MoM", "CPI YoY", "10-Year KTB Auction"), so the per-call markers
         // here use different event names to avoid a false collision.
         const base: Omit<EconomicEventAnalysisInput, 'event'> = {
+            region: '미국',
             impact: 'High',
             actual: 0.2,
             estimate: 0.3,
@@ -924,6 +942,7 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
 
     it('buildEconomicEventAnalysisPrompt: dynamic ends with the Few-shot examples, which follow the Event Details', () => {
         const { stable, dynamic } = buildEconomicEventAnalysisPrompt({
+            region: '미국',
             impact: 'High',
             actual: 0.2,
             estimate: 0.3,
