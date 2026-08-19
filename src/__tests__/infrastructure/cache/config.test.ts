@@ -4,6 +4,7 @@ import {
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
 import {
+    MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
     ANALYSIS_CACHE_TTL,
     BARS_OFFHOURS_TTL_CEILING_SECONDS,
     BARS_OPEN_TTL_SECONDS,
@@ -99,7 +100,9 @@ describe('cache key builders', () => {
     it('buildBriefingCacheKey includes the date-hour prefix, model, and input hash', () => {
         expect(
             buildBriefingCacheKey('2026-04-26T14', 'test-model', 'abc123')
-        ).toBe('briefing:market:2026-04-26T14:test-model:abc123');
+        ).toBe(
+            `briefing:market:2026-04-26T14:test-model:abc123:${MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION}`
+        );
     });
 
     it('buildBriefingCacheKey: a different input hash yields a different key', () => {

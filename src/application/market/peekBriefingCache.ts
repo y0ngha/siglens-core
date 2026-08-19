@@ -1,6 +1,10 @@
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import type { MarketBriefingResponse, MarketSummaryData } from '@/domain/types';
+import type {
+    MarketBriefingContext,
+    MarketBriefingResponse,
+    MarketSummaryData,
+} from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
     buildBriefingCacheKey,
@@ -26,15 +30,23 @@ import { hashBriefingInput } from './briefingInputHash';
  *
  * @example
  * ```ts
- * const cached = await peekBriefingCache(summaryData);
+ * const cached = await peekBriefingCache(summaryData, {
+ *     marketLabel: '미국 증시',
+ *     volatility: { label: 'VIX', level: 18.3 },
+ * });
  * if (cached) return cached; // serve from cache in SSR; else client submitBriefing()
  * ```
  *
- * @see submitBriefing
+ * `context` must match what `runBriefing` was called with — it is folded into
+ * the same input hash, so a mismatch reads a key nothing ever wrote and the
+ * peek silently misses forever.
+ *
+ * @see runBriefing
  * @see peekAnalysisCache
  */
 export async function peekBriefingCache(
     data: MarketSummaryData,
+    context: MarketBriefingContext,
     modelId: string = BRIEFING_MODEL_ID
 ): Promise<MarketBriefingResponse | null> {
     if (!data || !Array.isArray(data.indices) || !Array.isArray(data.sectors)) {
@@ -45,7 +57,7 @@ export async function peekBriefingCache(
 
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-    const inputHash = hashBriefingInput(data.indices, data.sectors);
+    const inputHash = hashBriefingInput(data.indices, data.sectors, context);
     const cacheKey = buildBriefingCacheKey(dateHour, modelId, inputHash);
 
     const cached = await cache

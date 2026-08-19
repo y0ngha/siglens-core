@@ -39,9 +39,10 @@ import { hashBriefingInput } from './briefingInputHash';
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
  * `context` names the market and carries its volatility reading, if any — the
- * prompt refuses to ask for a volatility number the caller did not supply.
- * The cache key needs no extra axis for it: `hashBriefingInput` already hashes
- * the tickers and quotes, which differ per market by construction.
+ * prompt refuses to ask for a volatility number the caller did not supply. It is
+ * folded into `hashBriefingInput`, because it changes the prompt: two calls with
+ * identical quotes but a different market label — or with the volatility reading
+ * present in one and absent in the other — must not share a cached briefing.
  *
  * @throws {Error} If the AI provider call fails (network, 5xx, AbortError).
  */
@@ -52,7 +53,7 @@ export async function runBriefing(
 ): Promise<RunBriefingResult> {
     const now = new Date();
     const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-    const inputHash = hashBriefingInput(data.indices, data.sectors);
+    const inputHash = hashBriefingInput(data.indices, data.sectors, context);
     const cacheKey = buildBriefingCacheKey(
         dateHour,
         BRIEFING_MODEL_ID,

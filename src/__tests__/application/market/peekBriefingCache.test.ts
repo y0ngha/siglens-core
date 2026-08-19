@@ -6,6 +6,7 @@ vi.mock('@/domain/analysis/normalizeMarketBriefing');
 
 import { peekBriefingCache } from '@/application/market/peekBriefingCache';
 import {
+    MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
     BRIEFING_MODEL_ID,
     buildBriefingCacheKey,
 } from '@/infrastructure/cache/config';
@@ -48,6 +49,11 @@ const mockCachedData = {
     generatedAt: '2026-06-04T10:00:00.000Z',
 };
 
+const CTX = {
+    marketLabel: '미국 증시',
+    volatility: { label: 'VIX', level: 18.3 },
+} as const;
+
 describe('peekBriefingCache 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -59,7 +65,7 @@ describe('peekBriefingCache 함수는', () => {
     it('(Happy) 캐시 HIT이면 normalizeMarketBriefing 결과를 반환한다', async () => {
         mockCacheGet.mockResolvedValueOnce(mockCachedData);
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         expect(result).toBe(mockBriefing);
         expect(mockNormalizeMarketBriefing).toHaveBeenCalledWith(
@@ -73,16 +79,16 @@ describe('peekBriefingCache 함수는', () => {
         try {
             mockCacheGet.mockResolvedValueOnce(mockCachedData);
 
-            await peekBriefingCache(mockData);
+            await peekBriefingCache(mockData, CTX);
 
             const calledKey = mockCacheGet.mock.calls[0][0] as string;
             const dateHour = new Date()
                 .toISOString()
                 .slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
-            // key format: briefing:market:<dateHour>:<model>:<inputHash(16 hex)>
+            // key format: briefing:market:<dateHour>:<model>:<inputHash(16 hex)>:<promptVersion>
             expect(calledKey).toMatch(
                 new RegExp(
-                    `^briefing:market:${dateHour}:${BRIEFING_MODEL_ID.replace(/\./g, '\\.')}:[0-9a-f]{16}$`
+                    `^briefing:market:${dateHour}:${BRIEFING_MODEL_ID.replace(/\./g, '\\.')}:[0-9a-f]{16}:${MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION}$`
                 )
             );
         } finally {
@@ -93,7 +99,7 @@ describe('peekBriefingCache 함수는', () => {
     it('modelId 미지정 시 BRIEFING_MODEL_ID 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(mockCachedData);
 
-        await peekBriefingCache(mockData);
+        await peekBriefingCache(mockData, CTX);
 
         const calledKey = mockCacheGet.mock.calls[0][0] as string;
         expect(calledKey).toContain(BRIEFING_MODEL_ID);
@@ -106,7 +112,7 @@ describe('peekBriefingCache 함수는', () => {
             mockCacheGet.mockResolvedValueOnce(mockCachedData);
             const customModel = 'gemini-2.5-pro';
 
-            await peekBriefingCache(mockData, customModel);
+            await peekBriefingCache(mockData, CTX, customModel);
 
             const calledKey = mockCacheGet.mock.calls[0][0] as string;
             const dateHour = new Date()
@@ -128,7 +134,7 @@ describe('peekBriefingCache 함수는', () => {
     it('(Worst) 캐시 MISS이면 null을 반환한다', async () => {
         mockCacheGet.mockResolvedValueOnce(null);
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         expect(result).toBeNull();
         expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
@@ -137,7 +143,7 @@ describe('peekBriefingCache 함수는', () => {
     it('(Worst) 캐시 프로바이더가 null이면 null을 반환하고 get을 호출하지 않는다', async () => {
         mockCreateCacheProvider.mockReturnValueOnce(null);
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         expect(result).toBeNull();
         expect(mockCacheGet).not.toHaveBeenCalled();
@@ -149,7 +155,7 @@ describe('peekBriefingCache 함수는', () => {
             .spyOn(console, 'error')
             .mockImplementation(() => {});
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         consoleSpy.mockRestore();
         expect(result).toBeNull();
@@ -162,7 +168,7 @@ describe('peekBriefingCache 함수는', () => {
             .spyOn(console, 'error')
             .mockImplementation(() => {});
 
-        await peekBriefingCache(mockData);
+        await peekBriefingCache(mockData, CTX);
 
         expect(consoleSpy).toHaveBeenCalledWith(
             '[Peek] Briefing cache read failed:',
@@ -180,7 +186,7 @@ describe('peekBriefingCache 함수는', () => {
             .spyOn(console, 'error')
             .mockImplementation(() => {});
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         consoleSpy.mockRestore();
         expect(result).toBeNull();
@@ -196,7 +202,7 @@ describe('peekBriefingCache 함수는', () => {
             .spyOn(console, 'error')
             .mockImplementation(() => {});
 
-        await peekBriefingCache(mockData);
+        await peekBriefingCache(mockData, CTX);
 
         expect(consoleSpy).toHaveBeenCalledWith(
             '[Peek] Briefing cache payload invalid:',
@@ -207,7 +213,8 @@ describe('peekBriefingCache 함수는', () => {
 
     it('(Worst/G1) null 데이터 전달 시 null을 반환하고 캐시 프로바이더를 호출하지 않는다', async () => {
         const result = await peekBriefingCache(
-            null as unknown as typeof mockData
+            null as unknown as typeof mockData,
+            CTX
         );
 
         expect(result).toBeNull();
@@ -216,7 +223,7 @@ describe('peekBriefingCache 함수는', () => {
     });
 
     it('(Worst/G1) indices/sectors 없는 객체 전달 시 null을 반환하고 캐시 프로바이더를 호출하지 않는다', async () => {
-        const result = await peekBriefingCache({} as typeof mockData);
+        const result = await peekBriefingCache({} as typeof mockData, CTX);
 
         expect(result).toBeNull();
         expect(mockCacheGet).not.toHaveBeenCalled();
@@ -224,10 +231,13 @@ describe('peekBriefingCache 함수는', () => {
     });
 
     it('(Worst/G1) indices는 배열이지만 sectors가 없는 경우 null을 반환하고 캐시 프로바이더를 호출하지 않는다', async () => {
-        const result = await peekBriefingCache({
-            indices: [],
-            sectors: undefined,
-        } as unknown as typeof mockData);
+        const result = await peekBriefingCache(
+            {
+                indices: [],
+                sectors: undefined,
+            } as unknown as typeof mockData,
+            CTX
+        );
 
         expect(result).toBeNull();
         expect(mockCreateCacheProvider).not.toHaveBeenCalled();
@@ -241,7 +251,7 @@ describe('peekBriefingCache 함수는', () => {
             generatedAt: '2026-06-04T10:00:00.000Z',
         });
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         expect(result).toBeNull();
         expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
@@ -252,7 +262,7 @@ describe('peekBriefingCache 함수는', () => {
             generatedAt: '2026-06-04T10:00:00.000Z',
         });
 
-        const result = await peekBriefingCache(mockData);
+        const result = await peekBriefingCache(mockData, CTX);
 
         expect(result).toBeNull();
         expect(mockNormalizeMarketBriefing).not.toHaveBeenCalled();
@@ -260,7 +270,7 @@ describe('peekBriefingCache 함수는', () => {
 
     it('캐시 HIT 경로에서 set/delete 부작용이 없다 (read-only)', async () => {
         mockCacheGet.mockResolvedValueOnce(mockCachedData);
-        await peekBriefingCache(mockData);
+        await peekBriefingCache(mockData, CTX);
 
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();
@@ -268,7 +278,7 @@ describe('peekBriefingCache 함수는', () => {
 
     it('캐시 MISS 경로에서 set/delete 부작용이 없다 (read-only)', async () => {
         mockCacheGet.mockResolvedValueOnce(null);
-        await peekBriefingCache(mockData);
+        await peekBriefingCache(mockData, CTX);
 
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();

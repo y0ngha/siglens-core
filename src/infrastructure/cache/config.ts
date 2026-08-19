@@ -400,12 +400,30 @@ export function buildAnalysisCacheKey(
  * @param inputHash - Short hash of the index/sector values used as prompt input.
  * @returns The cache key.
  */
+/**
+ * Prompt-template version for the market-briefing cache key.
+ *
+ * **Why this axis exists.** Sibling keys (`analysis`, `economic-event`,
+ * `fundamental`, `financials`) all carry one; market briefing did not, so a
+ * prompt change took up to a full TTL (1h) to take effect — within that window
+ * a cache HIT returns a response the *old* prompt produced. For the 2026-08-19
+ * change that meant English sector tickers and a fabricated VIX number still
+ * being served after deploy.
+ *
+ * Bump whenever `buildMarketBriefingPrompt`'s output changes in a way that
+ * would make a previously cached briefing wrong or stale. `p1` is the first
+ * version to carry the axis at all.
+ *
+ * @internal
+ */
+export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
 export function buildBriefingCacheKey(
     dateHour: string,
     model: string,
     inputHash: string
 ): string {
-    return `briefing:market:${dateHour}:${model}:${inputHash}`;
+    return `briefing:market:${dateHour}:${model}:${inputHash}:${MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
 /** @internal TTL for cached macro (economy) briefings. dateHour-bucketed. */
