@@ -146,12 +146,14 @@ export { normalizeIndicatorTranslation } from './domain/economy/normalizeIndicat
 
 // Model spec helpers
 export {
+    GEMINI_MODELS_SUPPORTING_DISABLED_THINKING,
     getProvider,
     getThinkingBudgetSequence,
     isChatGPTModel,
     isClaudeModel,
     isDeepSeekModel,
     isGeminiModel,
+    supportsDisabledThinking,
 } from './domain/analysis/modelSpecs';
 
 // Candle patterns (used by UI for rendering and by prompt builders)

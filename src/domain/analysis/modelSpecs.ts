@@ -295,6 +295,55 @@ export function isGeminiModel(model: ActiveModelId): model is GeminiModelId {
 }
 
 /**
+ * Gemini models that accept `thinkingBudget: 0` (thinking fully disabled).
+ * Live-measured against the Gemini API on 2026-07-31:
+ *
+ * | model                  | thinkingBudget: 0    | thinkingConfig omitted  |
+ * |------------------------|----------------------|-------------------------|
+ * | gemini-2.5-flash       | thoughts=0, total=51 | thoughts=245, total=300 |
+ * | gemini-2.5-flash-lite  | thoughts=0, total=54 | thoughts=0, total=48    |
+ *
+ * Separate calls the same day confirmed models that reject a literal 0 with a
+ * 400 ("This model only works in thinking mode"): `gemini-3.1-pro-preview`,
+ * `gemini-3.5-flash-lite`, `gemini-3.6-flash`. Note that
+ * `gemini-3-flash-preview` accepts 0 despite being generation 3 — support does
+ * NOT split cleanly by generation (2.5 vs 3.x), so never infer it from the
+ * model name or version. `gemini-2.5-pro` was not part of that measurement and
+ * is deliberately excluded (treating an unverified model as unsupported is the
+ * safe default).
+ *
+ * ⚠️ Revisit this list whenever a Gemini row is added to {@link MODEL_SPECS}.
+ * A new model stays out until it has been measured live.
+ *
+ * Why this lives in core: `callAnalysisAi` translates `reasoning: false` into
+ * `thinkingBudget: 0` on the Gemini branch, so every fixed-model path
+ * (`runNewsCardAnalysis`, `runEconomicEventAnalysis`,
+ * `runIndicatorTranslation`) and every consumer-side translation path shares
+ * the same constraint.
+ */
+export const GEMINI_MODELS_SUPPORTING_DISABLED_THINKING: ReadonlySet<GeminiModelId> =
+    new Set<GeminiModelId>([
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-3-flash-preview',
+    ]);
+
+/**
+ * Reports whether a model can handle `reasoning: false` (Gemini
+ * `thinkingBudget: 0`) without a 400. Providers other than Gemini have no
+ * literal-zero constraint, so they always return `true`.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `true` when sending a `reasoning: false` call to this model is safe.
+ */
+export function supportsDisabledThinking(model: ActiveModelId): boolean {
+    return (
+        !isGeminiModel(model) ||
+        GEMINI_MODELS_SUPPORTING_DISABLED_THINKING.has(model)
+    );
+}
+
+/**
  * Type predicate that narrows the model to the ChatGPT-hosted subset.
  *
  * @param model - Active model identifier to test.

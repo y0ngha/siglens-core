@@ -213,3 +213,15 @@
   Rule: CONVENTIONS.md array-mutation rule + FF 1-G viewpoint shift
   Fixed in R2: rewrote as explicit `for` loop over pre-allocated array
 
+## [PR | refactor/cheap-jobs-back-to-gemini | 2026-08-20] — Cheap jobs model migration R1→R2
+
+- Violation 1 (RECOMMENDED): `src/domain/analysis/modelSpecs.ts` — `ReadonlySet<string>` used for constant with restricted values when precise literal union `GeminiModelId` already existed in same file
+  Rule: TypeScript — use precise literal unions (not generic string) for constants with a closed set of valid values; repo precedent uses `ReadonlySet<CandlePattern>` etc.
+  Context: Imprecise type lost compile-time protection; test required `as ActiveModelId` cast to accommodate string type
+  Fixed in R2: Changed to `ReadonlySet<GeminiModelId>` for type precision and eliminated cast
+
+- Violation 2 (RECOMMENDED): `docs/PUBLIC_API.md` — new public exports added to inline inventory without dated changelog row
+  Rule: MISTAKES.md §Public API 1 — PUBLIC_API.md convention requires a dated changelog row appended for every additive public-API change; inline list alone is insufficient
+  Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
+  Fixed in R2: Added dated changelog row documenting the new public exports
+

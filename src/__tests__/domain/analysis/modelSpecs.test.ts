@@ -1,5 +1,6 @@
 import {
     DISABLED_THINKING_BUDGET,
+    GEMINI_MODELS_SUPPORTING_DISABLED_THINKING,
     getProvider,
     getThinkingBudgetSequence,
     isChatGPTModel,
@@ -7,6 +8,7 @@ import {
     isDeepSeekModel,
     isGeminiModel,
     MODEL_SPECS,
+    supportsDisabledThinking,
     THINKING_BUDGET_FALLBACK_STEPS,
     type ChatGPTModelId,
     type ClaudeModelId,
@@ -541,5 +543,31 @@ describe('isClaudeSamplingModelSpec', () => {
             expectTypeOf(spec.thinkingBudget).toEqualTypeOf<0>();
             expectTypeOf(spec.provider).toEqualTypeOf<'claude'>();
         }
+    });
+});
+
+describe('supportsDisabledThinking', () => {
+    // `callAnalysisAi`는 `reasoning: false`를 Gemini 분기에서 thinkingBudget 0으로
+    // 번역한다. 아래 세 모델은 2026-07-31 라이브 호출에서 리터럴 0을
+    // 400("This model only works in thinking mode")으로 거부했다 — 이 단언이
+    // 허용목록이 조용히 넓어지는 것을 막는다.
+    it('리터럴 0을 거부하는 Gemini 모델은 false다', () => {
+        expect(supportsDisabledThinking('gemini-3.1-pro-preview')).toBe(false);
+        expect(supportsDisabledThinking('gemini-3.5-flash-lite')).toBe(false);
+        expect(supportsDisabledThinking('gemini-3.6-flash')).toBe(false);
+        // 실측 대상이 아니었으므로 미지원으로 취급한다.
+        expect(supportsDisabledThinking('gemini-2.5-pro')).toBe(false);
+    });
+
+    it('실측으로 0을 허용한 Gemini 모델은 true다', () => {
+        for (const model of GEMINI_MODELS_SUPPORTING_DISABLED_THINKING) {
+            expect(supportsDisabledThinking(model)).toBe(true);
+        }
+    });
+
+    it('Gemini가 아닌 provider는 리터럴 0 제약이 없어 항상 true다', () => {
+        expect(supportsDisabledThinking('deepseek-v4-flash')).toBe(true);
+        expect(supportsDisabledThinking('claude-haiku-4-5')).toBe(true);
+        expect(supportsDisabledThinking('gpt-5-mini')).toBe(true);
     });
 });

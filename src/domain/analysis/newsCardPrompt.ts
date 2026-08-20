@@ -23,14 +23,15 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  * carry analytical value.
  *
  * Intended for high-volume calls on a cheap non-reasoning model (today
- * `deepseek-v4-flash` — see NEWS_CARD_MODEL_ID) where latency and cost per card
- * are critical. No skill injection needed — the task is purely translation +
- * classification, not market interpretation.
+ * `gemini-2.5-flash-lite` — see NEWS_CARD_MODEL_ID) where latency and cost per
+ * card are critical. No skill injection needed — the task is purely translation
+ * + classification, not market interpretation.
  *
- * The Output Schema and Allowed Values blocks below are the ONLY field contract
- * on the DeepSeek path — that adapter ignores `responseSchema` and sends
- * `response_format: { type: 'json_object' }`. Keep them in sync with
- * NEWS_CARD_RESPONSE_SCHEMA and normalizeNewsCardAnalysis.
+ * Keep the Output Schema and Allowed Values blocks below in sync with
+ * NEWS_CARD_RESPONSE_SCHEMA and normalizeNewsCardAnalysis. On Gemini the schema
+ * is actually enforced by the adapter, but a provider that ignores
+ * `responseSchema` (DeepSeek sends `response_format: { type: 'json_object' }`
+ * instead) leaves these blocks as the only field contract.
  *
  * @param item - The raw news article to analyse.
  * @returns `{ stable, dynamic }` ready to be dispatched to the news-card LLM.
