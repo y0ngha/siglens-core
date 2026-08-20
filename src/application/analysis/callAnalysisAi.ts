@@ -2,6 +2,7 @@ import type { CallAnalysisAiOptions } from '@/application/analysis/types';
 import {
     DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
+    supportsDisabledThinking,
 } from '@/domain/analysis/modelSpecs';
 import type {
     ChatGPTModelId,
@@ -27,6 +28,30 @@ import { resolveServerApiKey } from '@/infrastructure/ai/serverKeys';
  * 오인해 Claude/ChatGPT에 추가하지 않도록 명시한다.
  */
 const ANALYSIS_MAX_RETRY_DELAY_MS = 30_000;
+
+/**
+ * Models already warned about via {@link warnUnsupportedDisabledThinking}, so a
+ * batch of calls on the same model logs once instead of once per item.
+ */
+const warnedDisabledThinkingModels = new Set<string>();
+
+/**
+ * Log, at most once per model, that `reasoning: false` could not be honored.
+ *
+ * @param model - The Gemini model that rejects a literal `thinkingBudget: 0`.
+ */
+function warnUnsupportedDisabledThinking(model: string): void {
+    if (warnedDisabledThinkingModels.has(model)) return;
+    warnedDisabledThinkingModels.add(model);
+    console.warn(
+        `[callAnalysisAi] reasoning:false ignored — "${model}" rejects a disabled thinking budget; falling back to its spec default.`
+    );
+}
+
+/** @internal Test helper — clears the once-per-model warning set. */
+export function _resetDisabledThinkingWarningsForTest(): void {
+    warnedDisabledThinkingModels.clear();
+}
 
 /**
  * 분석용 AI 호출 — provider 라우팅, `reasoning` 번역, 재시도, JSON 정규화를 포함한다.
@@ -115,11 +140,23 @@ export async function callAnalysisAi(
                 // 눌러 호출자가 요청한 thinkingBudget보다 우선한다 — OFF는 완전 비활성이어야
                 // 하기 때문이다. reasoning===true/undefined는 기존 동작(thinkingBudget 있으면
                 // 사용, 없으면 스펙 기본)을 그대로 유지한다.
-                const budgetRef = minimizeEffort
-                    ? { current: DISABLED_THINKING_BUDGET }
-                    : thinkingBudget !== undefined
-                      ? { current: thinkingBudget }
-                      : undefined;
+                //
+                // 단, 리터럴 0을 400("This model only works in thinking mode")으로
+                // 거부하는 Gemini 모델이 있다(`supportsDisabledThinking`). 그런
+                // 모델에 0을 보내면 요청 자체가 죽으므로 스펙 기본으로 폴백하고
+                // 모델당 1회 경고한다 — 추론이 조금 켜진 채로 응답하는 편이
+                // 전 호출 400보다 낫다. 이 분기는 사용자가 모델과 추론 토글을
+                // 모두 고르는 경로(옵션·펀더멘털·재무 등)에서 실제로 열린다.
+                const canDisableThinking = supportsDisabledThinking(model);
+                if (minimizeEffort && !canDisableThinking) {
+                    warnUnsupportedDisabledThinking(model);
+                }
+                const budgetRef =
+                    minimizeEffort && canDisableThinking
+                        ? { current: DISABLED_THINKING_BUDGET }
+                        : thinkingBudget !== undefined
+                          ? { current: thinkingBudget }
+                          : undefined;
                 return callGeminiWithRetry(
                     prompt,
                     model as GeminiModelId,

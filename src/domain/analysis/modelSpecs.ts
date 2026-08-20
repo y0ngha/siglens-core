@@ -295,28 +295,31 @@ export function isGeminiModel(model: ActiveModelId): model is GeminiModelId {
 }
 
 /**
- * Gemini 모델 중 `thinkingBudget: 0`(사고 완전 비활성)을 그대로 받아들이는 집합.
- * 2026-07-31 Gemini API 라이브 호출로 실측:
+ * Gemini models that accept `thinkingBudget: 0` (thinking fully disabled).
+ * Live-measured against the Gemini API on 2026-07-31:
  *
- * | model                  | thinkingBudget: 0    | thinkingConfig 생략   |
- * |------------------------|----------------------|-----------------------|
+ * | model                  | thinkingBudget: 0    | thinkingConfig omitted  |
+ * |------------------------|----------------------|-------------------------|
  * | gemini-2.5-flash       | thoughts=0, total=51 | thoughts=245, total=300 |
  * | gemini-2.5-flash-lite  | thoughts=0, total=54 | thoughts=0, total=48    |
  *
- * 같은 날 별도 호출로 리터럴 0을 400("This model only works in thinking mode")
- * 으로 거부하는 모델도 확인: `gemini-3.1-pro-preview`, `gemini-3.5-flash-lite`,
- * `gemini-3.6-flash`. `gemini-3-flash-preview`는 3세대인데도 0을 허용한다 —
- * 세대(2.5 vs 3.x)로 갈리지 않으므로 모델명/버전으로 추론하지 말 것.
- * `gemini-2.5-pro`는 실측 대상이 아니었으므로 의도적으로 제외한다(미검증 =
- * 미지원이 안전한 기본값).
+ * Separate calls the same day confirmed models that reject a literal 0 with a
+ * 400 ("This model only works in thinking mode"): `gemini-3.1-pro-preview`,
+ * `gemini-3.5-flash-lite`, `gemini-3.6-flash`. Note that
+ * `gemini-3-flash-preview` accepts 0 despite being generation 3 — support does
+ * NOT split cleanly by generation (2.5 vs 3.x), so never infer it from the
+ * model name or version. `gemini-2.5-pro` was not part of that measurement and
+ * is deliberately excluded (treating an unverified model as unsupported is the
+ * safe default).
  *
- * ⚠️ `MODEL_SPECS`에 Gemini 행이 추가될 때마다 이 목록을 재검토해야 한다.
- * 신규 모델은 라이브 실측 전까지 넣지 않는다.
+ * ⚠️ Revisit this list whenever a Gemini row is added to {@link MODEL_SPECS}.
+ * A new model stays out until it has been measured live.
  *
- * 왜 core에 있나: `callAnalysisAi`가 `reasoning: false`를 Gemini 분기에서
- * `thinkingBudget: 0`으로 번역하므로, 고정 모델을 쓰는 모든 경로
+ * Why this lives in core: `callAnalysisAi` translates `reasoning: false` into
+ * `thinkingBudget: 0` on the Gemini branch, so every fixed-model path
  * (`runNewsCardAnalysis`, `runEconomicEventAnalysis`,
- * `runIndicatorTranslation`)와 소비자 쪽 번역 경로가 같은 제약을 공유한다.
+ * `runIndicatorTranslation`) and every consumer-side translation path shares
+ * the same constraint.
  */
 export const GEMINI_MODELS_SUPPORTING_DISABLED_THINKING: ReadonlySet<GeminiModelId> =
     new Set<GeminiModelId>([
@@ -326,12 +329,12 @@ export const GEMINI_MODELS_SUPPORTING_DISABLED_THINKING: ReadonlySet<GeminiModel
     ]);
 
 /**
- * `reasoning: false`(= Gemini `thinkingBudget: 0`)를 400 없이 처리할 수 있는
- * 모델인지 판정한다. Gemini가 아닌 provider는 리터럴 0 제약 자체가 없으므로
- * 항상 `true`.
+ * Reports whether a model can handle `reasoning: false` (Gemini
+ * `thinkingBudget: 0`) without a 400. Providers other than Gemini have no
+ * literal-zero constraint, so they always return `true`.
  *
  * @param model - Active model identifier to test.
- * @returns 이 모델로 `reasoning: false` 호출을 보내도 안전하면 `true`.
+ * @returns `true` when sending a `reasoning: false` call to this model is safe.
  */
 export function supportsDisabledThinking(model: ActiveModelId): boolean {
     return (
