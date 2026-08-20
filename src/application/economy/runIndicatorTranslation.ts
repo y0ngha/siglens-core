@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
+import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import type {
     RunIndicatorTranslationOptions,
     RunIndicatorTranslationResult,
@@ -21,12 +21,15 @@ import {
 /**
  * @internal Fixed model identifier for indicator name translation.
  *
- * Translation is a short one-field task (single Korean string): a cheap
- * non-reasoning model is the right cost/latency trade-off. Mirrors the
- * constant in `submitIndicatorTranslation.ts` — kept local so the run path is
- * self-contained.
+ * Translation is a short one-field task (single Korean string): the cheapest
+ * non-reasoning line is the right cost/latency trade-off. Kept local so the
+ * run path is self-contained.
+ *
+ * ⚠️ `reasoning: false`는 Gemini 분기에서 `thinkingBudget: 0`이 된다. 리터럴
+ * 0을 거부하는 Gemini 모델이 있으므로(runNewsCardAnalysis.ts의 같은 주석 참고)
+ * 이 상수를 바꾸기 전에 대상 모델이 0을 받는지 확인할 것.
  */
-const INDICATOR_TRANSLATION_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
+const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
 
 /**
  * Run an indicator-name AI translation end-to-end: cache lookup → LLM call →
@@ -38,7 +41,7 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `deepseek-v4-flash` with reasoning off (single Korean string output).
+ * `gemini-2.5-flash-lite` with reasoning off (single Korean string output).
  *
  * Indicator translation has no usage gate — no tier, no BYOK, no quota check.
  *

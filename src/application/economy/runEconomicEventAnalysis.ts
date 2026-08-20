@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
+import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import type {
     RunEconomicEventAnalysisOptions,
     RunEconomicEventAnalysisResult,
@@ -23,11 +23,14 @@ import {
  * @internal Fixed model identifier for economic-event analysis.
  *
  * A short structured classification task (sentiment + two Korean sentences):
- * a cheap non-reasoning model is the right cost/latency trade-off, mirroring
- * news-card analysis.
- * — kept local so the run path is self-contained.
+ * the cheapest non-reasoning line is the right cost/latency trade-off,
+ * mirroring news-card analysis. Kept local so the run path is self-contained.
+ *
+ * ⚠️ `reasoning: false`는 Gemini 분기에서 `thinkingBudget: 0`이 된다. 리터럴
+ * 0을 거부하는 Gemini 모델이 있으므로(runNewsCardAnalysis.ts의 같은 주석 참고)
+ * 이 상수를 바꾸기 전에 대상 모델이 0을 받는지 확인할 것.
  */
-const ECONOMIC_EVENT_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
+const ECONOMIC_EVENT_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
 
 /**
  * Build a deterministic hash of the economic-event input for cache-key use.
@@ -65,7 +68,7 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `deepseek-v4-flash` with reasoning off (short structured classification task).
+ * `gemini-2.5-flash-lite` with reasoning off (short structured classification task).
  *
  * Economic-event analysis has no usage gate — no tier, no BYOK, no quota check
  * or record. The analysis is public-economy data, same as congress trade analysis.

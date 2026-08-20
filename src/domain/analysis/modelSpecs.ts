@@ -295,6 +295,52 @@ export function isGeminiModel(model: ActiveModelId): model is GeminiModelId {
 }
 
 /**
+ * Gemini 모델 중 `thinkingBudget: 0`(사고 완전 비활성)을 그대로 받아들이는 집합.
+ * 2026-07-31 Gemini API 라이브 호출로 실측:
+ *
+ * | model                  | thinkingBudget: 0    | thinkingConfig 생략   |
+ * |------------------------|----------------------|-----------------------|
+ * | gemini-2.5-flash       | thoughts=0, total=51 | thoughts=245, total=300 |
+ * | gemini-2.5-flash-lite  | thoughts=0, total=54 | thoughts=0, total=48    |
+ *
+ * 같은 날 별도 호출로 리터럴 0을 400("This model only works in thinking mode")
+ * 으로 거부하는 모델도 확인: `gemini-3.1-pro-preview`, `gemini-3.5-flash-lite`,
+ * `gemini-3.6-flash`. `gemini-3-flash-preview`는 3세대인데도 0을 허용한다 —
+ * 세대(2.5 vs 3.x)로 갈리지 않으므로 모델명/버전으로 추론하지 말 것.
+ * `gemini-2.5-pro`는 실측 대상이 아니었으므로 의도적으로 제외한다(미검증 =
+ * 미지원이 안전한 기본값).
+ *
+ * ⚠️ `MODEL_SPECS`에 Gemini 행이 추가될 때마다 이 목록을 재검토해야 한다.
+ * 신규 모델은 라이브 실측 전까지 넣지 않는다.
+ *
+ * 왜 core에 있나: `callAnalysisAi`가 `reasoning: false`를 Gemini 분기에서
+ * `thinkingBudget: 0`으로 번역하므로, 고정 모델을 쓰는 모든 경로
+ * (`runNewsCardAnalysis`, `runEconomicEventAnalysis`,
+ * `runIndicatorTranslation`)와 소비자 쪽 번역 경로가 같은 제약을 공유한다.
+ */
+export const GEMINI_MODELS_SUPPORTING_DISABLED_THINKING: ReadonlySet<GeminiModelId> =
+    new Set<GeminiModelId>([
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-3-flash-preview',
+    ]);
+
+/**
+ * `reasoning: false`(= Gemini `thinkingBudget: 0`)를 400 없이 처리할 수 있는
+ * 모델인지 판정한다. Gemini가 아닌 provider는 리터럴 0 제약 자체가 없으므로
+ * 항상 `true`.
+ *
+ * @param model - Active model identifier to test.
+ * @returns 이 모델로 `reasoning: false` 호출을 보내도 안전하면 `true`.
+ */
+export function supportsDisabledThinking(model: ActiveModelId): boolean {
+    return (
+        !isGeminiModel(model) ||
+        GEMINI_MODELS_SUPPORTING_DISABLED_THINKING.has(model)
+    );
+}
+
+/**
  * Type predicate that narrows the model to the ChatGPT-hosted subset.
  *
  * @param model - Active model identifier to test.

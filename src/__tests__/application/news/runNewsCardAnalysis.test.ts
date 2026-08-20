@@ -8,7 +8,10 @@ import {
     runNewsCardAnalysis,
 } from '@/application/news/runNewsCardAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import {
+    MODEL_SPECS,
+    supportsDisabledThinking,
+} from '@/domain/analysis/modelSpecs';
 import type { NewsItem } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
@@ -78,7 +81,7 @@ describe('runNewsCardAnalysis', () => {
             );
         });
 
-        it('고정 모델은 DeepSeek non-thinking 라인이다', async () => {
+        it('고정 모델은 Gemini 저비용 라인이고 thinkingBudget 0을 받는다', async () => {
             // NEWS_CARD_MODEL_ID를 리터럴로 재선언하지 않고 실제 호출 인자를
             // 본다 — 상수만 바꾸고 정책 주석을 안 고치는 드리프트를 잡는다.
             await runNewsCardAnalysis({ item: testNewsItem });
@@ -86,7 +89,11 @@ describe('runNewsCardAnalysis', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
                 expect.objectContaining({ model: NEWS_CARD_MODEL_ID })
             );
-            expect(MODEL_SPECS[NEWS_CARD_MODEL_ID].provider).toBe('deepseek');
+            expect(MODEL_SPECS[NEWS_CARD_MODEL_ID].provider).toBe('gemini');
+            // 이 경로는 항상 `reasoning: false`를 보내고 callAnalysisAi가 그것을
+            // Gemini 분기에서 thinkingBudget 0으로 번역한다. 리터럴 0을 400으로
+            // 거부하는 Gemini 모델로 상수가 바뀌면 프로덕션 전 호출이 죽는다.
+            expect(supportsDisabledThinking(NEWS_CARD_MODEL_ID)).toBe(true);
         });
     });
 

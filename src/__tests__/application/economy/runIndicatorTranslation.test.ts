@@ -8,7 +8,10 @@ import { runIndicatorTranslation } from '@/application/economy/runIndicatorTrans
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { INDICATOR_TRANSLATION_CACHE_TTL } from '@/infrastructure/cache/config';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import {
+    MODEL_SPECS,
+    supportsDisabledThinking,
+} from '@/domain/analysis/modelSpecs';
 import type { ActiveModelId } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
@@ -91,7 +94,10 @@ describe('runIndicatorTranslation', () => {
             const { model } = mockCallAnalysisAi.mock.calls[0][0] as {
                 model: ActiveModelId;
             };
-            expect(MODEL_SPECS[model].provider).toBe('deepseek');
+            expect(MODEL_SPECS[model].provider).toBe('gemini');
+            // reasoning:false는 Gemini 분기에서 thinkingBudget 0이 된다 —
+            // 리터럴 0을 400으로 거부하는 모델로 상수가 바뀌면 전 호출이 죽는다.
+            expect(supportsDisabledThinking(model)).toBe(true);
         });
 
         it('결과를 { nameKo } envelope으로 INDICATOR_TRANSLATION_CACHE_TTL에 기��한다', async () => {
