@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.49.0](https://github.com/y0ngha/siglens-core/compare/v0.48.0...v0.49.0) (2026-08-20)
+
+
+### Bug Fixes
+
+* claude-review 지적 반영 — 공개 JSDoc 영어화 + 가드 실제 배선 ([85a0786](https://github.com/y0ngha/siglens-core/commit/85a0786befa5c14a6634b230e591f2ec0500c802))
+
 # [0.48.0](https://github.com/y0ngha/siglens-core/compare/v0.47.1...v0.48.0) (2026-08-19)
 
 ## [0.47.1](https://github.com/y0ngha/siglens-core/compare/v0.47.0...v0.47.1) (2026-08-19)
