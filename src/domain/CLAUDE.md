@@ -75,6 +75,38 @@ import type { CacheProvider } from '@/domain/ports/cache';
 export function createCacheProvider(): CacheProvider | null { ... }
 ```
 
+## Indicator Confluence (`signals/confluence.ts`)
+
+`evaluateConfluence(bars, options)` owns the multi-signal entry/exit rule that consumers
+(the trading system, the backtest generator) used to each re-implement. It is pure: the
+caller fetches every bar series, including the higher-timeframe one, and passes them in.
+Fetching is a consumer concern; the rule is not.
+
+Three things it does that a naive "count the signals" version does not:
+
+- **Counts indicator families, not signal types.** The 36 members of `SignalType` derive
+  from 14 indicators — RSI contributes 4, MACD 4, Bollinger 6 — so counting types treats
+  transforms of one close series as independent votes. `SIGNAL_FAMILY` collapses them;
+  unmapped types fall back to their own name so a new detector is never worth zero.
+- **Weighs `expected` phase at half.** `support_proximity_bullish` is a positional state,
+  not a completed cross. Phase is recovered from the type name (the two unions are
+  disjoint), which keeps `phase` out of the snapshot so previously stored snapshots stay
+  re-scorable.
+- **Separates the validated part from the invented part.** The trigger snaps (92 / 8)
+  come from a backtested rule; the continuous 50 ± `span` band does not. The band stays
+  narrow for that reason, and `scoreConfluence` clamps a corrupt `span` or
+  `expectedWeight` rather than letting a round-tripped snapshot invert the score.
+
+**The higher-timeframe and volume gates are entry-only, by design.** Both make a trigger
+harder to reach — the point for entries, exactly backwards for exits. A missed entry
+costs opportunity; a missed exit costs money. `exitTrigger` therefore references neither.
+Any change here needs the same asymmetry.
+
+Every tunable is an option, and the resolved set is written back onto the snapshot as
+`params`. A stored snapshot is then self-describing: it records not just what was
+detected but the thresholds it was judged against, which is what makes before/after
+comparison possible when a consumer tunes the rule.
+
 ## Dependency Rules
 
 ```

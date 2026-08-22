@@ -1,4 +1,7 @@
 import type {
+    ConfluenceParams,
+    ConfluenceSnapshot,
+    EvaluateConfluenceOptions,
     FinancialSignalType,
     NewsTimeRange,
     PatternTrend,
@@ -6,6 +9,16 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
+    calculateMA,
+    CONFLUENCE_MIN,
+    CONFLUENCE_SPAN,
+    CONFLUENCE_TRIGGER_SCORE,
+    confluenceFamilyWeight,
+    evaluateConfluence,
+    isConfluenceExit,
+    scoreConfluence,
+    signalFamily,
+    VOLUME_FAMILIES,
     runFinancialsAnalysis,
     checkAnalysisLimit,
     checkChatbotLimit,
@@ -54,6 +67,47 @@ describe('public API exports', () => {
         expect(FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX).toBe(55);
         expect(POC_WINDOW_DEFAULT).toBe(60);
         expect(scoreToLabel(10)).toBe('EXTREME_FEAR');
+    });
+
+    it('exports the indicator-confluence rule from package entrypoint', () => {
+        // Consumers (trader, backtests) must drive the same rule from one place —
+        // a second implementation is how the two silently drift apart.
+        expect(typeof evaluateConfluence).toBe('function');
+        expect(typeof scoreConfluence).toBe('function');
+        expect(typeof isConfluenceExit).toBe('function');
+        expect(CONFLUENCE_MIN).toBe(3);
+        expect(CONFLUENCE_SPAN).toBe(15);
+        expect(CONFLUENCE_TRIGGER_SCORE).toBe(92);
+        expect([...VOLUME_FAMILIES].sort()).toEqual(['cmf', 'mfi']);
+        expect(signalFamily('bollinger_lower_bounce')).toBe('bollinger');
+        expect(
+            confluenceFamilyWeight(['rsi_oversold', 'rsi_bullish_divergence'])
+        ).toBe(1);
+        expect(scoreConfluence(null)).toBe(50);
+
+        const params: ConfluenceParams = {
+            min: 3,
+            span: 15,
+            expectedWeight: 0.5,
+            htf: null,
+            requireVolume: true,
+        };
+        const opts: EvaluateConfluenceOptions = { timeframe: '30Min' };
+        const snap: ConfluenceSnapshot | null = evaluateConfluence([], opts);
+        expect(params.min).toBe(3);
+        expect(snap).toBeNull();
+    });
+
+    it('exports calculateMA so consumers stop re-implementing it', () => {
+        const bars = Array.from({ length: 5 }, (_, i) => ({
+            time: 1700000000 + i * 86400,
+            open: 10,
+            high: 10,
+            low: 10,
+            close: 10,
+            volume: 1,
+        }));
+        expect(calculateMA(bars, 3).at(-1)).toBe(10);
     });
 
     it('exports advanced domain helpers from package entrypoint', () => {

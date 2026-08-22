@@ -115,6 +115,29 @@ export {
     scoreToLabel,
 } from './domain/indicators';
 export { classifyTrend, detectSignals } from './domain/signals';
+export {
+    confluenceFamilyWeight,
+    CONFLUENCE_EXIT_SCORE,
+    CONFLUENCE_EXPECTED_WEIGHT,
+    CONFLUENCE_MIN,
+    CONFLUENCE_MIN_BARS,
+    CONFLUENCE_SHRINK,
+    CONFLUENCE_SPAN,
+    CONFLUENCE_TREND_MA_PERIOD,
+    CONFLUENCE_TRIGGER_SCORE,
+    evaluateConfluence,
+    isConfluenceExit,
+    scoreConfluence,
+    signalFamily,
+    VOLUME_FAMILIES,
+} from './domain/signals/confluence';
+export type {
+    ConfluenceParams,
+    ConfluenceSnapshot,
+    EvaluateConfluenceOptions,
+} from './domain/signals/confluence';
+// Exported so consumers stop re-implementing a moving average the library already has.
+export { calculateMA } from './domain/indicators/ma';
 
 // Prompt builders
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
