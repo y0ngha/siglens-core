@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.2](https://github.com/y0ngha/siglens-core/compare/v0.50.1...v0.50.2) (2026-08-22)
+
+
+### Bug Fixes
+
+* 컨플루언스 기본값을 실측으로 다시 잡는다 (min 2.5, 거래량 기본 off) ([9f065b5](https://github.com/y0ngha/siglens-core/commit/9f065b5b12f452d42aae7e772f3e8fe141ab7ecb))
+
 ## [0.50.1](https://github.com/y0ngha/siglens-core/compare/v0.50.0...v0.50.1) (2026-08-22)
 
 
