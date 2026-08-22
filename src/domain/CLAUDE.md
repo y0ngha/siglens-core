@@ -97,10 +97,17 @@ Three things it does that a naive "count the signals" version does not:
   narrow for that reason, and `scoreConfluence` clamps a corrupt `span` or
   `expectedWeight` rather than letting a round-tripped snapshot invert the score.
 
-**The higher-timeframe and volume gates are entry-only, by design.** Both make a trigger
-harder to reach — the point for entries, exactly backwards for exits. A missed entry
-costs opportunity; a missed exit costs money. `exitTrigger` therefore references neither.
-Any change here needs the same asymmetry.
+**Every tightening is entry-only, by design.** The higher-timeframe and volume gates make
+a trigger harder to reach — the point for entries, exactly backwards for exits. A missed
+entry costs opportunity; a missed exit costs money. `exitTrigger` therefore references
+neither gate, **and carries its own threshold** (`CONFLUENCE_EXIT_MIN`, lower than
+`CONFLUENCE_MIN`).
+
+The separate threshold is not cosmetic. When entry and exit shared one, raising the entry
+bar silently raised the exit bar with it and cut liquidation signals by 80% in production —
+the gates were correctly entry-only while the *constant behind them* was not. Any future
+tightening has to declare which side it lands on; "it's just a threshold" is how the last
+one slipped through.
 
 Every tunable is an option, and the resolved set is written back onto the snapshot as
 `params`. A stored snapshot is then self-describing: it records not just what was

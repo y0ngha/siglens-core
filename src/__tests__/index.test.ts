@@ -87,6 +87,7 @@ describe('public API exports', () => {
 
         const params: ConfluenceParams = {
             min: 3,
+            exitMin: 2.5,
             span: 15,
             expectedWeight: 0.5,
             htf: null,

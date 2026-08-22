@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+    CONFLUENCE_EXIT_MIN,
     CONFLUENCE_EXIT_SCORE,
     CONFLUENCE_EXPECTED_WEIGHT,
     CONFLUENCE_MIN,
@@ -42,6 +43,7 @@ function risingBars(n: number, start = 100, step = 0.5): Bar[] {
 
 const DEFAULT_PARAMS: ConfluenceParams = {
     min: CONFLUENCE_MIN,
+    exitMin: CONFLUENCE_EXIT_MIN,
     span: CONFLUENCE_SPAN,
     expectedWeight: CONFLUENCE_EXPECTED_WEIGHT,
     htf: null,
@@ -404,11 +406,59 @@ describe('evaluateConfluence', () => {
 
             expect(snap.params).toEqual({
                 min: 4,
+                exitMin: CONFLUENCE_EXIT_MIN,
                 span: 20,
                 expectedWeight: 0.25,
                 htf: null,
                 requireVolume: false,
             });
+        });
+
+        it('exitMin은 min과 독립이다 — 진입을 조여도 청산이 따라 조여지면 안 된다', () => {
+            const snap = evaluateConfluence(
+                risingBars(CONFLUENCE_MIN_BARS + 1),
+                {
+                    timeframe: '30Min',
+                    min: 8,
+                }
+            )!;
+
+            expect(snap.params.min).toBe(8);
+            expect(snap.params.exitMin).toBe(CONFLUENCE_EXIT_MIN);
+        });
+
+        it('exitMin만 따로 올릴 수 있다', () => {
+            const snap = evaluateConfluence(
+                risingBars(CONFLUENCE_MIN_BARS + 1),
+                {
+                    timeframe: '30Min',
+                    exitMin: 5,
+                }
+            )!;
+
+            expect(snap.params.min).toBe(CONFLUENCE_MIN);
+            expect(snap.params.exitMin).toBe(5);
+        });
+
+        it('청산 트리거는 exitMin을 본다 — 실측 회귀', () => {
+            // 계열 2.5짜리 약세 조합(확정 2 + 상태 1)은 구 규칙에서 3종으로 잡혔었다.
+            // exitMin 기본 2.5면 살아남고, min을 아무리 올려도 영향받지 않아야 한다.
+            const falling = buildBars(
+                Array.from(
+                    { length: CONFLUENCE_MIN_BARS + 3 },
+                    (_, i) => 200 - i * 0.4
+                )
+            );
+            const strictEntry = evaluateConfluence(falling, {
+                timeframe: '30Min',
+                min: 14,
+            })!;
+            const loose = evaluateConfluence(falling, {
+                timeframe: '30Min',
+                min: 1,
+            })!;
+
+            expect(strictEntry.exitTrigger).toBe(loose.exitTrigger);
         });
 
         it('비정상 파라미터는 기본값으로 되돌린다', () => {

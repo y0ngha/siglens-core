@@ -117,6 +117,7 @@ export {
 export { classifyTrend, detectSignals } from './domain/signals';
 export {
     confluenceFamilyWeight,
+    CONFLUENCE_EXIT_MIN,
     CONFLUENCE_EXIT_SCORE,
     CONFLUENCE_EXPECTED_WEIGHT,
     CONFLUENCE_MIN,

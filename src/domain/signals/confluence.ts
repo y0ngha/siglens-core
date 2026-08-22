@@ -65,6 +65,19 @@ export const CONFLUENCE_EXPECTED_WEIGHT = 0.5;
  */
 export const CONFLUENCE_MIN_BARS = 120;
 
+/**
+ * Weighted family count the **exit** trigger requires. Lower than {@link CONFLUENCE_MIN}.
+ *
+ * Entry and exit must not share one threshold. Tightening entry is a deliberate act;
+ * tightening exit is a defect — a missed entry costs opportunity, a missed exit costs
+ * money. When the two shared a knob, raising the entry bar silently raised the exit bar
+ * with it and cut liquidation signals by 80% in production.
+ *
+ * The default keeps the exit side at roughly the sensitivity it had when the rule counted
+ * raw signal types, while still benefiting from the family/phase correction.
+ */
+export const CONFLUENCE_EXIT_MIN = 2.5;
+
 /** Simple-moving-average period used as the same-timeframe trend filter. */
 export const CONFLUENCE_TREND_MA_PERIOD = 50;
 
@@ -143,8 +156,10 @@ const EXPECTED_SIGNAL_TYPES: ReadonlySet<string> = new Set([
 
 /** Parameters a snapshot was produced with, recorded so a stored row stays explainable. */
 export interface ConfluenceParams {
-    /** Weighted family count a trigger requires. */
+    /** Weighted family count the entry trigger requires. */
     min: number;
+    /** Weighted family count the exit trigger requires. Independent of {@link min}. */
+    exitMin: number;
     /** Half-width of the continuous score band. */
     span: number;
     /** Vote weight of `expected`-phase signals. */
@@ -196,8 +211,14 @@ export interface EvaluateConfluenceOptions {
     htfBars?: readonly Bar[] | null;
     /** Label recorded for `htfBars`. Ignored when `htfBars` is absent. */
     htfLabel?: string | null;
-    /** Weighted family count a trigger requires. Default {@link CONFLUENCE_MIN}. */
+    /** Weighted family count the entry trigger requires. Default {@link CONFLUENCE_MIN}. */
     min?: number;
+    /**
+     * Weighted family count the exit trigger requires. Default {@link CONFLUENCE_EXIT_MIN}.
+     *
+     * Separate from {@link min} on purpose — see {@link CONFLUENCE_EXIT_MIN}.
+     */
+    exitMin?: number;
     /** Half-width of the continuous band. Default {@link CONFLUENCE_SPAN}. */
     span?: number;
     /** `expected`-phase vote weight. Default {@link CONFLUENCE_EXPECTED_WEIGHT}. */
@@ -311,10 +332,12 @@ export function isConfluenceExit(snapshot: ConfluenceSnapshot | null): boolean {
  * "newly lit" clause is what timestamps the entry — three signals that have been on for
  * twenty bars are already in the price.
  *
- * The exit rule is the bearish inverse of the first three clauses only. The
- * higher-timeframe and volume gates are **entry-only by design**: both make a trigger
- * harder to reach, which is the point for entries and exactly backwards for exits — a
- * missed entry costs opportunity, a missed exit costs money.
+ * The exit rule is the bearish inverse of the first three clauses only, and it uses its
+ * own threshold ({@link CONFLUENCE_EXIT_MIN}). The higher-timeframe and volume gates are
+ * **entry-only by design**, and the thresholds are **separate for the same reason**: each
+ * of these makes a trigger harder to reach, which is the point for entries and exactly
+ * backwards for exits — a missed entry costs opportunity, a missed exit costs money. Any
+ * future tightening has to declare which side it lands on.
  *
  * @param bars - OHLCV bars sorted oldest-first, at the trading timeframe.
  * @param options - Timeframe label plus optional tunables and higher-timeframe bars.
@@ -391,7 +414,7 @@ export function evaluateConfluence(
             volumeOk,
         exitTrigger:
             confluenceFamilyWeight(bearish, params.expectedWeight) >=
-                params.min &&
+                params.exitMin &&
             freshBearish.length >= 1 &&
             ma !== null &&
             last.close < ma,
@@ -402,6 +425,7 @@ function resolveParams(options: EvaluateConfluenceOptions): ConfluenceParams {
     const gateOn = Array.isArray(options.htfBars) && options.htfBars.length > 0;
     return {
         min: nonNegative(options.min, CONFLUENCE_MIN),
+        exitMin: nonNegative(options.exitMin, CONFLUENCE_EXIT_MIN),
         span: nonNegative(options.span, CONFLUENCE_SPAN),
         expectedWeight: Math.min(
             nonNegative(options.expectedWeight, CONFLUENCE_EXPECTED_WEIGHT),
