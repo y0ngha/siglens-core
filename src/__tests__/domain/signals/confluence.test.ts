@@ -349,6 +349,33 @@ describe('isConfluenceExit', () => {
     });
 });
 
+describe('기본값 — 실측으로 정한 값이라 조용히 바뀌면 안 된다', () => {
+    it('진입 문턱 2.5, 청산 문턱 2.5, 폭 15', () => {
+        // 2.5는 타입을 세던 시절 3종이 받아들이던 조합("확정 2 + 예상 1")과 같은 모양이다.
+        // 3으로 두면 단위를 바꾸면서 문턱까지 같이 올리는 셈이라 진입이 17%로 떨어졌다.
+        expect(CONFLUENCE_MIN).toBe(2.5);
+        expect(CONFLUENCE_EXIT_MIN).toBe(2.5);
+        expect(CONFLUENCE_SPAN).toBe(15);
+        expect(CONFLUENCE_EXPECTED_WEIGHT).toBe(0.5);
+    });
+
+    it('거래량 요구는 기본 꺼짐 — 근거 없이 신호를 반으로 줄이지 않는다', () => {
+        const snap = evaluateConfluence(risingBars(CONFLUENCE_MIN_BARS + 1), {
+            timeframe: '30Min',
+        })!;
+        expect(snap.params.requireVolume).toBe(false);
+    });
+
+    it('상위 시간축 게이트는 봉을 주면 켜진다 — 이쪽은 실측에서 값을 했다', () => {
+        const snap = evaluateConfluence(risingBars(CONFLUENCE_MIN_BARS + 1), {
+            timeframe: '30Min',
+            htfBars: risingBars(200, 50, 1),
+            htfLabel: '1Day',
+        })!;
+        expect(snap.params.htf).toBe('1Day');
+    });
+});
+
 describe('evaluateConfluence', () => {
     describe('기권', () => {
         it('봉이 최소치 이하면 null', () => {

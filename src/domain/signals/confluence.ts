@@ -19,9 +19,16 @@ import { detectSignals } from '@/domain/signals';
  * (`bollinger_lower_bounce` + `bollinger_percentb_oversold` + `rsi_oversold`).
  *
  * Family counting can only tighten the rule: type count is always ≥ family count, so a
- * combination that failed before can never start passing.
+ * combination that failed before can never start passing. **That is why the default is 2.5
+ * rather than the 3 the type-counting rule used** — keeping 3 while switching the unit
+ * silently raised the bar twice. Measured: 3 families cut entry triggers to 17% of the
+ * type-counting rate; 2.5 lands at 75%, which is the intended "slightly tighter", not
+ * "effectively off".
+ *
+ * Fractional values are meaningful because the count is weighted — 2.5 is "two confirmed
+ * indicators plus one anticipated", the shape the type rule used to accept as three.
  */
-export const CONFLUENCE_MIN = 3;
+export const CONFLUENCE_MIN = 2.5;
 
 /**
  * Half-width of the continuous score band around the neutral 50, yielding 35..65.
@@ -223,7 +230,17 @@ export interface EvaluateConfluenceOptions {
     span?: number;
     /** `expected`-phase vote weight. Default {@link CONFLUENCE_EXPECTED_WEIGHT}. */
     expectedWeight?: number;
-    /** Require a volume-family bullish signal for the entry trigger. Default `true`. */
+    /**
+     * Require a volume-family bullish signal for the entry trigger. Default `false`.
+     *
+     * Shipped defaulting to `true` on the reasoning that a breakout no volume indicator
+     * supports tends to fade. Measurement did not back it: it halved entry triggers at
+     * every threshold, and on the three losing entries it was meant to catch, the
+     * higher-timeframe gate and the caller's own stop-distance guard already blocked all
+     * three — the volume requirement was redundant on every one. Left as an opt-in knob
+     * rather than removed, because the reasoning may still hold on other symbols; it just
+     * has not earned being on by default.
+     */
     requireVolume?: boolean;
     /** SMA period for the same-timeframe filter. Default {@link CONFLUENCE_TREND_MA_PERIOD}. */
     trendMaPeriod?: number;
@@ -432,7 +449,7 @@ function resolveParams(options: EvaluateConfluenceOptions): ConfluenceParams {
             1
         ),
         htf: gateOn ? (options.htfLabel ?? 'htf') : null,
-        requireVolume: options.requireVolume ?? true,
+        requireVolume: options.requireVolume ?? false,
     };
 }
 

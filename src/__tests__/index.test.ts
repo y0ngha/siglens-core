@@ -75,7 +75,7 @@ describe('public API exports', () => {
         expect(typeof evaluateConfluence).toBe('function');
         expect(typeof scoreConfluence).toBe('function');
         expect(typeof isConfluenceExit).toBe('function');
-        expect(CONFLUENCE_MIN).toBe(3);
+        expect(CONFLUENCE_MIN).toBe(2.5);
         expect(CONFLUENCE_SPAN).toBe(15);
         expect(CONFLUENCE_TRIGGER_SCORE).toBe(92);
         expect([...VOLUME_FAMILIES].sort()).toEqual(['cmf', 'mfi']);
