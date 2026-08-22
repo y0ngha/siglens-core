@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.1](https://github.com/y0ngha/siglens-core/compare/v0.50.0...v0.50.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* 청산 임계를 진입에서 분리한다 (CONFLUENCE_EXIT_MIN) ([591728a](https://github.com/y0ngha/siglens-core/commit/591728a0af22522ecb304dc3ff188809b6755c7b))
+
 # [0.50.0](https://github.com/y0ngha/siglens-core/compare/v0.49.0...v0.50.0) (2026-08-22)
 
 
