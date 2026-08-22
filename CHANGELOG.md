@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.50.0](https://github.com/y0ngha/siglens-core/compare/v0.49.0...v0.50.0) (2026-08-22)
+
+
+### Features
+
+* 지표 컨플루언스 룰을 core로 올린다 (evaluateConfluence + calculateMA export) ([ee0126d](https://github.com/y0ngha/siglens-core/commit/ee0126d99f7a5567a8d68efa390af20dd62f1ff8))
+
 # [0.49.0](https://github.com/y0ngha/siglens-core/compare/v0.48.0...v0.49.0) (2026-08-20)
 
 
