@@ -139,6 +139,12 @@ function filterActionRecommendation(
         riskReward: allowStoplossAndTarget ? recommendation.riskReward : null,
         ...optionalFields,
         ...(reconciledLevels ? { reconciledLevels } : {}),
+        // `planCheck` is derived from stopLoss and takeProfitPrices, so it rides the same
+        // gate as those fields — otherwise a free-tier response would hand back the exact
+        // risk:reward the paywall is withholding, just in numeric form.
+        ...(allowStoplossAndTarget && recommendation.planCheck
+            ? { planCheck: recommendation.planCheck }
+            : {}),
     };
 }
 

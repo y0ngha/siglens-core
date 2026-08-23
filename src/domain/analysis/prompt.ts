@@ -84,6 +84,7 @@ import type {
     Timeframe,
     Trend,
 } from '@/domain/types';
+import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
@@ -1298,10 +1299,10 @@ const ANALYSIS_GUIDELINES = [
     // intended behavior, not a regression.
     '',
     '### Confluence Assessment',
-    '- Confluence = 2+ independent signals pointing the same direction at the same price zone.',
-    '- Count confirming signals from different categories: (a) trend indicators, (b) momentum oscillators, (c) volume indicators, (d) pattern detection, (e) SMC/structure levels, (f) support/resistance tools.',
-    '- Strong confluence: 3+ categories agree. Moderate: 2 categories. Weak: single indicator.',
-    '- State the confluence count in keyLevels reasoning and in the summary.',
+    '- The indicator tally in ## Deterministic Metrics is computed by a rule engine, not by you. Do not recount it, restate it with a different number, or substitute your own category count.',
+    '- Cite its signal list as the evidence in keyLevels reasoning and in the summary — name the signals, not just the score.',
+    '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the confluence is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
+    '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the rule engine abstained.',
     '',
     '### Conflicting Signals',
     '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
@@ -1340,6 +1341,7 @@ const ANALYSIS_GUIDELINES = [
     '  - "enter": price near support + bullish confluence from 2+ categories + risk level not high',
     '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals)',
     '  - "avoid": price extended from support, strong resistance overhead, risk high, or bearish confluence dominates',
+    '  - Before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met confluence entry rule does not override this — the two were measured to be inversely related.',
     '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a risk:reward estimate — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
     '- Step 2 — Compute prices:',
     '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
@@ -1916,6 +1918,10 @@ export function buildAnalysisPrompt(
         formatSMCSection(indicators, bars),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(marketReference, timeframe),
+        // Placed after the reference levels it quotes: the risk:reward half is arithmetic
+        // over the levels rendered immediately above, and reading the inputs before the
+        // conclusion is what lets the model check the conclusion instead of trusting it.
+        formatDeterministicMetricsSection(bars, timeframe, marketReference),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),
         ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)

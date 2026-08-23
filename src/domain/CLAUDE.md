@@ -114,6 +114,58 @@ Every tunable is an option, and the resolved set is written back onto the snapsh
 detected but the thresholds it was judged against, which is what makes before/after
 comparison possible when a consumer tunes the rule.
 
+## Deterministic Metrics in the analysis prompt (`analysis/confluenceSection.ts`)
+
+The chart prompt used to instruct the model to tally confluence itself — *"Count
+confirming signals from different categories … Strong confluence: 3+ categories agree."*
+Two problems. The tally happened inside the model, so only the count reached the output
+and nothing about it could be checked. And the categories were coarser than the data
+warrants: every trend indicator was one bucket, while RSI, StochRSI and Connors RSI —
+three transforms of the same close series, all rendered separately in `## Indicator
+Values` — could each be read as independent confirmation. `evaluateConfluence` already
+answers that question correctly and is the same engine the trading consumer scores with,
+so the section renders its output and the instruction now says *do not recount*.
+
+`CONFLUENCE_PARAMS_BY_TIMEFRAME` is the one place the rule varies by chart. `1Day`
+restores the thresholds the original backtest used (3 families, `expected` at full
+weight); every intraday row runs 2.5 / 0.5. **Neither is the backtested rule** — that one
+counted signal types — so the rendered reliability line says which part is measured and
+which is inherited by argument. Writing "70% win rate" next to a modified rule is the
+specific mistake this wording exists to prevent. `exitMin` stays at the module default on
+every timeframe, including the daily one where `min` rises: raising an entry bar must not
+raise the exit bar with it.
+
+The section also renders **structural risk:reward from the current price**, computed off
+the reference levels rendered immediately above it. That ordering is the point — the model
+sees the inputs, then the conclusion, and can check one against the other. The reason it
+exists at all is measurement from the downstream trader: over 426 production ticks the
+nearest resistance sat *below* the current price 14.6% of the time, and risk:reward was
+inversely related to signal strength (median 1.27 in a middling composite-score band,
+**0.00** in the highest). Strong confluence is therefore not evidence that entering now is
+attractive, and the model cannot notice that unless the ratio precedes its verdict.
+
+## Plan check (`analysis/planCheck.ts`)
+
+`buildPlanCheck` attaches deterministic arithmetic to **every** recommendation, comparing
+the plan against the price that actually exists. It exists because `riskReward` is an
+LLM-authored prose string — the single most decision-relevant number in the analysis was
+neither computed nor checkable — and because the one deterministic risk:reward this
+codebase did produce lived on `reconciledLevels`, which is populated *only when a level
+fails validation*. The arithmetic was missing from every healthy analysis.
+
+`riskRewardAtEntry` and `riskRewardAtCurrent` are reported separately on purpose: a
+take-profit above the recommended entry passes validation while sitting below the price
+the reader is looking at. `0` and `null` are different answers — `0` means the targets
+exist and the market has passed all of them, `null` means the inputs cannot support a
+ratio — and collapsing them would turn a finding into a shrug. `belowStopLoss` exists for
+the same reason: without it, a plan the market has already stopped out of is
+indistinguishable from one with no stop at all.
+
+It is **not** in `TECHNICAL_RESPONSE_SCHEMA`. Asking the model to emit a field the domain
+always overwrites spends tokens and invites it to author the very number the field exists
+to take away from it. It rides the `stoploss`+`target` tier gate, since it is arithmetic
+over exactly those two fields.
+
 ## Dependency Rules
 
 ```
