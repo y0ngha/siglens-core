@@ -1,6 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
+import {
+    computeOverallScore,
+    type OverallScore,
+} from '@/domain/analysis/overallScore';
 import type {
     AnalysisResponse,
     AssembledPrompt,
@@ -250,6 +254,40 @@ function formatOptions(
 }
 
 /**
+ * Renders the deterministic axis weighting.
+ *
+ * The weights were already in this prompt as prose ("Technical, fundamental, and news
+ * inputs carry roughly equal weight"). Prose weighting cannot be diffed across runs and
+ * leaves no record of what a past synthesis actually weighed, so the numbers are stated
+ * and the model is told not to re-derive them.
+ *
+ * The composite is presented **without** a verdict threshold on purpose — see
+ * {@link computeOverallScore}. Naming a cutoff would invent a decision boundary nobody has
+ * measured on this distribution.
+ */
+function formatAxisScore(score: OverallScore): string {
+    const rows = score.axes.map(axis => {
+        const value = axis.score === null ? 'abstains' : axis.score.toFixed(1);
+        return `- ${axis.axis}: ${value} (weight ${axis.weight}) — ${axis.basis}`;
+    });
+
+    const composite =
+        score.composite === null
+            ? 'Composite: not computable — every axis abstained.'
+            : `Composite (weighted average of the reporting axes): ${score.composite.toFixed(1)} / 100, where 50 is neutral.`;
+
+    return [
+        '## Axis Weighting (computed, not yours to re-derive)',
+        'Each axis was mapped to a 0–100 directional read and combined with the weights below. Weights come from the timeframe: intraday charts lean on price action, daily charts give valuation real say.',
+        ...rows,
+        composite,
+        'An abstaining axis carries weight 0 and leaves the denominator — it does NOT vote neutral. Absent fundamentals on a crypto symbol must not pull the composite toward the middle.',
+        'This number is a weighted summary of the axis verdicts, not a trade signal. No buy/sell threshold has been measured on it, so do not invent one. Use it to check your own synthesis: if your conclusion leans the opposite way from the composite, say so explicitly and name which axis you are overriding and why.',
+        'The three-value axis reads are compressed to 25/50/75 rather than 0/50/100 because each axis reports a direction, not a magnitude. Do not restate them as conviction levels.',
+    ].join('\n');
+}
+
+/**
  * Formats the financials-scorecard section for the prompt.
  *
  * The financials axis is **synchronously precomputed** (not a polled
@@ -395,6 +433,21 @@ export function buildOverallAnalysisPrompt(
           : '(No fundamental data)';
     const fundamentalSection = `## Axis 2 — Fundamental Analysis\n${fundamentalBody}`;
 
+    const axisScoreSection = formatAxisScore(
+        computeOverallScore(
+            {
+                technical,
+                // Crypto has no corporate fundamentals; passing the value through keeps the
+                // abstention honest instead of manufacturing a neutral vote for it.
+                fundamental: isCrypto ? null : fundamental,
+                news,
+                options: resolvedOptions,
+                financials: financials ?? null,
+            },
+            timeframe
+        )
+    );
+
     // `stable` is empty: the Output Schema was the only part of this builder
     // with zero interpolation of any kind, but keeping it at the tail of
     // `dynamic` (after all axis data) matters more for rule recency than
@@ -427,6 +480,8 @@ ${formatOptions(resolvedOptions, resolvedOptionsOiStale)}
 
 ## Financials Scorecard
 ${formatFinancials(financials)}
+
+${axisScoreSection}
 
 ## Output Schema
 {
@@ -474,6 +529,7 @@ Rules:
 - integratedConclusionKo: synthesise all available axes (technical, fundamental, news, plus options and financials when present) into a cohesive directional verdict appropriate for the ${timeframe} timeframe context described above.
 - In integratedConclusionKo, attribute each claim to its source axis (e.g. "기술적 분석에 따르면…", "펀더멘털 분석에서는…", "뉴스 분석에서는…", "옵션 시장에서는…", "재무제표 분석에서는…") so the reader can see which axis each point came from. This reduces blending and hallucination.
 - When axes genuinely conflict, preserve the conflict explicitly rather than averaging it into a single smoothed verdict.
+- The composite in ## Axis Weighting is arithmetic that has already been done. Do not recompute it, restate it as a different number, or convert it into a buy/sell call. If integratedConclusionKo leans against it, name the axis you are overriding and the reason — a conclusion that silently contradicts the weighting is the failure this section exists to catch.
 
 ## Few-Shot — conflict preservation + axis attribution
 For integratedConclusionKo, when the technical axis is bearish but the news axis turns positive, do NOT smooth them into a vague "중립" verdict. Instead, attribute and preserve the tension:
