@@ -144,6 +144,40 @@ inversely related to signal strength (median 1.27 in a middling composite-score 
 **0.00** in the highest). Strong confluence is therefore not evidence that entering now is
 attractive, and the model cannot notice that unless the ratio precedes its verdict.
 
+## Overall axis weighting (`analysis/overallScore.ts`)
+
+The overall prompt hands five axis reports to one model and asks it to synthesize. The only
+thing telling it how to weigh them was a prose sentence per timeframe — *"Technical,
+fundamental, and news inputs carry roughly equal weight"*. Prose weighting cannot be
+diffed, cannot be tuned, and leaves no record of what a past synthesis actually weighed.
+
+`OVERALL_AXIS_WEIGHTS` is that sentence as numbers: technical dominates intraday,
+fundamental and financials climb toward the daily chart. They are **judgment, not
+measurement** — no backtest sets them; the integers encode relative emphasis and the sum
+is meaningless because this is a weighted average.
+
+Two decisions worth keeping:
+
+- **Three-value axes map to 25/50/75, not 0/50/100.** A `bullish` from the news axis is a
+  direction, not a magnitude. On the wider scale one axis drags the composite fifty points
+  on evidence that distinguishes three states.
+- **An absent axis abstains — weight 0, out of the denominator — it does not vote
+  neutral.** A crypto symbol has no fundamentals by definition, and a neutral vote would
+  pull every crypto composite toward the middle for a reason unrelated to the asset. Same
+  pattern as the confluence axis in the trading consumer.
+
+**No verdict threshold is attached, deliberately.** Over three-value enums the composite
+lands on a small discrete set, and no cutoff has been measured on that distribution.
+Naming one would repeat the mistake of picking a boundary from intuition about a single
+axis instead of from the distribution it actually produces. The prompt says as much to the
+model, and a test holds the wording.
+
+Congress is **not** an axis here and was not added. The trading consumer zeroed its weight
+after measuring 31/31 identical verdicts, but the reason was that a 30–45 day disclosure
+lag cannot answer a 30-minute question — on a daily chart the data may still carry
+information. Adding it would mean plumbing the congress report into
+`buildOverallAnalysisPrompt`, which nothing does today.
+
 ## Plan check (`analysis/planCheck.ts`)
 
 `buildPlanCheck` attaches deterministic arithmetic to **every** recommendation, comparing

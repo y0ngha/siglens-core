@@ -890,3 +890,109 @@ describe('buildOverallAnalysisPrompt', () => {
         });
     });
 });
+
+describe('buildOverallAnalysisPrompt — axis weighting', () => {
+    it('renders every axis with its weight and basis', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+
+        expect(prompt).toContain('## Axis Weighting');
+        // 종전에는 "roughly equal weight" 같은 산문이 전부였다. 산문 가중치는 diff도
+        // 튜닝도 안 되고, 과거 종합이 무엇을 얼마로 쳤는지 기록도 남기지 않는다.
+        expect(prompt).toContain(
+            '- technical: 25.0 (weight 8) — trend bearish'
+        );
+        expect(prompt).toContain('- news: 25.0 (weight 6) — sentiment bearish');
+        expect(prompt).toContain('Composite (weighted average');
+    });
+
+    it('weights the same axes differently by timeframe', () => {
+        const args = [
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+        ] as const;
+
+        const intraday = buildOverallAnalysisPrompt(
+            ...args,
+            '5Min' as Timeframe
+        );
+        const daily = buildOverallAnalysisPrompt(...args, '1Day' as Timeframe);
+
+        expect(intraday).toContain('(weight 14)');
+        expect(daily).toContain('(weight 8)');
+        expect(intraday).not.toContain('- technical: 25.0 (weight 8)');
+    });
+
+    it('marks a missing axis as abstaining, not as a neutral vote', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            null,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+
+        expect(prompt).toContain('- fundamental: abstains (weight 0)');
+        expect(prompt).toContain('it does NOT vote neutral');
+    });
+
+    it('abstains the fundamental axis for crypto even if a report is passed', () => {
+        // 암호화폐에 기업 펀더멘털은 정의상 없다. 넘어온 값을 그대로 채점하면 자산
+        // 종류와 무관한 이유로 종합이 중앙으로 끌린다.
+        const prompt = buildOverallAnalysisPrompt(
+            'BTCUSD',
+            'Bitcoin',
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'crypto'
+        );
+
+        expect(prompt).toContain('- fundamental: abstains (weight 0)');
+    });
+
+    it('forbids re-deriving the composite and demands conflicts be named', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+
+        expect(prompt).toContain('Do not recompute it');
+        expect(prompt).toContain('name the axis you are overriding');
+    });
+
+    it('does not turn the composite into a trade signal', () => {
+        // 3값 enum 위의 종합은 이산 분포이고 그 위에서 측정된 매수/매도 문턱이 없다.
+        // 문턱을 붙이면 분포가 아니라 직관에서 숫자를 고르는 실수를 반복하게 된다.
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+
+        expect(prompt).toContain('not a trade signal');
+        expect(prompt).toContain('do not invent one');
+    });
+});
