@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.52.0](https://github.com/y0ngha/siglens-core/compare/v0.51.0...v0.52.0) (2026-08-23)
+
+
+### Features
+
+* overall 종합에 수치 축 가중치를 넣는다 ([#183](https://github.com/y0ngha/siglens-core/issues/183)) ([e108300](https://github.com/y0ngha/siglens-core/commit/e1083004488d18f2db4008ee542ec9bb79e114db))
+
 # [0.51.0](https://github.com/y0ngha/siglens-core/compare/v0.50.2...v0.51.0) (2026-08-23)
 
 
