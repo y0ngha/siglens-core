@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     computeOverallScore,
     OVERALL_AXIS_WEIGHTS,
-    type OverallAxis,
+    type OverallScoreAxis,
     type OverallScoreInput,
 } from '@/domain/analysis/overallScore';
 import type {
@@ -58,7 +58,7 @@ function financials(score: number): FinancialsScorecard {
 
 function scoreOf(
     result: ReturnType<typeof computeOverallScore>,
-    axis: OverallAxis
+    axis: OverallScoreAxis
 ) {
     return result.axes.find(a => a.axis === axis);
 }

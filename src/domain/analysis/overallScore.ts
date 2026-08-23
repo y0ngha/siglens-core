@@ -1,3 +1,4 @@
+import type { OptionsTone } from '@/domain/options/types';
 import type {
     AnalysisResponse,
     FinancialsScorecard,
@@ -34,7 +35,7 @@ import type {
  *
  * An axis that can vote in the overall synthesis.
  */
-export type OverallAxis =
+export type OverallScoreAxis =
     | 'technical'
     | 'fundamental'
     | 'news'
@@ -53,6 +54,20 @@ const NEUTRAL = 50;
  * states, so the scale is compressed to 25..75 and the axis weights do the separating.
  */
 const DIRECTIONAL_SPAN = 25;
+
+/**
+ * Directional vote each options tone casts, averaged across expirations.
+ *
+ * `cautious` is half a bearish vote rather than neutral: it means protection is being
+ * bought, which is not a directional call but is not the absence of one either. Folding it
+ * into `neutral` would erase the distinction the tone union exists to make.
+ */
+const TONE_VOTE: Record<OptionsTone, number> = {
+    bullish: 1,
+    bearish: -1,
+    cautious: -0.5,
+    neutral: 0,
+};
 
 const SENTIMENT_SCORE: Record<Trend, number> = {
     bullish: NEUTRAL + DIRECTIONAL_SPAN,
@@ -78,7 +93,7 @@ const SENTIMENT_SCORE: Record<Trend, number> = {
  */
 export const OVERALL_AXIS_WEIGHTS: Record<
     Timeframe,
-    Record<OverallAxis, number>
+    Record<OverallScoreAxis, number>
 > = {
     '5Min': {
         technical: 14,
@@ -130,7 +145,7 @@ export const OVERALL_AXIS_WEIGHTS: Record<
  * One axis's contribution to the composite.
  */
 export interface OverallAxisRead {
-    axis: OverallAxis;
+    axis: OverallScoreAxis;
     /** 0–100 directional read, or `null` when the axis abstained. */
     score: number | null;
     /** Weight actually applied. `0` for an abstaining axis. */
@@ -192,54 +207,32 @@ function scoreOptions(options: OptionsAnalysisResponse): number | null {
     const tones = options.perExpiration.map(entry => entry.tone);
     if (tones.length === 0) return null;
 
-    let sum = 0;
-    for (const tone of tones) {
-        if (tone === 'bullish') sum += 1;
-        else if (tone === 'bearish') sum -= 1;
-        else if (tone === 'cautious') sum -= 0.5;
-    }
-
-    return clamp(
-        NEUTRAL + (sum / tones.length) * DIRECTIONAL_SPAN,
-        NEUTRAL - DIRECTIONAL_SPAN,
-        NEUTRAL + DIRECTIONAL_SPAN
-    );
+    const sum = tones.reduce((acc, tone) => acc + TONE_VOTE[tone], 0);
+    // No clamp: every vote lies in [-1, 1], so their mean does too and the result cannot
+    // leave `NEUTRAL ± DIRECTIONAL_SPAN`. A guard here would be unreachable code that
+    // reads like a real bound.
+    return NEUTRAL + (sum / tones.length) * DIRECTIONAL_SPAN;
 }
 
-function readTechnical(
-    input: OverallScoreInput
+/**
+ * Read one axis that reports a bare three-value direction.
+ *
+ * Technical, fundamental and news differ only in which field carries the verdict and what
+ * that field is called; sharing the body keeps a future change to the scale or to the
+ * abstention wording from landing on two of the three.
+ */
+function readSentimentAxis(
+    axis: OverallScoreAxis,
+    sentiment: Trend | undefined,
+    field: string,
+    absent: string
 ): Omit<OverallAxisRead, 'weight'> {
-    const trend = input.technical?.trend;
-    return trend === undefined
-        ? { axis: 'technical', score: null, basis: 'no technical analysis' }
-        : {
-              axis: 'technical',
-              score: SENTIMENT_SCORE[trend],
-              basis: `trend ${trend}`,
-          };
-}
-
-function readFundamental(
-    input: OverallScoreInput
-): Omit<OverallAxisRead, 'weight'> {
-    const sentiment = input.fundamental?.overallSentiment;
     return sentiment === undefined
-        ? { axis: 'fundamental', score: null, basis: 'no fundamental analysis' }
+        ? { axis, score: null, basis: absent }
         : {
-              axis: 'fundamental',
+              axis,
               score: SENTIMENT_SCORE[sentiment],
-              basis: `sentiment ${sentiment}`,
-          };
-}
-
-function readNews(input: OverallScoreInput): Omit<OverallAxisRead, 'weight'> {
-    const sentiment = input.news?.overallSentiment;
-    return sentiment === undefined
-        ? { axis: 'news', score: null, basis: 'no news analysis' }
-        : {
-              axis: 'news',
-              score: SENTIMENT_SCORE[sentiment],
-              basis: `sentiment ${sentiment}`,
+              basis: `${field} ${sentiment}`,
           };
 }
 
@@ -301,9 +294,24 @@ export function computeOverallScore(
 ): OverallScore {
     const weights = OVERALL_AXIS_WEIGHTS[timeframe];
     const reads = [
-        readTechnical(input),
-        readFundamental(input),
-        readNews(input),
+        readSentimentAxis(
+            'technical',
+            input.technical?.trend,
+            'trend',
+            'no technical analysis'
+        ),
+        readSentimentAxis(
+            'fundamental',
+            input.fundamental?.overallSentiment,
+            'sentiment',
+            'no fundamental analysis'
+        ),
+        readSentimentAxis(
+            'news',
+            input.news?.overallSentiment,
+            'sentiment',
+            'no news analysis'
+        ),
         readOptions(input),
         readFinancials(input),
     ];
@@ -313,13 +321,20 @@ export function computeOverallScore(
         weight: read.score === null ? 0 : weights[read.axis],
     }));
 
-    let weighted = 0;
-    let total = 0;
-    for (const axis of axes) {
-        if (axis.score === null || axis.weight <= 0) continue;
-        weighted += axis.score * axis.weight;
-        total += axis.weight;
-    }
+    // Only `score === null` is checked. A reporting axis always carries a positive weight
+    // (a test holds that over the whole table), and a zero weight would contribute zero to
+    // both the numerator and the denominator anyway — a guard for it would be inert code
+    // that reads like a real branch.
+    const { weighted, total } = axes.reduce(
+        (acc, axis) =>
+            axis.score === null
+                ? acc
+                : {
+                      weighted: acc.weighted + axis.score * axis.weight,
+                      total: acc.total + axis.weight,
+                  },
+        { weighted: 0, total: 0 }
+    );
 
     return {
         timeframe,

@@ -254,6 +254,40 @@ function formatOptions(
 }
 
 /**
+ * Renders the deterministic axis weighting.
+ *
+ * The weights were already in this prompt as prose ("Technical, fundamental, and news
+ * inputs carry roughly equal weight"). Prose weighting cannot be diffed across runs and
+ * leaves no record of what a past synthesis actually weighed, so the numbers are stated
+ * and the model is told not to re-derive them.
+ *
+ * The composite is presented **without** a verdict threshold on purpose — see
+ * {@link computeOverallScore}. Naming a cutoff would invent a decision boundary nobody has
+ * measured on this distribution.
+ */
+function formatAxisScore(score: OverallScore): string {
+    const rows = score.axes.map(axis => {
+        const value = axis.score === null ? 'abstains' : axis.score.toFixed(1);
+        return `- ${axis.axis}: ${value} (weight ${axis.weight}) — ${axis.basis}`;
+    });
+
+    const composite =
+        score.composite === null
+            ? 'Composite: not computable — every axis abstained.'
+            : `Composite (weighted average of the reporting axes): ${score.composite.toFixed(1)} / 100, where 50 is neutral.`;
+
+    return [
+        '## Axis Weighting (computed, not yours to re-derive)',
+        'Each axis was mapped to a 0–100 directional read and combined with the weights below. Weights come from the timeframe: intraday charts lean on price action, daily charts give valuation real say.',
+        ...rows,
+        composite,
+        'An abstaining axis carries weight 0 and leaves the denominator — it does NOT vote neutral. Absent fundamentals on a crypto symbol must not pull the composite toward the middle.',
+        'This number is a weighted summary of the axis verdicts, not a trade signal. No buy/sell threshold has been measured on it, so do not invent one. Use it to check your own synthesis: if your conclusion leans the opposite way from the composite, say so explicitly and name which axis you are overriding and why.',
+        'The three-value axis reads are compressed to 25/50/75 rather than 0/50/100 because each axis reports a direction, not a magnitude. Do not restate them as conviction levels.',
+    ].join('\n');
+}
+
+/**
  * Formats the financials-scorecard section for the prompt.
  *
  * The financials axis is **synchronously precomputed** (not a polled
@@ -354,40 +388,6 @@ function formatFinancials(
 // both call the 4-axis form, and every test (overallPrompt.test.ts +
 // submitOverallAnalysis.test.ts) was already migrated. No remaining
 // caller depended on the old shape.
-/**
- * Renders the deterministic axis weighting.
- *
- * The weights were already in this prompt as prose ("Technical, fundamental, and news
- * inputs carry roughly equal weight"). Prose weighting cannot be diffed across runs and
- * leaves no record of what a past synthesis actually weighed, so the numbers are stated
- * and the model is told not to re-derive them.
- *
- * The composite is presented **without** a verdict threshold on purpose — see
- * {@link computeOverallScore}. Naming a cutoff would invent a decision boundary nobody has
- * measured on this distribution.
- */
-function formatAxisScore(score: OverallScore): string {
-    const rows = score.axes.map(axis => {
-        const value = axis.score === null ? 'abstains' : axis.score.toFixed(1);
-        return `- ${axis.axis}: ${value} (weight ${axis.weight}) — ${axis.basis}`;
-    });
-
-    const composite =
-        score.composite === null
-            ? 'Composite: not computable — every axis abstained.'
-            : `Composite (weighted average of the reporting axes): ${score.composite.toFixed(1)} / 100, where 50 is neutral.`;
-
-    return [
-        '## Axis Weighting (computed, not yours to re-derive)',
-        'Each axis was mapped to a 0–100 directional read and combined with the weights below. Weights come from the timeframe: intraday charts lean on price action, daily charts give valuation real say.',
-        ...rows,
-        composite,
-        'An abstaining axis carries weight 0 and leaves the denominator — it does NOT vote neutral. Absent fundamentals on a crypto symbol must not pull the composite toward the middle.',
-        'This number is a weighted summary of the axis verdicts, not a trade signal. No buy/sell threshold has been measured on it, so do not invent one. Use it to check your own synthesis: if your conclusion leans the opposite way from the composite, say so explicitly and name which axis you are overriding and why.',
-        'The three-value axis reads are compressed to 25/50/75 rather than 0/50/100 because each axis reports a direction, not a magnitude. Do not restate them as conviction levels.',
-    ].join('\n');
-}
-
 export function buildOverallAnalysisPrompt(
     symbol: string,
     companyName: string,
