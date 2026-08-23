@@ -1530,6 +1530,28 @@ export interface FilteredActionRecommendation extends Omit<
     riskReward: string | null;
 }
 
+/** Deterministic plan-vs-price arithmetic, attached to every recommendation. */
+export interface PlanCheck {
+    /** Price this was measured against — the last close at analysis time. */
+    currentPrice: number;
+    /** Highest recommended entry price, or `null` when the plan names no entry. */
+    entryZoneTop: number | null;
+    /** Price has risen past the entry zone by more than {@link ENTRY_ZONE_TOLERANCE}. */
+    exceedsEntryZone: boolean;
+    /** Price has already fallen through the plan's stop — the plan is void, not merely stale. */
+    belowStopLoss: boolean;
+    /** Risk:reward measured from the plan's own entry. `null` when inputs are missing. */
+    riskRewardAtEntry: number | null;
+    /**
+     * Risk:reward measured from the current price — what a reader acting now would get.
+     *
+     * `0` and `null` are different answers: `0` means take-profit targets exist but none of
+     * them is above the current price (there is nothing left to capture), while `null` means
+     * the inputs could not support a ratio. Only the former is a finding.
+     */
+    riskRewardAtCurrent: number | null;
+}
+
 /** Long-position trading recommendation produced by the AI analyst. */
 export interface ActionRecommendation {
     /** Korean prose: current price position vs key levels. */
@@ -1550,6 +1572,8 @@ export interface ActionRecommendation {
     takeProfitPrices?: number[];
     /** Domain-derived fallback levels attached when the AI's stopLoss / takeProfitPrices are invalid or missing. The original AI fields above are never mutated — consumers can compare and decide which values to display. */
     reconciledLevels?: ReconciledActionLevels;
+    /** Deterministic plan-vs-current-price arithmetic. Unlike `reconciledLevels` this is attached on every path, including the one where the AI's own levels passed validation — that path is precisely where a computed risk:reward was previously unavailable. */
+    planCheck?: PlanCheck;
 }
 
 /**

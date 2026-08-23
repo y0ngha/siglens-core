@@ -248,6 +248,16 @@ export interface EvaluateConfluenceOptions {
     minBars?: number;
 }
 
+/**
+ * Whether a signal describes an anticipated condition rather than a completed event.
+ *
+ * Exported so a renderer can label the half-weight members instead of presenting a
+ * fractional family count with no visible explanation for the fraction.
+ */
+export function isExpectedSignal(type: string): boolean {
+    return EXPECTED_SIGNAL_TYPES.has(type);
+}
+
 /** The indicator family a signal belongs to; the type name itself when unmapped. */
 export function signalFamily(type: string): string {
     return SIGNAL_FAMILY[type] ?? type;

@@ -1,3 +1,4 @@
+import { buildPlanCheck } from '@/domain/analysis/planCheck';
 import type {
     ActionRecommendation,
     AnalysisResponse,
@@ -379,5 +380,29 @@ export function postProcessAnalysisWithReconcile(
         entryPrice,
         atr
     );
-    return { ...response, actionRecommendation: recommendation };
+
+    // Attached outside the reconcile branch on purpose. `reconciledLevels` — and with it
+    // the only deterministic risk:reward this module used to produce — exists solely when
+    // a level failed validation, so the arithmetic was missing from every *healthy*
+    // analysis. `planCheck` also measures against `fallbackEntryPrice` (the last close)
+    // rather than the plan's own entry, which is the comparison the reconcile path cannot
+    // make: a take-profit above the recommended entry still passes validation while
+    // sitting below the price the reader is actually looking at.
+    // `fallbackEntryPrice` (the last close) is passed straight through rather than falling
+    // back to `entryPrice`: without a real current price there is nothing to compare the
+    // plan against, and substituting the plan's own entry would report "price is exactly
+    // where the plan wants it" — a claim the inputs do not support. `buildPlanCheck`
+    // returns `null` in that case and the field is simply absent.
+    const planCheck = buildPlanCheck(
+        recommendation,
+        fallbackEntryPrice,
+        entryPrice
+    );
+
+    return {
+        ...response,
+        actionRecommendation: planCheck
+            ? { ...recommendation, planCheck }
+            : recommendation,
+    };
 }

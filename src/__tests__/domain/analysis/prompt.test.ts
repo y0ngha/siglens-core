@@ -4257,7 +4257,7 @@ describe('prompt', () => {
     describe('Confluence Assessment 가이드라인', () => {
         const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
 
-        it('should include Confluence Assessment guidelines', () => {
+        it('defers the tally to the rule engine instead of asking the model to count', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -4265,7 +4265,40 @@ describe('prompt', () => {
                 makeIndicators()
             );
             expect(result).toContain('### Confluence Assessment');
-            expect(result).toContain('2+ independent signals');
+            expect(result).toContain('computed by a rule engine, not by you');
+            // The replaced instruction told the model to tally categories itself, which
+            // produced a count nothing downstream could verify and which counted four
+            // transforms of the same close series as four confirmations.
+            expect(result).not.toContain('2+ independent signals');
+            expect(result).not.toContain('Count confirming signals');
+        });
+
+        it('actually renders the deterministic block the instruction points at', () => {
+            // The instruction says "see ## Deterministic Metrics". If the section were
+            // wired up wrong the prompt would reference a block that does not exist and
+            // the model would fall back to guessing — the exact failure being removed.
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            expect(result).toContain('## Deterministic Metrics');
+            expect(result).toContain('### Indicator Confluence');
+        });
+
+        it('still claims the non-indicator evidence for the model', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            // Handing the indicator tally to the engine must not read as "the engine
+            // decides confluence" — patterns, SMC and S/R are still the model's call.
+            expect(result).toContain(
+                'Pattern detection, SMC structure, and support/resistance are yours to judge'
+            );
         });
     });
 

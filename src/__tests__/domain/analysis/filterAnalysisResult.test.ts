@@ -449,3 +449,55 @@ describe('filterAnalysisResult', () => {
         expect(filtered.lockedInfoDepth).toEqual(['direction', 'summary']);
     });
 });
+
+describe('planCheck tier gating', () => {
+    const planCheck = {
+        currentPrice: 120,
+        entryZoneTop: 103,
+        exceedsEntryZone: true,
+        belowStopLoss: false,
+        riskRewardAtEntry: 2.5,
+        riskRewardAtCurrent: 0.4,
+    };
+
+    function withPlanCheck(): AnalysisResponse {
+        const base = makeAnalysisResponse();
+        const rec = base.actionRecommendation;
+        if (!rec) throw new Error('fixture must carry an actionRecommendation');
+        return { ...base, actionRecommendation: { ...rec, planCheck } };
+    }
+
+    it('hands the computed ratios to a tier that already sees stop-loss and targets', () => {
+        const { result } = filterAnalysisResult(
+            withPlanCheck(),
+            'pro',
+            restrictedConfig
+        );
+
+        expect(result.actionRecommendation?.planCheck).toEqual(planCheck);
+    });
+
+    it('withholds it from a tier without both stop-loss and target depth', () => {
+        // planCheck is arithmetic over stopLoss and takeProfitPrices. Leaking it would
+        // hand back the exact risk:reward the paywall is withholding, in numeric form.
+        const { result } = filterAnalysisResult(
+            withPlanCheck(),
+            'free',
+            restrictedConfig
+        );
+
+        expect(result.actionRecommendation?.planCheck).toBeUndefined();
+        expect(result.actionRecommendation?.stopLoss).toBeUndefined();
+        expect(result.actionRecommendation?.riskReward).toBeNull();
+    });
+
+    it('omits the key entirely when the source analysis carries no planCheck', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse(),
+            'pro',
+            restrictedConfig
+        );
+
+        expect(result.actionRecommendation).not.toHaveProperty('planCheck');
+    });
+});

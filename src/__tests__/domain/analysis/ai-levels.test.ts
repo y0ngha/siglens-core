@@ -377,4 +377,86 @@ describe('postProcessAnalysisWithReconcile', () => {
         expect(result).not.toBe(response);
         expect(result.actionRecommendation?.reconciledLevels).toBeDefined();
     });
+
+    describe('planCheck', () => {
+        const healthy: AnalysisResponse = {
+            ...baseResponse,
+            actionRecommendation: baseRec,
+        };
+
+        it('레벨이 전부 유효한 정상 경로에서도 붙는다', () => {
+            // 이 케이스가 요점이다. reconcileBullish...는 보정할 것이 없으면 조기 반환하므로
+            // 종전에는 **정상 분석에만** 결정론적 손익비가 없었다.
+            const result = postProcessAnalysisWithReconcile(
+                healthy,
+                entryPrice,
+                atr
+            );
+
+            expect(
+                result.actionRecommendation?.reconciledLevels
+            ).toBeUndefined();
+            expect(result.actionRecommendation?.planCheck).toEqual({
+                currentPrice: 100,
+                entryZoneTop: 100,
+                exceedsEntryZone: false,
+                belowStopLoss: false,
+                // (105 - 100) / (100 - 97)
+                riskRewardAtEntry: 5 / 3,
+                riskRewardAtCurrent: 5 / 3,
+            });
+        });
+
+        it('현재가가 진입 구간을 벗어나면 두 손익비가 갈라진다', () => {
+            const result = postProcessAnalysisWithReconcile(healthy, 104, atr);
+            const check = result.actionRecommendation?.planCheck;
+
+            expect(check?.exceedsEntryZone).toBe(true);
+            // 계획 기준으로는 여전히 매력적이지만 지금 사면 거의 남는 게 없다.
+            expect(check?.riskRewardAtEntry).toBeCloseTo(5 / 3);
+            expect(check?.riskRewardAtCurrent).toBeCloseTo(1 / 7);
+        });
+
+        it('목표가를 이미 지난 계획은 상방 0으로 보고한다', () => {
+            const result = postProcessAnalysisWithReconcile(healthy, 106, atr);
+
+            expect(
+                result.actionRecommendation?.planCheck?.riskRewardAtCurrent
+            ).toBe(0);
+        });
+
+        it("'avoid' 판정에도 붙는다 — 보정은 건너뛰지만 검산은 여전히 유효하다", () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: {
+                    ...baseRec,
+                    entryRecommendation: 'avoid',
+                    stopLoss: 200,
+                },
+            };
+
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr
+            );
+
+            expect(
+                result.actionRecommendation?.reconciledLevels
+            ).toBeUndefined();
+            expect(result.actionRecommendation?.planCheck).toBeDefined();
+        });
+
+        it('현재가가 없으면 계획 진입가로 대체하지 않고 생략한다', () => {
+            // 대체하면 "가격이 계획한 자리에 정확히 있다"고 보고하게 되는데, 입력이
+            // 뒷받침하지 않는 주장이다.
+            const result = postProcessAnalysisWithReconcile(
+                healthy,
+                undefined,
+                atr
+            );
+
+            expect(result.actionRecommendation?.planCheck).toBeUndefined();
+        });
+    });
 });

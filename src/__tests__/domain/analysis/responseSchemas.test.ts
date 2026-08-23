@@ -526,7 +526,16 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         riskReward: '1:2',
         reason: '보정',
     };
-    const actionSample: Required<ActionRecommendation> = {
+    // `planCheck` is computed by the domain after the model answers and is deliberately
+    // absent from the response schema — asking the model to emit a field we always
+    // overwrite spends tokens and invites it to author the very number the field exists to
+    // take away from it. `reconciledLevels` predates that reasoning and stays in the
+    // schema; it is not a precedent to extend.
+    type LlmAuthoredActionRecommendation = Omit<
+        Required<ActionRecommendation>,
+        'planCheck'
+    >;
+    const actionSample: LlmAuthoredActionRecommendation = {
         positionAnalysis: '포지션',
         entry: '진입',
         exit: '청산',
