@@ -190,12 +190,14 @@ function formatRiskReward(reference: MarketReference): string[] {
     const levels = nearestLevels(reference);
     if (!levels) return [];
 
-    const ratio = structuralRiskReward(levels);
-    if (ratio === null) return [];
-
     const up = levels.resistance[0];
     const down = levels.support[0];
     if (!up || !down) return [];
+
+    // Can still be null after the guard above: a zero-distance support or a "resistance"
+    // the collector placed at or below the price makes the ratio undefined, not zero.
+    const ratio = structuralRiskReward(levels);
+    if (ratio === null) return [];
 
     const verdict =
         ratio < 1

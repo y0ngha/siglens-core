@@ -27,6 +27,35 @@ function bars(count: number, start = 100, step = 0.4): Bar[] {
     });
 }
 
+/** Falling series — exercises the bearish side of the trend filter. */
+function fallingBars(count: number): Bar[] {
+    return bars(count, 160, -0.4);
+}
+
+/**
+ * Uptrend that breaks down in the last three bars.
+ *
+ * A monotone decline produces no bearish signals at all: the crosses happened long ago so
+ * nothing is "newly lit", and a persistently low RSI reads as oversold, which is bullish.
+ * Firing the exit rule takes a late reversal.
+ */
+function reversalBars(count: number): Bar[] {
+    const closes: number[] = [];
+    let price = 100;
+    for (let i = 0; i < count; i++) {
+        price += i < count - 3 ? 0.5 : -4;
+        closes.push(price);
+    }
+    return closes.map((close, i) => ({
+        time: 1700000000 + i * 1800,
+        open: close,
+        high: close * 1.003,
+        low: close * 0.997,
+        close,
+        volume: 900_000 + (i % 5) * 90_000,
+    }));
+}
+
 function level(price: number, distancePercent: number): ReferenceLevel {
     return { price, label: 'MA50', kind: 'ma', distancePercent };
 }
@@ -224,6 +253,36 @@ describe('formatDeterministicMetricsSection', () => {
         );
         expect(out).toContain('### Indicator Confluence');
         expect(out).not.toContain('### Risk:Reward From Current Price');
+    });
+
+    it('renders the bearish side of the trend filter on a falling chart', () => {
+        // Every other case here trends up, so `close > SMA50` was the only branch the
+        // suite ever rendered — and the exit rule was never seen firing at all.
+        const out = formatDeterministicMetricsSection(
+            fallingBars(CONFLUENCE_MIN_BARS + 5),
+            '30Min',
+            reference()
+        );
+        expect(out).toContain('at or below');
+        expect(out).not.toContain('SMA50 unavailable');
+        expect(out).toContain('Exit rule (>= 2.5 weighted bearish families');
+    });
+
+    it('renders a fired exit rule', () => {
+        const out = formatDeterministicMetricsSection(
+            reversalBars(130),
+            '30Min',
+            reference()
+        );
+        expect(out).toContain(
+            'Exit rule (>= 2.5 weighted bearish families, >= 1 newly lit, close below SMA50): MET'
+        );
+        expect(out).toContain('Newly lit on this bar (bearish):');
+        // The exit side never gained the higher-timeframe or volume gate that entry has,
+        // so its rendered clause list must stay shorter than entry's.
+        expect(out).not.toContain(
+            'Exit rule (>= 2.5 weighted bearish families, >= 1 newly lit, close below SMA50, higher timeframe'
+        );
     });
 
     it('never throws on an empty bar array', () => {
