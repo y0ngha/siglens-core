@@ -93,6 +93,14 @@ describe('structuralRiskReward', () => {
         ).toBeNull();
     });
 
+    it('returns null when a "support" is not actually below the price', () => {
+        // Math.abs() would otherwise launder an inconsistent positive distance into a
+        // plausible-looking ratio. Symmetric with the resistance guard below.
+        expect(
+            structuralRiskReward(levels([level(105, 5)], [level(102, 2)]))
+        ).toBeNull();
+    });
+
     it('returns null when a "resistance" is not actually above the price', () => {
         // The collector defines resistance as levels above current price; a non-positive
         // distance means its output is inconsistent, which is not the same claim as
@@ -177,6 +185,58 @@ describe('buildPlanCheck', () => {
         // Ratio is null here (price is below the stop), so without the flag the caller
         // could not tell "plan already stopped out" from "inputs missing".
         expect(check?.riskRewardAtCurrent).toBeNull();
+    });
+
+    it('measures against reconciled levels, not the AI levels the domain rejected', () => {
+        // reconcileBullishActionRecommendation leaves the AI's own fields untouched by
+        // design, so reading rec.stopLoss directly measures against a level already
+        // judged invalid. Here the AI's stop (200) sits above its own entry; the domain
+        // corrected it to 97. Without the fix this reports belowStopLoss for a chart
+        // trading at 100 and suppresses the ratio entirely.
+        const rejected = rec({
+            entryPrices: [100],
+            stopLoss: 200,
+            takeProfitPrices: [105],
+            reconciledLevels: {
+                stopLoss: 97,
+                takeProfitPrices: [105],
+                exit: '',
+                riskReward: '',
+                reason: '',
+            },
+        });
+
+        const check = buildPlanCheck(rejected, 100, 100);
+
+        expect(check?.belowStopLoss).toBe(false);
+        expect(check?.riskRewardAtCurrent).toBeCloseTo(
+            (105 - 100) / (100 - 97)
+        );
+    });
+
+    it('discards a stop that sits at or above the entry instead of measuring against it', () => {
+        // Reconciliation is skipped for an `avoid` verdict, so nothing corrects the level
+        // here. A "stop" above the entry is not a stop a long could act on; reporting the
+        // plan as already stopped out because of it would be a fabricated finding.
+        const nonsense = rec({
+            entryRecommendation: 'avoid',
+            entryPrices: [100],
+            stopLoss: 200,
+            takeProfitPrices: [105],
+        });
+
+        const check = buildPlanCheck(nonsense, 100, 100);
+
+        expect(check?.belowStopLoss).toBe(false);
+        expect(check?.riskRewardAtCurrent).toBeNull();
+        expect(check?.riskRewardAtEntry).toBeNull();
+    });
+
+    it('falls back to the AI levels when nothing was reconciled', () => {
+        const check = buildPlanCheck(plan, 105, 99);
+        expect(check?.riskRewardAtCurrent).toBeCloseTo(
+            (110 - 105) / (105 - 95)
+        );
     });
 
     it('returns null without a usable current price instead of substituting the entry', () => {

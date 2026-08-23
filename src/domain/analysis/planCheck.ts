@@ -24,6 +24,8 @@ import type {
  */
 
 /**
+ * @internal
+ *
  * Slack allowed above the entry zone before price counts as having left it (1%).
  *
  * The zone is an AI approximation and the reference price is a single close, so trimming on
@@ -37,6 +39,8 @@ function finitePositive(n: number | undefined): n is number {
 }
 
 /**
+ * @internal
+ *
  * Risk:reward for a long from `price`, given a stop below and take-profit targets above.
  *
  * Reward is measured to the **nearest** target above `price`, not the furthest: that is the
@@ -64,6 +68,8 @@ export function riskRewardFrom(
 }
 
 /**
+ * @internal
+ *
  * Risk:reward from `price` to the nearest structural levels on either side.
  *
  * Unlike {@link riskRewardFrom} this needs no plan — it runs on the deterministic
@@ -85,14 +91,19 @@ export function structuralRiskReward(levels: ReferenceLevels): number | null {
     if (!Number.isFinite(reward) || !Number.isFinite(risk) || risk === 0) {
         return null;
     }
-    // `resistance` is defined as the levels above current price, so a non-positive distance
-    // means the collector produced something inconsistent rather than "no upside".
-    if (reward <= 0) return null;
+    // `resistance` is defined as the levels above current price and `support` as the ones
+    // below, so a sign that contradicts either definition means the collector produced
+    // something inconsistent. That is "unmeasurable", not "no upside" — and on the support
+    // side `Math.abs` above would otherwise launder a positive distance into a
+    // plausible-looking ratio.
+    if (reward <= 0 || down.distancePercent > 0) return null;
 
     return reward / risk;
 }
 
 /**
+ * @internal
+ *
  * Whether the current price has risen past the top of the recommended entry zone.
  *
  * Only the upper side is checked. Price *below* the zone is cheaper than the plan asked
@@ -111,7 +122,11 @@ export function exceedsEntryZone(
     return price > top * (1 + safeTolerance);
 }
 
-/** Highest usable entry price in the plan, or `null` when none is usable. */
+/**
+ * @internal
+ *
+ * Highest usable entry price in the plan, or `null` when none is usable.
+ */
 export function entryZoneTop(
     entryPrices: readonly number[] | undefined
 ): number | null {
@@ -120,6 +135,8 @@ export function entryZoneTop(
 }
 
 /**
+ * @internal
+ *
  * Build the deterministic plan check for one recommendation.
  *
  * `entryPrice` is the plan's own reference (the mid of its entry zone), `currentPrice` the
@@ -136,8 +153,26 @@ export function buildPlanCheck(
 ): PlanCheck | null {
     if (!finitePositive(currentPrice)) return null;
 
-    const stopLoss = rec.stopLoss;
-    const targets = rec.takeProfitPrices;
+    // Reconciled levels win where they exist. `reconcileBullishActionRecommendation`
+    // leaves the AI's own fields untouched by design, so reading `rec.stopLoss` directly
+    // would measure against a level the domain already rejected: an AI stop of 200 under
+    // a 100 entry would report `belowStopLoss` for a chart trading at 100, and suppress
+    // the ratio entirely — in exactly the case a computed ratio is most needed.
+    const proposedStop = rec.reconciledLevels?.stopLoss ?? rec.stopLoss;
+    const targets =
+        rec.reconciledLevels?.takeProfitPrices ?? rec.takeProfitPrices;
+
+    // A long's stop sits below its entry. One that does not is not a stop the plan could
+    // ever act on, so it is dropped rather than measured against. The reconciled value
+    // above covers most of these, but not all: reconciliation is skipped entirely for an
+    // `avoid` verdict, which would otherwise leave the raw AI level to report a plan as
+    // "already stopped out" simply because its stop was nonsense.
+    const stopLoss =
+        finitePositive(entryPrice) &&
+        finitePositive(proposedStop) &&
+        proposedStop >= entryPrice
+            ? undefined
+            : proposedStop;
 
     return {
         currentPrice,

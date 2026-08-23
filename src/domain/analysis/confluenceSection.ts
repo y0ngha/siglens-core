@@ -5,8 +5,8 @@ import {
     scoreConfluence,
     signalFamily,
     CONFLUENCE_MIN_BARS,
+    type ConfluenceSnapshot,
 } from '@/domain/signals/confluence';
-import type { ConfluenceSnapshot } from '@/domain/signals/confluence';
 import type {
     Bar,
     MarketReference,
@@ -39,10 +39,18 @@ import type {
  * a verdict.
  */
 
-/** Header for the deterministic block. Exported so tests assert the rendered text. */
+/**
+ * @internal
+ *
+ * Header for the deterministic block. Exported so tests assert the rendered text.
+ */
 export const DETERMINISTIC_METRICS_HEADER = '## Deterministic Metrics';
 
-/** Confluence tunables that differ by chart timeframe. */
+/**
+ * @internal
+ *
+ * Confluence tunables that differ by chart timeframe.
+ */
 export interface TimeframeConfluenceParams {
     /** Weighted indicator families the entry rule requires. */
     min: number;
@@ -51,6 +59,8 @@ export interface TimeframeConfluenceParams {
 }
 
 /**
+ * @internal
+ *
  * Per-timeframe confluence parameters.
  *
  * The daily row restores the two **constants** the original backtest used — a threshold of
@@ -216,6 +226,8 @@ function formatRiskReward(reference: MarketReference): string[] {
 }
 
 /**
+ * @internal
+ *
  * Build the deterministic-metrics section, or `''` when nothing can be computed.
  *
  * An empty string is filtered out by the caller rather than rendering an empty header.

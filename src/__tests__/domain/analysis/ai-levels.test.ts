@@ -444,7 +444,38 @@ describe('postProcessAnalysisWithReconcile', () => {
             expect(
                 result.actionRecommendation?.reconciledLevels
             ).toBeUndefined();
-            expect(result.actionRecommendation?.planCheck).toBeDefined();
+            // 보정을 건너뛰므로 폴백할 값이 없다. 진입가 위에 있는 손절가는 롱이
+            // 실행할 수 있는 손절가가 아니므로 버려야 한다 — 남겨 두면 100에
+            // 거래되는 차트를 "이미 손절됐다"고 보고한다.
+            expect(result.actionRecommendation?.planCheck).toMatchObject({
+                belowStopLoss: false,
+                riskRewardAtCurrent: null,
+            });
+        });
+
+        it('보정된 손절가로 잰다 — 도메인이 물린 원본 값이 아니라', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: { ...baseRec, stopLoss: 200 },
+            };
+
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr
+            );
+
+            // entryPrice 100 − atr 2 × 1.5 = 97
+            expect(
+                result.actionRecommendation?.reconciledLevels?.stopLoss
+            ).toBeCloseTo(97);
+            expect(result.actionRecommendation?.planCheck).toMatchObject({
+                belowStopLoss: false,
+            });
+            // (105 − 100) / (100 − 97)
+            expect(
+                result.actionRecommendation?.planCheck?.riskRewardAtCurrent
+            ).toBeCloseTo(5 / 3);
         });
 
         it('현재가가 없으면 계획 진입가로 대체하지 않고 생략한다', () => {
