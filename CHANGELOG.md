@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.51.0](https://github.com/y0ngha/siglens-core/compare/v0.50.2...v0.51.0) (2026-08-23)
+
+
+### Features
+
+* 컨플루언스 집계와 손익비를 프롬프트에서 코드로 옮긴다 ([#182](https://github.com/y0ngha/siglens-core/issues/182)) ([289eb14](https://github.com/y0ngha/siglens-core/commit/289eb1407c6c82157911aec412d8a1f42ef5ce22))
+
 ## [0.50.2](https://github.com/y0ngha/siglens-core/compare/v0.50.1...v0.50.2) (2026-08-22)
 
 
