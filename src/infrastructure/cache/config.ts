@@ -373,6 +373,9 @@ export const PROMPT_TEMPLATE_VERSION = 'p8' as const;
  *   the parameter entirely (backward compatible — this is the v1 scope: only
  *   the technical/chart analysis key composes this axis, see the spec's
  *   cross-repo split).
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -610,6 +613,9 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  */
 export function buildFundamentalCacheKey(
@@ -694,6 +700,9 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -788,6 +797,9 @@ export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -880,6 +892,9 @@ export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
  *   accepted this option keep hitting. Mirrors {@link buildNewsCacheKey} —
  *   reasoning materially changes the digest's output depth, so an on/off pair
  *   must never share an entry.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -917,6 +932,9 @@ export function buildMarketNewsDigestCacheKey(
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -951,6 +969,9 @@ export function buildNewsCacheKey(
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  */
 export function buildOverallCacheKey(
@@ -1057,6 +1078,9 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
  *   reasoning-ON overall analysis never overwrites the reasoning-OFF "latest"
  *   pointer (or vice versa); `false`/`undefined` produce the exact same key
  *   as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The content-free peek cache key.
  */
 export function buildOverallPeekCacheKey(
@@ -1087,6 +1111,9 @@ export function buildOverallPeekCacheKey(
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  */
 export function buildOptionsCacheKey(

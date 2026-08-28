@@ -31,6 +31,9 @@ ${outputLanguageContract(locale)}`;
  * and output contract. Referenced verbatim by the worker when invoking the
  * configured AI provider for analysis prompts, and serves as the worker's
  * fallback system prompt when none is supplied on the dispatch body.
+ *
+ * @internal 함수 자체는 재노출되지 않는다 — `src/index.ts`가 내보내는 것은
+ * 기본 로케일로 고정한 {@link AI_SYSTEM_PROMPT} 상수뿐이다.
  */
 export function aiSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE

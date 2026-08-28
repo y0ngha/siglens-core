@@ -1819,6 +1819,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   system-prompt prefix shared across every caller. Omit for the base
  *   (no-bucket) analysis; see {@link buildAnalysisCacheKey}'s `positionBucket`
  *   param for the matching cache-key axis.
+ * @param locale - Output language for the model-facing text. Defaults to
+ *   {@link DEFAULT_ANALYSIS_LOCALE} (`ko`), which produces a byte-identical
+ *   prompt to the one this builder emitted before the parameter existed —
+ *   that byte identity is what keeps the existing Korean analysis cache valid.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
