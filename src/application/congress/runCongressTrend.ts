@@ -8,14 +8,14 @@ import type {
 } from '@/application/congress/types';
 import { normalizeCongressTrendResponse } from '@/domain/analysis/normalizeCongressTrend';
 import { normalizeCongressTrades } from '@/domain/analysis/normalizeCongressTrades';
-import { summarizeCongressTrades } from '@/domain/analysis/summarizeCongressTrades';
-import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
-import { CONGRESS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { congressSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { summarizeCongressTrades } from '@/domain/analysis/summarizeCongressTrades';
+import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
+import { CONGRESS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { congressSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {

@@ -14,12 +14,12 @@ import {
 } from '@/application/usage';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
-import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActiveModelId,

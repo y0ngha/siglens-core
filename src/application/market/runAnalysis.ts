@@ -23,13 +23,13 @@ import {
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
-import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
 import {

@@ -16,12 +16,12 @@ import type {
 import { normalizeFundamentalAnalysisResponse } from '@/domain/analysis/normalizeFundamental';
 import { normalizeFundamentalSnapshot } from '@/domain/analysis/normalizeFundamentalSnapshot';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
-import { FUNDAMENTAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { fundamentalSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { FUNDAMENTAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { fundamentalSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';

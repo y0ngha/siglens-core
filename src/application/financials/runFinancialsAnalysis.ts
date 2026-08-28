@@ -17,12 +17,12 @@ import { normalizeFinancialsAnalysisResponse } from '@/domain/analysis/normalize
 import { normalizeFinancialsSnapshot } from '@/domain/analysis/normalizeFinancialsSnapshot';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
-import { FINANCIALS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { FINANCIALS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import {

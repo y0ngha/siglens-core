@@ -1,3 +1,7 @@
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    type AnalysisLocale,
+} from '@/domain/analysis/outputLocale';
 import type {
     DashboardTimeframe,
     MarketSessionSpec,
@@ -17,10 +21,6 @@ import {
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
-import {
-    DEFAULT_ANALYSIS_LOCALE,
-    type AnalysisLocale,
-} from '@/domain/analysis/outputLocale';
 
 /**
  * @internal TTL for cached market briefings (in seconds).

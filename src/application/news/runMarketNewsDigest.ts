@@ -7,12 +7,12 @@ import type {
 } from '@/application/news/marketNewsDigestTypes';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestPrompt';
-import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {

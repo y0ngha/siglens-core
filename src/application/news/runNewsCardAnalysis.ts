@@ -7,12 +7,12 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsCardAnalysis } from '@/domain/analysis/normalizeNews';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
-import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { newsCardSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import { newsCardSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 
 /**

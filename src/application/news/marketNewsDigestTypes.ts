@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
     EnrichedNewsItem,
     ModelId,
@@ -7,7 +8,6 @@ import type {
     Skill,
     Tier,
 } from '@/domain/types';
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 
 /**
  * Options for submitting a market-news category digest job.
@@ -54,8 +54,10 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
      */
     reasoning?: boolean;
     /**
-     * AI 산출물의 출력 언어. 생략하면 `ko` — 이 필드가 생기기 전과 같은
-     * 한국어 결과가 나오고 캐시 키도 그대로다.
+     * Output language for the generated analysis text.
+     *
+     * Omit it to keep the previous behaviour exactly: Korean output and the
+     * same cache key this request used before the field existed.
      */
     locale?: AnalysisLocale;
     /**
