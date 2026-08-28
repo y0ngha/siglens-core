@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect } from 'vitest';
 import { buildOptionsAnalysisPrompt as buildOptionsAnalysisPromptRaw } from '@/domain/options/optionsPrompt';
 import type { OptionsSnapshot } from '@/domain/options/types';
@@ -104,7 +105,7 @@ describe('buildOptionsAnalysisPrompt', () => {
     });
 
     describe('buildOptionsAnalysisPrompt — 출력 로케일', () => {
-        const build = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+        const build = (locale?: AnalysisLocale) =>
             buildOptionsAnalysisPrompt({
                 expirationDate: 'all',
                 companyName: 'Apple Inc.',

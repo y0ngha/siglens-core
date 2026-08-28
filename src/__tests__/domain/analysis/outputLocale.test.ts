@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     ANALYSIS_LOCALES,
+    isValidAnalysisLocale,
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageContract,
     outputLanguageName,
@@ -67,5 +68,37 @@ describe('출력 로케일', () => {
     /** 언어마다 기본 문체가 달라 지정하지 않으면 호출마다 문체가 흔들린다. */
     it.each(ANALYSIS_LOCALES)('%s: 공손 층위를 지정한다', locale => {
         expect(outputLanguageContract(locale).length).toBeGreaterThan(40);
+    });
+
+    /**
+     * 로케일은 URL 세그먼트를 타고 들어온다 — 이 유니언 밖의 값이 실제로
+     * 도달할 수 있다(core가 아직 모르는 새 UI 로케일, 손으로 고친 주소).
+     * 가드가 없으면 `OUTPUT_LANGUAGE[locale]` 구조분해에서 TypeError가 나
+     * 분석 요청이 통째로 죽는다.
+     */
+    describe('isValidAnalysisLocale', () => {
+        it.each(ANALYSIS_LOCALES)('%s는 통과한다', locale => {
+            expect(isValidAnalysisLocale(locale)).toBe(true);
+        });
+
+        it.each(['kr', 'en-US', 'KO', '', 'zh-Hans'])('%j는 막는다', value => {
+            expect(isValidAnalysisLocale(value)).toBe(false);
+        });
+
+        it('null·undefined도 막는다', () => {
+            expect(isValidAnalysisLocale(null)).toBe(false);
+            expect(isValidAnalysisLocale(undefined)).toBe(false);
+        });
+
+        /** 막기만 하면 안 된다 — 모르는 값이 와도 기본 로케일로 살아나야 한다. */
+        it('알 수 없는 값은 기본 로케일로 떨어진다 — 던지지 않는다', () => {
+            const bogus = 'kr' as unknown as (typeof ANALYSIS_LOCALES)[number];
+            expect(() => outputLanguageName(bogus)).not.toThrow();
+            expect(outputLanguageName(bogus)).toBe(outputLanguageName('ko'));
+            expect(outputLanguageContract(bogus)).toBe(
+                outputLanguageContract('ko')
+            );
+            expect(outputLanguageReminder(bogus)).toBe('');
+        });
     });
 });

@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt as buildAnalysisPromptRaw,
@@ -4954,7 +4955,7 @@ describe('prompt', () => {
 
 describe('buildAnalysisPrompt — 출력 로케일', () => {
     const bars = [makeBar(0), makeBar(1), makeBar(2)];
-    const build = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+    const build = (locale?: AnalysisLocale) =>
         buildAnalysisPrompt(
             'AAPL',
             'Apple Inc.',
@@ -4993,6 +4994,30 @@ describe('buildAnalysisPrompt — 출력 로케일', () => {
      * 쓰라"가 되어 산출물이 통째로 깨지고, 일본어에서는 한자가 정상 표기라
      * 오히려 틀린 글이 나온다.
      */
+    /**
+     * keyPrices 라벨과 Step 3 산문은 **과업 규칙**으로 언어를 못 박고 있었다 —
+     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 자리다(리뷰 4라운드).
+     */
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 가이드라인의 언어 지시가 그 언어를 가리킨다',
+        locale => {
+            const prompt = build(locale);
+            expect(prompt).not.toContain(
+                'label values in keyPrices must be written in Korean'
+            );
+            expect(prompt).not.toContain('Write text fields in plain Korean');
+            expect(prompt).not.toContain('readable markdown in Korean');
+        }
+    );
+
+    it('ko: 가이드라인의 언어 지시는 예전 문구 그대로다', () => {
+        const prompt = build('ko');
+        expect(prompt).toContain(
+            'label values in keyPrices must be written in Korean'
+        );
+        expect(prompt).toContain('Write text fields in plain Korean');
+    });
+
     it('한글 전용 규칙은 ko에만 붙는다', () => {
         expect(build('ko')).toContain('pure Hangul');
         for (const locale of ['en', 'ja', 'zh'] as const) {

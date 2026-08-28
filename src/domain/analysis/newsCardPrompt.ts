@@ -12,20 +12,24 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  *
  * Build the per-card news analysis prompt for the fixed news-card model. No
  * skills, no other catalog-level knowledge (spec §3.2/Design C) — `stable`
- * is empty and `dynamic` is the full prompt, byte-for-byte the same
- * production order as before the assembly split (v0.31).
+ * is empty and `dynamic` is the full prompt, in the same production order as
+ * before the assembly split (v0.31). At the default locale it is byte-identical
+ * to the prompt this builder emitted before `locale` existed.
  *
  * Each {@link NewsItem} is processed individually: this prompt asks the model
- * to translate the title and body to Korean, produce a one-line Korean summary,
- * assign a sentiment label, and categorise the news theme — all returned as a
- * single JSON object.
+ * to render the title and body in the requested output language, produce a
+ * one-line summary, assign a sentiment label, and categorise the news theme —
+ * all returned as a single JSON object.
  *
- * When `item.sourceLanguage` is `'ko'` the translation step is dropped: the model
- * is told the article is already Korean and instructed to echo the original text
- * into `titleKo`/`bodyKo` verbatim. Asking for a Korean-to-Korean translation
- * burns tokens and lets the model quietly reword headlines that were already
- * correct. Classification and `summaryKo` still run — those are the parts that
- * carry analytical value.
+ * When the article's own language already matches the requested output language
+ * the translation step is dropped: the model is told the text is already in that
+ * language and instructed to echo it into `titleKo`/`bodyKo` verbatim. Asking
+ * for a same-language translation burns tokens and lets the model quietly reword
+ * headlines that were already correct. Classification and `summaryKo` still run
+ * — those are the parts that carry analytical value.
+ *
+ * The `Ko` field suffixes are schema names, not a language claim; their content
+ * follows `locale`.
  *
  * Intended for high-volume calls on a cheap non-reasoning model (today
  * `gemini-2.5-flash-lite` — see NEWS_CARD_MODEL_ID) where latency and cost per
@@ -39,6 +43,8 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  * instead) leaves these blocks as the only field contract.
  *
  * @param item - The raw news article to analyse.
+ * @param locale - Output language for the card text. Defaults to `ko`, which
+ *   keeps the prompt byte-identical to the pre-locale output.
  * @returns `{ stable, dynamic }` ready to be dispatched to the news-card LLM.
  */
 export function buildNewsCardAnalysisPrompt(

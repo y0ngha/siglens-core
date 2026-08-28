@@ -31,6 +31,7 @@ export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export {
     ANALYSIS_LOCALES,
     DEFAULT_ANALYSIS_LOCALE,
+    isValidAnalysisLocale,
     type AnalysisLocale,
 } from './domain/analysis/outputLocale';
 export {

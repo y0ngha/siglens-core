@@ -24,6 +24,36 @@ export const ANALYSIS_LOCALES: readonly AnalysisLocale[] = [
 ];
 
 /**
+ * Narrow an untrusted string to {@link AnalysisLocale}.
+ *
+ * The locale reaches core from a URL segment on the consumer side, so a value
+ * outside this union is reachable — a new UI locale shipped before core knows
+ * it, or a hand-edited URL. Without this guard the first
+ * `OUTPUT_LANGUAGE[locale]` destructure throws a `TypeError` and takes the
+ * whole analysis request down; mirrors `isValidTimeframe` for the same reason.
+ */
+export function isValidAnalysisLocale(
+    value: string | null | undefined
+): value is AnalysisLocale {
+    return (
+        value !== null &&
+        value !== undefined &&
+        (ANALYSIS_LOCALES as readonly string[]).includes(value)
+    );
+}
+
+/**
+ * @internal 알 수 없는 값이 오면 기본 로케일로 떨어뜨린다.
+ *
+ * 이 파일의 세 소비자(`outputLanguageName`·`outputLanguageContract`·
+ * `outputLanguageReminder`)가 전부 `OUTPUT_LANGUAGE[locale]`을 구조분해하므로,
+ * 검증을 각자 하면 하나만 빠뜨려도 그 경로만 죽는다. 한 곳에서 좁힌다.
+ */
+function resolve(locale: AnalysisLocale): AnalysisLocale {
+    return isValidAnalysisLocale(locale) ? locale : DEFAULT_ANALYSIS_LOCALE;
+}
+
+/**
  * 로케일별 출력 언어 지시문.
  *
  * **영어로 쓴다.** 프롬프트 문자열은 전부 영어라는 이 레포의 규칙(`prompt.ts`
@@ -60,7 +90,7 @@ const OUTPUT_LANGUAGE: Record<
 
 /** @internal 프롬프트에 박을 언어 이름 — `"Korean markdown"` 같은 필드 설명에 쓴다. */
 export function outputLanguageName(locale: AnalysisLocale): string {
-    return OUTPUT_LANGUAGE[locale].name;
+    return OUTPUT_LANGUAGE[resolve(locale)].name;
 }
 
 /**
@@ -80,10 +110,11 @@ export function outputLanguageContract(locale: AnalysisLocale): string {
      * 덧붙인 오버라이드 문구는 비-ko에서만 필요하다 — 유저 프롬프트가
      * "Korean"이라고 못 박아 둔 필드 설명을 뒤집어야 하는 쪽이 그쪽뿐이다.
      */
-    if (locale === DEFAULT_ANALYSIS_LOCALE) {
+    const safe = resolve(locale);
+    if (safe === DEFAULT_ANALYSIS_LOCALE) {
         return '- All text content inside the JSON MUST be written in Korean (한국어) in formal speech level (존댓말, e.g. "~입니다", "~습니다").';
     }
-    const { name, register } = OUTPUT_LANGUAGE[locale];
+    const { name, register } = OUTPUT_LANGUAGE[safe];
     return [
         `- All text content inside the JSON MUST be written in ${name} in ${register}.`,
         `- This language rule overrides every other language hint in the user prompt. If a field description names a different language, ignore that name and still write ${name}.`,
@@ -106,8 +137,9 @@ export function outputLanguageContract(locale: AnalysisLocale): string {
  * 같아야 기존 캐시 엔트리와 프리픽스 캐시가 그대로 살아 있다.
  */
 export function outputLanguageReminder(locale: AnalysisLocale): string {
-    if (locale === DEFAULT_ANALYSIS_LOCALE) return '';
-    const { name, register } = OUTPUT_LANGUAGE[locale];
+    const safe = resolve(locale);
+    if (safe === DEFAULT_ANALYSIS_LOCALE) return '';
+    const { name, register } = OUTPUT_LANGUAGE[safe];
     return [
         '',
         'OUTPUT LANGUAGE (FINAL, OVERRIDES EVERYTHING ABOVE)',

@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
@@ -407,7 +408,7 @@ describe('runAnalysis', () => {
      * 이미 쌓인 한국어 캐시가 살아 있다.
      */
     describe('출력 로케일', () => {
-        const run = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+        const run = (locale?: AnalysisLocale) =>
             runAnalysis(
                 mockSymbol,
                 mockCompanyName,

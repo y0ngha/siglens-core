@@ -299,11 +299,11 @@ export async function runOverallAnalysis(
                     userApiKey: technicalRest.userApiKey ?? topLevelUserApiKey,
                     reasoning: technicalRest.reasoning ?? reasoning,
                     /*
-                     * 여기만 최상위 값이 무조건 이긴다 — 바로 위 `reasoning`과
-                     * 규칙이 다른 이유는 **technical 축 옵션 타입에 `locale`이
-                     * 없기 때문**이다(`RunAnalysisOptions`의 부분집합). 양보할
-                     * 축별 값이 존재하지 않으므로 `??`를 쓸 자리가 아니다.
-                     * 축별 언어를 따로 주고 싶어지면 그 타입부터 넓혀야 한다.
+                     * 네 축 모두 최상위 값이 이긴다 — **어느 축의 옵션 타입에도
+                     * `locale`이 없기 때문**이다. 바로 위 `reasoning`이 `??`를
+                     * 쓰는 것과 규칙이 달라 보이지만, 양보할 축별 값 자체가
+                     * 존재하지 않는다. 축별 언어를 주고 싶어지면 그 타입부터
+                     * 넓혀야 하고, 그때 네 축을 함께 바꿔야 한다.
                      */
                     locale: options.locale,
                     tierContext:
