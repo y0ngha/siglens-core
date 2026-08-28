@@ -1,19 +1,21 @@
 /**
- * AI 산출물의 **출력 언어**.
+ * Output language for AI-generated analysis text.
  *
- * 화면 UI 언어와 같은 값을 받지만 의미가 다르다 — UI는 카탈로그가 번역하고,
- * 여기는 모델이 직접 그 언어로 쓴다. 그래서 번역 파이프라인이 아니라 프롬프트의
- * 출력 계약에 실린다.
+ * Takes the same values as the consumer's UI locale but means something
+ * different: the UI is translated from a message catalog, whereas this makes
+ * the model write in that language directly. It therefore rides on the
+ * prompt's output contract, not on a translation pipeline.
  *
- * **기본값은 `ko`다.** 호출부가 값을 넘기지 않으면 지금까지와 정확히 같은
- * 한국어 산출물이 나온다 — 이 필드가 추가돼도 기존 소비자는 아무것도 바꾸지
- * 않아도 된다.
+ * Defaults to {@link DEFAULT_ANALYSIS_LOCALE} (`ko`) everywhere it is
+ * optional, so existing callers that omit it keep getting byte-identical
+ * Korean output and keep hitting the same cache keys.
  */
 export type AnalysisLocale = 'ko' | 'en' | 'ja' | 'zh';
 
-/** 호출부가 로케일을 안 넘겼을 때의 출력 언어. */
+/** Output language used when a caller omits {@link AnalysisLocale}. */
 export const DEFAULT_ANALYSIS_LOCALE: AnalysisLocale = 'ko';
 
+/** Every supported output language, in catalog order. */
 export const ANALYSIS_LOCALES: readonly AnalysisLocale[] = [
     'ko',
     'en',
@@ -56,12 +58,14 @@ const OUTPUT_LANGUAGE: Record<
     },
 };
 
-/** 프롬프트에 박을 언어 이름 — `"Korean markdown"` 같은 필드 설명에 쓴다. */
+/** @internal 프롬프트에 박을 언어 이름 — `"Korean markdown"` 같은 필드 설명에 쓴다. */
 export function outputLanguageName(locale: AnalysisLocale): string {
     return OUTPUT_LANGUAGE[locale].name;
 }
 
 /**
+ * @internal
+ *
  * 시스템 프롬프트의 출력 언어 계약 한 줄.
  *
  * **이 문장이 언어의 단일 소스다.** 필드 설명에도 언어 이름이 들어가지만
@@ -88,6 +92,8 @@ export function outputLanguageContract(locale: AnalysisLocale): string {
 }
 
 /**
+ * @internal
+ *
  * 유저 프롬프트 **끝**에 붙이는 출력 언어 리마인더.
  *
  * 시스템 프롬프트가 이미 같은 계약을 담고 있는데 한 번 더 붙이는 이유:

@@ -1,7 +1,3 @@
-import {
-    DEFAULT_ANALYSIS_LOCALE,
-    type AnalysisLocale,
-} from '@/domain/analysis/outputLocale';
 import type {
     DashboardTimeframe,
     MarketSessionSpec,
@@ -21,6 +17,10 @@ import {
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    type AnalysisLocale,
+} from '@/domain/analysis/outputLocale';
 
 /**
  * @internal TTL for cached market briefings (in seconds).
@@ -1063,9 +1063,10 @@ export function buildOverallPeekCacheKey(
     symbol: string,
     timeframe: Timeframe,
     modelId: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -1093,7 +1094,8 @@ export function buildOptionsCacheKey(
     expirationDate: OptionsExpirationFilter,
     modelId: string,
     snapshotInputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }

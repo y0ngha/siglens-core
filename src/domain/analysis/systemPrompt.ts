@@ -32,6 +32,7 @@ ${outputLanguageContract(locale)}`;
  * configured AI provider for analysis prompts, and serves as the worker's
  * fallback system prompt when none is supplied on the dispatch body.
  */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function aiSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -41,10 +42,11 @@ Your job is to interpret bar data, technical indicators, and candle/chart patter
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `aiSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `aiSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const AI_SYSTEM_PROMPT = aiSystemPrompt(DEFAULT_ANALYSIS_LOCALE);
 
 /** @internal System instruction for the multi-axis overall-analysis LLM call. */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function overallSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -54,12 +56,13 @@ Your job is to synthesize technical, fundamental, news, and options signals into
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `overallSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `overallSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const OVERALL_SYSTEM_PROMPT = overallSystemPrompt(
     DEFAULT_ANALYSIS_LOCALE
 );
 
 /** @internal System instruction for the news-analysis LLM call. */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function newsSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -69,10 +72,11 @@ Your job is to assess the market impact and sentiment of news coverage for a sin
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `newsSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `newsSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const NEWS_SYSTEM_PROMPT = newsSystemPrompt(DEFAULT_ANALYSIS_LOCALE);
 
 /** @internal System instruction for the single-article news-card LLM call. */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function newsCardSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -82,12 +86,13 @@ Your job is to turn a single news article into a concise, neutral Korean summary
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `newsCardSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `newsCardSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const NEWS_CARD_SYSTEM_PROMPT = newsCardSystemPrompt(
     DEFAULT_ANALYSIS_LOCALE
 );
 
 /** @internal System instruction for the fundamental/valuation-analysis LLM call. */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function fundamentalSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -97,7 +102,7 @@ Your job is to interpret financial statements, valuation multiples, growth, prof
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `fundamentalSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `fundamentalSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const FUNDAMENTAL_SYSTEM_PROMPT = fundamentalSystemPrompt(
     DEFAULT_ANALYSIS_LOCALE
 );
@@ -109,6 +114,7 @@ export const FUNDAMENTAL_SYSTEM_PROMPT = fundamentalSystemPrompt(
  * earnings quality and accruals, solvency metrics, and sustainable cash generation.
  * Treat any value marked N/A or "데이터 없음" as missing data — never as zero or a neutral midpoint.
  */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function financialsSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -118,7 +124,7 @@ Your job is to interpret income statement, balance sheet, and cash flow data acr
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `financialsSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `financialsSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const FINANCIALS_SYSTEM_PROMPT = financialsSystemPrompt(
     DEFAULT_ANALYSIS_LOCALE
 );
@@ -132,6 +138,7 @@ export const FINANCIALS_SYSTEM_PROMPT = financialsSystemPrompt(
  * context only — never as a precise quantitative signal — and ground every
  * statement in the provided rows.
  */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function congressSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -141,12 +148,13 @@ Your job is to summarize Senate and House trade filings for a single ticker into
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `congressSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `congressSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const CONGRESS_SYSTEM_PROMPT = congressSystemPrompt(
     DEFAULT_ANALYSIS_LOCALE
 );
 
 /** @internal System instruction for the options-analysis LLM call. */
+/** @internal 로케일별 시스템 지시문. 재노출되지 않는다. */
 export function optionsSystemPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
@@ -156,7 +164,7 @@ Your job is to interpret the options chain, implied volatility, Greeks, and posi
 ${analysisSystemBase(locale)}`;
 }
 
-/** @deprecated 로케일을 넘기는 `optionsSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
+/** @internal @deprecated 로케일을 넘기는 `optionsSystemPrompt(locale)`을 쓴다. 기본 로케일(ko) 고정. */
 export const OPTIONS_SYSTEM_PROMPT = optionsSystemPrompt(
     DEFAULT_ANALYSIS_LOCALE
 );

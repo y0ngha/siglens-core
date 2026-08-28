@@ -247,6 +247,7 @@ export async function runOverallAnalysis(
                   tier: topLevelTier ?? DEFAULT_TIER,
                   userApiKey: topLevelUserApiKey,
                   reasoning,
+                  locale: options.locale,
                   ...optionsAxisOptions,
                   skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                   force: effectiveAxisForce,
@@ -276,6 +277,7 @@ export async function runOverallAnalysis(
               tier: topLevelTier ?? DEFAULT_TIER,
               userApiKey: topLevelUserApiKey,
               reasoning,
+              locale: options.locale,
               ...options.fundamental,
               skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
               force: effectiveAxisForce,
@@ -296,6 +298,7 @@ export async function runOverallAnalysis(
                     modelId: technicalRest.modelId ?? modelId,
                     userApiKey: technicalRest.userApiKey ?? topLevelUserApiKey,
                     reasoning: technicalRest.reasoning ?? reasoning,
+                    locale: options.locale,
                     tierContext:
                         technicalRest.tierContext ??
                         (topLevelTier !== undefined
@@ -315,6 +318,7 @@ export async function runOverallAnalysis(
                 tier: topLevelTier ?? DEFAULT_TIER,
                 userApiKey: topLevelUserApiKey,
                 reasoning,
+                locale: options.locale,
                 ...(newsFieldIsArray
                     ? undefined
                     : (newsField as object | undefined)),
@@ -543,7 +547,8 @@ export async function runOverallAnalysis(
             symbol,
             timeframe,
             modelId,
-            reasoning
+            reasoning,
+            options.locale
         );
         cache
             .set(peekKey, result, OVERALL_CACHE_TTL_SECONDS)

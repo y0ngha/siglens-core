@@ -1,4 +1,3 @@
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -20,6 +19,7 @@ import type {
     UserTierContext,
 } from '@/domain/types';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 
 export type { UserApiKeyRequiredError };
 

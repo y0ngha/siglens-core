@@ -1,4 +1,3 @@
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -44,6 +43,7 @@ import type {
 } from '@/application/options/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 
 /** Axis identifier for the four-axis overall analysis pipeline. */
 export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';

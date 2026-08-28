@@ -158,7 +158,8 @@ export async function runOptionsAnalysis(
         expirationDate,
         modelId,
         inputHash,
-        options.reasoning
+        options.reasoning,
+        options.locale
     );
     const cache = createCacheProvider();
 

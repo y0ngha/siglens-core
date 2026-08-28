@@ -81,7 +81,15 @@ export async function runNewsCardAnalysis(
     // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
-    const raw = await dedupeInFlight(`news-card:${item.id}`, () =>
+    /*
+     * in-flight 키에 로케일이 들어가야 한다. 같은 카드에 언어가 다른 동시
+     * 요청이 오면 하나로 합쳐져 늦게 부른 쪽이 **요청하지 않은 언어**를 받는다.
+     * 캐시 키와 같은 규약이라 ko는 접미가 없다.
+     */
+    const inFlightKey = `news-card:${item.id}${
+        locale === DEFAULT_ANALYSIS_LOCALE ? '' : `:lang=${locale}`
+    }`;
+    const raw = await dedupeInFlight(inFlightKey, () =>
         callAnalysisAi({
             prompt,
             model: NEWS_CARD_MODEL_ID,

@@ -1,4 +1,3 @@
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -13,6 +12,7 @@ import type {
     Tier,
     TierConfig,
 } from '@/domain/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 
 // ─────────────────────────────────────────
 // Submit Options Analysis

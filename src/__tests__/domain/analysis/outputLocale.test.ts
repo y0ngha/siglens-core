@@ -59,6 +59,8 @@ describe('출력 로케일', () => {
             const reminder = outputLanguageReminder(locale);
             expect(reminder).toContain('OVERRIDES EVERYTHING ABOVE');
             expect(reminder).toContain(outputLanguageName(locale));
+            // 필드 설명이 `Korean`이라고 못 박아 둔 것을 이름으로 집어 무력화한다.
+            expect(reminder).toContain('"Korean"');
         }
     );
 

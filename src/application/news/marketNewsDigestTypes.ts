@@ -1,4 +1,3 @@
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type {
     EnrichedNewsItem,
@@ -8,6 +7,7 @@ import type {
     Skill,
     Tier,
 } from '@/domain/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 
 /**
  * Options for submitting a market-news category digest job.

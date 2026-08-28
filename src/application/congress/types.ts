@@ -1,7 +1,7 @@
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 
 // ─────────────────────────────────────────
 // Submit
