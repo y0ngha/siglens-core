@@ -1,6 +1,11 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageName,
+    type AnalysisLocale,
+} from './outputLocale';
+import {
     ATR_DEFAULT_PERIOD,
     CCI_DEFAULT_PERIOD,
     CMF_DEFAULT_PERIOD,
@@ -1400,7 +1405,8 @@ const buildAnalysisRequest = (
     indicatorGuideSkills: Skill[],
     candlestickSkills: Skill[],
     supportResistanceSkills: Skill[],
-    regularSkills: Skill[]
+    regularSkills: Skill[],
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string => {
     const patternListInstruction =
         patternSkills.length > 0
@@ -1550,8 +1556,17 @@ const buildAnalysisRequest = (
     return [
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
-        'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
-        'Output language rule (STRICT): every Korean text field must be written in pure Hangul (한글) only — NEVER mix in 한자(漢字)/Chinese characters. Write every Sino-Korean word in Hangul (e.g. write "부근" not "附近", "매도" not "賣渡", "이익 실현" not "利益實現"). This applies to all prose fields (summary, keyLevels reasoning, actionRecommendation, strategyResults, candlePatterns, patternSummaries, etc.).',
+        `Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in ${outputLanguageName(locale)}.`,
+        /*
+         * 한자 혼용 금지는 **한국어에만** 적용된다. 중국어 출력에 이 규칙이
+         * 남으면 "한글로만 쓰라"가 되어 산출물이 통째로 깨지고, 일본어에서는
+         * 한자가 정상 표기라 오히려 틀린 글이 나온다.
+         */
+        ...(locale === 'ko'
+            ? [
+                  'Output language rule (STRICT): every Korean text field must be written in pure Hangul (한글) only — NEVER mix in 한자(漢字)/Chinese characters. Write every Sino-Korean word in Hangul (e.g. write "부근" not "附近", "매도" not "賣渡", "이익 실현" not "利益實現"). This applies to all prose fields (summary, keyLevels reasoning, actionRecommendation, strategyResults, candlePatterns, patternSummaries, etc.).',
+              ]
+            : []),
         FIELD_GUIDANCE_PREFACE,
         buildFieldGuidanceBody(),
         indicatorGuideInstruction,
@@ -1818,7 +1833,8 @@ export function buildAnalysisPrompt(
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot,
     assetClass: AssetClass = 'equity',
-    positionBucket?: PositionBucket
+    positionBucket?: PositionBucket,
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1881,7 +1897,8 @@ export function buildAnalysisPrompt(
         combinedGroups.indicator_guide,
         combinedGroups.candlestick,
         combinedGroups.support_resistance,
-        combinedGroups.regular
+        combinedGroups.regular,
+        locale
     );
 
     // Design C: `stable` carries ONLY the always_on skill digests — nothing

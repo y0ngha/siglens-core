@@ -20,7 +20,11 @@ import type {
 import { normalizeOptionsAnalysisResponse } from '@/domain/analysis/normalizeOptions';
 import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
 import { OPTIONS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { OPTIONS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { optionsSystemPrompt } from '@/domain/analysis/systemPrompt';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import {
@@ -214,10 +218,14 @@ export async function runOptionsAnalysis(
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM.
     // This builder has no skills catalog, so `stable` is always '' and
     // `system` stays the base persona unchanged.
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
-        ? `${OPTIONS_SYSTEM_PROMPT}\n\n${stable}`
-        : OPTIONS_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${optionsSystemPrompt(locale)}\n\n${stable}`
+        : optionsSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // callModelId resolves the actual ActiveModelId for the AI call.
     const callModelId: ActiveModelId =

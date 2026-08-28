@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
@@ -57,6 +58,11 @@ export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * AI 산출물의 출력 언어. 생략하면 `ko` — 이 필드가 생기기 전과 같은
+     * 한국어 결과가 나오고 캐시 키도 그대로다.
+     */
+    locale?: AnalysisLocale;
     /**
      * BYOK API key. When provided, forwarded to the worker as the
      * `X-AI-API-KEY` header — the same mechanism every other submit use-case

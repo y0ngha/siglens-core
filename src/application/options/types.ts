@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -83,6 +84,11 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * AI 산출물의 출력 언어. 생략하면 `ko` — 이 필드가 생기기 전과 같은
+     * 한국어 결과가 나오고 캐시 키도 그대로다.
+     */
+    locale?: AnalysisLocale;
     /**
      * Cancellation signal for the in-flight LLM call (used by `runOptionsAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection

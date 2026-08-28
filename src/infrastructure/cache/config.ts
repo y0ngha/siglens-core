@@ -1,3 +1,7 @@
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    type AnalysisLocale,
+} from '@/domain/analysis/outputLocale';
 import type {
     DashboardTimeframe,
     MarketSessionSpec,
@@ -160,6 +164,22 @@ export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
  */
 function reasoningKeySuffix(reasoning?: boolean): string {
     return reasoning === true ? ':reason=on' : '';
+}
+
+/**
+ * @internal Cache-key suffix for the AI **output language**.
+ *
+ * 같은 심볼·타임프레임·모델이라도 언어가 다르면 산출물이 다르므로 캐시를
+ * 공유하면 안 된다 — 한국어 결과가 `/en` 요청에 그대로 나간다.
+ *
+ * `reasoningKeySuffix`와 같은 규약을 쓴다: **기본 로케일(ko)은 접미가 없다.**
+ * 이 기능이 들어오기 전 키와 바이트가 같아야 이미 쌓인 한국어 캐시가 전부
+ * 살아 있고, 로케일을 넘기지 않는 기존 호출부·SSR peek도 같은 키를 맞힌다.
+ */
+function localeKeySuffix(locale?: AnalysisLocale): string {
+    return locale === undefined || locale === DEFAULT_ANALYSIS_LOCALE
+        ? ''
+        : `:lang=${locale}`;
 }
 
 /**
@@ -373,12 +393,13 @@ export function buildAnalysisCacheKey(
     modelId = DEFAULT_ANALYSIS_MODEL_ID,
     skillFingerprint?: string,
     reasoning?: boolean,
-    positionBucket?: PositionBucket
+    positionBucket?: PositionBucket,
+    locale?: AnalysisLocale
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -595,12 +616,13 @@ export function buildFundamentalCacheKey(
     symbol: string,
     modelId: string,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -687,12 +709,13 @@ export function buildFinancialsCacheKey(
     modelId: string,
     period: StatementPeriod,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:financials:${symbol}:${period}:${modelId}:${FINANCIALS_PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -779,12 +802,13 @@ export function buildCongressTrendCacheKey(
     symbol: string,
     modelId: string,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:congress:${symbol}:${modelId}:${CONGRESS_PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -870,9 +894,10 @@ export function buildMarketNewsDigestCacheKey(
     category: NewsFeedCategory,
     modelId: string,
     inputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -904,9 +929,10 @@ export function buildNewsCacheKey(
     symbol: string,
     modelId: string,
     inputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -932,9 +958,10 @@ export function buildOverallCacheKey(
     timeframe: Timeframe,
     modelId: string,
     inputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**

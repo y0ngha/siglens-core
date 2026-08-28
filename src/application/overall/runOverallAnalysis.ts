@@ -20,7 +20,11 @@ import {
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { OVERALL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { overallSystemPrompt } from '@/domain/analysis/systemPrompt';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import {
@@ -420,7 +424,8 @@ export async function runOverallAnalysis(
         timeframe,
         modelId,
         inputHash,
-        reasoning
+        reasoning,
+        options.locale
     );
     const cache = createCacheProvider();
 
@@ -483,10 +488,14 @@ export async function runOverallAnalysis(
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
-        ? `${OVERALL_SYSTEM_PROMPT}\n\n${stable}`
-        : OVERALL_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${overallSystemPrompt(locale)}\n\n${stable}`
+        : overallSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // Resolve the callable model (overall uses the same sentinel logic as runAnalysis)
     const callModelId: ActiveModelId =

@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BriefingModelId } from '@/application/analysis/briefingModel';
 import type { ActiveModelId, Tier } from '@/domain/types';
 
@@ -23,6 +24,11 @@ export interface CallAnalysisAiOptions {
      * tier 강제(free→false)는 호출 측 책임이다.
      */
     reasoning?: boolean;
+    /**
+     * AI 산출물의 출력 언어. 생략하면 `ko` — 이 필드가 생기기 전과 같은
+     * 한국어 결과가 나오고 캐시 키도 그대로다.
+     */
+    locale?: AnalysisLocale;
     /**
      * 로그 상관용 식별자. 이전에는 `jobId`였으나 job 큐가 제거되면서 이름만 남으면
      * 거짓이 되므로 개명했다. AI 호출 자체에는 영향을 주지 않는다.

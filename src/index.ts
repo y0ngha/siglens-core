@@ -144,6 +144,11 @@ export { calculateMA } from './domain/indicators/ma';
 // Prompt builders
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
+export {
+    ANALYSIS_LOCALES,
+    DEFAULT_ANALYSIS_LOCALE,
+    type AnalysisLocale,
+} from './domain/analysis/outputLocale';
 
 // Financials domain building blocks
 export { computeFinancialsScorecard } from './domain/analysis/financialsScorecard';

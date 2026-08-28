@@ -4951,3 +4951,52 @@ describe('prompt', () => {
         });
     });
 });
+
+describe('buildAnalysisPrompt — 출력 로케일', () => {
+    const bars = [makeBar(0), makeBar(1), makeBar(2)];
+    const build = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+        buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            bars,
+            makeIndicators(),
+            [],
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            locale
+        );
+
+    /**
+     * **이 단언이 캐시를 지킨다.** 로케일 인자가 붙기 전과 ko 산출물이 한 글자라도
+     * 달라지면 이미 쌓인 한국어 분석 캐시가 전부 낡은 프롬프트로 만든 것이 되고,
+     * `PROMPT_TEMPLATE_VERSION`을 올려 통째로 재생성해야 한다.
+     */
+    it('로케일을 생략하면 ko와 바이트가 같다', () => {
+        expect(build()).toBe(build('ko'));
+    });
+
+    it('ko는 "Respond in Korean."을 그대로 쓴다', () => {
+        expect(build('ko')).toContain('Respond in Korean.');
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s는 한국어로 응답하라는 지시를 남기지 않는다',
+        locale => {
+            expect(build(locale)).not.toContain('Respond in Korean.');
+        }
+    );
+
+    /**
+     * 한자 혼용 금지는 **한국어 전용** 규칙이다. 중국어 출력에 남으면 "한글로만
+     * 쓰라"가 되어 산출물이 통째로 깨지고, 일본어에서는 한자가 정상 표기라
+     * 오히려 틀린 글이 나온다.
+     */
+    it('한글 전용 규칙은 ko에만 붙는다', () => {
+        expect(build('ko')).toContain('pure Hangul');
+        for (const locale of ['en', 'ja', 'zh'] as const) {
+            expect(build(locale)).not.toContain('pure Hangul');
+        }
+    });
+});

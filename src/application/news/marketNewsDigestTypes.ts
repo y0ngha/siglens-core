@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type {
     EnrichedNewsItem,
@@ -52,6 +53,11 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
      * before this option existed still hit.
      */
     reasoning?: boolean;
+    /**
+     * AI 산출물의 출력 언어. 생략하면 `ko` — 이 필드가 생기기 전과 같은
+     * 한국어 결과가 나오고 캐시 키도 그대로다.
+     */
+    locale?: AnalysisLocale;
     /**
      * When `true`, skip enqueueing a new job on cache miss and return
      * `{ status: 'miss_no_trigger' }`. Cache hits are unaffected.

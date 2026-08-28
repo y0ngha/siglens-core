@@ -8,7 +8,11 @@ import type {
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestPrompt';
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { NEWS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
@@ -112,7 +116,8 @@ export async function runMarketNewsDigest(
         category,
         modelId,
         inputHash,
-        options.reasoning
+        options.reasoning,
+        options.locale
     );
     const cache = createCacheProvider();
 
@@ -140,10 +145,14 @@ export async function runMarketNewsDigest(
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
-        ? `${NEWS_SYSTEM_PROMPT}\n\n${stable}`
-        : NEWS_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${newsSystemPrompt(locale)}\n\n${stable}`
+        : newsSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // callModelId resolves the actual ActiveModelId for the AI call.
     // Deprecated model strings live in ModelId but not in MODEL_SPECS.
