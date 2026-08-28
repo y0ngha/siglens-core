@@ -69,10 +69,10 @@ export async function runNewsCardAnalysis(
 ): Promise<RunNewsCardAnalysisResult> {
     const { item } = options;
 
-    const { stable, dynamic } = buildNewsCardAnalysisPrompt(item);
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
+    const { stable, dynamic } = buildNewsCardAnalysisPrompt(item, locale);
     // Design C: this builder has no skills catalog, so `stable` is always ''
     // and `system` stays the base persona unchanged.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${newsCardSystemPrompt(locale)}\n\n${stable}`
         : newsCardSystemPrompt(locale);

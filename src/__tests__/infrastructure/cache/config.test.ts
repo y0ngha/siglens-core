@@ -730,6 +730,55 @@ describe('locale이 캐시 키에 반영될 때', () => {
         expect(en).toBe(`${base}:lang=en`);
     });
 
+    /**
+     * 형제 빌더가 아홉이라 하나를 놓쳐도 tsc가 잡아주지 않는다 — 실제로
+     * options 키를 빠뜨렸다가 리뷰에서 잡혔다. **각각을 직접 고정한다.**
+     */
+    it('나머지 분석 키도 전부 로케일을 가른다', () => {
+        const cases: Array<[string, string]> = [
+            [
+                buildFundamentalCacheKey('AAPL', 'm', 'f'),
+                buildFundamentalCacheKey('AAPL', 'm', 'f', undefined, 'en'),
+            ],
+            [
+                buildFinancialsCacheKey('AAPL', 'm', 'annual', 'f'),
+                buildFinancialsCacheKey(
+                    'AAPL',
+                    'm',
+                    'annual',
+                    'f',
+                    undefined,
+                    'en'
+                ),
+            ],
+            [
+                buildCongressTrendCacheKey('AAPL', 'm', 'f'),
+                buildCongressTrendCacheKey('AAPL', 'm', 'f', undefined, 'en'),
+            ],
+            [
+                buildMarketNewsDigestCacheKey('crypto', 'm', 'h'),
+                buildMarketNewsDigestCacheKey(
+                    'crypto',
+                    'm',
+                    'h',
+                    undefined,
+                    'en'
+                ),
+            ],
+            [
+                buildNewsCacheKey('AAPL', 'm', 'h'),
+                buildNewsCacheKey('AAPL', 'm', 'h', undefined, 'en'),
+            ],
+            [
+                buildOverallCacheKey('AAPL', '1Day', 'm', 'h'),
+                buildOverallCacheKey('AAPL', '1Day', 'm', 'h', undefined, 'en'),
+            ],
+        ];
+        for (const [base, localized] of cases) {
+            expect(localized).toBe(`${base}:lang=en`);
+        }
+    });
+
     it('overall peek 키도 로케일을 가른다', () => {
         const base = buildOverallPeekCacheKey('AAPL', '1Day', 'm');
         const ja = buildOverallPeekCacheKey(

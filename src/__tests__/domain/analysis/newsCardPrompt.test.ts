@@ -141,7 +141,7 @@ describe('sourceLanguage', () => {
     it('tells the model to copy Korean title and body verbatim', () => {
         const prompt = buildNewsCardAnalysisPrompt(KOREAN_NEWS_ITEM);
 
-        expect(prompt).toContain('ALREADY Korean — copy it verbatim');
+        expect(prompt).toContain('ALREADY in Korean — copy it verbatim');
         expect(prompt).toContain('Do not reword, shorten, or re-punctuate it.');
     });
 
@@ -162,7 +162,7 @@ describe('sourceLanguage', () => {
             'You are a financial news translator and classifier.'
         );
         expect(prompt).toContain(
-            'natural Korean translation of the English title.'
+            'natural Korean translation of the source title.'
         );
     });
 
@@ -241,6 +241,51 @@ describe('bodyTruncated', () => {
         });
 
         expect(prompt).toContain('EXCERPT — cut off mid-article');
-        expect(prompt).toContain('ALREADY Korean — copy it verbatim');
+        expect(prompt).toContain('ALREADY in Korean — copy it verbatim');
+    });
+});
+
+describe('buildNewsCardAnalysisPrompt — 출력 로케일', () => {
+    /**
+     * 이 빌더는 과업 자체가 "번역"이라 **본문 지시가 언어를 못 박는다**.
+     * 프롬프트 말미 리마인더는 필드 설명을 덮으려고 만든 것이라 여기까지
+     * 뒤집는다고 볼 수 없다 — 소스에서 직접 갈라야 한다(PR #184 리뷰 4라운드).
+     */
+    it('로케일을 생략하면 ko와 바이트가 같다', () => {
+        expect(buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM)).toBe(
+            buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM, 'ko')
+        );
+    });
+
+    /** 한국어 기사를 영어로 낼 때 — 번역 방향이 뒤집힌다. */
+    it('en 출력이면 한국어 번역 지시가 남지 않는다', () => {
+        const prompt = buildNewsCardAnalysisPrompt(
+            { ...FULL_NEWS_ITEM, sourceLanguage: 'ko' },
+            'en'
+        );
+        expect(prompt).not.toContain('Korean translation');
+        expect(prompt).toContain('natural English translation');
+    });
+
+    /** 원문 언어와 출력 언어가 같으면 번역이 아니라 그대로 쓰는 경로다. */
+    it('영문 원문 + en 출력이면 verbatim 경로로 간다', () => {
+        const prompt = buildNewsCardAnalysisPrompt(
+            { ...FULL_NEWS_ITEM, sourceLanguage: 'en' },
+            'en'
+        );
+        expect(prompt).toContain('ALREADY in English');
+        expect(prompt).toContain('financial news classifier');
+    });
+
+    /** few-shot 예문이 한국어라 다른 언어에서는 본보기가 어긋난다. */
+    it('한국어 few-shot은 ko에서만 실린다', () => {
+        expect(buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM, 'ko')).toContain(
+            '엔비디아가'
+        );
+        for (const locale of ['en', 'ja', 'zh'] as const) {
+            expect(
+                buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM, locale)
+            ).not.toContain('엔비디아가');
+        }
     });
 });

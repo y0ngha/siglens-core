@@ -2916,7 +2916,7 @@ describe('prompt', () => {
         it('actionRecommendation 텍스트 필드를 문단과 목록으로 작성하도록 지시한다', () => {
             expect(result).toContain('Step 3 formatting');
             expect(result).toContain(
-                'each actionRecommendation text field must be readable markdown Korean'
+                'each actionRecommendation text field must be readable markdown in Korean'
             );
             expect(result).toContain(
                 'use bullet lists for multiple prices or conditions'

@@ -1,5 +1,9 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageName,
+} from '@/domain/analysis/outputLocale';
 import type { AssembledPrompt } from '@/domain/types';
 import type { BuildOptionsAnalysisPromptOptions } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
@@ -33,7 +37,12 @@ import { summarizeChainForLlm } from './summarizeChainForLlm';
 export function buildOptionsAnalysisPrompt(
     options: BuildOptionsAnalysisPromptOptions
 ): AssembledPrompt {
-    const { expirationDate, companyName, snapshot } = options;
+    const {
+        expirationDate,
+        companyName,
+        snapshot,
+        locale = DEFAULT_ANALYSIS_LOCALE,
+    } = options;
 
     const targetChains =
         expirationDate === 'all'
@@ -47,7 +56,7 @@ export function buildOptionsAnalysisPrompt(
     const stable = '';
 
     const dynamic = [
-        `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in Korean.`,
+        `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in ${outputLanguageName(locale)}.`,
         '',
         `Current price: $${snapshot.underlyingPrice}`,
         '',
@@ -82,7 +91,7 @@ export function buildOptionsAnalysisPrompt(
         '- topOpenInterestStrikes: the 3 strikes with the most accumulated open interest.',
         '- topVolumeStrikes: the 3 strikes most actively traded today — read together with OI (accumulated bets) to spot price levels where the market is newly moving.',
         '- topOiBidAskSummary: bid/ask quotes (mid · spread) for the top OI strikes — a tight spread signals good liquidity at that price level.',
-        '- Use a friendly but accurate Korean tone in the output. Keep ticker symbols in English as-is (e.g. AAPL).',
+        `- Use a friendly but accurate tone in ${outputLanguageName(locale)}. Keep ticker symbols in English as-is (e.g. AAPL).`,
     ].join('\n');
 
     return { stable, dynamic };

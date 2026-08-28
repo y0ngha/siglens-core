@@ -211,15 +211,16 @@ export async function runOptionsAnalysis(
     }
 
     // ── 5. Build prompt, call LLM, normalise, cache, return ──
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildOptionsAnalysisPrompt({
         expirationDate,
         companyName,
         snapshot: { ...snapshot, chains: usableChains },
+        locale,
     });
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM.
     // This builder has no skills catalog, so `stable` is always '' and
     // `system` stays the base persona unchanged.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${optionsSystemPrompt(locale)}\n\n${stable}`
         : optionsSystemPrompt(locale);
