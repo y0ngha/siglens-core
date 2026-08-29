@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     ANALYSIS_LOCALES,
     isValidAnalysisLocale,
+    localeKeySuffixFor,
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageContract,
     outputLanguageName,
@@ -99,6 +100,9 @@ describe('출력 로케일', () => {
                 outputLanguageContract('ko')
             );
             expect(outputLanguageReminder(bogus)).toBe('');
+            // 키도 같이 떨어져야 한다 — 산출물만 ko로 가고 키가 갈리면
+            // 그 요청이 기존 한국어 캐시를 영영 못 맞힌다.
+            expect(localeKeySuffixFor(bogus)).toBe('');
         });
     });
 });
