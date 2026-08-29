@@ -3,6 +3,7 @@
 import {
     DEFAULT_ANALYSIS_LOCALE,
     localizedFieldDirective,
+    schemaLanguageLabel,
     type AnalysisLocale,
 } from './outputLocale';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
@@ -65,7 +66,8 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * Only skills with `category === 'congress'` are injected; all others are
  * filtered out.
  *
- * The JSON output schema specifies Korean text for fields labelled `Ko`.
+ * The `Ko`/`KO` suffixes are schema field names, not a language claim —
+ * their content follows the requested `locale`.
  *
  * @param symbol - Stock ticker (e.g. `'AAPL'`).
  * @param trades - Normalized congress trades for the symbol (newest first).
@@ -88,6 +90,7 @@ export function buildCongressTrendPrompt(
                   .join('\n\n')
             : 'No additional congress skills loaded.';
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## Domain Skills (Active)
 ${skillsSection}`;
 
@@ -118,9 +121,9 @@ ${CORE_SKILL_REFERENCE_POINTER}
 ## Output Schema
 Respond with a JSON object matching exactly:
 {
-  "summaryKo": "한국어 한 단락 — 의원 거래 동향 종합 요약",
-  "notableMembersKo": ["주목할 의원 또는 거래 설명 (한국어)", "..."],
-  "riskNoteKo": "한국어 — 공시 지연 및 데이터 한계 포함 리스크 주의사항",
+  "summaryKo": "${schemaLang} 한 단락 — 의원 거래 동향 종합 요약",
+  "notableMembersKo": ["주목할 의원 또는 거래 설명 (${schemaLang})", "..."],
+  "riskNoteKo": "${schemaLang} — 공시 지연 및 데이터 한계 포함 리스크 주의사항",
   "overallSentiment": "bullish" | "neutral" | "bearish"
 }
 

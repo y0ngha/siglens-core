@@ -169,3 +169,33 @@ export function localizedFieldDirective(locale: AnalysisLocale): string {
     const { name, register } = OUTPUT_LANGUAGE[safe];
     return `- The KO-suffixed fields are schema names, not a language claim — write their content in ${name} in ${register}.`;
 }
+
+/**
+ * @internal `## Output Schema` 예시 안의 **언어 표기**.
+ *
+ * 스키마 예시는 모델이 그대로 흉내 내는 자리라, 지시문보다 힘이 셀 수 있다.
+ * 예시가 `(한국어)`라고 적혀 있으면 말미 리마인더가 영어를 말해도 모델은
+ * 예시를 따라간다 — 실제로 여덟 축 중 여섯이 이 상태였다(리뷰 7라운드).
+ *
+ * **기본 로케일은 `한국어` 문자열 그대로다.** 예시가 한 글자라도 바뀌면
+ * 기본 로케일 프롬프트의 바이트가 달라져 기존 캐시가 통째로 낡는다.
+ */
+export function schemaLanguageLabel(locale: AnalysisLocale): string {
+    const safe = resolve(locale);
+    return safe === DEFAULT_ANALYSIS_LOCALE
+        ? '한국어'
+        : OUTPUT_LANGUAGE[safe].name;
+}
+
+/**
+ * @internal 로케일별 캐시/in-flight 키 접미.
+ *
+ * 캐시 키(`infrastructure/cache/config.ts`)와 news-card in-flight 키가 각자
+ * 같은 규칙을 구현하고 있었다 — 규약이 바뀌면 한쪽만 고쳐질 자리다.
+ * **기본 로케일은 빈 문자열**이라 이 기능 이전 키와 바이트가 같다.
+ */
+export function localeKeySuffixFor(locale: AnalysisLocale | undefined): string {
+    return locale === undefined || locale === DEFAULT_ANALYSIS_LOCALE
+        ? ''
+        : `:lang=${locale}`;
+}

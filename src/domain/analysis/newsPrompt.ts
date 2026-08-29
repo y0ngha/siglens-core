@@ -3,6 +3,7 @@
 import {
     DEFAULT_ANALYSIS_LOCALE,
     localizedFieldDirective,
+    schemaLanguageLabel,
     type AnalysisLocale,
 } from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
@@ -100,7 +101,8 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * and `always_on` skills are injected name-sorted; `confidenceWeight` is a
  * display label, not an inclusion gate.
  *
- * The JSON output schema specifies Korean text for fields labelled `KO`.
+ * The `Ko`/`KO` suffixes are schema field names, not a language claim —
+ * their content follows the requested `locale`.
  *
  * @param symbol            - Stock ticker (e.g. `'AAPL'`).
  * @param companyName       - Full company name (e.g. `'Apple Inc.'`).
@@ -182,6 +184,7 @@ export function buildNewsAnalysisPrompt(
             ? `This is a cryptocurrency with no earnings reports, quarterly fundamentals, or analyst ratings. Focus on regulatory news, macro/liquidity context, protocol updates, and sentiment shifts.`
             : `This is a publicly traded U.S. equity.`;
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)
 ${skillsSection}`;
 
@@ -206,14 +209,14 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "currentDriverKo": "한국어 한 단락 — 제공된 뉴스만 기준으로 본 핵심 뉴스 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
+  "currentDriverKo": "${schemaLang} 한 단락 — 제공된 뉴스만 기준으로 본 핵심 뉴스 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
   "keyEventsKo": [
-    "핵심 이벤트 bullet 1 (한국어)",
-    "핵심 이벤트 bullet 2 (한국어)"
+    "핵심 이벤트 bullet 1 (${schemaLang})",
+    "핵심 이벤트 bullet 2 (${schemaLang})"
   ],
   "upcomingEventsKo": [
-    "향후 주의 이벤트 bullet 1 (한국어)",
-    "향후 주의 이벤트 bullet 2 (한국어)"
+    "향후 주의 이벤트 bullet 1 (${schemaLang})",
+    "향후 주의 이벤트 bullet 2 (${schemaLang})"
   ],
   "overallSentiment": "neutral"
 }

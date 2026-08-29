@@ -369,6 +369,7 @@ describe('buildNewsAnalysisPrompt — 출력 로케일', () => {
         locale => {
             expect(build(locale)).not.toContain('must be written in Korean');
             expect(build(locale)).not.toContain('in Korean (존댓말)');
+            expect(build(locale)).not.toContain('한국어');
         }
     );
 

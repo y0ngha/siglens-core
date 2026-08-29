@@ -110,6 +110,10 @@ describe('buildMarketNewsDigestPrompt — 출력 로케일', () => {
             );
             expect(prompt).not.toContain('must be written in Korean');
             expect(prompt).not.toContain('in Korean (존댓말)');
+
+            // 스키마 예시는 모델이 그대로 흉내 내는 자리라 지시문보다 힘이 셀
+            // 수 있다 — `(한국어)` 표기가 남으면 리마인더가 무력해진다(리뷰 7라운드).
+            expect(prompt).not.toContain('한국어');
         }
     );
 

@@ -9,6 +9,7 @@ import { normalizeNewsCardAnalysis } from '@/domain/analysis/normalizeNews';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
+    localeKeySuffixFor,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
 import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
@@ -86,9 +87,7 @@ export async function runNewsCardAnalysis(
      * 요청이 오면 하나로 합쳐져 늦게 부른 쪽이 **요청하지 않은 언어**를 받는다.
      * 캐시 키와 같은 규약이라 ko는 접미가 없다.
      */
-    const inFlightKey = `news-card:${item.id}${
-        locale === DEFAULT_ANALYSIS_LOCALE ? '' : `:lang=${locale}`
-    }`;
+    const inFlightKey = `news-card:${item.id}${localeKeySuffixFor(locale)}`;
     const raw = await dedupeInFlight(inFlightKey, () =>
         callAnalysisAi({
             prompt,

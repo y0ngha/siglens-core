@@ -1,5 +1,5 @@
 import {
-    DEFAULT_ANALYSIS_LOCALE,
+    localeKeySuffixFor,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
 import type {
@@ -177,9 +177,7 @@ function reasoningKeySuffix(reasoning?: boolean): string {
  * 살아 있고, 로케일을 넘기지 않는 기존 호출부·SSR peek도 같은 키를 맞힌다.
  */
 function localeKeySuffix(locale?: AnalysisLocale): string {
-    return locale === undefined || locale === DEFAULT_ANALYSIS_LOCALE
-        ? ''
-        : `:lang=${locale}`;
+    return localeKeySuffixFor(locale);
 }
 
 /**

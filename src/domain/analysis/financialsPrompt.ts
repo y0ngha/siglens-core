@@ -3,6 +3,7 @@
 import {
     DEFAULT_ANALYSIS_LOCALE,
     localizedFieldDirective,
+    schemaLanguageLabel,
     type AnalysisLocale,
 } from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
@@ -192,7 +193,8 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
  * qualify; untagged ones throw fail-closed); `confidenceWeight` is a display
  * label, not an inclusion gate.
  *
- * The JSON output schema specifies Korean text for fields labelled `KO`.
+ * The `Ko`/`KO` suffixes are schema field names, not a language claim —
+ * their content follows the requested `locale`.
  *
  * @param symbol    - Stock ticker (e.g. `'AAPL'`).
  * @param snapshot  - Normalized financial statement data for the symbol.
@@ -234,6 +236,7 @@ export function buildFinancialsAnalysisPrompt(
         )
         .join('\n');
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## Financial Analysis Frameworks (Active Skills)
 ${skillsSection}`;
 
@@ -272,15 +275,15 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "overallConclusionKo": "한국어 한 단락 — 종합 결론",
+  "overallConclusionKo": "${schemaLang} 한 단락 — 종합 결론",
   "axisAssessments": [
     {
       "axis": "growth" | "quality" | "solvency" | "cash",
       "sentiment": "bullish" | "neutral" | "bearish",
-      "rationaleKo": "한국어 한 단락 — 축별 평가"
+      "rationaleKo": "${schemaLang} 한 단락 — 축별 평가"
     }
   ],
-  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"],
+  "riskFactorsKo": ["위험 요인 1 (${schemaLang})", "위험 요인 2 (${schemaLang})"],
   "overallSentiment": "bullish" | "neutral" | "bearish"
 }
 

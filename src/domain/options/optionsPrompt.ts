@@ -3,6 +3,7 @@
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageName,
+    schemaLanguageLabel,
 } from '@/domain/analysis/outputLocale';
 import type { AssembledPrompt } from '@/domain/types';
 import type { BuildOptionsAnalysisPromptOptions } from './types';
@@ -53,6 +54,7 @@ export function buildOptionsAnalysisPrompt(
         summarizeChainForLlm(c, snapshot.underlyingPrice)
     );
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = '';
 
     const dynamic = [
@@ -66,18 +68,18 @@ export function buildOptionsAnalysisPrompt(
         '== Output Schema ==',
         'Respond only with a JSON object matching the schema below. Do not include any other text.',
         '{',
-        '  "summary": "전체 옵션 시장에 대한 한 문단 요약 (3-5문장, 친근한 어투, 한국어)",',
+        `  "summary": "전체 옵션 시장에 대한 한 문단 요약 (3-5문장, 친근한 어투, ${schemaLang})",`,
         '  "perExpiration": [',
         '    {',
         '      "expirationDate": "YYYY-MM-DD",',
-        '      "commentary": "이 만기에 대한 해석 (2-3문장, 한국어)",',
+        `      "commentary": "이 만기에 대한 해석 (2-3문장, ${schemaLang})",`,
         '      "tone": "bullish | bearish | neutral | cautious"',
         '    }',
         '  ],',
         '  "signals": [',
         '    {',
         '      "kind": "bullish | bearish | neutral | volatility",',
-        '      "message": "신호 한 줄 설명 (한국어)"',
+        `      "message": "신호 한 줄 설명 (${schemaLang})"`,
         '    }',
         '  ]',
         '}',

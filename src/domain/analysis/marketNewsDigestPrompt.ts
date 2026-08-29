@@ -3,6 +3,7 @@
 import {
     DEFAULT_ANALYSIS_LOCALE,
     localizedFieldDirective,
+    schemaLanguageLabel,
     type AnalysisLocale,
 } from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
@@ -88,6 +89,7 @@ export function buildMarketNewsDigestPrompt(
             ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
             : 'No recent news articles available.';
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)
 ${skillsSection}`;
 
@@ -106,9 +108,9 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "currentDriverKo": "한국어 한 단락 — 제공된 뉴스만 기준으로 본 이 카테고리의 핵심 흐름/동인.",
-  "keyEventsKo": ["핵심 이벤트 bullet 1 (한국어)", "핵심 이벤트 bullet 2 (한국어)"],
-  "upcomingEventsKo": ["향후 주의 이벤트 bullet 1 (한국어)"],
+  "currentDriverKo": "${schemaLang} 한 단락 — 제공된 뉴스만 기준으로 본 이 카테고리의 핵심 흐름/동인.",
+  "keyEventsKo": ["핵심 이벤트 bullet 1 (${schemaLang})", "핵심 이벤트 bullet 2 (${schemaLang})"],
+  "upcomingEventsKo": ["향후 주의 이벤트 bullet 1 (${schemaLang})"],
   "overallSentiment": "neutral"
 }
 

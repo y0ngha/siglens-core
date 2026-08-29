@@ -127,6 +127,8 @@ describe('buildOptionsAnalysisPrompt', () => {
                 const prompt = build(locale);
                 expect(prompt).not.toContain('write your analysis in Korean');
                 expect(prompt).not.toContain('accurate Korean tone');
+                // 스키마 예시의 `(한국어)` 표기도 남으면 안 된다(리뷰 7라운드).
+                expect(prompt).not.toContain('한국어');
             }
         );
 
