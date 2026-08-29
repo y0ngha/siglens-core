@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect } from 'vitest';
 import { buildOptionsAnalysisPrompt as buildOptionsAnalysisPromptRaw } from '@/domain/options/optionsPrompt';
 import type { OptionsSnapshot } from '@/domain/options/types';
@@ -101,5 +102,38 @@ describe('buildOptionsAnalysisPrompt', () => {
         expect(allExpirationsPrompt).toContain(
             '전체 옵션 시장에 대한 한 문단 요약'
         );
+    });
+
+    describe('buildOptionsAnalysisPrompt — 출력 로케일', () => {
+        const build = (locale?: AnalysisLocale) =>
+            buildOptionsAnalysisPrompt({
+                expirationDate: 'all',
+                companyName: 'Apple Inc.',
+                snapshot,
+                ...(locale === undefined ? {} : { locale }),
+            });
+
+        it('로케일을 생략하면 ko와 바이트가 같다', () => {
+            expect(build()).toBe(build('ko'));
+        });
+
+        /**
+         * 역할 문장과 톤 지시가 프롬프트 본문에 "한국어로 쓰라"고 박혀 있었다 —
+         * 말미 리마인더로는 뒤집힌다고 볼 수 없는 과업 수준 지시다(리뷰 4라운드).
+         */
+        it.each(['en', 'ja', 'zh'] as const)(
+            '%s: 한국어로 쓰라는 지시가 남지 않는다',
+            locale => {
+                const prompt = build(locale);
+                expect(prompt).not.toContain('write your analysis in Korean');
+                expect(prompt).not.toContain('accurate Korean tone');
+                // 스키마 예시의 `(한국어)` 표기도 남으면 안 된다(리뷰 7라운드).
+                expect(prompt).not.toContain('한국어');
+            }
+        );
+
+        it('en: 영어로 쓰라고 지시한다', () => {
+            expect(build('en')).toContain('write your analysis in English');
+        });
     });
 });

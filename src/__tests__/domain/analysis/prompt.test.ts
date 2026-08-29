@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt as buildAnalysisPromptRaw,
@@ -2916,7 +2917,7 @@ describe('prompt', () => {
         it('actionRecommendation 텍스트 필드를 문단과 목록으로 작성하도록 지시한다', () => {
             expect(result).toContain('Step 3 formatting');
             expect(result).toContain(
-                'each actionRecommendation text field must be readable markdown Korean'
+                'each actionRecommendation text field must be readable markdown in Korean'
             );
             expect(result).toContain(
                 'use bullet lists for multiple prices or conditions'
@@ -4949,5 +4950,78 @@ describe('prompt', () => {
                 );
             }).not.toThrow();
         });
+    });
+});
+
+describe('buildAnalysisPrompt — 출력 로케일', () => {
+    const bars = [makeBar(0), makeBar(1), makeBar(2)];
+    const build = (locale?: AnalysisLocale) =>
+        buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            bars,
+            makeIndicators(),
+            [],
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            locale
+        );
+
+    /**
+     * **이 단언이 캐시를 지킨다.** 로케일 인자가 붙기 전과 ko 산출물이 한 글자라도
+     * 달라지면 이미 쌓인 한국어 분석 캐시가 전부 낡은 프롬프트로 만든 것이 되고,
+     * `PROMPT_TEMPLATE_VERSION`을 올려 통째로 재생성해야 한다.
+     */
+    it('로케일을 생략하면 ko와 바이트가 같다', () => {
+        expect(build()).toBe(build('ko'));
+    });
+
+    it('ko는 "Respond in Korean."을 그대로 쓴다', () => {
+        expect(build('ko')).toContain('Respond in Korean.');
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s는 한국어로 응답하라는 지시를 남기지 않는다',
+        locale => {
+            expect(build(locale)).not.toContain('Respond in Korean.');
+        }
+    );
+
+    /**
+     * 한자 혼용 금지는 **한국어 전용** 규칙이다. 중국어 출력에 남으면 "한글로만
+     * 쓰라"가 되어 산출물이 통째로 깨지고, 일본어에서는 한자가 정상 표기라
+     * 오히려 틀린 글이 나온다.
+     */
+    /**
+     * keyPrices 라벨과 Step 3 산문은 **과업 규칙**으로 언어를 못 박고 있었다 —
+     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 자리다(리뷰 4라운드).
+     */
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 가이드라인의 언어 지시가 그 언어를 가리킨다',
+        locale => {
+            const prompt = build(locale);
+            expect(prompt).not.toContain(
+                'label values in keyPrices must be written in Korean'
+            );
+            expect(prompt).not.toContain('Write text fields in plain Korean');
+            expect(prompt).not.toContain('readable markdown in Korean');
+        }
+    );
+
+    it('ko: 가이드라인의 언어 지시는 예전 문구 그대로다', () => {
+        const prompt = build('ko');
+        expect(prompt).toContain(
+            'label values in keyPrices must be written in Korean'
+        );
+        expect(prompt).toContain('Write text fields in plain Korean');
+    });
+
+    it('한글 전용 규칙은 ko에만 붙는다', () => {
+        expect(build('ko')).toContain('pure Hangul');
+        for (const locale of ['en', 'ja', 'zh'] as const) {
+            expect(build(locale)).not.toContain('pure Hangul');
+        }
     });
 });

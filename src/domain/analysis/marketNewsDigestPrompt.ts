@@ -1,5 +1,11 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    schemaLanguageLabel,
+    type AnalysisLocale,
+} from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
@@ -65,7 +71,8 @@ function formatNewsItem(item: EnrichedNewsItem, index: number): string {
 export function buildMarketNewsDigestPrompt(
     categoryLabel: string,
     news: ReadonlyArray<EnrichedNewsItem>,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const qualifiedSkills = selectNewsSkills(skills);
     const skillsSection =
@@ -82,6 +89,7 @@ export function buildMarketNewsDigestPrompt(
             ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
             : 'No recent news articles available.';
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)
 ${skillsSection}`;
 
@@ -100,9 +108,9 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "currentDriverKo": "한국어 한 단락 — 제공된 뉴스만 기준으로 본 이 카테고리의 핵심 흐름/동인.",
-  "keyEventsKo": ["핵심 이벤트 bullet 1 (한국어)", "핵심 이벤트 bullet 2 (한국어)"],
-  "upcomingEventsKo": ["향후 주의 이벤트 bullet 1 (한국어)"],
+  "currentDriverKo": "${schemaLang} 한 단락 — 제공된 뉴스만 기준으로 본 이 카테고리의 핵심 흐름/동인.",
+  "keyEventsKo": ["핵심 이벤트 bullet 1 (${schemaLang})", "핵심 이벤트 bullet 2 (${schemaLang})"],
+  "upcomingEventsKo": ["향후 주의 이벤트 bullet 1 (${schemaLang})"],
   "overallSentiment": "neutral"
 }
 
@@ -111,7 +119,7 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
 - currentDriverKo should describe the dominant market-wide flow of the "${categoryLabel}" category, not a single company.
 - keyEventsKo should cover the 3–5 most market-moving items when enough articles exist.

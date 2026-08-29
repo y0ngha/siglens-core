@@ -1,3 +1,7 @@
+import {
+    localeKeySuffixFor,
+    type AnalysisLocale,
+} from '@/domain/analysis/outputLocale';
 import type {
     DashboardTimeframe,
     MarketSessionSpec,
@@ -160,6 +164,20 @@ export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
  */
 function reasoningKeySuffix(reasoning?: boolean): string {
     return reasoning === true ? ':reason=on' : '';
+}
+
+/**
+ * @internal Cache-key suffix for the AI **output language**.
+ *
+ * 같은 심볼·타임프레임·모델이라도 언어가 다르면 산출물이 다르므로 캐시를
+ * 공유하면 안 된다 — 한국어 결과가 `/en` 요청에 그대로 나간다.
+ *
+ * `reasoningKeySuffix`와 같은 규약을 쓴다: **기본 로케일(ko)은 접미가 없다.**
+ * 이 기능이 들어오기 전 키와 바이트가 같아야 이미 쌓인 한국어 캐시가 전부
+ * 살아 있고, 로케일을 넘기지 않는 기존 호출부·SSR peek도 같은 키를 맞힌다.
+ */
+function localeKeySuffix(locale?: AnalysisLocale): string {
+    return localeKeySuffixFor(locale);
 }
 
 /**
@@ -353,6 +371,9 @@ export const PROMPT_TEMPLATE_VERSION = 'p8' as const;
  *   the parameter entirely (backward compatible — this is the v1 scope: only
  *   the technical/chart analysis key composes this axis, see the spec's
  *   cross-repo split).
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -373,12 +394,13 @@ export function buildAnalysisCacheKey(
     modelId = DEFAULT_ANALYSIS_MODEL_ID,
     skillFingerprint?: string,
     reasoning?: boolean,
-    positionBucket?: PositionBucket
+    positionBucket?: PositionBucket,
+    locale?: AnalysisLocale
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -589,18 +611,22 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  */
 export function buildFundamentalCacheKey(
     symbol: string,
     modelId: string,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -672,6 +698,9 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -687,12 +716,13 @@ export function buildFinancialsCacheKey(
     modelId: string,
     period: StatementPeriod,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:financials:${symbol}:${period}:${modelId}:${FINANCIALS_PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -765,6 +795,9 @@ export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -779,12 +812,13 @@ export function buildCongressTrendCacheKey(
     symbol: string,
     modelId: string,
     skillFingerprint?: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:congress:${symbol}:${modelId}:${CONGRESS_PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -856,6 +890,9 @@ export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
  *   accepted this option keep hitting. Mirrors {@link buildNewsCacheKey} —
  *   reasoning materially changes the digest's output depth, so an on/off pair
  *   must never share an entry.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -870,9 +907,10 @@ export function buildMarketNewsDigestCacheKey(
     category: NewsFeedCategory,
     modelId: string,
     inputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -892,6 +930,9 @@ export function buildMarketNewsDigestCacheKey(
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  *
  * @example
@@ -904,9 +945,10 @@ export function buildNewsCacheKey(
     symbol: string,
     modelId: string,
     inputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:${symbol}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -925,6 +967,9 @@ export function buildNewsCacheKey(
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  */
 export function buildOverallCacheKey(
@@ -932,9 +977,10 @@ export function buildOverallCacheKey(
     timeframe: Timeframe,
     modelId: string,
     inputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -1030,15 +1076,19 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
  *   reasoning-ON overall analysis never overwrites the reasoning-OFF "latest"
  *   pointer (or vice versa); `false`/`undefined` produce the exact same key
  *   as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The content-free peek cache key.
  */
 export function buildOverallPeekCacheKey(
     symbol: string,
     timeframe: Timeframe,
     modelId: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -1059,6 +1109,9 @@ export function buildOverallPeekCacheKey(
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
+ * @param locale - AI output language. Omit (or pass the default `ko`) to get
+ *   the exact key this builder produced before the parameter existed, so the
+ *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @returns The cache key.
  */
 export function buildOptionsCacheKey(
@@ -1066,7 +1119,8 @@ export function buildOptionsCacheKey(
     expirationDate: OptionsExpirationFilter,
     modelId: string,
     snapshotInputHash: string,
-    reasoning?: boolean
+    reasoning?: boolean,
+    locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }

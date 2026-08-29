@@ -129,3 +129,86 @@ describe('runNewsCardAnalysis', () => {
         });
     });
 });
+
+describe('runNewsCardAnalysis — 출력 로케일', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+    });
+
+    const systemOf = () =>
+        mockCallAnalysisAi.mock.calls[0]![0].system as string;
+    const promptOf = () =>
+        mockCallAnalysisAi.mock.calls[0]![0].prompt as string;
+
+    /**
+     * 기본 로케일은 **바이트가 같아야** 한다 — 다르면 이미 쌓인 한국어 캐시가
+     * 낡은 프롬프트로 만든 것이 되어 전량 재생성해야 한다.
+     */
+    it('로케일을 생략하면 ko와 같은 system·prompt를 보낸다', async () => {
+        await runNewsCardAnalysis({ item: testNewsItem });
+        const omitted = { system: systemOf(), prompt: promptOf() };
+
+        vi.clearAllMocks();
+        mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+        await runNewsCardAnalysis({ item: testNewsItem, locale: 'ko' });
+
+        expect({ system: systemOf(), prompt: promptOf() }).toEqual(omitted);
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 출력 언어 계약과 프롬프트 말미 리마인더가 실린다',
+        async locale => {
+            await runNewsCardAnalysis({ item: testNewsItem, locale });
+            expect(systemOf()).toContain('overrides');
+            expect(promptOf()).toContain(
+                'OUTPUT LANGUAGE (FINAL, OVERRIDES EVERYTHING ABOVE)'
+            );
+        }
+    );
+
+    /**
+     * 페르소나가 `"Korean summary"`를 못 박고 있었다(PR #184 리뷰 2라운드).
+     * 출력 언어는 OUTPUT FORMAT 계약만이 정한다.
+     */
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 페르소나가 한국어를 지시하지 않는다',
+        async locale => {
+            await runNewsCardAnalysis({ item: testNewsItem, locale });
+            expect(systemOf()).not.toContain('neutral Korean summary');
+        }
+    );
+
+    /**
+     * in-flight 키가 로케일을 안 가르면 언어가 다른 동시 요청이 하나로 합쳐져
+     * **늦게 부른 쪽이 요청하지 않은 언어를 받는다**(PR #184 리뷰 1라운드).
+     */
+    it('언어가 다른 동시 요청은 합쳐지지 않는다', async () => {
+        let resolveFirst: (v: string) => void = () => {};
+        mockCallAnalysisAi.mockImplementationOnce(
+            () => new Promise<string>(r => (resolveFirst = r))
+        );
+        mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+
+        const ko = runNewsCardAnalysis({ item: testNewsItem, locale: 'ko' });
+        const en = runNewsCardAnalysis({ item: testNewsItem, locale: 'en' });
+        resolveFirst(JSON.stringify(mockRawResult));
+        await Promise.all([ko, en]);
+
+        expect(mockCallAnalysisAi).toHaveBeenCalledTimes(2);
+    });
+
+    it('같은 언어의 동시 요청은 하나로 합쳐진다', async () => {
+        let resolveFirst: (v: string) => void = () => {};
+        mockCallAnalysisAi.mockImplementationOnce(
+            () => new Promise<string>(r => (resolveFirst = r))
+        );
+
+        const a = runNewsCardAnalysis({ item: testNewsItem, locale: 'en' });
+        const b = runNewsCardAnalysis({ item: testNewsItem, locale: 'en' });
+        resolveFirst(JSON.stringify(mockRawResult));
+        await Promise.all([a, b]);
+
+        expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+    });
+});

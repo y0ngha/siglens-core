@@ -4,6 +4,7 @@ import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
 } from '@/application/usage/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -81,6 +82,13 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * whatever value it is given.
      */
     reasoning?: boolean;
+    /**
+     * Output language for the generated analysis text.
+     *
+     * Omit it to keep the previous behaviour exactly: Korean output and the
+     * same cache key this request used before the field existed.
+     */
+    locale?: AnalysisLocale;
     /**
      * Member position-bucket hint
      * (personalized-analysis-by-position-bucket spec, Subsystem C). A

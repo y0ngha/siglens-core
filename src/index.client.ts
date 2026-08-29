@@ -29,6 +29,12 @@ export { classifyTrend, detectSignals } from './domain/signals';
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';
 export { AI_SYSTEM_PROMPT } from './domain/analysis/systemPrompt';
 export {
+    ANALYSIS_LOCALES,
+    DEFAULT_ANALYSIS_LOCALE,
+    isValidAnalysisLocale,
+    type AnalysisLocale,
+} from './domain/analysis/outputLocale';
+export {
     DEEPSEEK_V4_FLASH_MODEL,
     DEEPSEEK_V4_PRO_MODEL,
     GEMINI_2_5_FLASH_MODEL,

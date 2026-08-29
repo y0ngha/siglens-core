@@ -1,5 +1,11 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    schemaLanguageLabel,
+    type AnalysisLocale,
+} from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
@@ -104,7 +110,8 @@ function formatSectorDirection(
  * ones throw (fail-closed), and `always_on` skills are injected name-sorted;
  * `confidenceWeight` is a display label, not an inclusion gate.
  *
- * The JSON output schema specifies Korean text for fields labelled `KO`.
+ * The `Ko`/`KO` suffixes are schema field names, not a language claim —
+ * their content follows the requested `locale`.
  *
  * @param symbol   - Stock ticker (e.g. `'AAPL'`).
  * @param snapshot - Normalised fundamental data for the symbol.
@@ -114,7 +121,8 @@ function formatSectorDirection(
 export function buildFundamentalAnalysisPrompt(
     symbol: string,
     snapshot: FundamentalSnapshot,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const {
         profile,
@@ -148,6 +156,7 @@ export function buildFundamentalAnalysisPrompt(
                   .join('\n')
             : '  None';
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## Fundamental Analysis Frameworks (Active Skills)
 ${skillsSection}`;
 
@@ -213,21 +222,21 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "overallConclusionKo": "한국어 한 단락 — 종합 결론",
+  "overallConclusionKo": "${schemaLang} 한 단락 — 종합 결론",
   "categoryAssessments": [
     {
       "category": "valuation" | "profitability" | "growth" | "health" | "futureDirection",
       "sentiment": "bullish" | "neutral" | "bearish",
-      "rationaleKo": "한국어 한 단락 — 카테고리별 평가"
+      "rationaleKo": "${schemaLang} 한 단락 — 카테고리별 평가"
     }
   ],
-  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"],
+  "riskFactorsKo": ["위험 요인 1 (${schemaLang})", "위험 요인 2 (${schemaLang})"],
   "overallSentiment": "bullish" | "neutral" | "bearish"
 }
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - categoryAssessments must include all 5 categories in any order.
 - overallSentiment must reflect the balance of all 5 category sentiments.`;
 

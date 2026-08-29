@@ -996,3 +996,43 @@ describe('buildOverallAnalysisPrompt — axis weighting', () => {
         expect(prompt).toContain('do not invent one');
     });
 });
+
+describe('buildOverallAnalysisPrompt — 출력 로케일', () => {
+    const build = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+        buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'equity',
+            locale
+        );
+
+    /**
+     * 본문 지시뿐 아니라 **스키마 예시**도 `(한국어)`로 언어를 못 박고 있었다.
+     * 예시는 모델이 그대로 흉내 내는 자리라 지시문보다 힘이 셀 수 있다.
+     */
+    it('로케일을 생략하면 ko와 바이트가 같다', () => {
+        expect(build()).toBe(build('ko'));
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 본문 지시와 스키마 예시에 한국어가 남지 않는다',
+        locale => {
+            const prompt = build(locale);
+            expect(prompt).not.toContain('must be written in Korean');
+            expect(prompt).not.toContain('(한국어)');
+        }
+    );
+
+    it('ko: 예전 지시문과 예시가 그대로다', () => {
+        expect(build('ko')).toContain('Korean (존댓말)');
+        expect(build('ko')).toContain('(한국어)');
+    });
+});

@@ -17,8 +17,12 @@ import { normalizeFinancialsAnalysisResponse } from '@/domain/analysis/normalize
 import { normalizeFinancialsSnapshot } from '@/domain/analysis/normalizeFinancialsSnapshot';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { FINANCIALS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { FINANCIALS_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
 import {
@@ -176,7 +180,8 @@ export async function runFinancialsAnalysis(
         modelId,
         period,
         `${tier}:${skillSampling.fingerprint}`,
-        options.reasoning
+        options.reasoning,
+        options.locale
     );
     const cache = createCacheProvider();
 
@@ -213,18 +218,23 @@ export async function runFinancialsAnalysis(
 
     // scorecard is a local variable — no Redis meta write needed (invariant 1).
     const scorecard = computeFinancialsScorecard(snapshot);
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildFinancialsAnalysisPrompt(
         symbol,
         snapshot,
         scorecard,
-        skillSampling.skills
+        skillSampling.skills,
+        locale
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
     const system = stable
-        ? `${FINANCIALS_SYSTEM_PROMPT}\n\n${stable}`
-        : FINANCIALS_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${financialsSystemPrompt(locale)}\n\n${stable}`
+        : financialsSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // callModelId resolves the actual ActiveModelId for the AI call.
     // Deprecated model strings live in ModelId but not in MODEL_SPECS.

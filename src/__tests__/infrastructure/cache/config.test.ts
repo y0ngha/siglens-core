@@ -636,3 +636,158 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         expect(PROMPT_TEMPLATE_VERSION).toBe('p8');
     });
 });
+
+describe('locale이 캐시 키에 반영될 때', () => {
+    /**
+     * **ko는 접미가 없어야 한다.** `reasoningKeySuffix`와 같은 규약이다 —
+     * 이 기능 이전에 쌓인 한국어 캐시와, 로케일을 넘기지 않는 SSR peek이
+     * 같은 키를 그대로 맞혀야 한다. 접미가 붙으면 한국어 분석 캐시가
+     * 통째로 미스가 되어 전량 재생성된다.
+     */
+    it('ko와 생략은 완전히 같은 키다', () => {
+        const omitted = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash'
+        );
+        const ko = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            undefined,
+            undefined,
+            'ko'
+        );
+        expect(ko).toBe(omitted);
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s는 :lang= 접미를 붙인다',
+        locale => {
+            const base = buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash'
+            );
+            const localized = buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash',
+                undefined,
+                undefined,
+                undefined,
+                locale
+            );
+            expect(localized).toBe(`${base}:lang=${locale}`);
+        }
+    );
+
+    /** 언어가 다르면 산출물이 다르므로 캐시를 공유하면 안 된다. */
+    it('로케일이 다르면 키가 서로 다르다', () => {
+        const keys = (['ko', 'en', 'ja', 'zh'] as const).map(locale =>
+            buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-2.5-flash',
+                undefined,
+                undefined,
+                undefined,
+                locale
+            )
+        );
+        expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    /** reasoning 접미 **뒤**에 온다 — 순서가 흔들리면 같은 조합이 두 키가 된다. */
+    it('reasoning과 함께 쓰면 reason=on 뒤에 붙는다', () => {
+        const both = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            true,
+            undefined,
+            'en'
+        );
+        expect(both.endsWith(':reason=on:lang=en')).toBe(true);
+    });
+
+    /**
+     * options 키만 이 규약을 빠뜨렸다가 리뷰에서 잡혔다(PR #184). 형제 빌더가
+     * 여덟이라 하나를 놓쳐도 tsc가 잡아주지 않는다 — 각 빌더를 직접 고정한다.
+     */
+    it('options 키도 로케일을 가른다', () => {
+        const base = buildOptionsCacheKey('AAPL', '2026-01-16', 'm', 'h');
+        const en = buildOptionsCacheKey(
+            'AAPL',
+            '2026-01-16',
+            'm',
+            'h',
+            undefined,
+            'en'
+        );
+        expect(en).toBe(`${base}:lang=en`);
+    });
+
+    /**
+     * 형제 빌더가 아홉이라 하나를 놓쳐도 tsc가 잡아주지 않는다 — 실제로
+     * options 키를 빠뜨렸다가 리뷰에서 잡혔다. **각각을 직접 고정한다.**
+     */
+    it('나머지 분석 키도 전부 로케일을 가른다', () => {
+        const cases: Array<[string, string]> = [
+            [
+                buildFundamentalCacheKey('AAPL', 'm', 'f'),
+                buildFundamentalCacheKey('AAPL', 'm', 'f', undefined, 'en'),
+            ],
+            [
+                buildFinancialsCacheKey('AAPL', 'm', 'annual', 'f'),
+                buildFinancialsCacheKey(
+                    'AAPL',
+                    'm',
+                    'annual',
+                    'f',
+                    undefined,
+                    'en'
+                ),
+            ],
+            [
+                buildCongressTrendCacheKey('AAPL', 'm', 'f'),
+                buildCongressTrendCacheKey('AAPL', 'm', 'f', undefined, 'en'),
+            ],
+            [
+                buildMarketNewsDigestCacheKey('crypto', 'm', 'h'),
+                buildMarketNewsDigestCacheKey(
+                    'crypto',
+                    'm',
+                    'h',
+                    undefined,
+                    'en'
+                ),
+            ],
+            [
+                buildNewsCacheKey('AAPL', 'm', 'h'),
+                buildNewsCacheKey('AAPL', 'm', 'h', undefined, 'en'),
+            ],
+            [
+                buildOverallCacheKey('AAPL', '1Day', 'm', 'h'),
+                buildOverallCacheKey('AAPL', '1Day', 'm', 'h', undefined, 'en'),
+            ],
+        ];
+        for (const [base, localized] of cases) {
+            expect(localized).toBe(`${base}:lang=en`);
+        }
+    });
+
+    it('overall peek 키도 로케일을 가른다', () => {
+        const base = buildOverallPeekCacheKey('AAPL', '1Day', 'm');
+        const ja = buildOverallPeekCacheKey(
+            'AAPL',
+            '1Day',
+            'm',
+            undefined,
+            'ja'
+        );
+        expect(ja).toBe(`${base}:lang=ja`);
+    });
+});

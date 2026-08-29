@@ -1,3 +1,4 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
@@ -399,5 +400,51 @@ describe('runAnalysis', () => {
             expect(r1.status).toBe('done');
             expect(r2.status).toBe('done');
         });
+    });
+
+    /**
+     * 로케일 분기는 세 곳을 동시에 건드린다 — 시스템 프롬프트 선택, 프롬프트
+     * 말미 리마인더, 캐시 키. **기본 로케일은 셋 다 예전과 바이트가 같아야**
+     * 이미 쌓인 한국어 캐시가 살아 있다.
+     */
+    describe('출력 로케일', () => {
+        const run = (locale?: AnalysisLocale) =>
+            runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    ...(locale === undefined ? {} : { locale }),
+                }
+            );
+
+        const sentOf = () => {
+            const call = mockCallAnalysisAi.mock.calls.at(-1)![0] as {
+                system: string;
+                prompt: string;
+            };
+            return { system: call.system, prompt: call.prompt };
+        };
+
+        it('로케일을 생략하면 ko와 같은 system·prompt를 보낸다', async () => {
+            await run();
+            const omitted = sentOf();
+            mockCallAnalysisAi.mockClear();
+            await run('ko');
+            expect(sentOf()).toEqual(omitted);
+        });
+
+        it.each(['en', 'ja', 'zh'] as const)(
+            '%s: 프롬프트 말미에 출력 언어 리마인더가 붙는다',
+            async locale => {
+                await run(locale);
+                expect(sentOf().prompt).toContain(
+                    'OUTPUT LANGUAGE (FINAL, OVERRIDES EVERYTHING ABOVE)'
+                );
+            }
+        );
     });
 });

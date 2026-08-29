@@ -1,5 +1,11 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    schemaLanguageLabel,
+    type AnalysisLocale,
+} from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
@@ -95,7 +101,8 @@ function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
  * and `always_on` skills are injected name-sorted; `confidenceWeight` is a
  * display label, not an inclusion gate.
  *
- * The JSON output schema specifies Korean text for fields labelled `KO`.
+ * The `Ko`/`KO` suffixes are schema field names, not a language claim —
+ * their content follows the requested `locale`.
  *
  * @param symbol            - Stock ticker (e.g. `'AAPL'`).
  * @param companyName       - Full company name (e.g. `'Apple Inc.'`).
@@ -126,7 +133,8 @@ export function buildNewsAnalysisPrompt(
     news: ReadonlyArray<EnrichedNewsItem>,
     upcomingCalendar: readonly EarningsCalendarItem[],
     skills: readonly Skill[],
-    assetClass: AssetClass
+    assetClass: AssetClass,
+    locale?: AnalysisLocale
 ): AssembledPrompt;
 export function buildNewsAnalysisPrompt(
     symbol: string,
@@ -136,7 +144,8 @@ export function buildNewsAnalysisPrompt(
         | readonly EarningsCalendarItem[],
     calendarOrSkills: readonly EarningsCalendarItem[] | readonly Skill[],
     maybeSkills?: readonly Skill[],
-    assetClass: AssetClass = 'equity'
+    assetClass: AssetClass = 'equity',
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const companyName =
         typeof companyNameOrNews === 'string' ? companyNameOrNews : symbol;
@@ -175,6 +184,7 @@ export function buildNewsAnalysisPrompt(
             ? `This is a cryptocurrency with no earnings reports, quarterly fundamentals, or analyst ratings. Focus on regulatory news, macro/liquidity context, protocol updates, and sentiment shifts.`
             : `This is a publicly traded U.S. equity.`;
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)
 ${skillsSection}`;
 
@@ -199,14 +209,14 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "currentDriverKo": "한국어 한 단락 — 제공된 뉴스만 기준으로 본 핵심 뉴스 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
+  "currentDriverKo": "${schemaLang} 한 단락 — 제공된 뉴스만 기준으로 본 핵심 뉴스 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
   "keyEventsKo": [
-    "핵심 이벤트 bullet 1 (한국어)",
-    "핵심 이벤트 bullet 2 (한국어)"
+    "핵심 이벤트 bullet 1 (${schemaLang})",
+    "핵심 이벤트 bullet 2 (${schemaLang})"
   ],
   "upcomingEventsKo": [
-    "향후 주의 이벤트 bullet 1 (한국어)",
-    "향후 주의 이벤트 bullet 2 (한국어)"
+    "향후 주의 이벤트 bullet 1 (${schemaLang})",
+    "향후 주의 이벤트 bullet 2 (${schemaLang})"
   ],
   "overallSentiment": "neutral"
 }
@@ -216,7 +226,7 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
 - keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
 - upcomingEventsKo should highlight scheduled catalysts (earnings, regulatory deadlines, etc.).

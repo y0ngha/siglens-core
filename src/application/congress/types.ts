@@ -1,4 +1,5 @@
 import type { BackgroundTaskOptions } from '@/application/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
 
@@ -57,6 +58,13 @@ export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * Output language for the generated analysis text.
+     *
+     * Omit it to keep the previous behaviour exactly: Korean output and the
+     * same cache key this request used before the field existed.
+     */
+    locale?: AnalysisLocale;
     /**
      * BYOK API key. When provided, forwarded to the worker as the
      * `X-AI-API-KEY` header — the same mechanism every other submit use-case

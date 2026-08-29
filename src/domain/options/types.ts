@@ -1,3 +1,5 @@
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
+
 /**
  * Single options contract — one strike + side (call or put) from an exchange
  * listing. Plain data only; calculations live in dedicated helpers.
@@ -258,6 +260,12 @@ export interface BuildOptionsAnalysisPromptOptions {
     companyName: string;
     /** Pre-fetched options snapshot passed in by the caller. */
     snapshot: OptionsSnapshot;
+    /**
+     * Output language for the model-facing text. Defaults to `ko`, which keeps
+     * the prompt byte-identical to the one this builder emitted before the
+     * parameter existed.
+     */
+    locale?: AnalysisLocale;
 }
 
 /**

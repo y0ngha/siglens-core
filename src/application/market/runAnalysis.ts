@@ -23,9 +23,13 @@ import {
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
 import {
@@ -181,7 +185,8 @@ async function runAnalysisImpl(
         effectiveModelId,
         `${tier}:${skillSampling.fingerprint}`,
         options.reasoning,
-        options.positionBucket
+        options.positionBucket,
+        options.locale
     );
 
     if (!force && cache !== null) {
@@ -251,6 +256,7 @@ async function runAnalysisImpl(
             return null;
         });
 
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildAnalysisPrompt(
         symbol,
         companyName,
@@ -260,15 +266,19 @@ async function runAnalysisImpl(
         timeframe,
         fearGreed ?? undefined,
         options.assetClass ?? 'equity',
-        options.positionBucket
+        options.positionBucket,
+        locale
     );
 
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
     const system = stable
-        ? `${AI_SYSTEM_PROMPT}\n\n${stable}`
-        : AI_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${aiSystemPrompt(locale)}\n\n${stable}`
+        : aiSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     const raw = await dedupeInFlight(cacheKey, () =>
         callAnalysisAi({

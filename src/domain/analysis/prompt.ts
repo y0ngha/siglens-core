@@ -1,6 +1,11 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageName,
+    type AnalysisLocale,
+} from './outputLocale';
+import {
     ATR_DEFAULT_PERIOD,
     CCI_DEFAULT_PERIOD,
     CMF_DEFAULT_PERIOD,
@@ -1240,126 +1245,135 @@ const buildFieldGuidanceBody = (): string =>
         ),
     ].join('\n');
 
-const ANALYSIS_GUIDELINES = [
-    '## Analysis Guidelines',
-    '',
-    '### Name Field Matching',
-    '- skillName, strategyName, and indicatorName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
-    '',
-    '### Regular Skills Usage',
-    '- Skills shown in ## Active Skills are context-only regular skills without a dedicated structured output field.',
-    '- Use them only to enrich the summary with additional interpretation or market context when they are relevant.',
-    '- Do not create new top-level fields for regular skills, and do not force them into indicatorResults, patternSummaries, strategyResults, candlePatterns, or keyLevels unless another explicit rule already applies.',
-    '',
-    '### Candle Patterns vs Chart Patterns',
-    '- candlePatterns: Only include candle patterns (single/multi candle) detected from bar data. Chart patterns defined in skills/*.md go in patternSummaries.',
-    '- patternSummaries: Only include chart patterns defined in skills/*.md. Candle patterns go in candlePatterns.',
-    '- For each detected candle pattern, the candlePatterns[].trend field MUST copy the value from the [trend: ...] label in ## Detected Candle Patterns verbatim. Do not re-judge the trend yourself.',
-    '',
-    '### keyPrices Rules',
-    '- keyPrices must only contain actual price levels (numbers that represent a price, e.g. 150.00). Do NOT include bar indices, counts, or any non-price numeric values.',
-    '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "목표가", "손절선"). Never use English or snake_case identifiers.',
-    '',
-    '### Support/Resistance Assessment',
-    '- For keyLevels, you may reuse exact prices from the ## Market Reference section (to avoid arithmetic error) OR derive your own from patterns, SMC, and volume — neither is mandatory. State a brief reason for each level. Do NOT treat reference levels as carrying more conviction merely because they were precomputed; weigh them like any other evidence.',
-    `- Check convergence points of moving averages (MA ${MA_DEFAULT_PERIODS.join(',')}, EMA ${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_SHORT_INDEX]}/${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_LONG_INDEX]}) first`,
-    '- Use Volume Profile levels: POC is the strongest support/resistance, VAH/VAL mark the boundaries of the value area',
-    '- Price returning to POC indicates a high-probability reaction zone; breakouts above VAH or below VAL signal potential trend continuation',
-    '- Treat high/low of high-volume bars as supply/demand zones',
-    '- Reference prior swing highs/lows and Bollinger Band boundaries',
-    '- Each level must include a reason',
-    '',
-    '### Price Target Calculation',
-    '- Apply the measured move rule (project pattern height) for detected patterns',
-    '- First target: nearest support/resistance; second target: based on pattern measurement',
-    '- State the trigger condition (breakout/breakdown reference level) for each scenario',
-    '- Strengthen target viability with supporting indicators (RSI extremes, Bollinger Band touch, MACD trend)',
-    '- Sort targets by proximity to current price: bullish targets in ascending price order (closest first), bearish targets in descending price order (closest first). Never return targets in arbitrary order.',
-    '- Every target MUST include a non-empty basis explaining the rationale (supporting indicator, pattern measurement, swing level, etc.). If a basis cannot be provided, exclude that target entirely instead of returning it with an empty basis.',
-    '',
-    '### Trendline Detection',
-    '- Return 0 to 3 trendlines maximum',
-    '- Derive trendlines from the swing points in ## Smart Money Concepts (SMC) and the bar data, reusing their exact time/price values verbatim. Use real swing points as endpoints rather than inventing levels.',
-    '- ascending: connect higher lows (at least 2 clear swing low points)',
-    '- descending: connect lower highs (at least 2 clear swing high points)',
-    '- Use the Unix timestamp values from the provided bar data for the time field. Each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value into the time field. Do not calculate or guess timestamps.',
-    '- Only include a trendline when 2 or more clear swing points are identifiable',
-    '- If no clear trendlines exist, return an empty array',
-    '',
-    '### trendlines vs patternLines',
-    '- trendlines: Overall price trendlines visible on the full chart (ascending support / descending resistance). These are independent of any specific pattern.',
-    '- patternLines (inside patternSummaries): Structural lines that define a specific pattern (e.g. wedge upper/lower boundaries, neckline). These belong to a particular pattern and are rendered as part of that pattern overlay.',
-    '- Do not duplicate a trendline in patternLines or vice versa.',
-    '',
-    // NOTE: Individual indicator interpretation guidelines (ATR, OBV, Parabolic SAR, Supertrend,
-    // MFI, Williams %R, Keltner, CMF, Donchian, SMC, Squeeze Momentum) are intentionally omitted here
-    // because they are covered by the corresponding indicator_guide skills, which are now injected
-    // dynamically via frontmatter gating (selectSkills). When a guide's gating does not fire for the
-    // current chart state, its detailed interpretation is simply not in this prompt — that is the
-    // intended behavior, not a regression.
-    '',
-    '### Confluence Assessment',
-    '- The indicator tally in ## Deterministic Metrics is computed by a rule engine, not by you. Do not recount it, restate it with a different number, or substitute your own category count.',
-    '- Cite its signal list as the evidence in keyLevels reasoning and in the summary — name the signals, not just the score.',
-    '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the confluence is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
-    '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the rule engine abstained.',
-    '',
-    '### Conflicting Signals',
-    '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
-    '- Weight signals by the number of confirming indicators and the strength of each signal.',
-    '- Mention the conflict explicitly in the summary so the user understands the mixed picture.',
-    '',
-    '### Price Reference Naming',
-    '- The "Snapshot Price" labels in ## Analysis Snapshot and ## Smart Money Concepts (SMC) represent the bar close at the moment this analysis was captured, not a live market quote.',
-    '- In all Korean output fields (summary, actionRecommendation, strategyResults, etc.), refer to this value consistently as "분석 시점 가격" or "분석 당시 종가".',
-    '- NEVER call it "현재 가격" or "실시간 가격" — those phrases imply a live market quote, which this analysis does not have.',
-    '',
-    '### Readable Text Formatting Rules',
-    '- All long-form Korean prose fields must be easy to render in a UI without becoming one dense line.',
-    '- Use markdown where it improves readability: **short labels**, bullet lists, and compact numbered steps are allowed.',
-    '- Use \\n\\n to separate paragraphs when the context changes (trend overview, signal conflict, key levels, risk, conclusion).',
-    '- Use single \\n only inside a compact list or between adjacent **label**: value lines.',
-    '- Do not join multiple independent ideas with repeated periods in one line. Split them into separate paragraphs or list items.',
-    '- Apply these rules to summary, strategyResults[].summary, candlePatterns[].summary, patternSummaries[].summary, and every actionRecommendation text field.',
-    '',
-    '### Summary Writing Checklist (follow every step)',
-    '1. STATE the overall trend direction and strength in plain language.',
-    '2. SUMMARIZE key indicator findings — explain practical meaning, not raw values (e.g., "주가가 빠르게 상승하여 단기 조정 가능성이 있습니다" not "RSI is 75").',
-    '3. REPORT detected chart/candle patterns and what they typically predict.',
-    '4. INCLUDE strategy conclusions — for each strategy in strategyResults, state its finding (e.g., MACD/MA cycle stage, divergence detection result, mean reversion signal, breakout setup, Fibonacci level, Elliott wave position). If a strategy contradicts the dominant trend, explicitly state the conflict.',
-    '5. DESCRIBE key support/resistance levels and their significance.',
-    '6. ASSESS risk — warning signs and what could go wrong.',
-    '7. CONCLUDE: "What is happening with this stock and what does it mean for the investor?"',
-    '- Use \\n\\n between topic paragraphs. Never write a single long paragraph.',
-    '- Prefer 3 to 5 short paragraphs. Each paragraph should cover one context: trend, signals, levels, risk, investor takeaway.',
-    '- If signals conflict, state the mixed picture and which side has stronger confluence.',
-    '',
-    '### Action Recommendation Decision Tree',
-    '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
-    '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
-    '- Step 1 — Determine entryRecommendation:',
-    '  - "enter": price near support + bullish confluence from 2+ categories + risk level not high',
-    '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals)',
-    '  - "avoid": price extended from support, strong resistance overhead, risk high, or bearish confluence dominates',
-    '  - Before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met confluence entry rule does not override this — the two were measured to be inversely related.',
-    '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a risk:reward estimate — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
-    '- Step 2 — Compute prices:',
-    '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
-    '  - entryPrices: [low, high] range near support — the actionable zone for "enter"/"wait", or the contingent trigger zone for "avoid". Must match the entry text field exactly.',
-    '  - stopLoss: single number below nearest support (real or contingent). Must match the exit text field exactly.',
-    '  - takeProfitPrices: ascending order (lowest first). Must match the exit text field exactly.',
-    '- Step 3 — Write text fields in plain Korean:',
-    '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
-    '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state the conditional trigger explicitly (e.g. "OO 저항선을 거래량 동반 돌파 시") and give the contingent entry range tied to that trigger, using only a trigger level that is actually present in keyLevels — if none exists, say so instead of inventing one.',
-    '  - exit: for all three, provide take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry); for "avoid" frame these as applying once the contingent entry triggers. If a required reference level is missing from keyLevels/priceTargets, state that gap rather than guessing a number.',
-    '  - riskReward: for all three, provide a ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3") based on the (contingent) entry/exit prices for "avoid"; skip the ratio and note the missing input if entry/exit prices could not be grounded.',
-    '- Step 3 formatting: each actionRecommendation text field must be readable markdown Korean. Use \\n\\n between context paragraphs, and use bullet lists for multiple prices or conditions.',
-    '- Consistency: entryPrices, stopLoss, takeProfitPrices must numerically match the text in entry/exit fields — they are the same prices in structured form for chart rendering.',
-    '',
-    '### Insufficient Data',
-    '- If bar data is too short to reliably calculate an indicator or detect a pattern, state "데이터 부족" rather than guessing.',
-    '- Do not fabricate support/resistance levels or patterns when the data does not clearly support them.',
-].join('\n');
+/**
+ * 분석 가이드라인. **세 줄이 출력 언어에 묶여 있다** — keyPrices 라벨 언어와
+ * Step 3의 산문 언어 지시다. 프롬프트 말미 리마인더는 "필드 설명"을 덮으려고
+ * 만든 것이라, 이렇게 과업 규칙으로 적힌 지시까지 뒤집는다고 볼 수 없다
+ * (같은 이유로 `Respond in ...` 한 줄과 한자 규칙도 소스에서 직접 갈랐다).
+ */
+const analysisGuidelines = (locale: AnalysisLocale): string =>
+    [
+        '## Analysis Guidelines',
+        '',
+        '### Name Field Matching',
+        '- skillName, strategyName, and indicatorName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
+        '',
+        '### Regular Skills Usage',
+        '- Skills shown in ## Active Skills are context-only regular skills without a dedicated structured output field.',
+        '- Use them only to enrich the summary with additional interpretation or market context when they are relevant.',
+        '- Do not create new top-level fields for regular skills, and do not force them into indicatorResults, patternSummaries, strategyResults, candlePatterns, or keyLevels unless another explicit rule already applies.',
+        '',
+        '### Candle Patterns vs Chart Patterns',
+        '- candlePatterns: Only include candle patterns (single/multi candle) detected from bar data. Chart patterns defined in skills/*.md go in patternSummaries.',
+        '- patternSummaries: Only include chart patterns defined in skills/*.md. Candle patterns go in candlePatterns.',
+        '- For each detected candle pattern, the candlePatterns[].trend field MUST copy the value from the [trend: ...] label in ## Detected Candle Patterns verbatim. Do not re-judge the trend yourself.',
+        '',
+        '### keyPrices Rules',
+        '- keyPrices must only contain actual price levels (numbers that represent a price, e.g. 150.00). Do NOT include bar indices, counts, or any non-price numeric values.',
+        locale === DEFAULT_ANALYSIS_LOCALE
+            ? '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "목표가", "손절선"). Never use English or snake_case identifiers.'
+            : `- All label values in keyPrices must be written in ${outputLanguageName(locale)} (e.g. an upper trendline, a neckline, a target price, a stop-loss level). Never use snake_case identifiers.`,
+        '',
+        '### Support/Resistance Assessment',
+        '- For keyLevels, you may reuse exact prices from the ## Market Reference section (to avoid arithmetic error) OR derive your own from patterns, SMC, and volume — neither is mandatory. State a brief reason for each level. Do NOT treat reference levels as carrying more conviction merely because they were precomputed; weigh them like any other evidence.',
+        `- Check convergence points of moving averages (MA ${MA_DEFAULT_PERIODS.join(',')}, EMA ${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_SHORT_INDEX]}/${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_LONG_INDEX]}) first`,
+        '- Use Volume Profile levels: POC is the strongest support/resistance, VAH/VAL mark the boundaries of the value area',
+        '- Price returning to POC indicates a high-probability reaction zone; breakouts above VAH or below VAL signal potential trend continuation',
+        '- Treat high/low of high-volume bars as supply/demand zones',
+        '- Reference prior swing highs/lows and Bollinger Band boundaries',
+        '- Each level must include a reason',
+        '',
+        '### Price Target Calculation',
+        '- Apply the measured move rule (project pattern height) for detected patterns',
+        '- First target: nearest support/resistance; second target: based on pattern measurement',
+        '- State the trigger condition (breakout/breakdown reference level) for each scenario',
+        '- Strengthen target viability with supporting indicators (RSI extremes, Bollinger Band touch, MACD trend)',
+        '- Sort targets by proximity to current price: bullish targets in ascending price order (closest first), bearish targets in descending price order (closest first). Never return targets in arbitrary order.',
+        '- Every target MUST include a non-empty basis explaining the rationale (supporting indicator, pattern measurement, swing level, etc.). If a basis cannot be provided, exclude that target entirely instead of returning it with an empty basis.',
+        '',
+        '### Trendline Detection',
+        '- Return 0 to 3 trendlines maximum',
+        '- Derive trendlines from the swing points in ## Smart Money Concepts (SMC) and the bar data, reusing their exact time/price values verbatim. Use real swing points as endpoints rather than inventing levels.',
+        '- ascending: connect higher lows (at least 2 clear swing low points)',
+        '- descending: connect lower highs (at least 2 clear swing high points)',
+        '- Use the Unix timestamp values from the provided bar data for the time field. Each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value into the time field. Do not calculate or guess timestamps.',
+        '- Only include a trendline when 2 or more clear swing points are identifiable',
+        '- If no clear trendlines exist, return an empty array',
+        '',
+        '### trendlines vs patternLines',
+        '- trendlines: Overall price trendlines visible on the full chart (ascending support / descending resistance). These are independent of any specific pattern.',
+        '- patternLines (inside patternSummaries): Structural lines that define a specific pattern (e.g. wedge upper/lower boundaries, neckline). These belong to a particular pattern and are rendered as part of that pattern overlay.',
+        '- Do not duplicate a trendline in patternLines or vice versa.',
+        '',
+        // NOTE: Individual indicator interpretation guidelines (ATR, OBV, Parabolic SAR, Supertrend,
+        // MFI, Williams %R, Keltner, CMF, Donchian, SMC, Squeeze Momentum) are intentionally omitted here
+        // because they are covered by the corresponding indicator_guide skills, which are now injected
+        // dynamically via frontmatter gating (selectSkills). When a guide's gating does not fire for the
+        // current chart state, its detailed interpretation is simply not in this prompt — that is the
+        // intended behavior, not a regression.
+        '',
+        '### Confluence Assessment',
+        '- The indicator tally in ## Deterministic Metrics is computed by a rule engine, not by you. Do not recount it, restate it with a different number, or substitute your own category count.',
+        '- Cite its signal list as the evidence in keyLevels reasoning and in the summary — name the signals, not just the score.',
+        '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the confluence is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
+        '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the rule engine abstained.',
+        '',
+        '### Conflicting Signals',
+        '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
+        '- Weight signals by the number of confirming indicators and the strength of each signal.',
+        '- Mention the conflict explicitly in the summary so the user understands the mixed picture.',
+        '',
+        '### Price Reference Naming',
+        '- The "Snapshot Price" labels in ## Analysis Snapshot and ## Smart Money Concepts (SMC) represent the bar close at the moment this analysis was captured, not a live market quote.',
+        '- In all Korean output fields (summary, actionRecommendation, strategyResults, etc.), refer to this value consistently as "분석 시점 가격" or "분석 당시 종가".',
+        '- NEVER call it "현재 가격" or "실시간 가격" — those phrases imply a live market quote, which this analysis does not have.',
+        '',
+        '### Readable Text Formatting Rules',
+        '- All long-form Korean prose fields must be easy to render in a UI without becoming one dense line.',
+        '- Use markdown where it improves readability: **short labels**, bullet lists, and compact numbered steps are allowed.',
+        '- Use \\n\\n to separate paragraphs when the context changes (trend overview, signal conflict, key levels, risk, conclusion).',
+        '- Use single \\n only inside a compact list or between adjacent **label**: value lines.',
+        '- Do not join multiple independent ideas with repeated periods in one line. Split them into separate paragraphs or list items.',
+        '- Apply these rules to summary, strategyResults[].summary, candlePatterns[].summary, patternSummaries[].summary, and every actionRecommendation text field.',
+        '',
+        '### Summary Writing Checklist (follow every step)',
+        '1. STATE the overall trend direction and strength in plain language.',
+        '2. SUMMARIZE key indicator findings — explain practical meaning, not raw values (e.g., "주가가 빠르게 상승하여 단기 조정 가능성이 있습니다" not "RSI is 75").',
+        '3. REPORT detected chart/candle patterns and what they typically predict.',
+        '4. INCLUDE strategy conclusions — for each strategy in strategyResults, state its finding (e.g., MACD/MA cycle stage, divergence detection result, mean reversion signal, breakout setup, Fibonacci level, Elliott wave position). If a strategy contradicts the dominant trend, explicitly state the conflict.',
+        '5. DESCRIBE key support/resistance levels and their significance.',
+        '6. ASSESS risk — warning signs and what could go wrong.',
+        '7. CONCLUDE: "What is happening with this stock and what does it mean for the investor?"',
+        '- Use \\n\\n between topic paragraphs. Never write a single long paragraph.',
+        '- Prefer 3 to 5 short paragraphs. Each paragraph should cover one context: trend, signals, levels, risk, investor takeaway.',
+        '- If signals conflict, state the mixed picture and which side has stronger confluence.',
+        '',
+        '### Action Recommendation Decision Tree',
+        '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
+        '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
+        '- Step 1 — Determine entryRecommendation:',
+        '  - "enter": price near support + bullish confluence from 2+ categories + risk level not high',
+        '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals)',
+        '  - "avoid": price extended from support, strong resistance overhead, risk high, or bearish confluence dominates',
+        '  - Before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met confluence entry rule does not override this — the two were measured to be inversely related.',
+        '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a risk:reward estimate — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
+        '- Step 2 — Compute prices:',
+        '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
+        '  - entryPrices: [low, high] range near support — the actionable zone for "enter"/"wait", or the contingent trigger zone for "avoid". Must match the entry text field exactly.',
+        '  - stopLoss: single number below nearest support (real or contingent). Must match the exit text field exactly.',
+        '  - takeProfitPrices: ascending order (lowest first). Must match the exit text field exactly.',
+        `- Step 3 — Write text fields in plain ${outputLanguageName(locale)}:`,
+        '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
+        '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state the conditional trigger explicitly (e.g. "OO 저항선을 거래량 동반 돌파 시") and give the contingent entry range tied to that trigger, using only a trigger level that is actually present in keyLevels — if none exists, say so instead of inventing one.',
+        '  - exit: for all three, provide take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry); for "avoid" frame these as applying once the contingent entry triggers. If a required reference level is missing from keyLevels/priceTargets, state that gap rather than guessing a number.',
+        '  - riskReward: for all three, provide a ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3") based on the (contingent) entry/exit prices for "avoid"; skip the ratio and note the missing input if entry/exit prices could not be grounded.',
+        `- Step 3 formatting: each actionRecommendation text field must be readable markdown in ${outputLanguageName(locale)}. Use \\n\\n between context paragraphs, and use bullet lists for multiple prices or conditions.`,
+        '- Consistency: entryPrices, stopLoss, takeProfitPrices must numerically match the text in entry/exit fields — they are the same prices in structured form for chart rendering.',
+        '',
+        '### Insufficient Data',
+        '- If bar data is too short to reliably calculate an indicator or detect a pattern, state "데이터 부족" rather than guessing.',
+        '- Do not fabricate support/resistance levels or patterns when the data does not clearly support them.',
+    ].join('\n');
 
 const CRITICAL_RESPONSE_RULES = [
     '',
@@ -1400,7 +1414,8 @@ const buildAnalysisRequest = (
     indicatorGuideSkills: Skill[],
     candlestickSkills: Skill[],
     supportResistanceSkills: Skill[],
-    regularSkills: Skill[]
+    regularSkills: Skill[],
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string => {
     const patternListInstruction =
         patternSkills.length > 0
@@ -1550,8 +1565,17 @@ const buildAnalysisRequest = (
     return [
         '## Analysis Request',
         CRITICAL_RESPONSE_RULES,
-        'Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in Korean.',
-        'Output language rule (STRICT): every Korean text field must be written in pure Hangul (한글) only — NEVER mix in 한자(漢字)/Chinese characters. Write every Sino-Korean word in Hangul (e.g. write "부근" not "附近", "매도" not "賣渡", "이익 실현" not "利益實現"). This applies to all prose fields (summary, keyLevels reasoning, actionRecommendation, strategyResults, candlePatterns, patternSummaries, etc.).',
+        `Based on the data above, perform technical analysis and respond with a single JSON object. The response structure is enforced by the schema; follow the field content guidance below for the fields that need it. Respond in ${outputLanguageName(locale)}.`,
+        /*
+         * 한자 혼용 금지는 **한국어에만** 적용된다. 중국어 출력에 이 규칙이
+         * 남으면 "한글로만 쓰라"가 되어 산출물이 통째로 깨지고, 일본어에서는
+         * 한자가 정상 표기라 오히려 틀린 글이 나온다.
+         */
+        ...(locale === 'ko'
+            ? [
+                  'Output language rule (STRICT): every Korean text field must be written in pure Hangul (한글) only — NEVER mix in 한자(漢字)/Chinese characters. Write every Sino-Korean word in Hangul (e.g. write "부근" not "附近", "매도" not "賣渡", "이익 실현" not "利益實現"). This applies to all prose fields (summary, keyLevels reasoning, actionRecommendation, strategyResults, candlePatterns, patternSummaries, etc.).',
+              ]
+            : []),
         FIELD_GUIDANCE_PREFACE,
         buildFieldGuidanceBody(),
         indicatorGuideInstruction,
@@ -1804,6 +1828,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   system-prompt prefix shared across every caller. Omit for the base
  *   (no-bucket) analysis; see {@link buildAnalysisCacheKey}'s `positionBucket`
  *   param for the matching cache-key axis.
+ * @param locale - Output language for the model-facing text. Defaults to
+ *   {@link DEFAULT_ANALYSIS_LOCALE} (`ko`), which produces a byte-identical
+ *   prompt to the one this builder emitted before the parameter existed —
+ *   that byte identity is what keeps the existing Korean analysis cache valid.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
@@ -1818,7 +1846,8 @@ export function buildAnalysisPrompt(
     timeframe: Timeframe = '1Day',
     fearGreed?: FearGreedSnapshot,
     assetClass: AssetClass = 'equity',
-    positionBucket?: PositionBucket
+    positionBucket?: PositionBucket,
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1881,7 +1910,8 @@ export function buildAnalysisPrompt(
         combinedGroups.indicator_guide,
         combinedGroups.candlestick,
         combinedGroups.support_resistance,
-        combinedGroups.regular
+        combinedGroups.regular,
+        locale
     );
 
     // Design C: `stable` carries ONLY the always_on skill digests — nothing
@@ -1907,7 +1937,7 @@ export function buildAnalysisPrompt(
         `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
         ANALYSIS_INTENT_BLOCK,
-        ANALYSIS_GUIDELINES,
+        analysisGuidelines(locale),
         formatMarketSection(bars),
         formatLongTermContext(bars),
         formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),

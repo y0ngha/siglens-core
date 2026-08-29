@@ -18,9 +18,13 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { OVERALL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { OVERALL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { overallSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import {
@@ -243,6 +247,7 @@ export async function runOverallAnalysis(
                   tier: topLevelTier ?? DEFAULT_TIER,
                   userApiKey: topLevelUserApiKey,
                   reasoning,
+                  locale: options.locale,
                   ...optionsAxisOptions,
                   skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                   force: effectiveAxisForce,
@@ -272,6 +277,7 @@ export async function runOverallAnalysis(
               tier: topLevelTier ?? DEFAULT_TIER,
               userApiKey: topLevelUserApiKey,
               reasoning,
+              locale: options.locale,
               ...options.fundamental,
               skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
               force: effectiveAxisForce,
@@ -292,6 +298,14 @@ export async function runOverallAnalysis(
                     modelId: technicalRest.modelId ?? modelId,
                     userApiKey: technicalRest.userApiKey ?? topLevelUserApiKey,
                     reasoning: technicalRest.reasoning ?? reasoning,
+                    /*
+                     * 네 축 모두 최상위 값이 이긴다 — **어느 축의 옵션 타입에도
+                     * `locale`이 없기 때문**이다. 바로 위 `reasoning`이 `??`를
+                     * 쓰는 것과 규칙이 달라 보이지만, 양보할 축별 값 자체가
+                     * 존재하지 않는다. 축별 언어를 주고 싶어지면 그 타입부터
+                     * 넓혀야 하고, 그때 네 축을 함께 바꿔야 한다.
+                     */
+                    locale: options.locale,
                     tierContext:
                         technicalRest.tierContext ??
                         (topLevelTier !== undefined
@@ -311,6 +325,7 @@ export async function runOverallAnalysis(
                 tier: topLevelTier ?? DEFAULT_TIER,
                 userApiKey: topLevelUserApiKey,
                 reasoning,
+                locale: options.locale,
                 ...(newsFieldIsArray
                     ? undefined
                     : (newsField as object | undefined)),
@@ -420,7 +435,8 @@ export async function runOverallAnalysis(
         timeframe,
         modelId,
         inputHash,
-        reasoning
+        reasoning,
+        options.locale
     );
     const cache = createCacheProvider();
 
@@ -468,6 +484,7 @@ export async function runOverallAnalysis(
 
     // ── 9. Build overall prompt ──
     const optionsOiStale = options.optionsOiStale ?? false;
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildOverallAnalysisPrompt(
         symbol,
         companyName,
@@ -479,14 +496,18 @@ export async function runOverallAnalysis(
         optionsData,
         optionsOiStale,
         options.financialsScorecard,
-        options.assetClass ?? 'equity'
+        options.assetClass ?? 'equity',
+        locale
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.
     const system = stable
-        ? `${OVERALL_SYSTEM_PROMPT}\n\n${stable}`
-        : OVERALL_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${overallSystemPrompt(locale)}\n\n${stable}`
+        : overallSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // Resolve the callable model (overall uses the same sentinel logic as runAnalysis)
     const callModelId: ActiveModelId =
@@ -534,7 +555,8 @@ export async function runOverallAnalysis(
             symbol,
             timeframe,
             modelId,
-            reasoning
+            reasoning,
+            options.locale
         );
         cache
             .set(peekKey, result, OVERALL_CACHE_TTL_SECONDS)

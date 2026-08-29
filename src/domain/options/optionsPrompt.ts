@@ -1,5 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    outputLanguageName,
+    schemaLanguageLabel,
+} from '@/domain/analysis/outputLocale';
 import type { AssembledPrompt } from '@/domain/types';
 import type { BuildOptionsAnalysisPromptOptions } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
@@ -33,7 +38,12 @@ import { summarizeChainForLlm } from './summarizeChainForLlm';
 export function buildOptionsAnalysisPrompt(
     options: BuildOptionsAnalysisPromptOptions
 ): AssembledPrompt {
-    const { expirationDate, companyName, snapshot } = options;
+    const {
+        expirationDate,
+        companyName,
+        snapshot,
+        locale = DEFAULT_ANALYSIS_LOCALE,
+    } = options;
 
     const targetChains =
         expirationDate === 'all'
@@ -44,10 +54,11 @@ export function buildOptionsAnalysisPrompt(
         summarizeChainForLlm(c, snapshot.underlyingPrice)
     );
 
+    const schemaLang = schemaLanguageLabel(locale);
     const stable = '';
 
     const dynamic = [
-        `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in Korean.`,
+        `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in ${outputLanguageName(locale)}.`,
         '',
         `Current price: $${snapshot.underlyingPrice}`,
         '',
@@ -57,18 +68,18 @@ export function buildOptionsAnalysisPrompt(
         '== Output Schema ==',
         'Respond only with a JSON object matching the schema below. Do not include any other text.',
         '{',
-        '  "summary": "전체 옵션 시장에 대한 한 문단 요약 (3-5문장, 친근한 어투, 한국어)",',
+        `  "summary": "전체 옵션 시장에 대한 한 문단 요약 (3-5문장, 친근한 어투, ${schemaLang})",`,
         '  "perExpiration": [',
         '    {',
         '      "expirationDate": "YYYY-MM-DD",',
-        '      "commentary": "이 만기에 대한 해석 (2-3문장, 한국어)",',
+        `      "commentary": "이 만기에 대한 해석 (2-3문장, ${schemaLang})",`,
         '      "tone": "bullish | bearish | neutral | cautious"',
         '    }',
         '  ],',
         '  "signals": [',
         '    {',
         '      "kind": "bullish | bearish | neutral | volatility",',
-        '      "message": "신호 한 줄 설명 (한국어)"',
+        `      "message": "신호 한 줄 설명 (${schemaLang})"`,
         '    }',
         '  ]',
         '}',
@@ -82,7 +93,7 @@ export function buildOptionsAnalysisPrompt(
         '- topOpenInterestStrikes: the 3 strikes with the most accumulated open interest.',
         '- topVolumeStrikes: the 3 strikes most actively traded today — read together with OI (accumulated bets) to spot price levels where the market is newly moving.',
         '- topOiBidAskSummary: bid/ask quotes (mid · spread) for the top OI strikes — a tight spread signals good liquidity at that price level.',
-        '- Use a friendly but accurate Korean tone in the output. Keep ticker symbols in English as-is (e.g. AAPL).',
+        `- Use a friendly but accurate tone in ${outputLanguageName(locale)}. Keep ticker symbols in English as-is (e.g. AAPL).`,
     ].join('\n');
 
     return { stable, dynamic };

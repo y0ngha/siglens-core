@@ -346,4 +346,48 @@ describe('runOverallAnalysis', () => {
             expect(b.status).toBe('done');
         });
     });
+
+    describe('runOverallAnalysis — 출력 로케일', () => {
+        /**
+         * 상위 프롬프트만 로케일을 받고 축은 안 받으면, 축은 늘 한국어로 답하고
+         * 그 한국어가 `Summary (KO): …`로 상위 프롬프트에 박힌다 — "다른 언어로
+         * 쓰라"는 지시와 **모순되는 입력**이 만들어진다(PR #184 리뷰 1라운드).
+         */
+        it('로케일을 하위 축(technical·news)에 그대로 넘긴다', async () => {
+            await runOverallAnalysis({ ...baseOptions(), locale: 'en' });
+
+            expect(mockRunAnalysisForOverall).toHaveBeenCalled();
+            const technicalArgs = mockRunAnalysisForOverall.mock.calls[0]!;
+            expect(
+                technicalArgs.some(a =>
+                    typeof a === 'object' && a !== null && 'locale' in a
+                        ? (a as { locale?: string }).locale === 'en'
+                        : false
+                )
+            ).toBe(true);
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ locale: 'en' })
+            );
+        });
+
+        it('로케일을 생략하면 축에도 undefined가 간다 — 축이 기본(ko)으로 떨어진다', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ locale: undefined })
+            );
+        });
+
+        it('비-ko는 상위 프롬프트 말미에 출력 언어 리마인더를 싣는다', async () => {
+            await runOverallAnalysis({ ...baseOptions(), locale: 'ja' });
+
+            const prompt = (
+                mockCallAnalysisAi.mock.calls.at(-1)![0] as { prompt: string }
+            ).prompt as string;
+            expect(prompt).toContain(
+                'OUTPUT LANGUAGE (FINAL, OVERRIDES EVERYTHING ABOVE)'
+            );
+        });
+    });
 });

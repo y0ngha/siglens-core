@@ -1,5 +1,11 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    outputLanguageName,
+    type AnalysisLocale,
+} from './outputLocale';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import {
     computeOverallScore,
@@ -401,7 +407,8 @@ export function buildOverallAnalysisPrompt(
     options?: OptionsAnalysisResponse | null,
     optionsOiStale?: boolean,
     financials?: FinancialsScorecard | null,
-    assetClass: AssetClass = 'equity'
+    assetClass: AssetClass = 'equity',
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
     const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
@@ -452,6 +459,15 @@ export function buildOverallAnalysisPrompt(
     // with zero interpolation of any kind, but keeping it at the tail of
     // `dynamic` (after all axis data) matters more for rule recency than
     // caching it in isolation would (see this function's doc comment).
+    /*
+     * 스키마 예시의 언어 표기. ko는 `한국어`라고 적혀 있던 그대로 둔다 —
+     * 예시 문자열이 한 글자라도 바뀌면 기본 로케일 프롬프트의 바이트가 달라진다.
+     */
+    const schemaLanguage =
+        locale === DEFAULT_ANALYSIS_LOCALE
+            ? '한국어'
+            : outputLanguageName(locale);
+
     const stable = '';
 
     const dynamic = `${roleAndAxisLine}
@@ -485,41 +501,41 @@ ${axisScoreSection}
 
 ## Output Schema
 {
-  "headlineKo": "한국어 한 줄 정의 + 현재 상태 1단락",
+  "headlineKo": "${schemaLanguage} 한 줄 정의 + 현재 상태 1단락",
   "technicalBulletsKo": [
-    "기술적 분석 요약 bullet 1 (한국어)",
-    "기술적 분석 요약 bullet 2 (한국어)"
+    "기술적 분석 요약 bullet 1 (${schemaLanguage})",
+    "기술적 분석 요약 bullet 2 (${schemaLanguage})"
   ],
   "fundamentalBulletsKo": [
-    "펀더멘털 요약 bullet 1 (한국어)",
-    "펀더멘털 요약 bullet 2 (한국어)"
+    "펀더멘털 요약 bullet 1 (${schemaLanguage})",
+    "펀더멘털 요약 bullet 2 (${schemaLanguage})"
   ],
   "newsBulletsKo": [
-    "뉴스 요약 bullet 1 (한국어)",
-    "뉴스 요약 bullet 2 (한국어)"
+    "뉴스 요약 bullet 1 (${schemaLanguage})",
+    "뉴스 요약 bullet 2 (${schemaLanguage})"
   ],
   "optionsBulletsKo": [
-    "옵션 시장 요약 bullet 1 (한국어)",
-    "옵션 시장 요약 bullet 2 (한국어)"
+    "옵션 시장 요약 bullet 1 (${schemaLanguage})",
+    "옵션 시장 요약 bullet 2 (${schemaLanguage})"
   ],
   "financialsBulletsKo": [
-    "재무 스코어카드 요약 bullet 1 (한국어)",
-    "재무 스코어카드 요약 bullet 2 (한국어)"
+    "재무 스코어카드 요약 bullet 1 (${schemaLanguage})",
+    "재무 스코어카드 요약 bullet 2 (${schemaLanguage})"
   ],
-  "integratedConclusionKo": "네 축 종합 결론 (한 단락 또는 두 단락, 한국어)",
+  "integratedConclusionKo": "네 축 종합 결론 (한 단락 또는 두 단락, ${schemaLanguage})",
   "scenarios": [
     {
       "name": "bullish" | "neutral" | "bearish",
-      "triggerConditionKo": "시나리오 발동 조건 (한국어)",
-      "priceRangeKo": "예상 가격대 (한국어)"
+      "triggerConditionKo": "시나리오 발동 조건 (${schemaLanguage})",
+      "priceRangeKo": "예상 가격대 (${schemaLanguage})"
     }
   ],
-  "riskFactorsKo": ["위험 요인 1 (한국어)", "위험 요인 2 (한국어)"]
+  "riskFactorsKo": ["위험 요인 1 (${schemaLanguage})", "위험 요인 2 (${schemaLanguage})"]
 }
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - scenarios must include all three entries: bullish, neutral, bearish — in any order.
 - technicalBulletsKo, newsBulletsKo: provide 2–4 bullets each.
 - fundamentalBulletsKo: provide 2–4 bullets for equity assets; leave the array empty for crypto assets (no corporate fundamentals apply).

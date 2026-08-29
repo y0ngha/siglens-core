@@ -4,6 +4,7 @@ import type {
     AnalysisLimitError,
     AnalysisUsageOptions,
 } from '@/application/usage/types';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
     AssetClass,
     EarningsCalendarItem,
@@ -90,6 +91,13 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * collide; forwarded to the worker `/analyze` body only when `true`.
      */
     reasoning?: boolean;
+    /**
+     * Output language for the generated analysis text.
+     *
+     * Omit it to keep the previous behaviour exactly: Korean output and the
+     * same cache key this request used before the field existed.
+     */
+    locale?: AnalysisLocale;
     /**
      * Cancellation signal for the in-flight LLM call (used by `runNewsAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
@@ -187,6 +195,13 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
      * Has no effect on `submitNewsCardAnalysis` (the worker-based path).
      */
     signal?: AbortSignal;
+    /**
+     * Output language for the generated analysis text.
+     *
+     * Omit it to keep the previous behaviour exactly: Korean output and the
+     * same cache key this request used before the field existed.
+     */
+    locale?: AnalysisLocale;
 }
 
 /**

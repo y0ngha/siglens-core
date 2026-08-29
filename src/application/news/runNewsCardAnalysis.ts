@@ -7,8 +7,13 @@ import type {
 } from '@/application/news/types';
 import { normalizeNewsCardAnalysis } from '@/domain/analysis/normalizeNews';
 import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localeKeySuffixFor,
+    outputLanguageReminder,
+} from '@/domain/analysis/outputLocale';
 import { NEWS_CARD_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
-import { NEWS_CARD_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
+import { newsCardSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 
 /**
@@ -65,15 +70,25 @@ export async function runNewsCardAnalysis(
 ): Promise<RunNewsCardAnalysisResult> {
     const { item } = options;
 
-    const { stable, dynamic } = buildNewsCardAnalysisPrompt(item);
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
+    const { stable, dynamic } = buildNewsCardAnalysisPrompt(item, locale);
     // Design C: this builder has no skills catalog, so `stable` is always ''
     // and `system` stays the base persona unchanged.
     const system = stable
-        ? `${NEWS_CARD_SYSTEM_PROMPT}\n\n${stable}`
-        : NEWS_CARD_SYSTEM_PROMPT;
-    const prompt = dynamic;
+        ? `${newsCardSystemPrompt(locale)}\n\n${stable}`
+        : newsCardSystemPrompt(locale);
+    // 출력 언어를 **마지막 지시**로 한 번 더 못 박는다 — 유저 프롬프트의 필드
+    // 설명은 언어를 `Korean`으로 적어 둔 곳이 많아 그것만으로는 뒤집히지 않는다.
+    // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
+    const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
-    const raw = await dedupeInFlight(`news-card:${item.id}`, () =>
+    /*
+     * in-flight 키에 로케일이 들어가야 한다. 같은 카드에 언어가 다른 동시
+     * 요청이 오면 하나로 합쳐져 늦게 부른 쪽이 **요청하지 않은 언어**를 받는다.
+     * 캐시 키와 같은 규약이라 ko는 접미가 없다.
+     */
+    const inFlightKey = `news-card:${item.id}${localeKeySuffixFor(locale)}`;
+    const raw = await dedupeInFlight(inFlightKey, () =>
         callAnalysisAi({
             prompt,
             model: NEWS_CARD_MODEL_ID,
