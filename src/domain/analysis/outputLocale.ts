@@ -148,3 +148,24 @@ export function outputLanguageReminder(locale: AnalysisLocale): string {
         '- Keep JSON keys, ticker symbols, and standard finance abbreviations exactly as specified.',
     ].join('\n');
 }
+
+/**
+ * @internal 유저 프롬프트 본문의 **필드 언어 지시** 한 줄.
+ *
+ * 여섯 축(financials·fundamental·congress·marketNewsDigest·news·overall)이
+ * 글자 그대로 같은 문장을 각자 하드코딩하고 있었다. 한 곳으로 모으면
+ * 다음에 축이 늘어도 이 줄을 빠뜨릴 자리가 없다 — 실제로 이 PR이 세 축만
+ * 고치고 여섯을 놓쳤다(리뷰 6라운드).
+ *
+ * `Ko`/`KO` 접미는 **스키마 필드명**이지 언어 주장이 아니다. 그래서 문장은
+ * 필드명을 그대로 두고 내용 언어만 말한다.
+ */
+export function localizedFieldDirective(locale: AnalysisLocale): string {
+    const safe = resolve(locale);
+    if (safe === DEFAULT_ANALYSIS_LOCALE) {
+        // 기본 로케일은 예전 문장 그대로 — 프롬프트 바이트가 같아야 한다.
+        return '- All KO fields must be written in Korean (존댓말).';
+    }
+    const { name, register } = OUTPUT_LANGUAGE[safe];
+    return `- The KO-suffixed fields are schema names, not a language claim — write their content in ${name} in ${register}.`;
+}

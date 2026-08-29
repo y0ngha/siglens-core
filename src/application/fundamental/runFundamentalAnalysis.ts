@@ -244,14 +244,15 @@ export async function runFundamentalAnalysis(
     if (providerData.status === 'error') return providerData;
     const { snapshot } = providerData;
 
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildFundamentalAnalysisPrompt(
         symbol,
         snapshot,
-        skillSampling.skills
+        skillSampling.skills,
+        locale
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${fundamentalSystemPrompt(locale)}\n\n${stable}`
         : fundamentalSystemPrompt(locale);

@@ -1,5 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    type AnalysisLocale,
+} from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
@@ -114,7 +119,8 @@ function formatSectorDirection(
 export function buildFundamentalAnalysisPrompt(
     symbol: string,
     snapshot: FundamentalSnapshot,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const {
         profile,
@@ -227,7 +233,7 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - categoryAssessments must include all 5 categories in any order.
 - overallSentiment must reflect the balance of all 5 category sentiments.`;
 

@@ -155,15 +155,16 @@ export async function runCongressTrend(
     }
 
     const stats = summarizeCongressTrades(trades);
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildCongressTrendPrompt(
         symbol,
         trades,
         stats,
-        skillSampling.skills
+        skillSampling.skills,
+        locale
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${congressSystemPrompt(locale)}\n\n${stable}`
         : congressSystemPrompt(locale);

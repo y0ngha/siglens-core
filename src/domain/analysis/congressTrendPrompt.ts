@@ -1,5 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    type AnalysisLocale,
+} from './outputLocale';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import type {
     AssembledPrompt,
@@ -72,7 +77,8 @@ export function buildCongressTrendPrompt(
     symbol: string,
     trades: readonly CongressTrade[],
     stats: CongressTradeStats,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const qualifiedSkills = filterCongressSkills(skills);
     const skillsSection =
@@ -120,7 +126,7 @@ Respond with a JSON object matching exactly:
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All Ko fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - overallSentiment must be one of: "bullish", "neutral", "bearish".
 - Base overallSentiment on the provided net direction (${stats.direction}), not your own count.`;
 

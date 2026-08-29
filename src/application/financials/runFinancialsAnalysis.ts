@@ -218,15 +218,16 @@ export async function runFinancialsAnalysis(
 
     // scorecard is a local variable — no Redis meta write needed (invariant 1).
     const scorecard = computeFinancialsScorecard(snapshot);
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildFinancialsAnalysisPrompt(
         symbol,
         snapshot,
         scorecard,
-        skillSampling.skills
+        skillSampling.skills,
+        locale
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${financialsSystemPrompt(locale)}\n\n${stable}`
         : financialsSystemPrompt(locale);

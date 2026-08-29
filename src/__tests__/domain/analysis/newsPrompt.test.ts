@@ -342,3 +342,37 @@ describe('bodyTruncated propagation', () => {
         expect(prompt.match(/\[EXCERPT — cut off\]/g)).toHaveLength(1);
     });
 });
+
+describe('buildNewsAnalysisPrompt — 출력 로케일', () => {
+    /** 로컬 래퍼는 로케일을 받지 않으므로 원본을 직접 부른다. */
+    const build = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+        buildNewsAnalysisPromptRaw(
+            'AAPL',
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [],
+            [],
+            'equity',
+            locale
+        ).dynamic;
+
+    /**
+     * 이 축은 프롬프트 **본문**에 필드 언어 지시를 하드코딩하고 있었다 —
+     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 과업 규칙이다(리뷰 6라운드).
+     */
+    it('로케일을 생략하면 ko와 바이트가 같다', () => {
+        expect(build()).toBe(build('ko'));
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 한국어로 쓰라는 지시가 본문에 남지 않는다',
+        locale => {
+            expect(build(locale)).not.toContain('must be written in Korean');
+            expect(build(locale)).not.toContain('in Korean (존댓말)');
+        }
+    );
+
+    it('ko: 예전 지시문이 그대로다', () => {
+        expect(build('ko')).toContain('Korean (존댓말)');
+    });
+});

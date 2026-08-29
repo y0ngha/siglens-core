@@ -484,6 +484,7 @@ export async function runOverallAnalysis(
 
     // ── 9. Build overall prompt ──
     const optionsOiStale = options.optionsOiStale ?? false;
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildOverallAnalysisPrompt(
         symbol,
         companyName,
@@ -495,11 +496,11 @@ export async function runOverallAnalysis(
         optionsData,
         optionsOiStale,
         options.financialsScorecard,
-        options.assetClass ?? 'equity'
+        options.assetClass ?? 'equity',
+        locale
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${overallSystemPrompt(locale)}\n\n${stable}`
         : overallSystemPrompt(locale);

@@ -285,3 +285,38 @@ describe('buildFundamentalAnalysisPrompt', () => {
         expect(prompt).toContain('value body');
     });
 });
+
+describe('buildFundamentalAnalysisPrompt — 출력 로케일', () => {
+    /**
+     * 이 축은 프롬프트 **본문**에 필드 언어 지시를 하드코딩하고 있었다.
+     * 말미 리마인더는 필드 설명을 덮으려고 만든 것이라 과업 규칙으로 적힌
+     * 지시까지 뒤집는다고 볼 수 없다 — 소스에서 갈라야 한다(리뷰 6라운드).
+     */
+    it('로케일을 생략하면 ko와 바이트가 같다', () => {
+        expect(
+            buildFundamentalAnalysisPrompt(TEST_SYMBOL, TEST_SNAPSHOT, [])
+        ).toBe(
+            buildFundamentalAnalysisPrompt(TEST_SYMBOL, TEST_SNAPSHOT, [], 'ko')
+        );
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: 한국어로 쓰라는 지시가 본문에 남지 않는다',
+        locale => {
+            const prompt = buildFundamentalAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_SNAPSHOT,
+                [],
+                locale
+            );
+            expect(prompt).not.toContain('must be written in Korean');
+            expect(prompt).not.toContain('in Korean (존댓말)');
+        }
+    );
+
+    it('ko: 예전 지시문이 그대로다', () => {
+        expect(
+            buildFundamentalAnalysisPrompt(TEST_SYMBOL, TEST_SNAPSHOT, [], 'ko')
+        ).toContain('Korean (존댓말)');
+    });
+});

@@ -1,5 +1,10 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    localizedFieldDirective,
+    type AnalysisLocale,
+} from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
@@ -126,7 +131,8 @@ export function buildNewsAnalysisPrompt(
     news: ReadonlyArray<EnrichedNewsItem>,
     upcomingCalendar: readonly EarningsCalendarItem[],
     skills: readonly Skill[],
-    assetClass: AssetClass
+    assetClass: AssetClass,
+    locale?: AnalysisLocale
 ): AssembledPrompt;
 export function buildNewsAnalysisPrompt(
     symbol: string,
@@ -136,7 +142,8 @@ export function buildNewsAnalysisPrompt(
         | readonly EarningsCalendarItem[],
     calendarOrSkills: readonly EarningsCalendarItem[] | readonly Skill[],
     maybeSkills?: readonly Skill[],
-    assetClass: AssetClass = 'equity'
+    assetClass: AssetClass = 'equity',
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AssembledPrompt {
     const companyName =
         typeof companyNameOrNews === 'string' ? companyNameOrNews : symbol;
@@ -216,7 +223,7 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 Rules:
 - Respond with valid JSON only. No markdown fences.
-- All KO fields must be written in Korean (존댓말).
+${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
 - keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
 - upcomingEventsKo should highlight scheduled catalysts (earnings, regulatory deadlines, etc.).

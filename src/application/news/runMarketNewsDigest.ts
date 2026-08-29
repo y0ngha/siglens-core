@@ -138,14 +138,15 @@ export async function runMarketNewsDigest(
     }
 
     // ── 3. Build prompt ──
+    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildMarketNewsDigestPrompt(
         categoryLabel,
         news,
-        skillSampling.skills
+        skillSampling.skills,
+        locale
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const system = stable
         ? `${newsSystemPrompt(locale)}\n\n${stable}`
         : newsSystemPrompt(locale);
