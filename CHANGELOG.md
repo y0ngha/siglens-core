@@ -1,5 +1,17 @@
 # Changelog
 
+# [0.53.0](https://github.com/y0ngha/siglens-core/compare/v0.52.0...v0.53.0) (2026-08-30)
+
+
+### Features
+
+* AI 산출물 출력 언어를 로케일로 받는다 ([#184](https://github.com/y0ngha/siglens-core/issues/184)) ([0294a74](https://github.com/y0ngha/siglens-core/commit/0294a74))
+
+
+### Bug Fixes
+
+* 캐시 키 접미도 알 수 없는 로케일을 ko로 정규화한다 ([#185](https://github.com/y0ngha/siglens-core/issues/185)) ([3b538ae](https://github.com/y0ngha/siglens-core/commit/3b538ae))
+
 # [0.52.0](https://github.com/y0ngha/siglens-core/compare/v0.51.0...v0.52.0) (2026-08-23)
 
 
