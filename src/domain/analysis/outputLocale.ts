@@ -195,7 +195,13 @@ export function schemaLanguageLabel(locale: AnalysisLocale): string {
  * **기본 로케일은 빈 문자열**이라 이 기능 이전 키와 바이트가 같다.
  */
 export function localeKeySuffixFor(locale: AnalysisLocale | undefined): string {
-    return locale === undefined || locale === DEFAULT_ANALYSIS_LOCALE
-        ? ''
-        : `:lang=${locale}`;
+    if (locale === undefined) return '';
+    /*
+     * **이 파일의 다른 함수들과 같이 `resolve`를 거친다.** 안 거치면 유니언
+     * 밖의 값(`'kr'` 같은 오타, core가 아직 모르는 새 UI 로케일)이 왔을 때
+     * 산출물은 `resolve` 덕에 한국어로 나오는데 키만 `:lang=kr`로 갈린다 —
+     * 크래시는 아니지만 그 요청이 기존 한국어 캐시를 영영 못 맞힌다.
+     */
+    const safe = resolve(locale);
+    return safe === DEFAULT_ANALYSIS_LOCALE ? '' : `:lang=${safe}`;
 }
