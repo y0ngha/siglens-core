@@ -283,7 +283,11 @@ export {
     minutesUntilUsMarketClose,
     usMarketCloseMinute,
 } from './domain/marketCalendar';
-export type { AssetClass, MarketSessionSpec } from './domain/types';
+export type {
+    AssetClass,
+    CurrencyCode,
+    MarketSessionSpec,
+} from './domain/types';
 
 // Economy (macro) domain types — /economy page snapshot + briefing
 export type {

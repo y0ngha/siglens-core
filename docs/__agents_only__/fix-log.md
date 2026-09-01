@@ -225,3 +225,15 @@
   Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
   Fixed in R2: Added dated changelog row documenting the new public exports
 
+## [Consumer typecheck validation | uncommitted (2 rounds, approved) | 2026-09-01]
+
+- Violation 1 (RECOMMENDED): `src/domain/analysis/ai-levels.ts` — optional parameter given same `= 'USD'` default at three stacked layers, making inner two defaults dead code
+  Rule: MISTAKES.md §Coding Paradigm 6.5 — when function implementation changes, all related functions in the same module must use a consistent approach; defaults must resolve at exactly one boundary
+  Context: Module pattern (`locale` parameter) resolves default exactly once at outermost boundary. New `currency` parameter repeated the default at three nesting layers (inner two unreachable on real call path). Each layer added defensive default thinking independently without recognizing the stacking.
+  Fixed: Made inner two `currency` parameters required, resolving default only at outermost boundary per module convention
+
+- Violation 2 (RECOMMENDED): Output-affecting option (`currency`) deliberately excluded from analysis cache key, relying on a consumer-side invariant core cannot enforce
+  Rule: Cache key contracts must either include all output-affecting parameters or document the invariant constraint explicitly in the type/function JSDoc
+  Context: Core cannot enforce `currency` parity on all analysis callers; consumer repo (`siglens`) must guarantee the invariant. Mitigated by adding explicit invariant tests in consumer confirming `currency` is identical across re-used cached results.
+  Fixed: Mitigated in consumer-side (siglens) tests; core cache function JSDoc does not require changes per core-consumer contract
+
