@@ -23,6 +23,17 @@ export type MarketSessionStatus = EtSessionStatus;
 export type AssetClass = 'equity' | 'crypto';
 
 /**
+ * Currency used to render prices in generated prose.
+ *
+ * Core never infers this from the symbol. That `005930.KS` is quoted in won is
+ * a market-profile fact, not analysis-domain knowledge, and the exchange
+ * catalog lives in the consumer (siglens `shared/config/marketProfile`) — so
+ * the currency is *supplied*, never derived. Callers that omit it get `'USD'`,
+ * byte-for-byte the output produced before this type existed.
+ */
+export type CurrencyCode = 'USD' | 'KRW';
+
+/**
  * Coarse unrealized profit/loss band for a member's holding in a symbol
  * (personalized-analysis-by-position-bucket spec, Subsystem C).
  *

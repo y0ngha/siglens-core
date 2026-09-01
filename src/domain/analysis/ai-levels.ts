@@ -2,6 +2,7 @@ import { buildPlanCheck } from '@/domain/analysis/planCheck';
 import type {
     ActionRecommendation,
     AnalysisResponse,
+    CurrencyCode,
     ReconciledActionLevels,
     ReconcileResult,
     ResolvedLevel,
@@ -135,6 +136,20 @@ function ordinalLabel(index: number): string {
     return ORDINAL_LABEL[index] ?? `${index + 1}차`;
 }
 
+/**
+ * 가격 한 개를 통화에 맞게 표기한다.
+ *
+ * 원화는 소수 단위로 호가되지 않으므로 반올림해 정수로 쓰고 `원`을 붙인다.
+ * `$121980.70` 같은 표기는 값이 틀린 것과 같다 — 단위가 틀렸고, 존재하지 않는
+ * 정밀도를 주장한다. 달러는 `$1234.56` 표기를 그대로 유지한다(이 필드가 생기기
+ * 전 출력과 바이트 단위로 동일).
+ */
+function formatLevelPrice(price: number, currency: CurrencyCode): string {
+    return currency === 'KRW'
+        ? `${Math.round(price).toLocaleString('en-US')}원`
+        : `$${price.toFixed(2)}`;
+}
+
 /** 진입가 대비 signed 백분율 문자열 반환 (+3.2% / -1.2% 형식). */
 function formatSignedPct(entryPrice: number, price: number): string {
     const pct = ((price - entryPrice) / entryPrice) * 100;
@@ -144,16 +159,17 @@ function formatSignedPct(entryPrice: number, price: number): string {
 /** 유효 TP 배열을 exit 텍스트 TP 파트로 포맷. 빈 배열이면 undefined. */
 function buildExitTpPart(
     entryPrice: number,
-    validTps: readonly number[]
+    validTps: readonly number[],
+    currency: CurrencyCode
 ): string | undefined {
     if (validTps.length === 0) return undefined;
     if (validTps.length === 1) {
         const tp = validTps[0];
-        return `목표가 $${tp.toFixed(2)} (${formatSignedPct(entryPrice, tp)})에서 익절`;
+        return `목표가 ${formatLevelPrice(tp, currency)} (${formatSignedPct(entryPrice, tp)})에서 익절`;
     }
     const tpParts = validTps.map(
         (tp, idx) =>
-            `${ordinalLabel(idx)} 목표 $${tp.toFixed(2)} (${formatSignedPct(entryPrice, tp)})`
+            `${ordinalLabel(idx)} 목표 ${formatLevelPrice(tp, currency)} (${formatSignedPct(entryPrice, tp)})`
     );
     return `${tpParts.join(', ')}에서 익절`;
 }
@@ -161,7 +177,8 @@ function buildExitTpPart(
 /** 유효한 SL을 exit 텍스트 파트로 포맷. 무효값이면 undefined. */
 function buildExitSlPart(
     entryPrice: number,
-    stopLoss: number | undefined
+    stopLoss: number | undefined,
+    currency: CurrencyCode
 ): string | undefined {
     if (
         stopLoss === undefined ||
@@ -171,17 +188,23 @@ function buildExitSlPart(
     ) {
         return undefined;
     }
-    return `손절 $${stopLoss.toFixed(2)} (${formatSignedPct(entryPrice, stopLoss)})`;
+    return `손절 ${formatLevelPrice(stopLoss, currency)} (${formatSignedPct(entryPrice, stopLoss)})`;
 }
 
 /**
  * @internal Builds the bullish exit text from SL/TP.
  * bullish 포지션 SL/TP 기반 exit 텍스트 생성. 유효하지 않은 파트는 생략한다.
+ *
+ * `currency`는 필수다. 기본값은 이 모듈의 유일한 공개 진입점인
+ * {@link postProcessAnalysisWithReconcile}에서 한 번만 정한다 — `locale`이
+ * `runAnalysis` 경계에서 한 번만 해소되는 것과 같은 방식이다. 층마다 기본값을
+ * 두면 나중에 한 곳만 바뀌었을 때 조용히 갈린다.
  */
 export function buildBullishExitText(
     entryPrice: number,
     stopLoss: number | undefined,
-    takeProfitPrices: readonly number[] | undefined
+    takeProfitPrices: readonly number[] | undefined,
+    currency: CurrencyCode
 ): string {
     const validTps = (takeProfitPrices ?? []).filter(
         (tp): tp is number =>
@@ -189,8 +212,8 @@ export function buildBullishExitText(
     );
 
     const parts = [
-        buildExitTpPart(entryPrice, validTps),
-        buildExitSlPart(entryPrice, stopLoss),
+        buildExitTpPart(entryPrice, validTps, currency),
+        buildExitSlPart(entryPrice, stopLoss, currency),
     ].filter((p): p is string => p !== undefined);
 
     return parts.length > 0 ? parts.join(', ') + '.' : '';
@@ -258,7 +281,8 @@ function buildReconcileReason(
 export function reconcileBullishActionRecommendation(
     rec: ActionRecommendation,
     entryPrice: number,
-    atr: number | undefined
+    atr: number | undefined,
+    currency: CurrencyCode
 ): ReconcileResult {
     // avoid: AI가 의도적으로 레벨을 비운 것이므로 보정하지 않는다.
     if (rec.entryRecommendation === 'avoid') {
@@ -307,7 +331,12 @@ export function reconcileBullishActionRecommendation(
     const reconciled: ReconciledActionLevels = {
         stopLoss: reconciledSl,
         takeProfitPrices: reconciledTpArr,
-        exit: buildBullishExitText(entryPrice, reconciledSl, reconciledTpArr),
+        exit: buildBullishExitText(
+            entryPrice,
+            reconciledSl,
+            reconciledTpArr,
+            currency
+        ),
         riskReward: buildBullishRiskRewardText(
             entryPrice,
             reconciledSl,
@@ -363,7 +392,12 @@ function computeEntryPriceMid(
 export function postProcessAnalysisWithReconcile(
     response: AnalysisResponse,
     fallbackEntryPrice: number | undefined,
-    atr: number | undefined
+    atr: number | undefined,
+    /**
+     * 이 모듈에서 통화 기본값이 정해지는 **유일한** 지점. 하위 헬퍼들은
+     * 값을 요구하기만 한다.
+     */
+    currency: CurrencyCode = 'USD'
 ): AnalysisResponse {
     const rec = response.actionRecommendation;
     if (!rec) return response;
@@ -378,7 +412,8 @@ export function postProcessAnalysisWithReconcile(
     const { recommendation } = reconcileBullishActionRecommendation(
         rec,
         entryPrice,
-        atr
+        atr,
+        currency
     );
 
     // Attached outside the reconcile branch on purpose. `reconciledLevels` — and with it

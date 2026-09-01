@@ -153,36 +153,36 @@ describe('resolveBullishTakeProfit', () => {
 
 describe('buildBullishExitText', () => {
     it('유효한 TP와 SL로 exit 텍스트를 생성한다', () => {
-        const text = buildBullishExitText(100, 97, [105]);
+        const text = buildBullishExitText(100, 97, [105], 'USD');
         expect(text).toContain('105.00');
         expect(text).toContain('97.00');
     });
 
     it('TP가 없으면 SL만 포함한다', () => {
-        const text = buildBullishExitText(100, 97, []);
+        const text = buildBullishExitText(100, 97, [], 'USD');
         expect(text).toContain('97.00');
         expect(text).not.toContain('익절');
     });
 
     it('SL이 없으면 TP만 포함한다', () => {
-        const text = buildBullishExitText(100, undefined, [105]);
+        const text = buildBullishExitText(100, undefined, [105], 'USD');
         expect(text).toContain('105.00');
         expect(text).not.toContain('손절');
     });
 
     it('TP와 SL 모두 없으면 빈 문자열을 반환한다', () => {
-        const text = buildBullishExitText(100, undefined, []);
+        const text = buildBullishExitText(100, undefined, [], 'USD');
         expect(text).toBe('');
     });
 
     it('TP가 여러 개이면 1차, 2차 라벨을 포함한다', () => {
-        const text = buildBullishExitText(100, 97, [105, 110]);
+        const text = buildBullishExitText(100, 97, [105, 110], 'USD');
         expect(text).toContain('1차');
         expect(text).toContain('2차');
     });
 
     it('TP가 entryPrice 이하이면 무효로 처리한다', () => {
-        const text = buildBullishExitText(100, 97, [99]);
+        const text = buildBullishExitText(100, 97, [99], 'USD');
         expect(text).not.toContain('익절');
     });
 });
@@ -221,7 +221,8 @@ describe('reconcileBullishActionRecommendation', () => {
         const result = reconcileBullishActionRecommendation(
             rec,
             entryPrice,
-            atr
+            atr,
+            'USD'
         );
 
         expect(result.wasReconciled).toBe(false);
@@ -232,7 +233,8 @@ describe('reconcileBullishActionRecommendation', () => {
         const result = reconcileBullishActionRecommendation(
             baseRec,
             entryPrice,
-            atr
+            atr,
+            'USD'
         );
 
         expect(result.wasReconciled).toBe(false);
@@ -247,7 +249,8 @@ describe('reconcileBullishActionRecommendation', () => {
         const result = reconcileBullishActionRecommendation(
             rec,
             entryPrice,
-            atr
+            atr,
+            'USD'
         );
 
         expect(result.wasReconciled).toBe(true);
@@ -266,7 +269,8 @@ describe('reconcileBullishActionRecommendation', () => {
         const result = reconcileBullishActionRecommendation(
             rec,
             entryPrice,
-            atr
+            atr,
+            'USD'
         );
 
         expect(result.wasReconciled).toBe(true);
@@ -284,7 +288,8 @@ describe('reconcileBullishActionRecommendation', () => {
         const result = reconcileBullishActionRecommendation(
             rec,
             entryPrice,
-            atr
+            atr,
+            'USD'
         );
 
         expect(result.recommendation.stopLoss).toBe(200);
@@ -489,5 +494,67 @@ describe('postProcessAnalysisWithReconcile', () => {
 
             expect(result.actionRecommendation?.planCheck).toBeUndefined();
         });
+    });
+});
+
+describe('exit text currency', () => {
+    // 실측 회귀: 원화 종목 20건 중 19건이 `목표가 $143025.73 ... 손절 $121980.70`
+    // 형태로 나왔다. 단위가 틀렸고(달러 아님), 원화에 없는 소수 정밀도를 주장한다.
+    it('formats KRW levels as rounded won, not dollars', () => {
+        const text = buildBullishExitText(
+            131000,
+            121980.69948682484,
+            [143025.73401756687],
+            'KRW'
+        );
+
+        expect(text).toContain('목표가 143,026원');
+        expect(text).toContain('손절 121,981원');
+        expect(text).not.toContain('$');
+        expect(text).not.toContain('.7');
+    });
+
+    it('keeps the pre-existing dollar format for USD', () => {
+        // 이 인자가 생기기 전 출력과 바이트 단위로 같아야 한다.
+        expect(buildBullishExitText(100, 97, [105], 'USD')).toBe(
+            '목표가 $105.00 (+5.0%)에서 익절, 손절 $97.00 (-3.0%).'
+        );
+    });
+
+    it('applies the currency to every target in a multi-target exit', () => {
+        const text = buildBullishExitText(
+            100000,
+            95000,
+            [110000, 120000],
+            'KRW'
+        );
+
+        expect(text).toContain('1차 목표 110,000원');
+        expect(text).toContain('2차 목표 120,000원');
+        expect(text).not.toContain('$');
+    });
+
+    it('threads currency from postProcessAnalysisWithReconcile', () => {
+        // SL/TP 둘 다 없어 fallback 경로를 타야 reconciledLevels가 생긴다.
+        const response = {
+            actionRecommendation: {
+                entryRecommendation: 'enter',
+                entryPrices: [100000],
+            },
+        } as unknown as Parameters<typeof postProcessAnalysisWithReconcile>[0];
+
+        const out = postProcessAnalysisWithReconcile(
+            response,
+            100000,
+            2000,
+            'KRW'
+        );
+
+        expect(out.actionRecommendation?.reconciledLevels?.exit).not.toContain(
+            '$'
+        );
+        expect(out.actionRecommendation?.reconciledLevels?.exit).toContain(
+            '원'
+        );
     });
 });

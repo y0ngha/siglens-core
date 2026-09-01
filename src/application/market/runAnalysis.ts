@@ -301,7 +301,8 @@ async function runAnalysisImpl(
     const reconciled = postProcessAnalysisWithReconcile(
         enriched,
         lastClose,
-        atr
+        atr,
+        options.currency
     );
 
     const now = new Date();

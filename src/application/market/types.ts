@@ -9,6 +9,7 @@ import { getAllowedTimeframes } from '@/domain/tier';
 import type {
     AnalysisResponse,
     AssetClass,
+    CurrencyCode,
     FilteredAnalysisResponse,
     MarketBriefingResponse,
     ModelId,
@@ -71,6 +72,23 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * adds 24/7 context. Defaults to `'equity'` for backward compatibility.
      */
     assetClass?: AssetClass;
+    /**
+     * Currency used to render prices in the generated analysis text.
+     *
+     * Supplied by the caller, which owns the exchange→currency catalog; core
+     * never infers it from the symbol (see {@link CurrencyCode}). It affects
+     * only the stop-loss and take-profit figures in `reconciledLevels.exit`.
+     * Omitted callers get `'USD'` and the exact output produced before this
+     * field existed.
+     *
+     * ⚠️ Deliberately NOT part of the analysis cache key. Currency is a fixed
+     * property of a symbol, so two requests for the same symbol cannot
+     * disagree on it, and folding it into the key would invalidate every
+     * existing entry for no benefit. The cost of that choice: entries written
+     * *before* this field existed keep the old dollar-prefixed text until
+     * their TTL expires.
+     */
+    currency?: CurrencyCode;
     /**
      * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
      * `true` requests the model's default/spec reasoning depth; `false` or
