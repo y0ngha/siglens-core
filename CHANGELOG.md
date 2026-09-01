@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.54.0](https://github.com/y0ngha/siglens-core/compare/v0.53.0...v0.54.0) (2026-09-01)
+
+
+### Bug Fixes
+
+* 손절·목표가 표기에 통화를 반영한다 ([937b3e2](https://github.com/y0ngha/siglens-core/commit/937b3e253c3419aadfe6c226b1c215ef9ad5437e))
+
 # [0.53.0](https://github.com/y0ngha/siglens-core/compare/v0.52.0...v0.53.0) (2026-08-30)
 
 
