@@ -94,7 +94,15 @@ import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
-import { formatNullableNumber } from '@/domain/analysis/promptFormat';
+import {
+    formatNullableNumber,
+    TIMEFRAME_LABEL,
+} from '@/domain/analysis/promptFormat';
+import {
+    selectPriorAnalyses,
+    type PriorAnalysis,
+} from '@/domain/analysis/priorAnalysis';
+import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 
 type SkillGroupKey = SkillType | 'regular';
 
@@ -155,15 +163,6 @@ const SMC_MAX_FAIR_VALUE_GAPS = 5;
 const SMC_MAX_STRUCTURE_BREAKS = 3;
 const SMC_MAX_EQUAL_LEVELS = 3;
 const SMC_MAX_SWING_POINTS = 5;
-
-const TIMEFRAME_LABEL: Record<Timeframe, string> = {
-    '5Min': '5-Minute',
-    '15Min': '15-Minute',
-    '30Min': '30-Minute',
-    '1Hour': '1-Hour',
-    '4Hour': '4-Hour',
-    '1Day': 'Daily',
-};
 
 const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
     '5Min': 'Short-term chart. Combine indicator signals with volume confirmation before acting.',
@@ -1832,6 +1831,19 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   {@link DEFAULT_ANALYSIS_LOCALE} (`ko`), which produces a byte-identical
  *   prompt to the one this builder emitted before the parameter existed —
  *   that byte identity is what keeps the existing Korean analysis cache valid.
+ * @param priorAnalyses - Optional history of past analyses for this symbol +
+ *   timeframe, supplied by the consumer (siglens / siglens-trader) from its
+ *   own storage. When provided, narrowed via {@link selectPriorAnalyses} (bar
+ *   anchor, per-bar dedup, newest-first, capped at
+ *   {@link PRIOR_ANALYSIS_LIMIT}) and rendered via
+ *   {@link formatPriorAnalysisSection} — into `dynamic` only, never `stable`,
+ *   for the same reason as `positionBucket` above: a per-call value here
+ *   would destroy the byte-cacheable stable prefix shared across every
+ *   caller. It also never reaches skill selection — it is computed
+ *   independently of {@link buildSkillSelectionContext} / {@link selectSkills}
+ *   and cannot change which skills get injected into a prompt. Omitting it
+ *   (or passing an empty array) produces a byte-identical prompt to the one
+ *   this builder emitted before the parameter existed.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
@@ -1847,7 +1859,8 @@ export function buildAnalysisPrompt(
     fearGreed?: FearGreedSnapshot,
     assetClass: AssetClass = 'equity',
     positionBucket?: PositionBucket,
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    priorAnalyses?: readonly PriorAnalysis[]
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1928,6 +1941,21 @@ export function buildAnalysisPrompt(
         ? formatPositionHintSection(positionBucket)
         : '';
 
+    // Computed once here, like `positionHint` above, so the section array
+    // below can filter on the rendered result directly. `selectPriorAnalyses`
+    // narrows `priorAnalyses` to what's worth rendering (bar anchor, dedup,
+    // newest-first, capped); `formatPriorAnalysisSection` returns `''` when
+    // there is nothing left to render (empty history, or a history that
+    // doesn't anchor to any bar). Deliberately NOT threaded into
+    // `selectionContext` / `selectSkills` above — history must never change
+    // which skills get injected.
+    const priorAnalysisSection = formatPriorAnalysisSection(
+        selectPriorAnalyses(priorAnalyses ?? [], bars),
+        bars,
+        symbol,
+        timeframe
+    );
+
     // Faithful reproduction of the v0.31 production section order (see
     // `git show main:src/domain/analysis/prompt.ts`'s `sections` array),
     // minus the combined skill-content block (now split: `core` digests live
@@ -1958,6 +1986,10 @@ export function buildAnalysisPrompt(
             ? [ATR_EXTREME_SIZING_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
+        // Only push a non-empty section so an empty/unmatched history
+        // doesn't inject a stray blank entry that would double up the
+        // `\n\n` separator on join below (same guard as `positionHint`).
+        ...(priorAnalysisSection !== '' ? [priorAnalysisSection] : []),
         // Only push a non-empty hint so an unrecognized bucket (empty
         // `positionHint`) doesn't inject a stray blank entry that would
         // double up the `\n\n` separator on join below.

@@ -3,6 +3,7 @@ import {
     buildAnalysisCacheKey,
     buildFundamentalCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
+    FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
     PROMPT_TEMPLATE_VERSION,
     CACHE_KEY_SCHEMA_VERSION,
 } from '@/infrastructure/cache/config';
@@ -141,7 +142,7 @@ describe('chart cache key folds the skill fingerprint', () => {
 describe('fundamental cache key folds the skill fingerprint', () => {
     it('omits the fingerprint segment when none is passed', () => {
         expect(buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro')).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${PROMPT_TEMPLATE_VERSION}`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`
         );
     });
 

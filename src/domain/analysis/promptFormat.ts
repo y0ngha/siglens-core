@@ -6,6 +6,26 @@
  * injection into prompt templates.
  */
 
+import type { Timeframe } from '@/domain/types';
+
+/**
+ * Human-readable timeframe labels used in prompt headers.
+ *
+ * Lives here rather than in `prompt.ts` so that both the technical prompt
+ * builder and `priorAnalysisSection.ts` can read the same map without the two
+ * modules importing each other — a cycle that would otherwise form, since the
+ * prompt builder also imports the prior-analysis renderer. `promptFormat.ts`
+ * has no imports of its own, so it is the natural neutral home.
+ */
+export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
+    '5Min': '5-Minute',
+    '15Min': '15-Minute',
+    '30Min': '30-Minute',
+    '1Hour': '1-Hour',
+    '4Hour': '4-Hour',
+    '1Day': 'Daily',
+};
+
 /**
  * Format a nullable number for prompt injection.
  *

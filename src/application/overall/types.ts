@@ -21,6 +21,7 @@ import type {
     AnalysisUsageOptions,
 } from '@/application/usage/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
+import type { PriorAnalysis } from '@/domain/analysis/priorAnalysis';
 import type {
     AnalysisResponse,
     AssetClass,
@@ -87,6 +88,28 @@ export interface OverallDependencyInputs {
      * same cache key this request used before the field existed.
      */
     locale?: AnalysisLocale;
+    /**
+     * Prior-analysis-context history for this symbol + timeframe, supplied
+     * by the consumer (siglens / siglens-trader) from its own database —
+     * mirrors `SubmitAnalysisOptions.priorAnalyses`, but feeds the OVERALL
+     * prompt's own `## Prior Analyses` section directly (via
+     * `buildOverallAnalysisPrompt`'s `priorAnalyses` param), not the
+     * technical axis resolved inside this pipeline (`technical` above has
+     * no `priorAnalyses` field of its own — the two axes' history sections
+     * are independent). Size the query with `analysisHistoryQuery(timeframe)`
+     * before fetching. Both axes take the same lookback: `OVERALL_CACHE_TTL_SECONDS`
+     * governs the *recency* exclusion, which core applies itself in stage 1,
+     * not how far back the consumer must read.
+     *
+     * Narrowed twice before reaching the LLM, same two-stage design as the
+     * technical axis: once for the cache key (folded into `inputHash` via a
+     * `narrowPriorAnalysesForCacheKey` fingerprint, since
+     * `buildOverallCacheKey` has no dedicated history parameter), then again
+     * bar-anchored for the prompt. Omitting this field (or supplying `[]`)
+     * produces a prompt AND a cache key byte-identical to what this call
+     * produced before this field existed.
+     */
+    priorAnalyses?: readonly PriorAnalysis[];
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
     /**

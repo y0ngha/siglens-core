@@ -5,6 +5,7 @@ import type {
     AnalysisUsageOptions,
 } from '@/application/usage/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
+import type { PriorAnalysis } from '@/domain/analysis/priorAnalysis';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -124,6 +125,29 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * forwards whatever value it is given.
      */
     positionBucket?: PositionBucket;
+    /**
+     * Prior-analysis-context history for this symbol + timeframe, supplied
+     * by the consumer (siglens / siglens-trader) from its own database —
+     * core has no storage of its own for past analyses. Size the query with
+     * {@link analysisHistoryQuery} before fetching.
+     *
+     * Core narrows this list TWICE before any of it reaches the LLM: once
+     * for the cache key (drops entries generated inside the CURRENT cache
+     * window, so one user's freshly-finished analysis cannot invalidate
+     * every other user's cache entry mid-window — see
+     * `narrowPriorAnalysesForCacheKey`), then again for the prompt itself
+     * (bar-anchored, deduped to one entry per bar, capped at
+     * `PRIOR_ANALYSIS_LIMIT` — see `selectPriorAnalyses`). Both narrowings
+     * are internal; the consumer only supplies the raw history and reads
+     * the result.
+     *
+     * Omitting this field (or supplying `[]`) produces a prompt AND a cache
+     * key that are BYTE-IDENTICAL to what this call produced before this
+     * field existed — no `## Prior Analyses` section is rendered, and no
+     * `:hist=<fingerprint>` key segment is appended (see
+     * {@link buildAnalysisCacheKey}'s `historyFingerprint` param).
+     */
+    priorAnalyses?: readonly PriorAnalysis[];
     /**
      * Cancellation signal for the in-flight LLM call (used by `runAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped SSE

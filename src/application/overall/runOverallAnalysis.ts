@@ -36,6 +36,7 @@ import {
 import type {
     ActiveModelId,
     AnalysisResponse,
+    Bar,
     FearGreedSnapshot,
     FundamentalAnalysisResponse,
     OptionsAnalysisResponse,
@@ -46,6 +47,7 @@ import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
 import {
     buildOverallCacheKey,
     buildOverallPeekCacheKey,
+    narrowPriorAnalysesForCacheKey,
     OVERALL_CACHE_TTL_SECONDS,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -421,6 +423,27 @@ export async function runOverallAnalysis(
     // ── 7. Hash combined inputs and check overall cache ──
     const stableTechnical = stripVolatileTechnicalFields(technicalData);
     const stableOptions = stripVolatileOptionsFields(optionsData);
+    // Stage 1 of the two-stage prior-analysis narrowing (see
+    // `narrowPriorAnalysesForCacheKey`'s doc). Unlike the technical axis
+    // (`runAnalysis.ts`), the overall axis has no dedicated
+    // `historyFingerprint` parameter on its cache-key builder —
+    // `buildOverallCacheKey` already takes a caller-computed `inputHash`, so
+    // the fingerprint folds into the SAME object literal below (`ph` key)
+    // instead of a new key-builder parameter. `occurredAt` (this request's
+    // resolved reference time — `options.now ?? usage?.occurredAt ?? new
+    // Date()`, computed once at the top of this function) is reused here
+    // rather than a fresh `new Date()`, and reused again unchanged for the
+    // `buildOverallAnalysisPrompt` call in step 9 via `priorAnalysisCandidates`
+    // — one `narrowPriorAnalysesForCacheKey` call feeds both the key and the
+    // prompt, so they cannot disagree about which entries are "in the window".
+    const {
+        candidates: priorAnalysisCandidates,
+        fingerprint: historyFingerprint,
+    } = narrowPriorAnalysesForCacheKey(
+        options.priorAnalyses ?? [],
+        OVERALL_CACHE_TTL_SECONDS,
+        occurredAt
+    );
     const inputHash = hashAnalysisInput(
         JSON.stringify({
             t: stableTechnical,
@@ -428,6 +451,7 @@ export async function runOverallAnalysis(
             n: newsData,
             o: stableOptions,
             fin: options.financialsScorecard,
+            ph: historyFingerprint,
         })
     );
     const cacheKey = buildOverallCacheKey(
@@ -467,20 +491,59 @@ export async function runOverallAnalysis(
     }
 
     const fmpSymbol = technicalOptions.fmpSymbol;
-    const fearGreed: FearGreedSnapshot | null = await fetchBarsWithIndicators(
-        marketDataProvider,
-        symbol,
-        '1Day',
-        fmpSymbol
-    )
-        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
-        .catch(error => {
-            console.error(
-                '[RunOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
-                error
-            );
-            return null;
-        });
+
+    // 8b. Bars for the prior-analysis section (`buildOverallAnalysisPrompt`'s
+    // `bars` param). This function does not otherwise hold the subject
+    // symbol's bars at the OVERALL timeframe — the Fear & Greed fetch below
+    // is always '1Day' and may be a different series entirely.
+    //
+    // Gated on there being candidates to render. `fetchBarsWithIndicators` is
+    // a pass-through to `provider.getBars()` with NO caching inside core —
+    // whether it is a cheap repeat call is a property of the injected
+    // `MarketDataProvider`, which core cannot assume. Without this gate every
+    // overall cache miss would pay a bar fetch plus a full
+    // `calculateIndicators` pass whose indicators are then discarded, even
+    // though no consumer supplies `priorAnalyses` yet.
+    //
+    // Issued together with the Fear & Greed fetch rather than after it: the
+    // two are independent, and serialising them would add a full round trip
+    // to every cold overall request.
+    //
+    // Failure posture matches Fear & Greed's — logged and swallowed, leaving
+    // `undefined` bars, which makes `buildOverallAnalysisPrompt` skip the
+    // prior-analysis section entirely rather than failing the analysis.
+    const priorAnalysisBarsPromise: Promise<Bar[] | undefined> =
+        priorAnalysisCandidates.length > 0
+            ? fetchBarsWithIndicators(
+                  marketDataProvider,
+                  symbol,
+                  timeframe,
+                  fmpSymbol
+              )
+                  .then(d => d.bars)
+                  .catch(error => {
+                      console.error(
+                          '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
+                          error
+                      );
+                      return undefined;
+                  })
+            : Promise.resolve(undefined);
+
+    const [fearGreed, priorAnalysisBars] = await Promise.all([
+        fetchBarsWithIndicators(marketDataProvider, symbol, '1Day', fmpSymbol)
+            .then(d =>
+                computeFearGreedIndex(d.bars, d.indicators.buySellVolume)
+            )
+            .catch(error => {
+                console.error(
+                    '[RunOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                    error
+                );
+                return null;
+            }) as Promise<FearGreedSnapshot | null>,
+        priorAnalysisBarsPromise,
+    ]);
 
     // ── 9. Build overall prompt ──
     const optionsOiStale = options.optionsOiStale ?? false;
@@ -497,7 +560,9 @@ export async function runOverallAnalysis(
         optionsOiStale,
         options.financialsScorecard,
         options.assetClass ?? 'equity',
-        locale
+        locale,
+        priorAnalysisBars,
+        priorAnalysisCandidates
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.
