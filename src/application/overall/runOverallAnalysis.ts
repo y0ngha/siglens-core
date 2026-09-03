@@ -493,8 +493,7 @@ export async function runOverallAnalysis(
 
     // 8b. Bars for the prior-analysis section (`buildOverallAnalysisPrompt`'s
     // `bars` param). This function does not otherwise hold the subject
-    // symbol's bars at the OVERALL timeframe — the Fear & Greed fetch below
-    // is always '1Day' and may be a different series entirely.
+    // symbol's bars at the OVERALL timeframe.
     //
     // Gated on there being candidates to render. `fetchBarsWithIndicators` is
     // a pass-through to `provider.getBars()` with NO caching inside core —
@@ -504,19 +503,6 @@ export async function runOverallAnalysis(
     // `calculateIndicators` pass whose indicators are then discarded, even
     // though no consumer supplies `priorAnalyses` yet.
     //
-    // Issued together with the Fear & Greed fetch rather than after it: the
-    // two are independent, and serialising them would add a full round trip
-    // to every cold overall request.
-    //
-    // Failure posture matches Fear & Greed's — logged and swallowed, leaving
-    // `undefined` bars, which makes `buildOverallAnalysisPrompt` skip the
-    // prior-analysis section entirely rather than failing the analysis.
-    // The Fear & Greed snapshot always needs the DAILY series, whatever the
-    // overall request's own timeframe is. Held as one promise so the
-    // prior-analysis path can share it: on a '1Day' overall request the two
-    // fetches would otherwise carry byte-identical arguments and, since
-    // `fetchBarsWithIndicators` does not cache, pay for the same upstream call
-    // and the same `calculateIndicators` pass twice.
     // The Fear & Greed snapshot always needs the DAILY series, whatever the
     // overall request's own timeframe is. Held as one promise so the
     // prior-analysis path can share it: on a '1Day' overall request the two

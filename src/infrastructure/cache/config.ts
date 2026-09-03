@@ -17,16 +17,16 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import {
+    TIMEFRAME_BARS_LIMIT,
+    TIMEFRAME_LOOKBACK_DAYS,
+} from '@/domain/constants/market';
+import {
     MS_PER_DAY,
     MS_PER_SECOND,
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
-import {
-    TIMEFRAME_BARS_LIMIT,
-    TIMEFRAME_LOOKBACK_DAYS,
-} from '@/domain/constants/market';
 import {
     computeSecondsUntilCacheExpiry,
     secondsUntilNextEtRegularOpen,
