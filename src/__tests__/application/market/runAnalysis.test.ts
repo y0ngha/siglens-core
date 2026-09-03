@@ -52,7 +52,10 @@ vi.mock('@/infrastructure/skills/sampling', async importOriginal => {
 import { runAnalysis } from '@/application/market/runAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { computeEffectiveTtl } from '@/infrastructure/cache/config';
+import {
+    computeEffectiveTtl,
+    PROMPT_TEMPLATE_VERSION,
+} from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -311,6 +314,124 @@ describe('runAnalysis', () => {
         });
     });
 
+    describe('onPromptAssembled', () => {
+        it('cache miss → called once with the exact system/stable/dynamic the provider call receives', async () => {
+            const onPromptAssembled = vi.fn();
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, onPromptAssembled }
+            );
+
+            expect(onPromptAssembled).toHaveBeenCalledTimes(1);
+            const providerArgs = mockCallAnalysisAi.mock.calls[0][0];
+            expect(onPromptAssembled).toHaveBeenCalledWith({
+                system: providerArgs.system,
+                stable: 'mock-stable',
+                dynamic: providerArgs.prompt,
+                promptVersion: PROMPT_TEMPLATE_VERSION,
+            });
+        });
+
+        it('cache hit → NOT called', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+            const onPromptAssembled = vi.fn();
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, onPromptAssembled }
+            );
+
+            expect(onPromptAssembled).not.toHaveBeenCalled();
+        });
+
+        it('a throwing callback does not fail the analysis or change the result', async () => {
+            const onPromptAssembled = vi.fn(() => {
+                throw new Error('persistence boom');
+            });
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            const withCallback = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, onPromptAssembled }
+            );
+
+            mockCacheGet.mockClear();
+            const withoutCallback = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(onPromptAssembled).toHaveBeenCalledTimes(1);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('onPromptAssembled'),
+                expect.any(Error)
+            );
+            // `analyzedAt` is stamped per call from the wall clock, so a
+            // whole-object comparison flakes whenever the two awaited calls
+            // straddle a millisecond. Compare everything else.
+            const stripStamp = (r: unknown) => {
+                const { result, ...rest } = r as {
+                    result?: { analyzedAt?: string };
+                };
+                if (result === undefined) return rest;
+                const { analyzedAt: _dropped, ...resultRest } = result;
+                return { ...rest, result: resultRest };
+            };
+            expect(stripStamp(withCallback)).toEqual(
+                stripStamp(withoutCallback)
+            );
+
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('omitting it leaves the result and the cache key unchanged', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            const keyWithoutCallback = mockCacheGet.mock.calls[0]![0];
+
+            mockCacheGet.mockClear();
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    onPromptAssembled: vi.fn(),
+                }
+            );
+            const keyWithCallback = mockCacheGet.mock.calls[0]![0];
+
+            expect(keyWithCallback).toEqual(keyWithoutCallback);
+        });
+    });
+
     describe('cache write', () => {
         it('result is written to cache with TTL from computeEffectiveTtl', async () => {
             await runAnalysis(
@@ -399,6 +520,51 @@ describe('runAnalysis', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
             expect(r1.status).toBe('done');
             expect(r2.status).toBe('done');
+        });
+
+        it('동시 호출이어도 onPromptAssembled는 생성 1회당 한 번만 발화한다', async () => {
+            // 회귀 가드. 콜백이 dedup 팩토리 **밖**에 있으면 호출자마다 한 번씩
+            // 발화해, 실제 생성은 1회인데 기록은 N개가 되고 — 더 나쁘게 —
+            // 진 호출자에게는 **전송된 적 없는** 프롬프트가 전달된다(그가 받는
+            // 결과는 이긴 호출자의 것). 소비자가 "이 행을 만든 프롬프트"로
+            // 저장하면 중복 + 오귀속이 된다.
+            let resolveAi!: (value: string) => void;
+            const pendingAi = new Promise<string>(res => {
+                resolveAi = res;
+            });
+            mockCallAnalysisAi.mockReturnValueOnce(pendingAi);
+
+            const onPromptAssembled = vi.fn();
+            const call = () =>
+                runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider, onPromptAssembled }
+                );
+
+            const p1 = call();
+            const p2 = call();
+
+            resolveAi(JSON.stringify(mockRawResult));
+            await Promise.all([p1, p2]);
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(onPromptAssembled).toHaveBeenCalledTimes(1);
+
+            // 그리고 캡처된 프롬프트는 실제로 전송된 바로 그것이어야 한다.
+            const sent = mockCallAnalysisAi.mock.calls[0]![0] as {
+                prompt: string;
+                system: string;
+            };
+            const captured = onPromptAssembled.mock.calls[0]![0] as {
+                dynamic: string;
+                system: string;
+            };
+            expect(captured.dynamic).toBe(sent.prompt);
+            expect(captured.system).toBe(sent.system);
         });
     });
 

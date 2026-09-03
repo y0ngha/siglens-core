@@ -324,6 +324,77 @@ describe('runOverallAnalysis', () => {
         });
     });
 
+    describe('onPromptAssembled', () => {
+        it('cache miss → called once with the exact system/stable/dynamic the provider call receives', async () => {
+            const onPromptAssembled = vi.fn();
+
+            await runOverallAnalysis({ ...baseOptions(), onPromptAssembled });
+
+            expect(onPromptAssembled).toHaveBeenCalledTimes(1);
+            const providerArgs = mockCallAnalysisAi.mock.calls[0]![0] as {
+                system: string;
+                prompt: string;
+            };
+            expect(onPromptAssembled).toHaveBeenCalledWith({
+                system: providerArgs.system,
+                // Design C: no skills catalog on the overall axis, so `stable`
+                // is always ''.
+                stable: '',
+                dynamic: providerArgs.prompt,
+                promptVersion: expect.any(String),
+            });
+        });
+
+        it('cache hit → NOT called', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockOverallResult);
+            const onPromptAssembled = vi.fn();
+
+            await runOverallAnalysis({ ...baseOptions(), onPromptAssembled });
+
+            expect(onPromptAssembled).not.toHaveBeenCalled();
+        });
+
+        it('a throwing callback does not fail the analysis or change the result', async () => {
+            const onPromptAssembled = vi.fn(() => {
+                throw new Error('persistence boom');
+            });
+            const consoleErrorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            const withCallback = await runOverallAnalysis({
+                ...baseOptions(),
+                onPromptAssembled,
+            });
+
+            mockCacheGet.mockClear();
+            const withoutCallback = await runOverallAnalysis(baseOptions());
+
+            expect(onPromptAssembled).toHaveBeenCalledTimes(1);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('onPromptAssembled'),
+                expect.any(Error)
+            );
+            expect(withCallback).toEqual(withoutCallback);
+
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('omitting it leaves the result and the cache key unchanged', async () => {
+            await runOverallAnalysis(baseOptions());
+            const keyWithoutCallback = mockCacheGet.mock.calls[0]![0];
+
+            mockCacheGet.mockClear();
+            await runOverallAnalysis({
+                ...baseOptions(),
+                onPromptAssembled: vi.fn(),
+            });
+            const keyWithCallback = mockCacheGet.mock.calls[0]![0];
+
+            expect(keyWithCallback).toEqual(keyWithoutCallback);
+        });
+    });
+
     describe('in-flight 중복 제거', () => {
         it('같은 캐시 키 동시 호출은 LLM을 1회만 태운다', async () => {
             let resolveAi: (value: string) => void = () => {};
@@ -344,6 +415,39 @@ describe('runOverallAnalysis', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
             expect(a.status).toBe('done');
             expect(b.status).toBe('done');
+        });
+
+        it('동시 호출이어도 onPromptAssembled는 생성 1회당 한 번만 발화한다', async () => {
+            // 회귀 가드 — `runAnalysis.test.ts`의 동명 테스트와 같은 이유.
+            let resolveAi: (value: string) => void = () => {};
+            mockCallAnalysisAi.mockReturnValueOnce(
+                new Promise<string>(resolve => {
+                    resolveAi = resolve;
+                })
+            );
+
+            const onPromptAssembled = vi.fn();
+            const both = Promise.all([
+                runOverallAnalysis({ ...baseOptions(), onPromptAssembled }),
+                runOverallAnalysis({ ...baseOptions(), onPromptAssembled }),
+            ]);
+
+            resolveAi(JSON.stringify(mockOverallResult));
+            await both;
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(onPromptAssembled).toHaveBeenCalledTimes(1);
+
+            const sent = mockCallAnalysisAi.mock.calls[0]![0] as {
+                prompt: string;
+                system: string;
+            };
+            const captured = onPromptAssembled.mock.calls[0]![0] as {
+                dynamic: string;
+                system: string;
+            };
+            expect(captured.dynamic).toBe(sent.prompt);
+            expect(captured.system).toBe(sent.system);
         });
     });
 
