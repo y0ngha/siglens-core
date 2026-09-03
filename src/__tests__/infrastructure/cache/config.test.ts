@@ -5,6 +5,7 @@ import {
 } from '@/domain/constants/time';
 import {
     MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
+    analysisHistoryQuery,
     ANALYSIS_CACHE_TTL,
     BARS_OFFHOURS_TTL_CEILING_SECONDS,
     BARS_OPEN_TTL_SECONDS,
@@ -29,7 +30,9 @@ import {
     FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     MARKET_BRIEFING_CACHE_TTL,
+    narrowPriorAnalysesForCacheKey,
     NEWS_CACHE_TTL_SECONDS,
+    FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
     NEWS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
     PROMPT_TEMPLATE_VERSION,
@@ -38,8 +41,21 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
-import type { PositionBucket } from '@/domain/types';
+import {
+    PRIOR_ANALYSIS_LIMIT,
+    PRIOR_ANALYSIS_SLACK,
+} from '@/domain/analysis/priorAnalysis';
+import type { PositionBucket, PriorAnalysis } from '@/domain/types';
 import { describe, expect, it } from 'vitest';
+
+/** Minimal `PriorAnalysis` fixture — only `generatedAt` matters to the cache-key narrowing under test. */
+function priorAnalysisAt(generatedAt: Date): PriorAnalysis {
+    return {
+        generatedAt,
+        trend: 'bullish',
+        riskLevel: 'medium',
+    };
+}
 
 describe('cache config constants', () => {
     it('ANALYSIS_CACHE_TTL values', () => {
@@ -190,7 +206,7 @@ describe('new analysis cache keys', () => {
     it('returns {v}:analysis:fundamental:{symbol}:{model}:{promptVersion} format', () => {
         const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
         expect(a).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${PROMPT_TEMPLATE_VERSION}`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`
         );
     });
 
@@ -226,7 +242,7 @@ describe('new analysis cache keys', () => {
     });
 });
 
-describe('PROMPT_TEMPLATE_VERSION in technical & fundamental keys', () => {
+describe('prompt-template versions in technical & fundamental keys', () => {
     it('is a non-empty string, separate from CACHE_KEY_SCHEMA_VERSION', () => {
         expect(typeof PROMPT_TEMPLATE_VERSION).toBe('string');
         expect(PROMPT_TEMPLATE_VERSION.length).toBeGreaterThan(0);
@@ -239,9 +255,24 @@ describe('PROMPT_TEMPLATE_VERSION in technical & fundamental keys', () => {
         expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
     });
 
-    it('fundamental key ends with the prompt-template version segment', () => {
+    it('fundamental key ends with its OWN prompt-template version segment', () => {
         const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
-        expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
+        expect(key.endsWith(`:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`)).toBe(
+            true
+        );
+    });
+
+    it('fundamental is decoupled from the technical prompt version', () => {
+        // Regression guard for the coupling this split removed: while the two
+        // constants shared a value, every technical prompt bump cold-started
+        // the fundamental cache fleet (1-day TTL, ~13 upstream calls per miss)
+        // for a change that altered zero fundamental prompt bytes. If someone
+        // ever points fundamental back at PROMPT_TEMPLATE_VERSION, this fails.
+        expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).not.toBe(
+            PROMPT_TEMPLATE_VERSION
+        );
+        const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        expect(key).not.toContain(`:${PROMPT_TEMPLATE_VERSION}`);
     });
 });
 
@@ -623,7 +654,7 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         );
     });
 
-    it('PROMPT_TEMPLATE_VERSION은 pure-Korean 규칙 + holder-consistent 재구성으로 p8로 bump된다', () => {
+    it('PROMPT_TEMPLATE_VERSION은 pure-Korean 규칙 + holder-consistent 재구성으로 p8로 bump되었고, prior-analysis-context 섹션으로 p9로 다시 bump된다', () => {
         // The hint's *introduction* did not bump the version (it only appended a
         // brand-new `:pos=<bucket>` namespace). p7 reframed the hint to an
         // instructive position-management perspective. p8 ships two more
@@ -631,9 +662,13 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // output-language rule in buildAnalysisRequest, which changes bytes for
         // EVERY request, and (2) the holder-consistent reframe of
         // formatPositionHintSection (explicit holder opener, management as the
-        // primary frame). Warm entries carrying the old bytes must be
-        // invalidated — hence p8.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p8');
+        // primary frame). p9 adds the optional `## Prior Analyses` section
+        // (`buildAnalysisPrompt`'s new `priorAnalyses` param) — bytes change
+        // only for requests carrying usable history, but the constant has no
+        // per-request axis to scope the bump to, so it still cold-starts the
+        // fleet. Warm entries carrying the old bytes must be invalidated —
+        // hence p9.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p9');
     });
 });
 
@@ -789,5 +824,250 @@ describe('locale이 캐시 키에 반영될 때', () => {
             'ja'
         );
         expect(ja).toBe(`${base}:lang=ja`);
+    });
+});
+
+describe('narrowPriorAnalysesForCacheKey (prior-analysis-context, Task 5a)', () => {
+    const WINDOW_SECONDS = 300; // 5 minutes, arbitrary but representative of ANALYSIS_CACHE_TTL['5Min']
+    const NOW_MS = Date.parse('2026-01-01T00:10:00.000Z');
+    const windowStartMs = NOW_MS - WINDOW_SECONDS * 1000;
+
+    it('cutoff에 정확히 걸친 항목은 제외되고, 바로 바깥(더 과거) 항목은 포함된다', () => {
+        const now = new Date(NOW_MS);
+        const atCutoff = priorAnalysisAt(new Date(windowStartMs));
+        const justOutside = priorAnalysisAt(new Date(windowStartMs - 1));
+
+        const { candidates } = narrowPriorAnalysesForCacheKey(
+            [atCutoff, justOutside],
+            WINDOW_SECONDS,
+            now
+        );
+
+        expect(candidates).toEqual([justOutside]);
+    });
+
+    it(`생존자를 PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK(${PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK})개로 캡핑한다`, () => {
+        const now = new Date(NOW_MS);
+        const cap = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
+        const entries = Array.from({ length: cap + 5 }, (_, i) =>
+            priorAnalysisAt(new Date(windowStartMs - 1000 * (i + 1)))
+        );
+
+        const { candidates } = narrowPriorAnalysesForCacheKey(
+            entries,
+            WINDOW_SECONDS,
+            now
+        );
+
+        expect(candidates).toHaveLength(cap);
+    });
+
+    it('생존자를 newest-first로 정렬한다', () => {
+        const now = new Date(NOW_MS);
+        const older = priorAnalysisAt(new Date(windowStartMs - 5000));
+        const newer = priorAnalysisAt(new Date(windowStartMs - 1000));
+
+        const { candidates } = narrowPriorAnalysesForCacheKey(
+            [older, newer],
+            WINDOW_SECONDS,
+            now
+        );
+
+        expect(candidates).toEqual([newer, older]);
+    });
+
+    it('빈 입력이면 fingerprint가 undefined다', () => {
+        const { candidates, fingerprint } = narrowPriorAnalysesForCacheKey(
+            [],
+            WINDOW_SECONDS,
+            new Date(NOW_MS)
+        );
+
+        expect(candidates).toEqual([]);
+        expect(fingerprint).toBeUndefined();
+    });
+
+    it('전부 현재 윈도우 안이면(생존자 0명) fingerprint가 undefined다', () => {
+        const now = new Date(NOW_MS);
+        const insideWindow = priorAnalysisAt(new Date(windowStartMs + 1000));
+
+        const { candidates, fingerprint } = narrowPriorAnalysesForCacheKey(
+            [insideWindow],
+            WINDOW_SECONDS,
+            now
+        );
+
+        expect(candidates).toEqual([]);
+        expect(fingerprint).toBeUndefined();
+    });
+
+    it('같은 윈도우 내에서 now가 이동해도(경계를 넘지 않으면) fingerprint는 그대로다', () => {
+        const farPast = priorAnalysisAt(new Date(NOW_MS - 10_000_000));
+        const now1 = new Date(NOW_MS);
+        const now2 = new Date(NOW_MS + 1000);
+
+        const r1 = narrowPriorAnalysesForCacheKey(
+            [farPast],
+            WINDOW_SECONDS,
+            now1
+        );
+        const r2 = narrowPriorAnalysesForCacheKey(
+            [farPast],
+            WINDOW_SECONDS,
+            now2
+        );
+
+        expect(r1.fingerprint).toBeDefined();
+        expect(r2.fingerprint).toBe(r1.fingerprint);
+    });
+
+    it('항목이 현재 윈도우를 벗어나면(ages out) 생존자 집합이 바뀌어 fingerprint도 바뀐다', () => {
+        const entryMs = NOW_MS;
+        const entry = priorAnalysisAt(new Date(entryMs));
+
+        // Still inside the window at this `now` — excluded, no fingerprint.
+        const now1 = new Date(entryMs + (WINDOW_SECONDS * 1000) / 2);
+        const r1 = narrowPriorAnalysesForCacheKey(
+            [entry],
+            WINDOW_SECONDS,
+            now1
+        );
+        expect(r1.fingerprint).toBeUndefined();
+
+        // The window has rolled past `entry.generatedAt` — now included.
+        const now2 = new Date(entryMs + WINDOW_SECONDS * 1000 + 1000);
+        const r2 = narrowPriorAnalysesForCacheKey(
+            [entry],
+            WINDOW_SECONDS,
+            now2
+        );
+        expect(r2.fingerprint).toBeDefined();
+        expect(r2.fingerprint).not.toBe(r1.fingerprint);
+    });
+});
+
+describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-context, Task 5b)', () => {
+    it('historyFingerprint 생략 시 기존 키와 byte-identical하다', () => {
+        const legacy = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash'
+        );
+        const omitted = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined
+        );
+        expect(omitted).toBe(legacy);
+    });
+
+    it('historyFingerprint은 locale suffix 뒤(맨 끝)에 붙는다', () => {
+        const base = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            true,
+            'profit',
+            'en'
+        );
+        const historied = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-2.5-flash',
+            undefined,
+            true,
+            'profit',
+            'en',
+            'fp1'
+        );
+        expect(historied).toBe(`${base}:hist=fp1`);
+    });
+});
+
+describe('analysisHistoryQuery', () => {
+    const HOUR_MS = 60 * 60 * 1000;
+    const DAY_MS = 24 * HOUR_MS;
+
+    /**
+     * Real market gaps the window must clear. These are measured from a
+     * session's 16:00 ET close to the next session's 09:30 ET open, which is
+     * what actually decides whether the prior session's closing analysis
+     * survives the consumer's `WHERE` clause.
+     */
+    const OVERNIGHT_GAP_MS = 17.583 * HOUR_MS; // Fri→Mon excluded: plain weeknight
+    const WEEKEND_GAP_MS = 65.5 * HOUR_MS; // Friday close → Monday open
+    const LONG_WEEKEND_GAP_MS = 89.5 * HOUR_MS; // holiday Monday → Tuesday open
+
+    // These assertions deliberately do NOT recompute the implementation's
+    // formula from the same constants — that pins whatever the code currently
+    // does, including a wrong sizing, and passes regardless. They assert
+    // against independently measured market gaps instead.
+
+    it('every intraday timeframe clears a long-weekend gap', () => {
+        // The failure this guards is silent and weekly: if the window is
+        // shorter than the gap, the consumer's own SQL drops the prior
+        // session's analyses and `selectPriorAnalyses` never sees them, so the
+        // feature renders nothing all day every Monday with no error anywhere.
+        for (const tf of [
+            '5Min',
+            '15Min',
+            '30Min',
+            '1Hour',
+            '4Hour',
+        ] as const) {
+            expect(analysisHistoryQuery(tf).sinceMs).toBeGreaterThan(
+                LONG_WEEKEND_GAP_MS
+            );
+        }
+    });
+
+    it('5Min clears the single-overnight case its own rationale cites', () => {
+        // 16:00 ET → 09:35 ET is 17h35m, not the looser 17.5h a previous
+        // revision asserted; the implementation used to clear that looser
+        // bound by 1ms and fail this one.
+        expect(analysisHistoryQuery('5Min').sinceMs).toBeGreaterThan(
+            OVERNIGHT_GAP_MS
+        );
+        expect(analysisHistoryQuery('5Min').sinceMs).toBeGreaterThan(
+            WEEKEND_GAP_MS
+        );
+    });
+
+    it('1Day covers 21 trading days — about 30 calendar days plus holidays', () => {
+        expect(analysisHistoryQuery('1Day').sinceMs).toBeGreaterThan(
+            32 * DAY_MS
+        );
+    });
+
+    it('윈도우는 봉이 길수록 단조 증가한다', () => {
+        const windows = (
+            ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'] as const
+        ).map(tf => analysisHistoryQuery(tf).sinceMs);
+
+        for (let i = 1; i < windows.length; i++) {
+            expect(windows[i]).toBeGreaterThan(windows[i - 1]);
+        }
+    });
+
+    it('limit은 두 좁히기 단계가 쓰는 21건 캡과 같다', () => {
+        expect(analysisHistoryQuery('1Day').limit).toBe(
+            PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK
+        );
+    });
+
+    it('캐시 TTL 기반 사이징으로 되돌아가지 않는다 (회귀 가드)', () => {
+        // The original bug: sizing from ANALYSIS_CACHE_TTL gave 5Min a
+        // 1.75-hour window. Any future edit reintroducing a clock-time window
+        // fails here.
+        const cap = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
+        expect(analysisHistoryQuery('5Min').sinceMs).not.toBe(
+            ANALYSIS_CACHE_TTL['5Min'] * cap * 1000
+        );
     });
 });

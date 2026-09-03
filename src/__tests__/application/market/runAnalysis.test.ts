@@ -69,7 +69,7 @@ const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
-void buildAnalysisPrompt; // imported for the vi.mock side-effect; not directly asserted
+const mockBuildAnalysisPrompt = buildAnalysisPrompt as Mock;
 const mockComputeFearGreedIndex = computeFearGreedIndex as Mock;
 const mockEnrichAnalysisWithConfidence = enrichAnalysisWithConfidence as Mock;
 const mockPostProcessAnalysisWithReconcile =
@@ -399,6 +399,92 @@ describe('runAnalysis', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
             expect(r1.status).toBe('done');
             expect(r2.status).toBe('done');
+        });
+    });
+
+    /**
+     * `options.priorAnalyses`가 `narrowPriorAnalysesForCacheKey`(캐시 키
+     * 단계)와 `buildAnalysisPrompt`의 11번째 인자(프롬프트 단계) 양쪽에
+     * 올바르게 배선되는지, 그리고 생략했을 때 기존 캐시 키와 바이트가
+     * 같은지 확인한다 (Task 6b).
+     */
+    describe('prior-analysis-context (Task 6b)', () => {
+        it('priorAnalyses를 생략하면 캐시 키가 예전과 동일하다(:hist= 세그먼트 없음)', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            const keyArg = mockCacheGet.mock.calls[0]![0] as string;
+            expect(keyArg).not.toContain(':hist=');
+        });
+
+        it('현재 캐시 윈도우 안에서 생성된 priorAnalyses만 있으면(생존자 0명) 캐시 키가 생략 시와 동일하다', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            const omittedKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            mockCacheGet.mockClear();
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    // Generated "now" — inside the current cache window for
+                    // '1Day' (ANALYSIS_CACHE_TTL['1Day'] = 24h) — so stage 1
+                    // excludes it and the fingerprint stays undefined.
+                    priorAnalyses: [
+                        {
+                            generatedAt: new Date(),
+                            trend: 'bullish',
+                            riskLevel: 'low',
+                        },
+                    ],
+                }
+            );
+            const withRecentHistoryKey = mockCacheGet.mock
+                .calls[0]![0] as string;
+
+            expect(withRecentHistoryKey).toBe(omittedKey);
+        });
+
+        it('윈도우 밖의 priorAnalyses가 있으면 캐시 키에 :hist= 세그먼트가 붙고, buildAnalysisPrompt의 11번째 인자로 narrowed candidates가 전달된다', async () => {
+            const oldEntry = {
+                generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                trend: 'bullish' as const,
+                riskLevel: 'low' as const,
+            };
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    priorAnalyses: [oldEntry],
+                }
+            );
+
+            const keyArg = mockCacheGet.mock.calls[0]![0] as string;
+            expect(keyArg).toContain(':hist=');
+
+            const promptArgs = mockBuildAnalysisPrompt.mock.calls[0]!;
+            expect(promptArgs[10]).toEqual([oldEntry]);
         });
     });
 

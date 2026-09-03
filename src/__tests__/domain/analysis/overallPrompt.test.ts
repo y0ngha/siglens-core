@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/domain/analysis/overallPrompt';
 import type {
     AnalysisResponse,
+    Bar,
     FearGreedSnapshot,
     FinancialsScorecard,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
+    PriorAnalysis,
     Timeframe,
 } from '@/domain/types';
 
@@ -888,6 +890,192 @@ describe('buildOverallAnalysisPrompt', () => {
 
             expect(prompt).toContain('시그널: 없음');
         });
+    });
+});
+
+describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-context spec)', () => {
+    /** Bars sorted oldest-first, 1 day apart, starting at a fixed Unix-seconds base. */
+    const makePriorBars = (
+        count: number,
+        startTime = 1_700_000_000,
+        intervalSeconds = 86_400
+    ): Bar[] =>
+        Array.from({ length: count }, (_, i) => ({
+            time: startTime + i * intervalSeconds,
+            open: 100,
+            high: 101,
+            low: 99,
+            close: 100,
+            volume: 1000,
+        }));
+
+    const priorEntry = (
+        bars: Bar[],
+        barIndex: number,
+        overrides?: Partial<PriorAnalysis>
+    ): PriorAnalysis => ({
+        generatedAt: new Date(bars[barIndex].time * 1000),
+        trend: 'bullish',
+        riskLevel: 'medium',
+        ...overrides,
+    });
+
+    // Shared arg prefix through `locale` — identical to every other call site
+    // in this file (symbol, companyName, technical, fundamental, news,
+    // timeframe, fearGreed, options, optionsOiStale, financials, assetClass,
+    // locale). `bars` / `priorAnalyses` are the two NEW trailing params.
+    const baseArgs = [
+        TEST_SYMBOL,
+        TEST_COMPANY_NAME,
+        MOCK_TECHNICAL,
+        MOCK_FUNDAMENTAL,
+        MOCK_NEWS,
+        '1Day' as Timeframe,
+        undefined,
+        null,
+        false,
+        null,
+        'equity' as const,
+        'ko' as const,
+    ] as const;
+
+    it('omitting both bars and priorAnalyses is byte-identical to the pre-existing 12-arg call', () => {
+        const preExisting = buildOverallAnalysisPromptRaw(...baseArgs);
+        const explicitlyUndefined = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            undefined,
+            undefined
+        );
+        expect(explicitlyUndefined).toEqual(preExisting);
+    });
+
+    it('bars without priorAnalyses renders nothing and stays byte-identical', () => {
+        const bars = makePriorBars(10);
+        const withoutHistory = buildOverallAnalysisPromptRaw(...baseArgs);
+        const withBarsOnly = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            bars,
+            undefined
+        );
+        expect(withBarsOnly).toEqual(withoutHistory);
+    });
+
+    it('priorAnalyses without bars renders nothing and stays byte-identical', () => {
+        const bars = makePriorBars(10);
+        const history = [priorEntry(bars, 3)];
+        const withoutHistory = buildOverallAnalysisPromptRaw(...baseArgs);
+        const withHistoryOnly = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            undefined,
+            history
+        );
+        expect(withHistoryOnly).toEqual(withoutHistory);
+    });
+
+    it('empty bars + empty priorAnalyses renders nothing and stays byte-identical', () => {
+        const withoutHistory = buildOverallAnalysisPromptRaw(...baseArgs);
+        const withEmptyBoth = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            [],
+            []
+        );
+        expect(withEmptyBoth).toEqual(withoutHistory);
+    });
+
+    it('renders the "## Prior Analyses" section into `dynamic` when both bars and history are provided', () => {
+        const bars = makePriorBars(10);
+        const history = [priorEntry(bars, 3)];
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            bars,
+            history
+        );
+        expect(dynamic).toContain(
+            `## Prior Analyses (${TEST_SYMBOL} · Daily · reference only)`
+        );
+    });
+
+    it('places the section in `dynamic` only — `stable` never carries it (stable is always empty here)', () => {
+        const bars = makePriorBars(10);
+        const history = [priorEntry(bars, 3)];
+        const { stable, dynamic } = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            bars,
+            history
+        );
+        expect(dynamic).toContain('## Prior Analyses');
+        expect(stable).toBe('');
+    });
+
+    it('appears after the Axis Weighting section (the last per-call context section) and before "## Output Schema"', () => {
+        const bars = makePriorBars(10);
+        const history = [priorEntry(bars, 3)];
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            bars,
+            history
+        );
+        const axisWeightingIndex = dynamic.indexOf('## Axis Weighting');
+        const priorIndex = dynamic.indexOf('## Prior Analyses');
+        const schemaIndex = dynamic.indexOf('## Output Schema');
+        expect(axisWeightingIndex).toBeGreaterThan(-1);
+        expect(priorIndex).toBeGreaterThan(axisWeightingIndex);
+        expect(schemaIndex).toBeGreaterThan(priorIndex);
+    });
+
+    it('appears after the Fear & Greed section too, when both are present', () => {
+        const bars = makePriorBars(10);
+        const history = [priorEntry(bars, 3)];
+        const fg: FearGreedSnapshot = {
+            score: 50,
+            label: 'NEUTRAL',
+            groups: [
+                { name: 'Flow', score: 50, factors: [] },
+                { name: 'Trend', score: 50, factors: [] },
+            ],
+            confidence: 'normal',
+            sampleSize: 100,
+            warning: null,
+        };
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            fg,
+            null,
+            false,
+            null,
+            'equity',
+            'ko',
+            bars,
+            history
+        );
+        const fgIndex = dynamic.indexOf('Fear & Greed Index');
+        const priorIndex = dynamic.indexOf('## Prior Analyses');
+        expect(fgIndex).toBeGreaterThan(-1);
+        expect(priorIndex).toBeGreaterThan(fgIndex);
+    });
+
+    it('a history that narrows to nothing (outside the bar window) renders no section and stays byte-identical', () => {
+        // 10 bars is well inside the always-anchor-to-bars[0] fallback, so to
+        // exercise the "narrowed to empty" path, use candidates that all
+        // predate every bar entirely.
+        const bars = makePriorBars(10);
+        const tooOldHistory = [
+            priorEntry(bars, 0, {
+                generatedAt: new Date((bars[0].time - 10_000) * 1000),
+            }),
+        ];
+        const withoutHistory = buildOverallAnalysisPromptRaw(...baseArgs);
+        const withTooOldHistory = buildOverallAnalysisPromptRaw(
+            ...baseArgs,
+            bars,
+            tooOldHistory
+        );
+        expect(withTooOldHistory).toEqual(withoutHistory);
     });
 });
 

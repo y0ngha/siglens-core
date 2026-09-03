@@ -2,16 +2,28 @@ import {
     localeKeySuffixFor,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
+import {
+    PRIOR_ANALYSIS_LIMIT,
+    PRIOR_ANALYSIS_SLACK,
+    PRIOR_ANALYSIS_WINDOW_BARS,
+} from '@/domain/analysis/priorAnalysis';
 import type {
     DashboardTimeframe,
     MarketSessionSpec,
     NewsFeedCategory,
     OptionsExpirationFilter,
     PositionBucket,
+    PriorAnalysis,
     StatementPeriod,
     Timeframe,
 } from '@/domain/types';
 import {
+    TIMEFRAME_BARS_LIMIT,
+    TIMEFRAME_LOOKBACK_DAYS,
+} from '@/domain/constants/market';
+import {
+    MS_PER_DAY,
+    MS_PER_SECOND,
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
@@ -21,6 +33,11 @@ import {
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
+import type {
+    AnalysisHistoryQuery,
+    NarrowedPriorAnalyses,
+} from '@/infrastructure/cache/types';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 
 /**
  * @internal TTL for cached market briefings (in seconds).
@@ -197,6 +214,141 @@ function positionKeySuffix(bucket?: PositionBucket): string {
 }
 
 /**
+ * @internal Cache-key suffix for the prior-analysis-context fingerprint (see
+ * `narrowPriorAnalysesForCacheKey`).
+ *
+ * Mirrors the sibling suffix helpers' "append only when supplied" convention:
+ * `undefined` — no history was supplied, or every candidate fell inside the
+ * current cache window and none survived to be fingerprinted — produces no
+ * suffix at all, so a caller that never passes `priorAnalyses` reads/writes
+ * the exact same key this builder produced before the parameter existed.
+ */
+function historyKeySuffix(fingerprint?: string): string {
+    return fingerprint !== undefined ? `:hist=${fingerprint}` : '';
+}
+
+/**
+ * @internal
+ *
+ * Stage 1 of the two-stage prior-analysis narrowing that backs the
+ * prior-analysis-context feature (see `PriorAnalysis` in
+ * `domain/types.ts` for the feature overview). Cuts a
+ * caller-supplied history of past analyses down to the set that may
+ * legitimately determine the CACHE KEY for the CURRENT cache window, and
+ * derives a short fingerprint of that set for
+ * {@link buildAnalysisCacheKey}'s `historyFingerprint` parameter (the
+ * overall axis instead folds the fingerprint into the object it hashes into
+ * `buildOverallCacheKey`'s `inputHash` — see `runOverallAnalysis.ts`).
+ *
+ * **Why the window exclusion happens here, in infrastructure, rather than in
+ * `domain/`.** The exclusion boundary is `currentWindowSeconds` — a
+ * cache-policy value (`ANALYSIS_CACHE_TTL[timeframe]` for the technical axis,
+ * `OVERALL_CACHE_TTL_SECONDS` for the overall axis) that `domain/` is not
+ * permitted to import (`domain` may not import `infrastructure` — an ESLint
+ * error, see `src/domain/CLAUDE.md`). Stage 2
+ * (`selectPriorAnalyses` in `domain/analysis/priorAnalysis.ts`, and its
+ * caller `buildAnalysisPrompt`/`buildOverallAnalysisPrompt`) narrows THIS
+ * function's output further — by bar anchor and bar dedup — for the PROMPT.
+ * The two stages must be fed from the exact same already-window-filtered
+ * list — this function's `candidates` return value — or the fingerprint
+ * (which determines the cache key) and the prompt (which determines what is
+ * actually inside the response written under that key) can silently
+ * disagree: a request could read a cache entry keyed for one set of prior
+ * analyses while a DIFFERENT request rendered a different set into the
+ * prompt that produced it, because each computed its own filtered view
+ * independently instead of sharing one.
+ *
+ * **Why the window exclusion exists at all.** Without it, an analysis
+ * generated mid-window would change the fingerprint (and therefore the
+ * cache key) the moment it lands, for every OTHER caller requesting the same
+ * symbol/timeframe/model for the rest of the window — one user finishing an
+ * analysis would invalidate everyone else's cache entry mid-flight,
+ * defeating the point of caching. Entries generated BEFORE the current
+ * window opened carry no such risk: they were already visible when the
+ * window's first request computed its key, so every request within the
+ * window sees the identical prior-analysis set and therefore computes the
+ * identical key, all the way until the window rolls over.
+ *
+ * Concretely, in order:
+ * 1. Drop every entry with `generatedAt.getTime() >= now.getTime() -
+ *    currentWindowSeconds * 1000` (inside the current window — including the
+ *    boundary instant itself, which counts as "inside").
+ * 2. Sort survivors newest-first and cap at `PRIOR_ANALYSIS_LIMIT *
+ *    PRIOR_ANALYSIS_SLACK` (21) — the same slack multiplier
+ *    `selectPriorAnalyses` applies to its bar-count window, so under
+ *    the expected density of at most roughly one analysis per bar this stage
+ *    keeps everything stage 2 could still use. The cap is by COUNT, not by
+ *    bar, so the two are not equivalent in the limit: on a symbol analysed
+ *    many times within the same few bars, the 21 newest can all belong to
+ *    those bars and stage 2 then sees fewer than 7 distinct bars. That
+ *    degrades to a shorter section, never to wrong data.
+ * 3. Hash the survivors' `generatedAt` epoch milliseconds (comma-joined, in
+ *    the already-sorted order) via {@link hashAnalysisInput} — reused
+ *    rather than reimplemented, per this module's existing hashing
+ *    convention. `generatedAt` alone is sufficient to fingerprint the SET:
+ *    it is exactly the field this function filters and sorts on, so any
+ *    change to the survivor set (an entry aging out of the window, a new
+ *    entry appearing before it) changes at least one epoch value and
+ *    therefore the hash. The fingerprint deliberately does NOT cover
+ *    `trend`/`riskLevel`/prices — those feed the PROMPT via stage 2, not the
+ *    key; folding them in here would bust the cache key every time a past
+ *    analysis were retroactively edited in the consumer's own database, a
+ *    case this feature has no reason to invalidate on.
+ *
+ * @param priorAnalyses - Full history for this symbol + timeframe (and, for
+ *   the overall axis, this tab), as supplied by the consumer via
+ *   `options.priorAnalyses`. Order does not matter — this function sorts.
+ * @param currentWindowSeconds - Length of the CURRENT cache window in
+ *   seconds. NOT a `Timeframe` — the technical and overall axes' windows
+ *   diverge independently of timeframe (overall is a fixed day regardless of
+ *   chart resolution), so the caller resolves and passes the right window.
+ * @param now - Reference time for the window boundary. The caller MUST reuse
+ *   the exact same `Date` instance (or millisecond value) for this call and
+ *   for the sibling prompt-building call in the same request — computing the
+ *   two from separate `new Date()` calls risks a boundary crossing between
+ *   them, which would make the cache key and the rendered prompt disagree
+ *   about which entries are "in the window".
+ * @returns `candidates` — the window-filtered, capped, newest-first list.
+ *   Feed it to BOTH this key's `historyFingerprint` segment (via
+ *   `fingerprint`) AND, unfiltered by bar (that is stage 2's job), to
+ *   `selectPriorAnalyses` for the prompt. `fingerprint` — `undefined` when
+ *   `candidates` is empty, so the caller can omit the key segment entirely
+ *   and stay byte-identical to a request with no usable history at all (see
+ *   {@link historyKeySuffix}).
+ *
+ * **Input-size contract.** The caller is expected to have sized its own query
+ * with {@link analysisHistoryQuery}, whose `limit` already caps the array at
+ * `PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK`. Nothing here enforces that:
+ * this function sorts whatever it is handed, so a caller that forgets the
+ * limit and passes an unbounded result set pays an O(n log n) sort on every
+ * request. The cap below bounds everything downstream — including
+ * `selectPriorAnalyses`' per-candidate scan over `bars` — so an oversized
+ * input costs one sort, not unbounded work in the prompt path.
+ */
+export function narrowPriorAnalysesForCacheKey(
+    priorAnalyses: readonly PriorAnalysis[],
+    currentWindowSeconds: number,
+    now: Date
+): NarrowedPriorAnalyses {
+    const windowStartMs = now.getTime() - currentWindowSeconds * MS_PER_SECOND;
+    const cap = PRIOR_ANALYSIS_WINDOW_BARS;
+
+    const candidates = priorAnalyses
+        .filter(entry => entry.generatedAt.getTime() < windowStartMs)
+        .toSorted((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime())
+        .slice(0, cap);
+
+    if (candidates.length === 0) {
+        return { candidates, fingerprint: undefined };
+    }
+
+    const fingerprint = hashAnalysisInput(
+        candidates.map(entry => entry.generatedAt.getTime()).join(',')
+    );
+    return { candidates, fingerprint };
+}
+
+/**
  * @internal
  * Fixed model identifier for the market briefing. Core owns this choice and
  * sends it on the dispatch body; it is also folded into the briefing cache key
@@ -333,9 +485,29 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * is accepted per the versioning policy. Still bucket-qualitative (no digits)
  * and disclaimer-safe — see `positionHintSection.ts`.
  *
+ * @remarks
+ * **`p9` = prior-analysis-context section.** `buildAnalysisPrompt` gains an
+ * optional trailing `priorAnalyses` parameter; when the caller supplies a
+ * usable history (narrowed by `narrowPriorAnalysesForCacheKey` for the key,
+ * then `selectPriorAnalyses` for the prompt — see those functions' docs), a
+ * new `## Prior Analyses` section plus the {@link
+ * PRIOR_ANALYSIS_GUARDRAIL "prior-analysis guardrail"} line is appended to
+ * the technical prompt's dynamic tail. This changes the technical prompt's
+ * bytes ONLY for requests that actually carry usable prior-analysis history
+ * (the section renders to `''` and is skipped otherwise, so a caller that
+ * omits `priorAnalyses` — or supplies it with nothing surviving the two-stage
+ * narrowing — gets byte-identical prompt output to before this parameter
+ * existed). The bump is still required and still fleet-wide: this constant
+ * has no per-history-presence axis to scope it to (unlike `positionBucket`'s
+ * separate `:pos=*` key segment), so bumping cold-starts every technical AND
+ * fundamental cache entry (and the SSR peek path) as a side effect, same
+ * trade-off accepted for `p7`/`p8`. Without the bump, a symbol with a warm
+ * `p8` cache entry would keep serving history-free analyses for the rest of
+ * its TTL even once the consumer starts sending `priorAnalyses`.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p8' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p9' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -374,6 +546,13 @@ export const PROMPT_TEMPLATE_VERSION = 'p8' as const;
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
  *   Korean cache stays valid; other locales append `:lang=<locale>`.
+ * @param historyFingerprint - Prior-analysis-context fingerprint, from
+ *   `narrowPriorAnalysesForCacheKey`'s `fingerprint` return value. The
+ *   NEW LAST segment, appended AFTER the locale suffix. `undefined` — the
+ *   caller has no `priorAnalyses`, or nothing survived the two-stage
+ *   narrowing (see that function's doc) — produces no suffix at all, so this
+ *   is the exact key every existing caller (and every caller that never
+ *   adopts the prior-analysis-context feature) reads/writes today.
  * @returns The cache key.
  *
  * @example
@@ -386,6 +565,8 @@ export const PROMPT_TEMPLATE_VERSION = 'p8' as const;
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on'
  * const bucketed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true, 'profit');
  * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on:pos=profit'
+ * const historied = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true, 'profit', undefined, 'c3d4');
+ * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on:pos=profit:hist=c3d4'
  * ```
  */
 export function buildAnalysisCacheKey(
@@ -395,12 +576,13 @@ export function buildAnalysisCacheKey(
     skillFingerprint?: string,
     reasoning?: boolean,
     positionBucket?: PositionBucket,
-    locale?: AnalysisLocale
+    locale?: AnalysisLocale,
+    historyFingerprint?: string
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}${historyKeySuffix(historyFingerprint)}`;
 }
 
 /**
@@ -586,6 +768,30 @@ export const OVERALL_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
 
 /**
+ * Prompt-template version for the fundamental-analysis cache keys.
+ *
+ * **Why this exists as its own constant.** Until now the fundamental key
+ * embedded {@link PROMPT_TEMPLATE_VERSION}, the *technical* axis's constant,
+ * so every technical-prompt bump cold-started the entire fundamental cache
+ * fleet (TTL {@link FUNDAMENTAL_CACHE_TTL_SECONDS} = 1 day, and each miss
+ * fans out to ~13 parallel upstream calls) for a change that altered zero
+ * fundamental prompt bytes. Every other analysis type — financials, congress,
+ * news, briefing, economic-event, indicator-translation — already carries an
+ * independent version; fundamental was the last one still coupled.
+ *
+ * Splitting it is only free at a moment when the fundamental cache is being
+ * invalidated anyway. The p8→p9 technical bump shipping alongside this change
+ * is exactly that moment: the one-time cold start happens either way, and
+ * afterwards fundamental stops paying for technical's prompt iterations.
+ *
+ * `f1` starts the independent series. Bump it whenever the fundamental system
+ * or user prompt template changes in a way that makes cached results stale.
+ *
+ * @internal
+ */
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f1' as const;
+
+/**
  * Build the Redis key for a cached fundamental analysis result.
  *
  * Format: `{version}:analysis:fundamental:<symbol>:<modelId>:<promptVersion>`.
@@ -623,7 +829,7 @@ export function buildFundamentalCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
+    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:${symbol}:${modelId}:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
     return `${withFingerprint}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
@@ -981,6 +1187,101 @@ export function buildOverallCacheKey(
     locale?: AnalysisLocale
 ): string {
     return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+}
+
+/**
+ * @internal Multiplier applied to the *averaged* calendar span of the
+ * prior-analysis window before the closure allowance is added.
+ *
+ * Bars are not evenly spaced in calendar time, so an average understates any
+ * window that happens to straddle a weekend. This absorbs the ordinary
+ * two-day gap; {@link MAX_MARKET_CLOSURE_DAYS} covers the long ones.
+ */
+const HISTORY_WEEKEND_SAFETY_FACTOR = 1.5;
+
+/**
+ * @internal Flat calendar-day allowance for the longest stretch the U.S.
+ * equity market stays shut — a holiday adjoining a weekend (e.g. Friday close
+ * to Tuesday open is ~4 days; 5 leaves margin for a Thursday-holiday week).
+ *
+ * On short timeframes this term dominates: 21 five-minute bars span barely
+ * any calendar time, so without it the query window closes long before the
+ * prior trading session's analyses.
+ */
+const MAX_MARKET_CLOSURE_DAYS = 5;
+
+/**
+ * Sizes the consumer's own "recent analyses" query for
+ * `SubmitAnalysisOptions.priorAnalyses`.
+ *
+ * The consumer's database knows nothing about bars, so this is a **coarse
+ * pre-filter only** — deliberately generous. Core re-cuts precisely afterwards
+ * in two stages: `narrowPriorAnalysesForCacheKey` drops entries inside
+ * the current cache window, then `selectPriorAnalyses` applies the real
+ * bar-anchored window. Over-fetching here costs one wider `WHERE` clause;
+ * under-fetching silently disables the feature, because core can only narrow
+ * what it was handed.
+ *
+ * **Why `sinceMs` is derived from calendar days per bar, not from a cache
+ * TTL.** The window this feature actually cares about is
+ * `PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK` **bars**, and bars are not
+ * evenly spaced in wall-clock time — they skip nights, weekends, and
+ * holidays. Sizing the query from `ANALYSIS_CACHE_TTL` (one bar of *clock*
+ * time per bar) reintroduces exactly the defect the bar-counted window exists
+ * to avoid: on `'5Min'` it yields a 1.75-hour cutoff, so the prior session's
+ * closing analysis — roughly 17.5 hours old at the next open — is excluded by
+ * the consumer's SQL and never reaches `selectPriorAnalyses` at all. The
+ * feature would then appear to work while silently rendering nothing for the
+ * first hours of every session.
+ *
+ * {@link TIMEFRAME_LOOKBACK_DAYS} over {@link TIMEFRAME_BARS_LIMIT} gives
+ * calendar days per bar — but that ratio is an **average**, and the gap that
+ * matters here is the **worst case**. Averaged over a year, a 5-minute bar is
+ * ~3.5 calendar minutes apart; across a Friday close to a Monday open it is
+ * 65.5 hours, and across a holiday Monday, 89.5 hours. Sizing from the average
+ * alone gives `'5Min'` a 17.5-hour window, which clears one overnight gap and
+ * then fails every single Monday — the same silent failure this whole
+ * derivation exists to prevent, merely relocated from "the first hours of each
+ * session" to "all day, every Monday and after every market holiday".
+ *
+ * So the averaged span is widened by {@link HISTORY_WEEKEND_SAFETY_FACTOR} and
+ * then offset by {@link MAX_MARKET_CLOSURE_DAYS}, a flat allowance for the
+ * longest stretch the market is shut. The offset is what actually carries the
+ * short timeframes: 21 five-minute bars span almost no calendar time, so their
+ * window is essentially "the last long weekend plus change".
+ *
+ * Erring long is the correct bias here and costs almost nothing — this is a
+ * coarse pre-filter and core re-cuts precisely afterwards, so over-fetching
+ * widens one `WHERE` clause while under-fetching disables the feature with no
+ * error anywhere.
+ *
+ * **No `tab` parameter.** An earlier revision took one, on the theory that the
+ * overall axis needed a different window because its cache TTL is a fixed day.
+ * That was wrong: the TTL governs the *recency exclusion*, which core applies
+ * itself in stage 1, not how far back the consumer must look. Both axes need
+ * the same 21 bars of history, so both get the same query. The consumer still
+ * filters its own rows by tab — this helper only sizes the range.
+ *
+ * One consequence worth knowing: on the overall axis, stage 1 excludes
+ * everything newer than a day, so on short timeframes (`'5Min'`, where 21 bars
+ * span less than a day) the two bounds do not overlap and the prior-analysis
+ * section is legitimately always empty. That degrades to today's behaviour
+ * rather than misbehaving.
+ *
+ * @param timeframe - Bar resolution the consumer will query history for.
+ * @returns `limit` — the maximum rows worth fetching — and `sinceMs`, how far
+ *   back in milliseconds the `WHERE` clause should reach from now.
+ */
+export function analysisHistoryQuery(
+    timeframe: Timeframe
+): AnalysisHistoryQuery {
+    const limit = PRIOR_ANALYSIS_WINDOW_BARS;
+    const calendarDaysPerBar =
+        TIMEFRAME_LOOKBACK_DAYS[timeframe] / TIMEFRAME_BARS_LIMIT[timeframe];
+    const days =
+        calendarDaysPerBar * limit * HISTORY_WEEKEND_SAFETY_FACTOR +
+        MAX_MARKET_CLOSURE_DAYS;
+    return { limit, sinceMs: Math.ceil(days * MS_PER_DAY) };
 }
 
 /**

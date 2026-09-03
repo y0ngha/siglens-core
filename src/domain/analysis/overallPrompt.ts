@@ -11,15 +11,19 @@ import {
     computeOverallScore,
     type OverallScore,
 } from '@/domain/analysis/overallScore';
+import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
+import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import type {
     AnalysisResponse,
     AssembledPrompt,
     AssetClass,
+    Bar,
     FearGreedSnapshot,
     FinancialsScorecard,
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
+    PriorAnalysis,
     Timeframe,
 } from '@/domain/types';
 
@@ -387,6 +391,33 @@ function formatFinancials(
  * @param assetClass - Instrument asset class. `'crypto'` treats absent fundamental,
  *   options, and financials axis data as intentional (not missing) and adjusts the
  *   role line and axis label accordingly. Defaults to `'equity'`.
+ * @param bars - OHLCV bars for this symbol + timeframe, oldest-first. Unlike
+ *   the rest of this builder's inputs (which are all already-computed axis
+ *   summaries), the prior-analysis window in `priorAnalyses` is measured in
+ *   **bars**, not wall-clock time (session gaps already removed — see
+ *   `PRIOR_ANALYSIS_SLACK`'s doc comment in `priorAnalysis.ts`), so
+ *   `selectPriorAnalyses` needs the same bar series the technical
+ *   analysis for this symbol + timeframe was built from to anchor each past
+ *   call to a bar and measure its outcome. This builder does not fetch bars
+ *   itself; the caller supplies them. Note that the caller cannot simply
+ *   re-use the technical axis's bars — `AnalysisResponse` carries no raw
+ *   bars — so `runOverallAnalysis` issues its own `fetchBarsWithIndicators`
+ *   call, which core does NOT cache (`barsApi` is a pass-through to
+ *   `provider.getBars()`; whether a repeat call is cheap is a property of the
+ *   injected `MarketDataProvider`). Because that fetch is not free, the caller
+ *   gates it on there being narrowed history to render — do not remove that
+ *   gate. Optional, and only consulted together with `priorAnalyses` — see
+ *   that param.
+ * @param priorAnalyses - Optional history of past analyses for this symbol +
+ *   timeframe, supplied by the consumer (siglens / siglens-trader) from its
+ *   own storage. Rendered into `dynamic` via `selectPriorAnalyses` +
+ *   `formatPriorAnalysisSection` only when BOTH `bars` and
+ *   `priorAnalyses` are provided and non-empty — one without the other
+ *   cannot be anchored to a bar, so nothing is rendered. Into `dynamic`
+ *   only, never `stable` (same reasoning as every other per-call value in
+ *   this builder — `stable` here is already empty, see this function's own
+ *   doc comment). Omitting either parameter produces a byte-identical
+ *   prompt to the one this builder emitted before these parameters existed.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
@@ -408,7 +439,9 @@ export function buildOverallAnalysisPrompt(
     optionsOiStale?: boolean,
     financials?: FinancialsScorecard | null,
     assetClass: AssetClass = 'equity',
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    bars?: readonly Bar[],
+    priorAnalyses?: readonly PriorAnalysis[]
 ): AssembledPrompt {
     const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
     const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
@@ -419,6 +452,39 @@ export function buildOverallAnalysisPrompt(
         fearGreed !== undefined
             ? `\n\n${formatFearGreedSection(fearGreed)}`
             : '';
+
+    // Placement: right after `axisScoreSection`, immediately before
+    // `## Output Schema` (see the template below). Unlike `prompt.ts`, where
+    // Fear & Greed sits right next to the output-rules tail, this builder's
+    // `fearGreedBlock` is embedded inside Axis 1 (Technical), with axes 2–4,
+    // the Financials Scorecard, and the axis-weighting synthesis all between
+    // it and the tail — inserting immediately after `fearGreedBlock` would
+    // land Prior Analyses in the middle of the per-axis data instead of
+    // alongside it. `axisScoreSection` is this builder's own last per-call
+    // context section before the output-format tail, so that is the
+    // position analogous to where `positionHint` sits in `prompt.ts`.
+    //
+    // Rendered only when BOTH are present and non-empty: a history without
+    // bars (or bars without history) cannot anchor a single past call to a
+    // bar, so there is nothing `formatPriorAnalysisSection` could render —
+    // see the `bars` / `priorAnalyses` param docs above for why both are
+    // needed together. Even when both are present, `selectPriorAnalyses` can
+    // still narrow the history down to nothing (e.g. every candidate falls
+    // outside the bar window), so the section itself — not just the input
+    // presence check — decides whether the `\n\n` prefix is added; a bare
+    // presence check would leak a stray `\n\n` + '' into `dynamic` on that
+    // narrowed-to-empty path and break the "omit → byte-identical" contract.
+    const priorAnalysisSection =
+        bars && bars.length > 0 && priorAnalyses && priorAnalyses.length > 0
+            ? formatPriorAnalysisSection(
+                  selectPriorAnalyses(priorAnalyses, bars),
+                  bars,
+                  symbol,
+                  timeframe
+              )
+            : '';
+    const priorAnalysisBlock =
+        priorAnalysisSection !== '' ? `\n\n${priorAnalysisSection}` : '';
 
     const assetContext = isCrypto
         ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
@@ -497,7 +563,7 @@ ${formatOptions(resolvedOptions, resolvedOptionsOiStale)}
 ## Financials Scorecard
 ${formatFinancials(financials)}
 
-${axisScoreSection}
+${axisScoreSection}${priorAnalysisBlock}
 
 ## Output Schema
 {

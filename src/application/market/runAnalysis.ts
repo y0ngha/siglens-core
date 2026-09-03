@@ -45,9 +45,11 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import {
+    ANALYSIS_CACHE_TTL,
     buildAnalysisCacheKey,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
+    narrowPriorAnalysesForCacheKey,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
@@ -178,6 +180,25 @@ async function runAnalysisImpl(
         tier,
     ]);
 
+    // `narrowPriorAnalysesForCacheKey` is called exactly ONCE, from a single
+    // `Date`, and its `candidates` output is reused for BOTH the cache-key
+    // fingerprint below AND the `buildAnalysisPrompt` call further down —
+    // never re-derived from a second `new Date()`. Two independent calls
+    // could straddle the cache-window boundary and make the key and the
+    // prompt disagree about which prior analyses are "in the window" — see
+    // `narrowPriorAnalysesForCacheKey`'s doc. (Named `priorAnalysisNow`,
+    // distinct from the write-time `now` created later in this function for
+    // `analyzedAt`/TTL — an unrelated timestamp.)
+    const priorAnalysisNow = new Date();
+    const {
+        candidates: priorAnalysisCandidates,
+        fingerprint: historyFingerprint,
+    } = narrowPriorAnalysesForCacheKey(
+        options.priorAnalyses ?? [],
+        ANALYSIS_CACHE_TTL[timeframe],
+        priorAnalysisNow
+    );
+
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(
         symbol,
@@ -186,7 +207,8 @@ async function runAnalysisImpl(
         `${tier}:${skillSampling.fingerprint}`,
         options.reasoning,
         options.positionBucket,
-        options.locale
+        options.locale,
+        historyFingerprint
     );
 
     if (!force && cache !== null) {
@@ -267,7 +289,8 @@ async function runAnalysisImpl(
         fearGreed ?? undefined,
         options.assetClass ?? 'equity',
         options.positionBucket,
-        locale
+        locale,
+        priorAnalysisCandidates
     );
 
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so

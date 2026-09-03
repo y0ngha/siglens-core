@@ -347,6 +347,68 @@ describe('runOverallAnalysis', () => {
         });
     });
 
+    /**
+     * `options.priorAnalyses`가 `narrowPriorAnalysesForCacheKey`를 거쳐
+     * `inputHash`(→ `buildOverallCacheKey`)에 접히는지, 그리고 생략했을 때
+     * 기존 캐시 키와 바이트가 같은지 확인한다 (Task 6c).
+     */
+    describe('prior-analysis-context (Task 6c)', () => {
+        it('priorAnalyses를 생략하면 캐시 키가 예전과 동일하다', async () => {
+            await runOverallAnalysis(baseOptions());
+            const omittedKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            mockCacheGet.mockClear();
+            await runOverallAnalysis({ ...baseOptions(), priorAnalyses: [] });
+            const emptyArrayKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            expect(emptyArrayKey).toBe(omittedKey);
+        });
+
+        it('현재 캐시 윈도우 안에서 생성된 priorAnalyses만 있으면(생존자 0명) 캐시 키가 생략 시와 동일하다', async () => {
+            await runOverallAnalysis(baseOptions());
+            const omittedKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            mockCacheGet.mockClear();
+            await runOverallAnalysis({
+                ...baseOptions(),
+                // '1Day' → OVERALL_CACHE_TTL_SECONDS window; "now" is inside it,
+                // so stage 1 excludes it and the fingerprint stays undefined —
+                // same `ph: undefined` folded into inputHash as the omitted case.
+                priorAnalyses: [
+                    {
+                        generatedAt: new Date(),
+                        trend: 'bullish',
+                        riskLevel: 'low',
+                    },
+                ],
+            });
+            const withRecentHistoryKey = mockCacheGet.mock
+                .calls[0]![0] as string;
+
+            expect(withRecentHistoryKey).toBe(omittedKey);
+        });
+
+        it('윈도우 밖의 priorAnalyses가 있으면 캐시 키가 생략 시와 달라진다', async () => {
+            await runOverallAnalysis(baseOptions());
+            const omittedKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            mockCacheGet.mockClear();
+            await runOverallAnalysis({
+                ...baseOptions(),
+                priorAnalyses: [
+                    {
+                        generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                        trend: 'bullish',
+                        riskLevel: 'low',
+                    },
+                ],
+            });
+            const withOldHistoryKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            expect(withOldHistoryKey).not.toBe(omittedKey);
+        });
+    });
+
     describe('runOverallAnalysis — 출력 로케일', () => {
         /**
          * 상위 프롬프트만 로케일을 받고 축은 안 받으면, 축은 늘 한국어로 답하고
@@ -388,6 +450,148 @@ describe('runOverallAnalysis', () => {
             expect(prompt).toContain(
                 'OUTPUT LANGUAGE (FINAL, OVERRIDES EVERYTHING ABOVE)'
             );
+        });
+    });
+    /**
+     * 배포 안정성 감사 지적: `fetchBarsWithIndicators`는 core 안에서 캐시되지
+     * 않는다(provider 호출 pass-through). 렌더할 이력이 없는데도 매 캐시
+     * 미스마다 페치 + `calculateIndicators`를 돌리면 순수 낭비다.
+     *
+     * 타임프레임은 `baseOptions()`의 '1Day'를 유지한다 — tier를 넘기지 않으면
+     * free로 떨어져 장중 타임프레임이 게이트에 막히고, 그러면 step 8b에
+     * 도달하기도 전에 리턴돼 이 테스트가 무의미해진다. 그래서 페치 두 종류를
+     * 인자가 아니라 **호출 수**로 가른다: Fear & Greed 몫 1회는 항상 있고,
+     * 이력용 페치가 붙으면 2회가 된다.
+     */
+    describe('prior-analysis bars fetch gating', () => {
+        it('priorAnalyses가 없으면 이력용 봉을 페치하지 않는다 (F&G 1회뿐)', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+        });
+
+        it('priorAnalyses가 전부 현재 캐시 윈도우 안이면(생존자 0명) 페치하지 않는다', async () => {
+            await runOverallAnalysis({
+                ...baseOptions(),
+                priorAnalyses: [
+                    {
+                        generatedAt: new Date(),
+                        trend: 'bullish',
+                        riskLevel: 'medium',
+                    },
+                ],
+            });
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+        });
+
+        it('페치한 봉이 실제로 프롬프트의 Prior Analyses 섹션까지 배선된다', async () => {
+            // 호출 수만 세는 위 두 테스트는 게이트의 on/off만 고정한다 — 두 번째
+            // 페치 결과가 buildOverallAnalysisPrompt의 `bars`로 흘러가는지는
+            // 잡지 못한다(기본 목이 `bars: []`를 돌려줘 섹션이 어차피 안 그려짐).
+            // 여기서만 실물 봉을 돌려주고, 렌더된 프롬프트로 배선을 확인한다.
+            const generatedAt = new Date('2026-01-05T00:00:00.000Z');
+            const bars = Array.from({ length: 30 }, (_, i) => ({
+                // generatedAt이 중간 봉에 앵커되도록 그 앞뒤로 봉을 깐다.
+                time:
+                    Math.floor(generatedAt.getTime() / 1000) -
+                    (15 - i) * 86_400,
+                open: 100,
+                high: 101,
+                low: 99,
+                close: 100,
+                volume: 1000,
+            }));
+            mockFetchBarsWithIndicators.mockResolvedValue({
+                bars,
+                indicators: { buySellVolume: [] },
+            });
+
+            await runOverallAnalysis({
+                ...baseOptions(),
+                priorAnalyses: [
+                    {
+                        generatedAt,
+                        trend: 'bullish',
+                        riskLevel: 'medium',
+                    },
+                ],
+            });
+
+            const prompt = (
+                mockCallAnalysisAi.mock.calls.at(-1)![0] as { prompt: string }
+            ).prompt;
+            expect(prompt).toContain('## Prior Analyses');
+        });
+
+        it("공유된 '1Day' 페치가 실패하면 로그가 한 번만 찍힌다", async () => {
+            // 두 파생 promise가 같은 `dailyBarsPromise`를 공유하므로, 각자
+            // catch를 달면 하나의 원인에 대해 console.error가 두 줄 찍혀
+            // 독립된 두 장애처럼 읽힌다. 로깅은 공유 지점 한 곳에만 둔다.
+            mockFetchBarsWithIndicators.mockRejectedValue(
+                new Error('upstream down')
+            );
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            try {
+                await runOverallAnalysis({
+                    ...baseOptions(), // timeframe: '1Day'
+                    priorAnalyses: [
+                        {
+                            generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                            trend: 'bullish',
+                            riskLevel: 'medium',
+                        },
+                    ],
+                });
+
+                const barsFailureLogs = errorSpy.mock.calls.filter(call =>
+                    String(call[0]).includes('Daily bars fetch failed')
+                );
+                expect(barsFailureLogs).toHaveLength(1);
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+
+        it("timeframe이 '1Day'면 Fear & Greed 페치를 재사용해 한 번만 부른다", async () => {
+            // F&G는 언제나 '1Day'를 부른다. overall 요청 자체가 '1Day'면 두 호출의
+            // 인자가 완전히 동일해지는데, `fetchBarsWithIndicators`는 core에서
+            // 캐시되지 않으므로(+ `calculateIndicators` 포함) 같은 업스트림 호출과
+            // 지표 계산을 두 번 치르게 된다. 같은 promise를 공유해 한 번으로 줄인다.
+            await runOverallAnalysis({
+                ...baseOptions(), // timeframe: '1Day'
+                priorAnalyses: [
+                    {
+                        generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                        trend: 'bullish',
+                        riskLevel: 'medium',
+                    },
+                ],
+            });
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+        });
+
+        it('timeframe이 1Day가 아니면 이력용 봉을 따로 한 번 더 페치한다', async () => {
+            // pro tier를 명시해야 장중 타임프레임이 티어 게이트에 막히지 않는다 —
+            // 막히면 봉 페치 지점에 도달하기도 전에 리턴돼 이 테스트가 무의미해진다.
+            await runOverallAnalysis({
+                ...baseOptions(),
+                timeframe: '1Hour',
+                tier: 'pro',
+                priorAnalyses: [
+                    {
+                        generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                        trend: 'bullish',
+                        riskLevel: 'medium',
+                    },
+                ],
+            });
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
         });
     });
 });

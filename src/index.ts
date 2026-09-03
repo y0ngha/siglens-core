@@ -233,6 +233,18 @@ export { computeMarketReference } from './domain/analysis/marketReference';
 export { bucketizePosition } from './domain/analysis/positionBucket';
 export type { PositionBucket } from './domain/types';
 
+// Prior-analysis-context — the flat, language-neutral shape the consumer
+// (siglens / siglens-trader) reads out of its own database and passes back
+// in via `options.priorAnalyses` on `submitAnalysis`/`runAnalysis` and
+// `submitOverallAnalysis`/`runOverallAnalysis`. Only the TYPE is public: the
+// narrowing/rendering internals (`selectPriorAnalyses`,
+// `formatPriorAnalysisSection` in `domain/`; `narrowPriorAnalysesForCacheKey`
+// in `infrastructure/`) all stay internal, so a version bump is free to
+// change how core narrows or renders history without that being a breaking
+// change for the consumer — the consumer's only job is producing
+// `PriorAnalysis[]` and sizing its query with `analysisHistoryQuery`.
+export type { PriorAnalysis } from './domain/types';
+
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
 
@@ -338,6 +350,15 @@ export type {
 
 // Cache
 export { computeBarsEffectiveTtl } from './infrastructure/cache/config';
+// Sizes a consumer's own prior-analysis history DB query (limit + since).
+// The narrowing this returns a coarse budget for (`narrowPriorAnalysesForCacheKey`
+// / `selectPriorAnalyses`) stays internal — see the `PriorAnalysis` type
+// export's comment above. `PRIOR_ANALYSIS_LIMIT`/`PRIOR_ANALYSIS_SLACK`
+// themselves are deliberately NOT exported: this function is the only
+// consumer-facing surface that needs to size anything, and re-exporting the
+// raw constants would just invite a second, potentially-diverging place to
+// compute the same limit.
+export { analysisHistoryQuery } from './infrastructure/cache/config';
 export { createCacheProvider } from './infrastructure/cache/redis';
 
 // Chat token store
@@ -456,6 +477,8 @@ export type {
 } from './domain/ports/aiProvider';
 
 export type { CacheProvider } from './domain/ports/cache';
+// Return type of `analysisHistoryQuery` (Tier 3, exported above).
+export type { AnalysisHistoryQuery } from './infrastructure/cache/types';
 export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type { UserTier } from './domain/ports/userTierRepository';
 export type {

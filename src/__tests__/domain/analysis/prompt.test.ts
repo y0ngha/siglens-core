@@ -1,4 +1,9 @@
-import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    type AnalysisLocale,
+} from '@/domain/analysis/outputLocale';
+import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
+import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt as buildAnalysisPromptRaw,
@@ -52,6 +57,7 @@ import type {
     FearGreedSnapshot,
     IndicatorResult,
     PositionBucket,
+    PriorAnalysis,
     Skill,
     SkillUsageRole,
     SMCResult,
@@ -4593,6 +4599,225 @@ describe('prompt', () => {
             // stray empty entry (and its extra `\n\n` join separator) was
             // injected for the out-of-union bucket value.
             expect(withInvalidBucket.dynamic).toBe(withoutBucket.dynamic);
+        });
+    });
+
+    describe('buildAnalysisPrompt — prior analyses (Task 3, prior-analysis-context spec)', () => {
+        // Fewer than PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK (21) bars, so
+        // `selectPriorAnalyses` anchors at bars[0] — every entry below is well
+        // inside the window without needing to think about the slack math.
+        const priorBars: Bar[] = Array.from({ length: 10 }, (_, i) =>
+            makeBar(i)
+        );
+
+        const priorEntry = (
+            barIndex: number,
+            overrides?: Partial<PriorAnalysis>
+        ): PriorAnalysis => ({
+            generatedAt: new Date(priorBars[barIndex].time * 1000),
+            trend: 'bullish',
+            riskLevel: 'medium',
+            ...overrides,
+        });
+
+        it('omitting priorAnalyses is byte-identical to explicitly passing an empty array', () => {
+            const omitted = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                []
+            );
+            const explicitEmpty = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                DEFAULT_ANALYSIS_LOCALE,
+                []
+            );
+            expect(explicitEmpty).toEqual(omitted);
+        });
+
+        it('an empty array renders nothing and leaves `dynamic` byte-identical to omitting the param', () => {
+            const withoutHistory = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                []
+            );
+            const withEmptyHistory = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                DEFAULT_ANALYSIS_LOCALE,
+                []
+            );
+            expect(withEmptyHistory.dynamic).toBe(withoutHistory.dynamic);
+        });
+
+        it('renders the "## Prior Analyses" section into `dynamic` when history is provided', () => {
+            const { dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                DEFAULT_ANALYSIS_LOCALE,
+                [priorEntry(3)]
+            );
+            expect(dynamic).toContain(
+                `## Prior Analyses (${TEST_SYMBOL} · Daily · reference only)`
+            );
+        });
+
+        it('places the section in `dynamic` only — `stable` never carries it', () => {
+            const { stable, dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                DEFAULT_ANALYSIS_LOCALE,
+                [priorEntry(3)]
+            );
+            expect(dynamic).toContain('## Prior Analyses');
+            expect(stable).not.toContain('## Prior Analyses');
+        });
+
+        it('`stable` is byte-identical whether or not priorAnalyses is provided', () => {
+            const withoutHistory = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                []
+            );
+            const withHistory = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                DEFAULT_ANALYSIS_LOCALE,
+                [priorEntry(3)]
+            );
+            expect(withHistory.stable).toBe(withoutHistory.stable);
+        });
+
+        it('appears after the Fear & Greed section, before the position hint, and before the "## Analysis Request" tail', () => {
+            const fg: FearGreedSnapshot = {
+                score: 50,
+                label: 'NEUTRAL',
+                groups: [
+                    { name: 'Flow', score: 50, factors: [] },
+                    { name: 'Trend', score: 50, factors: [] },
+                ],
+                confidence: 'normal',
+                sampleSize: 100,
+                warning: null,
+            };
+            const { dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                fg,
+                'equity',
+                'profit',
+                DEFAULT_ANALYSIS_LOCALE,
+                [priorEntry(3)]
+            );
+            const fgIndex = dynamic.indexOf('Fear & Greed');
+            const priorIndex = dynamic.indexOf('## Prior Analyses');
+            const positionHintIndex = dynamic.indexOf(
+                '이 사용자는 이 종목을 이미 보유 중이며'
+            );
+            const requestIndex = dynamic.indexOf('## Analysis Request');
+            expect(fgIndex).toBeGreaterThan(-1);
+            expect(priorIndex).toBeGreaterThan(fgIndex);
+            expect(positionHintIndex).toBeGreaterThan(priorIndex);
+            expect(requestIndex).toBeGreaterThan(positionHintIndex);
+        });
+
+        it('injecting history changes nothing else in `dynamic` — proves skill selection is untouched', () => {
+            // A single always_on skill, so its digest is guaranteed to land in
+            // `dynamic` (via `selectedGroups`/`coreGroups` — either bucket is
+            // fine, this test only cares that the rest of `dynamic` besides
+            // the inserted Prior Analyses section is byte-for-byte unchanged,
+            // which necessarily includes skill selection/content).
+            const skill = makeSkill({ name: 'Unaffected Skill' });
+            const history = [priorEntry(3)];
+
+            const withoutHistory = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [skill]
+            );
+            const withHistory = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                priorBars,
+                makeIndicators(),
+                [skill],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                DEFAULT_ANALYSIS_LOCALE,
+                history
+            );
+
+            const expectedSection = formatPriorAnalysisSection(
+                selectPriorAnalyses(history, priorBars),
+                priorBars,
+                TEST_SYMBOL,
+                '1Day'
+            );
+            const tailMarker = '## Analysis Request';
+            const tailIndex = withoutHistory.dynamic.indexOf(tailMarker);
+            expect(tailIndex).toBeGreaterThan(-1);
+            const beforeTail = withoutHistory.dynamic.slice(0, tailIndex);
+            const tail = withoutHistory.dynamic.slice(tailIndex);
+            const expectedDynamic = `${beforeTail}${expectedSection}\n\n${tail}`;
+
+            expect(withHistory.dynamic).toBe(expectedDynamic);
+            // Reconfirms skill selection specifically (not just "everything
+            // else"): an always_on skill's digest lands in `stable`
+            // (Design C), so the same skill content showing up verbatim
+            // there on both sides — combined with `stable` byte-identity
+            // asserted above — proves history never altered which skills
+            // were selected or how their content was grouped.
+            expect(withHistory.stable).toContain(skill.content);
+            expect(withoutHistory.stable).toContain(skill.content);
         });
     });
 
