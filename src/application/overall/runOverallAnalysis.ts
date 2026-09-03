@@ -1,5 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildTimeframeNotAllowedError } from '@/application/market/types';
@@ -36,6 +37,7 @@ import {
 import type {
     ActiveModelId,
     AnalysisResponse,
+    AssembledPromptRecord,
     Bar,
     FundamentalAnalysisResponse,
     OptionsAnalysisResponse,
@@ -60,6 +62,19 @@ import {
  * absent or not a known `ActiveModelId`. Mirrors `runAnalysis`'s fallback.
  */
 const DEFAULT_RUN_OVERALL_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
+
+/**
+ * `AssembledPromptRecord.promptVersion` for the OVERALL axis.
+ *
+ * Unlike the technical axis (`PROMPT_TEMPLATE_VERSION`,
+ * `infrastructure/cache/config.ts`), the overall axis has no dedicated
+ * prompt-template-version constant — `buildOverallCacheKey` takes a
+ * caller-computed `inputHash` instead of embedding a version segment. This
+ * is a literal placeholder, not a real generation counter: promote it to a
+ * proper `OVERALL_PROMPT_TEMPLATE_VERSION` export if/when stored-prompt
+ * grouping by generation starts to matter for this axis.
+ */
+const OVERALL_PROMPT_VERSION_PLACEHOLDER = 'overall-unversioned';
 
 /**
  * Strip volatile, write-time-only fields from a cached technical `AnalysisResponse`
@@ -612,8 +627,25 @@ export async function runOverallAnalysis(
             : DEFAULT_RUN_OVERALL_MODEL;
 
     // ── 10. LLM call (with in-flight deduplication) ──
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
+    const raw = await dedupeInFlight(cacheKey, () => {
+        // Fired INSIDE the dedup factory — see the same comment in
+        // `runAnalysis.ts`. Every concurrent caller missing this cache key
+        // builds its own prompt, but only the first one's factory runs; the
+        // rest receive that winner's result. Firing outside would call back
+        // once per caller for one real generation and hand the losers a
+        // prompt that was never sent.
+        notifyPromptAssembled(
+            options.onPromptAssembled,
+            {
+                system,
+                stable,
+                dynamic: prompt,
+                promptVersion: OVERALL_PROMPT_VERSION_PLACEHOLDER,
+            } satisfies AssembledPromptRecord,
+            '[RunOverallAnalysis]'
+        );
+
+        return callAnalysisAi({
             prompt,
             model: callModelId,
             tier,
@@ -624,8 +656,8 @@ export async function runOverallAnalysis(
             seed: analysisSeed(`${system}\n\n${prompt}`),
             reasoning,
             correlationId: `${symbol}:overall`,
-        })
-    );
+        });
+    });
 
     // ── 11. Normalize and cache ──
     const result = normalizeOverallAnalysisResponse(

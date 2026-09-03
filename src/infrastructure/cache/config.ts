@@ -2,11 +2,7 @@ import {
     localeKeySuffixFor,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
-import {
-    PRIOR_ANALYSIS_LIMIT,
-    PRIOR_ANALYSIS_SLACK,
-    PRIOR_ANALYSIS_WINDOW_BARS,
-} from '@/domain/analysis/priorAnalysis';
+import { PRIOR_ANALYSIS_WINDOW_BARS } from '@/domain/analysis/priorAnalysis';
 import type {
     DashboardTimeframe,
     MarketSessionSpec,
@@ -273,8 +269,8 @@ function historyKeySuffix(fingerprint?: string): string {
  * 1. Drop every entry with `generatedAt.getTime() >= now.getTime() -
  *    currentWindowSeconds * 1000` (inside the current window — including the
  *    boundary instant itself, which counts as "inside").
- * 2. Sort survivors newest-first and cap at `PRIOR_ANALYSIS_LIMIT *
- *    PRIOR_ANALYSIS_SLACK` (21) — the same slack multiplier
+ * 2. Sort survivors newest-first and cap at
+ *    {@link PRIOR_ANALYSIS_WINDOW_BARS} (21) — the same slack multiplier
  *    `selectPriorAnalyses` applies to its bar-count window, so under
  *    the expected density of at most roughly one analysis per bar this stage
  *    keeps everything stage 2 could still use. The cap is by COUNT, not by
@@ -318,7 +314,7 @@ function historyKeySuffix(fingerprint?: string): string {
  *
  * **Input-size contract.** The caller is expected to have sized its own query
  * with {@link analysisHistoryQuery}, whose `limit` already caps the array at
- * `PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK`. Nothing here enforces that:
+ * {@link PRIOR_ANALYSIS_WINDOW_BARS}. Nothing here enforces that:
  * this function sorts whatever it is handed, so a caller that forgets the
  * limit and passes an unbounded result set pays an O(n log n) sort on every
  * request. The cap below bounds everything downstream — including
@@ -1224,7 +1220,7 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  *
  * **Why `sinceMs` is derived from calendar days per bar, not from a cache
  * TTL.** The window this feature actually cares about is
- * `PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK` **bars**, and bars are not
+ * {@link PRIOR_ANALYSIS_WINDOW_BARS} **bars**, and bars are not
  * evenly spaced in wall-clock time — they skip nights, weekends, and
  * holidays. Sizing the query from `ANALYSIS_CACHE_TTL` (one bar of *clock*
  * time per bar) reintroduces exactly the defect the bar-counted window exists

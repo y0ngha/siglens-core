@@ -1,5 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
 import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
@@ -41,6 +42,7 @@ import {
 import type {
     ActiveModelId,
     AnalysisResponse,
+    AssembledPromptRecord,
     FearGreedSnapshot,
     Timeframe,
 } from '@/domain/types';
@@ -50,6 +52,7 @@ import {
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
     narrowPriorAnalysesForCacheKey,
+    PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
@@ -303,8 +306,28 @@ async function runAnalysisImpl(
     // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
+    const raw = await dedupeInFlight(cacheKey, () => {
+        // Fired INSIDE the dedup factory, not before it. Every concurrent
+        // caller that misses the same cache key builds its own prompt, but
+        // `dedupeInFlight` runs only the first one's factory and hands the
+        // rest that winner's result. Firing outside would call back once per
+        // caller for a single real generation, and — worse — hand every
+        // losing caller a prompt that was never sent, while the result they
+        // receive came from the winner's. A consumer persisting "the prompt
+        // that produced this row" would store duplicates and misattribute
+        // the text.
+        notifyPromptAssembled(
+            options.onPromptAssembled,
+            {
+                system,
+                stable,
+                dynamic: prompt,
+                promptVersion: PROMPT_TEMPLATE_VERSION,
+            } satisfies AssembledPromptRecord,
+            '[RunAnalysis]'
+        );
+
+        return callAnalysisAi({
             prompt,
             model: callModelId,
             tier,
@@ -315,8 +338,8 @@ async function runAnalysisImpl(
             seed: analysisSeed(`${system}\n\n${prompt}`),
             reasoning: options.reasoning,
             correlationId: `${symbol}:${timeframe}`,
-        })
-    );
+        });
+    });
 
     // Inline post-processing (formerly in pollAnalysis). No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;

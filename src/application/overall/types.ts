@@ -23,6 +23,7 @@ import type {
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
     AnalysisResponse,
+    AssembledPromptRecord,
     AssetClass,
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -110,6 +111,55 @@ export interface OverallDependencyInputs {
      * produced before this field existed.
      */
     priorAnalyses?: readonly PriorAnalysis[];
+    /**
+     * Callback that receives the exact prompt sent to the model for the
+     * OVERALL axis, mirroring `SubmitAnalysisOptions.onPromptAssembled`
+     * (technical axis) so a consumer can persist prompts from both axes
+     * alongside the analyses they produced.
+     *
+     * Called synchronously exactly ONCE, immediately after the prompt is
+     * assembled and before the provider call — and ONLY on a cache miss.
+     * Omitting it leaves behavior byte-identical.
+     *
+     * The callback's own throw is caught and logged by core and never
+     * propagates — a consumer's persistence failure must not fail an
+     * analysis.
+     *
+     * **Fires at most once per real generation, not once per caller.** The
+     * invocation lives inside the in-flight dedup factory: concurrent callers
+     * that miss the same cache key each assemble their own prompt, but only
+     * the winner's factory runs and the rest receive the winner's result.
+     * Firing per caller would both duplicate the record and hand losers a
+     * prompt that was never sent.
+     *
+     * **A fired record can be orphaned.** It fires immediately before the
+     * provider call, so an abort (`signal`) or a provider failure after
+     * retries leaves a captured prompt with no corresponding result and no
+     * cache entry. Retries themselves do NOT re-fire — the retry wrapper
+     * reuses the same assembled strings. A consumer persisting these must
+     * therefore tolerate prompt records with no matching analysis row rather
+     * than assuming a 1:1 correspondence.
+     *
+     * **May be async.** A rejected promise is caught and logged, exactly like
+     * a synchronous throw. This is spelled out because the naive shape —
+     * declaring `=> void` and wrapping the call in `try`/`catch` — silently
+     * fails for the realistic case: a throw inside an `async` function never
+     * surfaces synchronously, so the `catch` sees nothing and the rejection
+     * goes unhandled, which Node terminates the process for by default. The
+     * documented use here is persisting the prompt, i.e. an async write.
+     *
+     * **A concurrent loser's callback is not called at all.** Because the
+     * invocation lives inside the dedup factory, when two callers miss the
+     * same cache key with DIFFERENT callbacks only the winner's runs — the
+     * loser still receives the winner's analysis result, but its own callback
+     * never fires and it therefore has no prompt to store for that result.
+     * This is the deliberate trade-off against the alternative, which is
+     * worse: firing every caller's callback would hand losers a prompt that
+     * was never sent, quietly misattributing text to a result it did not
+     * produce. Consumers must treat the captured prompt as best-effort and
+     * tolerate result rows with no prompt attached.
+     */
+    onPromptAssembled?: (record: AssembledPromptRecord) => void | Promise<void>;
     /** Fundamental data provider implementation injected by the caller. */
     fundamentalProvider: FundamentalDataProvider;
     /**

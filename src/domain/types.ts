@@ -1742,6 +1742,33 @@ export interface AssembledPrompt {
 }
 
 /**
+ * A verbatim copy of the prompt actually sent to the model for one fresh
+ * generation, handed to the consumer via `SubmitAnalysisOptions.onPromptAssembled`
+ * / `OverallDependencyInputs.onPromptAssembled` so it can persist the prompt
+ * alongside the analysis it produced (offline evaluation, debugging).
+ *
+ * Only delivered on a cache miss — a cache hit has no freshly assembled
+ * prompt to hand out. `system` already has `stable` folded into the base
+ * system persona (Design C: `system = basePersona + stable`), so a consumer
+ * that wants the exact provider-call arguments needs only `system` and
+ * `dynamic`; `stable` is broken out separately because it is
+ * BYTE-IDENTICAL across every call sharing the same `(analysisType,
+ * catalog)` fingerprint — a consumer storing many of these rows should
+ * content-address that half (store it once, reference it by hash) rather
+ * than copying it into every row.
+ */
+export interface AssembledPromptRecord {
+    /** The system message actually sent, including the folded-in `stable` skill digest. */
+    readonly system: string;
+    /** The `always_on` skill digest half — byte-identical across calls sharing a catalog. */
+    readonly stable: string;
+    /** Everything else: symbol framing, bar data, indicators, gated skills, prior analyses, output rules. */
+    readonly dynamic: string;
+    /** Prompt-template generation that produced this text, so stored prompts can be grouped by generation. */
+    readonly promptVersion: string;
+}
+
+/**
  * @internal
  * LLM이 반환하는 원시 분석 응답.
  *
