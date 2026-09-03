@@ -1680,10 +1680,13 @@ export interface FilteredAnalysisResult {
 export interface PriorAnalysis {
     /** When the analysis was produced (the original analysis time, not the row's insert time). */
     readonly generatedAt: Date;
+    /** Directional bias the analysis concluded with. */
     readonly trend: Trend;
+    /** Risk classification the analysis assigned. */
     readonly riskLevel: RiskLevel;
     /** Entry price range `[low, high]` or single `[price]`, when the analysis recommended one. */
     readonly entryPrices?: readonly number[];
+    /** Stop-loss price the analysis set, when it recommended an entry. */
     readonly stopLoss?: number;
     /** Take-profit targets in ascending order. */
     readonly takeProfitPrices?: readonly number[];

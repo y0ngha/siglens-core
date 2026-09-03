@@ -524,6 +524,38 @@ describe('runOverallAnalysis', () => {
             expect(prompt).toContain('## Prior Analyses');
         });
 
+        it("공유된 '1Day' 페치가 실패하면 로그가 한 번만 찍힌다", async () => {
+            // 두 파생 promise가 같은 `dailyBarsPromise`를 공유하므로, 각자
+            // catch를 달면 하나의 원인에 대해 console.error가 두 줄 찍혀
+            // 독립된 두 장애처럼 읽힌다. 로깅은 공유 지점 한 곳에만 둔다.
+            mockFetchBarsWithIndicators.mockRejectedValue(
+                new Error('upstream down')
+            );
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            try {
+                await runOverallAnalysis({
+                    ...baseOptions(), // timeframe: '1Day'
+                    priorAnalyses: [
+                        {
+                            generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                            trend: 'bullish',
+                            riskLevel: 'medium',
+                        },
+                    ],
+                });
+
+                const barsFailureLogs = errorSpy.mock.calls.filter(call =>
+                    String(call[0]).includes('Daily bars fetch failed')
+                );
+                expect(barsFailureLogs).toHaveLength(1);
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+
         it("timeframe이 '1Day'면 Fear & Greed 페치를 재사용해 한 번만 부른다", async () => {
             // F&G는 언제나 '1Day'를 부른다. overall 요청 자체가 '1Day'면 두 호출의
             // 인자가 완전히 동일해지는데, `fetchBarsWithIndicators`는 core에서

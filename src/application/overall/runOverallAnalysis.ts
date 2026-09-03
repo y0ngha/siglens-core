@@ -517,43 +517,57 @@ export async function runOverallAnalysis(
     // fetches would otherwise carry byte-identical arguments and, since
     // `fetchBarsWithIndicators` does not cache, pay for the same upstream call
     // and the same `calculateIndicators` pass twice.
+    // The Fear & Greed snapshot always needs the DAILY series, whatever the
+    // overall request's own timeframe is. Held as one promise so the
+    // prior-analysis path can share it: on a '1Day' overall request the two
+    // fetches would otherwise carry byte-identical arguments and, since
+    // `fetchBarsWithIndicators` does not cache, pay for the same upstream call
+    // and the same `calculateIndicators` pass twice.
+    //
+    // Failure is logged HERE, once, rather than in each derived promise's own
+    // catch. When the two share this promise a single upstream failure would
+    // otherwise print two console lines for one cause, which reads like two
+    // independent incidents. Both derived paths still degrade independently
+    // below — Fear & Greed to `null`, prior-analysis bars to `undefined` —
+    // so neither can fail the overall analysis.
     const dailyBarsPromise = fetchBarsWithIndicators(
         marketDataProvider,
         symbol,
         '1Day',
         fmpSymbol
+    ).catch(error => {
+        console.error(
+            '[RunOverallAnalysis] Daily bars fetch failed; proceeding without sentiment, and without prior-analysis context when the request timeframe is 1Day:',
+            error
+        );
+        return null;
+    });
+
+    const fearGreedPromise = dailyBarsPromise.then(d =>
+        d === null
+            ? null
+            : computeFearGreedIndex(d.bars, d.indicators.buySellVolume)
     );
 
-    const fearGreedPromise = dailyBarsPromise
-        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
-        .catch(error => {
-            console.error(
-                '[RunOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
-                error
-            );
-            return null;
-        });
-
     const priorAnalysisBarsPromise: Promise<Bar[] | undefined> =
-        priorAnalysisCandidates.length > 0
-            ? (timeframe === '1Day'
-                  ? dailyBarsPromise
-                  : fetchBarsWithIndicators(
-                        marketDataProvider,
-                        symbol,
-                        timeframe,
-                        fmpSymbol
-                    )
-              )
-                  .then(d => d.bars)
-                  .catch(error => {
-                      console.error(
-                          '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
-                          error
-                      );
-                      return undefined;
-                  })
-            : Promise.resolve(undefined);
+        priorAnalysisCandidates.length === 0
+            ? Promise.resolve(undefined)
+            : timeframe === '1Day'
+              ? dailyBarsPromise.then(d => d?.bars)
+              : fetchBarsWithIndicators(
+                    marketDataProvider,
+                    symbol,
+                    timeframe,
+                    fmpSymbol
+                )
+                    .then(d => d.bars)
+                    .catch(error => {
+                        console.error(
+                            '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
+                            error
+                        );
+                        return undefined;
+                    });
 
     const [fearGreed, priorAnalysisBars] = await Promise.all([
         fearGreedPromise,
