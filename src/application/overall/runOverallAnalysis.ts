@@ -529,11 +529,27 @@ export async function runOverallAnalysis(
         return null;
     });
 
-    const fearGreedPromise = dailyBarsPromise.then(d =>
-        d === null
-            ? null
-            : computeFearGreedIndex(d.bars, d.indicators.buySellVolume)
-    );
+    const fearGreedPromise = dailyBarsPromise
+        .then(d =>
+            d === null
+                ? null
+                : computeFearGreedIndex(d.bars, d.indicators.buySellVolume)
+        )
+        // Guards the COMPUTE step, not the fetch — that already logged above.
+        // Before the two paths shared one promise, fetch and compute sat in a
+        // single chain under one `catch`; splitting them left the compute step
+        // unprotected, so a throw inside `computeFearGreedIndex` would reject
+        // `Promise.all` and fail the whole overall analysis. Nothing in that
+        // call throws today, but the comment above promises Fear & Greed
+        // degrades to `null` no matter what, and the code has to actually
+        // honour that rather than rely on a callee never changing.
+        .catch(error => {
+            console.error(
+                '[RunOverallAnalysis] FearGreed computation failed; proceeding without sentiment:',
+                error
+            );
+            return null;
+        });
 
     const priorAnalysisBarsPromise: Promise<Bar[] | undefined> =
         priorAnalysisCandidates.length === 0

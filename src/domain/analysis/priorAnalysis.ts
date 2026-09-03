@@ -26,6 +26,21 @@ export const PRIOR_ANALYSIS_LIMIT = 7;
 export const PRIOR_ANALYSIS_SLACK = 3;
 
 /**
+ * @internal How many bars back the prior-analysis window reaches:
+ * {@link PRIOR_ANALYSIS_LIMIT} entries times {@link PRIOR_ANALYSIS_SLACK}
+ * slack, i.e. 21 bars.
+ *
+ * Derived once here rather than recomputed at each use. The same window is
+ * needed in three places — the bar anchor in {@link selectPriorAnalyses}, the
+ * cap in `narrowPriorAnalysesForCacheKey`, and the row limit in
+ * `analysisHistoryQuery` — and they must agree: if the stage-1 cap were
+ * smaller than the stage-2 anchor window, stage 2 would be starved of
+ * candidates it was entitled to, silently and with no error.
+ */
+export const PRIOR_ANALYSIS_WINDOW_BARS =
+    PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
+
+/**
  * @internal
  *
  * `Bar.time` is a Unix timestamp in **seconds**; `PriorAnalysis.generatedAt`
@@ -108,7 +123,7 @@ export function selectPriorAnalyses(
         return [];
     }
 
-    const windowBars = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
+    const windowBars = PRIOR_ANALYSIS_WINDOW_BARS;
     const anchorBar =
         bars.length < windowBars ? bars[0] : bars[bars.length - windowBars];
     const anchorMs = barTimeMs(anchorBar);

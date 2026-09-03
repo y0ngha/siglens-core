@@ -25,7 +25,7 @@ export type CachedMacroBriefingData = CachedBriefingData;
  */
 export interface NarrowedPriorAnalyses {
     /** Window-filtered, capped, newest-first list. Feed to stage 2 (`selectPriorAnalyses`), unfiltered by bar. */
-    candidates: PriorAnalysis[];
+    candidates: readonly PriorAnalysis[];
     /** Cache-key segment for this set; `undefined` when `candidates` is empty (byte-identical to no history at all). */
     fingerprint: string | undefined;
 }

@@ -5,6 +5,7 @@ import {
 import {
     PRIOR_ANALYSIS_LIMIT,
     PRIOR_ANALYSIS_SLACK,
+    PRIOR_ANALYSIS_WINDOW_BARS,
 } from '@/domain/analysis/priorAnalysis';
 import type {
     DashboardTimeframe,
@@ -32,11 +33,11 @@ import {
     secondsUntilNextEtRegularOpen,
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
-import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 import type {
     AnalysisHistoryQuery,
     NarrowedPriorAnalyses,
 } from '@/infrastructure/cache/types';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 
 /**
  * @internal TTL for cached market briefings (in seconds).
@@ -330,7 +331,7 @@ export function narrowPriorAnalysesForCacheKey(
     now: Date
 ): NarrowedPriorAnalyses {
     const windowStartMs = now.getTime() - currentWindowSeconds * MS_PER_SECOND;
-    const cap = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
+    const cap = PRIOR_ANALYSIS_WINDOW_BARS;
 
     const candidates = priorAnalyses
         .filter(entry => entry.generatedAt.getTime() < windowStartMs)
@@ -1274,7 +1275,7 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
 export function analysisHistoryQuery(
     timeframe: Timeframe
 ): AnalysisHistoryQuery {
-    const limit = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
+    const limit = PRIOR_ANALYSIS_WINDOW_BARS;
     const calendarDaysPerBar =
         TIMEFRAME_LOOKBACK_DAYS[timeframe] / TIMEFRAME_BARS_LIMIT[timeframe];
     const days =
