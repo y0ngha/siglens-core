@@ -566,6 +566,52 @@ describe('runAnalysis', () => {
             expect(captured.dynamic).toBe(sent.prompt);
             expect(captured.system).toBe(sent.system);
         });
+
+        it('서로 다른 콜백을 넘긴 동시 호출에서는 승자의 것만 발화한다', async () => {
+            // 멀티테넌트 실제 시나리오: 서로 다른 소비자가 같은 심볼·타임프레임을
+            // 동시에 요청한다. dedup 팩토리가 승자 것만 실행하므로 패자의 콜백은
+            // **아예 호출되지 않는다** — 패자는 승자의 결과를 받지만 그 결과에
+            // 대응하는 프롬프트는 못 받는다.
+            //
+            // 대안(모든 호출자의 콜백 발화)이 더 나쁘다: 패자에게 전송된 적 없는
+            // 프롬프트를 넘겨 결과에 잘못 귀속시키게 된다. 그래서 이 동작이
+            // 의도된 트레이드오프이고, 소비자는 프롬프트 없는 결과 행을
+            // 허용해야 한다. 이 테스트는 그 계약을 고정한다.
+            let resolveAi!: (value: string) => void;
+            mockCallAnalysisAi.mockReturnValueOnce(
+                new Promise<string>(res => {
+                    resolveAi = res;
+                })
+            );
+
+            const winnerCb = vi.fn();
+            const loserCb = vi.fn();
+            const call = (onPromptAssembled: () => void) =>
+                runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider, onPromptAssembled }
+                );
+
+            const p1 = call(winnerCb);
+            const p2 = call(loserCb);
+
+            resolveAi(JSON.stringify(mockRawResult));
+            const [r1, r2] = await Promise.all([p1, p2]);
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            // 정확히 하나만 발화한다. 어느 쪽이 승자인지는 스케줄링에 달렸으므로
+            // 합계로 단언한다 — 그래야 순서에 기대지 않는다.
+            expect(winnerCb.mock.calls.length + loserCb.mock.calls.length).toBe(
+                1
+            );
+            // 그럼에도 두 호출자 모두 결과는 받는다.
+            expect(r1.status).toBe('done');
+            expect(r2.status).toBe('done');
+        });
     });
 
     /**
