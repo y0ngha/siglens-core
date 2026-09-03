@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.56.0](https://github.com/y0ngha/siglens-core/compare/v0.55.0...v0.56.0) (2026-09-03)
+
+
+### Features
+
+* onPromptAssembled 콜백 및 lint 수정 ([3bbb16f](https://github.com/y0ngha/siglens-core/commit/3bbb16f817ffa304aa07b2d6a2b024df2d7a013b))
+
 # [0.55.0](https://github.com/y0ngha/siglens-core/compare/v0.54.0...v0.55.0) (2026-09-03)
 
 
