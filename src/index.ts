@@ -243,7 +243,7 @@ export type { PositionBucket } from './domain/types';
 // change how core narrows or renders history without that being a breaking
 // change for the consumer — the consumer's only job is producing
 // `PriorAnalysis[]` and sizing its query with `analysisHistoryQuery`.
-export type { PriorAnalysis } from './domain/analysis/priorAnalysis';
+export type { PriorAnalysis } from './domain/types';
 
 // LLM provider mapping
 export { getProviderForModel } from './domain/llm/providers';
@@ -477,6 +477,8 @@ export type {
 } from './domain/ports/aiProvider';
 
 export type { CacheProvider } from './domain/ports/cache';
+// Return type of `analysisHistoryQuery` (Tier 3, exported above).
+export type { AnalysisHistoryQuery } from './infrastructure/cache/types';
 export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type { UserTier } from './domain/ports/userTierRepository';
 export type {

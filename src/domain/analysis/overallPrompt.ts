@@ -11,10 +11,7 @@ import {
     computeOverallScore,
     type OverallScore,
 } from '@/domain/analysis/overallScore';
-import {
-    selectPriorAnalyses,
-    type PriorAnalysis,
-} from '@/domain/analysis/priorAnalysis';
+import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import type {
     AnalysisResponse,
@@ -26,6 +23,7 @@ import type {
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
+    PriorAnalysis,
     Timeframe,
 } from '@/domain/types';
 
@@ -397,8 +395,8 @@ function formatFinancials(
  *   the rest of this builder's inputs (which are all already-computed axis
  *   summaries), the prior-analysis window in `priorAnalyses` is measured in
  *   **bars**, not wall-clock time (session gaps already removed — see
- *   {@link PRIOR_ANALYSIS_SLACK}'s doc comment in `priorAnalysis.ts`), so
- *   {@link selectPriorAnalyses} needs the same bar series the technical
+ *   `PRIOR_ANALYSIS_SLACK`'s doc comment in `priorAnalysis.ts`), so
+ *   `selectPriorAnalyses` needs the same bar series the technical
  *   analysis for this symbol + timeframe was built from to anchor each past
  *   call to a bar and measure its outcome. This builder does not fetch bars
  *   itself; the caller supplies them. Note that the caller cannot simply
@@ -412,8 +410,8 @@ function formatFinancials(
  *   that param.
  * @param priorAnalyses - Optional history of past analyses for this symbol +
  *   timeframe, supplied by the consumer (siglens / siglens-trader) from its
- *   own storage. Rendered into `dynamic` via {@link selectPriorAnalyses} +
- *   {@link formatPriorAnalysisSection} only when BOTH `bars` and
+ *   own storage. Rendered into `dynamic` via `selectPriorAnalyses` +
+ *   `formatPriorAnalysisSection` only when BOTH `bars` and
  *   `priorAnalyses` are provided and non-empty — one without the other
  *   cannot be anchored to a bar, so nothing is rendered. Into `dynamic`
  *   only, never `stable` (same reasoning as every other per-call value in

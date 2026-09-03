@@ -15,7 +15,7 @@ import type { Timeframe } from '@/domain/types';
  * builder and `priorAnalysisSection.ts` can read the same map without the two
  * modules importing each other — a cycle that would otherwise form, since the
  * prompt builder also imports the prior-analysis renderer. `promptFormat.ts`
- * has no imports of its own, so it is the natural neutral home.
+ * imports only the `Timeframe` type, so it is the natural neutral home.
  */
 export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
     '5Min': '5-Minute',

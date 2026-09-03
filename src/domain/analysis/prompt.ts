@@ -77,6 +77,7 @@ import type {
     IndicatorResult,
     MarketReference,
     PositionBucket,
+    PriorAnalysis,
     PromptConfig,
     ReferenceLevel,
     Skill,
@@ -98,10 +99,7 @@ import {
     formatNullableNumber,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
-import {
-    selectPriorAnalyses,
-    type PriorAnalysis,
-} from '@/domain/analysis/priorAnalysis';
+import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 
 type SkillGroupKey = SkillType | 'regular';
@@ -1833,10 +1831,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   that byte identity is what keeps the existing Korean analysis cache valid.
  * @param priorAnalyses - Optional history of past analyses for this symbol +
  *   timeframe, supplied by the consumer (siglens / siglens-trader) from its
- *   own storage. When provided, narrowed via {@link selectPriorAnalyses} (bar
+ *   own storage. When provided, narrowed via `selectPriorAnalyses` (bar
  *   anchor, per-bar dedup, newest-first, capped at
- *   {@link PRIOR_ANALYSIS_LIMIT}) and rendered via
- *   {@link formatPriorAnalysisSection} — into `dynamic` only, never `stable`,
+ *   `PRIOR_ANALYSIS_LIMIT`) and rendered via
+ *   `formatPriorAnalysisSection` — into `dynamic` only, never `stable`,
  *   for the same reason as `positionBucket` above: a per-call value here
  *   would destroy the byte-cacheable stable prefix shared across every
  *   caller. It also never reaches skill selection — it is computed

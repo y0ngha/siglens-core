@@ -21,7 +21,6 @@ import type {
     AnalysisUsageOptions,
 } from '@/application/usage/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
-import type { PriorAnalysis } from '@/domain/analysis/priorAnalysis';
 import type {
     AnalysisResponse,
     AssetClass,
@@ -34,6 +33,7 @@ import type {
     OptionsAnalysisResponse,
     OptionsSnapshot,
     OverallAnalysisResponse,
+    PriorAnalysis,
     Tier,
     TierConfig,
     Timeframe,

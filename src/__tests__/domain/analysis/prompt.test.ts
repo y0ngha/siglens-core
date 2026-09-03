@@ -2,10 +2,7 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
-import {
-    selectPriorAnalyses,
-    type PriorAnalysis,
-} from '@/domain/analysis/priorAnalysis';
+import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
@@ -60,6 +57,7 @@ import type {
     FearGreedSnapshot,
     IndicatorResult,
     PositionBucket,
+    PriorAnalysis,
     Skill,
     SkillUsageRole,
     SMCResult,

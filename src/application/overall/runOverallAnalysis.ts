@@ -37,7 +37,6 @@ import type {
     ActiveModelId,
     AnalysisResponse,
     Bar,
-    FearGreedSnapshot,
     FundamentalAnalysisResponse,
     OptionsAnalysisResponse,
     OverallAnalysisResponse,
@@ -541,7 +540,7 @@ export async function runOverallAnalysis(
                     error
                 );
                 return null;
-            }) as Promise<FearGreedSnapshot | null>,
+            }),
         priorAnalysisBarsPromise,
     ]);
 

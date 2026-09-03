@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/domain/analysis/overallPrompt';
-import type { PriorAnalysis } from '@/domain/analysis/priorAnalysis';
 import type {
     AnalysisResponse,
     Bar,
@@ -9,6 +8,7 @@ import type {
     FundamentalAnalysisResponse,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
+    PriorAnalysis,
     Timeframe,
 } from '@/domain/types';
 

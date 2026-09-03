@@ -3,8 +3,7 @@ import {
     PRIOR_ANALYSIS_GUARDRAIL,
     formatPriorAnalysisSection,
 } from '@/domain/analysis/priorAnalysisSection';
-import type { PriorAnalysis } from '@/domain/analysis/priorAnalysis';
-import type { Bar } from '@/domain/types';
+import type { Bar, PriorAnalysis } from '@/domain/types';
 
 /** Bars sorted oldest-first, `intervalSeconds` apart, starting at `startTime` (Unix seconds). */
 function makeBars(

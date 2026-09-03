@@ -44,9 +44,8 @@ import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import {
     PRIOR_ANALYSIS_LIMIT,
     PRIOR_ANALYSIS_SLACK,
-    type PriorAnalysis,
 } from '@/domain/analysis/priorAnalysis';
-import type { PositionBucket } from '@/domain/types';
+import type { PositionBucket, PriorAnalysis } from '@/domain/types';
 import { describe, expect, it } from 'vitest';
 
 /** Minimal `PriorAnalysis` fixture — only `generatedAt` matters to the cache-key narrowing under test. */

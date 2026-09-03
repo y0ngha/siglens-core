@@ -5,7 +5,6 @@ import type {
     AnalysisUsageOptions,
 } from '@/application/usage/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
-import type { PriorAnalysis } from '@/domain/analysis/priorAnalysis';
 import { getAllowedTimeframes } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -15,6 +14,7 @@ import type {
     MarketBriefingResponse,
     ModelId,
     PositionBucket,
+    PriorAnalysis,
     Tier,
     TierConfig,
     TierInfoDepth,

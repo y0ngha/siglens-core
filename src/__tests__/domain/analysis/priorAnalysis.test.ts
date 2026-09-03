@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+    findAnchorBarIndex,
     PRIOR_ANALYSIS_LIMIT,
     PRIOR_ANALYSIS_SLACK,
     selectPriorAnalyses,
-    type PriorAnalysis,
 } from '@/domain/analysis/priorAnalysis';
-import type { Bar } from '@/domain/types';
+import type { Bar, PriorAnalysis } from '@/domain/types';
 
 const WINDOW_BARS = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK; // 21
 
@@ -168,5 +168,38 @@ describe('selectPriorAnalyses', () => {
         const result = selectPriorAnalyses([withPlan], bars);
 
         expect(result).toEqual([withPlan]);
+    });
+});
+
+describe('findAnchorBarIndex', () => {
+    it('returns the exact index when targetMs lands exactly on a bar time', () => {
+        const bars = makeBars(10);
+        expect(findAnchorBarIndex(bars, bars[5].time * 1000)).toBe(5);
+    });
+
+    it('returns the earlier bar when targetMs falls between two bars', () => {
+        const bars = makeBars(10);
+        const betweenMs = bars[5].time * 1000 + 1;
+        expect(findAnchorBarIndex(bars, betweenMs)).toBe(5);
+    });
+
+    it('returns null when targetMs is before the first bar', () => {
+        const bars = makeBars(10);
+        expect(findAnchorBarIndex(bars, bars[0].time * 1000 - 1)).toBeNull();
+    });
+
+    it('returns the last index when targetMs is after the last bar', () => {
+        const bars = makeBars(10);
+        const lastIndex = bars.length - 1;
+        expect(findAnchorBarIndex(bars, bars[lastIndex].time * 1000 + 1)).toBe(
+            lastIndex
+        );
+    });
+
+    it('single-bar array: returns 0 at/after the bar, null before it', () => {
+        const bars = makeBars(1);
+        expect(findAnchorBarIndex(bars, bars[0].time * 1000)).toBe(0);
+        expect(findAnchorBarIndex(bars, bars[0].time * 1000 + 1)).toBe(0);
+        expect(findAnchorBarIndex(bars, bars[0].time * 1000 - 1)).toBeNull();
     });
 });

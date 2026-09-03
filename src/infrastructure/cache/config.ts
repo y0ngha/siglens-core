@@ -5,7 +5,6 @@ import {
 import {
     PRIOR_ANALYSIS_LIMIT,
     PRIOR_ANALYSIS_SLACK,
-    type PriorAnalysis,
 } from '@/domain/analysis/priorAnalysis';
 import type {
     DashboardTimeframe,
@@ -13,6 +12,7 @@ import type {
     NewsFeedCategory,
     OptionsExpirationFilter,
     PositionBucket,
+    PriorAnalysis,
     StatementPeriod,
     Timeframe,
 } from '@/domain/types';
@@ -33,6 +33,10 @@ import {
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
+import type {
+    AnalysisHistoryQuery,
+    NarrowedPriorAnalyses,
+} from '@/infrastructure/cache/types';
 
 /**
  * @internal TTL for cached market briefings (in seconds).
@@ -210,7 +214,7 @@ function positionKeySuffix(bucket?: PositionBucket): string {
 
 /**
  * @internal Cache-key suffix for the prior-analysis-context fingerprint (see
- * {@link narrowPriorAnalysesForCacheKey}).
+ * `narrowPriorAnalysesForCacheKey`).
  *
  * Mirrors the sibling suffix helpers' "append only when supplied" convention:
  * `undefined` — no history was supplied, or every candidate fell inside the
@@ -223,9 +227,11 @@ function historyKeySuffix(fingerprint?: string): string {
 }
 
 /**
+ * @internal
+ *
  * Stage 1 of the two-stage prior-analysis narrowing that backs the
  * prior-analysis-context feature (see `PriorAnalysis` in
- * `domain/analysis/priorAnalysis.ts` for the feature overview). Cuts a
+ * `domain/types.ts` for the feature overview). Cuts a
  * caller-supplied history of past analyses down to the set that may
  * legitimately determine the CACHE KEY for the CURRENT cache window, and
  * derives a short fingerprint of that set for
@@ -268,7 +274,7 @@ function historyKeySuffix(fingerprint?: string): string {
  *    boundary instant itself, which counts as "inside").
  * 2. Sort survivors newest-first and cap at `PRIOR_ANALYSIS_LIMIT *
  *    PRIOR_ANALYSIS_SLACK` (21) — the same slack multiplier
- *    {@link selectPriorAnalyses} applies to its bar-count window, so under
+ *    `selectPriorAnalyses` applies to its bar-count window, so under
  *    the expected density of at most roughly one analysis per bar this stage
  *    keeps everything stage 2 could still use. The cap is by COUNT, not by
  *    bar, so the two are not equivalent in the limit: on a symbol analysed
@@ -322,7 +328,7 @@ export function narrowPriorAnalysesForCacheKey(
     priorAnalyses: readonly PriorAnalysis[],
     currentWindowSeconds: number,
     now: Date
-): { candidates: PriorAnalysis[]; fingerprint: string | undefined } {
+): NarrowedPriorAnalyses {
     const windowStartMs = now.getTime() - currentWindowSeconds * MS_PER_SECOND;
     const cap = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
 
@@ -540,7 +546,7 @@ export const PROMPT_TEMPLATE_VERSION = 'p9' as const;
  *   the exact key this builder produced before the parameter existed, so the
  *   Korean cache stays valid; other locales append `:lang=<locale>`.
  * @param historyFingerprint - Prior-analysis-context fingerprint, from
- *   {@link narrowPriorAnalysesForCacheKey}'s `fingerprint` return value. The
+ *   `narrowPriorAnalysesForCacheKey`'s `fingerprint` return value. The
  *   NEW LAST segment, appended AFTER the locale suffix. `undefined` — the
  *   caller has no `priorAnalyses`, or nothing survived the two-stage
  *   narrowing (see that function's doc) — produces no suffix at all, so this
@@ -1207,7 +1213,7 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  *
  * The consumer's database knows nothing about bars, so this is a **coarse
  * pre-filter only** — deliberately generous. Core re-cuts precisely afterwards
- * in two stages: {@link narrowPriorAnalysesForCacheKey} drops entries inside
+ * in two stages: `narrowPriorAnalysesForCacheKey` drops entries inside
  * the current cache window, then `selectPriorAnalyses` applies the real
  * bar-anchored window. Over-fetching here costs one wider `WHERE` clause;
  * under-fetching silently disables the feature, because core can only narrow
@@ -1263,10 +1269,9 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  * @returns `limit` — the maximum rows worth fetching — and `sinceMs`, how far
  *   back in milliseconds the `WHERE` clause should reach from now.
  */
-export function analysisHistoryQuery(timeframe: Timeframe): {
-    limit: number;
-    sinceMs: number;
-} {
+export function analysisHistoryQuery(
+    timeframe: Timeframe
+): AnalysisHistoryQuery {
     const limit = PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK;
     const calendarDaysPerBar =
         TIMEFRAME_LOOKBACK_DAYS[timeframe] / TIMEFRAME_BARS_LIMIT[timeframe];

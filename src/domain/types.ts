@@ -1668,6 +1668,27 @@ export interface FilteredAnalysisResult {
     lockedInfoDepth: readonly TierInfoDepth[];
 }
 
+/**
+ * One past analysis of the same symbol + timeframe, supplied by the consumer
+ * (the siglens web app / siglens-trader) from its own database.
+ *
+ * Deliberately a FLAT, language-neutral projection rather than a full
+ * `AnalysisResponse`: core must not know the consumer's storage shape, and the
+ * digest built from these values is rendered into prompts of every output
+ * locale, so no prose field may appear here.
+ */
+export interface PriorAnalysis {
+    /** When the analysis was produced (the original analysis time, not the row's insert time). */
+    readonly generatedAt: Date;
+    readonly trend: Trend;
+    readonly riskLevel: RiskLevel;
+    /** Entry price range `[low, high]` or single `[price]`, when the analysis recommended one. */
+    readonly entryPrices?: readonly number[];
+    readonly stopLoss?: number;
+    /** Take-profit targets in ascending order. */
+    readonly takeProfitPrices?: readonly number[];
+}
+
 /** Bars + computed indicator suite — see {@link fetchBarsWithIndicators}. */
 export interface BarsData {
     /** OHLCV bars sorted oldest-first. */

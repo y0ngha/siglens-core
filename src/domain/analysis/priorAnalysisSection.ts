@@ -9,16 +9,12 @@
 // that is identical underneath, splitting one cache entry into four for no
 // reason. Do not add one.
 
-import {
-    barTimeMs,
-    findAnchorBarIndex,
-    type PriorAnalysis,
-} from '@/domain/analysis/priorAnalysis';
+import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
     formatNullableNumber,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
-import type { Bar, Timeframe } from '@/domain/types';
+import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
 
 const PRICE_DECIMAL_PLACES = 2;
 const PERCENT_DECIMAL_PLACES = 2;
@@ -212,6 +208,8 @@ export const PRIOR_ANALYSIS_GUARDRAIL =
     'Prior-analysis guardrail: the history above is reference only. Where it conflicts with the current data, current data always wins. If a past call was wrong, say so explicitly and state in one line what changed since then. Do not maintain a direction, risk level, or plan because the history leans that way — the justification for your verdict is always the computed data above, never your own prior output.';
 
 /**
+ * @internal
+ *
  * Renders selected prior analyses into a `## Prior Analyses` prompt section,
  * each past call scored against what price actually did afterwards (high /
  * low / now relative to the price at the time of that call, plus whether its

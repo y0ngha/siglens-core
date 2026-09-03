@@ -1,31 +1,12 @@
 import { MS_PER_SECOND } from '@/domain/constants/time';
-import type { Bar, RiskLevel, Trend } from '@/domain/types';
+import type { Bar, PriorAnalysis } from '@/domain/types';
 
-/**
- * One past analysis of the same symbol + timeframe, supplied by the consumer
- * (the siglens web app / siglens-trader) from its own database.
- *
- * Deliberately a FLAT, language-neutral projection rather than a full
- * `AnalysisResponse`: core must not know the consumer's storage shape, and the
- * digest built from these values is rendered into prompts of every output
- * locale, so no prose field may appear here.
- */
-export interface PriorAnalysis {
-    /** When the analysis was produced (the original analysis time, not the row's insert time). */
-    readonly generatedAt: Date;
-    readonly trend: Trend;
-    readonly riskLevel: RiskLevel;
-    /** Entry price range `[low, high]` or single `[price]`, when the analysis recommended one. */
-    readonly entryPrices?: readonly number[];
-    readonly stopLoss?: number;
-    /** Take-profit targets in ascending order. */
-    readonly takeProfitPrices?: readonly number[];
-}
-
-/** How many past analyses are rendered into a prompt at most. */
+/** @internal How many past analyses are rendered into a prompt at most. */
 export const PRIOR_ANALYSIS_LIMIT = 7;
 
 /**
+ * @internal
+ *
  * Buffer multiplier on the lookback window. Analyses do not exist for every
  * bar, so the window reaches back `PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK`
  * bars to have a chance of filling the limit on sparsely-analysed symbols.
@@ -45,6 +26,8 @@ export const PRIOR_ANALYSIS_LIMIT = 7;
 export const PRIOR_ANALYSIS_SLACK = 3;
 
 /**
+ * @internal
+ *
  * `Bar.time` is a Unix timestamp in **seconds**; `PriorAnalysis.generatedAt`
  * is a `Date`, whose `getTime()` is **milliseconds**. Every comparison
  * between the two must go through this conversion — mixing the raw units is
@@ -57,12 +40,19 @@ export function barTimeMs(bar: Bar): number {
 }
 
 /**
+ * @internal
+ *
  * Index of the bar a millisecond timestamp belongs to: the bar with the
  * greatest `time` still `<= targetMs`. This is the single definition of
- * "which bar does this analysis belong to" — {@link selectPriorAnalyses}
+ * "which bar does this analysis belong to" — `selectPriorAnalyses`
  * uses it to bucket candidates for dedup, and the prompt renderer uses it to
  * find the reference bar an outcome is measured from. The two MUST agree, so
  * they share one implementation rather than two loops kept aligned by comment.
+ *
+ * `bars` is sorted oldest-first; this does a binary search for the greatest
+ * index whose `barTimeMs` is `<= targetMs` rather than scanning backwards,
+ * since it runs once per candidate in `selectPriorAnalyses` plus once per
+ * rendered entry in `priorAnalysisSection.ts`.
  *
  * Returns `null` only when `targetMs` predates every bar.
  */
@@ -70,15 +60,28 @@ export function findAnchorBarIndex(
     bars: readonly Bar[],
     targetMs: number
 ): number | null {
-    for (let i = bars.length - 1; i >= 0; i--) {
-        if (barTimeMs(bars[i]) <= targetMs) return i;
+    let low = 0;
+    let high = bars.length - 1;
+    let result = -1;
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (barTimeMs(bars[mid]) <= targetMs) {
+            // bars[mid] qualifies; a later bar might qualify too, so keep
+            // searching the upper half for a greater index.
+            result = mid;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
     }
-    return null;
+    return result === -1 ? null : result;
 }
 
 /**
+ * @internal
+ *
  * Narrows a caller-supplied history of past analyses down to the set worth
- * rendering into a prompt: at most {@link PRIOR_ANALYSIS_LIMIT} entries,
+ * rendering into a prompt: at most `PRIOR_ANALYSIS_LIMIT` entries,
  * newest first, at most one per bar.
  *
  * `candidates` must already be filtered to exclude analyses generated inside
@@ -123,14 +126,15 @@ export function selectPriorAnalyses(
     const winnerByBar = new Map<number, PriorAnalysis>();
     for (const candidate of withinWindow) {
         const candidateMs = candidate.generatedAt.getTime();
-        const anchorIndex = findAnchorBarIndex(bars, candidateMs);
-        const barKey = anchorIndex === null ? null : bars[anchorIndex].time;
-        // Cannot happen for any candidate that survived the anchor filter above
-        // (the anchor bar itself is always <= candidateMs), but skip defensively
-        // rather than group unassignable entries under a fake key.
-        if (barKey === null) {
-            continue;
-        }
+        // `withinWindow` guarantees `candidateMs >= anchorMs`, and `anchorBar`
+        // — whose `barTimeMs` IS `anchorMs` — is itself an element of `bars`.
+        // So `findAnchorBarIndex` always has at least `anchorBar` to return
+        // for any candidate reaching this loop; it cannot return null here.
+        // Non-null assertion documents that guarantee instead of reintroducing
+        // a defensive branch that can never execute (and so can never be
+        // exercised by a test — see MISTAKES.md Tests #5.5).
+        const anchorIndex = findAnchorBarIndex(bars, candidateMs)!;
+        const barKey = bars[anchorIndex].time;
 
         const current = winnerByBar.get(barKey);
         if (!current || candidateMs > current.generatedAt.getTime()) {
