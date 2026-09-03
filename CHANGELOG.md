@@ -1,5 +1,20 @@
 # Changelog
 
+# [0.55.0](https://github.com/y0ngha/siglens-core/compare/v0.54.0...v0.55.0) (2026-09-03)
+
+
+### Bug Fixes
+
+* PR [#187](https://github.com/y0ngha/siglens-core/issues/187) 코드 리뷰 반영 (4차) ([42d9463](https://github.com/y0ngha/siglens-core/commit/42d9463cad3806cbc9facb3fe898ac0a9e8819d1))
+* PR [#187](https://github.com/y0ngha/siglens-core/issues/187) 코드 리뷰 반영 (5차) ([2a055e9](https://github.com/y0ngha/siglens-core/commit/2a055e917e1271565e12c40a4f6ace00b6deff25))
+* PR [#187](https://github.com/y0ngha/siglens-core/issues/187) 코드 리뷰 피드백 (2차) ([00822cc](https://github.com/y0ngha/siglens-core/commit/00822cc730d4871af0209eb1a76aaab8df54d373))
+* PR [#187](https://github.com/y0ngha/siglens-core/issues/187) 코드 리뷰 피드백 (3차) ([24b5eb3](https://github.com/y0ngha/siglens-core/commit/24b5eb34ba94c6169f1f28855dc9471932bf5d97))
+
+
+### Features
+
+* prior-analysis context in prompts ([62f0f1c](https://github.com/y0ngha/siglens-core/commit/62f0f1c386482fa6b87644f0bc6b7d120552040a))
+
 # [0.54.0](https://github.com/y0ngha/siglens-core/compare/v0.53.0...v0.54.0) (2026-09-01)
 
 
