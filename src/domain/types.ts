@@ -1748,7 +1748,7 @@ export interface AssembledPrompt {
  * alongside the analysis it produced (offline evaluation, debugging).
  *
  * Only delivered on a cache miss — a cache hit has no freshly assembled
- * prompt to hand out. `system` is `stable` already folded into the base
+ * prompt to hand out. `system` already has `stable` folded into the base
  * system persona (Design C: `system = basePersona + stable`), so a consumer
  * that wants the exact provider-call arguments needs only `system` and
  * `dynamic`; `stable` is broken out separately because it is

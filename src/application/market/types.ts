@@ -186,6 +186,17 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * surfaces synchronously, so the `catch` sees nothing and the rejection
      * goes unhandled, which Node terminates the process for by default. The
      * documented use here is persisting the prompt, i.e. an async write.
+     *
+     * **A concurrent loser's callback is not called at all.** Because the
+     * invocation lives inside the dedup factory, when two callers miss the
+     * same cache key with DIFFERENT callbacks only the winner's runs — the
+     * loser still receives the winner's analysis result, but its own callback
+     * never fires and it therefore has no prompt to store for that result.
+     * This is the deliberate trade-off against the alternative, which is
+     * worse: firing every caller's callback would hand losers a prompt that
+     * was never sent, quietly misattributing text to a result it did not
+     * produce. Consumers must treat the captured prompt as best-effort and
+     * tolerate result rows with no prompt attached.
      */
     onPromptAssembled?: (record: AssembledPromptRecord) => void | Promise<void>;
     /**
