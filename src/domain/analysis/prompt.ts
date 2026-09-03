@@ -95,12 +95,12 @@ import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
+import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
+import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     formatNullableNumber,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
-import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
-import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 
 type SkillGroupKey = SkillType | 'regular';
 

@@ -511,13 +511,39 @@ export async function runOverallAnalysis(
     // Failure posture matches Fear & Greed's — logged and swallowed, leaving
     // `undefined` bars, which makes `buildOverallAnalysisPrompt` skip the
     // prior-analysis section entirely rather than failing the analysis.
+    // The Fear & Greed snapshot always needs the DAILY series, whatever the
+    // overall request's own timeframe is. Held as one promise so the
+    // prior-analysis path can share it: on a '1Day' overall request the two
+    // fetches would otherwise carry byte-identical arguments and, since
+    // `fetchBarsWithIndicators` does not cache, pay for the same upstream call
+    // and the same `calculateIndicators` pass twice.
+    const dailyBarsPromise = fetchBarsWithIndicators(
+        marketDataProvider,
+        symbol,
+        '1Day',
+        fmpSymbol
+    );
+
+    const fearGreedPromise = dailyBarsPromise
+        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
+        .catch(error => {
+            console.error(
+                '[RunOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+                error
+            );
+            return null;
+        });
+
     const priorAnalysisBarsPromise: Promise<Bar[] | undefined> =
         priorAnalysisCandidates.length > 0
-            ? fetchBarsWithIndicators(
-                  marketDataProvider,
-                  symbol,
-                  timeframe,
-                  fmpSymbol
+            ? (timeframe === '1Day'
+                  ? dailyBarsPromise
+                  : fetchBarsWithIndicators(
+                        marketDataProvider,
+                        symbol,
+                        timeframe,
+                        fmpSymbol
+                    )
               )
                   .then(d => d.bars)
                   .catch(error => {
@@ -530,17 +556,7 @@ export async function runOverallAnalysis(
             : Promise.resolve(undefined);
 
     const [fearGreed, priorAnalysisBars] = await Promise.all([
-        fetchBarsWithIndicators(marketDataProvider, symbol, '1Day', fmpSymbol)
-            .then(d =>
-                computeFearGreedIndex(d.bars, d.indicators.buySellVolume)
-            )
-            .catch(error => {
-                console.error(
-                    '[RunOverallAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
-                    error
-                );
-                return null;
-            }),
+        fearGreedPromise,
         priorAnalysisBarsPromise,
     ]);
 

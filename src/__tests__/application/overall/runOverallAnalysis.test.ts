@@ -524,9 +524,32 @@ describe('runOverallAnalysis', () => {
             expect(prompt).toContain('## Prior Analyses');
         });
 
-        it('윈도우 밖 생존자가 있으면 이력용 봉을 한 번 더 페치한다', async () => {
+        it("timeframe이 '1Day'면 Fear & Greed 페치를 재사용해 한 번만 부른다", async () => {
+            // F&G는 언제나 '1Day'를 부른다. overall 요청 자체가 '1Day'면 두 호출의
+            // 인자가 완전히 동일해지는데, `fetchBarsWithIndicators`는 core에서
+            // 캐시되지 않으므로(+ `calculateIndicators` 포함) 같은 업스트림 호출과
+            // 지표 계산을 두 번 치르게 된다. 같은 promise를 공유해 한 번으로 줄인다.
+            await runOverallAnalysis({
+                ...baseOptions(), // timeframe: '1Day'
+                priorAnalyses: [
+                    {
+                        generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                        trend: 'bullish',
+                        riskLevel: 'medium',
+                    },
+                ],
+            });
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+        });
+
+        it('timeframe이 1Day가 아니면 이력용 봉을 따로 한 번 더 페치한다', async () => {
+            // pro tier를 명시해야 장중 타임프레임이 티어 게이트에 막히지 않는다 —
+            // 막히면 봉 페치 지점에 도달하기도 전에 리턴돼 이 테스트가 무의미해진다.
             await runOverallAnalysis({
                 ...baseOptions(),
+                timeframe: '1Hour',
+                tier: 'pro',
                 priorAnalyses: [
                     {
                         generatedAt: new Date('2020-01-01T00:00:00.000Z'),

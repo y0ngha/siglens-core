@@ -785,6 +785,8 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  *
  * `f1` starts the independent series. Bump it whenever the fundamental system
  * or user prompt template changes in a way that makes cached results stale.
+ *
+ * @internal
  */
 export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f1' as const;
 
