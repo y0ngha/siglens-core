@@ -212,6 +212,24 @@ describe('runAnalysis', () => {
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
             expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
         });
+
+        it('cache hit → no `unfilteredResult` (persistence already happened)', async () => {
+            // The field is deliberately absent on `cached`: the row it would
+            // feed was written when the analysis was first generated, and
+            // adding it here would invite callers to persist a duplicate on
+            // every cache hit. Pinning the absence keeps that contract from
+            // drifting silently.
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
+
+            expect(result.status).toBe('cached');
+            expect('unfilteredResult' in result).toBe(false);
+        });
     });
 
     describe('skipEnqueueIfMiss (bot path)', () => {
