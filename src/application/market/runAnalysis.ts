@@ -376,7 +376,9 @@ async function runAnalysisImpl(
         return { status: 'done', result };
     }
     const filtered = filterAnalysisResult(result, tier, tierConfig);
-    return { status: 'done', ...filtered };
+    // `result`(필터 전)를 함께 돌려준다 — 렌더는 `filtered`, 이력 저장은
+    // `unfilteredResult`가 맞다. 근거는 `RunAnalysisResult` JSDoc 참고.
+    return { status: 'done', ...filtered, unfilteredResult: result };
 }
 
 /**

@@ -336,6 +336,29 @@ export type RunAnalysisResult =
           status: 'done';
           result: AnalysisResponse | FilteredAnalysisResponse;
           lockedInfoDepth: readonly TierInfoDepth[];
+          /**
+           * The same analysis **before** tier filtering — for callers that
+           * persist history rather than render.
+           *
+           * `result` above is what this tier may *see*; the tier's
+           * `infoDepth` nulls out whatever it may not. That is right for
+           * rendering and wrong for storage: a `free` caller's `infoDepth`
+           * is `direction`/`summary`/`skill_detection` only, so `riskLevel`
+           * arrives as `null` — and {@link PriorAnalysis} requires both
+           * `trend` and `riskLevel`. Persisting the filtered shape therefore
+           * yields rows that every later read must discard, which silently
+           * empties the prior-analysis history for exactly the traffic that
+           * produces most of it (anonymous visitors and SEO pre-warm, which
+           * runs as `free` because the tier is folded into the cache key).
+           *
+           * This costs nothing to provide: the value is already computed and
+           * is what gets written to the cache — filtering happens only on the
+           * way out to the caller.
+           *
+           * Present on `done` only. A `cached` result means the row it came
+           * from was already persisted when it was first generated.
+           */
+          unfilteredResult: AnalysisResponse;
       }
     | SubmitAnalysisMissNoTrigger
     | SubmitAnalysisErrorResult;
