@@ -212,6 +212,24 @@ describe('runAnalysis', () => {
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
             expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
         });
+
+        it('cache hit → no `unfilteredResult` (persistence already happened)', async () => {
+            // The field is deliberately absent on `cached`: the row it would
+            // feed was written when the analysis was first generated, and
+            // adding it here would invite callers to persist a duplicate on
+            // every cache hit. Pinning the absence keeps that contract from
+            // drifting silently.
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
+
+            expect(result.status).toBe('cached');
+            expect('unfilteredResult' in result).toBe(false);
+        });
     });
 
     describe('skipEnqueueIfMiss (bot path)', () => {
@@ -246,6 +264,31 @@ describe('runAnalysis', () => {
 
             expect(result.status).toBe('done');
             expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+
+        it('free tier: `result` is filtered but `unfilteredResult` keeps riskLevel', async () => {
+            // free의 infoDepth는 direction/summary/skill_detection뿐이라
+            // `riskLevel`(partial_detail)이 렌더용 `result`에서는 null이 된다.
+            // 그 모양을 그대로 저장하면 `PriorAnalysis`가 요구하는 riskLevel이
+            // 없어 이후 모든 읽기가 그 행을 버린다 — 이력이 조용히 비는 경로다.
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'free' },
+                }
+            );
+
+            expect(result.status).toBe('done');
+            if (result.status !== 'done') return;
+
+            expect(result.result.riskLevel).toBeNull();
+            expect(result.unfilteredResult.riskLevel).toBe('low');
+            expect(result.unfilteredResult.trend).toBe(mockRawResult.trend);
         });
 
         it('callAnalysisAi receives prompt, system, seed, and model', async () => {
@@ -388,13 +431,27 @@ describe('runAnalysis', () => {
             // `analyzedAt` is stamped per call from the wall clock, so a
             // whole-object comparison flakes whenever the two awaited calls
             // straddle a millisecond. Compare everything else.
+            const dropStamp = (r?: { analyzedAt?: string }) => {
+                if (r === undefined) return undefined;
+                const { analyzedAt: _dropped, ...rest } = r;
+                return rest;
+            };
+            // `analyzedAt` is stamped per call from the wall clock — on both
+            // `result` and `unfilteredResult`, which carry the same stamp.
             const stripStamp = (r: unknown) => {
-                const { result, ...rest } = r as {
+                const { result, unfilteredResult, ...rest } = r as {
                     result?: { analyzedAt?: string };
+                    unfilteredResult?: { analyzedAt?: string };
                 };
-                if (result === undefined) return rest;
-                const { analyzedAt: _dropped, ...resultRest } = result;
-                return { ...rest, result: resultRest };
+                return {
+                    ...rest,
+                    ...(result !== undefined
+                        ? { result: dropStamp(result) }
+                        : {}),
+                    ...(unfilteredResult !== undefined
+                        ? { unfilteredResult: dropStamp(unfilteredResult) }
+                        : {}),
+                };
             };
             expect(stripStamp(withCallback)).toEqual(
                 stripStamp(withoutCallback)
