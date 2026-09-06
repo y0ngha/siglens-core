@@ -1841,6 +1841,15 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   and cannot change which skills get injected into a prompt. Omitting it
  *   (or passing an empty array) produces a byte-identical prompt to the one
  *   this builder emitted before the parameter existed.
+ * @param marketEvents - Optional market-moving news events for this symbol,
+ *   supplied by the consumer from its own storage. When provided, narrowed via
+ *   `selectMarketEvents` (bar-window cut, impact filter, capped at
+ *   `MARKET_EVENT_LIMIT`) and rendered via `formatMarketEventsSection` — into
+ *   `dynamic` only, never `stable`, for the same reason as `priorAnalyses`
+ *   above. Only the classification travels (category / sentiment / impact);
+ *   headlines and bodies never reach this prompt. Omitting it (or passing
+ *   `[]`) renders no section, leaving `dynamic` byte-identical to what this
+ *   builder produced before the parameter existed.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators

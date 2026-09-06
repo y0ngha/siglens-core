@@ -25,9 +25,15 @@ export const MARKET_EVENT_LIMIT = 5;
  */
 export const RANKED_IMPACTS: readonly NewsImpact[] = ['high', 'medium'];
 
+/**
+ * Rank within {@link RANKED_IMPACTS}, most significant first.
+ *
+ * Only ever called on entries that already passed the `RANKED_IMPACTS` filter
+ * below, so `indexOf` cannot return `-1` here. Handling that case would add a
+ * branch no test could reach (MISTAKES.md Tests #5.5).
+ */
 function impactRank(impact: NewsImpact): number {
-    const index = RANKED_IMPACTS.indexOf(impact);
-    return index === -1 ? Number.POSITIVE_INFINITY : index;
+    return RANKED_IMPACTS.indexOf(impact);
 }
 
 /**

@@ -171,6 +171,7 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * existed — no `## Market Events` section, no `:evt=` key segment.
      */
     marketEvents?: readonly MarketEvent[];
+
     /**
      * Callback that receives the exact prompt sent to the model, for a
      * consumer that persists prompts alongside the analyses they produced

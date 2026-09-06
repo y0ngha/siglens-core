@@ -33,6 +33,7 @@ import {
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 import type {
     AnalysisHistoryQuery,
+    NarrowedMarketEvents,
     NarrowedPriorAnalyses,
 } from '@/infrastructure/cache/types';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
@@ -359,12 +360,6 @@ export function narrowPriorAnalysesForCacheKey(
     return { candidates, fingerprint };
 }
 
-/** @internal Result of {@link narrowMarketEventsForCacheKey}. */
-interface NarrowedMarketEvents {
-    candidates: MarketEvent[];
-    fingerprint: string | undefined;
-}
-
 /**
  * @internal
  *
@@ -643,6 +638,12 @@ export const PROMPT_TEMPLATE_VERSION = 'p11' as const;
  *   narrowing (see that function's doc) — produces no suffix at all, so this
  *   is the exact key every existing caller (and every caller that never
  *   adopts the prior-analysis-context feature) reads/writes today.
+ * @param eventsFingerprint - Market-events fingerprint, from
+ *   `narrowMarketEventsForCacheKey`'s `fingerprint` return value. Appended
+ *   AFTER the history suffix, making it the new last segment. `undefined` —
+ *   the caller has no `marketEvents`, or none of them carried `high`/`medium`
+ *   impact — produces no suffix at all, so a symbol with no market-moving news
+ *   reads/writes the exact key it did before this feature existed.
  * @returns The cache key.
  *
  * @example

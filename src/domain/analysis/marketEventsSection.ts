@@ -11,13 +11,15 @@ import type { Bar, MarketEvent, Timeframe } from '@/domain/types';
  * @internal
  * One rendered event line, anchored to the bar it landed on.
  *
- * Returns `null` when the event predates every bar — `findAnchorBarIndex`
- * cannot place it, and a line with no bar position would be unreadable next to
- * `## Recent Bar Data`.
+ * `selectMarketEvents` has already dropped anything published before the first
+ * bar, so `findAnchorBarIndex` always has at least `bars[0]` to return for an
+ * entry reaching here — it cannot yield `null`. The non-null assertion
+ * documents that guarantee rather than reintroducing a defensive branch no
+ * test could exercise (MISTAKES.md Tests #5.5), matching how
+ * `selectPriorAnalyses` handles the same invariant.
  */
-function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string | null {
-    const anchorIndex = findAnchorBarIndex(bars, entry.publishedAt.getTime());
-    if (anchorIndex === null) return null;
+function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string {
+    const anchorIndex = findAnchorBarIndex(bars, entry.publishedAt.getTime())!;
 
     const barsAgo = bars.length - 1 - anchorIndex;
     // Same helper `formatBarRow` and `## Prior Analyses` use, so this stamp
@@ -57,10 +59,7 @@ export function formatMarketEventsSection(
     const selected = selectMarketEvents(events, bars);
     if (selected.length === 0) return '';
 
-    const lines = selected
-        .map(entry => formatEvent(entry, bars))
-        .filter((line): line is string => line !== null);
-    if (lines.length === 0) return '';
+    const lines = selected.map(entry => formatEvent(entry, bars));
 
     const header = `## Market Events (${symbol} · ${TIMEFRAME_LABEL[timeframe]} · what landed on the bars above)`;
     return [header, ...lines].join('\n');
