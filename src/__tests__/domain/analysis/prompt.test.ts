@@ -5307,6 +5307,39 @@ describe('marketEvents (buildAnalysisPrompt)', () => {
         expect(result.stable).toBe(build().stable);
     });
 
+    it('`## Market Events` 는 `## Prior Analyses` 보다 앞에 온다', () => {
+        // 이벤트는 봉에 대한 사실이라 봉 데이터의 연장이고, 이력은 그 위에서
+        // 내린 판단이라 한 겹 위다. 리팩터링으로 순서가 뒤집히면 그 층위가
+        // 무너지므로 여기서 고정한다.
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            eventBars,
+            makeIndicators(),
+            [],
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            DEFAULT_ANALYSIS_LOCALE,
+            [
+                {
+                    generatedAt: new Date(eventBars[4].time * 1000),
+                    trend: 'bullish',
+                    riskLevel: 'medium',
+                },
+            ],
+            [marketEvent(5)]
+        );
+
+        const eventsAt = result.dynamic.indexOf('## Market Events');
+        const priorAt = result.dynamic.indexOf('## Prior Analyses');
+
+        expect(eventsAt).toBeGreaterThan(-1);
+        expect(priorAt).toBeGreaterThan(-1);
+        expect(eventsAt).toBeLessThan(priorAt);
+    });
+
     it('an event below the impact threshold renders nothing', () => {
         const result = build([marketEvent(5, { impact: 'low' })]);
 

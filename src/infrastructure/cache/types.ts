@@ -31,6 +31,7 @@ export interface NarrowedPriorAnalyses {
 }
 
 /**
+ * @internal
  * Return type of `narrowMarketEventsForCacheKey` — see that function in
  * `infrastructure/cache/config.ts` for the two-stage narrowing this is stage
  * 1 of.

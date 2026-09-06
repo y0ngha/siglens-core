@@ -1,4 +1,8 @@
 import {
+    MARKET_EVENT_CACHE_KEY_CAP,
+    MARKET_EVENT_LIMIT,
+} from '@/domain/analysis/marketEvents';
+import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     SECONDS_PER_MINUTE,
@@ -1154,6 +1158,27 @@ describe('marketEvents가 캐시 키에 반영될 때', () => {
         ]).fingerprint;
 
         expect(a).toBe(b);
+    });
+
+    it('오래된 이벤트가 아무리 많아도 stage 1 후보는 상한에서 멈춘다', () => {
+        // 상한이 없으면 consumer가 수년치를 넘길 때 fingerprint 입력이 무한정
+        // 커지고, 렌더 윈도우 밖의 옛 이벤트가 바뀔 때마다 캐시가 무효화된다.
+        const many = Array.from({ length: 50 }, (_, i) => event(i * 900_000));
+
+        const { candidates } = narrowMarketEventsForCacheKey(many);
+
+        expect(candidates).toHaveLength(MARKET_EVENT_CACHE_KEY_CAP);
+        // 상한은 렌더 상한보다 넓어야 stage 2 가 고를 수 있는 집합을 덮는다.
+        expect(MARKET_EVENT_CACHE_KEY_CAP).toBeGreaterThan(MARKET_EVENT_LIMIT);
+    });
+
+    it('상한 밖의 오래된 이벤트가 바뀌어도 fingerprint는 그대로다', () => {
+        const recent = Array.from({ length: 25 }, (_, i) => event(i * 900_000));
+        const withAncient = [...recent, event(-99 * 900_000)];
+
+        expect(narrowMarketEventsForCacheKey(withAncient).fingerprint).toBe(
+            narrowMarketEventsForCacheKey(recent).fingerprint
+        );
     });
 
     it('집합이 다르면 fingerprint가 갈린다', () => {

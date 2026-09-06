@@ -1,8 +1,11 @@
 import {
+    MARKET_EVENT_CACHE_KEY_CAP,
+    RANKED_IMPACTS,
+} from '@/domain/analysis/marketEvents';
+import {
     localeKeySuffixFor,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
-import { RANKED_IMPACTS } from '@/domain/analysis/marketEvents';
 import { PRIOR_ANALYSIS_WINDOW_BARS } from '@/domain/analysis/priorAnalysis';
 import type {
     DashboardTimeframe,
@@ -389,7 +392,8 @@ export function narrowMarketEventsForCacheKey(
 ): NarrowedMarketEvents {
     const candidates = events
         .filter(entry => RANKED_IMPACTS.includes(entry.impact))
-        .toSorted((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+        .toSorted((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+        .slice(0, MARKET_EVENT_CACHE_KEY_CAP);
 
     if (candidates.length === 0) {
         return { candidates, fingerprint: undefined };

@@ -95,9 +95,9 @@ import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceS
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
+import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
-import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     formatBarDateTime,

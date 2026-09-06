@@ -13,6 +13,22 @@ export const MARKET_EVENT_LIMIT = 5;
 
 /**
  * @internal
+ * Cap applied at the cache-key stage, before bars exist.
+ *
+ * Stage 1 cannot use the bar window, so without a cap a consumer handing over
+ * years of qualifying events would grow the fingerprint input without bound —
+ * and every add or removal among those ancient events would invalidate the
+ * cache even though {@link selectMarketEvents} would never render them.
+ *
+ * Deliberately wider than {@link MARKET_EVENT_LIMIT}: stage 1 must stay a
+ * superset of what stage 2 can pick, or the two would disagree about which
+ * events a request "has". `narrowPriorAnalysesForCacheKey` caps its own stage
+ * 1 the same way, with `PRIOR_ANALYSIS_WINDOW_BARS`.
+ */
+export const MARKET_EVENT_CACHE_KEY_CAP = 20;
+
+/**
+ * @internal
  * Impact levels worth telling the model about, ranked most significant first.
  *
  * `low` and `negligible` are dropped: on production data they are 13.5% and
