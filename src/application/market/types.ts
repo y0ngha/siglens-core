@@ -156,11 +156,13 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * its own store — core has no news storage of its own.
      *
      * Core narrows this list twice before it reaches the LLM: once for the
-     * cache key (impact filter only — bars are not available yet, see
-     * `narrowMarketEventsForCacheKey`), then again for the prompt itself
-     * (bar-window cut, capped at `MARKET_EVENT_LIMIT` — see
-     * `selectMarketEvents`). Both narrowings are internal; the consumer only
-     * supplies the raw list.
+     * cache key (impact filter, then capped at `MARKET_EVENT_CACHE_KEY_CAP` —
+     * bars are not available yet, see `narrowMarketEventsForCacheKey`), then
+     * again for the prompt itself (bar-window cut, capped at
+     * `MARKET_EVENT_LIMIT` — see `selectMarketEvents`). Both cuts use the same
+     * impact-first ordering, so the second never has to reach past what the
+     * first kept. Both narrowings are internal; the consumer only supplies the
+     * raw list.
      *
      * Only the classification travels — never the headline or body. Reading
      * the article is the news and overall axes' job; this axis needs the fact

@@ -1181,6 +1181,26 @@ describe('marketEvents가 캐시 키에 반영될 때', () => {
         );
     });
 
+    it('상한을 넘겨도 오래된 high 이벤트가 최신 medium 들에 밀려나지 않는다', () => {
+        // 두 단계가 서로 다른 기준으로 자르면 여기서 조용히 깨진다.
+        // stage 1 이 최신순으로만 자르면 유일한 high 가 20개의 fresher medium
+        // 뒤로 밀려 사라지고, stage 2 는 그 high 를 볼 기회조차 없다 —
+        // "가격을 움직인 이벤트를 싣는다"는 이 기능의 목적이 정면으로 깨진다.
+        const freshMediums = Array.from({ length: 25 }, (_, i) =>
+            event(i * 900_000, 'medium')
+        );
+        const loneOldHigh = event(-50 * 900_000, 'high');
+
+        const { candidates } = narrowMarketEventsForCacheKey([
+            ...freshMediums,
+            loneOldHigh,
+        ]);
+
+        expect(candidates).toHaveLength(MARKET_EVENT_CACHE_KEY_CAP);
+        expect(candidates[0].impact).toBe('high');
+        expect(candidates[0].publishedAt).toEqual(loneOldHigh.publishedAt);
+    });
+
     it('집합이 다르면 fingerprint가 갈린다', () => {
         const a = narrowMarketEventsForCacheKey([event(0)]).fingerprint;
         const b = narrowMarketEventsForCacheKey([event(900_000)]).fingerprint;

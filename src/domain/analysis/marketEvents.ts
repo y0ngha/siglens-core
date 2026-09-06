@@ -20,10 +20,13 @@ export const MARKET_EVENT_LIMIT = 5;
  * and every add or removal among those ancient events would invalidate the
  * cache even though {@link selectMarketEvents} would never render them.
  *
- * Deliberately wider than {@link MARKET_EVENT_LIMIT}: stage 1 must stay a
- * superset of what stage 2 can pick, or the two would disagree about which
- * events a request "has". `narrowPriorAnalysesForCacheKey` caps its own stage
- * 1 the same way, with `PRIOR_ANALYSIS_WINDOW_BARS`.
+ * Deliberately wider than {@link MARKET_EVENT_LIMIT}, and cut with the same
+ * {@link compareMarketEventPriority} ordering: stage 1 must stay a superset of
+ * what stage 2 can pick — in priority, not merely in count. Cutting by recency
+ * here would let a lone `high` event fall off the end behind twenty fresher
+ * `medium` ones, and stage 2 could never recover it.
+ * `narrowPriorAnalysesForCacheKey` caps its own stage 1 the same way, with
+ * `PRIOR_ANALYSIS_WINDOW_BARS`.
  */
 export const MARKET_EVENT_CACHE_KEY_CAP = 20;
 
@@ -50,6 +53,29 @@ export const RANKED_IMPACTS: readonly NewsImpact[] = ['high', 'medium'];
  */
 function impactRank(impact: NewsImpact): number {
     return RANKED_IMPACTS.indexOf(impact);
+}
+
+/**
+ * @internal
+ * Ordering used whenever events must be cut to a cap: impact first, then
+ * newest.
+ *
+ * **Both narrowing stages must sort by this.** Stage 1 (`narrowMarketEventsForCacheKey`)
+ * caps by count before bars exist, and stage 2 ({@link selectMarketEvents})
+ * caps again after the bar-window cut — but stage 2 can only choose from what
+ * stage 1 handed it. If stage 1 cut by recency alone, the single `high` event
+ * in a busy window could be dropped for being older than twenty `medium` ones,
+ * and stage 2 would never see it. That is the exact outcome this feature
+ * exists to prevent: the section is meant to say what moved price, not what
+ * happened most recently.
+ */
+export function compareMarketEventPriority(
+    a: MarketEvent,
+    b: MarketEvent
+): number {
+    const byImpact = impactRank(a.impact) - impactRank(b.impact);
+    if (byImpact !== 0) return byImpact;
+    return b.publishedAt.getTime() - a.publishedAt.getTime();
 }
 
 /**
@@ -86,11 +112,7 @@ export function selectMarketEvents(
             const at = entry.publishedAt.getTime();
             return at >= fromMs && at <= toMs;
         })
-        .toSorted((a, b) => {
-            const byImpact = impactRank(a.impact) - impactRank(b.impact);
-            if (byImpact !== 0) return byImpact;
-            return b.publishedAt.getTime() - a.publishedAt.getTime();
-        })
+        .toSorted(compareMarketEventPriority)
         .slice(0, MARKET_EVENT_LIMIT)
         .toSorted((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
 }

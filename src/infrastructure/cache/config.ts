@@ -1,4 +1,5 @@
 import {
+    compareMarketEventPriority,
     MARKET_EVENT_CACHE_KEY_CAP,
     RANKED_IMPACTS,
 } from '@/domain/analysis/marketEvents';
@@ -376,7 +377,11 @@ export function narrowPriorAnalysesForCacheKey(
  * `formatMarketEventsSection`) applies the bar-window cut once bars exist.
  * Stage 1 is therefore the wider of the two, which is safe: two requests
  * looking at the same symbol with the same caller-supplied lookback see the
- * same candidates, so they agree on the key.
+ * same candidates, so they agree on the key. It caps at
+ * {@link MARKET_EVENT_CACHE_KEY_CAP} using the **same**
+ * {@link compareMarketEventPriority} ordering stage 2 uses — cutting by
+ * recency here would drop a lone `high` event behind fresher `medium` ones,
+ * and stage 2 could never see it.
  *
  * Unlike prior analyses there is no TTL gate. Prior analyses need one because a
  * user's own freshly-finished analysis would otherwise invalidate every other
@@ -392,7 +397,7 @@ export function narrowMarketEventsForCacheKey(
 ): NarrowedMarketEvents {
     const candidates = events
         .filter(entry => RANKED_IMPACTS.includes(entry.impact))
-        .toSorted((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+        .toSorted(compareMarketEventPriority)
         .slice(0, MARKET_EVENT_CACHE_KEY_CAP);
 
     if (candidates.length === 0) {
