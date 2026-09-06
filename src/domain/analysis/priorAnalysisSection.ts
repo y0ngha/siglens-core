@@ -11,8 +11,9 @@
 
 import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
-    formatNullableNumber,
     TIMEFRAME_LABEL,
+    formatBarDateTime,
+    formatNullableNumber,
 } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
 
@@ -119,13 +120,14 @@ function formatEntry(
     const anchorBar = bars[anchorIndex];
     const lastBar = bars[bars.length - 1];
     const barsAgo = bars.length - 1 - anchorIndex;
-    // Derived from the anchor bar's own time (not `generatedAt`) so the
-    // rendered date is always one of the bar dates the model already sees in
-    // `## Recent Bar Data` — the same source `formatRecentBarsSection` /
-    // `formatBarRow` in prompt.ts render from, just sliced to date-only.
-    const anchorDate = new Date(barTimeMs(anchorBar))
-        .toISOString()
-        .slice(0, 10);
+    // Derived from the anchor bar's own time (not `generatedAt`) and rendered
+    // with the **same** helper `formatBarRow` uses, so this string appears
+    // verbatim in `## Recent Bar Data` above. That exact match is the point:
+    // it lets the model line a past call up with the bar it was made on
+    // instead of counting `N bars ago` backwards — a count that cannot be
+    // converted into elapsed time, since bar distance skips overnight and
+    // weekend gaps.
+    const anchorDate = formatBarDateTime(barTimeMs(anchorBar));
 
     const planParts = [
         formatEntryPlanPart(entry.entryPrices),

@@ -503,7 +503,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p9' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p10' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
