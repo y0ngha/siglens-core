@@ -1,0 +1,67 @@
+import { MS_PER_SECOND } from '@/domain/constants/time';
+import { selectMarketEvents } from '@/domain/analysis/marketEvents';
+import { findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
+import {
+    formatBarDateTime,
+    TIMEFRAME_LABEL,
+} from '@/domain/analysis/promptFormat';
+import type { Bar, MarketEvent, Timeframe } from '@/domain/types';
+
+/**
+ * @internal
+ * One rendered event line, anchored to the bar it landed on.
+ *
+ * Returns `null` when the event predates every bar — `findAnchorBarIndex`
+ * cannot place it, and a line with no bar position would be unreadable next to
+ * `## Recent Bar Data`.
+ */
+function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string | null {
+    const anchorIndex = findAnchorBarIndex(bars, entry.publishedAt.getTime());
+    if (anchorIndex === null) return null;
+
+    const barsAgo = bars.length - 1 - anchorIndex;
+    // Same helper `formatBarRow` and `## Prior Analyses` use, so this stamp
+    // appears verbatim in the bar rows above and the model can line the event
+    // up with the candle it landed on.
+    const at = formatBarDateTime(bars[anchorIndex].time * MS_PER_SECOND);
+
+    return `- ${barsAgo} bars ago (${at}): ${entry.category}, ${entry.sentiment}, ${entry.impact} impact`;
+}
+
+/**
+ * @internal
+ *
+ * Renders market events into a `## Market Events` prompt section, narrowing
+ * them to the rendered bar window first (see {@link selectMarketEvents}).
+ *
+ * Only the classification is rendered — never the headline or body. The model
+ * needs to know *that* a high-impact earnings event landed on a given bar to
+ * explain a gap; reading the article is the news and overall axes' job, and
+ * pulling prose in here would duplicate them.
+ *
+ * Returns `''` when nothing renders, following the same "empty section is
+ * skipped by the caller" contract `buildAnalysisPrompt` already uses for
+ * `positionHint` and `## Prior Analyses`.
+ *
+ * @param events - Candidate events for this symbol, any order.
+ * @param bars - OHLCV history for the same symbol + timeframe, oldest-first.
+ * @param symbol - Ticker symbol, for the section header.
+ * @param timeframe - Chart timeframe, for the section header label.
+ */
+export function formatMarketEventsSection(
+    events: readonly MarketEvent[],
+    bars: readonly Bar[],
+    symbol: string,
+    timeframe: Timeframe
+): string {
+    const selected = selectMarketEvents(events, bars);
+    if (selected.length === 0) return '';
+
+    const lines = selected
+        .map(entry => formatEvent(entry, bars))
+        .filter((line): line is string => line !== null);
+    if (lines.length === 0) return '';
+
+    const header = `## Market Events (${symbol} · ${TIMEFRAME_LABEL[timeframe]} · what landed on the bars above)`;
+    return [header, ...lines].join('\n');
+}
