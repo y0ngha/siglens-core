@@ -11,9 +11,9 @@
 
 import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
-    TIMEFRAME_LABEL,
     formatBarDateTime,
     formatNullableNumber,
+    TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
 

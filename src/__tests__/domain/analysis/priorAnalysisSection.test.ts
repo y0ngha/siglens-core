@@ -3,6 +3,7 @@ import {
     PRIOR_ANALYSIS_GUARDRAIL,
     formatPriorAnalysisSection,
 } from '@/domain/analysis/priorAnalysisSection';
+import { formatBarDateTime } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis } from '@/domain/types';
 
 /** Bars sorted oldest-first, `intervalSeconds` apart, starting at `startTime` (Unix seconds). */
@@ -478,10 +479,10 @@ describe('bar timestamp rendering', () => {
             '15Min'
         );
 
-        const expected = new Date((START + 6 * INTERVAL) * 1000)
-            .toISOString()
-            .replace('T', ' ')
-            .slice(0, 16);
+        // 포맷 자체는 `promptFormat.test.ts`가 리터럴로 고정한다. 여기서 볼 것은
+        // "어느 봉의 시각을 골랐는가"뿐이므로 프로덕션 헬퍼를 그대로 쓴다 —
+        // 슬라이스 길이를 여기서 다시 적으면 구현이 바뀔 때 조용히 어긋난다.
+        const expected = formatBarDateTime((START + 6 * INTERVAL) * 1000);
         expect(section).toContain(`(${expected})`);
     });
 });

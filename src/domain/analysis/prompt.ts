@@ -98,9 +98,9 @@ import { formatPositionHintSection } from '@/domain/analysis/positionHintSection
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
-    TIMEFRAME_LABEL,
     formatBarDateTime,
     formatNullableNumber,
+    TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
 
 type SkillGroupKey = SkillType | 'regular';
