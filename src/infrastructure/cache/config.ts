@@ -501,6 +501,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * `p8` cache entry would keep serving history-free analyses for the rest of
  * its TTL even once the consumer starts sending `priorAnalyses`.
  *
+ * @remarks
+ * **`p10` = bar timestamps rendered to the minute in both sections.**
+ * `## Recent Bar Data` already printed `YYYY-MM-DD HH:mm`; `## Prior Analyses`
+ * sliced the same value down to the date. On intraday timeframes that made
+ * every call from one session collapse to a single string, leaving the
+ * `N bars ago` count as the only ordering signal — and that count cannot be
+ * turned back into elapsed time, because bar-indexed distance skips overnight
+ * and weekend gaps (`20 bars ago` on a 15-minute chart reads as five hours but
+ * can span a whole night). Both sections now share `formatBarDateTime`, so a
+ * past call's stamp appears verbatim in the bar row it was made on. Bytes
+ * change for every request that renders bars — not just those carrying
+ * history, unlike `p9` — so warm entries across the fleet must be invalidated.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p10' as const;

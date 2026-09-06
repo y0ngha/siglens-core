@@ -127,7 +127,7 @@ function formatEntry(
     // instead of counting `N bars ago` backwards — a count that cannot be
     // converted into elapsed time, since bar distance skips overnight and
     // weekend gaps.
-    const anchorDate = formatBarDateTime(barTimeMs(anchorBar));
+    const anchorDateTime = formatBarDateTime(barTimeMs(anchorBar));
 
     const planParts = [
         formatEntryPlanPart(entry.entryPrices),
@@ -139,7 +139,7 @@ function formatEntry(
     const plan =
         planParts.length > 0 ? planParts.join(', ') : 'no entry recommended';
 
-    const headerLine = `- ${barsAgo} bars ago (${anchorDate}): ${entry.trend}, ${entry.riskLevel} risk | ${plan}`;
+    const headerLine = `- ${barsAgo} bars ago (${anchorDateTime}): ${entry.trend}, ${entry.riskLevel} risk | ${plan}`;
 
     const subsequentBars = bars.slice(anchorIndex + 1);
     if (subsequentBars.length === 0) {

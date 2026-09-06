@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     extractJsonFromLlmResponse,
+    formatBarDateTime,
     parseLlmPayload,
     stripLlmJsonFence,
 } from '@/domain/analysis/promptFormat';
@@ -119,5 +120,25 @@ describe('parseLlmPayload', () => {
 
     it('숫자이면 그대로 반환한다', () => {
         expect(parseLlmPayload(42)).toBe(42);
+    });
+});
+
+describe('formatBarDateTime', () => {
+    it('renders `YYYY-MM-DD HH:mm` in UTC, dropping seconds', () => {
+        // 초·밀리초가 있어도 분에서 잘린다 — 프롬프트의 봉 행과 같은 폭.
+        const ms = Date.parse('2026-09-04T14:30:45.678Z');
+        expect(formatBarDateTime(ms)).toBe('2026-09-04 14:30');
+    });
+
+    it('separates date and time with a space, not `T`', () => {
+        const out = formatBarDateTime(Date.parse('2026-09-04T09:05:00Z'));
+        expect(out).not.toContain('T');
+        expect(out).toBe('2026-09-04 09:05');
+    });
+
+    it('stays in UTC regardless of the host timezone', () => {
+        // 로컬 타임존으로 변환하면 봉 행과 문자열이 어긋나 매칭이 깨진다.
+        const ms = Date.parse('2026-01-01T00:00:00Z');
+        expect(formatBarDateTime(ms)).toBe('2026-01-01 00:00');
     });
 });
