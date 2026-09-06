@@ -51,6 +51,7 @@ import {
     buildAnalysisCacheKey,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
+    narrowMarketEventsForCacheKey,
     narrowPriorAnalysesForCacheKey,
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
@@ -202,6 +203,13 @@ async function runAnalysisImpl(
         priorAnalysisNow
     );
 
+    // 이벤트는 봉 없이 좁힌다 — 캐시 키가 봉 fetch보다 먼저 만들어져야 하기
+    // 때문이다(이력과 같은 순서 제약). 봉 기준 절단은 프롬프트 렌더 단계의
+    // `selectMarketEvents`가 맡는다.
+    const { fingerprint: eventsFingerprint } = narrowMarketEventsForCacheKey(
+        options.marketEvents ?? []
+    );
+
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(
         symbol,
@@ -211,7 +219,8 @@ async function runAnalysisImpl(
         options.reasoning,
         options.positionBucket,
         options.locale,
-        historyFingerprint
+        historyFingerprint,
+        eventsFingerprint
     );
 
     if (!force && cache !== null) {
@@ -293,7 +302,8 @@ async function runAnalysisImpl(
         options.assetClass ?? 'equity',
         options.positionBucket,
         locale,
-        priorAnalysisCandidates
+        priorAnalysisCandidates,
+        options.marketEvents ?? []
     );
 
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so

@@ -4,17 +4,16 @@ import {
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
 import {
-    MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
-    analysisHistoryQuery,
     ANALYSIS_CACHE_TTL,
+    analysisHistoryQuery,
     BARS_OFFHOURS_TTL_CEILING_SECONDS,
     BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
     buildBriefingCacheKey,
     buildCongressTrendCacheKey,
-    buildMacroBriefingCacheKey,
     buildFinancialsCacheKey,
     buildFundamentalCacheKey,
+    buildMacroBriefingCacheKey,
     buildMarketNewsDigestCacheKey,
     buildNewsCacheKey,
     buildOptionsCacheKey,
@@ -29,15 +28,17 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
     FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
+    FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
     MARKET_BRIEFING_CACHE_TTL,
+    MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
+    narrowMarketEventsForCacheKey,
     narrowPriorAnalysesForCacheKey,
     NEWS_CACHE_TTL_SECONDS,
-    FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
     NEWS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
     PROMPT_TEMPLATE_VERSION,
-    SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
+    SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
@@ -677,7 +678,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // already emitted this exact string), so the scope matches p9's:
         // requests carrying usable history. The bump is fleet-wide anyway
         // because the constant has no per-history-presence axis.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p10');
+        // p11 은 `## Market Events` 섹션을 추가한다 — 이벤트를 실은 요청에서만
+        // 바이트가 바뀌지만 상수에 per-request 축이 없어 무효화는 fleet-wide다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p11');
     });
 });
 
@@ -1078,5 +1081,85 @@ describe('analysisHistoryQuery', () => {
         expect(analysisHistoryQuery('5Min').sinceMs).not.toBe(
             ANALYSIS_CACHE_TTL['5Min'] * cap * 1000
         );
+    });
+});
+
+describe('marketEvents가 캐시 키에 반영될 때', () => {
+    const AT = Date.parse('2026-09-04T14:30:00Z');
+    const event = (
+        offsetMs: number,
+        impact: 'high' | 'medium' | 'low' = 'high'
+    ) => ({
+        publishedAt: new Date(AT + offsetMs),
+        category: 'earnings' as const,
+        sentiment: 'bullish' as const,
+        impact,
+    });
+
+    it('이벤트가 없으면 fingerprint가 undefined이고 키는 이 기능 도입 전과 같다', () => {
+        const { candidates, fingerprint } = narrowMarketEventsForCacheKey([]);
+
+        expect(candidates).toEqual([]);
+        expect(fingerprint).toBeUndefined();
+        expect(
+            buildAnalysisCacheKey(
+                'NVDA',
+                '15Min',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                fingerprint
+            )
+        ).toBe(buildAnalysisCacheKey('NVDA', '15Min'));
+    });
+
+    it('low / negligible 만 있으면 fingerprint가 생기지 않는다', () => {
+        const { fingerprint } = narrowMarketEventsForCacheKey([
+            event(0, 'low'),
+        ]);
+        expect(fingerprint).toBeUndefined();
+    });
+
+    it('이벤트가 있으면 `:evt=` 세그먼트가 붙는다', () => {
+        const { fingerprint } = narrowMarketEventsForCacheKey([event(0)]);
+
+        expect(fingerprint).toBeDefined();
+        expect(
+            buildAnalysisCacheKey(
+                'NVDA',
+                '15Min',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                fingerprint
+            )
+        ).toContain(`:evt=${fingerprint}`);
+    });
+
+    it('같은 집합은 입력 순서가 달라도 같은 fingerprint를 낸다', () => {
+        // 순서로 캐시가 쪼개지면 같은 화면을 보는 두 요청이 캐시를 공유하지 못한다.
+        const a = narrowMarketEventsForCacheKey([
+            event(0),
+            event(900_000),
+        ]).fingerprint;
+        const b = narrowMarketEventsForCacheKey([
+            event(900_000),
+            event(0),
+        ]).fingerprint;
+
+        expect(a).toBe(b);
+    });
+
+    it('집합이 다르면 fingerprint가 갈린다', () => {
+        const a = narrowMarketEventsForCacheKey([event(0)]).fingerprint;
+        const b = narrowMarketEventsForCacheKey([event(900_000)]).fingerprint;
+
+        expect(a).not.toBe(b);
     });
 });

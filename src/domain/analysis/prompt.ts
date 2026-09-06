@@ -64,17 +64,18 @@ import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import { screenChartPatterns } from '@/domain/patterns';
 import type {
+    AnalysisResponse,
     AssembledPrompt,
     AssetClass,
-    CandlePatternEntry,
-    AnalysisResponse,
     Bar,
+    CandlePatternEntry,
     ChartPatternId,
     FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
     ImpulseColor,
     IndicatorResult,
+    MarketEvent,
     MarketReference,
     PositionBucket,
     PriorAnalysis,
@@ -96,6 +97,7 @@ import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
+import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     formatBarDateTime,
@@ -1855,7 +1857,8 @@ export function buildAnalysisPrompt(
     assetClass: AssetClass = 'equity',
     positionBucket?: PositionBucket,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
-    priorAnalyses?: readonly PriorAnalysis[]
+    priorAnalyses?: readonly PriorAnalysis[],
+    marketEvents?: readonly MarketEvent[]
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1944,6 +1947,12 @@ export function buildAnalysisPrompt(
     // doesn't anchor to any bar). Deliberately NOT threaded into
     // `selectionContext` / `selectSkills` above — history must never change
     // which skills get injected.
+    const marketEventsSection = formatMarketEventsSection(
+        marketEvents ?? [],
+        bars,
+        symbol,
+        timeframe
+    );
     const priorAnalysisSection = formatPriorAnalysisSection(
         selectPriorAnalyses(priorAnalyses ?? [], bars),
         bars,
@@ -1984,6 +1993,9 @@ export function buildAnalysisPrompt(
         // Only push a non-empty section so an empty/unmatched history
         // doesn't inject a stray blank entry that would double up the
         // `\n\n` separator on join below (same guard as `positionHint`).
+        // 이벤트를 이력보다 앞에 둔다: 이벤트는 봉에 대한 사실이라 위쪽 봉
+        // 데이터의 연장이고, 이력은 그 위에서 내린 과거 판단이라 한 겹 위다.
+        ...(marketEventsSection !== '' ? [marketEventsSection] : []),
         ...(priorAnalysisSection !== '' ? [priorAnalysisSection] : []),
         // Only push a non-empty hint so an unrecognized bucket (empty
         // `positionHint`) doesn't inject a stray blank entry that would

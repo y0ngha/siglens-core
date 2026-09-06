@@ -13,6 +13,7 @@ import type {
     CurrencyCode,
     FilteredAnalysisResponse,
     MarketBriefingResponse,
+    MarketEvent,
     ModelId,
     PositionBucket,
     PriorAnalysis,
@@ -149,6 +150,27 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * {@link buildAnalysisCacheKey}'s `historyFingerprint` param).
      */
     priorAnalyses?: readonly PriorAnalysis[];
+
+    /**
+     * Market-moving news events for this symbol, supplied by the consumer from
+     * its own store — core has no news storage of its own.
+     *
+     * Core narrows this list twice before it reaches the LLM: once for the
+     * cache key (impact filter only — bars are not available yet, see
+     * `narrowMarketEventsForCacheKey`), then again for the prompt itself
+     * (bar-window cut, capped at `MARKET_EVENT_LIMIT` — see
+     * `selectMarketEvents`). Both narrowings are internal; the consumer only
+     * supplies the raw list.
+     *
+     * Only the classification travels — never the headline or body. Reading
+     * the article is the news and overall axes' job; this axis needs the fact
+     * to explain a bar move.
+     *
+     * Omitting this field (or supplying `[]`) produces a prompt AND a cache key
+     * that are BYTE-IDENTICAL to what this call produced before the field
+     * existed — no `## Market Events` section, no `:evt=` key segment.
+     */
+    marketEvents?: readonly MarketEvent[];
     /**
      * Callback that receives the exact prompt sent to the model, for a
      * consumer that persists prompts alongside the analyses they produced
