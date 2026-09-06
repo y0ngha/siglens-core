@@ -501,9 +501,28 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * `p8` cache entry would keep serving history-free analyses for the rest of
  * its TTL even once the consumer starts sending `priorAnalyses`.
  *
+ * @remarks
+ * **`p10` = bar timestamps rendered to the minute in both sections.**
+ * `## Recent Bar Data` already printed `YYYY-MM-DD HH:mm`; `## Prior Analyses`
+ * sliced the same value down to the date. On intraday timeframes that made
+ * every call from one session collapse to a single string, leaving the
+ * `N bars ago` count as the only ordering signal — and that count cannot be
+ * turned back into elapsed time, because bar-indexed distance skips overnight
+ * and weekend gaps (`20 bars ago` on a 15-minute chart reads as five hours but
+ * can span a whole night). Both sections now share `formatBarDateTime`, so a
+ * past call's stamp appears verbatim in the bar row it was made on.
+ *
+ * Scope is the same as `p9`, not wider: `formatBarRow` already produced this
+ * exact string (local `DATETIME_DISPLAY_LENGTH` slice), so routing it through
+ * the shared helper is a pure refactor with byte-identical output. The only
+ * changed bytes are in `## Prior Analyses`, which `formatPriorAnalysisSection`
+ * renders as `''` unless the request carries usable history. The bump is still
+ * fleet-wide for the same reason `p9` was — the constant has no
+ * per-history-presence axis to scope it to.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p9' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p10' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

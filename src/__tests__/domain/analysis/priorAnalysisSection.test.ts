@@ -3,6 +3,7 @@ import {
     PRIOR_ANALYSIS_GUARDRAIL,
     formatPriorAnalysisSection,
 } from '@/domain/analysis/priorAnalysisSection';
+import { formatBarDateTime } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis } from '@/domain/types';
 
 /** Bars sorted oldest-first, `intervalSeconds` apart, starting at `startTime` (Unix seconds). */
@@ -436,5 +437,52 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
 
         expect(result).not.toContain('Infinity');
         expect(result).not.toContain('-> since:');
+    });
+});
+
+describe('bar timestamp rendering', () => {
+    // 15분 간격 봉. intraday에서는 같은 세션의 여러 호출이 날짜만으로는
+    // 전부 같은 문자열이 되어 구분이 사라진다.
+    const INTERVAL = 900;
+    const START = 1_700_000_000;
+
+    it('renders minute precision so same-session calls stay distinct', () => {
+        const bars = makeBars(10, START, INTERVAL);
+        const at = (i: number) => new Date((START + i * INTERVAL) * 1000);
+        const section = formatPriorAnalysisSection(
+            [analysis(at(7)), analysis(at(5))],
+            bars,
+            'NVDA',
+            '15Min'
+        );
+
+        const stamps = [
+            ...section.matchAll(/\((\d{4}-\d{2}-\d{2}[^)]*)\)/g),
+        ].map(m => m[1]);
+        expect(stamps).toHaveLength(2);
+        stamps.forEach(v =>
+            expect(v).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+        );
+        // 날짜만이면 둘이 같아져 구분이 사라진다.
+        expect(new Set(stamps).size).toBe(2);
+    });
+
+    it('uses the anchor bar time, matching how `## Recent Bar Data` prints it', () => {
+        const bars = makeBars(10, START, INTERVAL);
+        // 봉 사이 시각에 생성된 분석도 그 봉의 시각으로 앵커돼 렌더된다 —
+        // 그래야 프롬프트 위쪽 봉 행과 문자열이 정확히 일치한다.
+        const between = new Date((START + 6 * INTERVAL + 300) * 1000);
+        const section = formatPriorAnalysisSection(
+            [analysis(between)],
+            bars,
+            'NVDA',
+            '15Min'
+        );
+
+        // 포맷 자체는 `promptFormat.test.ts`가 리터럴로 고정한다. 여기서 볼 것은
+        // "어느 봉의 시각을 골랐는가"뿐이므로 프로덕션 헬퍼를 그대로 쓴다 —
+        // 슬라이스 길이를 여기서 다시 적으면 구현이 바뀔 때 조용히 어긋난다.
+        const expected = formatBarDateTime((START + 6 * INTERVAL) * 1000);
+        expect(section).toContain(`(${expected})`);
     });
 });

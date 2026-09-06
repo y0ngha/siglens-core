@@ -98,6 +98,7 @@ import { formatPositionHintSection } from '@/domain/analysis/positionHintSection
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
+    formatBarDateTime,
     formatNullableNumber,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
@@ -105,7 +106,6 @@ import {
 type SkillGroupKey = SkillType | 'regular';
 
 const INDICATOR_DECIMAL_PLACES = 2;
-const DATETIME_DISPLAY_LENGTH = 16;
 const PERCENTAGE_FACTOR = 100;
 
 // MACD-V "momentum lifecycle" inner band: research §1 places the weak/strong
@@ -285,10 +285,7 @@ const formatLongTermContext = (bars: Bar[]): string => {
 };
 
 const formatBarRow = (bar: Bar): string => {
-    const datetime = new Date(bar.time * MS_PER_SECOND)
-        .toISOString()
-        .replace('T', ' ')
-        .slice(0, DATETIME_DISPLAY_LENGTH);
+    const datetime = formatBarDateTime(bar.time * MS_PER_SECOND);
     const pattern = detectCandlePattern(bar);
     return `[ts:${bar.time}] ${datetime} | O:${fmt(bar.open)} H:${fmt(bar.high)} L:${fmt(bar.low)} C:${fmt(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
 };

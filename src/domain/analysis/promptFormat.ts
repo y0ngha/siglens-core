@@ -27,6 +27,37 @@ export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
 };
 
 /**
+ * Character length of `YYYY-MM-DD HH:mm` — the prompt's bar-timestamp format.
+ *
+ * Named rather than inlined because {@link formatBarDateTime} slices an ISO
+ * string down to it, and a bare `16` there reads as an arbitrary cut.
+ */
+const DATETIME_DISPLAY_LENGTH = 16;
+
+/**
+ * @internal
+ * Bar timestamps rendered into prompts as `YYYY-MM-DD HH:mm` (UTC).
+ *
+ * Lives here for the same reason as {@link TIMEFRAME_LABEL}: `prompt.ts` and
+ * `priorAnalysisSection.ts` must render bar times **identically** or the model
+ * cannot line a past call up with the bar it was made on, and the two modules
+ * cannot import each other.
+ *
+ * Why minute precision matters on intraday timeframes: date-only text makes
+ * every call made in one session collapse to a single string, so the only
+ * remaining ordering signal is the `N bars ago` count — and that count cannot
+ * be converted back into elapsed time by the reader, because bar-indexed
+ * distance skips overnight and weekend gaps. `20 bars ago` on a 15-minute
+ * chart reads as five hours but can span a whole night.
+ */
+export function formatBarDateTime(timeMs: number): string {
+    return new Date(timeMs)
+        .toISOString()
+        .replace('T', ' ')
+        .slice(0, DATETIME_DISPLAY_LENGTH);
+}
+
+/**
  * Format a nullable number for prompt injection.
  *
  * Returns the number rounded to `dp` decimal places, or the literal string

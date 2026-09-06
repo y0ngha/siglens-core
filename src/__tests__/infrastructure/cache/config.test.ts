@@ -654,7 +654,7 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         );
     });
 
-    it('PROMPT_TEMPLATE_VERSION은 pure-Korean 규칙 + holder-consistent 재구성으로 p8로 bump되었고, prior-analysis-context 섹션으로 p9로 다시 bump된다', () => {
+    it('PROMPT_TEMPLATE_VERSION은 pure-Korean 규칙 + holder-consistent 재구성으로 p8로 bump되었고, prior-analysis-context 섹션으로 p9로 다시 bump된다, 그리고 봉 타임스탬프 분 단위 통일로 p10이 된다', () => {
         // The hint's *introduction* did not bump the version (it only appended a
         // brand-new `:pos=<bucket>` namespace). p7 reframed the hint to an
         // instructive position-management perspective. p8 ships two more
@@ -667,8 +667,17 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // only for requests carrying usable history, but the constant has no
         // per-request axis to scope the bump to, so it still cold-starts the
         // fleet. Warm entries carrying the old bytes must be invalidated —
-        // hence p9.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p9');
+        // hence p9. p10 renders bar timestamps to the minute in both
+        // `## Recent Bar Data` and `## Prior Analyses` (previously the latter
+        // was sliced to date-only), so a past call now matches the bar row it
+        // was made on verbatim instead of forcing the model to count
+        // `N bars ago` — a count that cannot be turned back into elapsed time
+        // because bar distance skips overnight and weekend gaps. Only the
+        // prior-analysis section's bytes actually change (`formatBarRow`
+        // already emitted this exact string), so the scope matches p9's:
+        // requests carrying usable history. The bump is fleet-wide anyway
+        // because the constant has no per-history-presence axis.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p10');
     });
 });
 
