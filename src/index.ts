@@ -752,6 +752,7 @@ export type {
     MACDResult,
     MarketBriefingContext,
     MarketBriefingResponse,
+    MarketEvent,
     NewsAnalysisResponse,
     NewsCardAnalysis,
     NewsCategory,
