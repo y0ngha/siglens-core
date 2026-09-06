@@ -510,9 +510,15 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * turned back into elapsed time, because bar-indexed distance skips overnight
  * and weekend gaps (`20 bars ago` on a 15-minute chart reads as five hours but
  * can span a whole night). Both sections now share `formatBarDateTime`, so a
- * past call's stamp appears verbatim in the bar row it was made on. Bytes
- * change for every request that renders bars — not just those carrying
- * history, unlike `p9` — so warm entries across the fleet must be invalidated.
+ * past call's stamp appears verbatim in the bar row it was made on.
+ *
+ * Scope is the same as `p9`, not wider: `formatBarRow` already produced this
+ * exact string (local `DATETIME_DISPLAY_LENGTH` slice), so routing it through
+ * the shared helper is a pure refactor with byte-identical output. The only
+ * changed bytes are in `## Prior Analyses`, which `formatPriorAnalysisSection`
+ * renders as `''` unless the request carries usable history. The bump is still
+ * fleet-wide for the same reason `p9` was — the constant has no
+ * per-history-presence axis to scope it to.
  *
  * @internal
  */

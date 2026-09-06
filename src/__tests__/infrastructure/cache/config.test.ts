@@ -672,8 +672,11 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // was sliced to date-only), so a past call now matches the bar row it
         // was made on verbatim instead of forcing the model to count
         // `N bars ago` — a count that cannot be turned back into elapsed time
-        // because bar distance skips overnight and weekend gaps. Bytes change
-        // for every request that renders bars, so warm entries must go.
+        // because bar distance skips overnight and weekend gaps. Only the
+        // prior-analysis section's bytes actually change (`formatBarRow`
+        // already emitted this exact string), so the scope matches p9's:
+        // requests carrying usable history. The bump is fleet-wide anyway
+        // because the constant has no per-history-presence axis.
         expect(PROMPT_TEMPLATE_VERSION).toBe('p10');
     });
 });
