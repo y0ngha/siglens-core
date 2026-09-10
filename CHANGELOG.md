@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.2](https://github.com/y0ngha/siglens-core/compare/v1.0.1...v1.0.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* 거시 브리핑 캐시 키에 프롬프트 버전 추가 ([a37a3fb](https://github.com/y0ngha/siglens-core/commit/a37a3fbaccb08ccb682fce511aa793a6dbe18d7f))
+* 리뷰 반영 — 경제 이벤트 캐시 버전·import 순서 ([89a7b4b](https://github.com/y0ngha/siglens-core/commit/89a7b4b8f7db598507fb8432f9713b2d5b1e7ec4))
+* 캐시 버전 축 추가·가격 포맷 스윕 ([67cd2cd](https://github.com/y0ngha/siglens-core/commit/67cd2cd7da0ac789b5e80c09ce103ad98db11179))
+* 프롬프트 수치 렌더링 결함 수정 ([f05ecd3](https://github.com/y0ngha/siglens-core/commit/f05ecd390b83cf7232bd71fece49b8da8499c8ee))
+
 ## [1.0.1](https://github.com/y0ngha/siglens-core/compare/v1.0.0...v1.0.1) (2026-09-10)
 
 
