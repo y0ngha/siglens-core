@@ -765,9 +765,30 @@ export function buildBriefingCacheKey(
 export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
 
 /**
+ * Prompt-template version for the macro (economy) briefing cache key.
+ *
+ * Same reason {@link MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION} exists: without
+ * this axis a change to `buildMacroBriefingPrompt`'s output takes up to a full
+ * TTL (1h) to take effect, because a cache HIT inside the same `dateHour`
+ * bucket returns a response the old prompt produced.
+ *
+ * Bump whenever `buildMacroBriefingPrompt`'s output changes in a way that would
+ * make a previously cached briefing wrong or stale.
+ *
+ * @remarks
+ * **`p1` = axis introduced with guarded figures.** Indicator values and
+ * calendar estimates render through `formatPlainNumber` (a non-finite value
+ * printed the literal `NaN`; binary float noise such as `0.30000000000000004`
+ * reached the model).
+ *
+ * @internal
+ */
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
  * @internal Build the Redis key for a cached macro (economy) briefing.
  *
- * Format: `briefing:macro:<dateHour>:<model>:<inputHash>`. Same bucketing
+ * Format: `briefing:macro:<dateHour>:<model>:<inputHash>:<promptVersion>`. Same bucketing
  * contract as {@link buildBriefingCacheKey} (date+hour share, model scopes,
  * input hash folds in the indicator/calendar snapshot) but a distinct `macro:`
  * namespace so market and economy briefings never collide.
@@ -777,7 +798,7 @@ export function buildMacroBriefingCacheKey(
     model: string,
     inputHash: string
 ): string {
-    return `briefing:macro:${dateHour}:${model}:${inputHash}`;
+    return `briefing:macro:${dateHour}:${model}:${inputHash}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
 /**
