@@ -5,6 +5,8 @@ import {
     outputLanguageName,
     type AnalysisLocale,
 } from './outputLocale';
+import { TIMEFRAME_MINUTES } from '@/domain/constants/market';
+import { MS_PER_SECOND } from '@/domain/constants/time';
 import {
     ATR_DEFAULT_PERIOD,
     CCI_DEFAULT_PERIOD,
@@ -47,8 +49,6 @@ import {
     VR_RANDOM_WALK,
     WILLIAMS_R_DEFAULT_PERIOD,
 } from '@/domain/indicators/constants';
-import { TIMEFRAME_MINUTES } from '@/domain/constants/market';
-import { MS_PER_SECOND } from '@/domain/constants/time';
 import { detectCandlePattern } from '@/domain/analysis/candle';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
 import {

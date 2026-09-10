@@ -1,14 +1,14 @@
+import {
+    MAX_REFERENCE_LEVELS_PER_SIDE,
+    RATIO_TO_PERCENT,
+    ROUND_NUMBER_TIERS,
+} from '@/domain/analysis/marketReferenceConstants';
 import type {
     IndicatorLevelOptions,
     IndicatorResult,
     ReferenceLevel,
     ReferenceLevels,
 } from '@/domain/types';
-import {
-    MAX_REFERENCE_LEVELS_PER_SIDE,
-    RATIO_TO_PERCENT,
-    ROUND_NUMBER_TIERS,
-} from '@/domain/analysis/marketReferenceConstants';
 
 /** Number of round levels to emit on each side of price. */
 const ROUND_LEVELS_PER_SIDE = 2;

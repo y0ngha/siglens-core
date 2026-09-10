@@ -41,8 +41,8 @@ import {
     classifyEmaStack,
     classifySwingStructure,
 } from '@/domain/analysis/trendStructure';
-import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
+import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 
 const EFFICIENCY_PERIOD = 20;
 

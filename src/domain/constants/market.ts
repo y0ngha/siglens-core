@@ -1,7 +1,9 @@
 import type { Timeframe } from '@/domain/types';
 
+/** @internal */
 export const DEFAULT_TIMEFRAME: Timeframe = '1Day';
 
+/** @internal */
 export const TIMEFRAMES: readonly Timeframe[] = [
     '5Min',
     '15Min',
@@ -11,6 +13,7 @@ export const TIMEFRAMES: readonly Timeframe[] = [
     '1Day',
 ];
 
+/** @internal */
 export function isValidTimeframe(
     value: string | undefined | null
 ): value is Timeframe {
@@ -18,7 +21,7 @@ export function isValidTimeframe(
     return (TIMEFRAMES as readonly string[]).includes(value);
 }
 
-// Per-timeframe bar counts: ~3.7 trading days (5Min) to 2 years (1Day).
+/** @internal Per-timeframe bar counts: ~3.7 trading days (5Min) to 2 years (1Day). */
 export const TIMEFRAME_BARS_LIMIT: Record<Timeframe, number> = {
     '5Min': 288,
     '15Min': 200,
@@ -28,9 +31,10 @@ export const TIMEFRAME_BARS_LIMIT: Record<Timeframe, number> = {
     '1Day': 500,
 };
 
+/** @internal */
 export const DEFAULT_BARS_LIMIT = TIMEFRAME_BARS_LIMIT[DEFAULT_TIMEFRAME];
 
-// Wall-clock minutes one bar spans.
+/** @internal Wall-clock minutes one bar spans. */
 export const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
     '5Min': 5,
     '15Min': 15,
@@ -40,7 +44,7 @@ export const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
     '1Day': 1_440,
 };
 
-// Calendar-day lookback per timeframe — wider than trading days to absorb weekends and holidays.
+/** @internal Calendar-day lookback per timeframe — wider than trading days to absorb weekends and holidays. */
 export const TIMEFRAME_LOOKBACK_DAYS: Record<Timeframe, number> = {
     '5Min': 10,
     '15Min': 20,

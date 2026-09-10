@@ -14,15 +14,15 @@ import {
 } from '@/domain/analysis/selectSkills';
 import type {
     AssembledPrompt,
+    BalanceSheetRow,
     CashFlowGrowthRow,
+    CashFlowRow,
     CurrencyCode,
     FinancialGrowthRow,
     FinancialsScorecard,
     FinancialsSnapshot,
     IncomeGrowthRow,
     IncomeStatementRow,
-    BalanceSheetRow,
-    CashFlowRow,
     Skill,
 } from '@/domain/types';
 import {

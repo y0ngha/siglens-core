@@ -1,4 +1,5 @@
 import { buildPlanCheck } from '@/domain/analysis/planCheck';
+import { formatPrice } from '@/domain/analysis/promptFormat';
 import type {
     ActionRecommendation,
     AnalysisResponse,
@@ -141,13 +142,14 @@ function ordinalLabel(index: number): string {
  *
  * 원화는 소수 단위로 호가되지 않으므로 반올림해 정수로 쓰고 `원`을 붙인다.
  * `$121980.70` 같은 표기는 값이 틀린 것과 같다 — 단위가 틀렸고, 존재하지 않는
- * 정밀도를 주장한다. 달러는 `$1234.56` 표기를 그대로 유지한다(이 필드가 생기기
- * 전 출력과 바이트 단위로 동일).
+ * 정밀도를 주장한다. 달러는 $1 이상이면 기존 `$1234.56` 표기와 바이트 동일,
+ * $1 미만은 유효숫자 4자리(`$0.08250`)로 표기해 서브달러 자산이 `$0.08`로
+ * 뭉개지지 않게 한다.
  */
 function formatLevelPrice(price: number, currency: CurrencyCode): string {
     return currency === 'KRW'
         ? `${Math.round(price).toLocaleString('en-US')}원`
-        : `$${price.toFixed(2)}`;
+        : `$${formatPrice(price)}`;
 }
 
 /** 진입가 대비 signed 백분율 문자열 반환 (+3.2% / -1.2% 형식). */
@@ -353,12 +355,12 @@ export function reconcileBullishActionRecommendation(
     const changes: readonly string[] = [
         ...(slWasReconciled
             ? [
-                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${reconciled.stopLoss?.toFixed(2)} (fallback)`,
+                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency)} (fallback)`,
               ]
             : []),
         ...(tpWasReconciled
             ? [
-                  `takeProfitPrices[0]: ${rec.takeProfitPrices?.[0] ?? 'null'} → ${tpResolved.value?.toFixed(2)} (fallback)`,
+                  `takeProfitPrices[0]: ${rec.takeProfitPrices?.[0] ?? 'null'} → ${formatPrice(tpResolved.value, currency)} (fallback)`,
               ]
             : []),
     ];

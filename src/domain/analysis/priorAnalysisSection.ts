@@ -13,13 +13,12 @@ import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
     formatBarDateTime,
     formatNullableNumber,
+    formatSignedPercent,
     listingCurrency,
     priceDecimalPlaces,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
-
-const PERCENT_DECIMAL_PLACES = 2;
 
 /**
  * Price for prompt injection, or `null` when the value is not a finite number.
@@ -35,12 +34,10 @@ const PERCENT_DECIMAL_PLACES = 2;
 const finitePrice = (n: number | undefined, priceDp: number): string | null =>
     n != null && Number.isFinite(n) ? formatNullableNumber(n, priceDp) : null;
 
-/** Signed percentage, e.g. `+1.80%` / `-4.30%` — mirrors the `sign + toFixed` convention already used by `marketBriefingPrompt.ts` / `fundamentalPrompt.ts`. */
-const fmtSignedPercent = (n: number): string =>
-    `${n >= 0 ? '+' : ''}${n.toFixed(PERCENT_DECIMAL_PLACES)}%`;
-
 /**
- * Percentage move of `value` from `reference`, formatted signed.
+ * Percentage move of `value` from `reference`, formatted signed via
+ * {@link formatSignedPercent} (e.g. `+1.80%` / `-4.30%`, `+0.00%` for a move
+ * that rounds to zero rather than the sign-losing `-0.00%`).
  *
  * A `reference` of `0` yields `'n/a'` rather than `Infinity%` / `NaN%`. A real
  * `Bar.close` is never `0` for a tradeable instrument, but this renderer's
@@ -53,7 +50,7 @@ const fmtSignedPercent = (n: number): string =>
 const percentFrom = (reference: number, value: number): string =>
     reference === 0 || !Number.isFinite(reference) || !Number.isFinite(value)
         ? 'n/a'
-        : fmtSignedPercent(((value - reference) / reference) * 100);
+        : formatSignedPercent(((value - reference) / reference) * 100);
 
 /**
  * `low <= stopLoss` when a stop was set; renders which of the two happened,

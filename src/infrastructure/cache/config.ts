@@ -1314,10 +1314,36 @@ export function buildNewsCacheKey(
 }
 
 /**
+ * Prompt-template version for the overall (3-axis) analysis cache keys.
+ *
+ * Parallel to {@link FUNDAMENTAL_PROMPT_TEMPLATE_VERSION} /
+ * {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} but scoped to the overall
+ * analysis type, so a change to `buildOverallAnalysisPrompt`'s rendered output
+ * can be invalidated independently of the other analysis types.
+ *
+ * Bump this string whenever `buildOverallAnalysisPrompt`'s output changes in a
+ * way that would make previously cached results stale.
+ *
+ * @remarks
+ * **`p1` introduces this axis**, together with the numeric-rendering audit
+ * that changed `buildOverallAnalysisPrompt`'s rendered bytes: KRX symbols get
+ * Korean-listing framing instead of "U.S. equity", and level prices render at
+ * a magnitude-aware precision instead of a fixed two decimals. The key
+ * previously carried no template-version segment, so pre-change entries
+ * (1-day TTL) kept being served after the prompt changed; `p1` gives this
+ * builder the same invalidation lever its siblings already have.
+ *
+ * @internal
+ */
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
  * Build the Redis key for a cached overall (3-axis) analysis result.
  *
- * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<inputHash>`.
- * The `timeframe` distinguishes analyses run with different chart contexts.
+ * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<promptVersion>:<inputHash>`.
+ * The `timeframe` distinguishes analyses run with different chart contexts;
+ * the {@link OVERALL_PROMPT_TEMPLATE_VERSION} segment invalidates the cache
+ * when the overall prompt template changes.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
  *   inside `submitOverallAnalysis`. Do not depend on this function from outside
@@ -1342,7 +1368,7 @@ export function buildOverallCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${OVERALL_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -1390,7 +1416,7 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  * feature would then appear to work while silently rendering nothing for the
  * first hours of every session.
  *
- * {@link TIMEFRAME_LOOKBACK_DAYS} over {@link TIMEFRAME_BARS_LIMIT} gives
+ * `TIMEFRAME_LOOKBACK_DAYS` over `TIMEFRAME_BARS_LIMIT` gives
  * calendar days per bar — but that ratio is an **average**, and the gap that
  * matters here is the **worst case**. Averaged over a year, a 5-minute bar is
  * ~3.5 calendar minutes apart; across a Friday close to a Monday open it is
@@ -1509,12 +1535,16 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
 /**
  * Build the **content-free** "peek" key for the latest cached overall analysis.
  *
- * Format: `{version}:analysis:overall:peek:<symbol>:<timeframe>:<modelId>`.
+ * Format: `{version}:analysis:overall:peek:<symbol>:<timeframe>:<modelId>:<promptVersion>`.
  *
  * Unlike {@link buildOverallCacheKey}, this key omits the input hash so it can
  * be reconstructed from `(symbol, timeframe, modelId)` alone — without
  * resolving the four dependency axes (which is the only way to derive the
- * input hash, and which would entail cache reads / potential generation).
+ * input hash, and which would entail cache reads / potential generation). The
+ * {@link OVERALL_PROMPT_TEMPLATE_VERSION} segment is still required here even
+ * though this is an overwrite-latest pointer: without it, a prompt-template
+ * change would leave this pointer serving the stale overall result until
+ * something else overwrites it.
  *
  * {@link pollOverallAnalysis} writes the normalized result under **both** keys:
  * the canonical hashed key (for the exact-input cache the submit path looks up)
@@ -1545,17 +1575,42 @@ export function buildOverallPeekCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}:${OVERALL_PROMPT_TEMPLATE_VERSION}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
+
+/**
+ * Prompt-template version for the options analysis cache keys.
+ *
+ * Parallel to {@link FUNDAMENTAL_PROMPT_TEMPLATE_VERSION} /
+ * {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} but scoped to the options
+ * analysis type, so a change to `buildOptionsAnalysisPrompt`'s rendered output
+ * can be invalidated independently of the other analysis types.
+ *
+ * Bump this string whenever `buildOptionsAnalysisPrompt`'s output changes in a
+ * way that would make previously cached results stale.
+ *
+ * @remarks
+ * **`p1` introduces this axis**, together with the numeric-rendering audit
+ * that changed `buildOptionsAnalysisPrompt`'s rendered bytes: the current
+ * price renders with cents instead of a whole number, and the metric JSON
+ * values render at 4-decimal precision. The key previously carried no
+ * template-version segment, so pre-change entries (1-day TTL) kept being
+ * served after the prompt changed; `p1` gives this builder the same
+ * invalidation lever its siblings already have.
+ *
+ * @internal
+ */
+export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
 
 /**
  * @internal Build the Redis key for a cached options analysis result.
  *
- * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<snapshotInputHash>`.
+ * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<promptVersion>:<snapshotInputHash>`.
  *
  * The schema-version prefix ({@link CACHE_KEY_SCHEMA_VERSION}) ensures future
  * shape changes invalidate the cache automatically, matching the sibling
- * analysis cache-key builders above.
+ * analysis cache-key builders above; the {@link OPTIONS_PROMPT_TEMPLATE_VERSION}
+ * segment invalidates the cache when the options prompt template changes.
  *
  * @param symbol - Underlying ticker (uppercase).
  * @param expirationDate - {@link OptionsExpirationFilter} — `'YYYY-MM-DD'` or the
@@ -1579,5 +1634,5 @@ export function buildOptionsCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${OPTIONS_PROMPT_TEMPLATE_VERSION}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }

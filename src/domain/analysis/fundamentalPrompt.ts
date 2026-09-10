@@ -25,6 +25,7 @@ import {
     formatLargeAmount,
     formatNullableNumber as fmt,
     formatPrice,
+    formatSignedPercent,
     listingCurrency,
 } from './promptFormat';
 
@@ -103,16 +104,10 @@ function formatPeerMetric(
 function formatSectorDirection(
     sd: FundamentalSnapshot['sectorDirection']
 ): string {
-    const today =
-        sd.todayChangePct != null
-            ? `${sd.todayChangePct >= 0 ? '+' : ''}${sd.todayChangePct.toFixed(2)}%`
-            : 'N/A';
+    const today = formatSignedPercent(sd.todayChangePct);
     const history = sd.historical
         .slice(0, 3)
-        .map(
-            h =>
-                `${h.date}: ${h.changePct >= 0 ? '+' : ''}${h.changePct.toFixed(2)}%`
-        )
+        .map(h => `${h.date}: ${formatSignedPercent(h.changePct)}`)
         .join(', ');
     return `Today: ${today}${history ? `; Recent: ${history}` : ''}`;
 }
