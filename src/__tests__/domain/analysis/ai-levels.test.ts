@@ -279,6 +279,24 @@ describe('reconcileBullishActionRecommendation', () => {
         ).toBeGreaterThan(entryPrice);
     });
 
+    it('sub-dollar fallback note는 4 유효숫자로 표기한다', () => {
+        const rec: ActionRecommendation = {
+            ...baseRec,
+            entryPrices: [0.09],
+            stopLoss: undefined,
+            takeProfitPrices: [0.095],
+        };
+
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            0.09,
+            0.005,
+            'USD'
+        );
+
+        expect(result.changes).toContain('stopLoss: null → 0.08250 (fallback)');
+    });
+
     it('AI 원본 필드는 수정하지 않는다', () => {
         const rec: ActionRecommendation = {
             ...baseRec,
@@ -556,5 +574,20 @@ describe('exit text currency', () => {
         expect(out.actionRecommendation?.reconciledLevels?.exit).toContain(
             '원'
         );
+    });
+});
+
+describe('buildBullishExitText 서브달러 정밀도', () => {
+    it('$1 미만 가격은 유효숫자 4자리로 표기한다', () => {
+        const text = buildBullishExitText(0.0835, 0.0825, [0.0852], 'USD');
+        expect(text).toContain('$0.08520');
+        expect(text).toContain('$0.08250');
+        expect(text).not.toContain('$0.08 ');
+    });
+
+    it('$1 이상 가격은 기존 2자리 표기를 유지한다', () => {
+        const text = buildBullishExitText(100, 95, [110], 'USD');
+        expect(text).toContain('$110.00');
+        expect(text).toContain('$95.00');
     });
 });

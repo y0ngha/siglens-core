@@ -380,3 +380,23 @@ describe('buildFundamentalAnalysisPrompt — currency and missing values', () =>
         expect(prompt).toContain('- Piotroski Score: 7/9');
     });
 });
+
+describe('buildFundamentalAnalysisPrompt — sector direction formatting', () => {
+    it('renders a NaN today and a zero-rounding historical move as N/A / +0.00%, never NaN% or -0.00%', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                sectorDirection: {
+                    todayChangePct: Number.NaN,
+                    historical: [{ date: '2025-04-28', changePct: -0.001 }],
+                },
+            },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain('Today: N/A; Recent: 2025-04-28: +0.00%');
+        expect(prompt).not.toContain('NaN%');
+        expect(prompt).not.toContain('-0.00%');
+    });
+});

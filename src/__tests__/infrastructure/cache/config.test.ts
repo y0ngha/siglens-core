@@ -40,6 +40,7 @@ import {
     NEWS_CACHE_TTL_SECONDS,
     NEWS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
+    OVERALL_PROMPT_TEMPLATE_VERSION,
     PROMPT_TEMPLATE_VERSION,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
@@ -225,7 +226,7 @@ describe('new analysis cache keys', () => {
         expect(
             buildOverallCacheKey('AAPL', '5Min', 'gemini-3.1-pro-preview', 'h3')
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-3.1-pro-preview:h3`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-3.1-pro-preview:${OVERALL_PROMPT_TEMPLATE_VERSION}:h3`
         );
     });
 
@@ -233,7 +234,7 @@ describe('new analysis cache keys', () => {
         expect(
             buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-3.1-pro-preview')
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-3.1-pro-preview`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-3.1-pro-preview:${OVERALL_PROMPT_TEMPLATE_VERSION}`
         );
     });
 

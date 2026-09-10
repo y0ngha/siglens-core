@@ -535,3 +535,37 @@ describe('formatPriorAnalysisSection price precision', () => {
         expect(out).toContain('now 269500');
     });
 });
+
+describe('formatPriorAnalysisSection — tiny negative move rounds to +0.00%, never -0.00%', () => {
+    it('renders a since-line move that rounds to zero without losing the sign convention', () => {
+        const bars: Bar[] = [
+            {
+                time: 1_700_000_000,
+                open: 100,
+                high: 100,
+                low: 100,
+                close: 100,
+                volume: 1000,
+            },
+            {
+                time: 1_700_086_400,
+                open: 100,
+                high: 100,
+                low: 99.999,
+                close: 99.9995,
+                volume: 1000,
+            },
+        ];
+        const entry = analysis(new Date(bars[0].time * 1000));
+
+        const result = formatPriorAnalysisSection(
+            [entry],
+            bars,
+            'AAPL',
+            '1Day'
+        );
+
+        expect(result).toContain('(+0.00%)');
+        expect(result).not.toContain('-0.00%');
+    });
+});
