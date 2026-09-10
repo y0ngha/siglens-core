@@ -1,4 +1,4 @@
-import { MS_PER_SECOND } from '@/domain/constants/time';
+import { barTimeMs } from '@/domain/analysis/priorAnalysis';
 import type { Bar, MarketEvent, NewsImpact } from '@/domain/types';
 
 /**
@@ -103,8 +103,8 @@ export function selectMarketEvents(
 ): MarketEvent[] {
     if (bars.length === 0) return [];
 
-    const fromMs = bars[0].time * MS_PER_SECOND;
-    const toMs = bars[bars.length - 1].time * MS_PER_SECOND;
+    const fromMs = barTimeMs(bars[0]);
+    const toMs = barTimeMs(bars[bars.length - 1]);
 
     return events
         .filter(entry => {

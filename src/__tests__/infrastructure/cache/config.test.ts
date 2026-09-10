@@ -1201,6 +1201,31 @@ describe('marketEvents가 캐시 키에 반영될 때', () => {
         expect(candidates[0].publishedAt).toEqual(loneOldHigh.publishedAt);
     });
 
+    it('같은 기사가 재분류되면 fingerprint가 갈린다', () => {
+        // 뉴스는 나중에 다시 분류될 수 있고, 그때 `publishedAt`은 그대로인 채
+        // impact/sentiment/category 만 바뀐다. 시각만 해시하면 캐시 키가 그대로라
+        // 렌더된 문구가 TTL 끝까지 옛 분류를 보여 준다.
+        const before = narrowMarketEventsForCacheKey([
+            event(0, 'high'),
+        ]).fingerprint;
+        const afterImpact = narrowMarketEventsForCacheKey([
+            event(0, 'medium'),
+        ]).fingerprint;
+
+        expect(afterImpact).not.toBe(before);
+
+        const base = event(0, 'high');
+        const afterSentiment = narrowMarketEventsForCacheKey([
+            { ...base, sentiment: 'bearish' as const },
+        ]).fingerprint;
+        const afterCategory = narrowMarketEventsForCacheKey([
+            { ...base, category: 'regulation' as const },
+        ]).fingerprint;
+
+        expect(afterSentiment).not.toBe(before);
+        expect(afterCategory).not.toBe(before);
+    });
+
     it('집합이 다르면 fingerprint가 갈린다', () => {
         const a = narrowMarketEventsForCacheKey([event(0)]).fingerprint;
         const b = narrowMarketEventsForCacheKey([event(900_000)]).fingerprint;

@@ -1,6 +1,5 @@
-import { MS_PER_SECOND } from '@/domain/constants/time';
 import { selectMarketEvents } from '@/domain/analysis/marketEvents';
-import { findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
+import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
     formatBarDateTime,
     TIMEFRAME_LABEL,
@@ -25,7 +24,7 @@ function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string {
     // Same helper `formatBarRow` and `## Prior Analyses` use, so this stamp
     // appears verbatim in the bar rows above and the model can line the event
     // up with the candle it landed on.
-    const at = formatBarDateTime(bars[anchorIndex].time * MS_PER_SECOND);
+    const at = formatBarDateTime(barTimeMs(bars[anchorIndex]));
 
     return `- ${barsAgo} bars ago (${at}): ${entry.category}, ${entry.sentiment}, ${entry.impact} impact`;
 }

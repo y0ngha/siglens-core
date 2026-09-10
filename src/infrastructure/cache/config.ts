@@ -404,10 +404,25 @@ export function narrowMarketEventsForCacheKey(
         return { candidates, fingerprint: undefined };
     }
 
+    // 분류값까지 해시에 넣는다 — `publishedAt`만으로는 부족하다.
+    //
+    // `narrowPriorAnalysesForCacheKey`는 `generatedAt`만 해시하는데, 그쪽은
+    // 한 번 만들어진 분석이 다시 쓰이지 않아 시각이 곧 내용의 식별자다.
+    // 뉴스는 다르다: 같은 기사가 나중에 다시 분류될 수 있고(운영 데이터에서
+    // 14.6만 건이 수집 하루 뒤 이후에 분석됐다), 그때 `publishedAt`은 그대로인
+    // 채 `impact`/`sentiment`/`category`만 바뀐다. 시각만 해시하면 그런 갱신이
+    // 캐시 키를 바꾸지 못해, 렌더된 `## Market Events` 문구가 TTL이 끝날 때까지
+    // 옛 분류를 그대로 보여 준다.
+    //
+    // 정렬한 뒤 해시하는 것은 같은 이유다 — 입력 순서가 캐시를 쪼개면 같은
+    // 화면을 보는 두 요청이 항목을 공유하지 못한다.
     const fingerprint = hashAnalysisInput(
         candidates
-            .map(entry => entry.publishedAt.getTime())
-            .toSorted((a, b) => a - b)
+            .map(
+                entry =>
+                    `${entry.publishedAt.getTime()}:${entry.category}:${entry.sentiment}:${entry.impact}`
+            )
+            .toSorted()
             .join(',')
     );
     return { candidates, fingerprint };
