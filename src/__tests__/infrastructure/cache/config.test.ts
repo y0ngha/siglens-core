@@ -33,6 +33,7 @@ import {
     FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
+    MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION,
     MARKET_BRIEFING_CACHE_TTL,
     MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
     narrowMarketEventsForCacheKey,
@@ -142,7 +143,20 @@ describe('cache key builders', () => {
     it('buildMacroBriefingCacheKey uses the briefing:macro: namespace with the dateHour, model, and input hash', () => {
         expect(
             buildMacroBriefingCacheKey('2026-06-16T09', 'test-model', 'abc123')
-        ).toBe('briefing:macro:2026-06-16T09:test-model:abc123');
+        ).toBe(
+            `briefing:macro:2026-06-16T09:test-model:abc123:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`
+        );
+    });
+
+    it('buildMacroBriefingCacheKey ends with the prompt-template version, so a future bump busts the cache', () => {
+        const key = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'test-model',
+            'abc123'
+        );
+        expect(key.endsWith(`:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`)).toBe(
+            true
+        );
     });
 
     it('buildMacroBriefingCacheKey: different input hash yields a different key', () => {

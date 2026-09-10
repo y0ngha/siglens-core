@@ -5,6 +5,7 @@ vi.mock('@/infrastructure/cache/redis');
 
 import { peekMacroBriefingCache } from '@/application/economy/peekMacroBriefingCache';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION } from '@/infrastructure/cache/config';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import type { EconomySnapshot } from '@/domain/types';
 
@@ -92,7 +93,7 @@ describe('peekMacroBriefingCache 함수는', () => {
         await peekMacroBriefingCache(SNAP);
         const key = mockCacheGet.mock.calls[0][0] as string;
         const re = new RegExp(
-            `^briefing:macro:.{${ISO_DATE_HOUR_PREFIX_LENGTH}}:.+:[0-9a-f]{16}$`
+            `^briefing:macro:.{${ISO_DATE_HOUR_PREFIX_LENGTH}}:.+:[0-9a-f]{16}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}$`
         );
         expect(key).toMatch(re);
         // setSystemTime(09:30Z)이라 09 버킷이 결정적으로 박혀야 한다.
