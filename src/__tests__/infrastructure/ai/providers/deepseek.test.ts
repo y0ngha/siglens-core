@@ -5,6 +5,8 @@ import { callDeepSeek } from '@/infrastructure/ai/providers/deepseek';
 import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
 
 const mockCreate = vi.hoisted(() => vi.fn());
+/** Responses API(`POST /responses`) — `responseSchema`가 있을 때 타는 경로. */
+const mockResponsesCreate = vi.hoisted(() => vi.fn());
 
 vi.mock('openai', () => ({
     __esModule: true,
@@ -14,6 +16,9 @@ vi.mock('openai', () => ({
             completions: {
                 create: mockCreate,
             },
+        },
+        responses: {
+            create: mockResponsesCreate,
         },
     })),
 }));
@@ -77,6 +82,7 @@ function successStream(usage?: unknown): AsyncIterable<Chunk> {
 describe('callDeepSeek', () => {
     beforeEach(() => {
         mockCreate.mockClear();
+        mockResponsesCreate.mockClear();
         mockedOpenAI.mockClear();
     });
 
@@ -269,18 +275,221 @@ describe('callDeepSeek', () => {
         });
     });
 
-    it('does not use responseSchema to constrain output (json_object mode always, no json_schema)', async () => {
-        mockCreate.mockResolvedValueOnce(successStream());
+    describe('responseSchema — Responses API로 강제한다', () => {
+        // `/chat/completions`는 `response_format: json_schema`를 거부한다
+        // (`400 This response_format type is unavailable now`, V4 모델 ID로도 동일).
+        // 강제하지 않던 시절 실측: 30k 토큰 기술 분석 프롬프트에서
+        // `indicatorResults[].signals`가 824건 전부 빈 배열이었다.
+        function responsesStream(
+            text: string,
+            usage?: unknown,
+            /** 종료 이벤트. 기본은 정상 완료. */
+            terminal: {
+                type:
+                    | 'response.completed'
+                    | 'response.incomplete'
+                    | 'response.failed';
+                incompleteReason?: string;
+                errorMessage?: string;
+            } = { type: 'response.completed' }
+        ): AsyncIterable<unknown> {
+            return {
+                async *[Symbol.asyncIterator]() {
+                    // reasoning 블록도 `text`를 갖는다 — 섞으면 JSON이 깨지므로
+                    // `response.output_text.delta`만 읽어야 한다.
+                    yield {
+                        type: 'response.reasoning_text.delta',
+                        delta: 'thinking out loud',
+                    };
+                    yield { type: 'response.output_text.delta', delta: text };
+                    yield {
+                        type: terminal.type,
+                        response: {
+                            ...(usage !== undefined ? { usage } : {}),
+                            ...(terminal.incompleteReason !== undefined
+                                ? {
+                                      incomplete_details: {
+                                          reason: terminal.incompleteReason,
+                                      },
+                                  }
+                                : {}),
+                            ...(terminal.errorMessage !== undefined
+                                ? { error: { message: terminal.errorMessage } }
+                                : {}),
+                        },
+                    };
+                },
+            };
+        }
 
-        const schema = { type: 'object', properties: {} };
-        await callDeepSeek('prompt', {
-            model: FLASH_MODEL,
-            apiKey: 'key',
-            responseSchema: schema,
+        it('스키마가 있으면 /responses로 가고 text.format에 실린다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('analysis result')
+            );
+
+            const schema = { type: 'object', properties: {} };
+            const result = await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: schema,
+            });
+
+            expect(result).toBe('analysis result');
+            expect(mockCreate).not.toHaveBeenCalled();
+            const call = mockResponsesCreate.mock.calls[0][0];
+            expect(call.text.format).toMatchObject({
+                type: 'json_schema',
+                schema,
+            });
+            expect(call.stream).toBe(true);
         });
 
-        const call = mockCreate.mock.calls[0][0];
-        expect(call.response_format).toEqual({ type: 'json_object' });
+        it('reasoning 블록의 델타는 본문에 섞지 않는다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('{"ok":1}')
+            );
+
+            const result = await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+            });
+
+            expect(result).toBe('{"ok":1}');
+            expect(result).not.toContain('thinking out loud');
+        });
+
+        it('usage를 chat 모양으로 옮긴다 — 안 옮기면 텔레메트리가 0이 된다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('ok', {
+                    input_tokens: 1000,
+                    output_tokens: 250,
+                    input_tokens_details: { cached_tokens: 100 },
+                })
+            );
+            const logSpy = vi
+                .spyOn(console, 'info')
+                .mockImplementation(() => {});
+
+            await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+                jobId: 'job-1',
+            });
+
+            const usageLine = logSpy.mock.calls
+                .filter(args => String(args[0]).startsWith('[Usage]'))
+                .map(args => String(args[1]))[0];
+            expect(usageLine).toBeDefined();
+            // 1000 − 100(cached) = 900
+            expect(usageLine).toContain('"promptTokens":900');
+            expect(usageLine).toContain('"outputTokens":250');
+            logSpy.mockRestore();
+        });
+
+        it('절단된 응답을 성공으로 반환하지 않는다 — max_output_tokens', async () => {
+            // `/responses`에는 finish_reason이 없어서, 종료 이벤트를 보지 않으면
+            // 절단 시점까지 흘러온 **부분 JSON**이 정상 응답으로 나간다.
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('{"indicatorResults":[{"indi', undefined, {
+                    type: 'response.incomplete',
+                    incompleteReason: 'max_output_tokens',
+                })
+            );
+
+            const promise = callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+            });
+
+            // chat 경로의 `length`와 같은 취급 — 재시도해도 같은 한도에 걸린다.
+            await expect(promise).rejects.toThrow(/output token limit/);
+            await expect(promise).rejects.not.toMatchObject({
+                retryable: true,
+            });
+        });
+
+        it('그 외 incomplete는 재시도 가능 오류로 올린다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('partial', undefined, {
+                    type: 'response.incomplete',
+                    incompleteReason: 'content_filter',
+                })
+            );
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
+        it('response.failed는 본문이 있어도 오류다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('{"partial":1}', undefined, {
+                    type: 'response.failed',
+                    errorMessage: 'upstream exploded',
+                })
+            );
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
+        it('본문이 비면 재시도 가능 오류다 — 정상 완료여도', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(responsesStream(''));
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
+        it('종료 이벤트 없이 스트림이 끝나면 완료로 치지 않는다', async () => {
+            // 연결이 조용히 닫히거나 SSE 프레이밍이 어긋나면 셋 중 무엇도 오지 않는다.
+            // `outcome` 기본값이 'completed'이면 그때도 부분 텍스트가 성공으로 나간다 —
+            // 절단 오분류와 같은 사고를 다른 입구로 내는 셈이다.
+            mockResponsesCreate.mockResolvedValueOnce({
+                async *[Symbol.asyncIterator]() {
+                    yield {
+                        type: 'response.output_text.delta',
+                        delta: '{"partial":',
+                    };
+                    // 종료 이벤트 없이 끝난다.
+                },
+            });
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
+        it('스키마가 없으면 종전 경로(json_object)를 그대로 탄다', async () => {
+            mockCreate.mockResolvedValueOnce(successStream());
+
+            await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+            expect(mockResponsesCreate).not.toHaveBeenCalled();
+            expect(mockCreate.mock.calls[0][0].response_format).toEqual({
+                type: 'json_object',
+            });
+        });
     });
 
     it('throws non-retryable error when finish_reason is length (max tokens)', async () => {

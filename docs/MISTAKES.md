@@ -56,6 +56,20 @@ and have been removed from this file.
    ✅ countSkillFiles reuses collectMdFiles for consistency
    ✅ All field lists synchronized when new fields are added
 
+6.7. Dual-entry-point state bugs: success/failure defaulting without sufficient guards
+   → When a value defaults to success/completion and is reassigned only in a guarded branch, all other code paths
+      silently return the default. The same bug reappears through different entry points (initialization, unguarded branches).
+   → State that affects control flow must be explicitly assigned in ALL paths before use
+   → Particularly common in event stream processing: outcome defaults to success, only reassigned when terminal event observed
+   ❌ let outcome = 'completed'; if (event.type === 'terminal') { outcome = classifyTerminal(event); }
+      return outcome;  // if no terminal event, outcome was never set; all non-terminal exits return 'completed'
+   ✅ let outcome = 'no_event';  // default to failure case
+      if (event.type === 'terminal') { outcome = classifyTerminal(event); }
+      if (!isValidOutcome(outcome)) throw new Error('...');  // explicit guard before using
+      return outcome;  // all paths explicitly assigned
+   → Lesson: fix one branch (terminal event case) while leaving same defect reachable via initialization (no event case).
+      Review both initialization AND all conditional branches; defaulting to success hides multiple exit paths.
+
 7. Tight coupling between interface props and dependent files
    → Group related prop pairs into a single type
 
@@ -278,6 +292,12 @@ and have been removed from this file.
    → Recurring mistake (fix/post-210a423 Tasks 1, 7, PR #76 R2): as-casts without accompanying safety comment,
       especially in guard branches (normalize*.ts sentinel checks, dependency resolver type narrowing).
       Review every `as` during code review to ensure inline explanation is present covering BOTH intent AND runtime guarantee.
+   → SDK discriminated unions anti-pattern: Hand-rolling `unknown` + event type to avoid SDK types defeats the purpose
+      of discriminated unions, hiding real failure modes. When integrating external SDKs with event streams, always
+      import the SDK's native discriminated union types (OpenAI ResponseIncompleteEvent / ResponseFailedEvent, etc.).
+      ❌ const event = body as unknown; if (event.type === 'foo') { ... }  // unknown loses type safety
+      ✅ import type { ResponseIncompleteEvent, ResponseFailedEvent } from 'openai'; const event: ResponseEvent = ...;
+         // Discriminated union reveals all terminal cases; missing handler → TS error
 
 8. Sibling types in the same error/result shape follow inconsistent declaration patterns
    → When multiple related type fields appear in the same interface, they must all use the same strategy (domain alias or inline literal)
@@ -489,6 +509,21 @@ and have been removed from this file.
 15. Reaching out to real external services inside tests
     → Tests must never hit Upstash, Neon, AI provider endpoints, or any real network destination
     → Replace each infrastructure interface (AnalysisCache, AiProvider, etc.) with a stub / vi.fn mock
+
+16. Negative assertions that confirm wrong behavior pin bugs in place
+    → Tests asserting that an option/feature has NO effect actively prevent detection of when that feature starts working
+    → Example: `does_not_use_responseSchema_to_constrain_output` test passes as long as the schema is ignored
+       When the schema is finally routed through, the test still passes, silently pinning the bug
+    → Replace negative assertions with positive ones: "option accepted" + "option has measurable effect"
+    ❌ test('does not use responseSchema to constrain output', () => { const result = call(input); expect(result.signals).toEqual([]); })
+       // This test PASSES when schema is ignored (buggy) and PASSES when schema works (correct) — provides zero signal
+    ✅ test('responseSchema accepted', () => { const schema = {...}; expect(() => call({ responseSchema: schema })).not.toThrow(); })
+       test('responseSchema constrains output structure', () => { const result = call(input, { schema: STRICT_SCHEMA }); 
+         expect(result.signals).toContainEqual({ type: expect.stringMatching(...) }); })
+       // Now the second test FAILS when schema is ignored, PASSES when schema works
+    → When a feature is added as an optional parameter, test suite must verify both:
+      (a) The option is accepted (doesn't throw)
+      (b) The option materially changes behavior (positive assertion on output, not absence of output)
 ```
 
 ---
@@ -521,6 +556,11 @@ and have been removed from this file.
 3. Inline code comments reference removed or changed implementation
    → Module-level JSDoc blocks must document current behavior, not legacy/removed code
    → When changing function implementation, update related comments immediately
+   → External API limitations asserted in comments must be re-verified during review; half-true assertions become stale bugs
+   ❌ // DeepSeek does not support strict json_schema mode (only true for /chat/completions; false for /responses API)
+      // Comment written once, never re-verified, silently disabled a feature for a month
+   ✅ // DeepSeek /chat/completions does not support json_schema; use /responses API for structured output
+      // Include endpoint name and re-check when SDK version changes or new endpoints are added
 
 4. Tier 1 public exports missing required JSDoc tags
    → Tier 1 functions require @param and @returns tags for IDE hover documentation
