@@ -1,5 +1,12 @@
 # Fix Log
 
+## [fix/prompt-numeric-audit R2 | 2026-09-11] — PR review (claude[bot], CHANGES_REQUESTED) fix application
+
+- Violation 1 (REQUIRED, R1): `src/infrastructure/cache/config.ts` — `ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION` was not bumped although `economicEventPrompt.ts` output changed for NaN / float-noise inputs
+  Rule: Infrastructure cache config — template version must be bumped whenever a builder's rendered bytes can change, even if only for previously-corrupt input handling
+  Context: Blocker fix. Version incremented p3→p4 with remarks documenting output change scope. Matches pattern: all sibling prompt builders' versions (OVERALL_ANALYSIS_TEMPLATE_VERSION, etc.) were re-bumped concurrently.
+  Fixed: ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION: 3 → 4
+
 ## [릴리스 v0.47.1 → v0.47.2 | 2026-08-19] — GitHub Packages 산출물 손상
 
 - Symptom: `yarn install`이 `@y0ngha/siglens-core@npm:0.47.1: All versions satisfying "0.47.1" are quarantined`로 실패
