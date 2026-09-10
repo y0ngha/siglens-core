@@ -1,5 +1,6 @@
 import { computeYieldSpread } from './normalizeTreasuryRates';
 import type { EconomySnapshot } from './types';
+import { formatPlainNumber } from '@/domain/analysis/promptFormat';
 import type { AssembledPrompt } from '@/domain/types';
 
 /** 프롬프트에 포함할 임박 캘린더 이벤트 최대 수(매직넘버 상수화). */
@@ -27,8 +28,11 @@ export function buildMacroBriefingPrompt(
             const latest =
                 i.latest === null
                     ? 'N/A'
-                    : `${i.latest.value} (${i.latest.date})`;
-            const prev = i.previous === null ? '' : ` ← ${i.previous.value}`;
+                    : `${formatPlainNumber(i.latest.value)} (${i.latest.date})`;
+            const prev =
+                i.previous === null
+                    ? ''
+                    : ` ← ${formatPlainNumber(i.previous.value)}`;
             return `${i.name}: ${latest}${prev}`;
         })
         .join('\n');
@@ -42,7 +46,7 @@ export function buildMacroBriefingPrompt(
     const calendarLines = snapshot.calendar
         .slice(0, MAX_CALENDAR_IN_PROMPT)
         .map(e => {
-            const est = e.estimate === null ? 'N/A' : String(e.estimate);
+            const est = formatPlainNumber(e.estimate);
             return `${e.date} ${e.event} (중요도=${e.impact}, 예상=${est})`;
         })
         .join('\n');

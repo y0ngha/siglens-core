@@ -13,11 +13,12 @@ import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
     formatBarDateTime,
     formatNullableNumber,
+    listingCurrency,
+    priceDecimalPlaces,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
 
-const PRICE_DECIMAL_PLACES = 2;
 const PERCENT_DECIMAL_PLACES = 2;
 
 /**
@@ -31,13 +32,8 @@ const PERCENT_DECIMAL_PLACES = 2;
  * a non-finite input — the same posture {@link percentFrom} takes for a zero
  * reference price.
  */
-const finitePrice = (n: number | undefined): string | null =>
-    n != null && Number.isFinite(n)
-        ? formatNullableNumber(n, PRICE_DECIMAL_PLACES)
-        : null;
-
-const fmtPrice = (n: number): string =>
-    formatNullableNumber(n, PRICE_DECIMAL_PLACES);
+const finitePrice = (n: number | undefined, priceDp: number): string | null =>
+    n != null && Number.isFinite(n) ? formatNullableNumber(n, priceDp) : null;
 
 /** Signed percentage, e.g. `+1.80%` / `-4.30%` — mirrors the `sign + toFixed` convention already used by `marketBriefingPrompt.ts` / `fundamentalPrompt.ts`. */
 const fmtSignedPercent = (n: number): string =>
@@ -87,7 +83,8 @@ const formatTargetWord = (firstTarget: number, high: number): string | null => {
 
 /** `entry a-b` for a range, `entry a` for a single price; `''` when absent. */
 const formatEntryPlanPart = (
-    entryPrices: readonly number[] | undefined
+    entryPrices: readonly number[] | undefined,
+    priceDp: number
 ): string => {
     if (!entryPrices || entryPrices.length === 0) return '';
     // Non-finite entries are dropped before the range is formed, so a partly
@@ -95,24 +92,27 @@ const formatEntryPlanPart = (
     // `entry NaN-180.00`.
     const finite = entryPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    if (finite.length === 1) return `entry ${fmtPrice(finite[0])}`;
-    return `entry ${fmtPrice(finite[0])}-${fmtPrice(finite[finite.length - 1])}`;
+    const px = (n: number): string => formatNullableNumber(n, priceDp);
+    if (finite.length === 1) return `entry ${px(finite[0])}`;
+    return `entry ${px(finite[0])}-${px(finite[finite.length - 1])}`;
 };
 
 /** `TP a/b/...` in the given (ascending) order; `''` when absent. */
 const formatTakeProfitPlanPart = (
-    takeProfitPrices: readonly number[] | undefined
+    takeProfitPrices: readonly number[] | undefined,
+    priceDp: number
 ): string => {
     if (!takeProfitPrices || takeProfitPrices.length === 0) return '';
     const finite = takeProfitPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    return `TP ${finite.map(fmtPrice).join('/')}`;
+    return `TP ${finite.map(n => formatNullableNumber(n, priceDp)).join('/')}`;
 };
 
 /** One rendered past call, newest-first order trusted from the caller (`selected` is not re-sorted here). */
 function formatEntry(
     entry: PriorAnalysis,
-    bars: readonly Bar[]
+    bars: readonly Bar[],
+    priceDp: number
 ): string | null {
     const anchorIndex = findAnchorBarIndex(bars, entry.generatedAt.getTime());
     if (anchorIndex === null) return null;
@@ -129,12 +129,11 @@ function formatEntry(
     // weekend gaps.
     const anchorDateTime = formatBarDateTime(barTimeMs(anchorBar));
 
+    const stopText = finitePrice(entry.stopLoss, priceDp);
     const planParts = [
-        formatEntryPlanPart(entry.entryPrices),
-        formatTakeProfitPlanPart(entry.takeProfitPrices),
-        finitePrice(entry.stopLoss) !== null
-            ? `SL ${finitePrice(entry.stopLoss)}`
-            : '',
+        formatEntryPlanPart(entry.entryPrices, priceDp),
+        formatTakeProfitPlanPart(entry.takeProfitPrices, priceDp),
+        stopText !== null ? `SL ${stopText}` : '',
     ].filter(part => part !== '');
     const plan =
         planParts.length > 0 ? planParts.join(', ') : 'no entry recommended';
@@ -161,9 +160,9 @@ function formatEntry(
     // would render `high NaN` into a prompt billed to a paid model — the exact
     // defect the `PriorAnalysis` field guards above exist to prevent, just
     // arriving by a different path.
-    const highText = finitePrice(high);
-    const lowText = finitePrice(low);
-    const nowText = finitePrice(now);
+    const highText = finitePrice(high, priceDp);
+    const lowText = finitePrice(low, priceDp);
+    const nowText = finitePrice(now, priceDp);
     if (highText === null || lowText === null || nowText === null) {
         // Without a trustworthy reference frame there is no honest outcome to
         // state, so the entry stops at its header line rather than reporting a
@@ -239,8 +238,14 @@ export function formatPriorAnalysisSection(
 ): string {
     if (selected.length === 0 || bars.length === 0) return '';
 
+    // Same precision rule the bar rows above use, so a past call's prices can be
+    // matched against them verbatim (sub-dollar assets, whole-won KRX).
+    const priceDp = priceDecimalPlaces(
+        bars[bars.length - 1].close,
+        listingCurrency(symbol)
+    );
     const entryLines = selected
-        .map(entry => formatEntry(entry, bars))
+        .map(entry => formatEntry(entry, bars, priceDp))
         .filter((line): line is string => line !== null);
     if (entryLines.length === 0) return '';
 

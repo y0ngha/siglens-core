@@ -47,6 +47,7 @@ import {
     VR_RANDOM_WALK,
     WILLIAMS_R_DEFAULT_PERIOD,
 } from '@/domain/indicators/constants';
+import { TIMEFRAME_MINUTES } from '@/domain/constants/market';
 import { MS_PER_SECOND } from '@/domain/constants/time';
 import { detectCandlePattern } from '@/domain/analysis/candle';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
@@ -100,8 +101,11 @@ import { formatPositionHintSection } from '@/domain/analysis/positionHintSection
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
+    equityListingContext,
     formatBarDateTime,
     formatNullableNumber,
+    listingCurrency,
+    priceDecimalPlaces,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
 
@@ -234,7 +238,11 @@ const formatVolume = (n: number): string =>
 const lastNonNull = (arr: (number | null)[]): number | null =>
     arr.findLast((v): v is number => v !== null) ?? null;
 
-const formatMarketSection = (bars: Bar[]): string => {
+/** `value / base` as a percent, or `'N/A'` when the base cannot divide. */
+const percentOf = (value: number, base: number): string =>
+    base > 0 ? `${fmt((value / base) * PERCENTAGE_FACTOR)}%` : 'N/A';
+
+const formatMarketSection = (bars: Bar[], priceDp: number): string => {
     if (bars.length === 0) {
         return [
             '## Analysis Snapshot',
@@ -247,49 +255,45 @@ const formatMarketSection = (bars: Bar[]): string => {
     const last = bars[bars.length - 1];
     const prev = bars.length > 1 ? bars[bars.length - 2] : null;
     const changeRate =
-        prev !== null
-            ? `${(((last.close - prev.close) / prev.close) * 100).toFixed(INDICATOR_DECIMAL_PLACES)}%`
-            : 'N/A';
+        prev !== null ? percentOf(last.close - prev.close, prev.close) : 'N/A';
 
     return [
         '## Analysis Snapshot',
-        `- Snapshot Price (price captured at analysis time; not a live quote): ${fmt(last.close)}`,
+        `- Snapshot Price (price captured at analysis time; not a live quote): ${formatNullableNumber(last.close, priceDp)}`,
         `- Price Change %: ${changeRate}`,
         `- Volume: ${formatVolume(last.volume)}`,
     ].join('\n');
 };
 
-const formatLongTermContext = (bars: Bar[]): string => {
+const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
     if (bars.length === 0) {
         return ['## Long-term Context', '- No data available'].join('\n');
     }
 
+    const px = (n: number): string => formatNullableNumber(n, priceDp);
     const highs = bars.map(b => b.high);
     const lows = bars.map(b => b.low);
     const periodHigh = Math.max(...highs);
     const periodLow = Math.min(...lows);
     const firstClose = bars[0].close;
     const lastClose = bars[bars.length - 1].close;
-    const periodReturn =
-        firstClose > 0
-            ? ((lastClose - firstClose) / firstClose) * PERCENTAGE_FACTOR
-            : 0;
 
     return [
         `## Long-term Context (${bars.length} bars total)`,
-        `- Period High: ${fmt(periodHigh)}`,
-        `- Period Low: ${fmt(periodLow)}`,
-        `- Price Range: ${fmt(periodHigh)} ~ ${fmt(periodLow)}`,
-        `- Period Return: ${periodReturn.toFixed(INDICATOR_DECIMAL_PLACES)}%`,
-        `- Current vs High: ${((lastClose / periodHigh) * PERCENTAGE_FACTOR).toFixed(INDICATOR_DECIMAL_PLACES)}%`,
-        `- Current vs Low: ${((lastClose / periodLow) * PERCENTAGE_FACTOR).toFixed(INDICATOR_DECIMAL_PLACES)}%`,
+        `- Period High: ${px(periodHigh)}`,
+        `- Period Low: ${px(periodLow)}`,
+        `- Price Range: ${px(periodHigh)} ~ ${px(periodLow)}`,
+        `- Period Return: ${percentOf(lastClose - firstClose, firstClose)}`,
+        `- Current vs High: ${percentOf(lastClose, periodHigh)}`,
+        `- Current vs Low: ${percentOf(lastClose, periodLow)}`,
     ].join('\n');
 };
 
-const formatBarRow = (bar: Bar): string => {
+const formatBarRow = (bar: Bar, priceDp: number): string => {
+    const px = (n: number): string => formatNullableNumber(n, priceDp);
     const datetime = formatBarDateTime(bar.time * MS_PER_SECOND);
     const pattern = detectCandlePattern(bar);
-    return `[ts:${bar.time}] ${datetime} | O:${fmt(bar.open)} H:${fmt(bar.high)} L:${fmt(bar.low)} C:${fmt(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
+    return `[ts:${bar.time}] ${datetime} | O:${px(bar.open)} H:${px(bar.high)} L:${px(bar.low)} C:${px(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
 };
 
 const buildCandlePatternEntries = (
@@ -325,7 +329,8 @@ const formatPatternEntry = (entry: PromptCandlePatternEntry): string =>
 const formatRecentBarsSection = (
     bars: Bar[],
     recentBarsCount: number,
-    candleEntries: CandlePatternEntry[]
+    candleEntries: CandlePatternEntry[],
+    priceDp: number
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -338,7 +343,7 @@ const formatRecentBarsSection = (
     return [
         `## Recent Bar Data (Last ${recentBars.length} bars)`,
         'Format: Date/Time(UTC) | O:Open H:High L:Low C:Close V:Volume [CandlePattern]',
-        ...recentBars.map(formatBarRow),
+        ...recentBars.map(bar => formatBarRow(bar, priceDp)),
         ...(patternEntries.length > 0
             ? [
                   `## Detected Candle Patterns (Short-term Trend Signal)`,
@@ -393,9 +398,12 @@ const sqzStateLabel = (r: SqueezeMomentumResult): string => {
     return 'no squeeze';
 };
 
+// Bar-over-bar histogram direction. Worded apart from the windowed `[rising]` trend
+// label that follows it: both used to render as `[rising]`, so the line read
+// `[rising] [rising]` — or `[rising] [falling]`, which looks self-contradictory.
 const sqzDirectionLabel = (r: SqueezeMomentumResult): string => {
     if (r.increasing === null) return '';
-    return r.increasing ? ' [rising]' : ' [falling]';
+    return r.increasing ? ' [up vs prior bar]' : ' [down vs prior bar]';
 };
 
 const countSqueezeDuration = (data: SqueezeMomentumResult[]): number => {
@@ -433,7 +441,8 @@ const detectZeroCross = (
 
 const formatSqueezeMomentumLine = (
     indicators: IndicatorResult,
-    config: PromptConfig
+    config: PromptConfig,
+    priceDp: number
 ): string => {
     const data = indicators.squeezeMomentum;
     const last = lastOf(data);
@@ -453,7 +462,7 @@ const formatSqueezeMomentumLine = (
             ? ` / ${cross.direction === 'bullish_cross' ? 'bullish' : 'bearish'} zero-cross (${cross.barsAgo} bars ago)`
             : '';
 
-    return `- Squeeze Momentum(BB:${SQUEEZE_MOMENTUM_BB_LENGTH},KC:${SQUEEZE_MOMENTUM_KC_LENGTH},mult:${SQUEEZE_MOMENTUM_KC_MULT}): momentum ${fmt(last.momentum)}${sqzDirectionLabel(last)}${trendLabel(momentumTrend)} / ${sqzStateLabel(last)}${durationStr}${crossStr}`;
+    return `- Squeeze Momentum(BB:${SQUEEZE_MOMENTUM_BB_LENGTH},KC:${SQUEEZE_MOMENTUM_KC_LENGTH},mult:${SQUEEZE_MOMENTUM_KC_MULT}): momentum ${formatNullableNumber(last.momentum, priceDp)}${sqzDirectionLabel(last)}${trendLabel(momentumTrend)} / ${sqzStateLabel(last)}${durationStr}${crossStr}`;
 };
 
 const barsAgoCount = (index: number, totalBars: number): number =>
@@ -467,9 +476,10 @@ const formatLiquidityLine = (
     label: string,
     liquidityKind: string,
     eq: SMCEqualLevel,
-    totalBars: number
+    totalBars: number,
+    priceDp: number
 ): string =>
-    `- ${label} at ${fmt(eq.price)} (${liquidityKind}) (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
+    `- ${label} at ${formatNullableNumber(eq.price, priceDp)} (${liquidityKind}) (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
 
 // When adding a new field to SMCResult, update this check accordingly.
 const isSMCEmpty = (smc: SMCResult): boolean =>
@@ -484,8 +494,14 @@ const isSMCEmpty = (smc: SMCResult): boolean =>
     smc.discountZone === null &&
     smc.equilibriumZone === null;
 
-const formatZoneLine = (zone: SMCZone | null, label: string): string | null =>
-    zone !== null ? `- ${label}: ${fmt(zone.low)} ~ ${fmt(zone.high)}` : null;
+const formatZoneLine = (
+    zone: SMCZone | null,
+    label: string,
+    priceDp: number
+): string | null =>
+    zone !== null
+        ? `- ${label}: ${formatNullableNumber(zone.low, priceDp)} ~ ${formatNullableNumber(zone.high, priceDp)}`
+        : null;
 
 // Priority: premium > discount > equilibrium (most actionable first).
 // Note: premium/discount checks use only one bound (>= low / <= high) intentionally.
@@ -509,7 +525,11 @@ const classifyPriceZone = (
     return 'neutral';
 };
 
-const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
+const formatSMCSection = (
+    indicators: IndicatorResult,
+    bars: Bar[],
+    priceDp: number
+): string => {
     const smc = indicators.smc;
 
     if (isSMCEmpty(smc)) {
@@ -519,6 +539,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
         ].join('\n');
     }
 
+    const px = (n: number): string => formatNullableNumber(n, priceDp);
     const totalBars = bars.length;
     const currentPrice = totalBars > 0 ? bars[totalBars - 1].close : null;
 
@@ -530,7 +551,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
                   '### Market Structure',
                   ...recentBreaks.map(
                       b =>
-                          `- [${b.breakType.toUpperCase()}] ${b.type} at ${fmt(b.price)} ${barsAgo(b.index, totalBars)}`
+                          `- [${b.breakType.toUpperCase()}] ${b.type} at ${px(b.price)} ${barsAgo(b.index, totalBars)}`
                   ),
               ]
             : [];
@@ -544,7 +565,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
         ...(activeOBs.length > 0
             ? activeOBs.map(
                   ob =>
-                      `- ${ob.type} OB: ${fmt(ob.low)} ~ ${fmt(ob.high)} ${barsAgo(ob.startIndex, totalBars)}`
+                      `- ${ob.type} OB: ${px(ob.low)} ~ ${px(ob.high)} ${barsAgo(ob.startIndex, totalBars)}`
               )
             : ['- No active order blocks']),
     ];
@@ -558,7 +579,7 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
         ...(activeFVGs.length > 0
             ? activeFVGs.map(
                   fvg =>
-                      `- ${fvg.type} FVG: ${fmt(fvg.low)} ~ ${fmt(fvg.high)} ${barsAgo(fvg.index, totalBars)}`
+                      `- ${fvg.type} FVG: ${px(fvg.low)} ~ ${px(fvg.high)} ${barsAgo(fvg.index, totalBars)}`
               )
             : ['- No active fair value gaps']),
     ];
@@ -575,7 +596,8 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
                           'Equal Highs',
                           'sell-side liquidity',
                           eq,
-                          totalBars
+                          totalBars,
+                          priceDp
                       )
                   ),
                   ...eqLows.map(eq =>
@@ -583,26 +605,36 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
                           'Equal Lows',
                           'buy-side liquidity',
                           eq,
-                          totalBars
+                          totalBars,
+                          priceDp
                       )
                   ),
               ]
             : [];
 
     // 5. Premium / Discount / Equilibrium Zones
-    const premiumLine = formatZoneLine(smc.premiumZone, 'Premium Zone');
+    const premiumLine = formatZoneLine(
+        smc.premiumZone,
+        'Premium Zone',
+        priceDp
+    );
     const equilibriumLine = formatZoneLine(
         smc.equilibriumZone,
-        'Equilibrium Zone'
+        'Equilibrium Zone',
+        priceDp
     );
-    const discountLine = formatZoneLine(smc.discountZone, 'Discount Zone');
+    const discountLine = formatZoneLine(
+        smc.discountZone,
+        'Discount Zone',
+        priceDp
+    );
     const zoneLines = [premiumLine, equilibriumLine, discountLine].filter(
         (l): l is string => l !== null
     );
     const currentPriceLine =
         currentPrice !== null
             ? [
-                  `- Snapshot Price (${fmt(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
+                  `- Snapshot Price (${px(currentPrice)}) is in ${classifyPriceZone(currentPrice, smc.premiumZone, smc.discountZone, smc.equilibriumZone)} zone`,
               ]
             : [];
     const marketZonesSection =
@@ -619,11 +651,11 @@ const formatSMCSection = (indicators: IndicatorResult, bars: Bar[]): string => {
                   `### Swing Points (period: ${SMC_SWING_PERIOD})`,
                   ...recentSwingHighs.map(
                       s =>
-                          `- Swing High: ${fmt(s.price)} ${barsAgo(s.index, totalBars)}`
+                          `- Swing High: ${px(s.price)} ${barsAgo(s.index, totalBars)}`
                   ),
                   ...recentSwingLows.map(
                       s =>
-                          `- Swing Low: ${fmt(s.price)} ${barsAgo(s.index, totalBars)}`
+                          `- Swing Low: ${px(s.price)} ${barsAgo(s.index, totalBars)}`
                   ),
               ]
             : [];
@@ -734,8 +766,11 @@ const MARKET_REFERENCE_FRAMING =
 
 const EFFICIENCY_DECIMAL_PLACES = 2;
 
-const formatReferenceLevelLine = (level: ReferenceLevel): string =>
-    `- ${fmt(level.price)} (${level.label}; ${Math.abs(level.distancePercent).toFixed(INDICATOR_DECIMAL_PLACES)}% away)`;
+const formatReferenceLevelLine = (
+    level: ReferenceLevel,
+    priceDp: number
+): string =>
+    `- ${formatNullableNumber(level.price, priceDp)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away)`;
 
 const HORIZON_LABEL: Record<HorizonKey, string> = {
     short: 'Short-term',
@@ -768,12 +803,40 @@ const HORIZON_SPAN_BY_TIMEFRAME: Record<
     '1Day': { short: '~1 month', medium: '~1 quarter', long: '~9-12 months' },
 };
 
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+/** Crypto spans below this many hours read in hours, then days, then weeks. */
+const CRYPTO_SPAN_HOURS_LIMIT = 48;
+const CRYPTO_SPAN_DAYS_LIMIT = 14;
+
+/**
+ * Calendar span of a crypto horizon window. The equity table above assumes
+ * ~390-minute sessions, so on a 24/7 market it overstated every intraday
+ * window — 24 hourly bars are one day of BTC, not "~4 trading days".
+ */
+const cryptoHorizonSpan = (barCount: number, timeframe: Timeframe): string => {
+    const hours = (barCount * TIMEFRAME_MINUTES[timeframe]) / MINUTES_PER_HOUR;
+    if (hours < CRYPTO_SPAN_HOURS_LIMIT) return `~${Math.round(hours)} hours`;
+    const days = hours / HOURS_PER_DAY;
+    if (days < CRYPTO_SPAN_DAYS_LIMIT) return `~${Math.round(days)} days`;
+    return `~${Math.round(days / DAYS_PER_WEEK)} weeks`;
+};
+
 const formatHorizonBlock = (
     key: HorizonKey,
     horizon: HorizonReference,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    priceDp: number,
+    assetClass: AssetClass
 ): string => {
     const s = horizon.structure;
+    const span =
+        assetClass === 'crypto'
+            ? cryptoHorizonSpan(horizon.window.bars, timeframe)
+            : HORIZON_SPAN_BY_TIMEFRAME[timeframe][key];
+    const levelLine = (level: ReferenceLevel): string =>
+        formatReferenceLevelLine(level, priceDp);
     const structureLine =
         `Structure: price ${s.priceVsMA60} MA60 / ${s.priceVsMA200} MA200; EMA ${s.emaStack}; swings ${s.swingStructure}; ` +
         `ADX ${s.adx != null ? s.adx.toFixed(INDICATOR_DECIMAL_PLACES) : 'n/a'}; efficiency ${s.efficiencyRatio != null ? s.efficiencyRatio.toFixed(EFFICIENCY_DECIMAL_PLACES) : 'n/a'}; regime ${s.regime}.`;
@@ -781,18 +844,15 @@ const formatHorizonBlock = (
         horizon.levels.resistance.length > 0
             ? [
                   'Resistance (above):',
-                  ...horizon.levels.resistance.map(formatReferenceLevelLine),
+                  ...horizon.levels.resistance.map(levelLine),
               ]
             : [];
     const support =
         horizon.levels.support.length > 0
-            ? [
-                  'Support (below):',
-                  ...horizon.levels.support.map(formatReferenceLevelLine),
-              ]
+            ? ['Support (below):', ...horizon.levels.support.map(levelLine)]
             : [];
     return [
-        `### ${HORIZON_LABEL[key]} — ${HORIZON_SPAN_BY_TIMEFRAME[timeframe][key]} (${horizon.window.bars} bars)`,
+        `### ${HORIZON_LABEL[key]} — ${span} (${horizon.window.bars} bars)`,
         structureLine,
         ...resistance,
         ...support,
@@ -807,15 +867,23 @@ const formatHorizonBlock = (
 // order rather than introducing a new standalone stable line.
 const formatMarketReferenceSection = (
     reference: MarketReference,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    priceDp: number,
+    assetClass: AssetClass
 ): string =>
     [
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
         ANTI_FABRICATION_GUARDRAIL,
-        formatHorizonBlock('short', reference.short, timeframe),
-        formatHorizonBlock('medium', reference.medium, timeframe),
-        formatHorizonBlock('long', reference.long, timeframe),
+        ...(['short', 'medium', 'long'] as const).map(key =>
+            formatHorizonBlock(
+                key,
+                reference[key],
+                timeframe,
+                priceDp,
+                assetClass
+            )
+        ),
     ].join('\n');
 
 // ── Pro-indicator measured-reliability annotations ─────────────────────────
@@ -985,9 +1053,13 @@ const formatRegimeContextSection = (
         indicators.ewmaVolatility,
         config.trendSampleCount
     );
+    // Both estimators return a per-bar σ as a fraction (~0.01). At two decimals that
+    // rendered `0.01` for nearly every chart, so they are shown as percentages.
+    const perBarPercent = (v: number | null): string =>
+        v === null ? 'N/A' : `${fmt(v * PERCENTAGE_FACTOR)}%`;
     const volLine = volAllNull
         ? '- Volatility: N/A (volatility estimators still in warm-up)'
-        : `- Volatility: Yang-Zhang ${fmt(lastYangZhang)}${trendLabel(yzTrend)} / EWMA ${fmt(lastEwma)}${trendLabel(ewmaTrend)} ${PRO_RELIABILITY_NOTE.volatility}`;
+        : `- Volatility (per-bar σ): Yang-Zhang ${perBarPercent(lastYangZhang)}${trendLabel(yzTrend)} / EWMA ${perBarPercent(lastEwma)}${trendLabel(ewmaTrend)} ${PRO_RELIABILITY_NOTE.volatility}`;
 
     return [header, regimeLine, volLine].join('\n');
 };
@@ -1044,8 +1116,12 @@ const formatBollingerPercentBLine = (indicators: IndicatorResult): string => {
     if (!last || last.pctB === null) {
         return `- Bollinger %B: N/A ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
     }
+    // BandWidth is (upper − lower) / middle, a fraction — shown as a percent so a
+    // squeeze (e.g. 3.84% vs 4.12%) is not flattened to `0.04`.
     const bandwidthStr =
-        last.bandwidth !== null ? ` / BandWidth ${fmt(last.bandwidth)}` : '';
+        last.bandwidth !== null
+            ? ` / BandWidth ${fmt(last.bandwidth * PERCENTAGE_FACTOR)}%`
+            : '';
     return `- Bollinger %B: ${fmt(last.pctB)}${bandwidthStr}${pctBLabel(last.pctB)} ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
 };
 
@@ -1078,15 +1154,20 @@ const formatForceIndexLine = (
         return `- Force Index: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
     }
     const trend = detectTrend(indicators.forceIndex, config.trendSampleCount);
-    return `- Force Index: ${fmt(value)}${forceIndexSignLabel(value)}${trendLabel(trend)} ${PRO_RELIABILITY_NOTE.advisory}`;
+    // Price change × volume: a volume-scale number, so it is grouped like OBV rather
+    // than printed with meaningless cents (`10106839.18`).
+    return `- Force Index: ${formatVolume(value)}${forceIndexSignLabel(value)}${trendLabel(trend)} ${PRO_RELIABILITY_NOTE.advisory}`;
 };
 
-const formatElderRayLine = (indicators: IndicatorResult): string => {
+const formatElderRayLine = (
+    indicators: IndicatorResult,
+    priceDp: number
+): string => {
     const last = lastOf(indicators.elderRay);
     if (!last || (last.bullPower === null && last.bearPower === null)) {
         return `- Elder-Ray: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
     }
-    return `- Elder-Ray: Bull Power ${fmt(last.bullPower)} / Bear Power ${fmt(last.bearPower)} ${PRO_RELIABILITY_NOTE.advisory}`;
+    return `- Elder-Ray: Bull Power ${formatNullableNumber(last.bullPower, priceDp)} / Bear Power ${formatNullableNumber(last.bearPower, priceDp)} ${PRO_RELIABILITY_NOTE.advisory}`;
 };
 
 const formatElderImpulseLine = (indicators: IndicatorResult): string => {
@@ -1098,21 +1179,25 @@ const formatElderImpulseLine = (indicators: IndicatorResult): string => {
     return `- Elder Impulse: ${last}${impulseFlipNote(colors)} ${PRO_RELIABILITY_NOTE.impulse}`;
 };
 
-const formatChandelierLine = (indicators: IndicatorResult): string => {
+const formatChandelierLine = (
+    indicators: IndicatorResult,
+    priceDp: number
+): string => {
     const last = lastOf(indicators.chandelierExit);
     if (!last || last.trend === null) {
         return `- Chandelier Exit: N/A ${PRO_RELIABILITY_NOTE.chandelier}`;
     }
     const activeStop =
         last.trend === 'long'
-            ? `long stop ${fmt(last.longStop)}`
-            : `short stop ${fmt(last.shortStop)}`;
+            ? `long stop ${formatNullableNumber(last.longStop, priceDp)}`
+            : `short stop ${formatNullableNumber(last.shortStop, priceDp)}`;
     return `- Chandelier Exit: ${activeStop} (trend: ${last.trend}) ${PRO_RELIABILITY_NOTE.chandelier}`;
 };
 
 const formatProIndicatorSection = (
     indicators: IndicatorResult,
-    config: PromptConfig
+    config: PromptConfig,
+    priceDp: number
 ): string =>
     [
         PRO_INDICATOR_SECTION_HEADER,
@@ -1120,15 +1205,19 @@ const formatProIndicatorSection = (
         formatMacdVLine(indicators, config),
         formatConnorsRsiLine(indicators),
         formatForceIndexLine(indicators, config),
-        formatElderRayLine(indicators),
+        formatElderRayLine(indicators, priceDp),
         formatElderImpulseLine(indicators),
-        formatChandelierLine(indicators),
+        formatChandelierLine(indicators, priceDp),
     ].join('\n');
 
 const formatIndicatorSection = (
     indicators: IndicatorResult,
-    config: PromptConfig
+    config: PromptConfig,
+    priceDp: number
 ): string => {
+    // Price-scale values (MACD, bands, averages, ATR, stops) render at the prompt's
+    // price precision; bounded oscillators (RSI, DMI, %K, CCI, MFI, CMF) keep `fmt`.
+    const px = (n: number | null): string => formatNullableNumber(n, priceDp);
     const lastRSI = lastNonNull(indicators.rsi);
     const lastMACD = lastOf(indicators.macd);
     const lastBollinger = lastOf(indicators.bollinger);
@@ -1164,27 +1253,27 @@ const formatIndicatorSection = (
     return [
         INDICATOR_VALUES_SECTION_HEADER,
         `- RSI(${RSI_DEFAULT_PERIOD}): ${fmt(lastRSI)}${trendLabel(rsiTrend)}`,
-        `- MACD: ${fmt(lastMACD?.macd ?? null)} / Signal ${fmt(lastMACD?.signal ?? null)} / Histogram ${fmt(lastMACD?.histogram ?? null)}${trendLabel(macdTrend)}`,
-        `- Bollinger Bands: Upper ${fmt(lastBollinger?.upper ?? null)} / Middle ${fmt(lastBollinger?.middle ?? null)} / Lower ${fmt(lastBollinger?.lower ?? null)}`,
+        `- MACD: ${px(lastMACD?.macd ?? null)} / Signal ${px(lastMACD?.signal ?? null)} / Histogram ${px(lastMACD?.histogram ?? null)}${trendLabel(macdTrend)}`,
+        `- Bollinger Bands: Upper ${px(lastBollinger?.upper ?? null)} / Middle ${px(lastBollinger?.middle ?? null)} / Lower ${px(lastBollinger?.lower ?? null)}`,
         `- DMI: +DI ${fmt(lastDMI?.diPlus ?? null)} / -DI ${fmt(lastDMI?.diMinus ?? null)} / ADX ${fmt(lastDMI?.adx ?? null)}`,
         `- Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K ${fmt(lastStochastic?.percentK ?? null)} / %D ${fmt(lastStochastic?.percentD ?? null)}`,
         `- StochRSI(${STOCH_RSI_RSI_PERIOD},${STOCH_RSI_STOCH_PERIOD},${STOCH_RSI_K_PERIOD},${STOCH_RSI_D_PERIOD}): K ${fmt(lastStochRSI?.k ?? null)} / D ${fmt(lastStochRSI?.d ?? null)}`,
         `- CCI(${CCI_DEFAULT_PERIOD}): ${fmt(lastCCI)}${trendLabel(cciTrend)}`,
-        `- VWAP: ${fmt(lastVWAP)}`,
-        `- Volume Profile: POC ${fmt(vp?.poc ?? null)} / VAH ${fmt(vp?.vah ?? null)} / VAL ${fmt(vp?.val ?? null)}`,
-        `- MA: ${MA_DEFAULT_PERIODS.map(p => `MA(${p}): ${fmt(lastNonNull(indicators.ma[p] ?? []))}`).join(' / ')}`,
-        `- EMA: ${EMA_DEFAULT_PERIODS.map(p => `EMA(${p}): ${fmt(lastNonNull(indicators.ema[p] ?? []))}`).join(' / ')}`,
-        `- Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan ${fmt(lastIchimoku?.tenkan ?? null)} / Kijun ${fmt(lastIchimoku?.kijun ?? null)} / SpanA ${fmt(lastIchimoku?.senkouA ?? null)} / SpanB ${fmt(lastIchimoku?.senkouB ?? null)} / Chikou ${fmt(lastIchimoku?.chikou ?? null)}`,
-        `- ATR(${ATR_DEFAULT_PERIOD}): ${fmt(lastATR)}${trendLabel(atrTrend)}`,
+        `- VWAP: ${px(lastVWAP)}`,
+        `- Volume Profile: POC ${px(vp?.poc ?? null)} / VAH ${px(vp?.vah ?? null)} / VAL ${px(vp?.val ?? null)}`,
+        `- MA: ${MA_DEFAULT_PERIODS.map(p => `MA(${p}): ${px(lastNonNull(indicators.ma[p] ?? []))}`).join(' / ')}`,
+        `- EMA: ${EMA_DEFAULT_PERIODS.map(p => `EMA(${p}): ${px(lastNonNull(indicators.ema[p] ?? []))}`).join(' / ')}`,
+        `- Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan ${px(lastIchimoku?.tenkan ?? null)} / Kijun ${px(lastIchimoku?.kijun ?? null)} / SpanA ${px(lastIchimoku?.senkouA ?? null)} / SpanB ${px(lastIchimoku?.senkouB ?? null)} / Chikou ${px(lastIchimoku?.chikou ?? null)}`,
+        `- ATR(${ATR_DEFAULT_PERIOD}): ${px(lastATR)}${trendLabel(atrTrend)}`,
         `- OBV: ${lastOBV !== null ? formatVolume(lastOBV) : 'N/A'}${trendLabel(obvTrend)}`,
-        `- Parabolic SAR: ${fmt(lastPSAR?.sar ?? null)} (${lastPSAR?.trend ?? 'N/A'})`,
+        `- Parabolic SAR: ${px(lastPSAR?.sar ?? null)} (${lastPSAR?.trend ?? 'N/A'})`,
         `- Williams %R(${WILLIAMS_R_DEFAULT_PERIOD}): ${fmt(lastWilliamsR)}`,
-        `- Supertrend(${SUPERTREND_ATR_PERIOD},${SUPERTREND_MULTIPLIER}): ${fmt(lastSupertrend?.supertrend ?? null)} (${lastSupertrend?.trend ?? 'N/A'})`,
+        `- Supertrend(${SUPERTREND_ATR_PERIOD},${SUPERTREND_MULTIPLIER}): ${px(lastSupertrend?.supertrend ?? null)} (${lastSupertrend?.trend ?? 'N/A'})`,
         `- MFI(${MFI_DEFAULT_PERIOD}): ${fmt(lastMFI)}${trendLabel(mfiTrend)}`,
-        `- Keltner Channel(${KELTNER_EMA_PERIOD},${KELTNER_ATR_PERIOD},${KELTNER_MULTIPLIER}): Upper ${fmt(lastKeltner?.upper ?? null)} / Middle ${fmt(lastKeltner?.middle ?? null)} / Lower ${fmt(lastKeltner?.lower ?? null)}`,
+        `- Keltner Channel(${KELTNER_EMA_PERIOD},${KELTNER_ATR_PERIOD},${KELTNER_MULTIPLIER}): Upper ${px(lastKeltner?.upper ?? null)} / Middle ${px(lastKeltner?.middle ?? null)} / Lower ${px(lastKeltner?.lower ?? null)}`,
         `- CMF(${CMF_DEFAULT_PERIOD}): ${fmt(lastCMF)}${trendLabel(cmfTrend)}`,
-        `- Donchian Channel(${DONCHIAN_DEFAULT_PERIOD}): Upper ${fmt(lastDonchian?.upper ?? null)} / Middle ${fmt(lastDonchian?.middle ?? null)} / Lower ${fmt(lastDonchian?.lower ?? null)}`,
-        formatSqueezeMomentumLine(indicators, config),
+        `- Donchian Channel(${DONCHIAN_DEFAULT_PERIOD}): Upper ${px(lastDonchian?.upper ?? null)} / Middle ${px(lastDonchian?.middle ?? null)} / Lower ${px(lastDonchian?.lower ?? null)}`,
+        formatSqueezeMomentumLine(indicators, config, priceDp),
     ].join('\n');
 };
 
@@ -1911,6 +2000,12 @@ export function buildAnalysisPrompt(
     ]);
 
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
+    // One precision for every price-scale value in this prompt, taken from the
+    // snapshot close — see `priceDecimalPlaces` for why a fixed 2 was wrong.
+    const priceDp = priceDecimalPlaces(
+        bars.at(-1)?.close,
+        listingCurrency(symbol)
+    );
 
     const marketReference = computeMarketReference(bars, indicators, timeframe);
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
@@ -1918,7 +2013,7 @@ export function buildAnalysisPrompt(
     const assetContext =
         assetClass === 'crypto'
             ? `This is a cryptocurrency trading 24/7 with no market open/close. There are no earnings, fundamentals, or analyst ratings — focus purely on price action, technical structure, volatility, and macro/liquidity context.`
-            : `This is a publicly traded U.S. equity.`;
+            : equityListingContext(symbol);
 
     // Reunites the static output-rules preamble with the per-type
     // writing-rule instructions into one atomic block (see its own doc
@@ -1979,20 +2074,35 @@ export function buildAnalysisPrompt(
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
         ANALYSIS_INTENT_BLOCK,
         analysisGuidelines(locale),
-        formatMarketSection(bars),
-        formatLongTermContext(bars),
-        formatRecentBarsSection(bars, config.recentBarsCount, candleEntries),
+        formatMarketSection(bars, priceDp),
+        formatLongTermContext(bars, priceDp),
+        formatRecentBarsSection(
+            bars,
+            config.recentBarsCount,
+            candleEntries,
+            priceDp
+        ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),
-        formatIndicatorSection(indicators, config),
-        formatProIndicatorSection(indicators, config),
-        formatSMCSection(indicators, bars),
+        formatIndicatorSection(indicators, config, priceDp),
+        formatProIndicatorSection(indicators, config, priceDp),
+        formatSMCSection(indicators, bars, priceDp),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
-        formatMarketReferenceSection(marketReference, timeframe),
+        formatMarketReferenceSection(
+            marketReference,
+            timeframe,
+            priceDp,
+            assetClass
+        ),
         // Placed after the reference levels it quotes: the risk:reward half is arithmetic
         // over the levels rendered immediately above, and reading the inputs before the
         // conclusion is what lets the model check the conclusion instead of trusting it.
-        formatDeterministicMetricsSection(bars, timeframe, marketReference),
+        formatDeterministicMetricsSection(
+            bars,
+            timeframe,
+            marketReference,
+            priceDp
+        ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),
         ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)

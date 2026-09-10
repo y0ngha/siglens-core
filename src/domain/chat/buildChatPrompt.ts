@@ -16,7 +16,13 @@ import type {
     OverallAnalysisResponse,
     PriceScenario,
     Timeframe,
+    CurrencyCode,
 } from '@/domain/types';
+import {
+    formatPrice,
+    isKrxListedSymbol,
+    listingCurrency,
+} from '@/domain/analysis/promptFormat';
 
 const TIMEFRAMES: readonly Timeframe[] = [
     '5Min',
@@ -34,21 +40,28 @@ function isTimeframe(value: unknown): value is Timeframe {
     );
 }
 
-function formatKeyLevels(levels: KeyLevel[]): string {
+// Level prices follow their own magnitude and the listing currency, so a
+// sub-dollar level is not flattened to `0.08` and a won level is not `269500.00`.
+function formatKeyLevels(levels: KeyLevel[], currency: CurrencyCode): string {
     if (levels.length === 0) return 'None detected';
-    return levels.map(l => `${l.price.toFixed(2)} (${l.reason})`).join(', ');
+    return levels
+        .map(l => `${formatPrice(l.price, currency)} (${l.reason})`)
+        .join(', ');
 }
 
-function formatPoc(poc: KeyLevel | undefined): string {
-    return poc ? `${poc.price.toFixed(2)} (${poc.reason})` : 'None detected';
+function formatPoc(poc: KeyLevel | undefined, currency: CurrencyCode): string {
+    return poc
+        ? `${formatPrice(poc.price, currency)} (${poc.reason})`
+        : 'None detected';
 }
 
 function formatPriceTargets(
-    scenario: PriceScenario | null | undefined
+    scenario: PriceScenario | null | undefined,
+    currency: CurrencyCode
 ): string {
     if (!scenario || scenario.targets.length === 0) return 'None';
     return scenario.targets
-        .map(t => `${t.price.toFixed(2)} — ${t.basis}`)
+        .map(t => `${formatPrice(t.price, currency)} — ${t.basis}`)
         .join('; ');
 }
 
@@ -342,7 +355,12 @@ export function buildChatPrompt(
         ? 'equity'
         : (maybeAssetClass ?? 'equity');
     const isCrypto = assetClass === 'crypto';
-    const assetKind = isCrypto ? 'cryptocurrency' : 'U.S. equity';
+    const currency = listingCurrency(symbol);
+    const assetKind = isCrypto
+        ? 'cryptocurrency'
+        : isKrxListedSymbol(symbol)
+          ? 'Korean equity listed on the KRX, priced in KRW'
+          : 'U.S. equity';
     const refuseExample = isCrypto
         ? `- REFUSE (unrelated asset): "다른 코인은 지금 어때요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`
         : `- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`;
@@ -401,9 +419,9 @@ Trading Strategy:
         : ''
 }
 Key Levels:
-- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance)}
-- Support: ${formatKeyLevels(analysis.keyLevels.support)}
-- POC: ${formatPoc(analysis.keyLevels.poc)}
+- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, currency)}
+- Support: ${formatKeyLevels(analysis.keyLevels.support, currency)}
+- POC: ${formatPoc(analysis.keyLevels.poc, currency)}
 
 Detected Patterns: ${formatDetectedPatterns(analysis.patternSummaries)}
 
@@ -414,8 +432,8 @@ Indicator Signals:
 ${formatIndicatorSignals(analysis.indicatorResults) || 'None'}
 
 Price Targets:
-- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish)}
-- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish)}
+- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, currency)}
+- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, currency)}
 === END ANALYSIS DATA ===${formatCurrentAnalysisContext(currentAnalysisContext)}`;
 
     const messages = [

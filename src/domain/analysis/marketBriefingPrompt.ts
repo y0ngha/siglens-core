@@ -1,3 +1,7 @@
+import {
+    formatNullableNumber,
+    formatSignedPercent,
+} from '@/domain/analysis/promptFormat';
 import type {
     AssembledPrompt,
     MarketBriefingContext,
@@ -53,8 +57,7 @@ export function buildMarketBriefingPrompt(
 ): AssembledPrompt {
     const indexLines = indices
         .map(i => {
-            const sign = i.changesPercentage >= 0 ? '+' : '';
-            return `${i.displayName}: ${i.price.toFixed(2)} (${sign}${i.changesPercentage.toFixed(2)}%)`;
+            return `${i.displayName}: ${formatNullableNumber(i.price)} (${formatSignedPercent(i.changesPercentage)})`;
         })
         .join('\n');
 
@@ -70,8 +73,7 @@ export function buildMarketBriefingPrompt(
      */
     const sectorLines = sectors
         .map(s => {
-            const sign = s.changesPercentage >= 0 ? '+' : '';
-            return `${s.koreanName} (${s.symbol}): ${sign}${s.changesPercentage.toFixed(2)}%`;
+            return `${s.koreanName} (${s.symbol}): ${formatSignedPercent(s.changesPercentage)}`;
         })
         .join('\n');
 
@@ -95,7 +97,7 @@ export function buildMarketBriefingPrompt(
             ? ''
             : `,
   "volatilityAnalysis": {
-    "vixLevel": ${volatility.level},
+    "vixLevel": ${formatNullableNumber(volatility.level)},
     "description": "string — 한국어(존댓말) ${volatility.label} 해석"
   }`;
     // Instruction text stays English (file convention); only the field
@@ -103,7 +105,7 @@ export function buildMarketBriefingPrompt(
     const volatilityRule =
         volatility === null
             ? `- This market has no volatility index available. Omit the "volatilityAnalysis" key entirely. Never invent a volatility number. Ground "riskSentiment" instead in the spread between the index moves and between the best and worst sector below.`
-            : `- Copy the ${volatility.label} level ${volatility.level} given above into "volatilityAnalysis.vixLevel" verbatim. Never compute or invent a different number.`;
+            : `- Copy the ${volatility.label} level ${formatNullableNumber(volatility.level)} given above into "volatilityAnalysis.vixLevel" verbatim. Never compute or invent a different number.`;
 
     const stable = '';
 

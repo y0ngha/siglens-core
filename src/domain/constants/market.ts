@@ -30,6 +30,16 @@ export const TIMEFRAME_BARS_LIMIT: Record<Timeframe, number> = {
 
 export const DEFAULT_BARS_LIMIT = TIMEFRAME_BARS_LIMIT[DEFAULT_TIMEFRAME];
 
+// Wall-clock minutes one bar spans.
+export const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
+    '5Min': 5,
+    '15Min': 15,
+    '30Min': 30,
+    '1Hour': 60,
+    '4Hour': 240,
+    '1Day': 1_440,
+};
+
 // Calendar-day lookback per timeframe — wider than trading days to absorb weekends and holidays.
 export const TIMEFRAME_LOOKBACK_DAYS: Record<Timeframe, number> = {
     '5Min': 10,

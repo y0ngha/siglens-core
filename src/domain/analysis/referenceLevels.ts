@@ -16,17 +16,50 @@ const ROUND_LEVELS_PER_SIDE = 2;
 /** Extra candidate above base so the resistance side keeps >= ROUND_LEVELS_PER_SIDE levels. */
 const ROUND_LEVELS_UPPER_EXTRA = 1;
 
-/** Decimal places used to normalize emitted round-number prices. */
-const ROUND_PRICE_PRECISION = 4;
+/** Significant digits used to strip float noise from emitted round-number prices. */
+const ROUND_PRICE_SIGNIFICANT_DIGITS = 12;
 
-// The final tier's ceiling is +Infinity, so find() always matches; the `??`
-// only satisfies the type checker and reuses that tier's increment (no second
-// source of truth for the top-tier value).
-const incrementFor = (price: number): number =>
-    (
+/** Prices inside [min, max] use the hand-picked USD tiers; outside it the step scales. */
+const TIERED_ROUND_MIN_PRICE = 1;
+const TIERED_ROUND_MAX_PRICE = 1_000;
+/** Target round-number spacing as a fraction of price outside the tiered band. */
+const SCALED_ROUND_STEP_FRACTION = 0.02;
+/** Step multipliers per power of ten; the step is the smallest one at or above the target. */
+const NICE_STEP_MULTIPLIERS = [1, 2.5, 5, 10] as const;
+
+/** Smallest 1 / 2.5 / 5 × 10ⁿ step that is at least `target`. */
+const niceStepAtLeast = (target: number): number => {
+    const power = 10 ** Math.floor(Math.log10(target));
+    // `10 × power` always clears a positive target, so find() always matches; the `??`
+    // only satisfies the type checker (same pattern as the tier lookup below).
+    const multiplier =
+        NICE_STEP_MULTIPLIERS.find(m => m * power >= target) ??
+        NICE_STEP_MULTIPLIERS[NICE_STEP_MULTIPLIERS.length - 1];
+    return multiplier * power;
+};
+
+/**
+ * Round-number spacing for a price.
+ *
+ * The tiers top out at a flat 10, which is right for a $300 stock and meaningless above
+ * that: BTC at 77,107 got `Round 77110` 0.00% away and a KRX stock at 269,500 won got
+ * `Round 269490` / `Round 269510`, which then became the nearest support and resistance.
+ * Below one unit the 0.5 step produced nothing near the price at all. Outside the tiered
+ * band the step therefore scales to ~2% of price (77,107 → 2,500; 269,500 → 10,000;
+ * 0.0836 → 0.0025).
+ */
+const incrementFor = (price: number): number => {
+    if (price < TIERED_ROUND_MIN_PRICE || price > TIERED_ROUND_MAX_PRICE) {
+        return niceStepAtLeast(price * SCALED_ROUND_STEP_FRACTION);
+    }
+    // The final tier's ceiling is +Infinity, so find() always matches; the `??`
+    // only satisfies the type checker and reuses that tier's increment (no second
+    // source of truth for the top-tier value).
+    return (
         ROUND_NUMBER_TIERS.find(t => price <= t.maxPrice) ??
         ROUND_NUMBER_TIERS[ROUND_NUMBER_TIERS.length - 1]
     ).increment;
+};
 
 const roundLabel = (price: number): string => `Round ${price}`;
 
@@ -41,7 +74,9 @@ export function roundNumberLevels(currentPrice: number): ReferenceLevel[] {
         i <= ROUND_LEVELS_PER_SIDE + ROUND_LEVELS_UPPER_EXTRA;
         i++
     ) {
-        const price = Number((base + i * inc).toFixed(ROUND_PRICE_PRECISION));
+        const price = Number(
+            (base + i * inc).toPrecision(ROUND_PRICE_SIGNIFICANT_DIGITS)
+        );
         if (price <= 0) continue;
         levels.push({
             price,

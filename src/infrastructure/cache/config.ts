@@ -614,9 +614,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * the same scope as `p9`/`p10`. The bump is still fleet-wide because the
  * constant has no per-request axis to scope it to.
  *
+ * @remarks
+ * **`p12` = numeric rendering audit.** Price-scale values render at a
+ * precision derived from the snapshot close (sub-dollar assets keep four
+ * significant digits, KRX renders whole won) instead of a fixed two decimals
+ * that zeroed SHIBUSD's bars; KRX symbols get Korean-listing framing instead of
+ * "U.S. equity"; volatility and BandWidth render as percentages and Force Index
+ * as a grouped integer; pivots come from the prior session on intraday charts;
+ * round-number steps scale outside $1–$1,000; and the structural risk:reward
+ * skips levels inside half the mean bar range. Bytes change for every request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p11' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p12' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -734,9 +744,14 @@ export function buildAnalysisCacheKey(
  * would make a previously cached briefing wrong or stale. `p1` is the first
  * version to carry the axis at all.
  *
+ * @remarks
+ * **`p2` = guarded numbers.** Index/sector changes render through a signed-percent
+ * helper (a missing change printed `NaN%`) and the volatility level is rounded to
+ * cents in both places the model is told to copy it verbatim.
+ *
  * @internal
  */
-export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 export function buildBriefingCacheKey(
     dateHour: string,
@@ -903,9 +918,17 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * `f1` starts the independent series. Bump it whenever the fundamental system
  * or user prompt template changes in a way that makes cached results stale.
  *
+ * @remarks
+ * **`f2` = currency-aware amounts.** Market caps, cash flow, and revenue
+ * estimates render scaled with their listing currency (a KRX cap arrived in
+ * won and printed as ~`1600000B USD`; a sub-$500M cap printed as `0B`), a
+ * missing cap renders `N/A`, percent metrics never print `N/A%`, the debt
+ * ratio carries its `%`, and a missing Piotroski score is `N/A` instead of
+ * `N/A/9`.
+ *
  * @internal
  */
-export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f1' as const;
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f2' as const;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.
@@ -991,9 +1014,14 @@ export function buildFundamentalCacheKey(
  * so free and non-free requests never share a cache entry. Bumped to
  * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
  *
+ * @remarks
+ * **`p6` = currency-aware amounts.** Statement amounts render as T/B/M with
+ * the listing currency (KRX statements are in won, previously printed as bare
+ * `B`), and non-finite margins/growth render `N/A` instead of `NaN%`.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -1187,9 +1215,14 @@ export function buildCongressTrendCacheKey(
  * take, so free and non-free requests never share a cache entry. Bumped to
  * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
  *
+ * @remarks
+ * **`p5` = listing framing + currency.** KRX symbols are framed as Korean
+ * listings instead of "a publicly traded U.S. equity", and earnings-calendar
+ * revenue estimates carry their currency.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
