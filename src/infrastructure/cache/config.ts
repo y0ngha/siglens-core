@@ -1,10 +1,16 @@
 import {
+    compareMarketEventPriority,
+    MARKET_EVENT_CACHE_KEY_CAP,
+    RANKED_IMPACTS,
+} from '@/domain/analysis/marketEvents';
+import {
     localeKeySuffixFor,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
 import { PRIOR_ANALYSIS_WINDOW_BARS } from '@/domain/analysis/priorAnalysis';
 import type {
     DashboardTimeframe,
+    MarketEvent,
     MarketSessionSpec,
     NewsFeedCategory,
     OptionsExpirationFilter,
@@ -31,6 +37,7 @@ import {
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 import type {
     AnalysisHistoryQuery,
+    NarrowedMarketEvents,
     NarrowedPriorAnalyses,
 } from '@/infrastructure/cache/types';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
@@ -226,6 +233,19 @@ function historyKeySuffix(fingerprint?: string): string {
 /**
  * @internal
  *
+ * Cache-key segment for the market-events fingerprint.
+ *
+ * Absent when no qualifying event exists, so a symbol with no market-moving
+ * news produces the exact same key this builder produced before the parameter
+ * existed.
+ */
+function eventsKeySuffix(fingerprint?: string): string {
+    return fingerprint !== undefined ? `:evt=${fingerprint}` : '';
+}
+
+/**
+ * @internal
+ *
  * Stage 1 of the two-stage prior-analysis narrowing that backs the
  * prior-analysis-context feature (see `PriorAnalysis` in
  * `domain/types.ts` for the feature overview). Cuts a
@@ -340,6 +360,70 @@ export function narrowPriorAnalysesForCacheKey(
 
     const fingerprint = hashAnalysisInput(
         candidates.map(entry => entry.generatedAt.getTime()).join(',')
+    );
+    return { candidates, fingerprint };
+}
+
+/**
+ * @internal
+ *
+ * Stage 1 of the two-stage market-events narrowing: picks the events that can
+ * reach the prompt and fingerprints them for the cache key.
+ *
+ * **Deliberately does not take bars.** The cache key must exist before the
+ * cache is read, and bars are only fetched after a miss — the same ordering
+ * constraint `narrowPriorAnalysesForCacheKey` works around. So stage 1 filters
+ * on impact alone, and stage 2 ({@link selectMarketEvents}, called from
+ * `formatMarketEventsSection`) applies the bar-window cut once bars exist.
+ * Stage 1 is therefore the wider of the two, which is safe: two requests
+ * looking at the same symbol with the same caller-supplied lookback see the
+ * same candidates, so they agree on the key. It caps at
+ * {@link MARKET_EVENT_CACHE_KEY_CAP} using the **same**
+ * {@link compareMarketEventPriority} ordering stage 2 uses — cutting by
+ * recency here would drop a lone `high` event behind fresher `medium` ones,
+ * and stage 2 could never see it.
+ *
+ * Unlike prior analyses there is no TTL gate. Prior analyses need one because a
+ * user's own freshly-finished analysis would otherwise invalidate every other
+ * user's cache entry mid-window. Events are facts about the past, so that
+ * cannot happen; the one thing that shifts the set is a late-arriving article,
+ * which costs a single miss and buys a more accurate answer.
+ *
+ * The fingerprint covers publication times only — the same selection arriving
+ * in a different order must not split the cache.
+ */
+export function narrowMarketEventsForCacheKey(
+    events: readonly MarketEvent[]
+): NarrowedMarketEvents {
+    const candidates = events
+        .filter(entry => RANKED_IMPACTS.includes(entry.impact))
+        .toSorted(compareMarketEventPriority)
+        .slice(0, MARKET_EVENT_CACHE_KEY_CAP);
+
+    if (candidates.length === 0) {
+        return { candidates, fingerprint: undefined };
+    }
+
+    // 분류값까지 해시에 넣는다 — `publishedAt`만으로는 부족하다.
+    //
+    // `narrowPriorAnalysesForCacheKey`는 `generatedAt`만 해시하는데, 그쪽은
+    // 한 번 만들어진 분석이 다시 쓰이지 않아 시각이 곧 내용의 식별자다.
+    // 뉴스는 다르다: 같은 기사가 나중에 다시 분류될 수 있고(운영 데이터에서
+    // 14.6만 건이 수집 하루 뒤 이후에 분석됐다), 그때 `publishedAt`은 그대로인
+    // 채 `impact`/`sentiment`/`category`만 바뀐다. 시각만 해시하면 그런 갱신이
+    // 캐시 키를 바꾸지 못해, 렌더된 `## Market Events` 문구가 TTL이 끝날 때까지
+    // 옛 분류를 그대로 보여 준다.
+    //
+    // 정렬한 뒤 해시하는 것은 같은 이유다 — 입력 순서가 캐시를 쪼개면 같은
+    // 화면을 보는 두 요청이 항목을 공유하지 못한다.
+    const fingerprint = hashAnalysisInput(
+        candidates
+            .map(
+                entry =>
+                    `${entry.publishedAt.getTime()}:${entry.category}:${entry.sentiment}:${entry.impact}`
+            )
+            .toSorted()
+            .join(',')
     );
     return { candidates, fingerprint };
 }
@@ -520,9 +604,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
  * fleet-wide for the same reason `p9` was — the constant has no
  * per-history-presence axis to scope it to.
  *
+ * @remarks
+ * **`p11` = market-events context section.** `buildAnalysisPrompt` gains a
+ * trailing `marketEvents` parameter; when the caller supplies qualifying
+ * events, a `## Market Events` block renders between the bar data and the
+ * prior-analysis section, naming what landed on those bars (category,
+ * sentiment, impact — never the headline). Bytes change only for requests
+ * carrying events, since `formatMarketEventsSection` returns `''` otherwise —
+ * the same scope as `p9`/`p10`. The bump is still fleet-wide because the
+ * constant has no per-request axis to scope it to.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p10' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p11' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -568,6 +662,12 @@ export const PROMPT_TEMPLATE_VERSION = 'p10' as const;
  *   narrowing (see that function's doc) — produces no suffix at all, so this
  *   is the exact key every existing caller (and every caller that never
  *   adopts the prior-analysis-context feature) reads/writes today.
+ * @param eventsFingerprint - Market-events fingerprint, from
+ *   `narrowMarketEventsForCacheKey`'s `fingerprint` return value. Appended
+ *   AFTER the history suffix, making it the new last segment. `undefined` —
+ *   the caller has no `marketEvents`, or none of them carried `high`/`medium`
+ *   impact — produces no suffix at all, so a symbol with no market-moving news
+ *   reads/writes the exact key it did before this feature existed.
  * @returns The cache key.
  *
  * @example
@@ -592,12 +692,13 @@ export function buildAnalysisCacheKey(
     reasoning?: boolean,
     positionBucket?: PositionBucket,
     locale?: AnalysisLocale,
-    historyFingerprint?: string
+    historyFingerprint?: string,
+    eventsFingerprint?: string
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}${historyKeySuffix(historyFingerprint)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}${historyKeySuffix(historyFingerprint)}${eventsKeySuffix(eventsFingerprint)}`;
 }
 
 /**

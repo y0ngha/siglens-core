@@ -64,17 +64,18 @@ import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import { screenChartPatterns } from '@/domain/patterns';
 import type {
+    AnalysisResponse,
     AssembledPrompt,
     AssetClass,
-    CandlePatternEntry,
-    AnalysisResponse,
     Bar,
+    CandlePatternEntry,
     ChartPatternId,
     FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
     ImpulseColor,
     IndicatorResult,
+    MarketEvent,
     MarketReference,
     PositionBucket,
     PriorAnalysis,
@@ -94,6 +95,7 @@ import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceS
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
+import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
@@ -1839,6 +1841,15 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   and cannot change which skills get injected into a prompt. Omitting it
  *   (or passing an empty array) produces a byte-identical prompt to the one
  *   this builder emitted before the parameter existed.
+ * @param marketEvents - Optional market-moving news events for this symbol,
+ *   supplied by the consumer from its own storage. When provided, narrowed via
+ *   `selectMarketEvents` (bar-window cut, impact filter, capped at
+ *   `MARKET_EVENT_LIMIT`) and rendered via `formatMarketEventsSection` — into
+ *   `dynamic` only, never `stable`, for the same reason as `priorAnalyses`
+ *   above. Only the classification travels (category / sentiment / impact);
+ *   headlines and bodies never reach this prompt. Omitting it (or passing
+ *   `[]`) renders no section, leaving `dynamic` byte-identical to what this
+ *   builder produced before the parameter existed.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
@@ -1855,7 +1866,8 @@ export function buildAnalysisPrompt(
     assetClass: AssetClass = 'equity',
     positionBucket?: PositionBucket,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
-    priorAnalyses?: readonly PriorAnalysis[]
+    priorAnalyses?: readonly PriorAnalysis[],
+    marketEvents?: readonly MarketEvent[]
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -1944,6 +1956,12 @@ export function buildAnalysisPrompt(
     // doesn't anchor to any bar). Deliberately NOT threaded into
     // `selectionContext` / `selectSkills` above — history must never change
     // which skills get injected.
+    const marketEventsSection = formatMarketEventsSection(
+        marketEvents ?? [],
+        bars,
+        symbol,
+        timeframe
+    );
     const priorAnalysisSection = formatPriorAnalysisSection(
         selectPriorAnalyses(priorAnalyses ?? [], bars),
         bars,
@@ -1984,6 +2002,9 @@ export function buildAnalysisPrompt(
         // Only push a non-empty section so an empty/unmatched history
         // doesn't inject a stray blank entry that would double up the
         // `\n\n` separator on join below (same guard as `positionHint`).
+        // 이벤트를 이력보다 앞에 둔다: 이벤트는 봉에 대한 사실이라 위쪽 봉
+        // 데이터의 연장이고, 이력은 그 위에서 내린 과거 판단이라 한 겹 위다.
+        ...(marketEventsSection !== '' ? [marketEventsSection] : []),
         ...(priorAnalysisSection !== '' ? [priorAnalysisSection] : []),
         // Only push a non-empty hint so an unrecognized bucket (empty
         // `positionHint`) doesn't inject a stray blank entry that would

@@ -56,6 +56,7 @@ import type {
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
+    MarketEvent,
     PositionBucket,
     PriorAnalysis,
     Skill,
@@ -5248,5 +5249,101 @@ describe('buildAnalysisPrompt — 출력 로케일', () => {
         for (const locale of ['en', 'ja', 'zh'] as const) {
             expect(build(locale)).not.toContain('pure Hangul');
         }
+    });
+});
+
+describe('marketEvents (buildAnalysisPrompt)', () => {
+    const eventBars: Bar[] = Array.from({ length: 10 }, (_, i) => makeBar(i));
+
+    const marketEvent = (
+        barIndex: number,
+        overrides: Partial<MarketEvent> = {}
+    ): MarketEvent => ({
+        publishedAt: new Date(eventBars[barIndex].time * 1000),
+        category: 'earnings',
+        sentiment: 'bullish',
+        impact: 'high',
+        ...overrides,
+    });
+
+    const build = (events?: readonly MarketEvent[]) =>
+        buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            eventBars,
+            makeIndicators(),
+            [],
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            DEFAULT_ANALYSIS_LOCALE,
+            [],
+            events
+        );
+
+    it('omitting marketEvents is byte-identical to explicitly passing an empty array', () => {
+        expect(build([])).toEqual(build());
+    });
+
+    it('an empty array leaves `dynamic` byte-identical to omitting the param', () => {
+        expect(build([]).dynamic).toBe(build().dynamic);
+        expect(build([]).dynamic).not.toContain('## Market Events');
+    });
+
+    it('a qualifying event renders the section into `dynamic`', () => {
+        const result = build([marketEvent(5)]);
+
+        expect(result.dynamic).toContain('## Market Events');
+        expect(result.dynamic).toContain('earnings, bullish, high impact');
+    });
+
+    it('the section never reaches `stable`', () => {
+        // `stable` is content-addressed and cached per skill set; a per-request
+        // value there would multiply the stored blobs.
+        const result = build([marketEvent(5)]);
+
+        expect(result.stable).not.toContain('## Market Events');
+        expect(result.stable).toBe(build().stable);
+    });
+
+    it('`## Market Events` 는 `## Prior Analyses` 보다 앞에 온다', () => {
+        // 이벤트는 봉에 대한 사실이라 봉 데이터의 연장이고, 이력은 그 위에서
+        // 내린 판단이라 한 겹 위다. 리팩터링으로 순서가 뒤집히면 그 층위가
+        // 무너지므로 여기서 고정한다.
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            eventBars,
+            makeIndicators(),
+            [],
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            DEFAULT_ANALYSIS_LOCALE,
+            [
+                {
+                    generatedAt: new Date(eventBars[4].time * 1000),
+                    trend: 'bullish',
+                    riskLevel: 'medium',
+                },
+            ],
+            [marketEvent(5)]
+        );
+
+        const eventsAt = result.dynamic.indexOf('## Market Events');
+        const priorAt = result.dynamic.indexOf('## Prior Analyses');
+
+        expect(eventsAt).toBeGreaterThan(-1);
+        expect(priorAt).toBeGreaterThan(-1);
+        expect(eventsAt).toBeLessThan(priorAt);
+    });
+
+    it('an event below the impact threshold renders nothing', () => {
+        const result = build([marketEvent(5, { impact: 'low' })]);
+
+        expect(result.dynamic).not.toContain('## Market Events');
+        expect(result.dynamic).toBe(build().dynamic);
     });
 });
