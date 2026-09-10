@@ -1,573 +1,445 @@
 import {
-    DISABLED_THINKING_BUDGET,
-    GEMINI_MODELS_SUPPORTING_DISABLED_THINKING,
     getProvider,
-    getThinkingBudgetSequence,
+    getThinkingLevelSequence,
     isChatGPTModel,
     isClaudeModel,
     isDeepSeekModel,
     isGeminiModel,
+    isReasoningToggleable,
     MODEL_SPECS,
-    supportsDisabledThinking,
-    THINKING_BUDGET_FALLBACK_STEPS,
+    supportsHardOff,
     type ChatGPTModelId,
     type ClaudeModelId,
     type DeepSeekModelId,
     type GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
 import {
-    isClaudeReasoningModelSpec,
-    isClaudeSamplingModelSpec,
-    isReasoningModelSpec,
-    isSamplingModelSpec,
+    isClaudeAdaptiveModelSpec,
+    isClaudeBudgetModelSpec,
+    isClaudeModelSpec,
+    isTemperatureModelSpec,
+    resolveReasoningConfig,
     type ActiveModelId,
     type ChatGPTModelSpec,
-    type ClaudeReasoningModelSpec,
-    type ClaudeSamplingModelSpec,
+    type ClaudeAdaptiveModelSpec,
+    type ClaudeBudgetModelSpec,
     type GeminiModelSpec,
     type ModelSpec,
 } from '@/domain/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
+/** Every model the registry is expected to hold, in access-class order. */
+const ALL_MODELS: readonly ActiveModelId[] = [
+    // free
+    'gpt-5.6-luna',
+    'gemini-3.5-flash-lite',
+    'deepseek-v4.1-flash',
+    'gemini-3.6-flash',
+    'claude-haiku-4-5',
+    // member
+    'gemini-3.7-flash',
+    'gemini-3.8-flash',
+    'deepseek-v4.1-pro',
+    'claude-sonnet-5',
+    'gpt-5.6-terra',
+    'gemini-3.1-pro-preview',
+    // byok
+    'gpt-5.6-sol',
+    'claude-opus-4-8',
+    'claude-opus-5',
+    'claude-fable-5-1',
+    'gpt-6-astra',
+];
+
+/**
+ * Identifiers removed in the 2026-09 registry restructure, including the two
+ * deprecated Claude 4 aliases whose replacement models were themselves removed.
+ */
+const REMOVED_MODEL_IDS: readonly string[] = [
+    'claude-sonnet-4-6',
+    'claude-opus-4-7',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+    'gemini-3-flash-preview',
+    'gpt-5-mini',
+    'gpt-5.4',
+    'gpt-5.5',
+    'claude-sonnet-4',
+    'claude-opus-4',
+];
+
 describe('MODEL_SPECS', () => {
     it('covers every active model identifier exactly once', () => {
-        const expected: readonly ActiveModelId[] = [
-            'claude-haiku-4-5',
-            'claude-sonnet-4-6',
-            'claude-opus-4-7',
-            'claude-sonnet-5',
-            'claude-opus-5',
-            'gemini-2.5-flash',
-            'gemini-2.5-flash-lite',
-            'gemini-2.5-pro',
-            'gemini-3-flash-preview',
-            'gemini-3.1-pro-preview',
-            'gemini-3.5-flash-lite',
-            'gemini-3.6-flash',
-            'gpt-5-mini',
-            'gpt-5.4',
-            'gpt-5.5',
-            'gpt-5.6-terra',
-            'gpt-5.6-sol',
-            'deepseek-v4-flash',
-            'deepseek-v4-pro',
-        ];
         expect(Object.keys(MODEL_SPECS).toSorted()).toEqual(
-            [...expected].toSorted()
+            [...ALL_MODELS].toSorted()
         );
     });
 
-    it('uses temperature only for providers that support sampling temperature', () => {
+    it('holds no identifier removed in the registry restructure', () => {
+        for (const removed of REMOVED_MODEL_IDS) {
+            expect(Object.keys(MODEL_SPECS), removed).not.toContain(removed);
+        }
+    });
+
+    it('keys every apiModelId to its own row, except where the provider names it differently', () => {
+        /** Rows whose provider id genuinely differs from our registry key. */
+        const RENAMED: Record<string, string> = {
+            // Pre-4.6 Claude models keep a dated snapshot id; 4.6 onward the
+            // dateless id IS the pinned snapshot and a date suffix 404s.
+            'claude-haiku-4-5': 'claude-haiku-4-5-20251001',
+            // `deepseek-v4.1-*` is a version designation, not an API id —
+            // sending it returns 400. The API accepts only these two.
+            'deepseek-v4.1-flash': 'deepseek-flash',
+            'deepseek-v4.1-pro': 'deepseek-v4-pro',
+        };
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
-            if (
+            expect(spec.apiModelId, model).toBe(RENAMED[model] ?? model);
+        }
+    });
+
+    it('carries temperature only on specs whose provider accepts sampling', () => {
+        for (const [model, spec] of Object.entries(MODEL_SPECS)) {
+            // Adaptive-thinking Claude and every GPT reasoning model reject
+            // sampling parameters outright.
+            const acceptsSampling =
                 spec.provider === 'gemini' ||
                 spec.provider === 'deepseek' ||
-                model === 'claude-haiku-4-5'
-            ) {
-                expect('temperature' in spec, model).toBe(true);
-                if ('temperature' in spec) {
-                    expect(spec.temperature, model).toBe(0);
-                }
-            } else {
-                expect('temperature' in spec, model).toBe(false);
+                model === 'claude-haiku-4-5';
+            expect('temperature' in spec, model).toBe(acceptsSampling);
+            if ('temperature' in spec) {
+                expect(spec.temperature, model).toBe(0);
             }
         }
     });
 
-    it('keeps Claude max output tokens aligned with current provider caps', () => {
+    it('keeps max output tokens aligned with each provider cap', () => {
         expect(MODEL_SPECS['claude-haiku-4-5'].maxOutputTokens).toBe(64_000);
-        expect(MODEL_SPECS['claude-sonnet-4-6'].maxOutputTokens).toBe(64_000);
-        expect(MODEL_SPECS['claude-opus-4-7'].maxOutputTokens).toBe(128_000);
-        // Sonnet 5는 4.6과 달리 128K를 요청한다 — adaptive thinking이 기본 ON이라
-        // 64K로는 thinking + 응답이 함께 잘릴 수 있다.
-        expect(MODEL_SPECS['claude-sonnet-5'].maxOutputTokens).toBe(128_000);
-        expect(MODEL_SPECS['claude-opus-5'].maxOutputTokens).toBe(128_000);
-    });
 
-    it('uses 65_536 max output tokens for every Gemini model', () => {
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
             if (spec.provider === 'gemini') {
                 expect(spec.maxOutputTokens, model).toBe(65_536);
-            }
-        }
-    });
-
-    it('uses 65_536 max output tokens for every GPT mini model', () => {
-        expect(MODEL_SPECS['gpt-5-mini'].maxOutputTokens).toBe(65_536);
-    });
-
-    it('uses 128_000 max output tokens for every GPT model without GPT mini', () => {
-        for (const [model, spec] of Object.entries(MODEL_SPECS)) {
-            if (spec.provider === 'chatgpt' && model !== 'gpt-5-mini') {
+            } else if (spec.provider === 'chatgpt') {
+                expect(spec.maxOutputTokens, model).toBe(128_000);
+            } else if (spec.provider === 'deepseek') {
+                // DeepSeek V4.1 supports 384K (384 * 1024) output tokens.
+                expect(spec.maxOutputTokens, model).toBe(393_216);
+            } else if (model !== 'claude-haiku-4-5') {
+                // Adaptive-thinking Claude shares max_tokens with thinking, so
+                // every one of them requests the 128K ceiling.
                 expect(spec.maxOutputTokens, model).toBe(128_000);
             }
         }
     });
 
-    it('disables thinking budget for haiku', () => {
-        expect(MODEL_SPECS['claude-haiku-4-5'].thinkingBudget).toBe(0);
+    it('splits Claude specs by thinking API', () => {
+        // haiku is the only pre-4.6 model left, so it is the only budget spec.
+        expect(MODEL_SPECS['claude-haiku-4-5'].thinkingApi).toBe('budget');
+        for (const model of [
+            'claude-sonnet-5',
+            'claude-opus-4-8',
+            'claude-opus-5',
+            'claude-fable-5-1',
+        ] as const) {
+            expect(MODEL_SPECS[model].thinkingApi, model).toBe('adaptive');
+        }
     });
 
-    it('uses effort instead of thinking budget for Claude adaptive thinking and GPT reasoning models', () => {
-        expect(MODEL_SPECS['claude-sonnet-4-6'].effort).toBe('high');
-        expect(MODEL_SPECS['claude-opus-4-7'].effort).toBe('high');
-        expect(MODEL_SPECS['gpt-5-mini'].effort).toBe('medium');
-        expect(MODEL_SPECS['gpt-5.4'].effort).toBe('high');
-        expect(MODEL_SPECS['gpt-5.5'].effort).toBe('high');
-        expect(MODEL_SPECS['claude-sonnet-5'].effort).toBe('high');
-        expect(MODEL_SPECS['claude-opus-5'].effort).toBe('high');
-        expect(MODEL_SPECS['gpt-5.6-terra'].effort).toBe('high');
-        expect(MODEL_SPECS['gpt-5.6-sol'].effort).toBe('high');
+    it('gives every spec both toggle states and a default', () => {
+        for (const [model, spec] of Object.entries(MODEL_SPECS)) {
+            expect(spec.reasoning.off, model).toBeDefined();
+            expect(spec.reasoning.on, model).toBeDefined();
+            expect(['off', 'on'], model).toContain(spec.reasoning.default);
+        }
     });
 
-    it('does not include temperature on GPT reasoning model specs', () => {
-        expect('temperature' in MODEL_SPECS['gpt-5-mini']).toBe(false);
-        expect('temperature' in MODEL_SPECS['gpt-5.4']).toBe(false);
-        expect('temperature' in MODEL_SPECS['gpt-5.5']).toBe(false);
-        expect('temperature' in MODEL_SPECS['gpt-5.6-terra']).toBe(false);
-        expect('temperature' in MODEL_SPECS['gpt-5.6-sol']).toBe(false);
+    it('uses the provider-appropriate config shape on both toggle states', () => {
+        for (const [model, rawSpec] of Object.entries(MODEL_SPECS)) {
+            const spec: ModelSpec = rawSpec;
+            for (const state of [spec.reasoning.off, spec.reasoning.on]) {
+                switch (spec.provider) {
+                    case 'gemini':
+                        expect(state, model).toHaveProperty('level');
+                        break;
+                    case 'chatgpt':
+                        expect(state, model).toHaveProperty('effort');
+                        break;
+                    case 'deepseek':
+                        expect(state, model).toHaveProperty('thinking');
+                        break;
+                    case 'claude':
+                        expect(
+                            spec.thinkingApi === 'adaptive'
+                                ? 'mode' in state
+                                : 'budgetTokens' in state,
+                            model
+                        ).toBe(true);
+                        break;
+                }
+            }
+        }
     });
+});
 
-    // 아래 두 테스트는 Gemini 모델 전체를 8_192 그룹과 그 여집합으로 분할한다.
-    // 여집합은 하드코딩이 아니라 도출되므로 32_768이 사실상 기본값이 된다:
-    // 새 Gemini 모델을 LOW_BUDGET_GEMINI에 넣지 않은 채 추가하면 자동으로 여집합에
-    // 들어가고, 그 예산이 32_768이 아니면 두 번째 테스트가 실패한다. 즉 "32_768이
-    // 아닌 예산은 반드시 명시적으로 분류해야 한다"가 이 쌍이 보장하는 불변식이다.
-    const LOW_BUDGET_GEMINI: readonly ActiveModelId[] = [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-3.5-flash-lite',
+describe('supportsHardOff', () => {
+    /**
+     * Models that cannot remove reasoning entirely. Every entry is a live
+     * measurement, not an inference from the model name — see the per-row
+     * comments in `MODEL_SPECS`.
+     */
+    const PARTIAL_OFF_MODELS: readonly ActiveModelId[] = [
+        'gemini-3.7-flash',
+        'gemini-3.8-flash',
+        'gemini-3.1-pro-preview',
+        'claude-fable-5-1',
+        'gpt-6-astra',
     ];
 
-    it('keeps the low-budget Gemini line at the documented 8_192 thinking budget', () => {
-        for (const model of LOW_BUDGET_GEMINI) {
-            expect(MODEL_SPECS[model], model).toMatchObject({
-                provider: 'gemini',
-                thinkingBudget: 8_192,
-            });
+    it('reports false for exactly the models that cannot disable reasoning', () => {
+        const actual = ALL_MODELS.filter(model => !supportsHardOff(model));
+        expect(actual.toSorted()).toEqual([...PARTIAL_OFF_MODELS].toSorted());
+    });
+
+    it('reports true for every other model', () => {
+        for (const model of ALL_MODELS) {
+            if (PARTIAL_OFF_MODELS.includes(model)) continue;
+            expect(supportsHardOff(model), model).toBe(true);
         }
     });
 
-    it('uses 32_768 thinking budget for every remaining Gemini model', () => {
-        const remaining = Object.entries(MODEL_SPECS).filter(
-            ([model, spec]) =>
-                spec.provider === 'gemini' &&
-                !LOW_BUDGET_GEMINI.includes(model as ActiveModelId)
-        );
-        expect(remaining.length).toBeGreaterThan(0);
-        for (const [model, spec] of remaining) {
-            expect(spec, model).toMatchObject({ thinkingBudget: 32_768 });
+    it('keeps a partial-off Gemini model off the `minimal` level it rejects', () => {
+        // gemini-3.7-flash / 3.8-flash / 3.1-pro-preview return 400 for
+        // `minimal`, so their off state must bottom out at `low`.
+        for (const model of [
+            'gemini-3.7-flash',
+            'gemini-3.8-flash',
+            'gemini-3.1-pro-preview',
+        ] as const) {
+            expect(MODEL_SPECS[model].reasoning.off.level, model).toBe('low');
         }
     });
 
-    it('toggles DeepSeek reasoning via the boolean `thinking` field — flash off, pro on', () => {
-        expect(MODEL_SPECS['deepseek-v4-flash'].thinking).toBe(false);
-        expect(MODEL_SPECS['deepseek-v4-pro'].thinking).toBe(true);
+    it('uses `minimal` for the two Gemini models measured at zero thought tokens', () => {
+        for (const model of [
+            'gemini-3.5-flash-lite',
+            'gemini-3.6-flash',
+        ] as const) {
+            expect(MODEL_SPECS[model].reasoning.off.level, model).toBe(
+                'minimal'
+            );
+        }
+    });
+});
+
+describe('isReasoningToggleable', () => {
+    it('reports false only for claude-haiku-4-5', () => {
+        const actual = ALL_MODELS.filter(
+            model => !isReasoningToggleable(model)
+        );
+        expect(actual).toEqual(['claude-haiku-4-5']);
     });
 
-    it('allows both DeepSeek models up to 393_216 max output tokens (384K, live-API-verified)', () => {
-        expect(MODEL_SPECS['deepseek-v4-flash'].maxOutputTokens).toBe(393_216);
-        expect(MODEL_SPECS['deepseek-v4-pro'].maxOutputTokens).toBe(393_216);
+    it('gives a non-toggleable model identical off and on states', () => {
+        // The invariant behind the disabled toggle: if these ever diverged, a
+        // consumer UI would block a control that actually changes the request.
+        for (const model of ALL_MODELS) {
+            if (isReasoningToggleable(model)) continue;
+            const spec: ModelSpec = MODEL_SPECS[model];
+            expect(spec.reasoning.off, model).toEqual(spec.reasoning.on);
+        }
     });
 
-    it('routes both DeepSeek models to the deepseek provider with apiModelId matching their key', () => {
-        expect(MODEL_SPECS['deepseek-v4-flash'].provider).toBe('deepseek');
-        expect(MODEL_SPECS['deepseek-v4-flash'].apiModelId).toBe(
-            'deepseek-v4-flash'
+    it('gives every toggleable model states that actually differ', () => {
+        for (const model of ALL_MODELS) {
+            if (!isReasoningToggleable(model)) continue;
+            const spec: ModelSpec = MODEL_SPECS[model];
+            expect(spec.reasoning.off, model).not.toEqual(spec.reasoning.on);
+        }
+    });
+});
+
+describe('resolveReasoningConfig', () => {
+    it('returns the off state for false and the on state for true', () => {
+        const spec: GeminiModelSpec = MODEL_SPECS['gemini-3.6-flash'];
+        expect(resolveReasoningConfig(spec.reasoning, false)).toEqual({
+            level: 'minimal',
+        });
+        expect(resolveReasoningConfig(spec.reasoning, true)).toEqual({
+            level: 'high',
+        });
+    });
+
+    it('falls back to the spec default when the caller has no preference', () => {
+        const free: GeminiModelSpec = MODEL_SPECS['gemini-3.6-flash'];
+        expect(resolveReasoningConfig(free.reasoning, undefined)).toEqual(
+            free.reasoning.off
         );
-        expect(MODEL_SPECS['deepseek-v4-pro'].provider).toBe('deepseek');
-        expect(MODEL_SPECS['deepseek-v4-pro'].apiModelId).toBe(
-            'deepseek-v4-pro'
+
+        const byok: ClaudeAdaptiveModelSpec = MODEL_SPECS['claude-opus-5'];
+        expect(resolveReasoningConfig(byok.reasoning, undefined)).toEqual(
+            byok.reasoning.on
         );
+    });
+});
+
+describe('getThinkingLevelSequence', () => {
+    it('descends from the initial level to the floor inclusive', () => {
+        expect(getThinkingLevelSequence('high', 'minimal')).toEqual([
+            'high',
+            'medium',
+            'low',
+            'minimal',
+        ]);
+    });
+
+    it('stops at a raised floor', () => {
+        expect(getThinkingLevelSequence('high', 'low')).toEqual([
+            'high',
+            'medium',
+            'low',
+        ]);
+    });
+
+    it('returns a single step when the initial level is already the floor', () => {
+        expect(getThinkingLevelSequence('low', 'low')).toEqual(['low']);
+    });
+
+    it('returns a single step when the initial level is below the floor', () => {
+        // Defensive: a caller should never start below its own floor, but the
+        // sequence must not silently climb back up if one does.
+        expect(getThinkingLevelSequence('minimal', 'low')).toEqual(['minimal']);
+    });
+
+    it('never repeats a level', () => {
+        const sequence = getThinkingLevelSequence('high', 'minimal');
+        expect(new Set(sequence).size).toBe(sequence.length);
     });
 });
 
 describe('getProvider', () => {
     it('routes Claude models to the claude provider', () => {
         expect(getProvider('claude-haiku-4-5')).toBe('claude');
-        expect(getProvider('claude-sonnet-4-6')).toBe('claude');
-        expect(getProvider('claude-opus-4-7')).toBe('claude');
+        expect(getProvider('claude-sonnet-5')).toBe('claude');
+        expect(getProvider('claude-fable-5-1')).toBe('claude');
     });
 
     it('routes Gemini models to the gemini provider', () => {
-        expect(getProvider('gemini-2.5-flash')).toBe('gemini');
-        expect(getProvider('gemini-3.1-pro-preview')).toBe('gemini');
+        expect(getProvider('gemini-3.6-flash')).toBe('gemini');
+        expect(getProvider('gemini-3.8-flash')).toBe('gemini');
     });
 
     it('routes GPT models to the chatgpt provider', () => {
-        expect(getProvider('gpt-5-mini')).toBe('chatgpt');
-        expect(getProvider('gpt-5.5')).toBe('chatgpt');
+        expect(getProvider('gpt-5.6-luna')).toBe('chatgpt');
+        expect(getProvider('gpt-6-astra')).toBe('chatgpt');
     });
 
     it('routes DeepSeek models to the deepseek provider', () => {
-        expect(getProvider('deepseek-v4-flash')).toBe('deepseek');
-        expect(getProvider('deepseek-v4-pro')).toBe('deepseek');
+        expect(getProvider('deepseek-v4.1-flash')).toBe('deepseek');
+        expect(getProvider('deepseek-v4.1-pro')).toBe('deepseek');
     });
 });
 
 describe('provider type guards', () => {
-    it('isClaudeModel matches only Claude entries', () => {
-        expect(isClaudeModel('claude-opus-4-7')).toBe(true);
-        expect(isClaudeModel('gemini-2.5-flash')).toBe(false);
-        expect(isClaudeModel('gpt-5-mini')).toBe(false);
-    });
-
-    it('isGeminiModel matches only Gemini entries', () => {
-        expect(isGeminiModel('gemini-2.5-pro')).toBe(true);
-        expect(isGeminiModel('claude-haiku-4-5')).toBe(false);
-        expect(isGeminiModel('gpt-5.4')).toBe(false);
-    });
-
-    it('isChatGPTModel matches only GPT entries', () => {
-        expect(isChatGPTModel('gpt-5.5')).toBe(true);
-        expect(isChatGPTModel('claude-sonnet-4-6')).toBe(false);
-        expect(isChatGPTModel('gemini-3-flash-preview')).toBe(false);
-    });
-
-    it('isDeepSeekModel matches only DeepSeek entries', () => {
-        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
-        expect(isDeepSeekModel('deepseek-v4-pro')).toBe(true);
-        expect(isDeepSeekModel('claude-sonnet-4-6')).toBe(false);
-        expect(isDeepSeekModel('gemini-3-flash-preview')).toBe(false);
-        expect(isDeepSeekModel('gpt-5.5')).toBe(false);
+    it('partitions every model into exactly one provider', () => {
+        for (const model of ALL_MODELS) {
+            const matches = [
+                isClaudeModel(model),
+                isGeminiModel(model),
+                isChatGPTModel(model),
+                isDeepSeekModel(model),
+            ].filter(Boolean);
+            expect(matches.length, model).toBe(1);
+        }
     });
 
     it('isClaudeModel narrows ActiveModelId to ClaudeModelId at the type level', () => {
-        const model = 'claude-opus-4-7' as ActiveModelId;
+        const model = 'claude-opus-5' as ActiveModelId;
         if (isClaudeModel(model)) {
-            // Compile-time assertion: narrowed identifier assigns to the
-            // Claude-only subset without a cast.
-            const narrowed: ClaudeModelId = model;
-            expect(MODEL_SPECS[narrowed].provider).toBe('claude');
-        } else {
-            throw new Error('expected claude-opus-4-7 to narrow to Claude');
+            expectTypeOf(model).toEqualTypeOf<ClaudeModelId>();
         }
     });
 
     it('isGeminiModel narrows ActiveModelId to GeminiModelId at the type level', () => {
-        const model = 'gemini-2.5-pro' as ActiveModelId;
+        const model = 'gemini-3.6-flash' as ActiveModelId;
         if (isGeminiModel(model)) {
-            const narrowed: GeminiModelId = model;
-            expect(MODEL_SPECS[narrowed].provider).toBe('gemini');
-        } else {
-            throw new Error('expected gemini-2.5-pro to narrow to Gemini');
+            expectTypeOf(model).toEqualTypeOf<GeminiModelId>();
         }
     });
 
     it('isChatGPTModel narrows ActiveModelId to ChatGPTModelId at the type level', () => {
-        const model = 'gpt-5.5' as ActiveModelId;
+        const model = 'gpt-5.6-sol' as ActiveModelId;
         if (isChatGPTModel(model)) {
-            const narrowed: ChatGPTModelId = model;
-            expect(MODEL_SPECS[narrowed].provider).toBe('chatgpt');
-        } else {
-            throw new Error('expected gpt-5.5 to narrow to ChatGPT');
+            expectTypeOf(model).toEqualTypeOf<ChatGPTModelId>();
         }
     });
 
     it('isDeepSeekModel narrows ActiveModelId to DeepSeekModelId at the type level', () => {
-        const model = 'deepseek-v4-flash' as ActiveModelId;
+        const model = 'deepseek-v4.1-pro' as ActiveModelId;
         if (isDeepSeekModel(model)) {
-            const narrowed: DeepSeekModelId = model;
-            expect(MODEL_SPECS[narrowed].provider).toBe('deepseek');
-        } else {
-            throw new Error('expected deepseek-v4-flash to narrow to DeepSeek');
+            expectTypeOf(model).toEqualTypeOf<DeepSeekModelId>();
         }
     });
 });
 
-describe('getThinkingBudgetSequence', () => {
-    it('returns full descending sequence with two halving steps for high initial value', () => {
-        // 32000 → 16000 → 8000 → fallback steps (8192 skipped, >= previous) → 4096 → 2048 → 0
-        expect(getThinkingBudgetSequence(32000)).toEqual([
-            32000,
-            16000,
-            8000,
-            4096,
-            2048,
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('halves twice before falling into the fallback steps for the Gemini default budget', () => {
-        // 24576 → 12288 → 6144 → fallback steps (8192 skipped, 4096 added) → 2048 → 0
-        expect(getThinkingBudgetSequence(24576)).toEqual([
-            24576,
-            12288,
-            6144,
-            4096,
-            2048,
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('deduplicates halving values that match standard candidates', () => {
-        // 8192 → 4096 (dup with halving) → 2048 → 0
-        expect(getThinkingBudgetSequence(8192)).toEqual([
-            THINKING_BUDGET_FALLBACK_STEPS[0],
-            THINKING_BUDGET_FALLBACK_STEPS[1],
-            THINKING_BUDGET_FALLBACK_STEPS[2],
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('excludes candidates greater than or equal to the previous step', () => {
-        // 4096 → 2048 → 1024 → fallback steps (all skipped) → 0
-        expect(getThinkingBudgetSequence(4096)).toEqual([
-            4096,
-            2048,
-            1024,
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('returns only zero when initial is zero', () => {
-        expect(getThinkingBudgetSequence(0)).toEqual([
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('includes both halvings when both fall between standard candidates', () => {
-        // 18000 → 9000 → 4500 → fallback (8192 skipped, 4096 added, 2048 added) → 0
-        expect(getThinkingBudgetSequence(18000)).toEqual([
-            18000,
-            9000,
-            4500,
-            4096,
-            2048,
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('skips halving when it equals a standard candidate', () => {
-        // 16384 → 8192 (dup) → 4096 (dup) → fallback (only 2048 added) → 0
-        expect(getThinkingBudgetSequence(16384)).toEqual([
-            16384,
-            THINKING_BUDGET_FALLBACK_STEPS[0],
-            THINKING_BUDGET_FALLBACK_STEPS[1],
-            THINKING_BUDGET_FALLBACK_STEPS[2],
-            DISABLED_THINKING_BUDGET,
-        ]);
-    });
-
-    it('exposes the standard fallback steps tuple unchanged', () => {
-        expect(THINKING_BUDGET_FALLBACK_STEPS).toEqual([8192, 4096, 2048]);
-    });
-});
-
-// ---------------------------------------------------------------------------
-// ModelSpec type guards
-// ---------------------------------------------------------------------------
-
-describe('isReasoningModelSpec', () => {
-    it('returns true for Claude reasoning models', () => {
-        expect(isReasoningModelSpec(MODEL_SPECS['claude-sonnet-4-6'])).toBe(
-            true
-        );
-        expect(isReasoningModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(true);
-    });
-
-    it('returns true for ChatGPT reasoning models', () => {
-        expect(isReasoningModelSpec(MODEL_SPECS['gpt-5-mini'])).toBe(true);
-        expect(isReasoningModelSpec(MODEL_SPECS['gpt-5.4'])).toBe(true);
-        expect(isReasoningModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(true);
-    });
-
-    it('returns false for Claude sampling model', () => {
-        expect(isReasoningModelSpec(MODEL_SPECS['claude-haiku-4-5'])).toBe(
-            false
-        );
-    });
-
-    it('returns false for Gemini models', () => {
-        expect(isReasoningModelSpec(MODEL_SPECS['gemini-2.5-flash'])).toBe(
-            false
-        );
-        expect(isReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(false);
-    });
-
-    it('returns false for BOTH DeepSeek models — even the thinking `deepseek-v4-pro`, which toggles reasoning via `thinking` and has no `effort`', () => {
-        expect(isReasoningModelSpec(MODEL_SPECS['deepseek-v4-flash'])).toBe(
-            false
-        );
-        expect(isReasoningModelSpec(MODEL_SPECS['deepseek-v4-pro'])).toBe(
-            false
-        );
-    });
-
-    it('narrows the type to ClaudeReasoningModelSpec | ChatGPTModelSpec and exposes effort as EffortLevel', () => {
-        const spec: ModelSpec = MODEL_SPECS['claude-opus-4-7'];
-        if (isReasoningModelSpec(spec)) {
-            // After narrowing, spec is assignable to the reasoning union.
-            const _narrowed: ClaudeReasoningModelSpec | ChatGPTModelSpec = spec;
-            void _narrowed;
-            // effort must be EffortLevel — not undefined
-            expectTypeOf(spec.effort).toEqualTypeOf<
-                'low' | 'medium' | 'high'
-            >();
+describe('spec type guards', () => {
+    it('isClaudeModelSpec matches every Claude spec regardless of thinking API', () => {
+        for (const model of ALL_MODELS) {
+            const spec: ModelSpec = MODEL_SPECS[model];
+            expect(isClaudeModelSpec(spec), model).toBe(
+                spec.provider === 'claude'
+            );
         }
     });
-});
 
-describe('isSamplingModelSpec', () => {
-    it('returns true for Claude haiku (sampling)', () => {
-        expect(isSamplingModelSpec(MODEL_SPECS['claude-haiku-4-5'])).toBe(true);
+    it('isClaudeAdaptiveModelSpec excludes the budget-based haiku spec', () => {
+        const haiku: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
+        const sonnet: ModelSpec = MODEL_SPECS['claude-sonnet-5'];
+        expect(isClaudeAdaptiveModelSpec(haiku)).toBe(false);
+        expect(isClaudeAdaptiveModelSpec(sonnet)).toBe(true);
     });
 
-    it('returns true for all Gemini models', () => {
-        expect(isSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash'])).toBe(true);
-        expect(isSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash-lite'])).toBe(
-            true
-        );
-        expect(isSamplingModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(true);
+    it('isClaudeBudgetModelSpec matches only the haiku spec', () => {
+        for (const model of ALL_MODELS) {
+            const spec: ModelSpec = MODEL_SPECS[model];
+            expect(isClaudeBudgetModelSpec(spec), model).toBe(
+                model === 'claude-haiku-4-5'
+            );
+        }
     });
 
-    it('returns false for Claude reasoning models', () => {
-        expect(isSamplingModelSpec(MODEL_SPECS['claude-sonnet-4-6'])).toBe(
-            false
-        );
-        expect(isSamplingModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(false);
+    it('isTemperatureModelSpec matches exactly the specs that carry a temperature', () => {
+        for (const model of ALL_MODELS) {
+            const spec: ModelSpec = MODEL_SPECS[model];
+            expect(isTemperatureModelSpec(spec), model).toBe(
+                'temperature' in spec
+            );
+        }
     });
 
-    it('returns false for ChatGPT models', () => {
-        expect(isSamplingModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(false);
+    it('narrows to the adaptive Claude spec and exposes its reasoning modes', () => {
+        const spec: ModelSpec = MODEL_SPECS['claude-opus-5'];
+        if (isClaudeAdaptiveModelSpec(spec)) {
+            expectTypeOf(spec).toEqualTypeOf<ClaudeAdaptiveModelSpec>();
+            expect(spec.reasoning.on).toEqual({
+                mode: 'adaptive',
+                effort: 'high',
+            });
+        }
     });
 
-    it('returns true for BOTH DeepSeek models — INCLUDING the thinking `deepseek-v4-pro` (footgun: it has no `effort` so it classifies as sampling; callers MUST gate `temperature` on `spec.thinking`, not on this guard)', () => {
-        expect(isSamplingModelSpec(MODEL_SPECS['deepseek-v4-flash'])).toBe(
-            true
-        );
-        expect(isSamplingModelSpec(MODEL_SPECS['deepseek-v4-pro'])).toBe(true);
-    });
-
-    it('narrows the type to ClaudeSamplingModelSpec | GeminiModelSpec and exposes temperature as number', () => {
+    it('narrows to the budget Claude spec and exposes its budget tokens', () => {
         const spec: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
-        if (isSamplingModelSpec(spec)) {
-            // After narrowing, spec is assignable to the sampling union.
-            const _narrowed: ClaudeSamplingModelSpec | GeminiModelSpec = spec;
-            void _narrowed;
-            // temperature must be a number — not undefined
-            expectTypeOf(spec.temperature).toEqualTypeOf<number>();
-            // thinkingBudget is 0 (ClaudeSamplingModelSpec) | number (GeminiModelSpec)
-            // — both extend number, neither is undefined.
-            // Use assignability check rather than toEqualTypeOf because the
-            // narrowed union resolves to `0 | number`, which is structurally
-            // equivalent to `number` but not literally identical.
-            const _budget: number = spec.thinkingBudget;
-            void _budget;
+        if (isClaudeBudgetModelSpec(spec)) {
+            expectTypeOf(spec).toEqualTypeOf<ClaudeBudgetModelSpec>();
+            expect(spec.reasoning.off.budgetTokens).toBe(0);
         }
     });
 
-    it('narrows Gemini spec correctly: thinkingBudget is number, temperature is number', () => {
-        const spec: ModelSpec = MODEL_SPECS['gemini-2.5-flash'];
-        if (isSamplingModelSpec(spec)) {
-            expectTypeOf(spec.temperature).toEqualTypeOf<number>();
-            const _budget: number = spec.thinkingBudget;
-            void _budget;
+    it('narrows a ChatGPT spec through its provider discriminant', () => {
+        const spec: ModelSpec = MODEL_SPECS['gpt-5.6-terra'];
+        if (spec.provider === 'chatgpt') {
+            expectTypeOf(spec).toEqualTypeOf<ChatGPTModelSpec>();
+            expect(spec.reasoning.off).toEqual({ effort: 'none' });
         }
-    });
-});
-
-describe('isClaudeReasoningModelSpec', () => {
-    it('returns true only for Claude adaptive-thinking models', () => {
-        expect(
-            isClaudeReasoningModelSpec(MODEL_SPECS['claude-sonnet-4-6'])
-        ).toBe(true);
-        expect(isClaudeReasoningModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(
-            true
-        );
-    });
-
-    it('returns false for Claude sampling model', () => {
-        expect(
-            isClaudeReasoningModelSpec(MODEL_SPECS['claude-haiku-4-5'])
-        ).toBe(false);
-    });
-
-    it('returns false for ChatGPT models even though they have effort', () => {
-        expect(isClaudeReasoningModelSpec(MODEL_SPECS['gpt-5.5'])).toBe(false);
-    });
-
-    it('returns false for Gemini models', () => {
-        expect(isClaudeReasoningModelSpec(MODEL_SPECS['gemini-2.5-pro'])).toBe(
-            false
-        );
-    });
-
-    it('narrows the type to ClaudeReasoningModelSpec exactly', () => {
-        const spec: ModelSpec = MODEL_SPECS['claude-opus-4-7'];
-        if (isClaudeReasoningModelSpec(spec)) {
-            const _narrowed: ClaudeReasoningModelSpec = spec;
-            void _narrowed;
-            expectTypeOf(spec.effort).toEqualTypeOf<
-                'low' | 'medium' | 'high'
-            >();
-            expectTypeOf(spec.provider).toEqualTypeOf<'claude'>();
-        }
-    });
-});
-
-describe('isClaudeSamplingModelSpec', () => {
-    it('returns true for claude-haiku-4-5', () => {
-        expect(isClaudeSamplingModelSpec(MODEL_SPECS['claude-haiku-4-5'])).toBe(
-            true
-        );
-    });
-
-    it('returns false for Claude adaptive-thinking models', () => {
-        expect(
-            isClaudeSamplingModelSpec(MODEL_SPECS['claude-sonnet-4-6'])
-        ).toBe(false);
-        expect(isClaudeSamplingModelSpec(MODEL_SPECS['claude-opus-4-7'])).toBe(
-            false
-        );
-    });
-
-    it('returns false for Gemini models', () => {
-        expect(isClaudeSamplingModelSpec(MODEL_SPECS['gemini-2.5-flash'])).toBe(
-            false
-        );
-    });
-
-    it('returns false for ChatGPT models', () => {
-        expect(isClaudeSamplingModelSpec(MODEL_SPECS['gpt-5-mini'])).toBe(
-            false
-        );
-    });
-
-    it('narrows the type to ClaudeSamplingModelSpec exactly', () => {
-        const spec: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
-        if (isClaudeSamplingModelSpec(spec)) {
-            const _narrowed: ClaudeSamplingModelSpec = spec;
-            void _narrowed;
-            expectTypeOf(spec.temperature).toEqualTypeOf<number>();
-            expectTypeOf(spec.thinkingBudget).toEqualTypeOf<0>();
-            expectTypeOf(spec.provider).toEqualTypeOf<'claude'>();
-        }
-    });
-});
-
-describe('supportsDisabledThinking', () => {
-    // `callAnalysisAi`는 `reasoning: false`를 Gemini 분기에서 thinkingBudget 0으로
-    // 번역한다. 아래 세 모델은 2026-07-31 라이브 호출에서 리터럴 0을
-    // 400("This model only works in thinking mode")으로 거부했다 — 이 단언이
-    // 허용목록이 조용히 넓어지는 것을 막는다.
-    it('리터럴 0을 거부하는 Gemini 모델은 false다', () => {
-        expect(supportsDisabledThinking('gemini-3.1-pro-preview')).toBe(false);
-        expect(supportsDisabledThinking('gemini-3.5-flash-lite')).toBe(false);
-        expect(supportsDisabledThinking('gemini-3.6-flash')).toBe(false);
-        // 실측 대상이 아니었으므로 미지원으로 취급한다.
-        expect(supportsDisabledThinking('gemini-2.5-pro')).toBe(false);
-    });
-
-    it('실측으로 0을 허용한 Gemini 모델은 true다', () => {
-        for (const model of GEMINI_MODELS_SUPPORTING_DISABLED_THINKING) {
-            expect(supportsDisabledThinking(model)).toBe(true);
-        }
-    });
-
-    it('Gemini가 아닌 provider는 리터럴 0 제약이 없어 항상 true다', () => {
-        expect(supportsDisabledThinking('deepseek-v4-flash')).toBe(true);
-        expect(supportsDisabledThinking('claude-haiku-4-5')).toBe(true);
-        expect(supportsDisabledThinking('gpt-5-mini')).toBe(true);
     });
 });

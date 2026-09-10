@@ -1,7 +1,7 @@
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
 import {
     EMPTY_INDICATOR_RESULT,
@@ -137,9 +137,9 @@ const restrictedTierConfig = {
     timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
     infoDepth: { free: ['summary'], member: ['summary'], pro: ['summary'] },
     models: {
-        free: ['gemini-2.5-flash'],
-        member: ['gemini-2.5-flash'],
-        pro: ['gemini-2.5-flash'],
+        free: ['gemini-3.6-flash'],
+        member: ['gemini-3.6-flash'],
+        pro: ['gemini-3.6-flash'],
     },
     featureFlags: { enableTierRestrictions: true },
 } as const;
@@ -312,7 +312,7 @@ describe('runAnalysis', () => {
                     // 같은 모델로 해석된다. 'analysis-worker'는 캐시 키 센티널일 뿐
                     // 호출 가능한 모델이 아니다 — runAnalysis.ts의
                     // DEFAULT_RUN_ANALYSIS_MODEL JSDoc 참조.
-                    model: DEEPSEEK_V4_FLASH_MODEL,
+                    model: DEEPSEEK_V4_1_FLASH_MODEL,
                 })
             );
         });

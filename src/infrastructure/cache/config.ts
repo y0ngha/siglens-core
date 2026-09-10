@@ -350,7 +350,7 @@ export function narrowPriorAnalysesForCacheKey(
  * sends it on the dispatch body; it is also folded into the briefing cache key
  * so a model change misses the old cache.
  */
-export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
+export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
 
 /**
  * Prompt-template version folded into the technical and fundamental analysis
@@ -1118,9 +1118,9 @@ export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
  *
  * @example
  * ```ts
- * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4-flash', 'abc123');
+ * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4.1-flash', 'abc123');
  * // → 'v1:analysis:market-news:crypto:deepseek-v4-flash:p2:abc123'
- * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4-flash', 'abc123', true);
+ * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4.1-flash', 'abc123', true);
  * // → 'v1:analysis:market-news:crypto:deepseek-v4-flash:p2:abc123:reason=on'
  * ```
  */

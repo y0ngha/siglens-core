@@ -102,8 +102,8 @@ describe('computeEffectiveTtl', () => {
 
 describe('cache key builders', () => {
     it('buildAnalysisCacheKey includes model identifier and prompt-template version', () => {
-        expect(buildAnalysisCacheKey('AAPL', '1Hour', 'gemini-2.5-flash')).toBe(
-            `analysis:AAPL:1Hour:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
+        expect(buildAnalysisCacheKey('AAPL', '1Hour', 'gemini-3.6-flash')).toBe(
+            `analysis:AAPL:1Hour:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}`
         );
     });
 
@@ -204,29 +204,31 @@ describe('cache key builders', () => {
 
 describe('new analysis cache keys', () => {
     it('returns {v}:analysis:fundamental:{symbol}:{model}:{promptVersion} format', () => {
-        const a = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        const a = buildFundamentalCacheKey('AAPL', 'gemini-3.1-pro-preview');
         expect(a).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-3.1-pro-preview:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`
         );
     });
 
     it('buildNewsCacheKey same shape with version prefix', () => {
-        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2')).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:AAPL:gemini-2.5-pro:${NEWS_PROMPT_TEMPLATE_VERSION}:h2`
+        expect(buildNewsCacheKey('AAPL', 'gemini-3.1-pro-preview', 'h2')).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:news:AAPL:gemini-3.1-pro-preview:${NEWS_PROMPT_TEMPLATE_VERSION}:h2`
         );
     });
 
     it('buildOverallCacheKey includes timeframe and version prefix', () => {
         expect(
-            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3')
+            buildOverallCacheKey('AAPL', '5Min', 'gemini-3.1-pro-preview', 'h3')
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-2.5-pro:h3`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-3.1-pro-preview:h3`
         );
     });
 
     it('buildOverallPeekCacheKey is content-free (no input hash) with peek segment and version prefix', () => {
-        expect(buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-2.5-pro')).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-2.5-pro`
+        expect(
+            buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-3.1-pro-preview')
+        ).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-3.1-pro-preview`
         );
     });
 
@@ -251,12 +253,16 @@ describe('prompt-template versions in technical & fundamental keys', () => {
     });
 
     it('technical key ends with the prompt-template version segment', () => {
-        const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-pro');
+        const key = buildAnalysisCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-3.1-pro-preview'
+        );
         expect(key.endsWith(`:${PROMPT_TEMPLATE_VERSION}`)).toBe(true);
     });
 
     it('fundamental key ends with its OWN prompt-template version segment', () => {
-        const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        const key = buildFundamentalCacheKey('AAPL', 'gemini-3.1-pro-preview');
         expect(key.endsWith(`:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`)).toBe(
             true
         );
@@ -271,7 +277,7 @@ describe('prompt-template versions in technical & fundamental keys', () => {
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).not.toBe(
             PROMPT_TEMPLATE_VERSION
         );
-        const key = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        const key = buildFundamentalCacheKey('AAPL', 'gemini-3.1-pro-preview');
         expect(key).not.toContain(`:${PROMPT_TEMPLATE_VERSION}`);
     });
 });
@@ -280,12 +286,12 @@ describe('buildFinancialsCacheKey', () => {
     it('includes schema version, symbol, period, model, prompt version, and fingerprint', () => {
         const k = buildFinancialsCacheKey(
             'AAPL',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             'annual',
             'sk1'
         );
         expect(k).toContain(
-            ':analysis:financials:AAPL:annual:gemini-2.5-flash:'
+            ':analysis:financials:AAPL:annual:gemini-3.6-flash:'
         );
         expect(k.endsWith(':sk1')).toBe(true);
     });
@@ -293,7 +299,7 @@ describe('buildFinancialsCacheKey', () => {
         expect(
             buildFinancialsCacheKey(
                 'AAPL',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 'annual'
             ).endsWith(':sk1')
         ).toBe(false);
@@ -301,12 +307,12 @@ describe('buildFinancialsCacheKey', () => {
     it('annual and quarter produce different keys for the same symbol and model', () => {
         const annualKey = buildFinancialsCacheKey(
             'AAPL',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             'annual'
         );
         const quarterKey = buildFinancialsCacheKey(
             'AAPL',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             'quarter'
         );
         expect(annualKey).not.toBe(quarterKey);
@@ -320,15 +326,15 @@ describe('buildFinancialsCacheKey', () => {
 
 describe('buildCongressTrendCacheKey', () => {
     it('skillFingerprint 미제공 시 base key', () => {
-        expect(buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash')).toBe(
-            `v1:analysis:congress:AAPL:gemini-2.5-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}`
+        expect(buildCongressTrendCacheKey('AAPL', 'gemini-3.6-flash')).toBe(
+            `v1:analysis:congress:AAPL:gemini-3.6-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}`
         );
     });
     it('skillFingerprint 제공 시 suffix 추가', () => {
         expect(
-            buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash', 'sk1')
+            buildCongressTrendCacheKey('AAPL', 'gemini-3.6-flash', 'sk1')
         ).toBe(
-            `v1:analysis:congress:AAPL:gemini-2.5-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}:sk1`
+            `v1:analysis:congress:AAPL:gemini-3.6-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}:sk1`
         );
     });
 });
@@ -361,11 +367,11 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
         expect(
             buildMarketNewsDigestCacheKey(
                 'crypto',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 'abc123'
             )
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-2.5-flash:${NEWS_PROMPT_TEMPLATE_VERSION}:abc123`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-3.6-flash:${NEWS_PROMPT_TEMPLATE_VERSION}:abc123`
         );
     });
 
@@ -376,18 +382,18 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
         // 이 옵션이 생기기 전에 쓰인 엔트리가 계속 히트하게 하기 위함이다.
         const omitted = buildMarketNewsDigestCacheKey(
             'crypto',
-            'deepseek-v4-flash',
+            'deepseek-v4.1-flash',
             'abc123'
         );
         const off = buildMarketNewsDigestCacheKey(
             'crypto',
-            'deepseek-v4-flash',
+            'deepseek-v4.1-flash',
             'abc123',
             false
         );
         const on = buildMarketNewsDigestCacheKey(
             'crypto',
-            'deepseek-v4-flash',
+            'deepseek-v4.1-flash',
             'abc123',
             true
         );
@@ -400,11 +406,11 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
 
 describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-toggle spec Part A)', () => {
     it('buildAnalysisCacheKey: reasoning=true는 :reason=on suffix를 추가한다', () => {
-        const off = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash');
+        const off = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash');
         const on = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             true
         );
@@ -416,13 +422,13 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
         const legacy = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
         expect(
             buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 false
             )
@@ -431,7 +437,7 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
             buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 undefined
             )
@@ -442,35 +448,48 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
         const key = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             'sk1',
             true
         );
         expect(key).toBe(
-            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:sk1:reason=on`
+            `analysis:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}:sk1:reason=on`
         );
     });
 
     it('buildFundamentalCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
-        const legacy = buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro');
+        const legacy = buildFundamentalCacheKey(
+            'AAPL',
+            'gemini-3.1-pro-preview'
+        );
         expect(
-            buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', undefined, false)
+            buildFundamentalCacheKey(
+                'AAPL',
+                'gemini-3.1-pro-preview',
+                undefined,
+                false
+            )
         ).toBe(legacy);
         expect(
-            buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro', undefined, true)
+            buildFundamentalCacheKey(
+                'AAPL',
+                'gemini-3.1-pro-preview',
+                undefined,
+                true
+            )
         ).toBe(`${legacy}:reason=on`);
     });
 
     it('buildFinancialsCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
         const legacy = buildFinancialsCacheKey(
             'AAPL',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             'annual'
         );
         expect(
             buildFinancialsCacheKey(
                 'AAPL',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 'annual',
                 undefined,
                 false
@@ -479,7 +498,7 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
         expect(
             buildFinancialsCacheKey(
                 'AAPL',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 'annual',
                 undefined,
                 true
@@ -488,11 +507,11 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
     });
 
     it('buildCongressTrendCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
-        const legacy = buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash');
+        const legacy = buildCongressTrendCacheKey('AAPL', 'gemini-3.6-flash');
         expect(
             buildCongressTrendCacheKey(
                 'AAPL',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 false
             )
@@ -500,7 +519,7 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
         expect(
             buildCongressTrendCacheKey(
                 'AAPL',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 true
             )
@@ -508,27 +527,43 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
     });
 
     it('buildNewsCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
-        const legacy = buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2');
-        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2', false)).toBe(
-            legacy
+        const legacy = buildNewsCacheKey(
+            'AAPL',
+            'gemini-3.1-pro-preview',
+            'h2'
         );
-        expect(buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2', true)).toBe(
-            `${legacy}:reason=on`
-        );
+        expect(
+            buildNewsCacheKey('AAPL', 'gemini-3.1-pro-preview', 'h2', false)
+        ).toBe(legacy);
+        expect(
+            buildNewsCacheKey('AAPL', 'gemini-3.1-pro-preview', 'h2', true)
+        ).toBe(`${legacy}:reason=on`);
     });
 
     it('buildOverallCacheKey: on/off 키가 다르고, off는 기존 키와 동일하다', () => {
         const legacy = buildOverallCacheKey(
             'AAPL',
             '5Min',
-            'gemini-2.5-pro',
+            'gemini-3.1-pro-preview',
             'h3'
         );
         expect(
-            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3', false)
+            buildOverallCacheKey(
+                'AAPL',
+                '5Min',
+                'gemini-3.1-pro-preview',
+                'h3',
+                false
+            )
         ).toBe(legacy);
         expect(
-            buildOverallCacheKey('AAPL', '5Min', 'gemini-2.5-pro', 'h3', true)
+            buildOverallCacheKey(
+                'AAPL',
+                '5Min',
+                'gemini-3.1-pro-preview',
+                'h3',
+                true
+            )
         ).toBe(`${legacy}:reason=on`);
     });
 
@@ -536,13 +571,23 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
         const legacy = buildOverallPeekCacheKey(
             'AAPL',
             '5Min',
-            'gemini-2.5-pro'
+            'gemini-3.1-pro-preview'
         );
         expect(
-            buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-2.5-pro', false)
+            buildOverallPeekCacheKey(
+                'AAPL',
+                '5Min',
+                'gemini-3.1-pro-preview',
+                false
+            )
         ).toBe(legacy);
         expect(
-            buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-2.5-pro', true)
+            buildOverallPeekCacheKey(
+                'AAPL',
+                '5Min',
+                'gemini-3.1-pro-preview',
+                true
+            )
         ).toBe(`${legacy}:reason=on`);
     });
 
@@ -579,16 +624,16 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         const legacy = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
         expect(legacy).toBe(
-            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
+            `analysis:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}`
         );
         expect(
             buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 undefined,
                 undefined
@@ -600,7 +645,7 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         const legacy = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
         const buckets: PositionBucket[] = [
             'deep-profit',
@@ -613,7 +658,7 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
             buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 undefined,
                 bucket
@@ -630,13 +675,13 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         const key = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             'sk1',
             true,
             'profit'
         );
         expect(key).toBe(
-            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:sk1:reason=on:pos=profit`
+            `analysis:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}:sk1:reason=on:pos=profit`
         );
     });
 
@@ -644,13 +689,13 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         const key = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             undefined,
             'deep-loss'
         );
         expect(key).toBe(
-            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:pos=deep-loss`
+            `analysis:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}:pos=deep-loss`
         );
     });
 
@@ -692,12 +737,12 @@ describe('locale이 캐시 키에 반영될 때', () => {
         const omitted = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
         const ko = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             undefined,
             undefined,
@@ -712,12 +757,12 @@ describe('locale이 캐시 키에 반영될 때', () => {
             const base = buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash'
+                'gemini-3.6-flash'
             );
             const localized = buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 undefined,
                 undefined,
@@ -733,7 +778,7 @@ describe('locale이 캐시 키에 반영될 때', () => {
             buildAnalysisCacheKey(
                 'AAPL',
                 '1Day',
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 undefined,
                 undefined,
                 undefined,
@@ -748,7 +793,7 @@ describe('locale이 캐시 키에 반영될 때', () => {
         const both = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             true,
             undefined,
@@ -960,12 +1005,12 @@ describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-cont
         const legacy = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
         const omitted = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             undefined,
             undefined,
@@ -979,7 +1024,7 @@ describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-cont
         const base = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             true,
             'profit',
@@ -988,7 +1033,7 @@ describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-cont
         const historied = buildAnalysisCacheKey(
             'AAPL',
             '1Day',
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             true,
             'profit',

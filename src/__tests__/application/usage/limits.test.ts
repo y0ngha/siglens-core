@@ -15,9 +15,9 @@ const restrictedConfig: TierConfig = {
     timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
     infoDepth: { free: ['summary'], member: ['summary'], pro: ['summary'] },
     models: {
-        free: ['gemini-2.5-flash'],
-        member: ['gemini-2.5-flash'],
-        pro: ['gemini-2.5-flash'],
+        free: ['gemini-3.6-flash'],
+        member: ['gemini-3.6-flash'],
+        pro: ['gemini-3.6-flash'],
     },
     featureFlags: { enableTierRestrictions: true },
 };

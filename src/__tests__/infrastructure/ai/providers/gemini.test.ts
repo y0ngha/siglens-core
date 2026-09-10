@@ -14,11 +14,19 @@ vi.mock('@google/genai', () => ({
             generateContent: mockGenerateContent,
         },
     })),
+    // The adapter maps domain thinking levels through this enum, so the mock
+    // must carry it — a bare function mock makes the import undefined at runtime.
+    ThinkingLevel: {
+        MINIMAL: 'MINIMAL',
+        LOW: 'LOW',
+        MEDIUM: 'MEDIUM',
+        HIGH: 'HIGH',
+    },
 }));
 
 const mockedGoogleGenAI = vi.mocked(GoogleGenAI);
 
-const MODEL: GeminiModelId = 'gemini-2.5-flash-lite';
+const MODEL: GeminiModelId = 'gemini-3.5-flash-lite';
 
 const SUCCESS = {
     candidates: [{ finishReason: 'STOP' }],

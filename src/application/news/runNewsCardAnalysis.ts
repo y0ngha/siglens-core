@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
+import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import type {
     RunNewsCardAnalysisResult,
     SubmitNewsCardAnalysisOptions,
@@ -28,13 +28,14 @@ import { analysisSeed } from '@/infrastructure/hash/analysisInput';
  * 강제하므로 필드 계약이 프롬프트+normalize에만 실려 있던 DeepSeek 경로보다
  * 오히려 안전하다.
  *
- * ⚠️ 아래 `reasoning: false`는 Gemini 분기에서 `thinkingBudget: 0`으로
- * 번역된다(`callAnalysisAi`). 리터럴 0을 400으로 거부하는 Gemini 모델이
- * 있으므로(`gemini-3.1-pro-preview`·`gemini-3.5-flash-lite`·`gemini-3.6-flash`
- * — 2026-07-31 라이브 실측) 이 상수를 바꿀 때는 대상 모델이 0을 받는지
- * 먼저 확인할 것. 세대(2.5 vs 3.x)로 갈리지 않는다.
+ * ⚠️ 아래 `reasoning: false`는 스펙의 `reasoning.off` 설정으로 해석된다.
+ * Gemini 모델 대부분은 추론을 **완전히 끄지 못한다** — 2026-09-06 라이브 실측
+ * 기준 `gemini-3.5-flash-lite`와 `gemini-3.6-flash`만 `thinkingLevel:'minimal'`
+ * 에서 사고 토큰 0이고, `3.7-flash`·`3.8-flash`·`3.1-pro-preview`는 `low`가
+ * 바닥이며 그마저 계속 생각한다. 이 상수를 바꿀 때는 대상 모델의
+ * `supportsHardOff`를 확인할 것. 세대 번호로 갈리지 않는다.
  */
-export const NEWS_CARD_MODEL_ID = GEMINI_2_5_FLASH_LITE_MODEL;
+export const NEWS_CARD_MODEL_ID = GEMINI_FLASH_LITE_MODEL;
 
 /**
  * Run a per-card news analysis end-to-end: build prompt → LLM call →

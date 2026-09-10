@@ -20,7 +20,7 @@ vi.mock('@/infrastructure/ai/retry/withRetry', () => ({
 const mockCallChatGPT = vi.mocked(callChatGPT);
 const mockWithRetry = vi.mocked(withRetry);
 
-const MODEL: ChatGPTModelId = 'gpt-5-mini';
+const MODEL: ChatGPTModelId = 'gpt-5.6-luna';
 
 describe('callChatGPTWithRetry', () => {
     beforeEach(() => {

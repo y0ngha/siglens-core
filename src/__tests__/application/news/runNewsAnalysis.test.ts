@@ -29,7 +29,7 @@ const mockCacheProvider = {
     delete: vi.fn(),
 };
 
-const mockModelId: TierModel = 'gemini-2.5-flash';
+const mockModelId: TierModel = 'gemini-3.6-flash';
 
 function makeEnrichedNewsItem(id: string): EnrichedNewsItem {
     return {

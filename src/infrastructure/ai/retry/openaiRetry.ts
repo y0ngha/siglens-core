@@ -1,4 +1,4 @@
-import type { EffortLevel } from '@/domain/types';
+import type { ChatGptReasoningConfig } from '@/domain/types';
 import { callChatGPT } from '@/infrastructure/ai/providers/openai';
 import type { ChatGPTModelId } from '@/domain/analysis/modelSpecs';
 import {
@@ -11,8 +11,8 @@ export interface ChatGPTWithRetryOptions {
     maxAttempts?: number;
     signal?: AbortSignal;
     abortIfCumulativeDelayReachesMs?: number;
-    /** Reasoning toggle override (spec §A.2) — forwarded to `callChatGPT`. */
-    effort?: EffortLevel;
+    /** 추론 설정 오버라이드. 미지정 시 모델 스펙의 기본 상태가 적용된다. */
+    reasoning?: ChatGptReasoningConfig;
     system?: string;
     responseSchema?: unknown;
     jobId?: string;
@@ -33,7 +33,7 @@ export async function callChatGPTWithRetry(
         maxAttempts = AI_RETRY_MAX_ATTEMPTS,
         signal,
         abortIfCumulativeDelayReachesMs,
-        effort,
+        reasoning,
         system,
         responseSchema,
         jobId,
@@ -43,7 +43,7 @@ export async function callChatGPTWithRetry(
             callChatGPT(prompt, {
                 model,
                 apiKey,
-                effort,
+                reasoning,
                 signal,
                 system,
                 responseSchema,

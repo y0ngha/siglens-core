@@ -1,4 +1,5 @@
 import type {
+    ModelAccess,
     Tier,
     TierConfig,
     TierInfoDepth,
@@ -39,40 +40,65 @@ const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
     'confidence',
 ];
 const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [...PRO_INFO_DEPTH];
-const FREE_MODELS: readonly TierModel[] = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'claude-haiku-4-5',
-    'gpt-5-mini',
-    'deepseek-v4-flash',
-    'deepseek-v4-pro',
-];
-// 프리미엄(= free 목록 밖) 모델은 pro가 아닌 등급에서 BYOK 키가 있어야 호출된다
-// (`isPremiumModel` → siglens `resolveTierAndByok`).
+// 아래 세 목록은 **서로소**다. 누적(`[...FREE_MODELS, ...]`) 방식이 아니므로
+// 한 모델은 정확히 한 목록에만 존재하며, `getModelAccess`가 단일 값을 돌려줄 수
+// 있다. 등급별 **허용 목록**(누적)이 필요한 `TIER_CONFIG.models`는 이 셋에서
+// 파생한다.
 //
-// free 목록은 "siglens가 서버 키로 요금을 대납하는 모델"이지 "싼 모델"이 아니다.
-// 그래서 신규 세대는 저비용 라인(예: gemini-3.5-flash-lite)이라도 free에 넣지 않고
-// member 이상 + 사용자 키로만 연다 — 대납 범위를 세대 단위로 고정해 두어야
-// 모델이 늘어날 때마다 서버 비용이 따라 늘지 않는다. free 승격은 비용 실측 후
-// 별도 결정 사항이다.
-const MEMBER_MODELS: readonly TierModel[] = [
-    ...FREE_MODELS,
-    'gemini-2.5-pro',
-    'gemini-3-flash-preview',
+// 배치 기준은 출력 단가다. Free ≤ $5 < Member ≤ $12 < Byok ≥ $20으로 구간이
+// 겹치지 않는다. provider 내부 순위가 아니라 절대 단가로 자르는 이유는, provider마다
+// 가격 스케일이 달라 상대 순위로 나누면 싼 모델이 상위 등급에 올라가는 역전이
+// 생기기 때문이다.
+
+/** 서버 키로 대납하며 비회원도 호출할 수 있는 모델. */
+const FREE_MODELS: readonly TierModel[] = [
+    'gpt-5.6-luna',
     'gemini-3.5-flash-lite',
+    'deepseek-v4.1-flash',
     'gemini-3.6-flash',
-    'claude-sonnet-4-6',
-    'claude-sonnet-5',
-    'gpt-5.4',
-    'gpt-5.6-terra',
+    'claude-haiku-4-5',
 ];
-const PRO_MODELS: readonly TierModel[] = [
-    ...MEMBER_MODELS,
+
+/**
+ * 서버 키로 대납하되 로그인을 요구하는 모델. BYOK 키는 필요 없다.
+ *
+ * ⚠️ 일일 분석 한도(`TIER_CONFIG.limits.analysisPerDay`)가 `Infinity`이므로
+ * 이 목록의 모델은 회원당 무제한으로 대납된다. 목록을 넓힐 때는 한도 도입 여부를
+ * 함께 검토할 것.
+ */
+const MEMBER_MODELS: readonly TierModel[] = [
+    'gemini-3.7-flash',
+    'gemini-3.8-flash',
+    'deepseek-v4.1-pro',
+    'claude-sonnet-5',
+    'gpt-5.6-terra',
     'gemini-3.1-pro-preview',
-    'claude-opus-4-7',
-    'claude-opus-5',
-    'gpt-5.5',
+];
+
+/**
+ * 사용자 BYOK 키로만 호출되는 모델 (`requiresByokKey` → siglens
+ * `resolveTierAndByok`).
+ *
+ * pro 티어는 이 목록도 서버 키로 대납한다 — 즉 Byok 목록은 "pro 라이선스가
+ * 열리면 pro에게 제공될 모델"과 같은 집합이다. pro 라이선스를 운영하지 않는
+ * 현재는 BYOK 키가 유일한 경로다.
+ */
+const BYOK_MODELS: readonly TierModel[] = [
     'gpt-5.6-sol',
+    'claude-opus-4-8',
+    'claude-opus-5',
+    'claude-fable-5-1',
+    'gpt-6-astra',
+];
+
+/** 등급별 누적 허용 목록 — 상위 등급은 하위 등급 모델을 모두 포함한다. */
+const MEMBER_ALLOWED_MODELS: readonly TierModel[] = [
+    ...FREE_MODELS,
+    ...MEMBER_MODELS,
+];
+const PRO_ALLOWED_MODELS: readonly TierModel[] = [
+    ...MEMBER_ALLOWED_MODELS,
+    ...BYOK_MODELS,
 ];
 
 /** Default tier assigned to unauthenticated or newly-created users. */
@@ -112,8 +138,8 @@ export const TIER_CONFIG = {
     },
     models: {
         free: FREE_MODELS,
-        member: MEMBER_MODELS,
-        pro: PRO_MODELS,
+        member: MEMBER_ALLOWED_MODELS,
+        pro: PRO_ALLOWED_MODELS,
     },
     featureFlags: {
         enableTierRestrictions: false,
@@ -165,7 +191,7 @@ function resolveAllowedModels(
 ): readonly TierModel[] {
     return config.featureFlags.enableTierRestrictions
         ? config.models[tier]
-        : PRO_MODELS;
+        : PRO_ALLOWED_MODELS;
 }
 
 /**
@@ -324,14 +350,69 @@ export function isTier(value: string): value is Tier {
 }
 
 /**
+ * Classify a model by how it is paid for and who may reach it.
+ *
+ * This is the single access axis. It replaces the previous binary
+ * free/premium split, which could not express "member pays nothing but must
+ * be logged in".
+ *
+ * | 결과 | 접근 | 비용 |
+ * |---|---|---|
+ * | `'free'` | 비회원 포함 누구나 | 서버 키 |
+ * | `'member'` | 로그인 필요 | 서버 키 |
+ * | `'byok'` | 로그인 + 해당 provider 키 (pro면 키 면제) | 사용자 키 |
+ *
+ * Derived from `config.models`, whose three lists are cumulative — a member
+ * may use every free model, and pro every member model. The exclusive class
+ * is therefore the *narrowest* list containing the model.
+ *
+ * Like {@link isModelAllowed}'s counterpart classifiers, this intentionally
+ * **ignores** `config.featureFlags.enableTierRestrictions`: it describes the
+ * model's intrinsic class, not an access decision, so it must answer the same
+ * way regardless of restriction mode.
+ *
+ * @param model - The AI model identifier to classify.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns The model's access class.
+ * @throws {Error} When `model` appears in none of the three lists — a model
+ *   that exists in `MODEL_SPECS` but was never placed in `domain/tier.ts`.
+ *   The compiler cannot catch that omission, so it is surfaced loudly here
+ *   rather than silently defaulting to the most permissive class.
+ */
+export function getModelAccess(
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): ModelAccess {
+    // The lists are typed as `readonly TierModel[]` (string-literal unions).
+    // Widening to `readonly string[]` lets `.includes(model: ModelId)` accept a
+    // non-literal argument. Read-only views — never mutated through these bindings.
+    if ((config.models.free as readonly string[]).includes(model)) {
+        return 'free';
+    }
+    if ((config.models.member as readonly string[]).includes(model)) {
+        return 'member';
+    }
+    if ((config.models.pro as readonly string[]).includes(model)) {
+        return 'byok';
+    }
+    throw new Error(
+        `getModelAccess: model "${model}" is not present in any tier model list. ` +
+            'Add it to FREE_MODELS, MEMBER_MODELS, or BYOK_MODELS in domain/tier.ts.'
+    );
+}
+
+/**
  * Return whether a model is considered premium (not in the free-tier list).
  *
  * Unlike {@link isModelAllowed}, this function intentionally **ignores**
  * `config.featureFlags.enableTierRestrictions`. It is a classifier of the
- * model's intrinsic class (free vs premium), not an access decision — so
- * it must return the same result regardless of restriction mode. Callers
- * use this to decide whether BYOK is required, which is independent of
- * whether tier restrictions are toggled on.
+ * model's intrinsic class, not an access decision — so it must return the
+ * same result regardless of restriction mode.
+ *
+ * ⚠️ "Premium" means "not free"; it covers **both** member and byok models and
+ * therefore no longer implies a BYOK key is required. Use
+ * {@link requiresByokKey} for that question, or {@link getModelAccess} when
+ * you need the exact class.
  *
  * @param model - The AI model identifier to check.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
@@ -341,12 +422,7 @@ export function isPremiumModel(
     model: ModelId,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    // `config.models.free` is typed as `readonly TierModel[]` (string-literal union).
-    // Widening to `readonly string[]` lets `.includes(model: ModelId)` accept a non-literal
-    // argument; same pattern as `isKnownModelId` in submitAnalysisAction. Read-only view —
-    // we never mutate through this binding.
-    const freeModels = config.models.free as readonly string[];
-    return !freeModels.includes(model);
+    return getModelAccess(model, config) !== 'free';
 }
 
 /**
@@ -371,10 +447,15 @@ export function isFreeModel(
 /**
  * Return whether a request requires a BYOK API key.
  *
- * BYOK is required when a non-pro tier user requests a premium model.
- * Pro tier and free models bypass BYOK (server pays).
+ * BYOK is required only for `'byok'`-class models on a non-pro tier. Free and
+ * member models are covered by the server key, and pro tier bypasses BYOK
+ * entirely.
  *
- * Like {@link isPremiumModel}, this function intentionally **ignores**
+ * ⚠️ This narrowed with the three-way access axis. It previously returned
+ * `true` for every non-free model, which meant a member had to supply a key
+ * for models the server now pays for.
+ *
+ * Like {@link getModelAccess}, this intentionally **ignores**
  * `config.featureFlags.enableTierRestrictions` — BYOK classification is
  * independent of whether tier restrictions are enabled.
  *
@@ -390,5 +471,23 @@ export function requiresByokKey(
     model: ModelId,
     config: TierConfig = TIER_CONFIG
 ): boolean {
-    return tier !== 'pro' && isPremiumModel(model, config);
+    return tier !== 'pro' && getModelAccess(model, config) === 'byok';
+}
+
+/**
+ * Return whether a model requires the caller to be signed in.
+ *
+ * True for both `'member'` and `'byok'` models — the difference between them
+ * is who pays, not whether authentication is needed. Consumers use this to
+ * decide between an auth gate and a BYOK gate.
+ *
+ * @param model - The AI model identifier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns `true` when anonymous callers must be blocked.
+ */
+export function requiresAuth(
+    model: ModelId,
+    config: TierConfig = TIER_CONFIG
+): boolean {
+    return getModelAccess(model, config) !== 'free';
 }

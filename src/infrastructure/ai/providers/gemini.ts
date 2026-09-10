@@ -1,16 +1,32 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import type { GeminiModelId } from '@/domain/analysis/modelSpecs';
+import type { GeminiModelSpec, GeminiThinkingLevel } from '@/domain/types';
+import { resolveReasoningConfig } from '@/domain/types';
 import { extractGeminiUsage, logUsage } from '@/infrastructure/ai/usage';
 
 /**
  * MAX_TOKENS 에러 식별 코드.
- * thinkingBudget을 줄여 재시도해야 함을 호출 측에 알린다.
+ * thinkingLevel을 한 단계 낮춰 재시도해야 함을 호출 측에 알린다.
  */
 export const MAX_TOKENS_CODE = 'GEMINI_MAX_TOKENS';
 
 const GEMINI_TIMEOUT_MS = 3600_000;
+
+/**
+ * Domain thinking levels → the SDK's `ThinkingLevel` enum.
+ *
+ * The wire format is case-insensitive (the API echoes an unsupported level
+ * back uppercased in its 400 message), but the SDK types the field as this
+ * enum, so map at the boundary rather than casting.
+ */
+const THINKING_LEVEL_TO_SDK: Record<GeminiThinkingLevel, ThinkingLevel> = {
+    minimal: ThinkingLevel.MINIMAL,
+    low: ThinkingLevel.LOW,
+    medium: ThinkingLevel.MEDIUM,
+    high: ThinkingLevel.HIGH,
+};
 
 const clientCache = new Map<string, GoogleGenAI>();
 
@@ -28,8 +44,15 @@ export interface GeminiCallOptions {
     model: GeminiModelId;
     /** 호출에 사용할 API key. */
     apiKey: string;
-    thinking?: boolean;
-    thinkingBudget?: number;
+    /**
+     * Thinking level override. When omitted, the model spec's own default
+     * state (`reasoning.default`) is resolved and applied.
+     *
+     * Always sent to the API — unlike the previous `thinkingBudget` path,
+     * which only attached `thinkingConfig` when thinking was explicitly on and
+     * therefore let the model's natural default through on every other call.
+     */
+    thinkingLevel?: GeminiThinkingLevel;
     /**
      * core가 디스패치하는 deterministic seed.
      * 지정 시 `config.seed`로 전달해 동일 입력에 대한 재현성을 높인다. 미지정 시 seed 미설정(기존 동작).
@@ -59,14 +82,17 @@ export async function callGemini(
     // caching (2.5+) keys on an identical byte-for-byte prefix formed by
     // `system` (persona + folded skill digest, design C) + this `prompt`.
     const client = getClient(apiKey);
-    const spec = MODEL_SPECS[model] as
-        | (typeof MODEL_SPECS)[typeof model]
-        | undefined;
+    // Widened to the interface (not the literal row type) so
+    // `resolveReasoningConfig` infers its config type from both toggle states.
+    const spec = MODEL_SPECS[model] as GeminiModelSpec | undefined;
     if (!spec) {
         throw new Error(`[Gemini] Unknown model: ${model}`);
     }
     const maxOutputTokens = spec.maxOutputTokens;
-    const defaultBudget = spec.thinkingBudget;
+    // Resolve the spec's own default when the caller expressed no preference.
+    const thinkingLevel =
+        options.thinkingLevel ??
+        resolveReasoningConfig(spec.reasoning, undefined).level;
 
     const controller = new AbortController();
     // .unref()로 timer가 event loop를 점유하지 않게 하여 정상 종료를 막지 않도록 한다.
@@ -96,16 +122,19 @@ export async function callGemini(
                 ...(options.responseSchema !== undefined && {
                     responseJsonSchema: options.responseSchema,
                 }),
-                ...(options.thinking === true && {
-                    thinkingConfig: {
-                        // -1(무제한)은 output token budget을 thinking이 전부 소모하여
-                        // MAX_TOKENS + 빈 텍스트 응답을 유발한다.
-                        // 호출 측에서 모델별 상한을 주입한다.
-                        // flash-lite: 24576 / flash, pro: 32768
-                        thinkingBudget: options.thinkingBudget ?? defaultBudget,
-                        includeThoughts: false,
-                    },
-                }),
+                // thinkingConfig는 **항상** 보낸다. 생략하면 모델의 자연
+                // 기본값이 적용되는데, 그 값은 대체로 추론 ON이다(실측
+                // 2026-09-06: `gemini-3.6-flash` 미지정 시 418 사고 토큰).
+                // Free·Member 모델의 기본 OFF를 보장하려면 매 호출 명시해야 한다.
+                //
+                // 숫자 `thinkingBudget`은 쓰지 않는다 — 3세대 모델은 이를
+                // 거부하거나(`gemini-3.1-pro-preview`, `3.5-flash-lite`,
+                // `3.6-flash`가 0에 400) 에러 없이 무시한다(`3.7-flash`,
+                // `3.8-flash`). 조용한 무시가 특히 위험해서 level로 전환했다.
+                thinkingConfig: {
+                    thinkingLevel: THINKING_LEVEL_TO_SDK[thinkingLevel],
+                    includeThoughts: false,
+                },
             },
         });
 
@@ -156,8 +185,8 @@ export async function callGemini(
         }
 
         if (finishReason === 'MAX_TOKENS') {
-            // 출력 토큰 한도 초과 — 같은 thinkingBudget으로 재시도해도 동일하게 실패한다.
-            // non-retryable로 던져 호출 측에서 thinkingBudget을 줄여 재시도하도록 한다.
+            // 출력 토큰 한도 초과 — 같은 thinkingLevel로 재시도해도 동일하게 실패한다.
+            // non-retryable로 던져 호출 측에서 level을 한 단계 낮춰 재시도하도록 한다.
             console.warn('[Gemini] MAX_TOKENS: output truncated', {
                 model,
                 finishReason,

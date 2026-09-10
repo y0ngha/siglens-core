@@ -12,7 +12,7 @@ import { callDeepSeekWithRetry } from '@/infrastructure/ai/retry/deepseekRetry';
 import { callGeminiWithRetry } from '@/infrastructure/ai/retry/geminiRetry';
 
 const OK = 'briefing text';
-const FALLBACK = 'deepseek-v4-flash';
+const FALLBACK = 'deepseek-v4.1-flash';
 
 beforeEach(() => {
     vi.mocked(callGeminiWithRetry).mockResolvedValue(OK);
@@ -30,13 +30,13 @@ describe('callBriefingAi', () => {
     it('gemini 요청은 gemini 어댑터로 라우팅한다', async () => {
         await callBriefingAi({
             prompt: 'p',
-            requestedModel: 'gemini-2.5-flash',
+            requestedModel: 'gemini-3.6-flash',
             fallbackModel: FALLBACK,
         });
         expect(callGeminiWithRetry).toHaveBeenCalledTimes(1);
         expect(callDeepSeekWithRetry).not.toHaveBeenCalled();
         expect(vi.mocked(callGeminiWithRetry).mock.calls[0][1]).toBe(
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
     });
 
@@ -50,7 +50,7 @@ describe('callBriefingAi', () => {
     it('브리핑 불가 모델(claude)은 fallback으로 degrade된다', async () => {
         await callBriefingAi({
             prompt: 'p',
-            requestedModel: 'claude-opus-4-7',
+            requestedModel: 'claude-opus-5',
             fallbackModel: FALLBACK,
         });
         expect(vi.mocked(callDeepSeekWithRetry).mock.calls[0][1]).toBe(
@@ -61,10 +61,10 @@ describe('callBriefingAi', () => {
     it('항상 서버 키를 쓴다 (BYOK 개념 없음)', async () => {
         await callBriefingAi({
             prompt: 'p',
-            requestedModel: 'gemini-2.5-pro',
+            requestedModel: 'gemini-3.1-pro-preview',
             fallbackModel: FALLBACK,
         });
-        // gemini-2.5-pro는 premium 모델이지만 브리핑은 tier와 무관하게 서버 키를 쓴다.
+        // gemini-3.1-pro-preview는 premium 모델이지만 브리핑은 tier와 무관하게 서버 키를 쓴다.
         expect(vi.mocked(callGeminiWithRetry).mock.calls[0][2]).toBe(
             'server-gemini'
         );

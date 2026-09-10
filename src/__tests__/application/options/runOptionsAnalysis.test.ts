@@ -21,7 +21,7 @@ const mockCacheProvider = {
     delete: vi.fn(),
 };
 
-const mockModelId: TierModel = 'gemini-2.5-flash';
+const mockModelId: TierModel = 'gemini-3.6-flash';
 
 /** Minimal valid OptionsSnapshot with 1 chain and 2 strikes each side. */
 function makeSnapshot(overrides?: Partial<OptionsSnapshot>): OptionsSnapshot {

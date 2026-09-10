@@ -256,7 +256,7 @@ describe('logUsage', () => {
 
         logUsage({
             jobId: 'job-1',
-            model: 'claude-opus-4-7',
+            model: 'claude-opus-5',
             promptTokens: 100,
             cachedTokens: 80,
             cacheWriteTokens: 40,
@@ -268,7 +268,7 @@ describe('logUsage', () => {
             '[Usage]',
             JSON.stringify({
                 jobId: 'job-1',
-                model: 'claude-opus-4-7',
+                model: 'claude-opus-5',
                 promptTokens: 100,
                 cachedTokens: 80,
                 cacheWriteTokens: 40,

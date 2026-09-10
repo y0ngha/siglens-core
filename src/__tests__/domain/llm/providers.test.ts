@@ -4,20 +4,20 @@ import type { ModelId } from '@/domain/types';
 
 describe('getProviderForModel', () => {
     describe('active models resolved via MODEL_SPECS', () => {
-        it('returns google for gemini-2.5-flash', () => {
-            expect(getProviderForModel('gemini-2.5-flash')).toBe('google');
+        it('returns google for gemini-3.6-flash', () => {
+            expect(getProviderForModel('gemini-3.6-flash')).toBe('google');
         });
 
         it('returns anthropic for claude-haiku-4-5', () => {
             expect(getProviderForModel('claude-haiku-4-5')).toBe('anthropic');
         });
 
-        it('returns openai for gpt-5-mini', () => {
-            expect(getProviderForModel('gpt-5-mini')).toBe('openai');
+        it('returns openai for gpt-5.6-luna', () => {
+            expect(getProviderForModel('gpt-5.6-luna')).toBe('openai');
         });
 
         it('returns deepseek for deepseek-v4-flash', () => {
-            expect(getProviderForModel('deepseek-v4-flash')).toBe('deepseek');
+            expect(getProviderForModel('deepseek-v4.1-flash')).toBe('deepseek');
         });
     });
 

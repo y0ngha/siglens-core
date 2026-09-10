@@ -31,7 +31,7 @@ const mockCacheProvider = {
 };
 
 const mockSymbol = 'AAPL';
-const mockModelId: TierModel = 'gemini-2.5-flash';
+const mockModelId: TierModel = 'gemini-3.6-flash';
 
 const mockRawResult = {
     overallConclusionKo: '재무 상태 양호.',

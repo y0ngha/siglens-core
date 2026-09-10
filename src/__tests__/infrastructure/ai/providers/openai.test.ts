@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { callChatGPT } from '@/infrastructure/ai/providers/openai';
 import type { ChatGPTModelId } from '@/domain/analysis/modelSpecs';
 
@@ -17,7 +16,7 @@ vi.mock('openai', () => ({
 
 const mockedOpenAI = vi.mocked(OpenAI);
 
-const MODEL: ChatGPTModelId = 'gpt-5.5';
+const MODEL: ChatGPTModelId = 'gpt-5.6-sol';
 
 const SUCCESS = {
     status: 'completed',
@@ -47,7 +46,7 @@ describe('callChatGPT', () => {
         await callChatGPT('prompt', { model: MODEL, apiKey: 'key' });
 
         const call = mockCreate.mock.calls[0][0];
-        expect(call.model).toBe('gpt-5.5');
+        expect(call.model).toBe('gpt-5.6-sol');
         expect(call.input).toBe('prompt');
         expect(call.instructions).toBeDefined();
         expect(call).not.toHaveProperty('temperature');
@@ -95,19 +94,20 @@ describe('callChatGPT', () => {
 
         await callChatGPT('prompt', { model: MODEL, apiKey: 'key' });
 
-        // gpt-5.5 spec.effort = 'high' → reasoning: { effort: 'high' }으로 전달
+        // gpt-5.6-sol spec.effort = 'high' → reasoning: { effort: 'high' }으로 전달
         expect(mockCreate.mock.calls[0][0].reasoning).toEqual({
             effort: 'high',
         });
     });
 
-    it('passes reasoning effort medium for gpt-5-mini', async () => {
+    it("passes the spec's default effort for gpt-5.6-luna", async () => {
         mockCreate.mockResolvedValueOnce({ ...SUCCESS, output_text: 'ok' });
 
-        await callChatGPT('prompt', { model: 'gpt-5-mini', apiKey: 'key' });
+        await callChatGPT('prompt', { model: 'gpt-5.6-luna', apiKey: 'key' });
 
+        // Free-class model → `reasoning.default: 'off'` → `effort: 'none'`.
         expect(mockCreate.mock.calls[0][0].reasoning).toEqual({
-            effort: 'medium',
+            effort: 'none',
         });
     });
 
@@ -117,9 +117,9 @@ describe('callChatGPT', () => {
             mockCreate.mockResolvedValueOnce(SUCCESS);
 
             await callChatGPT('prompt', {
-                model: MODEL, // gpt-5.5 spec.effort = 'high'
+                model: MODEL, // gpt-5.6-sol spec.effort = 'high'
                 apiKey: 'key',
-                effort: 'low',
+                reasoning: { effort: 'low' },
             });
 
             expect(mockCreate.mock.calls[0][0].reasoning).toEqual({
@@ -138,38 +138,6 @@ describe('callChatGPT', () => {
             expect(mockCreate.mock.calls[0][0].reasoning).toEqual({
                 effort: 'high',
             });
-        });
-
-        // Guards against a future non-reasoning GPT model (no `effort` in its
-        // MODEL_SPECS entry): the override must NOT be applied, matching how
-        // claude.ts's `adaptiveThinking = spec.effort !== undefined` guard
-        // prevents thinking config from being sent to non-reasoning specs.
-        it('does not apply the effort override when spec.effort is undefined (non-reasoning model)', async () => {
-            const FAKE_NON_REASONING_MODEL = 'gpt-fake-non-reasoning';
-            const specs = MODEL_SPECS as Record<string, unknown>;
-            specs[FAKE_NON_REASONING_MODEL] = {
-                provider: 'chatgpt',
-                apiModelId: 'gpt-fake-non-reasoning',
-                maxOutputTokens: 4096,
-                temperature: 0.7,
-                // no `effort` field — mirrors a temperature-based, non-reasoning spec.
-            };
-
-            try {
-                mockCreate.mockResolvedValueOnce(SUCCESS);
-
-                await callChatGPT('prompt', {
-                    model: FAKE_NON_REASONING_MODEL as ChatGPTModelId,
-                    apiKey: 'key',
-                    effort: 'low',
-                });
-
-                const call = mockCreate.mock.calls[0][0];
-                expect(call).not.toHaveProperty('reasoning');
-                expect(call.temperature).toBe(0.7);
-            } finally {
-                delete specs[FAKE_NON_REASONING_MODEL];
-            }
         });
     });
 

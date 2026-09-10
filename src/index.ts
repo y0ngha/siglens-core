@@ -70,10 +70,9 @@ export type { BackgroundTaskOptions } from './application/types';
 
 // Chat
 export {
-    DEEPSEEK_V4_FLASH_MODEL,
-    DEEPSEEK_V4_PRO_MODEL,
-    GEMINI_2_5_FLASH_LITE_MODEL,
-    GEMINI_2_5_FLASH_MODEL,
+    DEEPSEEK_V4_1_FLASH_MODEL,
+    DEEPSEEK_V4_1_PRO_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 export { requestChatCompletion } from './application/chat/requestChatCompletion';
@@ -177,14 +176,14 @@ export { normalizeIndicatorTranslation } from './domain/economy/normalizeIndicat
 
 // Model spec helpers
 export {
-    GEMINI_MODELS_SUPPORTING_DISABLED_THINKING,
     getProvider,
-    getThinkingBudgetSequence,
+    getThinkingLevelSequence,
     isChatGPTModel,
     isClaudeModel,
     isDeepSeekModel,
     isGeminiModel,
-    supportsDisabledThinking,
+    isReasoningToggleable,
+    supportsHardOff,
 } from './domain/analysis/modelSpecs';
 
 // Candle patterns (used by UI for rendering and by prompt builders)
@@ -252,6 +251,7 @@ export { getProviderForModel } from './domain/llm/providers';
 export {
     getAllowedModels,
     getAllowedTimeframes,
+    getModelAccess,
     getTierLimit,
     isAllowed,
     isInfoDepthAllowed,
@@ -260,6 +260,7 @@ export {
     isPremiumModel,
     isTier,
     isTimeframeAllowed,
+    requiresAuth,
     requiresByokKey,
 } from './domain/tier';
 
@@ -401,7 +402,6 @@ export {
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {
-    DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
     type ChatGPTModelId,
     type ClaudeModelId,
@@ -412,18 +412,29 @@ export type {
     ActiveModelId,
     AIProvider,
     ChatGPTModelSpec,
-    ClaudeReasoningModelSpec,
-    ClaudeSamplingModelSpec,
+    ChatGptEffortLevel,
+    ChatGptReasoningConfig,
+    ClaudeAdaptiveModelSpec,
+    ClaudeAdaptiveReasoningConfig,
+    ClaudeBudgetModelSpec,
+    ClaudeBudgetReasoningConfig,
+    ClaudeEffortLevel,
+    ClaudeModelSpec,
     DeepSeekModelSpec,
+    DeepSeekReasoningConfig,
     EffortLevel,
     GeminiModelSpec,
+    GeminiReasoningConfig,
+    GeminiThinkingLevel,
     ModelSpec,
+    ReasoningModes,
 } from './domain/types';
 export {
-    isClaudeReasoningModelSpec,
-    isClaudeSamplingModelSpec,
-    isReasoningModelSpec,
-    isSamplingModelSpec,
+    isClaudeAdaptiveModelSpec,
+    isClaudeBudgetModelSpec,
+    isClaudeModelSpec,
+    isTemperatureModelSpec,
+    resolveReasoningConfig,
 } from './domain/types';
 
 // Dashboard tickers / sectors
@@ -828,6 +839,7 @@ export type {
     StrategyResult,
     SubmitBriefingResult,
     SupertrendResult,
+    ModelAccess,
     Tier,
     TierConfig,
     TierFeatureFlags,

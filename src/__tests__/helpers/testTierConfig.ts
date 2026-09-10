@@ -10,10 +10,13 @@ import type { TierConfig } from '@/domain/types';
  */
 export const TEST_TIER_CONFIG: TierConfig = {
     ...TIER_CONFIG,
+    // 세 목록은 누적이다 — 어떤 등급에서 처음 등장하는지가 곧 접근 등급이다.
+    // `gemini-3.1-pro-preview`가 pro에만 있으므로 byok 등급이 되고, 그래야
+    // 비-pro 호출이 BYOK 게이트에 걸린다.
     models: {
-        free: ['gemini-2.5-flash'],
-        member: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-        pro: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+        free: ['gemini-3.6-flash'],
+        member: ['gemini-3.6-flash'],
+        pro: ['gemini-3.6-flash', 'gemini-3.1-pro-preview'],
     },
     featureFlags: { enableTierRestrictions: false },
 };

@@ -20,8 +20,10 @@ vi.mock('openai', () => ({
 
 const mockedOpenAI = vi.mocked(OpenAI);
 
-const FLASH_MODEL: DeepSeekModelId = 'deepseek-v4-flash'; // thinking: false
-const PRO_MODEL: DeepSeekModelId = 'deepseek-v4-pro'; // thinking: true
+/** Free class — `reasoning.default: 'off'`. */
+const FLASH_MODEL: DeepSeekModelId = 'deepseek-v4.1-flash';
+/** Member class — also `reasoning.default: 'off'`; thinking is opt-in. */
+const PRO_MODEL: DeepSeekModelId = 'deepseek-v4.1-pro';
 
 // DeepSeek is called in STREAMING mode, so the SDK's `create` resolves to an
 // async iterable of chat-completion chunks. These helpers build fresh streams
@@ -137,7 +139,10 @@ describe('callDeepSeek', () => {
         await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
 
         const call = mockCreate.mock.calls[0][0];
-        expect(call.model).toBe('deepseek-v4-flash');
+        // The wire id is `spec.apiModelId`, not our registry key — DeepSeek
+        // returns 400 for `deepseek-v4.1-flash`, which is a version label
+        // rather than an API id.
+        expect(call.model).toBe('deepseek-flash');
         expect(call.messages).toEqual([
             { role: 'system', content: AI_SYSTEM_PROMPT },
             { role: 'user', content: 'prompt' },
@@ -180,10 +185,14 @@ describe('callDeepSeek', () => {
         ]);
     });
 
-    it('enables thinking with reasoning_effort=high for a thinking model and omits temperature', async () => {
+    it('enables thinking with reasoning_effort=high and omits temperature when reasoning is on', async () => {
         mockCreate.mockResolvedValueOnce(successStream());
 
-        await callDeepSeek('prompt', { model: PRO_MODEL, apiKey: 'key' });
+        await callDeepSeek('prompt', {
+            model: PRO_MODEL,
+            apiKey: 'key',
+            reasoning: { thinking: true },
+        });
 
         const call = mockCreate.mock.calls[0][0];
         expect(call.thinking).toEqual({
@@ -193,7 +202,7 @@ describe('callDeepSeek', () => {
         expect(call).not.toHaveProperty('temperature');
     });
 
-    it('disables thinking for a non-thinking model and applies temperature', async () => {
+    it('disables thinking and applies temperature when reasoning is off', async () => {
         mockCreate.mockResolvedValueOnce(successStream());
 
         await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
@@ -203,15 +212,15 @@ describe('callDeepSeek', () => {
         expect(call.temperature).toBe(0);
     });
 
-    // Reasoning toggle (spec §A.2): options.thinking overrides spec.thinking.
-    describe('thinking override (reasoning toggle)', () => {
-        it('thinking:true forces thinking enabled even for a spec-thinking:false model', async () => {
+    // The toggle picks between the spec's two states; omitting it uses `default`.
+    describe('reasoning override', () => {
+        it('reasoning.thinking=true enables thinking on the flash line too', async () => {
             mockCreate.mockResolvedValueOnce(successStream());
 
             await callDeepSeek('prompt', {
-                model: FLASH_MODEL, // spec.thinking: false
+                model: FLASH_MODEL, // spec.reasoning: { thinking: false }
                 apiKey: 'key',
-                thinking: true,
+                reasoning: { thinking: true },
             });
 
             const call = mockCreate.mock.calls[0][0];
@@ -222,13 +231,13 @@ describe('callDeepSeek', () => {
             expect(call).not.toHaveProperty('temperature');
         });
 
-        it('thinking:false disables thinking even for a spec-thinking:true model', async () => {
+        it('reasoning.thinking=false disables thinking on the pro line', async () => {
             mockCreate.mockResolvedValueOnce(successStream());
 
             await callDeepSeek('prompt', {
-                model: PRO_MODEL, // spec.thinking: true
+                model: PRO_MODEL, // spec.reasoning: { thinking: true }
                 apiKey: 'key',
-                thinking: false,
+                reasoning: { thinking: false },
             });
 
             const call = mockCreate.mock.calls[0][0];
@@ -236,20 +245,20 @@ describe('callDeepSeek', () => {
             expect(call.temperature).toBe(0);
         });
 
-        it('omitted thinking falls back to spec.thinking (true model)', async () => {
+        it("omitted reasoning falls back to the spec's default state (pro model)", async () => {
             mockCreate.mockResolvedValueOnce(successStream());
 
             await callDeepSeek('prompt', { model: PRO_MODEL, apiKey: 'key' });
 
+            // Member-class model → `reasoning.default: 'off'`. The pro line is
+            // a thinking model, but the server pays for it, so thinking is
+            // opt-in rather than automatic.
             const call = mockCreate.mock.calls[0][0];
-            expect(call.thinking).toEqual({
-                type: 'enabled',
-                reasoning_effort: 'high',
-            });
-            expect(call).not.toHaveProperty('temperature');
+            expect(call.thinking).toEqual({ type: 'disabled' });
+            expect(call.temperature).toBe(0);
         });
 
-        it('omitted thinking falls back to spec.thinking (false model)', async () => {
+        it("omitted reasoning falls back to the spec's default state (flash model)", async () => {
             mockCreate.mockResolvedValueOnce(successStream());
 
             await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });

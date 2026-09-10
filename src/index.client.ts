@@ -35,10 +35,9 @@ export {
     type AnalysisLocale,
 } from './domain/analysis/outputLocale';
 export {
-    DEEPSEEK_V4_FLASH_MODEL,
-    DEEPSEEK_V4_PRO_MODEL,
-    GEMINI_2_5_FLASH_MODEL,
-    GEMINI_2_5_FLASH_LITE_MODEL,
+    DEEPSEEK_V4_1_FLASH_MODEL,
+    DEEPSEEK_V4_1_PRO_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
     VALID_CHAT_MODELS,
 } from './application/chat/constants';
 
@@ -51,6 +50,7 @@ export {
     TIER_CONFIG,
     getAllowedModels,
     getAllowedTimeframes,
+    getModelAccess,
     getTierLimit,
     isAllowed,
     isFreeModel,
@@ -59,6 +59,7 @@ export {
     isPremiumModel,
     isTier,
     isTimeframeAllowed,
+    requiresAuth,
     requiresByokKey,
 } from './domain/tier';
 
@@ -197,14 +198,14 @@ export type {
 
 // Model spec helpers
 export {
-    GEMINI_MODELS_SUPPORTING_DISABLED_THINKING,
     getProvider,
-    getThinkingBudgetSequence,
+    getThinkingLevelSequence,
     isChatGPTModel,
     isClaudeModel,
     isDeepSeekModel,
     isGeminiModel,
-    supportsDisabledThinking,
+    isReasoningToggleable,
+    supportsHardOff,
 } from './domain/analysis/modelSpecs';
 
 // Candle patterns
@@ -289,7 +290,6 @@ export {
 
 // Model specs (single source of truth for AI SDK call parameters)
 export {
-    DISABLED_THINKING_BUDGET,
     MODEL_SPECS,
     type ChatGPTModelId,
     type ClaudeModelId,
@@ -300,18 +300,29 @@ export type {
     ActiveModelId,
     AIProvider,
     ChatGPTModelSpec,
-    ClaudeReasoningModelSpec,
-    ClaudeSamplingModelSpec,
+    ChatGptEffortLevel,
+    ChatGptReasoningConfig,
+    ClaudeAdaptiveModelSpec,
+    ClaudeAdaptiveReasoningConfig,
+    ClaudeBudgetModelSpec,
+    ClaudeBudgetReasoningConfig,
+    ClaudeEffortLevel,
+    ClaudeModelSpec,
     DeepSeekModelSpec,
+    DeepSeekReasoningConfig,
     EffortLevel,
     GeminiModelSpec,
+    GeminiReasoningConfig,
+    GeminiThinkingLevel,
     ModelSpec,
+    ReasoningModes,
 } from './domain/types';
 export {
-    isClaudeReasoningModelSpec,
-    isClaudeSamplingModelSpec,
-    isReasoningModelSpec,
-    isSamplingModelSpec,
+    isClaudeAdaptiveModelSpec,
+    isClaudeBudgetModelSpec,
+    isClaudeModelSpec,
+    isTemperatureModelSpec,
+    resolveReasoningConfig,
 } from './domain/types';
 
 // Indicator constants
@@ -435,6 +446,7 @@ export type {
     OverallScenarioName,
     PriceTargetAvg,
     Timeframe,
+    ModelAccess,
     Tier,
     TierConfig,
     TierFeatureFlags,

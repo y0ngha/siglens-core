@@ -8,10 +8,7 @@ import { runEconomicEventAnalysis } from '@/application/economy/runEconomicEvent
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { ECONOMIC_EVENT_CACHE_TTL } from '@/infrastructure/cache/config';
-import {
-    MODEL_SPECS,
-    supportsDisabledThinking,
-} from '@/domain/analysis/modelSpecs';
+import { MODEL_SPECS, supportsHardOff } from '@/domain/analysis/modelSpecs';
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
 import type { ActiveModelId } from '@/domain/types';
 
@@ -106,7 +103,7 @@ describe('runEconomicEventAnalysis', () => {
             expect(MODEL_SPECS[model].provider).toBe('gemini');
             // reasoning:false는 Gemini 분기에서 thinkingBudget 0이 된다 —
             // 리터럴 0을 400으로 거부하는 모델로 상수가 바뀌면 전 호출이 죽는다.
-            expect(supportsDisabledThinking(model)).toBe(true);
+            expect(supportsHardOff(model)).toBe(true);
         });
 
         it('결과를 ECONOMIC_EVENT_CACHE_TTL로 캐시에 기록한다', async () => {

@@ -22,7 +22,7 @@ const mockCacheProvider = {
 const SYMBOL = 'AAPL';
 const COMPANY = 'Apple Inc.';
 const TIMEFRAME: Timeframe = '1Day';
-const MODEL: ModelId = 'gemini-2.5-flash';
+const MODEL: ModelId = 'gemini-3.6-flash';
 
 /** A well-formed cached overall analysis payload (object, as stored in Redis). */
 const cachedOverall = {

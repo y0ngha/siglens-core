@@ -1,7 +1,8 @@
-import {
-    callClaude,
-    type EffortLevel,
-} from '@/infrastructure/ai/providers/anthropic';
+import { callClaude } from '@/infrastructure/ai/providers/anthropic';
+import type {
+    ClaudeAdaptiveReasoningConfig,
+    ClaudeBudgetReasoningConfig,
+} from '@/domain/types';
 import type { ClaudeModelId } from '@/domain/analysis/modelSpecs';
 import {
     AI_RETRY_DELAY_MS,
@@ -13,7 +14,8 @@ export interface ClaudeWithRetryOptions {
     maxAttempts?: number;
     signal?: AbortSignal;
     abortIfCumulativeDelayReachesMs?: number;
-    effort?: EffortLevel;
+    /** 추론 설정 오버라이드. 미지정 시 모델 스펙의 기본 상태가 적용된다. */
+    reasoning?: ClaudeAdaptiveReasoningConfig | ClaudeBudgetReasoningConfig;
     system?: string;
     responseSchema?: unknown;
     jobId?: string;
@@ -34,7 +36,7 @@ export async function callClaudeWithRetry(
         maxAttempts = AI_RETRY_MAX_ATTEMPTS,
         signal,
         abortIfCumulativeDelayReachesMs,
-        effort,
+        reasoning,
         system,
         responseSchema,
         jobId,
@@ -44,7 +46,7 @@ export async function callClaudeWithRetry(
             callClaude(prompt, {
                 model,
                 apiKey,
-                effort,
+                reasoning,
                 signal,
                 system,
                 responseSchema,

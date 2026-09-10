@@ -14,10 +14,9 @@ vi.mock('@/infrastructure/ai/retry/deepseekRetry', () => ({
 }));
 
 import {
-    _resetDisabledThinkingWarningsForTest,
+    _resetPartialHardOffWarningsForTest,
     callAnalysisAi,
 } from '@/application/analysis/callAnalysisAi';
-import { DISABLED_THINKING_BUDGET } from '@/domain/analysis/modelSpecs';
 import { callClaudeWithRetry } from '@/infrastructure/ai/retry/anthropicRetry';
 import { callDeepSeekWithRetry } from '@/infrastructure/ai/retry/deepseekRetry';
 import { callGeminiWithRetry } from '@/infrastructure/ai/retry/geminiRetry';
@@ -26,17 +25,43 @@ import { callChatGPTWithRetry } from '@/infrastructure/ai/retry/openaiRetry';
 const OK = '{"ok":true}';
 
 /** free 모델(서버 키 경로) — tier와 무관하게 서버 키를 쓴다. */
-const GEMINI_FREE = 'gemini-2.5-flash';
+const GEMINI_FREE = 'gemini-3.6-flash';
 /**
- * Gemini 모델이지만 `thinkingBudget: 0`을 400으로 거부한다
- * (`GEMINI_MODELS_SUPPORTING_DISABLED_THINKING` 밖 — 2026-07-31 라이브 실측).
- * premium이라 pro tier로 호출해야 서버 키 경로를 탄다.
+ * 추론을 완전히 끌 수 있는 Gemini 모델 — `reasoning.off`가 `'minimal'`이고
+ * 실측 사고 토큰이 0이다(2026-09-06).
  */
-const GEMINI_THINKING_ONLY = 'gemini-3.6-flash';
-const DEEPSEEK_FREE = 'deepseek-v4-flash';
+const GEMINI_HARD_OFF = 'gemini-3.6-flash';
+/**
+ * 추론을 완전히 끄지 못하는 Gemini 모델 — `'minimal'`을 400으로 거부해
+ * `reasoning.off`가 `'low'`이고, 그 상태에서도 사고 토큰을 소비한다
+ * (`hardOff: false`, 2026-09-06 실측).
+ */
+const GEMINI_PARTIAL_OFF = 'gemini-3.1-pro-preview';
+const DEEPSEEK_FREE = 'deepseek-v4.1-flash';
 /** premium 모델 — non-pro tier에서는 BYOK가 필요하다. */
-const CLAUDE_PREMIUM = 'claude-opus-4-7';
-const GPT_PREMIUM = 'gpt-5.5';
+const CLAUDE_PREMIUM = 'claude-opus-5';
+const GPT_PREMIUM = 'gpt-5.6-sol';
+
+function deepseekOptions(): Record<string, unknown> {
+    return vi.mocked(callDeepSeekWithRetry).mock.calls[0][3] as Record<
+        string,
+        unknown
+    >;
+}
+
+function claudeOptions(): Record<string, unknown> {
+    return vi.mocked(callClaudeWithRetry).mock.calls[0][3] as Record<
+        string,
+        unknown
+    >;
+}
+
+function chatgptOptions(): Record<string, unknown> {
+    return vi.mocked(callChatGPTWithRetry).mock.calls[0][3] as Record<
+        string,
+        unknown
+    >;
+}
 
 function geminiOptions(): Record<string, unknown> {
     return vi.mocked(callGeminiWithRetry).mock.calls[0][3] as Record<
@@ -62,6 +87,20 @@ afterEach(() => {
 });
 
 describe('callAnalysisAi — 키 라우팅', () => {
+    it('member 등급 모델은 사용자 키 없이 서버 키로 호출된다', async () => {
+        // 회귀 가드: 3분류 도입 전 `shouldUseServerKey`는 `isFreeModel` 기반이라
+        // member 등급 모델에서 false를 반환했고, 서버가 대납하는 모델인데도
+        // "User API key required"로 죽었다.
+        await expect(
+            callAnalysisAi({
+                prompt: 'p',
+                model: 'claude-sonnet-5',
+                tier: 'member',
+            })
+        ).resolves.toBeDefined();
+        expect(callClaudeWithRetry).toHaveBeenCalled();
+    });
+
     it('free 모델은 tier와 무관하게 서버 키를 쓴다', async () => {
         await callAnalysisAi({ prompt: 'p', model: GEMINI_FREE, tier: 'free' });
         expect(vi.mocked(callGeminiWithRetry).mock.calls[0][2]).toBe(
@@ -104,52 +143,47 @@ describe('callAnalysisAi — 키 라우팅', () => {
     });
 });
 
-describe('callAnalysisAi — reasoning 번역', () => {
-    it('reasoning=false는 gemini thinkingBudget을 0으로 강제한다', async () => {
+describe('callAnalysisAi — reasoning 해석', () => {
+    it('reasoning=false는 gemini를 스펙의 off level로 내린다', async () => {
         await callAnalysisAi({
             prompt: 'p',
-            model: GEMINI_FREE,
+            model: GEMINI_HARD_OFF,
             reasoning: false,
-            // 호출자가 준 budget보다 OFF가 우선해야 한다.
-            thinkingBudget: 8192,
         });
-        expect(geminiOptions().budgetRef).toEqual({
-            current: DISABLED_THINKING_BUDGET,
-        });
+        expect(geminiOptions().levelRef).toEqual({ current: 'minimal' });
     });
 
-    it('리터럴 0을 거부하는 Gemini 모델에서는 reasoning=false를 무시하고 스펙 기본으로 폴백한다', async () => {
-        // gemini-3.6-flash는 thinkingBudget 0을 400("This model only works in
-        // thinking mode")으로 거부한다. 0을 그대로 보내면 요청 자체가 죽으므로
-        // 스펙 기본으로 떨어뜨린다 — 사용자가 모델과 추론 토글을 모두 고르는
-        // 경로(옵션·펀더멘털·재무)에서 실제로 열리는 분기다.
+    it('완전히 끄지 못하는 모델은 off level까지만 내리고 경고한다', async () => {
+        // gemini-3.1-pro-preview는 'minimal'을 400으로 거부한다. 요청을 죽이는 대신
+        // 그 모델이 받는 최저 level('low')로 내리고, 사용자가 "껐다"고 오해하지
+        // 않도록 한 번 경고한다.
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        _resetDisabledThinkingWarningsForTest();
+        _resetPartialHardOffWarningsForTest();
 
         await callAnalysisAi({
             prompt: 'p',
-            model: GEMINI_THINKING_ONLY,
+            model: GEMINI_PARTIAL_OFF,
             tier: 'pro',
             reasoning: false,
         });
 
-        expect(geminiOptions().budgetRef).toBeUndefined();
+        expect(geminiOptions().levelRef).toEqual({ current: 'low' });
         expect(warnSpy).toHaveBeenCalledWith(
-            expect.stringContaining(GEMINI_THINKING_ONLY)
+            expect.stringContaining(GEMINI_PARTIAL_OFF)
         );
 
         warnSpy.mockRestore();
     });
 
-    it('폴백 경고는 같은 모델에 대해 1회만 로깅한다', async () => {
+    it('경고는 같은 모델에 대해 1회만 로깅한다', async () => {
         // 뉴스카드 25건처럼 같은 모델로 배치 호출할 때 경고가 도배되지 않아야 한다.
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        _resetDisabledThinkingWarningsForTest();
+        _resetPartialHardOffWarningsForTest();
 
         for (let i = 0; i < 3; i += 1) {
             await callAnalysisAi({
                 prompt: 'p',
-                model: GEMINI_THINKING_ONLY,
+                model: GEMINI_PARTIAL_OFF,
                 tier: 'pro',
                 reasoning: false,
             });
@@ -160,89 +194,58 @@ describe('callAnalysisAi — reasoning 번역', () => {
         warnSpy.mockRestore();
     });
 
-    it('리터럴 0을 거부하는 모델이어도 호출자 thinkingBudget은 그대로 전달된다', async () => {
-        _resetDisabledThinkingWarningsForTest();
+    it('완전히 끌 수 있는 모델에서는 경고하지 않는다', async () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        _resetPartialHardOffWarningsForTest();
 
         await callAnalysisAi({
             prompt: 'p',
-            model: GEMINI_THINKING_ONLY,
-            tier: 'pro',
+            model: GEMINI_HARD_OFF,
             reasoning: false,
-            thinkingBudget: 4096,
         });
 
-        expect(geminiOptions().budgetRef).toEqual({ current: 4096 });
+        expect(warnSpy).not.toHaveBeenCalled();
 
         warnSpy.mockRestore();
     });
 
-    it('reasoning=undefined면 gemini에 아무 override도 걸지 않는다', async () => {
-        await callAnalysisAi({ prompt: 'p', model: GEMINI_FREE });
-        expect(geminiOptions().budgetRef).toBeUndefined();
+    it('reasoning=undefined면 스펙의 default 쪽을 쓴다', async () => {
+        // GEMINI_HARD_OFF는 Free 등급이라 `default: 'off'` → 'minimal'.
+        await callAnalysisAi({ prompt: 'p', model: GEMINI_HARD_OFF });
+        expect(geminiOptions().levelRef).toEqual({ current: 'minimal' });
     });
 
-    it('reasoning=undefined여도 호출자 thinkingBudget은 그대로 전달된다', async () => {
+    it('reasoning=true는 gemini를 스펙의 on level로 올린다', async () => {
         await callAnalysisAi({
             prompt: 'p',
-            model: GEMINI_FREE,
-            thinkingBudget: 4096,
-        });
-        expect(geminiOptions().budgetRef).toEqual({ current: 4096 });
-    });
-
-    it('reasoning=true는 gemini에 override를 걸지 않는다 (스펙 강도 유지)', async () => {
-        await callAnalysisAi({
-            prompt: 'p',
-            model: GEMINI_FREE,
+            model: GEMINI_HARD_OFF,
             reasoning: true,
         });
-        expect(geminiOptions().budgetRef).toBeUndefined();
+        expect(geminiOptions().levelRef).toEqual({ current: 'high' });
     });
 
-    it('deepseek은 reasoning 값을 thinking으로 그대로 전달한다', async () => {
+    it('deepseek은 reasoning=true를 thinking:true로 전달한다', async () => {
         await callAnalysisAi({
             prompt: 'p',
             model: DEEPSEEK_FREE,
             reasoning: true,
         });
-        expect(
-            (
-                vi.mocked(callDeepSeekWithRetry).mock.calls[0][3] as Record<
-                    string,
-                    unknown
-                >
-            ).thinking
-        ).toBe(true);
+        expect(deepseekOptions().reasoning).toEqual({ thinking: true });
     });
 
-    it('deepseek reasoning=undefined는 thinking:undefined로 스펙 기본을 유지한다', async () => {
+    it('deepseek reasoning=undefined는 스펙 default(off)를 쓴다', async () => {
         await callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE });
-        expect(
-            (
-                vi.mocked(callDeepSeekWithRetry).mock.calls[0][3] as Record<
-                    string,
-                    unknown
-                >
-            ).thinking
-        ).toBeUndefined();
+        expect(deepseekOptions().reasoning).toEqual({ thinking: false });
     });
 
-    it('reasoning=false는 claude/gpt를 effort:low로 최소화한다', async () => {
+    it('reasoning=false는 claude를 disabled로, gpt를 effort:none으로 내린다', async () => {
         await callAnalysisAi({
             prompt: 'p',
             model: CLAUDE_PREMIUM,
             tier: 'pro',
             reasoning: false,
         });
-        expect(
-            (
-                vi.mocked(callClaudeWithRetry).mock.calls[0][3] as Record<
-                    string,
-                    unknown
-                >
-            ).effort
-        ).toBe('low');
+        expect(claudeOptions().reasoning).toEqual({ mode: 'disabled' });
 
         await callAnalysisAi({
             prompt: 'p',
@@ -250,31 +253,30 @@ describe('callAnalysisAi — reasoning 번역', () => {
             tier: 'pro',
             reasoning: false,
         });
-        expect(
-            (
-                vi.mocked(callChatGPTWithRetry).mock.calls[0][3] as Record<
-                    string,
-                    unknown
-                >
-            ).effort
-        ).toBe('low');
+        expect(chatgptOptions().reasoning).toEqual({ effort: 'none' });
     });
 
-    it('reasoning=true/undefined는 claude/gpt에 effort를 넣지 않는다', async () => {
+    it('reasoning=true는 claude/gpt에서도 스펙 on을 적용한다', async () => {
+        // 회귀 가드: 예전에는 ON 오버라이드가 deepseek 전용이라, 스펙 기본이
+        // OFF가 되면 claude/gpt는 토글을 켜도 아무 일도 일어나지 않았다.
         await callAnalysisAi({
             prompt: 'p',
             model: CLAUDE_PREMIUM,
             tier: 'pro',
             reasoning: true,
         });
-        expect(
-            (
-                vi.mocked(callClaudeWithRetry).mock.calls[0][3] as Record<
-                    string,
-                    unknown
-                >
-            ).effort
-        ).toBeUndefined();
+        expect(claudeOptions().reasoning).toEqual({
+            mode: 'adaptive',
+            effort: 'high',
+        });
+
+        await callAnalysisAi({
+            prompt: 'p',
+            model: GPT_PREMIUM,
+            tier: 'pro',
+            reasoning: true,
+        });
+        expect(chatgptOptions().reasoning).toEqual({ effort: 'high' });
     });
 });
 

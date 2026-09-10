@@ -1,4 +1,9 @@
-import type { ActiveModelId, AIProvider, ModelSpec } from '@/domain/types';
+import type {
+    ActiveModelId,
+    AIProvider,
+    GeminiThinkingLevel,
+    ModelSpec,
+} from '@/domain/types';
 
 /**
  * Default sampling temperature applied to models whose provider APIs accept it.
@@ -20,206 +25,320 @@ const DEFAULT_TEMPERATURE = 0 as const;
  * 1. The `TierModel` union (`domain/types.ts`) — omitting it makes the
  *    `satisfies` clause below fail to compile.
  * 2. A row in this map — omitting it also fails the `satisfies` clause above.
- * 3. The tier placement in `TIER_CONFIG.models` (`domain/tier.ts`) — **this is
- *    the one site the compiler does not catch.** Omitting it produces a
- *    model that `getAllowedModels` never returns, so no tier can select it
- *    (the coverage assertion in `tier.test.ts` guards this).
+ * 3. The access placement in `FREE_MODELS` / `MEMBER_MODELS` / `BYOK_MODELS`
+ *    (`domain/tier.ts`) — **this is the one site the compiler does not catch.**
+ *    Omitting it makes `getModelAccess` throw and `getAllowedModels` never
+ *    return the model (the coverage assertion in `tier.test.ts` guards this).
  *
  * After that, a core publish is required; consumers pick it up on a version
  * bump.
  *
- * Notes:
- * - Claude haiku: no thinking support (`thinkingBudget: 0`), uses temperature.
- * - Claude sonnet/opus: adaptive thinking via `effort`; no `budget_tokens`/temperature.
- * - Gemini: uses `thinkingBudget` as-is.
- * - GPT-5 series: maps `effort` to the Responses API `reasoning.effort`; does not accept temperature.
- * - DeepSeek V4: toggles reasoning with a boolean `thinking`; uses temperature only when non-thinking.
+ * ## The `reasoning` field
+ *
+ * Every spec carries both toggle states (`off` / `on`) and which one applies
+ * when the caller expresses no preference (`default`). Free- and member-tier
+ * models default to `off` so server-key spend stays predictable; BYOK models
+ * keep their provider default.
+ *
+ * Two optional flags record what a model genuinely cannot do:
+ * - `hardOff: false` — `off` is only the lowest strength the model accepts;
+ *   it still spends thinking tokens.
+ * - `toggleable: false` — `off` and `on` are identical, so the toggle cannot
+ *   change the request and consumer UIs must disable it.
+ *
+ * Per-provider mapping:
+ * - Claude `thinkingApi: 'budget'` (haiku): numeric `budget_tokens`; `0` disables.
+ * - Claude `thinkingApi: 'adaptive'` (sonnet/opus/fable): `thinking.type` plus
+ *   `output_config.effort`; no sampling temperature.
+ * - Gemini: `thinkingConfig.thinkingLevel` string. The numeric `thinkingBudget`
+ *   is NOT used — generation-3 models either reject it or ignore it silently.
+ * - ChatGPT: `reasoning.effort` on the Responses API; no temperature.
+ * - DeepSeek: boolean `thinking`; temperature applies only when thinking is off.
  */
 export const MODEL_SPECS = {
-    'claude-haiku-4-5': {
-        provider: 'claude',
-        apiModelId: 'claude-haiku-4-5-20251001',
-        maxOutputTokens: 64_000,
-        thinkingBudget: 0,
-        temperature: DEFAULT_TEMPERATURE,
-    },
-    'claude-sonnet-4-6': {
-        provider: 'claude',
-        apiModelId: 'claude-sonnet-4-6',
-        maxOutputTokens: 64_000,
-        effort: 'high',
-    },
-    'claude-opus-4-7': {
-        provider: 'claude',
-        apiModelId: 'claude-opus-4-7',
+    // ---------------------------------------------------------------- free
+    'gpt-5.6-luna': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-5.6-luna',
         maxOutputTokens: 128_000,
-        effort: 'high',
+        reasoning: {
+            off: { effort: 'none' },
+            on: { effort: 'high' },
+            default: 'off',
+        },
     },
-    // The Claude 5 generation's `claude-sonnet-5` / `claude-opus-5` ids are
-    // themselves the complete model id Anthropic documents — appending a
-    // dated snapshot suffix 404s (unlike older models such as
-    // `claude-haiku-4-5-20251001`, which do have dated ids). The "no alias"
-    // rule in the GPT-5.6 comment below targets routing aliases that resolve
-    // to one of several models (`gpt-5.6` → sol); these ids are not that.
-    'claude-sonnet-5': {
-        provider: 'claude',
-        apiModelId: 'claude-sonnet-5',
-        // Sonnet 5 has adaptive thinking on by default, and thinking tokens
-        // share the max_tokens budget. Reusing Sonnet 4.6's baseline (64K)
-        // risks truncation, so we request the model ceiling (128K) instead.
-        maxOutputTokens: 128_000,
-        effort: 'high',
-    },
-    'claude-opus-5': {
-        provider: 'claude',
-        apiModelId: 'claude-opus-5',
-        maxOutputTokens: 128_000,
-        effort: 'high',
-    },
-    'gemini-2.5-flash': {
-        provider: 'gemini',
-        apiModelId: 'gemini-2.5-flash',
-        maxOutputTokens: 65_536,
-        thinkingBudget: 8_192,
-        temperature: DEFAULT_TEMPERATURE,
-    },
-    'gemini-2.5-flash-lite': {
-        provider: 'gemini',
-        apiModelId: 'gemini-2.5-flash-lite',
-        maxOutputTokens: 65_536,
-        thinkingBudget: 8_192,
-        temperature: DEFAULT_TEMPERATURE,
-    },
-    'gemini-2.5-pro': {
-        provider: 'gemini',
-        apiModelId: 'gemini-2.5-pro',
-        maxOutputTokens: 65_536,
-        thinkingBudget: 32_768,
-        temperature: DEFAULT_TEMPERATURE,
-    },
-    'gemini-3-flash-preview': {
-        provider: 'gemini',
-        apiModelId: 'gemini-3-flash-preview',
-        maxOutputTokens: 65_536,
-        thinkingBudget: 32_768,
-        temperature: DEFAULT_TEMPERATURE,
-    },
-    'gemini-3.1-pro-preview': {
-        provider: 'gemini',
-        apiModelId: 'gemini-3.1-pro-preview',
-        maxOutputTokens: 65_536,
-        thinkingBudget: 32_768,
-        temperature: DEFAULT_TEMPERATURE,
-    },
-    // Gemini thinking budgets split by how a model is used, not by
-    // flash-vs-pro. The 2.5-generation flash/flash-lite models are cheap
-    // helper models, so they get 8K; generation-3+ flash is Gemini's primary
-    // reasoning line (3.6 Flash is the current GA top flash), so it gets the
-    // same 32K as pro.
     'gemini-3.5-flash-lite': {
         provider: 'gemini',
         apiModelId: 'gemini-3.5-flash-lite',
         maxOutputTokens: 65_536,
-        // flash-lite is the high-volume, low-latency line — same 8K budget as 2.5 flash-lite.
-        thinkingBudget: 8_192,
         temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            // Measured 2026-09-06: `minimal` yields thoughtsTokenCount === 0
+            // even on a prompt that demands multi-step reasoning.
+            off: { level: 'minimal' },
+            on: { level: 'high' },
+            default: 'off',
+        },
+    },
+    'deepseek-v4.1-flash': {
+        provider: 'deepseek',
+        // ⚠️ Key and apiModelId differ on purpose. `deepseek-v4.1-*` is a
+        // version designation, NOT an API id — calling it returns 400
+        // ("The supported API model names are deepseek-flash,
+        // deepseek-v4-pro"). The API accepts exactly two ids, and
+        // `deepseek-flash` is the canonical one for this line; the legacy
+        // `deepseek-v4-flash` alias still resolves here but is documented as
+        // retired, so we pin the canonical id. Verified live 2026-09-10.
+        apiModelId: 'deepseek-flash',
+        // DeepSeek V4.1 supports up to 384K (384 * 1024) output tokens.
+        maxOutputTokens: 393_216,
+        temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            off: { thinking: false },
+            on: { thinking: true },
+            default: 'off',
+        },
     },
     'gemini-3.6-flash': {
         provider: 'gemini',
         apiModelId: 'gemini-3.6-flash',
         maxOutputTokens: 65_536,
-        // Generation-3 primary flash line — same 32K budget as gemini-3-flash-preview.
-        thinkingBudget: 32_768,
         temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            // Measured 2026-09-06: `minimal` yields thoughtsTokenCount === 0
+            // (omitting the config entirely yields 418).
+            off: { level: 'minimal' },
+            on: { level: 'high' },
+            default: 'off',
+        },
     },
-    'gpt-5-mini': {
-        provider: 'chatgpt',
-        apiModelId: 'gpt-5-mini',
+    'claude-haiku-4-5': {
+        provider: 'claude',
+        thinkingApi: 'budget',
+        // Older Claude models keep dated snapshot ids; the 4.6 generation
+        // onward uses the dateless id as its own pinned snapshot.
+        apiModelId: 'claude-haiku-4-5-20251001',
+        maxOutputTokens: 64_000,
+        temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            // haiku is the lowest-latency free model and is deliberately kept
+            // thinking-free. Enabling it would need a `budget_tokens >= 1024`
+            // path plus verification that extended thinking tolerates
+            // `temperature: 0` — for no product gain, since a user who wants
+            // reasoning should pick a stronger model. `toggleable: false`
+            // tells consumer UIs to disable the control rather than let a user
+            // flip a switch that changes nothing.
+            off: { budgetTokens: 0 },
+            on: { budgetTokens: 0 },
+            default: 'off',
+            toggleable: false,
+        },
+    },
+
+    // -------------------------------------------------------------- member
+    'gemini-3.7-flash': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.7-flash',
         maxOutputTokens: 65_536,
-        effort: 'medium',
+        temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            // Measured 2026-09-06: rejects `minimal` with a 400 and SILENTLY
+            // IGNORES `thinkingBudget: 0` (176 thought tokens on a hard
+            // prompt). `low` is the floor and still thinks (~158).
+            off: { level: 'low' },
+            on: { level: 'high' },
+            default: 'off',
+            hardOff: false,
+        },
     },
-    'gpt-5.4': {
-        provider: 'chatgpt',
-        apiModelId: 'gpt-5.4',
+    'gemini-3.8-flash': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.8-flash',
+        maxOutputTokens: 65_536,
+        temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            // Measured 2026-09-06: same as 3.7-flash — `minimal` 400s and
+            // `thinkingBudget: 0` is ignored (200 thoughts). Floor `low` (~178).
+            off: { level: 'low' },
+            on: { level: 'high' },
+            default: 'off',
+            hardOff: false,
+        },
+    },
+    'deepseek-v4.1-pro': {
+        provider: 'deepseek',
+        // ⚠️ Key and apiModelId differ — see the flash row. `deepseek-v4-pro`
+        // is the only id the API accepts for this line.
+        //
+        // ⏳ EXPIRES 2026-09-14: from 12:00 Beijing time that day, DeepSeek
+        // routes every `deepseek-v4-pro` request to V4.1 Flash at Flash
+        // pricing "until V4.1 Pro is released". From then until that release
+        // this row is the same underlying model as `deepseek-v4.1-flash`, so
+        // its `reasoning.on` (`thinking: true`) no longer buys a stronger
+        // model — only a thinking-enabled Flash. Revisit the member-tier
+        // placement when V4.1 Pro ships.
+        apiModelId: 'deepseek-v4-pro',
+        // DeepSeek V4.1 supports up to 384K (384 * 1024) output tokens.
+        maxOutputTokens: 393_216,
+        temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            off: { thinking: false },
+            on: { thinking: true },
+            default: 'off',
+        },
+    },
+    'claude-sonnet-5': {
+        provider: 'claude',
+        thinkingApi: 'adaptive',
+        // The Claude 5 generation's ids are themselves the complete model id
+        // Anthropic documents — appending a dated snapshot suffix 404s.
+        apiModelId: 'claude-sonnet-5',
+        // Sonnet 5 has adaptive thinking on by default, and thinking tokens
+        // share the max_tokens budget, so we request the model ceiling.
         maxOutputTokens: 128_000,
-        effort: 'high',
+        reasoning: {
+            off: { mode: 'disabled' },
+            on: { mode: 'adaptive', effort: 'high' },
+            default: 'off',
+        },
     },
-    'gpt-5.5': {
-        provider: 'chatgpt',
-        apiModelId: 'gpt-5.5',
-        maxOutputTokens: 128_000,
-        effort: 'high',
-    },
-    // The GPT-5.6 family pins explicit variant ids instead of the `gpt-5.6`
-    // alias (which routes to sol), because a provider can silently repoint
-    // an alias, and this repo binds analysis cache keys and response
-    // characteristics to the model id.
     'gpt-5.6-terra': {
         provider: 'chatgpt',
+        // The GPT-5.6 family pins explicit variant ids instead of the
+        // `gpt-5.6` alias (which routes to sol), because a provider can
+        // silently repoint an alias, and this repo binds analysis cache keys
+        // and response characteristics to the model id.
         apiModelId: 'gpt-5.6-terra',
         maxOutputTokens: 128_000,
-        effort: 'high',
+        reasoning: {
+            off: { effort: 'none' },
+            on: { effort: 'high' },
+            default: 'off',
+        },
     },
+    'gemini-3.1-pro-preview': {
+        provider: 'gemini',
+        apiModelId: 'gemini-3.1-pro-preview',
+        maxOutputTokens: 65_536,
+        temperature: DEFAULT_TEMPERATURE,
+        reasoning: {
+            // Measured 2026-09-06: rejects both `thinkingBudget: 0`
+            // ("This model only works in thinking mode") and `minimal`.
+            // `low` is the floor and still spends ~400 thought tokens.
+            off: { level: 'low' },
+            on: { level: 'high' },
+            default: 'off',
+            hardOff: false,
+        },
+    },
+
+    // ---------------------------------------------------------------- byok
     'gpt-5.6-sol': {
         provider: 'chatgpt',
         apiModelId: 'gpt-5.6-sol',
         maxOutputTokens: 128_000,
-        effort: 'high',
+        reasoning: {
+            off: { effort: 'none' },
+            on: { effort: 'high' },
+            default: 'on',
+        },
     },
-    'deepseek-v4-flash': {
-        provider: 'deepseek',
-        apiModelId: 'deepseek-v4-flash',
-        // DeepSeek V4 supports up to 384K (384 * 1024) output tokens.
-        maxOutputTokens: 393_216,
-        thinking: false,
-        temperature: DEFAULT_TEMPERATURE,
+    'claude-opus-4-8': {
+        provider: 'claude',
+        thinkingApi: 'adaptive',
+        apiModelId: 'claude-opus-4-8',
+        maxOutputTokens: 128_000,
+        reasoning: {
+            off: { mode: 'disabled' },
+            on: { mode: 'adaptive', effort: 'high' },
+            default: 'on',
+        },
     },
-    'deepseek-v4-pro': {
-        provider: 'deepseek',
-        apiModelId: 'deepseek-v4-pro',
-        // DeepSeek V4 supports up to 384K (384 * 1024) output tokens.
-        maxOutputTokens: 393_216,
-        thinking: true,
-        temperature: DEFAULT_TEMPERATURE,
+    'claude-opus-5': {
+        provider: 'claude',
+        thinkingApi: 'adaptive',
+        apiModelId: 'claude-opus-5',
+        maxOutputTokens: 128_000,
+        reasoning: {
+            // Opus 5 accepts `thinking: {type:'disabled'}` only while effort is
+            // `high` or lower; pairing it with `xhigh`/`max` returns a 400.
+            // Revisit this row if `on.effort` is ever raised past `high`.
+            off: { mode: 'disabled' },
+            on: { mode: 'adaptive', effort: 'high' },
+            default: 'on',
+        },
+    },
+    'claude-fable-5-1': {
+        provider: 'claude',
+        thinkingApi: 'adaptive',
+        apiModelId: 'claude-fable-5-1',
+        maxOutputTokens: 128_000,
+        reasoning: {
+            // Fable thinks unconditionally: both `{type:'disabled'}` and
+            // `{type:'enabled', budget_tokens}` return 400. The lowest reachable
+            // strength is adaptive thinking at `low` effort.
+            off: { mode: 'adaptive', effort: 'low' },
+            on: { mode: 'adaptive', effort: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
+    'gpt-6-astra': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-6-astra',
+        maxOutputTokens: 128_000,
+        reasoning: {
+            // Unlike the 5.6 family, astra returns 400 for `effort: 'none'`.
+            off: { effort: 'low' },
+            on: { effort: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
     },
 } as const satisfies Record<ActiveModelId, ModelSpec>;
 
 /**
+ * Gemini thinking levels ordered weakest to strongest.
+ *
  * @internal
- * Standard thinking-budget fallback steps used when MAX_TOKENS retry occurs.
  */
-export const THINKING_BUDGET_FALLBACK_STEPS = [8192, 4096, 2048] as const;
-
-/** Disabled thinking budget — last step in the fallback sequence. */
-export const DISABLED_THINKING_BUDGET = 0;
+const THINKING_LEVEL_ORDER: readonly GeminiThinkingLevel[] = [
+    'minimal',
+    'low',
+    'medium',
+    'high',
+];
 
 /**
- * Generate the MAX_TOKENS retry sequence for thinking-budget reduction.
+ * Generate the MAX_TOKENS retry sequence for Gemini thinking-level reduction.
  *
- * Sequence: `initial → initial/2 → initial/4 → THINKING_BUDGET_FALLBACK_STEPS → 0`.
- * Two halving steps preserve response quality with as large a budget as
- * possible before falling into the standard candidates. Entries that are
- * greater than or equal to the previous accepted value are skipped, so
- * duplicates and non-decreasing values never appear in the result.
+ * When a Gemini call finishes with `MAX_TOKENS` the thinking budget consumed
+ * the output allowance, so the retry steps thinking down one level at a time.
+ * The sequence starts at `initial` and descends to `floor` inclusive.
  *
- * @param initial - Initial thinking budget (in tokens) to derive the sequence from.
- * @returns Strictly-decreasing sequence of thinking budgets, ending at `0`.
+ * `floor` exists because the weakest level is per-model: `gemini-3.7-flash`,
+ * `gemini-3.8-flash`, and `gemini-3.1-pro-preview` reject `'minimal'` with a
+ * 400, so their floor is `'low'`. Pass `MODEL_SPECS[model].reasoning.off.level`
+ * — the spec already records each model's floor.
+ *
+ * @param initial - Level to start from.
+ * @param floor - Weakest level the model accepts.
+ * @returns Strictly-descending levels from `initial` down to `floor`. Returns
+ *   `[initial]` when `initial` is already at or below `floor`.
  */
-export function getThinkingBudgetSequence(initial: number): readonly number[] {
-    const candidates = [
-        initial,
-        Math.floor(initial / 2),
-        Math.floor(initial / 4),
-        ...THINKING_BUDGET_FALLBACK_STEPS,
-        DISABLED_THINKING_BUDGET,
-    ];
-    const result: number[] = [];
-    for (const budget of candidates) {
-        if (result.length === 0 || budget < result[result.length - 1]) {
-            result.push(budget);
-        }
+export function getThinkingLevelSequence(
+    initial: GeminiThinkingLevel,
+    floor: GeminiThinkingLevel
+): readonly GeminiThinkingLevel[] {
+    const initialIndex = THINKING_LEVEL_ORDER.indexOf(initial);
+    const floorIndex = THINKING_LEVEL_ORDER.indexOf(floor);
+    if (initialIndex <= floorIndex) {
+        return [initial];
     }
-    return result;
+    return THINKING_LEVEL_ORDER.slice(
+        floorIndex,
+        initialIndex + 1
+    ).toReversed();
 }
 
 /**
@@ -231,7 +350,7 @@ export function getThinkingBudgetSequence(initial: number): readonly number[] {
  * `MODEL_SPECS` (e.g. UI labels, model selection screens).
  *
  * For the LLM key-storage / SDK provider taxonomy (`'anthropic' | 'google' |
- * 'openai'`) — including legacy/deprecated model identifiers that are not in
+ * 'openai'`) — including legacy model identifiers that are not in
  * `MODEL_SPECS` — use {@link getProviderForModel} from `domain/llm/providers`
  * instead. The two functions intentionally cover different layers and accept
  * different input domains; neither is a drop-in replacement for the other.
@@ -242,6 +361,44 @@ export function getThinkingBudgetSequence(initial: number): readonly number[] {
  */
 export function getProvider(model: ActiveModelId): AIProvider {
     return MODEL_SPECS[model].provider;
+}
+
+/**
+ * Reports whether the reasoning toggle changes anything for this model.
+ *
+ * Consumer UIs must disable the toggle when this returns `false` — the
+ * model's `off` and `on` configurations are identical, so flipping the control
+ * cannot alter the request. Leaving such a toggle live tells the user
+ * something happened when nothing did.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `false` only for models whose spec sets `toggleable: false`.
+ */
+export function isReasoningToggleable(model: ActiveModelId): boolean {
+    // Widen to `ModelSpec` before reading: `as const satisfies` keeps the
+    // literal shape of each row, so a field only some rows declare is absent
+    // from the inferred union.
+    const spec: ModelSpec = MODEL_SPECS[model];
+    return spec.reasoning.toggleable ?? true;
+}
+
+/**
+ * Reports whether turning reasoning off actually removes it for this model.
+ *
+ * Successor to the removed `supportsDisabledThinking`. That helper asked
+ * "does a literal `thinkingBudget: 0` avoid a 400?", which measured the wrong
+ * thing: `gemini-3.7-flash` and `gemini-3.8-flash` accept the zero without
+ * error and then think anyway, so they passed a check they should have failed.
+ * This helper reads the spec's measured `hardOff` instead, and covers every
+ * provider rather than Gemini alone.
+ *
+ * @param model - Active model identifier to test.
+ * @returns `false` when the model still spends thinking tokens with reasoning off.
+ */
+export function supportsHardOff(model: ActiveModelId): boolean {
+    // See the widening note in `isReasoningToggleable`.
+    const spec: ModelSpec = MODEL_SPECS[model];
+    return spec.reasoning.hardOff ?? true;
 }
 
 /** Active model identifiers hosted on Claude (Anthropic). */
@@ -292,55 +449,6 @@ export function isClaudeModel(model: ActiveModelId): model is ClaudeModelId {
  */
 export function isGeminiModel(model: ActiveModelId): model is GeminiModelId {
     return MODEL_SPECS[model].provider === 'gemini';
-}
-
-/**
- * Gemini models that accept `thinkingBudget: 0` (thinking fully disabled).
- * Live-measured against the Gemini API on 2026-07-31:
- *
- * | model                  | thinkingBudget: 0    | thinkingConfig omitted  |
- * |------------------------|----------------------|-------------------------|
- * | gemini-2.5-flash       | thoughts=0, total=51 | thoughts=245, total=300 |
- * | gemini-2.5-flash-lite  | thoughts=0, total=54 | thoughts=0, total=48    |
- *
- * Separate calls the same day confirmed models that reject a literal 0 with a
- * 400 ("This model only works in thinking mode"): `gemini-3.1-pro-preview`,
- * `gemini-3.5-flash-lite`, `gemini-3.6-flash`. Note that
- * `gemini-3-flash-preview` accepts 0 despite being generation 3 — support does
- * NOT split cleanly by generation (2.5 vs 3.x), so never infer it from the
- * model name or version. `gemini-2.5-pro` was not part of that measurement and
- * is deliberately excluded (treating an unverified model as unsupported is the
- * safe default).
- *
- * ⚠️ Revisit this list whenever a Gemini row is added to {@link MODEL_SPECS}.
- * A new model stays out until it has been measured live.
- *
- * Why this lives in core: `callAnalysisAi` translates `reasoning: false` into
- * `thinkingBudget: 0` on the Gemini branch, so every fixed-model path
- * (`runNewsCardAnalysis`, `runEconomicEventAnalysis`,
- * `runIndicatorTranslation`) and every consumer-side translation path shares
- * the same constraint.
- */
-export const GEMINI_MODELS_SUPPORTING_DISABLED_THINKING: ReadonlySet<GeminiModelId> =
-    new Set<GeminiModelId>([
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-3-flash-preview',
-    ]);
-
-/**
- * Reports whether a model can handle `reasoning: false` (Gemini
- * `thinkingBudget: 0`) without a 400. Providers other than Gemini have no
- * literal-zero constraint, so they always return `true`.
- *
- * @param model - Active model identifier to test.
- * @returns `true` when sending a `reasoning: false` call to this model is safe.
- */
-export function supportsDisabledThinking(model: ActiveModelId): boolean {
-    return (
-        !isGeminiModel(model) ||
-        GEMINI_MODELS_SUPPORTING_DISABLED_THINKING.has(model)
-    );
 }
 
 /**

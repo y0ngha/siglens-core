@@ -5,24 +5,24 @@ import type { ActiveModelId } from '@/domain/types';
 // Configured server-side default — BRIEFING_MODEL_ID switched to
 // deepseek-v4-flash, so this mirrors the deepseek default rather than the
 // previous Gemini-only default.
-const FALLBACK: ActiveModelId = 'deepseek-v4-flash';
+const FALLBACK: ActiveModelId = 'deepseek-v4.1-flash';
 
 describe('resolveBriefingModel', () => {
     it('returns the request-supplied model when it is a valid Gemini model', () => {
-        expect(resolveBriefingModel('gemini-2.5-flash', FALLBACK)).toBe(
-            'gemini-2.5-flash'
+        expect(resolveBriefingModel('gemini-3.6-flash', FALLBACK)).toBe(
+            'gemini-3.6-flash'
         );
-        expect(resolveBriefingModel('gemini-2.5-pro', FALLBACK)).toBe(
-            'gemini-2.5-pro'
+        expect(resolveBriefingModel('gemini-3.1-pro-preview', FALLBACK)).toBe(
+            'gemini-3.1-pro-preview'
         );
     });
 
     it('returns the request-supplied model when it is a valid DeepSeek model', () => {
-        expect(resolveBriefingModel('deepseek-v4-flash', FALLBACK)).toBe(
-            'deepseek-v4-flash'
+        expect(resolveBriefingModel('deepseek-v4.1-flash', FALLBACK)).toBe(
+            'deepseek-v4.1-flash'
         );
-        expect(resolveBriefingModel('deepseek-v4-pro', FALLBACK)).toBe(
-            'deepseek-v4-pro'
+        expect(resolveBriefingModel('deepseek-v4.1-pro', FALLBACK)).toBe(
+            'deepseek-v4.1-pro'
         );
     });
 
@@ -35,10 +35,8 @@ describe('resolveBriefingModel', () => {
         // claude/gpt are real, supported models but callBriefingAi cannot route
         // them, so the resolver degrades to the briefing-capable default instead
         // of returning a model that would later throw in callBriefingAi.
-        expect(resolveBriefingModel('claude-opus-4-7', FALLBACK)).toBe(
-            FALLBACK
-        );
-        expect(resolveBriefingModel('gpt-5.5', FALLBACK)).toBe(FALLBACK);
+        expect(resolveBriefingModel('claude-opus-5', FALLBACK)).toBe(FALLBACK);
+        expect(resolveBriefingModel('gpt-5.6-sol', FALLBACK)).toBe(FALLBACK);
     });
 
     it('falls back to the configured default for an unknown/bogus model string', () => {

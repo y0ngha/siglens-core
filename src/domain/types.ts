@@ -2024,6 +2024,20 @@ export interface ChatPromptPayload {
 export type Tier = 'free' | 'member' | 'pro';
 
 /**
+ * How a model is paid for and who may reach it.
+ *
+ * Orthogonal to {@link Tier}: a tier describes the *caller*, an access class
+ * describes the *model*. Resolved by `getModelAccess` in `domain/tier.ts`.
+ *
+ * - `'free'` — server key, reachable by anonymous callers.
+ * - `'member'` — server key, requires sign-in.
+ * - `'byok'` — requires sign-in plus the caller's own provider key. Pro tier
+ *   is exempt from the key requirement, so this is also the set a pro
+ *   licence would unlock on the server key.
+ */
+export type ModelAccess = 'free' | 'member' | 'byok';
+
+/**
  * Daily usage-limited feature identifiers.
  */
 export type TierLimitedFeature = 'analysisPerDay' | 'chatbotPerDay';
@@ -2056,7 +2070,140 @@ export type TierInfoDepth =
 export type AIProvider = 'claude' | 'gemini' | 'chatgpt' | 'deepseek';
 
 /** Effort level shared by Claude adaptive thinking and ChatGPT reasoning. */
+/**
+ * Adaptive-thinking effort levels accepted by Claude models.
+ *
+ * Claude has no "off" effort — thinking is disabled through
+ * `thinking: {type:'disabled'}` rather than an effort value. See
+ * {@link ClaudeAdaptiveReasoningConfig}.
+ */
+export type ClaudeEffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/**
+ * Reasoning effort levels accepted by ChatGPT models on the Responses API.
+ *
+ * Unlike Claude, GPT expresses "no reasoning" as an effort value (`'none'`),
+ * so the unions intentionally differ. Not every GPT model accepts `'none'` —
+ * `gpt-6-astra` returns 400 for it and bottoms out at `'low'`, which the spec
+ * records via {@link ReasoningModes.hardOff}.
+ *
+ * `'max'` is deliberately absent: the OpenAI API documents it, but the
+ * installed SDK's `ReasoningEffort` type does not yet include it, and no spec
+ * needs it. Add it here once the SDK catches up.
+ */
+export type ChatGptEffortLevel =
+    | 'none'
+    | 'minimal'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'xhigh';
+
+/**
+ * @deprecated Use {@link ClaudeEffortLevel} or {@link ChatGptEffortLevel}.
+ * The shared union cannot express GPT's `'none'`, and widening it would let
+ * Claude specs hold a value the Anthropic API rejects.
+ * Will be removed in the next major version.
+ */
 export type EffortLevel = 'low' | 'medium' | 'high';
+
+/**
+ * Gemini thinking levels (`thinkingConfig.thinkingLevel`).
+ *
+ * Generation-3 Gemini models control thinking with this string rather than a
+ * numeric budget. Support is per-model and does NOT follow the version number:
+ * `gemini-3.5-flash-lite` and `gemini-3.6-flash` accept `'minimal'` (measured
+ * `thoughtsTokenCount === 0`), while `gemini-3.7-flash`, `gemini-3.8-flash`,
+ * and `gemini-3.1-pro-preview` reject it with a 400 and bottom out at
+ * `'low'`. Never infer support from the model name — measure it.
+ */
+export type GeminiThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
+
+/** Gemini reasoning configuration for one toggle state. */
+export interface GeminiReasoningConfig {
+    /** Thinking level sent as `thinkingConfig.thinkingLevel`. */
+    level: GeminiThinkingLevel;
+}
+
+/**
+ * Claude adaptive-thinking configuration for one toggle state.
+ *
+ * `{mode:'disabled'}` maps to `thinking: {type:'disabled'}`; `{mode:'adaptive'}`
+ * maps to `thinking: {type:'adaptive'}` plus `output_config.effort`.
+ */
+export type ClaudeAdaptiveReasoningConfig =
+    | { mode: 'disabled' }
+    | { mode: 'adaptive'; effort: ClaudeEffortLevel };
+
+/**
+ * Claude extended-thinking configuration for one toggle state, used by
+ * pre-4.6 models that still take a numeric `budget_tokens`.
+ *
+ * `0` disables thinking entirely.
+ */
+export interface ClaudeBudgetReasoningConfig {
+    /** Maps to `thinking: {type:'enabled', budget_tokens}`; `0` means disabled. */
+    budgetTokens: number;
+}
+
+/** ChatGPT reasoning configuration for one toggle state. */
+export interface ChatGptReasoningConfig {
+    /** Maps to `reasoning.effort` on the Responses API. */
+    effort: ChatGptEffortLevel;
+}
+
+/** DeepSeek reasoning configuration for one toggle state. */
+export interface DeepSeekReasoningConfig {
+    /** Maps to `thinking: {type: 'enabled' | 'disabled'}`. */
+    thinking: boolean;
+}
+
+/**
+ * Both toggle states of a model's reasoning configuration, plus which one
+ * applies when the caller expresses no preference.
+ *
+ * Holding both states as data (rather than translating a `reasoning` boolean
+ * per provider at the call site) is deliberate. Every provider expresses
+ * "off" differently — `thinkingLevel:'minimal'`, `thinking:{type:'disabled'}`,
+ * `effort:'none'`, `thinking:false` — and several models cannot honour "off"
+ * at all. Encoding that per model keeps the knowledge next to the model it
+ * describes instead of spreading it across provider branches, which is how
+ * the previous `GEMINI_MODELS_SUPPORTING_DISABLED_THINKING` set drifted out of
+ * sync with reality.
+ *
+ * @typeParam TConfig - Provider-specific configuration shape.
+ */
+export interface ReasoningModes<TConfig> {
+    /** Configuration applied when reasoning is off. */
+    off: TConfig;
+    /** Configuration applied when reasoning is on. */
+    on: TConfig;
+    /**
+     * Which state applies when the caller passes no `reasoning` preference.
+     *
+     * Free- and member-tier models default to `'off'` so server-key spend
+     * stays predictable; BYOK models keep their provider default (`'on'`).
+     */
+    default: 'off' | 'on';
+    /**
+     * Whether {@link ReasoningModes.off} removes reasoning entirely. Defaults
+     * to `true` when omitted.
+     *
+     * `false` means `off` is merely the lowest strength the model accepts and
+     * the model still spends thinking tokens. Consumers must not report such a
+     * model as "reasoning disabled".
+     */
+    hardOff?: boolean;
+    /**
+     * Whether the reasoning toggle changes anything for this model. Defaults
+     * to `true` when omitted.
+     *
+     * `false` means {@link ReasoningModes.off} and {@link ReasoningModes.on}
+     * are identical, so consumer UIs must disable the toggle rather than let a
+     * user flip a control that cannot affect the request.
+     */
+    toggleable?: boolean;
+}
 
 interface BaseModelSpec {
     /**
@@ -2073,46 +2220,44 @@ interface BaseModelSpec {
 }
 
 /**
- * Claude model without adaptive thinking.
+ * Claude model on the pre-4.6 extended-thinking API, which takes a numeric
+ * `budget_tokens` rather than adaptive thinking. Currently Claude haiku.
  */
-export interface ClaudeSamplingModelSpec extends BaseModelSpec {
+export interface ClaudeBudgetModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: 'claude';
-    /**
-     * Thinking budget tokens. `0` = thinking not supported.
-     * Currently used by Claude haiku.
-     */
-    thinkingBudget: 0;
-    /** Adaptive thinking is not supported by this model. */
-    effort?: undefined;
+    /** Discriminant separating the two Claude thinking APIs. */
+    thinkingApi: 'budget';
+    /** Per-toggle-state thinking budgets. */
+    reasoning: ReasoningModes<ClaudeBudgetReasoningConfig>;
     /** Sampling temperature. */
     temperature: number;
 }
 
 /**
- * Claude model using adaptive thinking effort.
+ * Claude model on the adaptive-thinking API (4.6 generation and later).
+ *
+ * These models reject sampling parameters, so `temperature` is absent.
  */
-export interface ClaudeReasoningModelSpec extends BaseModelSpec {
+export interface ClaudeAdaptiveModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: 'claude';
-    /** Adaptive thinking effort level. */
-    effort: EffortLevel;
+    /** Discriminant separating the two Claude thinking APIs. */
+    thinkingApi: 'adaptive';
+    /** Per-toggle-state thinking configuration. */
+    reasoning: ReasoningModes<ClaudeAdaptiveReasoningConfig>;
     /** Adaptive-thinking Claude models do not accept sampling temperature. */
     temperature?: undefined;
-    /** Adaptive-thinking Claude models do not use explicit thinking budgets. */
-    thinkingBudget?: undefined;
 }
 
 /**
- * Gemini model using thinking-budget controls and sampling temperature.
+ * Gemini model using `thinkingLevel` controls and sampling temperature.
  */
 export interface GeminiModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: 'gemini';
-    /** Thinking budget tokens. */
-    thinkingBudget: number;
-    /** Gemini uses thinking budget instead of reasoning effort. */
-    effort?: undefined;
+    /** Per-toggle-state thinking levels. */
+    reasoning: ReasoningModes<GeminiReasoningConfig>;
     /** Sampling temperature. */
     temperature: number;
 }
@@ -2123,21 +2268,16 @@ export interface GeminiModelSpec extends BaseModelSpec {
 export interface ChatGPTModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: 'chatgpt';
-    /**
-     * Reasoning effort level.
-     * ChatGPT: maps to `reasoning.effort` in the Responses API.
-     */
-    effort: EffortLevel;
+    /** Per-toggle-state reasoning efforts. */
+    reasoning: ReasoningModes<ChatGptReasoningConfig>;
     /** GPT reasoning models do not accept sampling temperature. */
     temperature?: undefined;
-    /** GPT reasoning models do not use thinking budgets. */
-    thinkingBudget?: undefined;
 }
 
 /**
- * DeepSeek V4 model on the OpenAI-compatible chat/completions API.
+ * DeepSeek V4.1 model on the OpenAI-compatible chat/completions API.
  *
- * DeepSeek V4 models toggle reasoning via a `thinking` switch rather than a
+ * DeepSeek V4.1 models toggle reasoning via a `thinking` switch rather than a
  * numeric budget or an effort level, so the boolean {@link DeepSeekModelSpec.thinking}
  * flag drives the SDK request. Both thinking and non-thinking modes accept a
  * sampling `temperature`; the SDK caller applies it in non-thinking mode.
@@ -2146,21 +2286,17 @@ export interface DeepSeekModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: 'deepseek';
     /**
-     * Whether DeepSeek reasoning ("thinking") mode is enabled for this model.
-     * `true` maps to `thinking: { type: 'enabled', reasoning_effort: 'high' }`
-     * in the request; `false` maps to `thinking: { type: 'disabled' }`.
+     * Per-toggle-state thinking switches. `true` maps to
+     * `thinking: { type: 'enabled', reasoning_effort: 'high' }`; `false` maps
+     * to `thinking: { type: 'disabled' }`.
      */
-    thinking: boolean;
+    reasoning: ReasoningModes<DeepSeekReasoningConfig>;
     /**
-     * Sampling temperature. The SDK caller applies it ONLY in non-thinking mode
-     * (`thinking === false`); DeepSeek ignores temperature when reasoning is
-     * enabled, so callers must gate on {@link DeepSeekModelSpec.thinking}.
+     * Sampling temperature. The SDK caller applies it ONLY in non-thinking mode;
+     * DeepSeek ignores temperature when reasoning is enabled, so callers must
+     * gate on the resolved {@link DeepSeekReasoningConfig.thinking} value.
      */
     temperature: number;
-    /** DeepSeek uses the `thinking` toggle instead of a reasoning effort level. */
-    effort?: undefined;
-    /** DeepSeek does not use Gemini-style numeric thinking budgets. */
-    thinkingBudget?: undefined;
 }
 
 /**
@@ -2173,121 +2309,131 @@ export interface DeepSeekModelSpec extends BaseModelSpec {
  * automatically.
  */
 export type ModelSpec =
-    | ClaudeSamplingModelSpec
-    | ClaudeReasoningModelSpec
+    | ClaudeBudgetModelSpec
+    | ClaudeAdaptiveModelSpec
     | GeminiModelSpec
     | ChatGPTModelSpec
     | DeepSeekModelSpec;
 
+/** Any Claude spec, regardless of which thinking API it uses. */
+export type ClaudeModelSpec = ClaudeBudgetModelSpec | ClaudeAdaptiveModelSpec;
+
 /**
- * Narrows a `ModelSpec` to the reasoning variants (`ClaudeReasoningModelSpec |
- * ChatGPTModelSpec`). Use this guard whenever you need to read `spec.effort`
- * without a cast — both variants require `effort: EffortLevel` and do not
- * accept a sampling temperature.
+ * Narrows a `ModelSpec` to any Claude variant.
  *
  * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeReasoningModelSpec` or `ChatGPTModelSpec`.
+ * @returns `true` when `spec` is a {@link ClaudeModelSpec}.
  */
-export function isReasoningModelSpec(
-    spec: ModelSpec
-): spec is ClaudeReasoningModelSpec | ChatGPTModelSpec {
-    return spec.effort !== undefined;
+export function isClaudeModelSpec(spec: ModelSpec): spec is ClaudeModelSpec {
+    return spec.provider === 'claude';
 }
 
 /**
- * Narrows a `ModelSpec` to the sampling variants (`ClaudeSamplingModelSpec |
- * GeminiModelSpec | DeepSeekModelSpec`). Every sampling variant carries a
- * numeric `temperature` field, but this guard does NOT mean "temperature is
- * always applied": it only partitions specs by `effort === undefined`.
- *
- * ⚠️ DeepSeek caveat: `deepseek-v4-pro` is a *thinking* model yet classifies as
- * sampling here (it has no `effort`). DeepSeek ignores `temperature` when
- * reasoning is enabled, so a caller that reads `spec.temperature` after this
- * guard MUST additionally gate on `spec.provider === 'deepseek' && spec.thinking`
- * (or narrow via {@link isDeepSeekModel}) before applying it. `thinkingBudget`
- * is only present on the Claude/Gemini sampling variants.
+ * Narrows a `ModelSpec` to `ClaudeAdaptiveModelSpec` — the 4.6-generation and
+ * later models driven by `thinking: {type:'adaptive'}` plus `output_config.effort`.
+ * These reject sampling parameters.
  *
  * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeSamplingModelSpec`, `GeminiModelSpec`,
+ * @returns `true` when `spec` is a `ClaudeAdaptiveModelSpec`.
+ */
+export function isClaudeAdaptiveModelSpec(
+    spec: ModelSpec
+): spec is ClaudeAdaptiveModelSpec {
+    return spec.provider === 'claude' && spec.thinkingApi === 'adaptive';
+}
+
+/**
+ * Narrows a `ModelSpec` to `ClaudeBudgetModelSpec` — the pre-4.6 models driven
+ * by a numeric `budget_tokens`, which do accept a sampling temperature.
+ *
+ * @param spec - The model spec to narrow.
+ * @returns `true` when `spec` is a `ClaudeBudgetModelSpec`.
+ */
+export function isClaudeBudgetModelSpec(
+    spec: ModelSpec
+): spec is ClaudeBudgetModelSpec {
+    return spec.provider === 'claude' && spec.thinkingApi === 'budget';
+}
+
+/**
+ * Narrows a `ModelSpec` to the variants that carry a numeric `temperature`.
+ *
+ * ⚠️ Carrying a temperature is not the same as applying one. DeepSeek ignores
+ * `temperature` whenever reasoning is enabled, so a caller that reads
+ * `spec.temperature` after this guard MUST additionally check the resolved
+ * reasoning config (`spec.provider === 'deepseek'` → the active
+ * {@link DeepSeekReasoningConfig.thinking}) before sending it.
+ *
+ * @param spec - The model spec to narrow.
+ * @returns `true` when `spec` is a `ClaudeBudgetModelSpec`, `GeminiModelSpec`,
  *   or `DeepSeekModelSpec`.
  */
-export function isSamplingModelSpec(
+export function isTemperatureModelSpec(
     spec: ModelSpec
-): spec is ClaudeSamplingModelSpec | GeminiModelSpec | DeepSeekModelSpec {
-    return spec.effort === undefined;
+): spec is ClaudeBudgetModelSpec | GeminiModelSpec | DeepSeekModelSpec {
+    return spec.provider !== 'chatgpt' && !isClaudeAdaptiveModelSpec(spec);
 }
 
 /**
- * Narrows a `ModelSpec` to `ClaudeReasoningModelSpec` specifically. Use this
- * guard when you need both `provider === 'claude'` and adaptive-thinking
- * semantics — i.e., you intend to pass `budget_tokens` via the Anthropic SDK's
- * thinking block but not a sampling temperature.
+ * Resolves which reasoning configuration applies for a given toggle value.
  *
- * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeReasoningModelSpec`.
- */
-export function isClaudeReasoningModelSpec(
-    spec: ModelSpec
-): spec is ClaudeReasoningModelSpec {
-    return spec.provider === 'claude' && spec.effort !== undefined;
-}
-
-/**
- * Narrows a `ModelSpec` to `ClaudeSamplingModelSpec` specifically. Use this
- * guard when you need both `provider === 'claude'` and sampling-temperature
- * semantics — the model does not support adaptive thinking and requires a
- * numeric `temperature` in the API call.
+ * Central helper so every caller resolves the toggle the same way: an explicit
+ * `true`/`false` wins, and `undefined` falls back to the spec's own default.
+ * This is what makes `reasoning === true` override the spec on every provider
+ * — previously only DeepSeek did so, which meant turning the toggle on was a
+ * no-op once a spec defaulted to off.
  *
- * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeSamplingModelSpec`.
+ * @typeParam TModes - The spec's `ReasoningModes` type. Written over the
+ *   modes object rather than the config so a union of provider spec types
+ *   (e.g. both Claude variants) still resolves — inferring `TConfig` from a
+ *   union argument fails.
+ * @param modes - The spec's reasoning modes.
+ * @param reasoning - Caller preference; `undefined` defers to `modes.default`.
+ * @returns The configuration to send to the provider.
  */
-export function isClaudeSamplingModelSpec(
-    spec: ModelSpec
-): spec is ClaudeSamplingModelSpec {
-    return spec.provider === 'claude' && spec.effort === undefined;
+export function resolveReasoningConfig<TModes extends ReasoningModes<unknown>>(
+    modes: TModes,
+    reasoning: boolean | undefined
+): TModes['off'] | TModes['on'] {
+    const enabled = reasoning ?? modes.default === 'on';
+    return enabled ? modes.on : modes.off;
 }
 
 /**
  * AI model identifiers allowed by tier gating.
  */
 export type TierModel =
-    | 'gemini-2.5-flash'
-    | 'gemini-2.5-flash-lite'
-    | 'gemini-2.5-pro'
-    | 'gemini-3-flash-preview'
     | 'gemini-3.1-pro-preview'
     | 'gemini-3.5-flash-lite'
     | 'gemini-3.6-flash'
+    | 'gemini-3.7-flash'
+    | 'gemini-3.8-flash'
     | 'claude-haiku-4-5'
-    | 'claude-sonnet-4-6'
-    | 'claude-opus-4-7'
     | 'claude-sonnet-5'
+    | 'claude-opus-4-8'
     | 'claude-opus-5'
-    | 'gpt-5-mini'
-    | 'gpt-5.4'
-    | 'gpt-5.5'
+    | 'claude-fable-5-1'
+    | 'gpt-5.6-luna'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-sol'
-    | 'deepseek-v4-flash'
-    | 'deepseek-v4-pro'
-    /** @deprecated Use `claude-sonnet-4-6` instead. Will be removed in the next major version. */
-    | 'claude-sonnet-4'
-    /** @deprecated Use `claude-opus-4-7` instead. Will be removed in the next major version. */
-    | 'claude-opus-4';
+    | 'gpt-6-astra'
+    | 'deepseek-v4.1-flash'
+    | 'deepseek-v4.1-pro';
 
 /**
- * Deprecated AI model identifiers retained in {@link TierModel} for
- * backward-compatibility with consumers that still reference the older labels.
- * Active SDK call configuration is keyed by {@link ActiveModelId} so deprecated
- * identifiers are intentionally excluded.
+ * Active AI model identifiers — every model AI SDK callers may invoke.
+ *
+ * Identical to {@link TierModel}: the deprecated `claude-sonnet-4` /
+ * `claude-opus-4` aliases were removed along with the models they pointed at,
+ * so no identifier is gated out any more. Both names are kept because
+ * consumers use them to express intent — "a tier-gated model" vs. "a model we
+ * can call" — and they may diverge again if aliases return.
+ *
+ * Stored identifiers that are no longer in this union (older selections in
+ * localStorage or analysis history) are rejected by consumer-side allowlist
+ * validation and fall back to the default model.
  */
-type DeprecatedModelId = 'claude-sonnet-4' | 'claude-opus-4';
-
-/**
- * Active AI model identifiers — the subset of {@link TierModel} that AI SDK
- * callers actually invoke. Deprecated aliases are filtered out.
- */
-export type ActiveModelId = Exclude<TierModel, DeprecatedModelId>;
+export type ActiveModelId = TierModel;
 
 /** Public model identifier used by tier model access helpers. */
 export type ModelId = TierModel;

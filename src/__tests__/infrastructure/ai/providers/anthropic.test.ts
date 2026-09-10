@@ -17,30 +17,48 @@ vi.mock('@anthropic-ai/sdk', () => ({
     })),
 }));
 
-// siglens-core를 mock해 effort 필드가 추가된 새 ModelSpec을 반영한다.
+// MODEL_SPECS를 mock해 이 파일이 프로덕션 등급 배치 변경에 흔들리지 않게 한다.
+// 형태는 실제 스펙과 동일해야 한다 — 옛 `effort`/`thinkingBudget` 평면 필드를
+// 남겨두면 어댑터가 읽는 `reasoning`이 undefined가 되어 조용히 어긋난다.
 vi.mock('@/domain/analysis/modelSpecs', () => ({
     MODEL_SPECS: {
-        'claude-opus-4-7': {
+        // 추론 기본 ON(byok 등급 상당) — thinking이 실제로 나가는 경로.
+        'claude-opus-5': {
             provider: 'claude',
-            apiModelId: 'claude-opus-4-7',
+            thinkingApi: 'adaptive',
+            apiModelId: 'claude-opus-5',
             maxOutputTokens: 128_000,
-            effort: 'medium',
-            temperature: 0,
+            reasoning: {
+                off: { mode: 'disabled' },
+                on: { mode: 'adaptive', effort: 'medium' },
+                default: 'on',
+            },
         },
-        'claude-sonnet-4-6': {
+        // 추론 기본 OFF(member 등급 상당).
+        'claude-sonnet-5': {
             provider: 'claude',
-            apiModelId: 'claude-sonnet-4-6',
+            thinkingApi: 'adaptive',
+            apiModelId: 'claude-sonnet-5',
             maxOutputTokens: 64_000,
-            effort: 'medium',
-            temperature: 0,
+            reasoning: {
+                off: { mode: 'disabled' },
+                on: { mode: 'adaptive', effort: 'medium' },
+                default: 'off',
+            },
         },
+        // budget API + 토글 불가.
         'claude-haiku-4-5': {
             provider: 'claude',
+            thinkingApi: 'budget',
             apiModelId: 'claude-haiku-4-5-20251001',
             maxOutputTokens: 8_192,
-            thinkingBudget: 0,
             temperature: 0,
-            topP: 0.95,
+            reasoning: {
+                off: { budgetTokens: 0 },
+                on: { budgetTokens: 0 },
+                default: 'off',
+                toggleable: false,
+            },
         },
     },
 }));
@@ -51,7 +69,10 @@ vi.mock('@/domain/analysis/systemPrompt', () => ({
 
 const mockedAnthropic = vi.mocked(Anthropic);
 
-const MODEL_WITH_EFFORT: ClaudeModelId = 'claude-opus-4-7';
+/** 추론 기본 ON인 adaptive 모델. */
+const MODEL_WITH_EFFORT: ClaudeModelId = 'claude-opus-5';
+/** 추론 기본 OFF인 adaptive 모델. */
+const MODEL_DEFAULT_OFF: ClaudeModelId = 'claude-sonnet-5';
 const MODEL_WITHOUT_THINKING: ClaudeModelId = 'claude-haiku-4-5';
 
 function makeStream(response: object) {
@@ -135,11 +156,48 @@ describe('callClaude', () => {
         await callClaude('prompt', {
             model: MODEL_WITH_EFFORT,
             apiKey: 'key',
-            effort: 'low',
+            reasoning: { mode: 'adaptive', effort: 'low' },
         });
 
         const call = mockStream.mock.calls[0][0];
         expect(call.output_config).toEqual({ effort: 'low' });
+    });
+
+    it('sends thinking:{type:"disabled"} when reasoning is off', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'end_turn',
+                content: [{ type: 'text', text: 'ok' }],
+            })
+        );
+
+        await callClaude('prompt', {
+            model: MODEL_WITH_EFFORT,
+            apiKey: 'key',
+            reasoning: { mode: 'disabled' },
+        });
+
+        const call = mockStream.mock.calls[0][0];
+        // effort:'low'로 낮추는 것과 다르다 — low는 여전히 사고 토큰을 쓴다.
+        expect(call.thinking).toEqual({ type: 'disabled' });
+        expect(call).not.toHaveProperty('output_config');
+    });
+
+    it("follows the spec's default state when no reasoning is given", async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'end_turn',
+                content: [{ type: 'text', text: 'ok' }],
+            })
+        );
+
+        await callClaude('prompt', {
+            model: MODEL_DEFAULT_OFF,
+            apiKey: 'key',
+        });
+
+        const call = mockStream.mock.calls[0][0];
+        expect(call.thinking).toEqual({ type: 'disabled' });
     });
 
     it('omits thinking config when model does not support thinking (haiku)', async () => {
@@ -246,7 +304,7 @@ describe('callClaude', () => {
         });
 
         const call = mockStream.mock.calls[0][0];
-        // claude-opus-4-7 max output = 128000
+        // claude-opus-5 max output = 128000
         expect(call.max_tokens).toBe(128_000);
     });
 
@@ -343,7 +401,7 @@ describe('callClaude', () => {
             await callClaude('prompt', {
                 model: MODEL_WITH_EFFORT,
                 apiKey: 'key',
-                effort: 'high',
+                reasoning: { mode: 'adaptive', effort: 'high' },
                 responseSchema: SCHEMA,
             });
 

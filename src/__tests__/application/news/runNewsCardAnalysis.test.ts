@@ -8,10 +8,7 @@ import {
     runNewsCardAnalysis,
 } from '@/application/news/runNewsCardAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import {
-    MODEL_SPECS,
-    supportsDisabledThinking,
-} from '@/domain/analysis/modelSpecs';
+import { MODEL_SPECS, supportsHardOff } from '@/domain/analysis/modelSpecs';
 import type { NewsItem } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
@@ -90,10 +87,10 @@ describe('runNewsCardAnalysis', () => {
                 expect.objectContaining({ model: NEWS_CARD_MODEL_ID })
             );
             expect(MODEL_SPECS[NEWS_CARD_MODEL_ID].provider).toBe('gemini');
-            // 이 경로는 항상 `reasoning: false`를 보내고 callAnalysisAi가 그것을
-            // Gemini 분기에서 thinkingBudget 0으로 번역한다. 리터럴 0을 400으로
-            // 거부하는 Gemini 모델로 상수가 바뀌면 프로덕션 전 호출이 죽는다.
-            expect(supportsDisabledThinking(NEWS_CARD_MODEL_ID)).toBe(true);
+            // 이 경로는 항상 `reasoning: false`를 보낸다. 추론을 완전히 끄지
+            // 못하는 Gemini 모델로 상수가 바뀌면(대부분이 그렇다) 이 저비용
+            // 헬퍼 경로가 조용히 사고 토큰을 쓰기 시작한다.
+            expect(supportsHardOff(NEWS_CARD_MODEL_ID)).toBe(true);
         });
     });
 

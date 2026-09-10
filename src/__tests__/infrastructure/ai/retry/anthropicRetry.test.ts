@@ -26,7 +26,7 @@ vi.mock('@/infrastructure/ai/retry/withRetry', () => ({
 const mockCallClaude = vi.mocked(callClaude);
 const mockWithRetry = vi.mocked(withRetry);
 
-const MODEL: ClaudeModelId = 'claude-opus-4-7';
+const MODEL: ClaudeModelId = 'claude-opus-5';
 
 describe('callClaudeWithRetry', () => {
     beforeEach(() => {
@@ -66,11 +66,15 @@ describe('callClaudeWithRetry', () => {
     it('passes effort option to callClaude', async () => {
         mockCallClaude.mockResolvedValueOnce('result');
 
-        await callClaudeWithRetry('prompt', MODEL, 'key', { effort: 'low' });
+        await callClaudeWithRetry('prompt', MODEL, 'key', {
+            reasoning: { mode: 'adaptive', effort: 'low' },
+        });
 
         expect(mockCallClaude).toHaveBeenCalledWith(
             'prompt',
-            expect.objectContaining({ effort: 'low' })
+            expect.objectContaining({
+                reasoning: { mode: 'adaptive', effort: 'low' },
+            })
         );
     });
 

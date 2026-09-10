@@ -35,7 +35,7 @@ const mockCacheProvider = {
 };
 
 const mockSymbol = 'AAPL';
-const mockModelId = 'gemini-2.5-flash';
+const mockModelId = 'gemini-3.6-flash';
 
 const mockRawResult = {
     overallConclusionKo: '테스트 분석입니다.',
@@ -275,7 +275,7 @@ describe('runFundamentalAnalysis', () => {
         it('non-pro premium model without userApiKey → returns key_error', async () => {
             const result = await runFundamentalAnalysis({
                 symbol: mockSymbol,
-                modelId: 'gemini-2.5-pro',
+                modelId: 'gemini-3.1-pro-preview',
                 dataProvider: mockDataProvider,
                 tier: 'member',
                 tierConfig: TEST_TIER_CONFIG,
@@ -288,7 +288,7 @@ describe('runFundamentalAnalysis', () => {
         it('non-pro premium model with userApiKey → proceeds', async () => {
             const result = await runFundamentalAnalysis({
                 symbol: mockSymbol,
-                modelId: 'gemini-2.5-pro',
+                modelId: 'gemini-3.1-pro-preview',
                 dataProvider: mockDataProvider,
                 tier: 'member',
                 tierConfig: TEST_TIER_CONFIG,

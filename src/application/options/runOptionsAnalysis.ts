@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     analysisSeed,
@@ -233,7 +233,7 @@ export async function runOptionsAnalysis(
     const callModelId: ActiveModelId =
         (modelId as string) in MODEL_SPECS
             ? (modelId as ActiveModelId)
-            : DEEPSEEK_V4_FLASH_MODEL;
+            : DEEPSEEK_V4_1_FLASH_MODEL;
 
     const raw = await dedupeInFlight(cacheKey, () =>
         callAnalysisAi({

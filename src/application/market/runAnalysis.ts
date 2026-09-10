@@ -1,7 +1,7 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
-import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
@@ -99,7 +99,7 @@ export type RunAnalysisForOverallResult =
  *
  * 캐시 키는 계속 `DEFAULT_ANALYSIS_MODEL_ID`를 쓴다(기존 캐시 호환).
  */
-const DEFAULT_RUN_ANALYSIS_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
+const DEFAULT_RUN_ANALYSIS_MODEL: ActiveModelId = DEEPSEEK_V4_1_FLASH_MODEL;
 
 /**
  * Shared implementation for `runAnalysis` (public, filtered) and

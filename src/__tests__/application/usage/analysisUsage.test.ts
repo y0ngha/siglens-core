@@ -17,9 +17,9 @@ const restrictedConfig: TierConfig = {
     timeframes: { free: ['1Day'], member: ['1Day'], pro: ['1Day'] },
     infoDepth: { free: ['summary'], member: ['summary'], pro: ['summary'] },
     models: {
-        free: ['gemini-2.5-flash'],
-        member: ['gemini-2.5-flash'],
-        pro: ['gemini-2.5-flash'],
+        free: ['gemini-3.6-flash'],
+        member: ['gemini-3.6-flash'],
+        pro: ['gemini-3.6-flash'],
     },
     featureFlags: { enableTierRestrictions: true },
 };
@@ -57,7 +57,7 @@ describe('recordAnalysisUsageSafely', () => {
     it('is a no-op when usage is undefined', async () => {
         // Branch (1): usage === undefined
         await expect(
-            recordAnalysisUsageSafely(undefined, 'gemini-2.5-flash', new Date())
+            recordAnalysisUsageSafely(undefined, 'gemini-3.6-flash', new Date())
         ).resolves.toBeUndefined();
     });
 
@@ -67,14 +67,14 @@ describe('recordAnalysisUsageSafely', () => {
         const usage = makeUsage(makeUsageRepository({ recordUsage }));
         const occurredAt = new Date('2026-04-29T00:00:00.000Z');
 
-        await recordAnalysisUsageSafely(usage, 'gemini-2.5-flash', occurredAt);
+        await recordAnalysisUsageSafely(usage, 'gemini-3.6-flash', occurredAt);
 
         expect(recordUsage).toHaveBeenCalledTimes(1);
         expect(recordUsage).toHaveBeenCalledWith({
             userId: null,
             ipAddress: '203.0.113.10',
             actionType: 'analysis',
-            modelUsed: 'gemini-2.5-flash',
+            modelUsed: 'gemini-3.6-flash',
             occurredAt,
         });
     });
@@ -87,7 +87,7 @@ describe('recordAnalysisUsageSafely', () => {
             modelUsed: 'override-model',
         });
 
-        await recordAnalysisUsageSafely(usage, 'gemini-2.5-flash');
+        await recordAnalysisUsageSafely(usage, 'gemini-3.6-flash');
 
         expect(recordUsage).toHaveBeenCalledWith({
             userId: 'user-abc',
@@ -108,7 +108,7 @@ describe('recordAnalysisUsageSafely', () => {
         const usage = makeUsage(makeUsageRepository({ recordUsage }));
 
         await expect(
-            recordAnalysisUsageSafely(usage, 'gemini-2.5-flash')
+            recordAnalysisUsageSafely(usage, 'gemini-3.6-flash')
         ).resolves.toBeUndefined();
 
         expect(consoleWarn).toHaveBeenCalledWith(
