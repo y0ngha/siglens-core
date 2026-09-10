@@ -5,6 +5,8 @@ import { callDeepSeek } from '@/infrastructure/ai/providers/deepseek';
 import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
 
 const mockCreate = vi.hoisted(() => vi.fn());
+/** Responses API(`POST /responses`) — `responseSchema`가 있을 때 타는 경로. */
+const mockResponsesCreate = vi.hoisted(() => vi.fn());
 
 vi.mock('openai', () => ({
     __esModule: true,
@@ -14,6 +16,9 @@ vi.mock('openai', () => ({
             completions: {
                 create: mockCreate,
             },
+        },
+        responses: {
+            create: mockResponsesCreate,
         },
     })),
 }));
@@ -77,6 +82,7 @@ function successStream(usage?: unknown): AsyncIterable<Chunk> {
 describe('callDeepSeek', () => {
     beforeEach(() => {
         mockCreate.mockClear();
+        mockResponsesCreate.mockClear();
         mockedOpenAI.mockClear();
     });
 
@@ -269,18 +275,110 @@ describe('callDeepSeek', () => {
         });
     });
 
-    it('does not use responseSchema to constrain output (json_object mode always, no json_schema)', async () => {
-        mockCreate.mockResolvedValueOnce(successStream());
+    describe('responseSchema — Responses API로 강제한다', () => {
+        // `/chat/completions`는 `response_format: json_schema`를 거부한다
+        // (`400 This response_format type is unavailable now`, V4 모델 ID로도 동일).
+        // 강제하지 않던 시절 실측: 30k 토큰 기술 분석 프롬프트에서
+        // `indicatorResults[].signals`가 824건 전부 빈 배열이었다.
+        function responsesStream(
+            text: string,
+            usage?: unknown
+        ): AsyncIterable<unknown> {
+            return {
+                async *[Symbol.asyncIterator]() {
+                    // reasoning 블록도 `text`를 갖는다 — 섞으면 JSON이 깨지므로
+                    // `response.output_text.delta`만 읽어야 한다.
+                    yield {
+                        type: 'response.reasoning_text.delta',
+                        delta: 'thinking out loud',
+                    };
+                    yield { type: 'response.output_text.delta', delta: text };
+                    if (usage !== undefined) {
+                        yield {
+                            type: 'response.completed',
+                            response: { usage },
+                        };
+                    }
+                },
+            };
+        }
 
-        const schema = { type: 'object', properties: {} };
-        await callDeepSeek('prompt', {
-            model: FLASH_MODEL,
-            apiKey: 'key',
-            responseSchema: schema,
+        it('스키마가 있으면 /responses로 가고 text.format에 실린다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('analysis result')
+            );
+
+            const schema = { type: 'object', properties: {} };
+            const result = await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: schema,
+            });
+
+            expect(result).toBe('analysis result');
+            expect(mockCreate).not.toHaveBeenCalled();
+            const call = mockResponsesCreate.mock.calls[0][0];
+            expect(call.text.format).toMatchObject({
+                type: 'json_schema',
+                schema,
+            });
+            expect(call.stream).toBe(true);
         });
 
-        const call = mockCreate.mock.calls[0][0];
-        expect(call.response_format).toEqual({ type: 'json_object' });
+        it('reasoning 블록의 델타는 본문에 섞지 않는다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('{"ok":1}')
+            );
+
+            const result = await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+            });
+
+            expect(result).toBe('{"ok":1}');
+            expect(result).not.toContain('thinking out loud');
+        });
+
+        it('usage를 chat 모양으로 옮긴다 — 안 옮기면 텔레메트리가 0이 된다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('ok', {
+                    input_tokens: 1000,
+                    output_tokens: 250,
+                    input_tokens_details: { cached_tokens: 100 },
+                })
+            );
+            const logSpy = vi
+                .spyOn(console, 'info')
+                .mockImplementation(() => {});
+
+            await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+                jobId: 'job-1',
+            });
+
+            const usageLine = logSpy.mock.calls
+                .filter(args => String(args[0]).startsWith('[Usage]'))
+                .map(args => String(args[1]))[0];
+            expect(usageLine).toBeDefined();
+            // 1000 − 100(cached) = 900
+            expect(usageLine).toContain('"promptTokens":900');
+            expect(usageLine).toContain('"outputTokens":250');
+            logSpy.mockRestore();
+        });
+
+        it('스키마가 없으면 종전 경로(json_object)를 그대로 탄다', async () => {
+            mockCreate.mockResolvedValueOnce(successStream());
+
+            await callDeepSeek('prompt', { model: FLASH_MODEL, apiKey: 'key' });
+
+            expect(mockResponsesCreate).not.toHaveBeenCalled();
+            expect(mockCreate.mock.calls[0][0].response_format).toEqual({
+                type: 'json_object',
+            });
+        });
     });
 
     it('throws non-retryable error when finish_reason is length (max tokens)', async () => {
