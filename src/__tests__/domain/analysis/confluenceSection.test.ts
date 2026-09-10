@@ -191,6 +191,25 @@ describe('formatDeterministicMetricsSection', () => {
         );
     });
 
+    it('treats a history with no usable bar range as a 0% floor', () => {
+        // Every bar fails the `high >= low` guard, so no range is measurable at all —
+        // a separate branch from zero-width bars, which still produce a (zero) range.
+        const inverted = enough.map(b => ({
+            ...b,
+            high: b.close * 0.99,
+            low: b.close * 1.01,
+        }));
+        const out = formatDeterministicMetricsSection(
+            inverted,
+            '30Min',
+            reference()
+        );
+        expect(out).not.toContain('Levels within');
+        expect(out).toContain(
+            'Structural risk:reward from current price = 0.25'
+        );
+    });
+
     it('does not claim the backtest win rate for the family-counting variant', () => {
         // The measured 70% was produced by a rule that counted signal TYPES. Restoring the
         // thresholds does not restore the counting unit, and a prompt line that says

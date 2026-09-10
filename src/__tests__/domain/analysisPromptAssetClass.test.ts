@@ -156,4 +156,36 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
         const p = renderDynamic('AAPL', syntheticBars(260, 320), '1Hour');
         expect(p).toMatch(/momentum -?\d+\.\d{2} \[(up|down) vs prior bar\]/);
     });
+
+    it('renders a percent against a non-positive base as N/A', () => {
+        const zeroBase: Bar[] = [
+            {
+                time: 1_788_000_000,
+                open: 0,
+                high: 0,
+                low: 0,
+                close: 0,
+                volume: 0,
+            },
+            {
+                time: 1_788_003_600,
+                open: 10,
+                high: 11,
+                low: 9,
+                close: 10,
+                volume: 1000,
+            },
+        ];
+        const p = buildAnalysisPrompt(
+            'AAPL',
+            'Apple',
+            zeroBase,
+            indicators,
+            [],
+            '1Hour'
+        );
+        expect(p).toContain('- Price Change %: N/A');
+        expect(p).toContain('- Period Return: N/A');
+        expect(p).toContain('- Current vs Low: N/A');
+    });
 });
