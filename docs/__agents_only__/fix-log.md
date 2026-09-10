@@ -237,3 +237,36 @@
   Context: Core cannot enforce `currency` parity on all analysis callers; consumer repo (`siglens`) must guarantee the invariant. Mitigated by adding explicit invariant tests in consumer confirming `currency` is identical across re-used cached results.
   Fixed: Mitigated in consumer-side (siglens) tests; core cache function JSDoc does not require changes per core-consumer contract
 
+## [PR | fix/deepseek-responses-api-schema | 2026-09-10] — Responses API schema routing R1→R3 (approved)
+
+- Violation 1 (REQUIRED, R1): `finishReason` hardcoded to `'stop'` on new Responses API path
+  Rule: MISTAKES.md §Infrastructure 3 (NEW) — Event stream terminal condition must not default to success; explicit state assignment required for all paths
+  Context: R1 case — `response.incomplete` (`incomplete_details.reason === 'max_output_tokens'`) and `response.failed` were indistinguishable from a genuine completion, so partial streamed text returned as success. The sibling chat path already treated the equivalent condition as a non-retryable `length` error. (The initialization-path variant of the same defect is Violation 4, found in R2.)
+  Fixed: R1 added `finishReason` validation. R2 inverted outcome default to `'no_terminal'`, assigned only on observed terminal event, whitelist-mapped final states.
+  Promoted: YES — add rule to MISTAKES.md Infrastructure 3 (new section on state initialization via default + single-path assignment)
+
+- Violation 2 (REQUIRED, R1): Cast to `client.responses.create` used `body: unknown` + hand-rolled event type
+  Rule: MISTAKES.md §TypeScript 7 (EXTEND) — SDK discriminated unions must be imported directly; hand-rolling unknown defeats type safety
+  Context: JSDoc claimed "SDK may not type it"; actually v6.35.0 types it fully (ResponseIncompleteEvent, ResponseFailedEvent). Using real types surfaced truncation/failure cases that `unknown` hid.
+  Fixed: Imported real OpenAI types; removed cast; discriminated union reveals incompleteness on stream end.
+  Promoted: YES — extend TypeScript rule 7 to cover "avoid unknown casts when SDK provides concrete discriminated types"
+
+- Violation 3 (RECOMMENDED, R1): Empty-text warning said `json_object` mode, wrong for schema path
+  Rule: Error messages must reference the actual code path being executed, not a sibling path's terminology
+  Context: Backend `console.warn` on the shared empty-response branch read "json_object mode occasionally returns empty content" even when the call had used `text.format` schema mode. Not user-facing — it misleads on-call triage about which endpoint actually failed.
+  Fixed: R1 reworded warning to match Responses API schema terminology.
+
+- Violation 4 (RECOMMENDED, R2): `outcome` defaulted to `'completed'` without guard; same misclassification reachable through initialization path
+  Rule: MISTAKES.md §Coding Paradigm (NEW facet) — dual-entry-point bugs: when a value defaults to success and is only reassigned in one branch, all other exit paths silently return the default (fix one branch while leaving the same defect reachable via initialization)
+  Context: Fallback: outcome='completed' + only reassigned inside terminal-event branch → stream with zero terminal events still returned success. R1 fixed termination check; R2 fixed initialization. Identical bug class, different entry point.
+  Fixed: Defaulted outcome to 'no_terminal', whitelist-assigned only on observed terminal; removes unguarded success path.
+  Promoted: YES — add rule to MISTAKES.md Coding Paradigm (dual-entry-point state bugs)
+
+- Violation 5 (RECOMMENDED, R1): No tests for truncated/failed output; test suite asserted wrong behavior
+  Rule: MISTAKES.md §Tests (NEW rule) — negative assertions (does NOT use feature) pin the bug; when option goes unused (intended or not), test suite actively asserts the ignoring, preventing detection of feature activation
+  Context: Existing test `does not use responseSchema to constrain output` asserted the bug as intended behavior. It never failed while the bug was live — production (824/824 empty arrays) was the only signal. When the fix landed, that test failed, which is how the pin was found. Negative assertions should verify a precondition (option accepted) rather than an outcome (feature off), or the suite defends the defect.
+  Fixed: Added tests for truncated output, complete output, missing terminal events; test now verifies option has an effect.
+  Promoted: YES — add rule to MISTAKES.md Tests (negative assertions that confirm wrong behavior pin bugs)
+
+- Production impact (pre-fix, siglens-trader): ~30k-token prompt, indicatorResults[].signals empty in 824/824 analyses (gemini: 143/143 filled). Downstream axis degraded from 3 inputs to 1 while keeping full weight, measured inverted (top tercile −1.604% forward return). Bug pinned for 1 month by comment asserting "DeepSeek does not support strict json_schema" (half-true: chat endpoint doesn't, Responses endpoint does).
+
