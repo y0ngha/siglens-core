@@ -501,8 +501,9 @@ Byok 5개가 Claude 3 / GPT 2로 구성되어 Google·DeepSeek 키를 등록해�
 ## 9. Public API 영향 (BREAKING)
 
 `src/index.ts`에서 제거되거나 시그니처가 바뀌는 public export다. core는 0.x이므로
-minor 범프(`0.58.0 → 0.59.0`)로 breaking을 표시하고 `docs/PUBLIC_API.md`에
-기록한다.
+minor 범프로 breaking을 표시하고 `docs/PUBLIC_API.md`에
+기록한다. 이 작업이 열려 있는 동안 main이 `v0.59.0`(PR #191, market-events)을
+먼저 배포했으므로 대상 버전은 `0.59.0 → 0.60.0`이다.
 
 | 심볼 | 위치 | 조치 |
 |---|---|---|

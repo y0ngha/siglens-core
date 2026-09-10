@@ -1,6 +1,6 @@
 # Public API Boundary
 
-> ⚠️ **0.59.0 — BREAKING: 모델 등급 3분류 + 추론 설정 재구성**
+> ⚠️ **0.60.0 — BREAKING: 모델 등급 3분류 + 추론 설정 재구성**
 >
 > 설계 문서: `docs/superpowers/specs/2026-09-06-model-tier-restructure-design.md`
 >
