@@ -33,7 +33,7 @@ import type { AnalysisTypeUnderTest, PromptCaseOutput } from './buildPrompts';
  * `DEFAULT_ANALYSIS_MODEL_ID` from `infrastructure/cache/config.ts`, which is
  * just the cache-key placeholder string `'analysis-worker'`, not a real model id.
  */
-const DEFAULT_ANALYSIS_MODEL = 'gemini-2.5-flash-lite' as const;
+const DEFAULT_ANALYSIS_MODEL = 'gemini-3.7-flash' as const;
 
 /** Per-case retry budget: up to 4 attempts total, with backoff between attempts 1→2, 2→3, 3→4. */
 const MAX_ATTEMPTS = 4;
