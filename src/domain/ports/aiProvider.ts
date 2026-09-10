@@ -40,7 +40,7 @@ export interface CallAiProviderOptions {
      * the application layer enforces this invariant.
      */
     serverApiKey: string | undefined;
-    /** Model identifier (e.g. `'gemini-2.5-flash'`, `'gpt-5.5'`, `'claude-opus-4-7'`). */
+    /** Model identifier (e.g. `'gemini-3.6-flash'`, `'gpt-5.6-sol'`, `'claude-opus-5'`). */
     model: string;
     /** Prompt contents — plain string or role-tagged turn list. */
     contents: AiContents;

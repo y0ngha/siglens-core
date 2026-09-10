@@ -111,7 +111,7 @@ function sleep(ms: number): Promise<void> {
  * 세는 것과 달리 이 예산은 `fn()` 실행시간까지 포함한다.
  *
  * 왜 둘 다 필요한가 — 2026-08-09 프로덕션 실측:
- * `deepseek-v4-pro`가 PLTR(promptTokens 29k)에서 **248.5초** 만에 실패했는데,
+ * `deepseek-v4.1-pro`가 PLTR(promptTokens 29k)에서 **248.5초** 만에 실패했는데,
  * 그 시점 `cumulativeDelay`는 0이라 delay cap(30초)을 통과해 재시도가 시작됐다.
  * 호출자(SSE 라우트)의 마감이 300초였으므로 두 번째 시도는 완주할 수 없었고,
  * 대기 중이던 요청 4건이 한꺼번에 타임아웃으로 실패했다(core `dedupeInFlight`가

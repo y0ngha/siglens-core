@@ -63,7 +63,7 @@ const mockCachedResult = {
 
 const BASE_OPTIONS = {
     symbol: 'AAPL',
-    modelId: 'gemini-2.5-flash' as const,
+    modelId: 'gemini-3.6-flash' as const,
     dataProvider: mockDataProvider,
 };
 

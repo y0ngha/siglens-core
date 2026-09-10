@@ -1,31 +1,50 @@
 import type { ActiveModelId, Tier } from '@/domain/types';
-import { isFreeModel, isModelAllowed } from '@/domain/tier';
+import { isModelAllowed, requiresByokKey } from '@/domain/tier';
+
+/**
+ * `tier`가 없으면 가장 제한적인 등급으로 본다.
+ *
+ * `requiresByokKey`는 `tier === 'pro'`만 특별 취급하므로, 미지의 호출자를 free로
+ * 접는 것은 "pro 면제를 주지 않는다"와 같은 뜻이다.
+ *
+ * @internal
+ */
+function resolveTierOrDefault(tier: Tier | undefined): Tier {
+    return tier ?? 'free';
+}
 
 /**
  * Determine whether a request should use the server key.
  *
- * Server key is used when:
- * - Model is a free-tier model (server-managed)
- * - OR user is on pro tier (server pays for premium)
+ * Server key covers the `'free'` and `'member'` access classes, plus every
+ * model for a pro-tier caller. Only a `'byok'`-class model on a non-pro tier
+ * falls through to the user's own key.
+ *
+ * ⚠️ Do NOT reimplement this as `isFreeModel(model) || tier === 'pro'`. That
+ * was the pre-three-way-axis form, and it charges member-class models to the
+ * caller's key — a member requesting `claude-sonnet-5` would be told
+ * "User API key required" for a model the server pays for. Key routing must
+ * go through {@link requiresByokKey}, which is the only classifier that knows
+ * the `'member'` class exists.
  */
 export function shouldUseServerKey(
     model: ActiveModelId,
     tier: Tier | undefined
 ): boolean {
-    return isFreeModel(model) || tier === 'pro';
+    return !requiresByokKey(resolveTierOrDefault(tier), model);
 }
 
 /**
  * Determine whether a request requires a user-provided API key.
  *
- * Symmetric inverse of `shouldUseServerKey` for the case when a user key
- * is mandatory: non-free model AND non-pro tier.
+ * Symmetric inverse of {@link shouldUseServerKey}: byok-class model AND
+ * non-pro tier.
  */
 export function requiresUserApiKey(
     model: ActiveModelId,
     tier: Tier | undefined
 ): boolean {
-    return !isFreeModel(model) && tier !== 'pro';
+    return requiresByokKey(resolveTierOrDefault(tier), model);
 }
 
 /**
@@ -48,7 +67,7 @@ export function requiresUserApiKey(
  * `isModelAllowed`에 위임함으로써 이 정책 불일치를 해소한다.
  *
  * 비용 안전장치는 이 함수의 책임이 아니다 — `shouldUseServerKey`/`requiresUserApiKey`가
- * `isFreeModel`(free vs premium 분류, `enableTierRestrictions`와 무관)을 기반으로 별도로
+ * `requiresByokKey`(3분류 접근 등급 기반, `enableTierRestrictions`와 무관)를 통해 별도로
  * 담당하며, 이 경로는 전혀 바뀌지 않는다.
  *
  * @returns `tier`가 undefined면 검사 생략(true). 그 외에는 `isModelAllowed`가 참조하는

@@ -1,14 +1,19 @@
 import { getAllowedModels } from '@/domain/tier';
 import type { ModelId } from '@/domain/types';
 
-export const GEMINI_2_5_FLASH_MODEL = 'gemini-2.5-flash';
-export const GEMINI_2_5_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
-/** @internal Gemini 2.5 Pro premium model identifier (test fixture for premium-tier chat scenarios). */
-export const GEMINI_2_5_PRO_MODEL = 'gemini-2.5-pro';
-/** Default chat + briefing model. DeepSeek V4 Flash (non-thinking, free tier). */
-export const DEEPSEEK_V4_FLASH_MODEL = 'deepseek-v4-flash';
-/** DeepSeek V4 Pro (thinking/reasoning, free tier). */
-export const DEEPSEEK_V4_PRO_MODEL = 'deepseek-v4-pro';
+/**
+ * Cheapest Gemini line — the fixed model for short structured helper tasks
+ * (news cards, economic events, indicator translation).
+ *
+ * Succeeds `GEMINI_2_5_FLASH_LITE_MODEL`, removed with the 2.5 generation.
+ * Free access class, and one of only two Gemini models that can disable
+ * thinking outright (`reasoning.off` is `thinkingLevel: 'minimal'`).
+ */
+export const GEMINI_FLASH_LITE_MODEL = 'gemini-3.5-flash-lite';
+/** Default chat + briefing model. DeepSeek V4.1 Flash (non-thinking, free access class). */
+export const DEEPSEEK_V4_1_FLASH_MODEL = 'deepseek-v4.1-flash';
+/** DeepSeek V4.1 Pro (thinking/reasoning, member access class). */
+export const DEEPSEEK_V4_1_PRO_MODEL = 'deepseek-v4.1-pro';
 
 /**
  * All valid chat models, derived from the default tier configuration at module

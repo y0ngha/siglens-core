@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callGemini } from '@/infrastructure/ai/providers/gemini';
 import {
-    callGeminiReducingBudget,
+    callGeminiReducingLevel,
     callGeminiWithRetry,
 } from '@/infrastructure/ai/retry/geminiRetry';
 import type { GeminiModelId } from '@/domain/analysis/modelSpecs';
@@ -30,8 +30,17 @@ vi.mock('@/infrastructure/ai/retry/withRetry', () => ({
 const mockCallGemini = vi.mocked(callGemini);
 const mockWithRetry = vi.mocked(withRetry);
 
-// flash-lite의 기본 thinking budget=8192을 그대로 활용한다.
-const MODEL: GeminiModelId = 'gemini-2.5-flash-lite';
+/**
+ * Free 등급 flash-lite — `reasoning.off`가 `'minimal'`이라 축소 시퀀스의 바닥이
+ * `'minimal'`이고, 기본 상태(`default: 'off'`)도 `'minimal'`이다.
+ */
+const MODEL: GeminiModelId = 'gemini-3.5-flash-lite';
+
+/**
+ * 바닥이 `'low'`인 모델 — `'minimal'`을 400으로 거부한다(2026-09-06 실측).
+ * 축소 시퀀스가 모델별 바닥을 존중하는지 검증하는 데 쓴다.
+ */
+const MODEL_FLOOR_LOW: GeminiModelId = 'gemini-3.7-flash';
 
 describe('gemini-retry', () => {
     let MAX_TOKENS_ERROR: Error & { code: string };
@@ -46,123 +55,144 @@ describe('gemini-retry', () => {
         SERVER_ERROR = Object.assign(new Error('5xx'), { status: 503 });
     });
 
-    describe('callGeminiReducingBudget', () => {
+    describe('callGeminiReducingLevel', () => {
         it('returns result on successful first call', async () => {
             mockCallGemini.mockResolvedValueOnce('result');
 
-            const budgetRef = { current: 24576 };
-            const result = await callGeminiReducingBudget(
+            const levelRef = { current: 'high' as const };
+            const result = await callGeminiReducingLevel(
                 'prompt',
                 MODEL,
                 'key',
                 undefined,
-                budgetRef
+                levelRef
             );
 
             expect(result).toBe('result');
             expect(mockCallGemini).toHaveBeenCalledWith(
                 'prompt',
-                expect.objectContaining({ thinkingBudget: 24576 })
+                expect.objectContaining({ thinkingLevel: 'high' })
             );
         });
 
-        it('reduces budget on MAX_TOKENS and retries with next step', async () => {
+        it('steps the level down one notch on MAX_TOKENS and retries', async () => {
             mockCallGemini
                 .mockRejectedValueOnce(MAX_TOKENS_ERROR)
                 .mockResolvedValueOnce('result');
 
-            const budgetRef = { current: 24576 };
-            const result = await callGeminiReducingBudget(
+            const levelRef = { current: 'high' as const };
+            const result = await callGeminiReducingLevel(
                 'prompt',
                 MODEL,
                 'key',
                 undefined,
-                budgetRef
+                levelRef
             );
 
             expect(result).toBe('result');
             expect(mockCallGemini).toHaveBeenNthCalledWith(
                 1,
                 'prompt',
-                expect.objectContaining({ thinkingBudget: 24576 })
+                expect.objectContaining({ thinkingLevel: 'high' })
             );
             expect(mockCallGemini).toHaveBeenNthCalledWith(
                 2,
                 'prompt',
-                expect.objectContaining({ thinkingBudget: 12288 })
+                expect.objectContaining({ thinkingLevel: 'medium' })
             );
         });
 
-        it('falls through two halving steps before reaching THINKING_BUDGET_FALLBACK_STEPS', async () => {
-            // 24576 → 12288 → 6144 → 4096 → 2048 → 0
-            // First two halvings exhaust before standard steps engage.
+        it('descends high → medium → low → minimal for a model whose floor is minimal', async () => {
             mockCallGemini
-                .mockRejectedValueOnce(MAX_TOKENS_ERROR) // 24576
-                .mockRejectedValueOnce(MAX_TOKENS_ERROR) // 12288
-                .mockResolvedValueOnce('result'); // 6144
+                .mockRejectedValueOnce(MAX_TOKENS_ERROR) // high
+                .mockRejectedValueOnce(MAX_TOKENS_ERROR) // medium
+                .mockResolvedValueOnce('result'); // low
 
-            const budgetRef = { current: 24576 };
-            const result = await callGeminiReducingBudget(
+            const levelRef = { current: 'high' as const };
+            const result = await callGeminiReducingLevel(
                 'prompt',
                 MODEL,
                 'key',
                 undefined,
-                budgetRef
+                levelRef
             );
 
             expect(result).toBe('result');
             expect(mockCallGemini).toHaveBeenNthCalledWith(
                 3,
                 'prompt',
-                expect.objectContaining({ thinkingBudget: 6144 })
+                expect.objectContaining({ thinkingLevel: 'low' })
             );
-            expect(budgetRef.current).toBe(6144);
+            expect(levelRef.current).toBe('low');
         });
 
-        it('throws when MAX_TOKENS occurs with thinking disabled (budget=0)', async () => {
+        it("stops at the model's own floor rather than a global minimum", async () => {
+            // gemini-3.7-flash rejects 'minimal', so the sequence must end at 'low'.
             mockCallGemini.mockRejectedValue(MAX_TOKENS_ERROR);
 
-            const budgetRef = { current: 0 };
+            const levelRef = { current: 'high' as const };
             await expect(
-                callGeminiReducingBudget(
+                callGeminiReducingLevel(
+                    'prompt',
+                    MODEL_FLOOR_LOW,
+                    'key',
+                    undefined,
+                    levelRef
+                )
+            ).rejects.toThrow('MAX_TOKENS');
+
+            expect(mockCallGemini).toHaveBeenCalledTimes(3);
+            expect(levelRef.current).toBe('low');
+            expect(mockCallGemini).not.toHaveBeenCalledWith(
+                'prompt',
+                expect.objectContaining({ thinkingLevel: 'minimal' })
+            );
+        });
+
+        it('throws when MAX_TOKENS occurs at the lowest level', async () => {
+            mockCallGemini.mockRejectedValue(MAX_TOKENS_ERROR);
+
+            const levelRef = { current: 'minimal' as const };
+            await expect(
+                callGeminiReducingLevel(
                     'prompt',
                     MODEL,
                     'key',
                     undefined,
-                    budgetRef
+                    levelRef
                 )
             ).rejects.toThrow('MAX_TOKENS');
         });
 
-        it('propagates 5xx error and preserves current budget in budgetRef', async () => {
+        it('propagates 5xx error and preserves current level in levelRef', async () => {
             mockCallGemini.mockRejectedValueOnce(SERVER_ERROR);
 
-            const budgetRef = { current: 24576 };
+            const levelRef = { current: 'high' as const };
             await expect(
-                callGeminiReducingBudget(
+                callGeminiReducingLevel(
                     'prompt',
                     MODEL,
                     'key',
                     undefined,
-                    budgetRef
+                    levelRef
                 )
             ).rejects.toEqual(SERVER_ERROR);
 
-            // budgetRef reflects the budget being tried when 5xx occurred
-            expect(budgetRef.current).toBe(24576);
+            // levelRef reflects the level being tried when the 5xx occurred
+            expect(levelRef.current).toBe('high');
         });
 
         it('propagates null error (isMaxTokensError: null path)', async () => {
             mockCallGemini.mockRejectedValueOnce(null);
 
-            const budgetRef = { current: 24576 };
+            const levelRef = { current: 'high' as const };
             await expect(
-                callGeminiReducingBudget(
+                callGeminiReducingLevel(
                     'prompt',
                     MODEL,
                     'key',
                     undefined,
-                    budgetRef
+                    levelRef
                 )
             ).rejects.toBeNull();
         });
@@ -170,38 +200,38 @@ describe('gemini-retry', () => {
         it('propagates string error (isMaxTokensError: non-object path)', async () => {
             mockCallGemini.mockRejectedValueOnce('unexpected string error');
 
-            const budgetRef = { current: 24576 };
+            const levelRef = { current: 'high' as const };
             await expect(
-                callGeminiReducingBudget(
+                callGeminiReducingLevel(
                     'prompt',
                     MODEL,
                     'key',
                     undefined,
-                    budgetRef
+                    levelRef
                 )
             ).rejects.toBe('unexpected string error');
         });
 
-        it('preserves reduced budget in budgetRef when 5xx follows MAX_TOKENS', async () => {
-            // Sequence: MAX_TOKENS at 24576 → continues to 12288 → 5xx at 12288
+        it('preserves the reduced level in levelRef when 5xx follows MAX_TOKENS', async () => {
+            // Sequence: MAX_TOKENS at high → continues to medium → 5xx at medium
             mockCallGemini
                 .mockRejectedValueOnce(MAX_TOKENS_ERROR)
                 .mockRejectedValueOnce(SERVER_ERROR);
 
-            const budgetRef = { current: 24576 };
+            const levelRef = { current: 'high' as const };
             await expect(
-                callGeminiReducingBudget(
+                callGeminiReducingLevel(
                     'prompt',
                     MODEL,
                     'key',
                     undefined,
-                    budgetRef
+                    levelRef
                 )
             ).rejects.toEqual(SERVER_ERROR);
 
-            // Must be 12288 (reduced), not 24576 (initial)
-            // withRetry's next attempt will start from this reduced budget
-            expect(budgetRef.current).toBe(12288);
+            // Must be 'medium' (reduced), not 'high' (initial) —
+            // withRetry's next attempt resumes from the reduced level.
+            expect(levelRef.current).toBe('medium');
         });
     });
 
@@ -271,28 +301,29 @@ describe('gemini-retry', () => {
             );
         });
 
-        it('uses provided budgetRef as starting budget', async () => {
+        it('uses the provided levelRef as the starting level', async () => {
             mockCallGemini.mockResolvedValueOnce('result');
 
-            const budgetRef = { current: 12288 };
+            const levelRef = { current: 'medium' as const };
             await callGeminiWithRetry('prompt', MODEL, 'paid-key', {
-                budgetRef,
+                levelRef,
             });
 
             expect(mockCallGemini).toHaveBeenCalledWith(
                 'prompt',
-                expect.objectContaining({ thinkingBudget: 12288 })
+                expect.objectContaining({ thinkingLevel: 'medium' })
             );
         });
 
-        it('creates new budgetRef from MODEL_SPECS[model].thinkingBudget when not provided', async () => {
+        it("starts from the spec's default state when no levelRef is provided", async () => {
             mockCallGemini.mockResolvedValueOnce('result');
 
             await callGeminiWithRetry('prompt', MODEL, 'key');
 
+            // Free-class model → `reasoning.default: 'off'` → `'minimal'`.
             expect(mockCallGemini).toHaveBeenCalledWith(
                 'prompt',
-                expect.objectContaining({ thinkingBudget: 8192 })
+                expect.objectContaining({ thinkingLevel: 'minimal' })
             );
         });
 

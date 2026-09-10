@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
     AI_SYSTEM_PROMPT,
     computeFinancialsScorecard,
-    DEEPSEEK_V4_FLASH_MODEL,
-    DEEPSEEK_V4_PRO_MODEL,
+    DEEPSEEK_V4_1_FLASH_MODEL,
+    DEEPSEEK_V4_1_PRO_MODEL,
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
-    GEMINI_2_5_FLASH_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
     getAllowedModels,
     getAllowedTimeframes,
     getTierLimit,
@@ -39,7 +39,7 @@ import type {
 describe('browser public API exports', () => {
     it('exports domain values used by browser consumers', () => {
         const skillType: SkillType = 'indicator_guide';
-        const modelId: ModelId = 'gemini-2.5-pro';
+        const modelId: ModelId = 'gemini-3.1-pro-preview';
         const tierConfig: TierConfig = TIER_CONFIG;
         const sectorGroup: SectorGroupDef = {
             label: 'Technology',
@@ -48,15 +48,15 @@ describe('browser public API exports', () => {
         expect(sectorGroup.label).toBe('Technology');
 
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);
-        expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
-        expect(DEEPSEEK_V4_FLASH_MODEL).toBe('deepseek-v4-flash');
-        expect(DEEPSEEK_V4_PRO_MODEL).toBe('deepseek-v4-pro');
-        expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
-        expect(VALID_CHAT_MODELS).toContain('deepseek-v4-flash');
-        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
-        expect(isDeepSeekModel('gemini-2.5-flash')).toBe(false);
+        expect(GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+        expect(DEEPSEEK_V4_1_FLASH_MODEL).toBe('deepseek-v4.1-flash');
+        expect(DEEPSEEK_V4_1_PRO_MODEL).toBe('deepseek-v4.1-pro');
+        expect(VALID_CHAT_MODELS).toContain('gemini-3.5-flash-lite');
+        expect(VALID_CHAT_MODELS).toContain('deepseek-v4.1-flash');
+        expect(isDeepSeekModel('deepseek-v4.1-flash')).toBe(true);
+        expect(isDeepSeekModel('gemini-3.6-flash')).toBe(false);
         expect(DEFAULT_TIER).toBe('free');
-        expect(getAllowedModels('free')).toContain('claude-opus-4-7');
+        expect(getAllowedModels('free')).toContain('claude-opus-5');
         expect(getAllowedTimeframes('free')).toEqual(['1Day']);
         expect(isTimeframeAllowed('free', '5Min')).toBe(false);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);

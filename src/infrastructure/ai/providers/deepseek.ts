@@ -1,6 +1,10 @@
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
-import type { DeepSeekModelSpec } from '@/domain/types';
+import type {
+    DeepSeekModelSpec,
+    DeepSeekReasoningConfig,
+} from '@/domain/types';
+import { resolveReasoningConfig } from '@/domain/types';
 import OpenAI from 'openai';
 import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
 import { extractDeepSeekUsage, logUsage } from '@/infrastructure/ai/usage';
@@ -52,12 +56,10 @@ export interface DeepSeekCallOptions {
     /** 호출에 사용할 API key. user 키 또는 server 키. */
     apiKey: string;
     /**
-     * Reasoning toggle override (spec §A.2). 미지정 시 `spec.thinking`을 그대로
-     * 사용한다(기존 동작, backward-compatible). 지정 시 spec을 오버라이드한다 —
-     * deepseek은 ON(true)에서도 오버라이드 대상이다(다른 provider와 달리 spec.thinking:false
-     * 모델도 reasoning:true로 강제 활성화해야 하기 때문).
+     * 추론 설정 오버라이드. 미지정 시 스펙의 기본 상태(`reasoning.default`)를
+     * 해석해 적용한다.
      */
-    thinking?: boolean;
+    reasoning?: DeepSeekReasoningConfig;
     /** 외부에서 전달되는 abort signal. */
     signal?: AbortSignal;
     /** 호출별 system 프롬프트. 미지정 시 AI_SYSTEM_PROMPT 사용. */
@@ -105,10 +107,11 @@ export async function callDeepSeek(
         { role: 'user' as const, content: prompt },
     ];
 
-    // reasoning toggle override (spec §A.2): options.thinking, when provided,
-    // overrides spec.thinking — undefined falls back to the model spec
-    // (existing/backward-compatible behavior).
-    const useThinking = options.thinking ?? spec.thinking;
+    // 스펙이 OFF/ON 두 상태를 모두 들고 있으므로, 호출자가 준 설정이 없으면
+    // 기본 상태를 해석한다.
+    const useThinking = (
+        options.reasoning ?? resolveReasoningConfig(spec.reasoning, undefined)
+    ).thinking;
 
     const params: DeepSeekChatCompletionCreateParams = {
         model: spec.apiModelId,

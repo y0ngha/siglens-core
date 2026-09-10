@@ -50,7 +50,7 @@ function baseArgs() {
     return {
         category: 'crypto' as const,
         categoryLabel: '미국 암호화폐',
-        modelId: 'gemini-2.5-flash' as const,
+        modelId: 'gemini-3.6-flash' as const,
         news: [ITEM],
     };
 }

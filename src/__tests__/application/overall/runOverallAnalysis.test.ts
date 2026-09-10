@@ -119,7 +119,7 @@ function baseOptions(): RunOverallAnalysisOptions {
     return {
         symbol: 'AAPL',
         timeframe: '1Day',
-        modelId: 'deepseek-v4-flash',
+        modelId: 'deepseek-v4.1-flash',
         assetClass: 'crypto',
         technical: {},
         newsItems: [mockNewsItem],

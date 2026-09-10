@@ -108,17 +108,17 @@ describe('hashSkillCatalog', () => {
 
 describe('chart cache key folds the skill fingerprint', () => {
     it('omits the fingerprint segment when none is passed (backward compatible)', () => {
-        expect(buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash')).toBe(
-            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}`
+        expect(buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash')).toBe(
+            `analysis:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}`
         );
     });
 
     it('appends the fingerprint segment when provided', () => {
         const fp = hashSkillCatalog(CATALOG_A);
         expect(
-            buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', fp)
+            buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash', fp)
         ).toBe(
-            `analysis:AAPL:1Day:gemini-2.5-flash:${PROMPT_TEMPLATE_VERSION}:${fp}`
+            `analysis:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}:${fp}`
         );
     });
 
@@ -141,20 +141,20 @@ describe('chart cache key folds the skill fingerprint', () => {
 
 describe('fundamental cache key folds the skill fingerprint', () => {
     it('omits the fingerprint segment when none is passed', () => {
-        expect(buildFundamentalCacheKey('AAPL', 'gemini-2.5-pro')).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-2.5-pro:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`
+        expect(buildFundamentalCacheKey('AAPL', 'gemini-3.1-pro-preview')).toBe(
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:fundamental:AAPL:gemini-3.1-pro-preview:${FUNDAMENTAL_PROMPT_TEMPLATE_VERSION}`
         );
     });
 
     it('two different skill catalogs → different fundamental cache keys', () => {
         const keyA = buildFundamentalCacheKey(
             'AAPL',
-            'gemini-2.5-pro',
+            'gemini-3.1-pro-preview',
             hashSkillCatalog(CATALOG_A)
         );
         const keyB = buildFundamentalCacheKey(
             'AAPL',
-            'gemini-2.5-pro',
+            'gemini-3.1-pro-preview',
             hashSkillCatalog(CATALOG_B)
         );
         expect(keyA).not.toBe(keyB);

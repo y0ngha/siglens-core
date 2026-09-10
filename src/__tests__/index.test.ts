@@ -25,15 +25,15 @@ import {
     clusterKeyLevels,
     computeFinancialsScorecard,
     createChatTokenStore,
-    DEEPSEEK_V4_FLASH_MODEL,
-    DEEPSEEK_V4_PRO_MODEL,
+    DEEPSEEK_V4_1_FLASH_MODEL,
+    DEEPSEEK_V4_1_PRO_MODEL,
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
     extractReconciledActionLines,
     FEAR_GREED_LABEL_CUTOFFS,
-    GEMINI_2_5_FLASH_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
     getAllowedModels,
     getAllowedTimeframes,
     getTierLimit,
@@ -141,8 +141,8 @@ describe('public API exports', () => {
         expect(getTierLimit('free', 'analysisPerDay')).toBe(Infinity);
         expect(isTimeframeAllowed('free', '5Min')).toBe(false);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
-        expect(isModelAllowed('free', 'claude-opus-4-7')).toBe(true);
-        expect(getAllowedModels('free')).toContain('claude-opus-4-7');
+        expect(isModelAllowed('free', 'claude-opus-5')).toBe(true);
+        expect(getAllowedModels('free')).toContain('claude-opus-5');
         expect(isTier('member')).toBe(true);
         expect(typeof checkAnalysisLimit).toBe('function');
         expect(typeof checkChatbotLimit).toBe('function');
@@ -175,16 +175,16 @@ describe('public API exports', () => {
     it('exports chat application and infrastructure entrypoints', () => {
         expect(typeof requestChatCompletion).toBe('function');
         expect(typeof createChatTokenStore).toBe('function');
-        expect(GEMINI_2_5_FLASH_MODEL).toBe('gemini-2.5-flash');
-        expect(DEEPSEEK_V4_FLASH_MODEL).toBe('deepseek-v4-flash');
-        expect(DEEPSEEK_V4_PRO_MODEL).toBe('deepseek-v4-pro');
-        expect(VALID_CHAT_MODELS).toContain('gemini-2.5-flash-lite');
-        expect(VALID_CHAT_MODELS).toContain('deepseek-v4-flash');
+        expect(GEMINI_FLASH_LITE_MODEL).toBe('gemini-3.5-flash-lite');
+        expect(DEEPSEEK_V4_1_FLASH_MODEL).toBe('deepseek-v4.1-flash');
+        expect(DEEPSEEK_V4_1_PRO_MODEL).toBe('deepseek-v4.1-pro');
+        expect(VALID_CHAT_MODELS).toContain('gemini-3.5-flash-lite');
+        expect(VALID_CHAT_MODELS).toContain('deepseek-v4.1-flash');
     });
 
     it('exports the DeepSeek model type guard from package entrypoint', () => {
-        expect(isDeepSeekModel('deepseek-v4-flash')).toBe(true);
-        expect(isDeepSeekModel('gemini-2.5-flash')).toBe(false);
+        expect(isDeepSeekModel('deepseek-v4.1-flash')).toBe(true);
+        expect(isDeepSeekModel('gemini-3.6-flash')).toBe(false);
     });
 
     it('exports financials domain and application entrypoints', () => {

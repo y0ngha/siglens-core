@@ -320,7 +320,7 @@ describe('withRetry', () => {
      * wall-clock 예산 가드.
      *
      * `abortIfCumulativeDelayReachesMs`는 **sleep 시간만** 세므로 느린 실패를 못 막는다.
-     * 2026-08-09 프로덕션에서 `deepseek-v4-pro`가 248.5초 만에 실패했는데 그 시점
+     * 2026-08-09 프로덕션에서 `deepseek-v4.1-pro`가 248.5초 만에 실패했는데 그 시점
      * 누적 delay는 0이라 delay cap(30s)을 통과해 재시도가 시작됐고, 호출자 마감(300초)을
      * 넘겨 대기 중이던 4건이 한꺼번에 실패했다.
      */

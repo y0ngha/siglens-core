@@ -1,8 +1,6 @@
 import {
-    DEEPSEEK_V4_FLASH_MODEL,
-    GEMINI_2_5_FLASH_LITE_MODEL,
-    GEMINI_2_5_FLASH_MODEL,
-    GEMINI_2_5_PRO_MODEL,
+    DEEPSEEK_V4_1_FLASH_MODEL,
+    GEMINI_FLASH_LITE_MODEL,
 } from '@/application/chat/constants';
 import { requestChatCompletion } from '@/application/chat/requestChatCompletion';
 import type { RequestChatCompletionParams } from '@/application/chat/types';
@@ -18,6 +16,19 @@ import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
 import { constants } from 'node:http2';
 import type { Mock } from 'vitest';
+
+/**
+ * Free-access-class model: reachable by anonymous callers on the server key.
+ */
+const FREE_MODEL: ModelId = 'gemini-3.6-flash';
+/**
+ * Byok-access-class model: a non-pro caller must supply their own key.
+ *
+ * Must stay in the byok class, not merely "not free". Member-class models are
+ * covered by the server key, so picking one here would silently stop
+ * exercising the BYOK gate.
+ */
+const BYOK_MODEL: ModelId = 'claude-opus-5';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MINIMAL_ANALYSIS: AnalysisResponse = {
@@ -45,21 +56,24 @@ const restrictedTierConfig: TierConfig = {
     infoDepth: TIER_CONFIG.infoDepth,
     models: {
         free: [
-            'gemini-2.5-flash',
-            'gemini-2.5-flash-lite',
-            'deepseek-v4-flash',
+            'gemini-3.6-flash',
+            'gemini-3.5-flash-lite',
+            'deepseek-v4.1-flash',
         ],
         member: [
-            'gemini-2.5-flash',
-            'gemini-2.5-flash-lite',
-            'gemini-2.5-pro',
-            'deepseek-v4-flash',
+            'gemini-3.6-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.1-pro-preview',
+            'deepseek-v4.1-flash',
         ],
+        // BYOK_MODEL은 pro 목록에만 둔다 — 세 목록이 누적이므로 "pro에만 있음"이
+        // 곧 byok 등급이고, 그래야 BYOK 게이트를 실제로 통과한다.
         pro: [
-            'gemini-2.5-flash',
-            'gemini-2.5-flash-lite',
-            'gemini-2.5-pro',
-            'deepseek-v4-flash',
+            'gemini-3.6-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.1-pro-preview',
+            'deepseek-v4.1-flash',
+            'claude-opus-5',
         ],
     },
     featureFlags: { enableTierRestrictions: true },
@@ -119,7 +133,7 @@ describe('requestChatCompletion', () => {
             userId: null,
             ipHash: 'hashed-ip',
             actionType: 'chatbot',
-            modelUsed: GEMINI_2_5_FLASH_MODEL,
+            modelUsed: FREE_MODEL,
             date: '2026-04-29',
             createdAt: new Date('2026-04-29T00:00:00.000Z'),
         });
@@ -209,7 +223,7 @@ describe('requestChatCompletion', () => {
     it('returns user_api_key_required when a non-pro tier user requests a premium model without a user key', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 userApiKey: undefined,
                 tierContext: { userId: null, tier: 'member' },
             }),
@@ -223,7 +237,7 @@ describe('requestChatCompletion', () => {
     it('returns server_error when a free model is requested without a server key', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_FLASH_MODEL,
+                model: FREE_MODEL,
                 userApiKey: undefined,
                 serverApiKey: undefined,
             }),
@@ -237,7 +251,7 @@ describe('requestChatCompletion', () => {
     it('succeeds for non-pro tier + premium model + userApiKey even when serverApiKey is absent', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 userApiKey: 'user-key',
                 serverApiKey: undefined,
                 tierContext: { userId: null, tier: 'member' },
@@ -254,7 +268,7 @@ describe('requestChatCompletion', () => {
             expect.objectContaining({
                 userApiKey: 'user-key',
                 serverApiKey: undefined,
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
             })
         );
     });
@@ -262,7 +276,7 @@ describe('requestChatCompletion', () => {
     it('allows a pro tier user to call a premium model using serverApiKey when no userApiKey is provided', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 userApiKey: undefined,
                 serverApiKey: 'server-key',
                 tierContext: { userId: 'user-1', tier: 'pro' },
@@ -279,7 +293,7 @@ describe('requestChatCompletion', () => {
             expect.objectContaining({
                 userApiKey: undefined,
                 serverApiKey: 'server-key',
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
             })
         );
         expect(tryConsumeToken).toHaveBeenCalled();
@@ -288,7 +302,7 @@ describe('requestChatCompletion', () => {
     it('returns server_error when a pro tier user has a userApiKey but no serverApiKey', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_FLASH_MODEL,
+                model: FREE_MODEL,
                 userApiKey: 'paid-key',
                 serverApiKey: undefined,
                 tierContext: { userId: 'user-1', tier: 'pro' },
@@ -304,7 +318,7 @@ describe('requestChatCompletion', () => {
     it('returns server_error when a pro tier user has no userApiKey and no serverApiKey', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 userApiKey: undefined,
                 serverApiKey: undefined,
                 tierContext: { userId: 'user-1', tier: 'pro' },
@@ -329,7 +343,7 @@ describe('requestChatCompletion', () => {
     it('returns model_not_allowed before token consumption when tier restrictions reject the model', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
             }),
             {
@@ -351,7 +365,7 @@ describe('requestChatCompletion', () => {
                 history: [{ role: 'model', content: '이전 답변입니다.' }],
                 userMessage: 'RSI도 설명해줘',
                 serverApiKey: 'server-key',
-                model: GEMINI_2_5_FLASH_LITE_MODEL,
+                model: GEMINI_FLASH_LITE_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
                 occurredAt,
             }),
@@ -375,7 +389,7 @@ describe('requestChatCompletion', () => {
             expect.objectContaining({
                 userApiKey: undefined,
                 serverApiKey: 'server-key',
-                model: GEMINI_2_5_FLASH_LITE_MODEL,
+                model: GEMINI_FLASH_LITE_MODEL,
                 contents: [
                     {
                         role: 'assistant',
@@ -400,7 +414,7 @@ describe('requestChatCompletion', () => {
             userId: 'user-1',
             ipAddress: '1.2.3.4',
             actionType: 'chatbot',
-            modelUsed: GEMINI_2_5_FLASH_LITE_MODEL,
+            modelUsed: GEMINI_FLASH_LITE_MODEL,
             occurredAt: occurredAt,
         });
     });
@@ -444,13 +458,13 @@ describe('requestChatCompletion', () => {
         });
 
         const firstCall = (callAiProvider as Mock).mock.calls[0]?.[0];
-        expect(firstCall).toMatchObject({ model: DEEPSEEK_V4_FLASH_MODEL });
+        expect(firstCall).toMatchObject({ model: DEEPSEEK_V4_1_FLASH_MODEL });
     });
 
     it('records member premium model usage after a successful response', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
                 occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
@@ -466,7 +480,7 @@ describe('requestChatCompletion', () => {
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
-            modelUsed: GEMINI_2_5_PRO_MODEL,
+            modelUsed: BYOK_MODEL,
             date: '2026-04-28',
         });
     });
@@ -474,7 +488,7 @@ describe('requestChatCompletion', () => {
     it('records pro premium model usage after a successful response', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'pro' },
                 occurredAt: new Date('2026-04-28T12:34:56.000Z'),
             }),
@@ -490,7 +504,7 @@ describe('requestChatCompletion', () => {
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
-            modelUsed: GEMINI_2_5_PRO_MODEL,
+            modelUsed: BYOK_MODEL,
             date: '2026-04-28',
         });
     });
@@ -498,7 +512,7 @@ describe('requestChatCompletion', () => {
     it('records premium usage for a pro tier user calling via serverApiKey without userApiKey', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 userApiKey: undefined,
                 serverApiKey: 'server-key',
                 tierContext: { userId: 'user-1', tier: 'pro' },
@@ -516,7 +530,7 @@ describe('requestChatCompletion', () => {
             userId: 'user-1',
             ipHash: '6694f83c9f476da31f5df6bcc520034e7e57d421d247b9d34f49edbfc84a764c',
             actionType: 'premium_model',
-            modelUsed: GEMINI_2_5_PRO_MODEL,
+            modelUsed: BYOK_MODEL,
             date: '2026-04-28',
         });
     });
@@ -526,7 +540,7 @@ describe('requestChatCompletion', () => {
 
         await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
                 occurredAt,
             }),
@@ -535,10 +549,12 @@ describe('requestChatCompletion', () => {
                 usageRepository,
                 callAiProvider,
                 usageLogs,
-                tierConfig: restrictedTierConfig,
             }
         );
 
+        // restrictedTierConfig를 쓰지 않는다: 그 설정은 tier 제한이 켜져 있어
+        // byok 모델이 member 허용 목록 밖이고, 요청이 사용량 기록 전에 거부된다.
+        // 이 테스트가 검증하는 건 occurredAt 전달이지 tier 제한이 아니다.
         expect(recordUsage).toHaveBeenCalledWith(
             expect.objectContaining({ occurredAt })
         );
@@ -550,7 +566,7 @@ describe('requestChatCompletion', () => {
     it('does not record premium model usage for anonymous users', async () => {
         await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: null, tier: 'member' },
             }),
             { tokenStore, callAiProvider, usageLogs }
@@ -562,7 +578,7 @@ describe('requestChatCompletion', () => {
     it('does not record premium model usage for free tier users', async () => {
         await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'free' },
             }),
             { tokenStore, callAiProvider, usageLogs }
@@ -574,7 +590,7 @@ describe('requestChatCompletion', () => {
     it('does not record free model usage for members', async () => {
         await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_FLASH_MODEL,
+                model: FREE_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
             }),
             { tokenStore, callAiProvider, usageLogs }
@@ -586,7 +602,7 @@ describe('requestChatCompletion', () => {
     it('returns successful response when premium usage tracking is not provided', async () => {
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
             }),
             { tokenStore, callAiProvider }
@@ -607,7 +623,7 @@ describe('requestChatCompletion', () => {
 
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'member' },
             }),
             { tokenStore, callAiProvider, usageLogs }
@@ -734,15 +750,15 @@ describe('requestChatCompletion', () => {
         const flashOnlyTierConfig: TierConfig = {
             ...restrictedTierConfig,
             models: {
-                free: ['gemini-2.5-flash'],
-                member: ['gemini-2.5-flash'],
-                pro: ['gemini-2.5-flash'],
+                free: ['gemini-3.6-flash'],
+                member: ['gemini-3.6-flash'],
+                pro: ['gemini-3.6-flash'],
             },
         };
 
         const result = await requestChatCompletion(
             createParams({
-                model: GEMINI_2_5_PRO_MODEL,
+                model: BYOK_MODEL,
                 tierContext: { userId: 'user-1', tier: 'pro' },
             }),
             {

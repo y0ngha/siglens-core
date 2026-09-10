@@ -10,17 +10,18 @@ export interface CallAnalysisAiOptions {
      * 서버 키/BYOK 판정만 수행한다(`shouldUseServerKey`).
      */
     tier?: Tier;
-    /** BYOK. 서버 키를 쓰지 않는 경로(non-free 모델 + non-pro tier)에서 필수. */
+    /** BYOK. 서버 키를 쓰지 않는 경로(byok 등급 모델 + non-pro tier)에서 필수. */
     userApiKey?: string;
     signal?: AbortSignal;
     system?: string;
     responseSchema?: unknown;
     seed?: number;
-    /** Gemini 전용 초기 thinking budget. `reasoning:false`면 0으로 덮인다. */
-    thinkingBudget?: number;
     /**
-     * "깊은 생각" 토글. `false`=최소화, `true`=활성화, `undefined`=스펙 기본(무개입).
-     * tier 강제(free→false)는 호출 측 책임이다.
+     * "깊은 생각" 토글. `false`=모델 스펙의 `reasoning.off`, `true`=`reasoning.on`,
+     * `undefined`=스펙의 `reasoning.default`.
+     *
+     * `false`가 곧 "추론 없음"은 아니다 — 완전히 끄지 못하는 모델이 있다
+     * (`supportsHardOff` 참고). tier 강제(free→false)는 호출 측 책임이다.
      */
     reasoning?: boolean;
     /**
@@ -35,7 +36,7 @@ export interface CallAnalysisAiOptions {
  *
  * 브리핑은 tier/BYOK 개념이 없이 항상 서버 키를 쓴다 — `callAnalysisAi`를 재사용하면
  * tier가 undefined일 때 non-free 모델이 BYOK 경로를 타서 브리핑이 깨진다
- * (예: gemini-2.5-pro override).
+ * (예: gemini-3.1-pro-preview override).
  */
 export interface CallBriefingAiOptions {
     prompt: string;

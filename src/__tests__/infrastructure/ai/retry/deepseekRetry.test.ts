@@ -20,7 +20,7 @@ vi.mock('@/infrastructure/ai/retry/withRetry', () => ({
 const mockCallDeepSeek = vi.mocked(callDeepSeek);
 const mockWithRetry = vi.mocked(withRetry);
 
-const MODEL: DeepSeekModelId = 'deepseek-v4-pro';
+const MODEL: DeepSeekModelId = 'deepseek-v4.1-pro';
 
 describe('callDeepSeekWithRetry', () => {
     beforeEach(() => {

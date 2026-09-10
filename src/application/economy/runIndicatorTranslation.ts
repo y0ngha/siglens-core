@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { GEMINI_2_5_FLASH_LITE_MODEL } from '@/application/chat/constants';
+import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import type {
     RunIndicatorTranslationOptions,
     RunIndicatorTranslationResult,
@@ -25,11 +25,11 @@ import {
  * non-reasoning line is the right cost/latency trade-off. Kept local so the
  * run path is self-contained.
  *
- * ⚠️ `reasoning: false`는 Gemini 분기에서 `thinkingBudget: 0`이 된다. 리터럴
- * 0을 거부하는 Gemini 모델이 있으므로(runNewsCardAnalysis.ts의 같은 주석 참고)
- * 이 상수를 바꾸기 전에 대상 모델이 0을 받는지 확인할 것.
+ * ⚠️ `reasoning: false`는 스펙의 `reasoning.off` 설정으로 해석된다. Gemini
+ * 모델 대부분은 추론을 완전히 끄지 못하므로(runNewsCardAnalysis.ts의 같은 주석
+ * 참고) 이 상수를 바꾸기 전에 대상 모델의 `supportsHardOff`를 확인할 것.
  */
-const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
+const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_FLASH_LITE_MODEL;
 
 /**
  * Run an indicator-name AI translation end-to-end: cache lookup → LLM call →
@@ -41,7 +41,7 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_2_5_FLASH_LITE_MODEL;
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `gemini-2.5-flash-lite` with reasoning off (single Korean string output).
+ * `gemini-3.5-flash-lite` with reasoning off (single Korean string output).
  *
  * Indicator translation has no usage gate — no tier, no BYOK, no quota check.
  *

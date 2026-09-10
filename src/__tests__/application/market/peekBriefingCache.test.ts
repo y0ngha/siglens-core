@@ -110,7 +110,7 @@ describe('peekBriefingCache 함수는', () => {
         vi.setSystemTime(new Date('2026-06-04T10:30:00.000Z'));
         try {
             mockCacheGet.mockResolvedValueOnce(mockCachedData);
-            const customModel = 'gemini-2.5-pro';
+            const customModel = 'gemini-3.1-pro-preview';
 
             await peekBriefingCache(mockData, CTX, customModel);
 

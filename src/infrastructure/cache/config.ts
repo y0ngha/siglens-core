@@ -434,7 +434,7 @@ export function narrowMarketEventsForCacheKey(
  * sends it on the dispatch body; it is also folded into the briefing cache key
  * so a model change misses the old cache.
  */
-export const BRIEFING_MODEL_ID = 'deepseek-v4-flash' as const;
+export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
 
 /**
  * Prompt-template version folded into the technical and fundamental analysis
@@ -672,16 +672,16 @@ export const PROMPT_TEMPLATE_VERSION = 'p11' as const;
  *
  * @example
  * ```ts
- * const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash');
- * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1'
- * const keyed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2');
- * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2'
- * const reasoned = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true);
- * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on'
- * const bucketed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true, 'profit');
- * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on:pos=profit'
- * const historied = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-2.5-flash', 'a1b2', true, 'profit', undefined, 'c3d4');
- * // → 'analysis:AAPL:1Day:gemini-2.5-flash:p1:a1b2:reason=on:pos=profit:hist=c3d4'
+ * const key = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash');
+ * // → 'analysis:AAPL:1Day:gemini-3.6-flash:p1'
+ * const keyed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash', 'a1b2');
+ * // → 'analysis:AAPL:1Day:gemini-3.6-flash:p1:a1b2'
+ * const reasoned = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash', 'a1b2', true);
+ * // → 'analysis:AAPL:1Day:gemini-3.6-flash:p1:a1b2:reason=on'
+ * const bucketed = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash', 'a1b2', true, 'profit');
+ * // → 'analysis:AAPL:1Day:gemini-3.6-flash:p1:a1b2:reason=on:pos=profit'
+ * const historied = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash', 'a1b2', true, 'profit', undefined, 'c3d4');
+ * // → 'analysis:AAPL:1Day:gemini-3.6-flash:p1:a1b2:reason=on:pos=profit:hist=c3d4'
  * ```
  */
 export function buildAnalysisCacheKey(
@@ -1027,10 +1027,10 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
  *
  * @example
  * ```ts
- * buildFinancialsCacheKey('AAPL', 'gemini-2.5-flash', 'annual');
- * // → 'v1:analysis:financials:AAPL:annual:gemini-2.5-flash:p1'
- * buildFinancialsCacheKey('AAPL', 'gemini-2.5-flash', 'quarter', 'sk1');
- * // → 'v1:analysis:financials:AAPL:quarter:gemini-2.5-flash:p1:sk1'
+ * buildFinancialsCacheKey('AAPL', 'gemini-3.6-flash', 'annual');
+ * // → 'v1:analysis:financials:AAPL:annual:gemini-3.6-flash:p1'
+ * buildFinancialsCacheKey('AAPL', 'gemini-3.6-flash', 'quarter', 'sk1');
+ * // → 'v1:analysis:financials:AAPL:quarter:gemini-3.6-flash:p1:sk1'
  * ```
  */
 export function buildFinancialsCacheKey(
@@ -1124,10 +1124,10 @@ export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  *
  * @example
  * ```ts
- * buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash');
- * // → 'v1:analysis:congress:AAPL:gemini-2.5-flash:p1'
- * buildCongressTrendCacheKey('AAPL', 'gemini-2.5-flash', 'sk1');
- * // → 'v1:analysis:congress:AAPL:gemini-2.5-flash:p1:sk1'
+ * buildCongressTrendCacheKey('AAPL', 'gemini-3.6-flash');
+ * // → 'v1:analysis:congress:AAPL:gemini-3.6-flash:p1'
+ * buildCongressTrendCacheKey('AAPL', 'gemini-3.6-flash', 'sk1');
+ * // → 'v1:analysis:congress:AAPL:gemini-3.6-flash:p1:sk1'
  * ```
  */
 export function buildCongressTrendCacheKey(
@@ -1219,10 +1219,10 @@ export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
  *
  * @example
  * ```ts
- * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4-flash', 'abc123');
- * // → 'v1:analysis:market-news:crypto:deepseek-v4-flash:p2:abc123'
- * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4-flash', 'abc123', true);
- * // → 'v1:analysis:market-news:crypto:deepseek-v4-flash:p2:abc123:reason=on'
+ * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4.1-flash', 'abc123');
+ * // → 'v1:analysis:market-news:crypto:deepseek-v4.1-flash:p2:abc123'
+ * buildMarketNewsDigestCacheKey('crypto', 'deepseek-v4.1-flash', 'abc123', true);
+ * // → 'v1:analysis:market-news:crypto:deepseek-v4.1-flash:p2:abc123:reason=on'
  * ```
  */
 export function buildMarketNewsDigestCacheKey(
@@ -1259,8 +1259,8 @@ export function buildMarketNewsDigestCacheKey(
  *
  * @example
  * ```ts
- * buildNewsCacheKey('AAPL', 'gemini-2.5-pro', 'h2');
- * // → 'v1:analysis:news:AAPL:gemini-2.5-pro:p2:h2'
+ * buildNewsCacheKey('AAPL', 'gemini-3.1-pro-preview', 'h2');
+ * // → 'v1:analysis:news:AAPL:gemini-3.1-pro-preview:p2:h2'
  * ```
  */
 export function buildNewsCacheKey(

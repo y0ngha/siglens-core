@@ -85,14 +85,14 @@ describe('peekAnalysisCache 함수는', () => {
             SYMBOL,
             TIMEFRAME,
             undefined,
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
             buildAnalysisCacheKey(
                 SYMBOL,
                 TIMEFRAME,
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 `free:${EMPTY_CATALOG_FP}`
             )
         );
@@ -105,7 +105,7 @@ describe('peekAnalysisCache 함수는', () => {
             SYMBOL,
             TIMEFRAME,
             undefined,
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             true
         );
 
@@ -113,7 +113,7 @@ describe('peekAnalysisCache 함수는', () => {
             buildAnalysisCacheKey(
                 SYMBOL,
                 TIMEFRAME,
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 `free:${EMPTY_CATALOG_FP}`,
                 true
             )
@@ -127,14 +127,14 @@ describe('peekAnalysisCache 함수는', () => {
             SYMBOL,
             TIMEFRAME,
             undefined,
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
             buildAnalysisCacheKey(
                 SYMBOL,
                 TIMEFRAME,
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 `free:${EMPTY_CATALOG_FP}`
             )
         );
@@ -147,7 +147,7 @@ describe('peekAnalysisCache 함수는', () => {
             SYMBOL,
             TIMEFRAME,
             undefined,
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             undefined,
             DEFAULT_TIER,
             TIER_CONFIG,
@@ -158,7 +158,7 @@ describe('peekAnalysisCache 함수는', () => {
             buildAnalysisCacheKey(
                 SYMBOL,
                 TIMEFRAME,
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 `free:${EMPTY_CATALOG_FP}`,
                 undefined,
                 'profit'
@@ -173,14 +173,14 @@ describe('peekAnalysisCache 함수는', () => {
             SYMBOL,
             TIMEFRAME,
             undefined,
-            'gemini-2.5-flash'
+            'gemini-3.6-flash'
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
             buildAnalysisCacheKey(
                 SYMBOL,
                 TIMEFRAME,
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 `free:${EMPTY_CATALOG_FP}`
             )
         );
@@ -193,7 +193,7 @@ describe('peekAnalysisCache 함수는', () => {
             SYMBOL,
             TIMEFRAME,
             undefined,
-            'gemini-2.5-flash',
+            'gemini-3.6-flash',
             true,
             DEFAULT_TIER,
             TIER_CONFIG,
@@ -204,7 +204,7 @@ describe('peekAnalysisCache 함수는', () => {
             buildAnalysisCacheKey(
                 SYMBOL,
                 TIMEFRAME,
-                'gemini-2.5-flash',
+                'gemini-3.6-flash',
                 `free:${EMPTY_CATALOG_FP}`,
                 true,
                 'deep-loss'

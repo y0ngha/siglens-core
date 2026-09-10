@@ -38,7 +38,7 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
      *
      * `true` forces reasoning on even when `MODEL_SPECS[modelId].thinking` is
      * `false` — that override is what lets the digest run reasoning on a cheap
-     * non-reasoning model (`deepseek-v4-flash`) instead of paying for a
+     * non-reasoning model (`deepseek-v4.1-flash`) instead of paying for a
      * reasoning-tier model. `false` forces it off. Omitted preserves the
      * model spec's own default.
      *

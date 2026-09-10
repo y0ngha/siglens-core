@@ -44,7 +44,7 @@ import type {
     OverallAnalysisResponse,
 } from '@/domain/types';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { DEEPSEEK_V4_FLASH_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import {
     buildOverallCacheKey,
     buildOverallPeekCacheKey,
@@ -61,7 +61,7 @@ import {
  * Default model for the overall synthesis LLM call when `options.modelId` is
  * absent or not a known `ActiveModelId`. Mirrors `runAnalysis`'s fallback.
  */
-const DEFAULT_RUN_OVERALL_MODEL: ActiveModelId = DEEPSEEK_V4_FLASH_MODEL;
+const DEFAULT_RUN_OVERALL_MODEL: ActiveModelId = DEEPSEEK_V4_1_FLASH_MODEL;
 
 /**
  * `AssembledPromptRecord.promptVersion` for the OVERALL axis.

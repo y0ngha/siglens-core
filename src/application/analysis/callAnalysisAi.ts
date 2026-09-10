@@ -1,9 +1,7 @@
 import type { CallAnalysisAiOptions } from '@/application/analysis/types';
-import {
-    DISABLED_THINKING_BUDGET,
-    MODEL_SPECS,
-    supportsDisabledThinking,
-} from '@/domain/analysis/modelSpecs';
+import { MODEL_SPECS, supportsHardOff } from '@/domain/analysis/modelSpecs';
+import type { ModelSpec } from '@/domain/types';
+import { resolveReasoningConfig } from '@/domain/types';
 import type {
     ChatGPTModelId,
     ClaudeModelId,
@@ -30,42 +28,48 @@ import { resolveServerApiKey } from '@/infrastructure/ai/serverKeys';
 const ANALYSIS_MAX_RETRY_DELAY_MS = 30_000;
 
 /**
- * Models already warned about via {@link warnUnsupportedDisabledThinking}, so a
- * batch of calls on the same model logs once instead of once per item.
+ * Models already warned about via {@link warnPartialHardOff}, so a batch of
+ * calls on the same model logs once instead of once per item.
  */
-const warnedDisabledThinkingModels = new Set<string>();
+const warnedPartialHardOffModels = new Set<string>();
 
 /**
- * Log, at most once per model, that `reasoning: false` could not be honored.
+ * Log, at most once per model, that `reasoning: false` could not fully disable
+ * reasoning.
  *
- * @param model - The Gemini model that rejects a literal `thinkingBudget: 0`.
+ * The call still succeeds — the model runs at the lowest strength it accepts —
+ * but it keeps spending thinking tokens, so a caller that assumed "off means
+ * zero" would be wrong about both cost and latency.
+ *
+ * @param model - A model whose spec sets `hardOff: false`.
  */
-function warnUnsupportedDisabledThinking(model: string): void {
-    if (warnedDisabledThinkingModels.has(model)) return;
-    warnedDisabledThinkingModels.add(model);
+function warnPartialHardOff(model: string): void {
+    if (warnedPartialHardOffModels.has(model)) return;
+    warnedPartialHardOffModels.add(model);
     console.warn(
-        `[callAnalysisAi] reasoning:false ignored — "${model}" rejects a disabled thinking budget; falling back to its spec default.`
+        `[callAnalysisAi] reasoning:false only partially honored — "${model}" cannot disable reasoning; using its lowest supported level instead.`
     );
 }
 
 /** @internal Test helper — clears the once-per-model warning set. */
-export function _resetDisabledThinkingWarningsForTest(): void {
-    warnedDisabledThinkingModels.clear();
+export function _resetPartialHardOffWarningsForTest(): void {
+    warnedPartialHardOffModels.clear();
 }
 
 /**
- * 분석용 AI 호출 — provider 라우팅, `reasoning` 번역, 재시도, JSON 정규화를 포함한다.
+ * 분석용 AI 호출 — provider 라우팅, `reasoning` 해석, 재시도, JSON 정규화를 포함한다.
  *
- * `reasoning` boolean → per-provider translation (provider 어댑터로 디스패치하기 전 중앙 번역):
+ * `reasoning`은 provider별로 번역되지 않는다. 각 모델 스펙이 두 상태를 모두
+ * 들고 있고(`ReasoningModes`), `resolveReasoningConfig`가 그중 하나를 골라
+ * 어댑터에 그대로 넘긴다:
  *
- * - `reasoning === false` (MINIMIZE): deepseek → thinking:false / gemini →
- *   thinkingBudget:0 / claude·gpt → effort:'low'. 모델 스펙을 **오버라이드**한다
- *   (thinking 모델인 deepseek 스펙도 강제로 꺼진다).
- * - `reasoning === true` (ENABLE): deepseek → thinking:true (스펙 오버라이드 —
- *   deepseek-v4-flash처럼 spec.thinking:false인 모델도 켠다). gemini/claude/gpt는
- *   **오버라이드 없음** — 이미 스펙 강도로 추론하므로 스펙 기본이 그대로 적용된다.
- * - `reasoning === undefined`: 어디에도 오버라이드 없음 — 토글 도입 이전 동작
- *   (스펙 기본 / 호출자가 준 thinkingBudget)을 정확히 보존한다.
+ * - `reasoning === false` → `spec.reasoning.off`
+ * - `reasoning === true` → `spec.reasoning.on`
+ * - `reasoning === undefined` → `spec.reasoning.default`가 가리키는 쪽
+ *
+ * ⚠️ `false`가 "추론 없음"을 보장하지는 않는다. 일부 모델은 완전 비활성이
+ * 불가능해 `off`가 최저 강도일 뿐이며, 그 경우 모델당 1회 경고를 남긴다
+ * (`supportsHardOff` 참고).
  */
 export async function callAnalysisAi(
     options: CallAnalysisAiOptions
@@ -79,7 +83,6 @@ export async function callAnalysisAi(
         system,
         responseSchema,
         seed,
-        thinkingBudget,
         reasoning,
         correlationId,
     } = options;
@@ -95,8 +98,11 @@ export async function callAnalysisAi(
         );
     }
 
-    // reasoning===false 만 최소화 effort로 번역한다 — true/undefined는 스펙 기본 유지(무개입).
-    const minimizeEffort = reasoning === false;
+    // 추론 OFF를 요청했지만 모델이 완전히 끄지 못하는 경우(`hardOff: false`)를
+    // 모델당 한 번 알린다. 요청은 성공하되 사고 토큰이 계속 소비된다.
+    if (reasoning === false && !supportsHardOff(model)) {
+        warnPartialHardOff(model);
+    }
 
     const raw = await dispatch();
     if (raw.trim() === '') {
@@ -107,8 +113,15 @@ export async function callAnalysisAi(
     function dispatch(): Promise<string> {
         // apiKey는 위 가드에서 이미 narrowing됐다.
         const key = apiKey as string;
+        // 스펙이 OFF/ON 두 상태를 모두 들고 있어 provider별 번역 분기가 필요 없다.
+        // `resolveReasoningConfig`가 호출자의 `reasoning`(또는 스펙 기본)을 해석해
+        // 그 provider가 이해하는 설정을 그대로 돌려준다. 이 덕분에
+        // `reasoning === true`가 전 provider에서 스펙을 오버라이드한다 — 예전에는
+        // DeepSeek만 그랬고, 그래서 스펙 기본이 OFF가 되면 토글을 켜도 아무 일도
+        // 일어나지 않았다.
+        const spec: ModelSpec = MODEL_SPECS[model];
 
-        switch (MODEL_SPECS[model].provider) {
+        switch (spec.provider) {
             case 'claude':
                 return callClaudeWithRetry(
                     prompt,
@@ -119,7 +132,10 @@ export async function callAnalysisAi(
                         system,
                         responseSchema,
                         jobId: correlationId,
-                        ...(minimizeEffort && { effort: 'low' as const }),
+                        reasoning: resolveReasoningConfig(
+                            spec.reasoning,
+                            reasoning
+                        ),
                     }
                 );
             case 'chatgpt':
@@ -132,31 +148,13 @@ export async function callAnalysisAi(
                         system,
                         responseSchema,
                         jobId: correlationId,
-                        ...(minimizeEffort && { effort: 'low' as const }),
+                        reasoning: resolveReasoningConfig(
+                            spec.reasoning,
+                            reasoning
+                        ),
                     }
                 );
-            case 'gemini': {
-                // reasoning===false는 thinkingBudget을 강제로 0(DISABLED_THINKING_BUDGET)으로
-                // 눌러 호출자가 요청한 thinkingBudget보다 우선한다 — OFF는 완전 비활성이어야
-                // 하기 때문이다. reasoning===true/undefined는 기존 동작(thinkingBudget 있으면
-                // 사용, 없으면 스펙 기본)을 그대로 유지한다.
-                //
-                // 단, 리터럴 0을 400("This model only works in thinking mode")으로
-                // 거부하는 Gemini 모델이 있다(`supportsDisabledThinking`). 그런
-                // 모델에 0을 보내면 요청 자체가 죽으므로 스펙 기본으로 폴백하고
-                // 모델당 1회 경고한다 — 추론이 조금 켜진 채로 응답하는 편이
-                // 전 호출 400보다 낫다. 이 분기는 사용자가 모델과 추론 토글을
-                // 모두 고르는 경로(옵션·펀더멘털·재무 등)에서 실제로 열린다.
-                const canDisableThinking = supportsDisabledThinking(model);
-                if (minimizeEffort && !canDisableThinking) {
-                    warnUnsupportedDisabledThinking(model);
-                }
-                const budgetRef =
-                    minimizeEffort && canDisableThinking
-                        ? { current: DISABLED_THINKING_BUDGET }
-                        : thinkingBudget !== undefined
-                          ? { current: thinkingBudget }
-                          : undefined;
+            case 'gemini':
                 return callGeminiWithRetry(
                     prompt,
                     model as GeminiModelId,
@@ -165,14 +163,18 @@ export async function callAnalysisAi(
                         signal,
                         abortIfCumulativeDelayReachesMs:
                             ANALYSIS_MAX_RETRY_DELAY_MS,
-                        budgetRef,
                         system,
                         responseSchema,
                         seed,
                         jobId: correlationId,
+                        levelRef: {
+                            current: resolveReasoningConfig(
+                                spec.reasoning,
+                                reasoning
+                            ).level,
+                        },
                     }
                 );
-            }
             case 'deepseek':
                 return callDeepSeekWithRetry(
                     prompt,
@@ -187,13 +189,10 @@ export async function callAnalysisAi(
                         system,
                         responseSchema,
                         jobId: correlationId,
-                        // deepseek만 reasoning===true도 번역 대상이다: OFF(false)는 최소화,
-                        // ON(true)은 spec.thinking을 오버라이드해 강제 활성화한다(다른 provider와
-                        // 달리 ON에서도 개입 — deepseek-v4-flash처럼 spec.thinking:false인 모델도
-                        // 켜야 함). reasoning===undefined면 thinking:undefined가 전달되어
-                        // deepseek 어댑터의 `options.thinking ?? spec.thinking` 폴백으로 스펙
-                        // 기본이 그대로 유지된다.
-                        thinking: reasoning,
+                        reasoning: resolveReasoningConfig(
+                            spec.reasoning,
+                            reasoning
+                        ),
                     }
                 );
         }

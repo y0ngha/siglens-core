@@ -54,10 +54,10 @@ import { parseArgs, parsePositiveIntArg } from './cliArgs';
 import type { ModelRunResult } from './runModels';
 
 /**
- * Judge model — Claude Opus, resolved from `MODEL_SPECS['claude-opus-4-7']`
+ * Judge model — Claude Opus, resolved from `MODEL_SPECS['claude-opus-4-8']`
  * (the exact Opus id currently configured for production use).
  */
-const JUDGE_MODEL = 'claude-opus-4-7' as const;
+const JUDGE_MODEL = 'claude-opus-4-8' as const;
 const JUDGE_MAX_TOKENS = 4_096;
 const RETRY_DELAY_MS = 2_000;
 

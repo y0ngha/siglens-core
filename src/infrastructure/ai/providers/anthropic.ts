@@ -1,11 +1,21 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { EffortLevel, ModelSpec } from '@/domain/types';
+import type {
+    ClaudeAdaptiveReasoningConfig,
+    ClaudeBudgetReasoningConfig,
+    ClaudeEffortLevel,
+    ClaudeModelSpec,
+} from '@/domain/types';
+import {
+    isClaudeAdaptiveModelSpec,
+    isClaudeBudgetModelSpec,
+    resolveReasoningConfig,
+} from '@/domain/types';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import type { ClaudeModelId } from '@/domain/analysis/modelSpecs';
 import { extractClaudeUsage, logUsage } from '@/infrastructure/ai/usage';
 
-export type { EffortLevel };
+export type { ClaudeEffortLevel };
 
 type ClaudeTextBlock = Anthropic.Messages.TextBlock;
 type ClaudeToolUseBlock = Anthropic.Messages.ToolUseBlock;
@@ -49,11 +59,14 @@ export interface ClaudeCallOptions {
     /** 호출에 사용할 API key. user 키 또는 server 키. */
     apiKey: string;
     /**
-     * Adaptive thinking effort 수준 (Sonnet/Opus 전용).
-     * 미지정 시 MODEL_SPECS[model].effort 기본값 사용.
-     * haiku처럼 effort가 없는 모델은 무시된다.
+     * 추론 설정 오버라이드. 미지정 시 스펙의 기본 상태(`reasoning.default`)를
+     * 해석해 적용한다.
+     *
+     * adaptive 모델(sonnet/opus/fable)은 {@link ClaudeAdaptiveReasoningConfig},
+     * budget 모델(haiku)은 {@link ClaudeBudgetReasoningConfig}를 받는다. 모델의
+     * `thinkingApi`와 맞지 않는 형태를 넘기면 무시된다.
      */
-    effort?: EffortLevel;
+    reasoning?: ClaudeAdaptiveReasoningConfig | ClaudeBudgetReasoningConfig;
     /** 외부에서 전달되는 abort signal. */
     signal?: AbortSignal;
     /** 호출별 system 프롬프트. 미지정 시 AI_SYSTEM_PROMPT 사용. */
@@ -82,7 +95,7 @@ export async function callClaude(
     options: ClaudeCallOptions
 ): Promise<string> {
     const { model, apiKey } = options;
-    const spec = MODEL_SPECS[model] as ModelSpec | undefined;
+    const spec = MODEL_SPECS[model] as ClaudeModelSpec | undefined;
     if (!spec) {
         throw new Error(`[Claude] Unknown model: ${model}`);
     }
@@ -90,11 +103,27 @@ export async function callClaude(
     // thinking은 schema 유무와 독립적으로 유지된다 — effort 유무로만 결정된다 (아래).
     const structuredOutput = options.responseSchema !== undefined;
 
-    // spec.effort가 있으면 Sonnet/Opus — adaptive thinking 사용.
-    // 없으면 haiku(thinkingBudget: 0) — temperature 사용.
-    // thinking 여부는 responseSchema와 무관하게 effort 유무로만 결정된다.
-    const defaultEffort = spec.effort;
-    const adaptiveThinking = defaultEffort !== undefined;
+    // thinkingApi가 두 갈래를 가른다 — 4.6 세대 이후는 adaptive,
+    // 그 이전(haiku)은 numeric budget_tokens + temperature.
+    // 스펙이 두 상태를 모두 들고 있으므로, 호출자가 준 설정이 없으면 기본 상태를 해석한다.
+    const adaptiveConfig = isClaudeAdaptiveModelSpec(spec)
+        ? ((options.reasoning as ClaudeAdaptiveReasoningConfig | undefined) ??
+          resolveReasoningConfig(spec.reasoning, undefined))
+        : undefined;
+    const budgetConfig = isClaudeBudgetModelSpec(spec)
+        ? ((options.reasoning as ClaudeBudgetReasoningConfig | undefined) ??
+          resolveReasoningConfig(spec.reasoning, undefined))
+        : undefined;
+    // budget 모델에서 budget_tokens가 0이면 thinking 블록 자체를 보내지 않는다.
+    const budgetThinking =
+        budgetConfig !== undefined && budgetConfig.budgetTokens > 0;
+    // 이 요청이 실제로 thinking을 보내는지 — 스펙이 아니라 **해석된 상태**로 판정한다.
+    // adaptive 모델이라도 추론 OFF면 thinking 블록을 보내지 않으므로, 아래
+    // tool_choice 제약이 걸리지 않는다.
+    const thinkingActive =
+        adaptiveConfig !== undefined
+            ? adaptiveConfig.mode === 'adaptive'
+            : budgetThinking;
 
     // PR5a — tool_choice 강제 여부는 thinking 지원 여부로 갈린다.
     // Anthropic API 제약(empirically 확인, commit 83d01ba/e3b4d01 참고):
@@ -104,11 +133,15 @@ export async function callClaude(
     // 위해 tool_choice를 auto로 되돌렸다(sonnet-4-6에서 thinking 블록 + tool_use 조합을
     // 400 없이 실증).
     // 따라서:
-    // - adaptiveThinking === true (sonnet/opus): tool_choice는 `auto` 유지 — force하면 400.
-    // - adaptiveThinking === false (haiku): thinking을 전혀 보내지 않으므로 tool_choice를
+    // - thinkingActive === true: tool_choice는 `auto` 유지 — force하면 400.
+    // - thinkingActive === false: thinking을 전혀 보내지 않으므로 tool_choice를
     //   `{type:'tool', name}`으로 FORCE해 구조화 출력을 보장한다 (extractJsonWithRepair
     //   폴백 의존 제거). Gemini(responseJsonSchema)/OpenAI(strict json_schema)와 대칭.
-    const forceStructuredTool = structuredOutput && !adaptiveThinking;
+    //
+    // 스펙이 아니라 해석된 상태를 보는 이유: 추론 OFF인 adaptive 모델은 thinking을
+    // 보내지 않으므로 강제해도 400이 나지 않는다. 스펙 기준으로 판정하면 그 경우
+    // 이유 없이 구조화 출력 강제를 포기하게 된다.
+    const forceStructuredTool = structuredOutput && !thinkingActive;
 
     const client = getClient(apiKey);
 
@@ -164,20 +197,37 @@ export async function callClaude(
                           }
                         : { type: 'auto' as const },
                 }),
-                // thinking은 schema 유무와 독립적으로 effort 유무로만 결정된다.
-                ...(adaptiveThinking
-                    ? {
-                          thinking: {
-                              type: 'adaptive' as const,
-                              // 응답에 thinking 블록을 포함하지 않아 전송량을 줄인다.
-                              display: 'omitted' as const,
-                          },
-                          output_config: {
-                              effort: options.effort ?? defaultEffort,
-                          },
-                      }
+                // thinking은 schema 유무와 독립적으로 thinkingApi로만 결정된다.
+                ...(adaptiveConfig !== undefined
+                    ? adaptiveConfig.mode === 'disabled'
+                        ? {
+                              // 추론 OFF — Free·Member 등급 adaptive 모델의 기본값.
+                              // `effort: 'low'`로 낮추는 것과 다르다: low는 여전히
+                              // 사고 토큰을 쓴다.
+                              //
+                              // ⚠️ Opus 5는 `disabled`를 effort `high` 이하에서만
+                              // 허용한다(xhigh/max와 함께 보내면 400). 여기서는
+                              // disabled일 때 output_config을 아예 보내지 않으므로
+                              // 충돌하지 않는다.
+                              thinking: { type: 'disabled' as const },
+                          }
+                        : {
+                              thinking: {
+                                  type: 'adaptive' as const,
+                                  // 응답에 thinking 블록을 포함하지 않아 전송량을 줄인다.
+                                  display: 'omitted' as const,
+                              },
+                              output_config: { effort: adaptiveConfig.effort },
+                          }
                     : {
-                          // haiku: thinking 미지원 — temperature만 지정.
+                          // haiku: pre-4.6 extended thinking — budget_tokens 경로.
+                          // budget 0이면 thinking 블록을 생략한다.
+                          ...(budgetThinking && {
+                              thinking: {
+                                  type: 'enabled' as const,
+                                  budget_tokens: budgetConfig.budgetTokens,
+                              },
+                          }),
                           // Anthropic API는 temperature/top_p 동시 지정을 허용하지 않는다.
                           temperature: spec.temperature,
                       }),
