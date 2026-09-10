@@ -85,7 +85,7 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  *     'AAPL',
  *     'Apple Inc.',
  *     '1Day',
- *     'gemini-2.5-flash'
+ *     'gemini-3.6-flash'
  * );
  * if (cached !== null) return cached; // serve in SSR at zero cost
  * ```

@@ -36,7 +36,7 @@ export interface CallAnalysisAiOptions {
  *
  * 브리핑은 tier/BYOK 개념이 없이 항상 서버 키를 쓴다 — `callAnalysisAi`를 재사용하면
  * tier가 undefined일 때 non-free 모델이 BYOK 경로를 타서 브리핑이 깨진다
- * (예: gemini-2.5-pro override).
+ * (예: gemini-3.1-pro-preview override).
  */
 export interface CallBriefingAiOptions {
     prompt: string;

@@ -68,7 +68,7 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `gemini-2.5-flash-lite` with reasoning off (short structured classification task).
+ * `gemini-3.5-flash-lite` with reasoning off (short structured classification task).
  *
  * Economic-event analysis has no usage gate — no tier, no BYOK, no quota check
  * or record. The analysis is public-economy data, same as congress trade analysis.

@@ -41,7 +41,7 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_FLASH_LITE_MODEL;
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
- * `gemini-2.5-flash-lite` with reasoning off (single Korean string output).
+ * `gemini-3.5-flash-lite` with reasoning off (single Korean string output).
  *
  * Indicator translation has no usage gate — no tier, no BYOK, no quota check.
  *

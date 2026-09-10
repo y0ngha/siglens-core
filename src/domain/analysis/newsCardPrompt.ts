@@ -32,7 +32,7 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  * follows `locale`.
  *
  * Intended for high-volume calls on a cheap non-reasoning model (today
- * `gemini-2.5-flash-lite` — see NEWS_CARD_MODEL_ID) where latency and cost per
+ * `gemini-3.5-flash-lite` — see NEWS_CARD_MODEL_ID) where latency and cost per
  * card are critical. No skill injection needed — the task is purely translation
  * + classification, not market interpretation.
  *
