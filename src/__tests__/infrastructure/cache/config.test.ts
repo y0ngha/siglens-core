@@ -33,6 +33,7 @@ import {
     FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
+    MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION,
     MARKET_BRIEFING_CACHE_TTL,
     MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
     narrowMarketEventsForCacheKey,
@@ -40,6 +41,7 @@ import {
     NEWS_CACHE_TTL_SECONDS,
     NEWS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
+    OVERALL_PROMPT_TEMPLATE_VERSION,
     PROMPT_TEMPLATE_VERSION,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
@@ -141,7 +143,20 @@ describe('cache key builders', () => {
     it('buildMacroBriefingCacheKey uses the briefing:macro: namespace with the dateHour, model, and input hash', () => {
         expect(
             buildMacroBriefingCacheKey('2026-06-16T09', 'test-model', 'abc123')
-        ).toBe('briefing:macro:2026-06-16T09:test-model:abc123');
+        ).toBe(
+            `briefing:macro:2026-06-16T09:test-model:abc123:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`
+        );
+    });
+
+    it('buildMacroBriefingCacheKey ends with the prompt-template version, so a future bump busts the cache', () => {
+        const key = buildMacroBriefingCacheKey(
+            '2026-06-16T09',
+            'test-model',
+            'abc123'
+        );
+        expect(key.endsWith(`:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`)).toBe(
+            true
+        );
     });
 
     it('buildMacroBriefingCacheKey: different input hash yields a different key', () => {
@@ -225,7 +240,7 @@ describe('new analysis cache keys', () => {
         expect(
             buildOverallCacheKey('AAPL', '5Min', 'gemini-3.1-pro-preview', 'h3')
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-3.1-pro-preview:h3`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:AAPL:5Min:gemini-3.1-pro-preview:${OVERALL_PROMPT_TEMPLATE_VERSION}:h3`
         );
     });
 
@@ -233,7 +248,7 @@ describe('new analysis cache keys', () => {
         expect(
             buildOverallPeekCacheKey('AAPL', '5Min', 'gemini-3.1-pro-preview')
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-3.1-pro-preview`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-3.1-pro-preview:${OVERALL_PROMPT_TEMPLATE_VERSION}`
         );
     });
 
@@ -729,7 +744,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // because the constant has no per-history-presence axis.
         // p11 은 `## Market Events` 섹션을 추가한다 — 이벤트를 실은 요청에서만
         // 바이트가 바뀌지만 상수에 per-request 축이 없어 무효화는 fleet-wide다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p11');
+        // p12 는 숫자 렌더링 감사다 — 가격 정밀도·KRX 프레이밍·세션 피벗·R:R 노이즈 바닥이
+        // 모든 요청의 바이트를 바꾼다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p12');
     });
 });
 

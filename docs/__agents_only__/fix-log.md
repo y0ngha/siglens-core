@@ -12,39 +12,6 @@
   yarn의 "quarantined"는 인증 문제로 오인하기 쉽지만 실제로는 "tarball을 못 받는다"는 뜻이다.
 
 
-## [feat/prompt-region-context | 2026-08-19] — 프롬프트 지역 전제 제거 (R1~R6, approved)
-
-- Violation 1: 프로그래밍 치환을 **확인 없이 완료 보고** — 6라운드에 걸쳐 5회
-  Rule: MISTAKES.md §Documentation Sync 3 / §Coding Paradigm 6.5 — 편집 후 grep 카운트로 적용 여부를 확인하기 전에는 완료로 보고하지 않는다
-  Context: 매번 같은 메커니즘이었다. prettier가 대상 문자열을 여러 줄로 재포맷한 뒤, 한 줄짜리 옛 문자열로 치환을 시도해 조용히 0건 매치. 대상: `config.ts` 해시 필드목록, `@see submitEconomicEventAnalysis`(2회), 중복 테스트 제거, malformed 분기 단언 추가. 전부 리뷰어가 잡았고, 그중 한 번은 리뷰어가 스크래치패드에 직접 변이를 주입해 "당신의 변이 검증 주장은 성립하지 않는다"고 반박했다 — 맞았다.
-  Fixed: R6까지 전부 적용 + 이후 편집은 grep 카운트로 확인
-
-- Violation 2: 부재 단언을 **그것이 들어갈 수 없는 앵커**에 걸어 항상 참
-  Rule: MISTAKES.md §Tests 13.5 — 무언가의 부재를 단언하기 전에 그 앵커가 그것을 담을 수 있음을 먼저 증명한다
-  Context: few-shot 가드가 `Input:` 줄에 `not.toContain('한국은행')`을 걸었는데, `Input:` 줄에는 구조상 `interpretationKo`가 없다. 예시 내용과 무관하게 통과.
-  Fixed: `fewShotOutputFor()`로 그 예시 자신의 `Output:` 줄에 단언
-
-- Violation 3: 위치 조회 헬퍼가 **앞으로 훑어** 삭제된 대상이 이웃으로 조용히 해석됨
-  Rule: MISTAKES.md §Tests 13.5 — 위치 기반 조회는 기대 위치만 읽고 아니면 throw
-  Context: `lines.slice(i+1).find(l => l.startsWith('Output: '))`는 그 예시의 Output만 지워졌을 때 다음 예시의 Output을 돌려줬다. 없애려던 "항상 참" 단언이 되살아난다.
-  Fixed: `lines[i + 1]`만 읽고 형식이 아니면 throw
-
-- Violation 4: 프롬프트가 **자기 few-shot과 모순**
-  Rule: MISTAKES.md §Coding Paradigm 6.5 — 지시문과 예시가 어긋나면 예시가 이긴다. LLM은 산문 규칙보다 시연을 따르므로 규칙이 무력화된다
-  Context: `interpretationKo` 규칙이 "통화정책 발표일 때만 중앙은행 명시"라고 했는데 미국·한국 CPI few-shot이 둘 다 연준/한국은행을 명시했다. CPI는 통계청 발표다.
-  Fixed: 게이트를 "정책 경로에 닿는 발표(정책 결정·물가·고용)"로 넓혀 예시와 정합
-
-- Violation 5: 프롬프트가 **거짓을 사실로 단정**
-  Rule: 프롬프트는 모델에게 사실 주장을 한다 — 코드처럼 검증할 것
-  Context: "설문 데이터는 중앙은행 발표가 아니다"라고 썼는데 한국은행이 소비자심리지수(CCSI)·기업경기실사지수(BSI)를 발표한다. 비-미국 귀속을 바로잡으려는 프롬프트가 정작 그 시장의 참인 귀속을 막고 있었다.
-  Fixed: 소유권 단정 삭제, "전달 경로가 발행 주체보다 독자에게 중요하다"로
-
-- Violation 6: 규칙의 **불리언 구조가 의도를 뒤집음**
-  Rule: 두 분기가 서로 다른 접속사를 쓰면 실제 입력을 양쪽에 통과시켜 볼 것
-  Context: `bullish: beats estimate AND …` / `bearish: misses estimate OR …`. `AND`가 거른 것을 `OR`가 전부 삼켜, 금리 인하 서프라이즈와 예상보다 낮은 CPI가 bearish로 분류됐다. 프로덕션 입력(한국은행 금리 결정, KR CPI, GDP)으로 확인.
-  Fixed: 부호가 아니라 경제적 의미로 판단하도록 재작성 + 반전 지표군 명시
-
-
 ## [PR #102 | feat/bars-cache-ttl | 2026-05-28] — Oscillation resolution
 - Symbol: `secondsUntilNextEtRegularOpen` `Math.max(1, ...)` guard
 - R1 (review-agent): suggested wrapping in `Math.max(1, ...)` for a defensive min-1s TTL → applied.
@@ -137,81 +104,10 @@
 - Rule: Public API Smoke Tests — when wiring new public symbols through entrypoints, add basic assertions in corresponding .test.ts and .client.test.ts files to verify exports are present and callable
 - Context: Round 2 recommended findings — scoreToLabel, FEAR_GREED_LABEL_CUTOFFS, POC_WINDOW_DEFAULT were added to entrypoints but had no entrypoint smoke tests. Added 3 assertions to index.test.ts (scoreToLabel callability, CUTOFFS presence/type) and 3 to index.client.test.ts verifying all three symbols export correctly.
 
-## [PR #106 | test/improve-coverage-hardening | 2026-05-29] — review comment fixes
-- Violation: Coverage threshold lowered in vitest.config.ts without updating the docs that mandate the target
-- Rule: Documentation Sync — when changing an enforced threshold/policy in config, every doc stating that policy must be updated in the same change, or config and docs silently diverge
-- Context: vitest threshold was lowered 100%→90% and `application/` added to coverage.include, but CONVENTIONS.md / MISTAKES.md / layer CLAUDE.md still said "100% (필수)". Per maintainer decision, aligned all docs (CONVENTIONS.md §Coverage Targets, MISTAKES.md rules 15 & Infrastructure 2, domain/infra/application CLAUDE.md, PR_FIX_FLOW.md checklist) to 90%.
-
-- Violation: Test mock generic declared a parameter as `unknown` instead of the real domain type
-- Rule: TypeScript — a mock/stub generic signature should use the actual domain type so it is verified against the real function signature at compile time (the test-file `as`-cast exception does not justify widening a typed mock generic to `unknown`)
-- Context: sectorSignals.test.ts stubbed computeStockSignalResult with `vi.fn<(stock: unknown, ...)>`; the real first parameter is `SectorStock`. Imported SectorStock and replaced both `unknown` occurrences.
-
-## [PR #114 R2 | refactor/fear-greed-public-api | 2026-05-29] — @internal re-export contradiction
-- Violation: `src/application/market/types.ts:17` and `:27` had `@internal` tags on bare `export type { X }` re-export statements (UserApiKeyRequiredError, AnalysisUsageOptions) even though both types are reachable from public exports in src/index.ts (union member of public SubmitAnalysisErrorResult; field of public SubmitAnalysisOptions)
-- Rule: MISTAKES.md §Public API & Module Exports Rule 9 — re-export statement contradiction scan must include bare `export type { X }` statements, not just type definitions. Intermediate re-export statements can carry @internal tags that contradict the public export, hidden from plain definition audits.
-- Context: Reverted both re-export statements to origin/main form (no @internal, accurate comment). Full contradiction scan (definitions + bare `export type { X }` re-exports vs index exports) now reports 0. Updated MISTAKES.md Rule 9 to explicitly cover re-export-statement scan in the reachability audit procedure.
-
-## [PR #115 | feat/hashClientIp-jsdoc-tokenStore-cancelJob | 2026-05-29] — Whole-file @internal sweep + surviving public export JSDoc audit
-- Violation 1: `src/infrastructure/chat/tokenStore.ts` `hashClientIp` — re-exported from src/index.ts (Tier 3) but had NO JSDoc; CONVENTIONS.md Tier 3 requires description + @param + @returns. Root cause: @internal tagging sweep checked that non-public siblings got tagged but did not verify surviving PUBLIC sibling's JSDoc completeness.
-- Violation 2: `src/infrastructure/jobs/queue.ts` `cancelJob` — had description + @param but missing @returns JSDoc tag (Tier 3 requirement).
-- Rule: MISTAKES.md §9.5 with added facet — when conducting whole-file sweep to tag non-public exports @internal, enumerate ALL surviving public exports in that same file and verify each meets Tier 3 JSDoc requirements (description + @param + @returns per CONVENTIONS.md). The existing rule covers "tag every non-re-exported export @internal" but not "audit surviving public exports' JSDoc completeness during the sweep".
-- Context: Both violations fixed by adding/completing JSDoc. Pattern: sweeps that batch-tag exports often miss JSDoc verification on survivors, relying on reviewers to catch missing tags one-by-one in follow-up rounds. Lesson: before considering @internal tagging complete, verify JSDoc completeness on public survivors by reading ALL public functions in touched files.
-
-## [PR #115 | feat/hashClientIp-jsdoc-tokenStore-cancelJob | 2026-05-30] — Round 2: Public JSDoc {@link} reference audit
-- Violation 1: `cancelJob` (public Tier 3) JSDoc `{@link isJobCancelled}` referenced a symbol PR7 made @internal. Under TypeDoc `excludeInternal: true`, renders as broken link + points consumers at inaccessible symbol (Documentation Sync #3 — broken public API references).
-- Violation 2: `computeBarsEffectiveTtl` (public) JSDoc `{@link computeEffectiveTtl}` similarly broke when target became @internal.
-- Violation 3: `NewsTimeRange` kept public but ONLY reachable via @internal `NewsProvider.fetchNews()` (no public call path); resolved by @internal'ing `NewsTimeRange` also, removing from src/index.ts re-exports.
-- Violation 4: Scoped proactive scan — ran grep for `{@link}` across codebase scoped to PR7's swept 27 symbols; confirmed zero remaining public-JSDoc references pointing to those specific swept symbols after fixes. (Comprehensive cross-symbol audit completed in R3.)
-- Rule: MISTAKES.md §9.5 sub-facet — when a bulk @internal/removal sweep converts symbols to @internal, scan all remaining public exports' JSDoc blocks for `{@link symbol-name}` references pointing to newly-@internal targets. Rewrite references as prose to avoid TypeDoc broken links under excludeInternal mode. Pattern: reachability audits miss JSDoc link validity; bulk sweeps create orphaned `{@link}` references that render broken in generated docs.
-- Context: All 4 violations fixed in R2. Root cause: @internal sweep completed without validating public-JSDoc link targets remain public. Lesson: after @internal'ing symbols in a sweep, grep `{@link}` in all non-@internal JSDoc blocks and rewrite references to targets that became @internal.
-
-## [PR #115 | feat/hashClientIp-jsdoc-tokenStore-cancelJob | 2026-05-30] — Round 3: Comprehensive {@link} audit against full non-public symbol set
-- Violation 1: `src/application/market/peekAnalysisCache.ts` (PR7-touched file) contained `{@link normalizeCachedAnalysisResponse}` ×2 — target symbol was @internal'd in PR5, not among PR7's 27 swept symbols, breaking public documentation links.
-- Violation 2: `src/application/market/peekAnalysisCache.ts` contained `{@link DEFAULT_ANALYSIS_MODEL_ID}` — target symbol never exported public, breaking link.
-- Violation 3: `src/application/market/peekAnalysisCache.ts` contained `{@link isEmptyAnalysis}` (module-private) — marked as Suggestion but fixed proactively.
-- All 4 fixed by replacing `{@link}` with inline-code prose (e.g., `` `normalizeCachedAnalysisResponse` ``). Comprehensive re-scan of ALL PR7-touched files against the FULL set of non-public symbols (all @internal from any PR + all module-private symbols) now reports zero broken public-JSDoc `{@link}` references.
-- Rule: MISTAKES.md §9.5 {@link} facet refined — when conducting a whole-file @internal/removal sweep that touches multiple files, the subsequent {@link} audit must check ALL remaining public-JSDoc references against EVERY non-public symbol in the repo (all @internal, all non-exported module-private), not only symbols swept in the current PR. Touching a file invites review of ALL its public documentation links.
-- Context: R2 scoped the scan to PR7's 27 swept symbols only; R3 audited against the complete non-public symbol universe across the entire PR7-touched file set. Lesson: cross-file sweeps require cross-symbol audits, not symbol-scoped audits. A touched file's JSDoc links can reference symbols from any PR's @internal'ing, not just the current change.
-
-## [Consumer typecheck validation post-merge | main | 2026-05-30] — Cross-repo reachability audit gap
-- Violation: Bulk dead-export cleanup (PR6+PR7) deleted `SectorGroupDef` and @internal'd `NewsTimeRange` despite both being public contract for consumer-instantiated/implemented code
-- Context: Post-merge validation (removed-since-0.15.0 public symbols ∩ all consumer imports == 0) found 2 breakages all reviewers missed (core-only reachability audit + review-agent + GitHub claude-review + Gemini):
-  - `SectorGroupDef`: core's `src/index.ts` exported it, but deleted as "unused". siglens types its own `export const SECTOR_GROUPS: readonly SectorGroupDef[]` — consumer instantiates config with the type.
-  - `NewsTimeRange`: core's `src/index.ts` exported it but PR7 @internal'd as "only NewsProvider.fetchNews uses it" — siglens + siglens-trader implement NewsProvider adapters that take `range: NewsTimeRange` param. Consumers implement the port, so port param types are public contract.
-- Rule: MISTAKES.md §9 reachability audit — NEW REQUIRED STEP before export removal/demotion: Cross-check all 3 consumer repos (../siglens, ../siglens-worker, ../siglens-trader) for `grep` matches of the symbol and for `import ... from '@y0ngha/siglens-core'`. A symbol imported or implemented by any consumer is public contract regardless of core-internal reachability. Core-only reachability audit is necessary but NOT sufficient — consumer-import cross-check is mandatory before merge, and a final post-merge intersection check (removed-symbols ∩ consumer-imports == 0) is the gate.
-  - Sub-principle: Consumer-implemented ports — domain port param/return types are public contract because consumers provide the adapter implementations (consumers are the "users" of the port interface, even if core never calls them by name).
-  - Sub-principle: Consumer-instantiated config types — a type can be unused inside core yet consumers type their own constants/config exports with it (SectorGroupDef in consumer's SECTOR_GROUPS).
-- Promoted: YES — extend MISTAKES.md §9 with mandatory consumer cross-check procedure before removal/demotion of any public export.
-
 ## [PR #160 R4 | feat/chart-pattern-screener | 2026-07-03]
 - Violation: `CURVATURE_VERTEX_MID_LO` and `CURVATURE_VERTEX_MID_HI` in `src/domain/patterns/constants.ts` shared a single `/** @internal ... */` JSDoc block above the first declaration
 - Rule: MISTAKES.md §Documentation — TypeDoc attaches a JSDoc block only to the immediately-following declaration; a shared comment above two sibling `export const` statements silently leaves the second one undocumented in generated docs, even though the source reads as if both are covered
 - Context: PR #160 review round 4 suggestion — the shared block described both constants together ("the fraction-of-span range within which..."), but TypeDoc renders `CURVATURE_VERTEX_MID_HI` with no doc at all. Fixed by giving each constant its own `@internal` JSDoc block, mirroring the per-constant style used by every other constant in the file.
-
-## [PR (feat/market-fear-greed) R1 | Market-wide Fear & Greed domain module | 2026-08-15]
-- Violation 1: `src/domain/indicators/marketFearGreed/composition.ts` — `export interface MarketComposition` exported without `/** @internal */` tag, not re-exported in `src/index.ts`
-  Rule: MISTAKES.md §9.5 — intermediate interfaces must carry `@internal` tag if not re-exported
-  Fixed in R2: deleted intermediate interface, returned `Omit<MarketFearGreedSnapshot, 'asOf'>` instead
-
-- Violation 2: `src/domain/indicators/marketFearGreed/align.ts` — three `as` casts with no comment explaining safety: `{} as Record<...>` ×2, `map.get(date) as number` ×1
-  Rule: MISTAKES.md §TypeScript 7 — `as` casts must include invariant comments at cast site
-  Fixed in R2: added invariant comments at each cast site
-
-- Violation 3: `src/domain/indicators/marketFearGreed/align.ts` — `input[key] ?? []` guard branch had no dedicated test
-  Rule: MISTAKES.md §Tests 5.5 — guard branches need dedicated test coverage
-  Fixed in R2: added test deleting one series key, asserts empty join; now 100% coverage
-
-- Violation 4 (RECOMMENDED): `types.ts` — inline `'normal' | 'limited'` union duplicated sibling's `Exclude<FearGreedConfidence, 'insufficient'>`
-  Rule: MISTAKES.md §TypeScript 6 — avoid duplicating named types; reuse instead
-  Fixed in R2: replaced with reuse of named type
-
-- Violation 5 (RECOMMENDED): `factors.ts` — `sma(closes.slice(0, t + 1), window)` allocated O(t) prefix copy per session → O(n²) history computation
-  Rule: Performance — avoid redundant allocations in hot loops
-  Fixed in R2: slice only the window, not prefix
-
-- Violation 6 (RECOMMENDED): `walkForward.ts` — `.map()` callback mutating outer `sample` array via `push`
-  Rule: CONVENTIONS.md array-mutation rule + FF 1-G viewpoint shift
-  Fixed in R2: rewrote as explicit `for` loop over pre-allocated array
 
 ## [PR | refactor/cheap-jobs-back-to-gemini | 2026-08-20] — Cheap jobs model migration R1→R2
 
@@ -225,48 +121,11 @@
   Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
   Fixed in R2: Added dated changelog row documenting the new public exports
 
-## [Consumer typecheck validation | uncommitted (2 rounds, approved) | 2026-09-01]
+## [PR #194 R3 | feat/prompt-numeric-audit | 2026-09-11] — Macro briefing cache key prompt-version blocker
 
-- Violation 1 (RECOMMENDED): `src/domain/analysis/ai-levels.ts` — optional parameter given same `= 'USD'` default at three stacked layers, making inner two defaults dead code
-  Rule: MISTAKES.md §Coding Paradigm 6.5 — when function implementation changes, all related functions in the same module must use a consistent approach; defaults must resolve at exactly one boundary
-  Context: Module pattern (`locale` parameter) resolves default exactly once at outermost boundary. New `currency` parameter repeated the default at three nesting layers (inner two unreachable on real call path). Each layer added defensive default thinking independently without recognizing the stacking.
-  Fixed: Made inner two `currency` parameters required, resolving default only at outermost boundary per module convention
+- Violation (BLOCKER R3): `src/infrastructure/cache/config.ts` — `buildMacroBriefingCacheKey` missing `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION` segment despite `macroBriefingPrompt.ts` output change in this PR (numeric format support added).
+- Rule: MISTAKES.md Infrastructure Functions 6 — cache builders' template/prompt versions must be incremented when rendered bytes change; keys must include version segment to bust stale entries.
+- Context: Sibling builder `buildBriefingCacheKey` was correctly bumped in same PR. Macro briefing was overlooked. Audit on review: all 14 `build*Key` functions in config.ts verified; macro-briefing was sole LLM-output key missing version interpolation.
+- Fixed in R3: Added `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1'`, appended to key interpolation, updated corresponding tests. Full sibling audit completed and documented in MISTAKES.md §Infrastructure Functions 6 recurrence note.
 
-- Violation 2 (RECOMMENDED): Output-affecting option (`currency`) deliberately excluded from analysis cache key, relying on a consumer-side invariant core cannot enforce
-  Rule: Cache key contracts must either include all output-affecting parameters or document the invariant constraint explicitly in the type/function JSDoc
-  Context: Core cannot enforce `currency` parity on all analysis callers; consumer repo (`siglens`) must guarantee the invariant. Mitigated by adding explicit invariant tests in consumer confirming `currency` is identical across re-used cached results.
-  Fixed: Mitigated in consumer-side (siglens) tests; core cache function JSDoc does not require changes per core-consumer contract
-
-## [PR | fix/deepseek-responses-api-schema | 2026-09-10] — Responses API schema routing R1→R3 (approved)
-
-- Violation 1 (REQUIRED, R1): `finishReason` hardcoded to `'stop'` on new Responses API path
-  Rule: MISTAKES.md §Infrastructure 3 (NEW) — Event stream terminal condition must not default to success; explicit state assignment required for all paths
-  Context: R1 case — `response.incomplete` (`incomplete_details.reason === 'max_output_tokens'`) and `response.failed` were indistinguishable from a genuine completion, so partial streamed text returned as success. The sibling chat path already treated the equivalent condition as a non-retryable `length` error. (The initialization-path variant of the same defect is Violation 4, found in R2.)
-  Fixed: R1 added `finishReason` validation. R2 inverted outcome default to `'no_terminal'`, assigned only on observed terminal event, whitelist-mapped final states.
-  Promoted: YES — add rule to MISTAKES.md Infrastructure 3 (new section on state initialization via default + single-path assignment)
-
-- Violation 2 (REQUIRED, R1): Cast to `client.responses.create` used `body: unknown` + hand-rolled event type
-  Rule: MISTAKES.md §TypeScript 7 (EXTEND) — SDK discriminated unions must be imported directly; hand-rolling unknown defeats type safety
-  Context: JSDoc claimed "SDK may not type it"; actually v6.35.0 types it fully (ResponseIncompleteEvent, ResponseFailedEvent). Using real types surfaced truncation/failure cases that `unknown` hid.
-  Fixed: Imported real OpenAI types; removed cast; discriminated union reveals incompleteness on stream end.
-  Promoted: YES — extend TypeScript rule 7 to cover "avoid unknown casts when SDK provides concrete discriminated types"
-
-- Violation 3 (RECOMMENDED, R1): Empty-text warning said `json_object` mode, wrong for schema path
-  Rule: Error messages must reference the actual code path being executed, not a sibling path's terminology
-  Context: Backend `console.warn` on the shared empty-response branch read "json_object mode occasionally returns empty content" even when the call had used `text.format` schema mode. Not user-facing — it misleads on-call triage about which endpoint actually failed.
-  Fixed: R1 reworded warning to match Responses API schema terminology.
-
-- Violation 4 (RECOMMENDED, R2): `outcome` defaulted to `'completed'` without guard; same misclassification reachable through initialization path
-  Rule: MISTAKES.md §Coding Paradigm (NEW facet) — dual-entry-point bugs: when a value defaults to success and is only reassigned in one branch, all other exit paths silently return the default (fix one branch while leaving the same defect reachable via initialization)
-  Context: Fallback: outcome='completed' + only reassigned inside terminal-event branch → stream with zero terminal events still returned success. R1 fixed termination check; R2 fixed initialization. Identical bug class, different entry point.
-  Fixed: Defaulted outcome to 'no_terminal', whitelist-assigned only on observed terminal; removes unguarded success path.
-  Promoted: YES — add rule to MISTAKES.md Coding Paradigm (dual-entry-point state bugs)
-
-- Violation 5 (RECOMMENDED, R1): No tests for truncated/failed output; test suite asserted wrong behavior
-  Rule: MISTAKES.md §Tests (NEW rule) — negative assertions (does NOT use feature) pin the bug; when option goes unused (intended or not), test suite actively asserts the ignoring, preventing detection of feature activation
-  Context: Existing test `does not use responseSchema to constrain output` asserted the bug as intended behavior. It never failed while the bug was live — production (824/824 empty arrays) was the only signal. When the fix landed, that test failed, which is how the pin was found. Negative assertions should verify a precondition (option accepted) rather than an outcome (feature off), or the suite defends the defect.
-  Fixed: Added tests for truncated output, complete output, missing terminal events; test now verifies option has an effect.
-  Promoted: YES — add rule to MISTAKES.md Tests (negative assertions that confirm wrong behavior pin bugs)
-
-- Production impact (pre-fix, siglens-trader): ~30k-token prompt, indicatorResults[].signals empty in 824/824 analyses (gemini: 143/143 filled). Downstream axis degraded from 3 inputs to 1 while keeping full weight, measured inverted (top tercile −1.604% forward return). Bug pinned for 1 month by comment asserting "DeepSeek does not support strict json_schema" (half-true: chat endpoint doesn't, Responses endpoint does).
 

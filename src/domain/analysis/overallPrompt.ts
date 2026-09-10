@@ -13,11 +13,17 @@ import {
 } from '@/domain/analysis/overallScore';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
+import {
+    equityListingContext,
+    formatPrice,
+    listingCurrency,
+} from '@/domain/analysis/promptFormat';
 import type {
     AnalysisResponse,
     AssembledPrompt,
     AssetClass,
     Bar,
+    CurrencyCode,
     FearGreedSnapshot,
     FinancialsScorecard,
     FundamentalAnalysisResponse,
@@ -72,7 +78,13 @@ const TIMEFRAME_CONFIG: Record<Timeframe, { label: string; context: string }> =
     };
 
 /** Formats technical analysis fields (trend, risk, key levels, price targets, patterns) into prompt lines. */
-function formatTechnical(tech: AnalysisResponse): string {
+function formatTechnical(
+    tech: AnalysisResponse,
+    currency: CurrencyCode
+): string {
+    // Precision follows each price's magnitude and the listing currency, so a
+    // sub-dollar target is not flattened to `0.08` and a won level is not `269500.00`.
+    const px = (n: number): string => formatPrice(n, currency);
     const lines: string[] = [
         `- Overall Trend: ${tech.trend}`,
         `- Risk Level: ${tech.riskLevel}`,
@@ -81,21 +93,21 @@ function formatTechnical(tech: AnalysisResponse): string {
 
     if (tech.keyLevels.support.length > 0) {
         const supports = tech.keyLevels.support
-            .map(l => `${l.price.toFixed(2)} (${l.reason})`)
+            .map(l => `${px(l.price)} (${l.reason})`)
             .join(', ');
         lines.push(`- Key Support Levels: ${supports}`);
     }
 
     if (tech.keyLevels.resistance.length > 0) {
         const resistances = tech.keyLevels.resistance
-            .map(l => `${l.price.toFixed(2)} (${l.reason})`)
+            .map(l => `${px(l.price)} (${l.reason})`)
             .join(', ');
         lines.push(`- Key Resistance Levels: ${resistances}`);
     }
 
     if (tech.priceTargets.bullish) {
         const targets = tech.priceTargets.bullish.targets
-            .map(t => t.price.toFixed(2))
+            .map(t => px(t.price))
             .join(', ');
         lines.push(
             `- Bullish Targets: ${targets} — ${tech.priceTargets.bullish.condition}`
@@ -104,7 +116,7 @@ function formatTechnical(tech: AnalysisResponse): string {
 
     if (tech.priceTargets.bearish) {
         const targets = tech.priceTargets.bearish.targets
-            .map(t => t.price.toFixed(2))
+            .map(t => px(t.price))
             .join(', ');
         lines.push(
             `- Bearish Targets: ${targets} — ${tech.priceTargets.bearish.condition}`
@@ -488,7 +500,7 @@ export function buildOverallAnalysisPrompt(
 
     const assetContext = isCrypto
         ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
-        : `This is a publicly traded U.S. equity.`;
+        : equityListingContext(symbol);
 
     // "matching the exact schema below" — the schema now lives at the tail of
     // `dynamic` (after all four axis sections), so it is spatially below this
@@ -550,7 +562,7 @@ ${assetContext}
 ${context}
 
 ## Axis 1 — Technical Analysis
-${formatTechnical(technical)}${fearGreedBlock}
+${formatTechnical(technical, listingCurrency(symbol))}${fearGreedBlock}
 
 ${fundamentalSection}
 

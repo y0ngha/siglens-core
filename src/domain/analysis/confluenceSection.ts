@@ -1,4 +1,7 @@
+import { RATIO_TO_PERCENT } from '@/domain/analysis/marketReferenceConstants';
 import { structuralRiskReward } from '@/domain/analysis/planCheck';
+import { formatNullableNumber } from '@/domain/analysis/promptFormat';
+import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import {
     evaluateConfluence,
     isExpectedSignal,
@@ -10,6 +13,7 @@ import {
 import type {
     Bar,
     MarketReference,
+    ReferenceLevel,
     ReferenceLevels,
     Timeframe,
 } from '@/domain/types';
@@ -114,10 +118,6 @@ const CONFLUENCE_RELIABILITY: Record<Timeframe, string> = {
     '1Day': 'Daily horizon, running the thresholds the original backtest used (3 families, expected signals at full weight). The backtest counted signal types rather than indicator families, so this is a stricter variant of the measured rule, not the measured rule itself — treat a met rule as strong evidence, not as a validated 70% setup.',
 };
 
-function fmtPrice(n: number): string {
-    return n.toFixed(2);
-}
-
 function fmtRatio(n: number): string {
     return n.toFixed(2);
 }
@@ -146,13 +146,14 @@ function signalLine(label: string, types: readonly string[]): string {
  */
 function formatConfluence(
     snapshot: ConfluenceSnapshot,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    priceDp: number
 ): string[] {
     const params = snapshot.params;
     const maText =
         snapshot.ma50 === null
             ? 'SMA50 unavailable (short history)'
-            : `close ${fmtPrice(snapshot.close)} vs SMA50 ${fmtPrice(snapshot.ma50)} (${
+            : `close ${formatNullableNumber(snapshot.close, priceDp)} vs SMA50 ${formatNullableNumber(snapshot.ma50, priceDp)} (${
                   snapshot.close > snapshot.ma50 ? 'above' : 'at or below'
               })`;
 
@@ -178,10 +179,49 @@ function formatConfluence(
     ];
 }
 
-/** Pick the horizon whose levels bracket the price most tightly; `null` when none do. */
-function nearestLevels(reference: MarketReference): ReferenceLevels | null {
+/**
+ * Share of the recent mean bar range inside which a level counts as "at price".
+ *
+ * Without a floor the ratio divided by whatever level happened to sit closest, and on real
+ * charts that was routinely a level the price was already touching: a 15-minute NVDA chart
+ * rendered `Pivot PP … (-0.00%)` and a risk:reward of 180.38, a 5-won KRX round number gave
+ * exactly 1.00, and hourly AAPL paired a 0.06% "resistance" with a 0.01% "support". Those
+ * numbers are noise divided by noise. A level closer than half an ordinary bar's range is
+ * crossed by the next bar either way, so it can serve neither as a stop nor as a target.
+ */
+const AT_PRICE_NOISE_BAR_RANGE_FRACTION = 0.5;
+
+/** Half the mean high–low range of the last {@link ATR_DEFAULT_PERIOD} bars, in percent of close. */
+function atPriceNoisePercent(bars: readonly Bar[]): number {
+    const ranges = bars
+        .slice(-ATR_DEFAULT_PERIOD)
+        .filter(b => b.close > 0 && b.high >= b.low)
+        .map(b => ((b.high - b.low) / b.close) * RATIO_TO_PERCENT);
+    if (ranges.length === 0) return 0;
+    const meanRange = ranges.reduce((sum, r) => sum + r, 0) / ranges.length;
+    return meanRange * AT_PRICE_NOISE_BAR_RANGE_FRACTION;
+}
+
+/** Levels at least `floorPercent` away from price on each side. */
+function levelsBeyondNoise(
+    levels: ReferenceLevels,
+    floorPercent: number
+): ReferenceLevels {
+    const clear = (l: ReferenceLevel): boolean =>
+        Math.abs(l.distancePercent) >= floorPercent;
+    return {
+        support: levels.support.filter(clear),
+        resistance: levels.resistance.filter(clear),
+    };
+}
+
+/** Pick the tightest horizon that still has a level beyond the noise floor on both sides. */
+function nearestLevels(
+    reference: MarketReference,
+    floorPercent: number
+): ReferenceLevels | null {
     for (const horizon of [reference.short, reference.medium, reference.long]) {
-        const levels = horizon.levels;
+        const levels = levelsBeyondNoise(horizon.levels, floorPercent);
         if (levels.resistance.length > 0 && levels.support.length > 0) {
             return levels;
         }
@@ -196,8 +236,13 @@ function nearestLevels(reference: MarketReference): ReferenceLevels | null {
  * downstream failure was not that analyses described the upside inaccurately — it was that
  * `entryRecommendation` said "enter" while the nearest obstacle was half a percent away.
  */
-function formatRiskReward(reference: MarketReference): string[] {
-    const levels = nearestLevels(reference);
+function formatRiskReward(
+    reference: MarketReference,
+    bars: readonly Bar[],
+    priceDp: number
+): string[] {
+    const floorPercent = atPriceNoisePercent(bars);
+    const levels = nearestLevels(reference, floorPercent);
     if (!levels) return [];
 
     const up = levels.resistance[0];
@@ -216,8 +261,13 @@ function formatRiskReward(reference: MarketReference): string[] {
 
     return [
         '### Risk:Reward From Current Price',
-        `Nearest resistance ${up.label} at ${fmtPrice(up.price)} (${up.distancePercent.toFixed(2)}%)`,
-        `Nearest support ${down.label} at ${fmtPrice(down.price)} (${down.distancePercent.toFixed(2)}%)`,
+        ...(floorPercent > 0
+            ? [
+                  `Levels within ${formatNullableNumber(floorPercent)}% of the current price (half the mean bar range over the last ${ATR_DEFAULT_PERIOD} bars) sit inside ordinary bar noise and are skipped here. Do not anchor a stop-loss or an entry trigger on such an at-price level.`,
+              ]
+            : []),
+        `Nearest resistance ${up.label} at ${formatNullableNumber(up.price, priceDp)} (${formatNullableNumber(up.distancePercent)}%)`,
+        `Nearest support ${down.label} at ${formatNullableNumber(down.price, priceDp)} (${formatNullableNumber(down.distancePercent)}%)`,
         `Structural risk:reward from current price = ${fmtRatio(ratio)}`,
         verdict,
         // The correlation is the part the model cannot infer from the ratio alone.
@@ -238,7 +288,8 @@ function formatRiskReward(reference: MarketReference): string[] {
 export function formatDeterministicMetricsSection(
     bars: readonly Bar[],
     timeframe: Timeframe,
-    reference: MarketReference
+    reference: MarketReference,
+    priceDp = 2
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
     // `exitMin` is deliberately not raised alongside `min` on the daily chart. Raising the
@@ -257,13 +308,13 @@ export function formatDeterministicMetricsSection(
 
     const confluence =
         snapshot !== null
-            ? formatConfluence(snapshot, timeframe)
+            ? formatConfluence(snapshot, timeframe, priceDp)
             : [
                   `### Indicator Confluence (rule engine, ${timeframe} bars)`,
                   `Not measurable: the rule needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of confluence — judge the indicators yourself for this chart.`,
               ];
 
-    const riskReward = formatRiskReward(reference);
+    const riskReward = formatRiskReward(reference, bars, priceDp);
 
     return [
         DETERMINISTIC_METRICS_HEADER,

@@ -413,3 +413,47 @@ describe('buildFinancialsAnalysisPrompt — 출력 로케일', () => {
         ).toContain('Korean (존댓말)');
     });
 });
+
+describe('buildFinancialsAnalysisPrompt — currency and non-finite values', () => {
+    const scorecard = computeFinancialsScorecard(empty);
+
+    it('renders statement amounts with the listing currency', () => {
+        const snapshot: FinancialsSnapshot = { ...empty, income: [incomeRow] };
+        expect(
+            buildFinancialsAnalysisPrompt('AAPL', snapshot, scorecard, [])
+        ).toContain('Revenue 383.3B USD');
+        // KRX statements arrive in won; the same figure must not be labelled as dollars.
+        expect(
+            buildFinancialsAnalysisPrompt('005930.KS', snapshot, scorecard, [])
+        ).toContain('Revenue 383.3B KRW');
+    });
+
+    it('renders a non-finite margin as N/A instead of NaN%', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            income: [{ ...incomeRow, grossMargin: Number.NaN }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            scorecard,
+            []
+        );
+        expect(p).toContain('Gross Margin N/A');
+        expect(p).not.toContain('NaN%');
+    });
+
+    it('renders a missing growth rate as N/A', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            financialGrowth: [{ ...growthRow, revenueGrowth: null }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            scorecard,
+            []
+        );
+        expect(p).toContain('Revenue Growth N/A');
+    });
+});

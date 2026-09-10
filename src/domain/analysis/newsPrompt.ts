@@ -15,11 +15,17 @@ import {
 import type {
     AssembledPrompt,
     AssetClass,
+    CurrencyCode,
     EarningsCalendarItem,
     EnrichedNewsItem,
     Skill,
 } from '@/domain/types';
-import { formatNullableNumber as fmt } from './promptFormat';
+import {
+    equityListingContext,
+    formatLargeAmount,
+    formatNullableNumber as fmt,
+    listingCurrency,
+} from './promptFormat';
 
 /**
  * Select the news-category skills via the shared selection engine (whitelist +
@@ -54,15 +60,15 @@ function formatNewsItem(item: EnrichedNewsItem, index: number): string {
 }
 
 /** Format upcoming earnings calendar items into a compact block. */
-function formatCalendarItems(items: readonly EarningsCalendarItem[]): string {
+function formatCalendarItems(
+    items: readonly EarningsCalendarItem[],
+    currency: CurrencyCode
+): string {
     if (items.length === 0) return '  None scheduled.';
     return items
         .map(item => {
             const eps = fmt(item.epsEstimated);
-            const rev =
-                item.revenueEstimated != null
-                    ? `${(item.revenueEstimated / 1e9).toFixed(1)}B`
-                    : 'N/A';
+            const rev = formatLargeAmount(item.revenueEstimated, currency);
             const actEps =
                 item.epsActual != null
                     ? `Actual EPS: ${fmt(item.epsActual)}`
@@ -177,12 +183,15 @@ export function buildNewsAnalysisPrompt(
             ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
             : 'No recent news articles available.';
 
-    const calendarSection = formatCalendarItems(upcomingCalendar);
+    const calendarSection = formatCalendarItems(
+        upcomingCalendar,
+        listingCurrency(symbol)
+    );
 
     const assetContext =
         assetClass === 'crypto'
             ? `This is a cryptocurrency with no earnings reports, quarterly fundamentals, or analyst ratings. Focus on regulatory news, macro/liquidity context, protocol updates, and sentiment shifts.`
-            : `This is a publicly traded U.S. equity.`;
+            : equityListingContext(symbol);
 
     const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)

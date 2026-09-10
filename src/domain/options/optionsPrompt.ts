@@ -5,9 +5,25 @@ import {
     outputLanguageName,
     schemaLanguageLabel,
 } from '@/domain/analysis/outputLocale';
+import { formatPrice } from '@/domain/analysis/promptFormat';
 import type { AssembledPrompt } from '@/domain/types';
 import type { BuildOptionsAnalysisPromptOptions } from './types';
 import { summarizeChainForLlm } from './summarizeChainForLlm';
+
+/** Decimals kept for fractional metrics in the Key Metrics JSON. */
+const METRIC_DECIMAL_PLACES = 4;
+
+/**
+ * `JSON.stringify` replacer that rounds fractional numbers.
+ *
+ * The summary carries raw floats — IV `0.28345678912`, put/call `0.8712345679`, implied
+ * move `4.123456789` — which cost tokens and invite the model to quote false precision.
+ * Integers (open interest, volume, whole strikes) pass through untouched.
+ */
+const roundMetric = (_key: string, value: unknown): unknown =>
+    typeof value === 'number' && !Number.isInteger(value)
+        ? Number(value.toFixed(METRIC_DECIMAL_PLACES))
+        : value;
 
 /**
  * @internal Builds the options-analysis LLM prompt.
@@ -60,10 +76,10 @@ export function buildOptionsAnalysisPrompt(
     const dynamic = [
         `You are an options market analyst. Interpret the options market data for ${companyName} (${snapshot.symbol}) and write your analysis in ${outputLanguageName(locale)}.`,
         '',
-        `Current price: $${snapshot.underlyingPrice}`,
+        `Current price: $${formatPrice(snapshot.underlyingPrice)}`,
         '',
         '== Key Metrics by Expiration ==',
-        JSON.stringify(summaries, null, 2),
+        JSON.stringify(summaries, roundMetric, 2),
         '',
         '== Output Schema ==',
         'Respond only with a JSON object matching the schema below. Do not include any other text.',

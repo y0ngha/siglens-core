@@ -41,9 +41,52 @@ import {
     classifyEmaStack,
     classifySwingStructure,
 } from '@/domain/analysis/trendStructure';
+import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 
 const EFFICIENCY_PERIOD = 20;
+
+/**
+ * UTC calendar day of a bar. U.S. regular hours (13:30–21:00 UTC), KRX (00:00–06:30 UTC)
+ * and the crypto UTC day each fall inside a single UTC date, so the date is a session key.
+ */
+const utcDay = (bar: Bar): number => Math.floor(bar.time / SECONDS_PER_DAY);
+
+/**
+ * The bar floor pivots are computed from: the previous bar on a daily chart, the previous
+ * **session** otherwise.
+ *
+ * Pivots used to come from the previous bar on every timeframe. Standard and Camarilla
+ * pivots are defined on the prior session's high/low/close, and on an intraday chart the
+ * previous bar is a sliver of that — its pivot point lands on top of the price (`Pivot PP
+ * … 0.01% away` on hourly AAPL) and its "S3" can sit above the price. Those levels then
+ * became the nearest support/resistance the prompt handed to the model for stops.
+ * Aggregating the prior session's bars restores the levels traders actually watch.
+ */
+function pivotSourceBar(
+    bars: readonly Bar[],
+    timeframe: Timeframe
+): Bar | null {
+    if (bars.length < 2) return null;
+    if (timeframe === '1Day') return bars[bars.length - 2];
+
+    const lastDay = utcDay(bars[bars.length - 1]);
+    const priorEnd = bars.findLastIndex(b => utcDay(b) !== lastDay);
+    if (priorEnd < 0) return null;
+    const priorDay = utcDay(bars[priorEnd]);
+    const priorStart =
+        bars.findLastIndex((b, i) => i < priorEnd && utcDay(b) !== priorDay) +
+        1;
+    const session = bars.slice(priorStart, priorEnd + 1);
+    return {
+        time: session[0].time,
+        open: session[0].open,
+        high: Math.max(...session.map(b => b.high)),
+        low: Math.min(...session.map(b => b.low)),
+        close: session[session.length - 1].close,
+        volume: session.reduce((sum, b) => sum + b.volume, 0),
+    };
+}
 const MIN_EFFICIENCY_PERIOD = 2;
 const FIB_RATIO_DECIMAL_PLACES = 1;
 
@@ -120,7 +163,8 @@ function buildHorizon(
     bars: Bar[],
     indicators: IndicatorResult,
     key: HorizonKey,
-    windowBars: number
+    windowBars: number,
+    pivotBar: Bar | null
 ): HorizonReference {
     const barsLen = bars.length;
     const windowLen = Math.min(windowBars, barsLen);
@@ -165,8 +209,7 @@ function buildHorizon(
           ]
         : [];
 
-    const priorBar = windowLen >= 2 ? barWindow[windowLen - 2] : null;
-    const sp = priorBar ? computeStandardPivot(priorBar) : null;
+    const sp = pivotBar ? computeStandardPivot(pivotBar) : null;
     const standardPivotLevels: ReferenceLevel[] = sp
         ? STANDARD_PIVOT_KEYS.map(k =>
               makeReferenceLevel(
@@ -177,7 +220,7 @@ function buildHorizon(
               )
           )
         : [];
-    const cam = priorBar ? computeCamarillaPivot(priorBar) : null;
+    const cam = pivotBar ? computeCamarillaPivot(pivotBar) : null;
     const camarillaLevels: ReferenceLevel[] = cam
         ? CAMARILLA_LEVEL_KEYS.map(k =>
               makeReferenceLevel(
@@ -281,8 +324,9 @@ export function computeMarketReference(
     timeframe: Timeframe
 ): MarketReference {
     const w = HORIZON_WINDOWS_BY_TIMEFRAME[timeframe];
+    const pivotBar = pivotSourceBar(bars, timeframe);
     const horizon = (key: HorizonKey): HorizonReference =>
-        buildHorizon(bars, indicators, key, w[key]);
+        buildHorizon(bars, indicators, key, w[key], pivotBar);
     return {
         short: horizon('short'),
         medium: horizon('medium'),

@@ -147,6 +147,69 @@ describe('formatDeterministicMetricsSection', () => {
         expect(out).toContain('thresholds the original backtest used');
     });
 
+    it('skips levels inside half the mean bar range when picking the risk:reward pair', () => {
+        // bars() spans 0.4% per bar, so the floor is 0.20%. The 0.10% / -0.05% levels sit
+        // inside it; a ratio built from them would read 2.00 on pure noise.
+        const out = formatDeterministicMetricsSection(
+            enough,
+            '30Min',
+            reference(
+                [level(100.1, 0.1), level(103, 3)],
+                [level(99.95, -0.05), level(98, -2)]
+            )
+        );
+        expect(out).toContain('Levels within 0.20% of the current price');
+        expect(out).toContain('Nearest resistance MA50 at 103.00 (3.00%)');
+        expect(out).toContain('Nearest support MA50 at 98.00 (-2.00%)');
+        expect(out).toContain(
+            'Structural risk:reward from current price = 1.50'
+        );
+    });
+
+    it('renders prices at the precision it is given', () => {
+        const out = formatDeterministicMetricsSection(
+            enough,
+            '30Min',
+            reference([level(0.08423, 1)], [level(0.0826, -2)]),
+            5
+        );
+        expect(out).toContain('MA50 at 0.08423 (1.00%)');
+        expect(out).toContain('MA50 at 0.08260 (-2.00%)');
+    });
+
+    it('skips no level and prints no noise line when the bars have zero range', () => {
+        // A zero-range history gives a 0% floor: the nearest levels are used as-is.
+        const flat = enough.map(b => ({ ...b, high: b.close, low: b.close }));
+        const out = formatDeterministicMetricsSection(
+            flat,
+            '30Min',
+            reference()
+        );
+        expect(out).not.toContain('Levels within');
+        expect(out).toContain(
+            'Structural risk:reward from current price = 0.25'
+        );
+    });
+
+    it('treats a history with no usable bar range as a 0% floor', () => {
+        // Every bar fails the `high >= low` guard, so no range is measurable at all —
+        // a separate branch from zero-width bars, which still produce a (zero) range.
+        const inverted = enough.map(b => ({
+            ...b,
+            high: b.close * 0.99,
+            low: b.close * 1.01,
+        }));
+        const out = formatDeterministicMetricsSection(
+            inverted,
+            '30Min',
+            reference()
+        );
+        expect(out).not.toContain('Levels within');
+        expect(out).toContain(
+            'Structural risk:reward from current price = 0.25'
+        );
+    });
+
     it('does not claim the backtest win rate for the family-counting variant', () => {
         // The measured 70% was produced by a rule that counted signal TYPES. Restoring the
         // thresholds does not restore the counting unit, and a prompt line that says

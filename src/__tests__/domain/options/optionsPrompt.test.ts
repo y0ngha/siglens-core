@@ -137,3 +137,46 @@ describe('buildOptionsAnalysisPrompt', () => {
         });
     });
 });
+
+describe('buildOptionsAnalysisPrompt numeric rounding', () => {
+    const contract = (strike: number, impliedVolatility: number) => ({
+        contractSymbol: `AAPL${strike}`,
+        strike,
+        lastPrice: 1.23456,
+        bid: 1.2,
+        ask: 1.26789,
+        volume: 10,
+        openInterest: 100,
+        impliedVolatility,
+        inTheMoney: false,
+    });
+    const snapshot: OptionsSnapshot = {
+        symbol: 'AAPL',
+        underlyingPrice: 198.123456,
+        capturedAt: '2026-05-14T16:00:00Z',
+        chains: [
+            {
+                expirationDate: '2026-05-22',
+                daysToExpiration: 8,
+                calls: [contract(197.5, 0.283456789)],
+                puts: [contract(197.5, 0.291234567)],
+            },
+        ],
+    };
+    const prompt = buildOptionsAnalysisPrompt({
+        expirationDate: 'all',
+        companyName: 'Apple Inc.',
+        snapshot,
+    });
+
+    it('rounds the underlying price to cents', () => {
+        expect(prompt).toContain('Current price: $198.12');
+    });
+
+    it('rounds fractional metrics to four decimals and leaves integers alone', () => {
+        expect(prompt).not.toMatch(/\d\.\d{5,}/);
+        expect(prompt).toContain('"atmImpliedVolatility": 0.2835');
+        expect(prompt).toContain('"strike": 197.5');
+        expect(prompt).toContain('"putCallRatio": 1,');
+    });
+});

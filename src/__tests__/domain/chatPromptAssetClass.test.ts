@@ -289,3 +289,92 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
         );
     });
 });
+
+// ─── KRX listing framing ────────────────────────────────────────────────────
+
+describe('KRX listing framing (chat / news)', () => {
+    it('chat frames a KRX symbol as a Korean listing and renders levels in whole won', () => {
+        const payload = buildChatPrompt(
+            '005930.KS',
+            '삼성전자',
+            '1Day',
+            {
+                ...analysis,
+                keyLevels: {
+                    support: [{ price: 264000, reason: '지지선' }],
+                    resistance: [],
+                },
+            },
+            [],
+            '어때요?'
+        );
+        expect(payload.systemPrompt).toContain(
+            'Korean equity listed on the KRX'
+        );
+        expect(payload.systemPrompt).not.toContain('U.S. equity');
+        expect(payload.systemPrompt).toContain('- Support: 264000 (지지선)');
+    });
+
+    it('news frames a KRX symbol as a Korean listing', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            '005930.KS',
+            '삼성전자',
+            [],
+            [],
+            [],
+            'equity'
+        );
+        expect(prompt).toContain('Korean equity listed on the KRX');
+        expect(prompt).not.toContain('U.S. equity');
+    });
+});
+
+describe('buildOverallAnalysisPrompt listing framing and level precision', () => {
+    it('frames a KRX symbol as a Korean listing and renders its levels in whole won', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            '005930.KS',
+            '삼성전자',
+            {
+                ...analysis,
+                keyLevels: {
+                    support: [{ price: 264000, reason: '지지선' }],
+                    resistance: [],
+                },
+            },
+            mockFundamental,
+            mockNews,
+            '1Day',
+            undefined,
+            null,
+            false,
+            null,
+            'equity'
+        );
+        expect(prompt).toContain('Korean equity listed on the KRX');
+        expect(prompt).not.toContain('publicly traded U.S. equity');
+        expect(prompt).toContain('- Key Support Levels: 264000 (지지선)');
+    });
+
+    it('keeps significant digits on a sub-dollar level instead of rounding to 0.08', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            'DOGEUSD',
+            'Dogecoin',
+            {
+                ...analysis,
+                keyLevels: {
+                    support: [{ price: 0.0826, reason: 'swing low' }],
+                    resistance: [],
+                },
+            },
+            null,
+            mockNews,
+            '1Hour',
+            undefined,
+            null,
+            false,
+            null,
+            'crypto'
+        );
+        expect(prompt).toContain('- Key Support Levels: 0.08260 (swing low)');
+    });
+});

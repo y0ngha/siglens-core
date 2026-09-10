@@ -486,3 +486,86 @@ describe('bar timestamp rendering', () => {
         expect(section).toContain(`(${expected})`);
     });
 });
+
+describe('formatPriorAnalysisSection price precision', () => {
+    const subDollarBars: Bar[] = Array.from({ length: 5 }, (_, i) => ({
+        time: 1_700_000_000 + i * 86_400,
+        open: 0.0835,
+        high: 0.0841,
+        low: 0.0829,
+        close: 0.08345,
+        volume: 1000,
+    }));
+
+    it('renders a sub-dollar plan at the bars’ precision instead of 0.08', () => {
+        const entry = analysis(new Date(subDollarBars[1].time * 1000), {
+            entryPrices: [0.0831, 0.0834],
+            takeProfitPrices: [0.0852],
+            stopLoss: 0.0825,
+        });
+        const out = formatPriorAnalysisSection(
+            [entry],
+            subDollarBars,
+            'DOGEUSD',
+            '1Day'
+        );
+        expect(out).toContain('entry 0.08310-0.08340, TP 0.08520, SL 0.08250');
+        expect(out).toContain('now 0.08345');
+    });
+
+    it('renders a KRX plan in whole won', () => {
+        const krwBars = subDollarBars.map(b => ({
+            ...b,
+            open: 269000,
+            high: 271000,
+            low: 267000,
+            close: 269500,
+        }));
+        const entry = analysis(new Date(krwBars[1].time * 1000), {
+            entryPrices: [266000, 268000],
+            stopLoss: 262000,
+        });
+        const out = formatPriorAnalysisSection(
+            [entry],
+            krwBars,
+            '005930.KS',
+            '1Day'
+        );
+        expect(out).toContain('entry 266000-268000, SL 262000');
+        expect(out).toContain('now 269500');
+    });
+});
+
+describe('formatPriorAnalysisSection — tiny negative move rounds to +0.00%, never -0.00%', () => {
+    it('renders a since-line move that rounds to zero without losing the sign convention', () => {
+        const bars: Bar[] = [
+            {
+                time: 1_700_000_000,
+                open: 100,
+                high: 100,
+                low: 100,
+                close: 100,
+                volume: 1000,
+            },
+            {
+                time: 1_700_086_400,
+                open: 100,
+                high: 100,
+                low: 99.999,
+                close: 99.9995,
+                volume: 1000,
+            },
+        ];
+        const entry = analysis(new Date(bars[0].time * 1000));
+
+        const result = formatPriorAnalysisSection(
+            [entry],
+            bars,
+            'AAPL',
+            '1Day'
+        );
+
+        expect(result).toContain('(+0.00%)');
+        expect(result).not.toContain('-0.00%');
+    });
+});

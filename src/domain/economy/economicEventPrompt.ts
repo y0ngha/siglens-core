@@ -1,6 +1,7 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import type { EconomicEventAnalysisInput } from './types';
+import { formatPlainNumber } from '@/domain/analysis/promptFormat';
 import type { AssembledPrompt } from '@/domain/types';
 
 /**
@@ -54,9 +55,9 @@ export function buildEconomicEventAnalysisPrompt(
      * `4.42`로 반올림돼 요약에 실리면 채권을 보는 독자에게는 틀린 숫자다(실측 확인).
      * 헬퍼 자체는 다른 빌더가 2자리를 원하므로 건드리지 않는다.
      */
-    const actualStr = input.actual == null ? 'N/A' : String(input.actual);
-    const estimateStr = input.estimate == null ? 'N/A' : String(input.estimate);
-    const previousStr = input.previous == null ? 'N/A' : String(input.previous);
+    const actualStr = formatPlainNumber(input.actual);
+    const estimateStr = formatPlainNumber(input.estimate);
+    const previousStr = formatPlainNumber(input.previous);
     const unit = input.unit || '';
 
     const stable = '';

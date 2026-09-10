@@ -614,9 +614,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * the same scope as `p9`/`p10`. The bump is still fleet-wide because the
  * constant has no per-request axis to scope it to.
  *
+ * @remarks
+ * **`p12` = numeric rendering audit.** Price-scale values render at a
+ * precision derived from the snapshot close (sub-dollar assets keep four
+ * significant digits, KRX renders whole won) instead of a fixed two decimals
+ * that zeroed SHIBUSD's bars; KRX symbols get Korean-listing framing instead of
+ * "U.S. equity"; volatility and BandWidth render as percentages and Force Index
+ * as a grouped integer; pivots come from the prior session on intraday charts;
+ * round-number steps scale outside $1–$1,000; and the structural risk:reward
+ * skips levels inside half the mean bar range. Bytes change for every request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p11' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p12' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -734,9 +744,14 @@ export function buildAnalysisCacheKey(
  * would make a previously cached briefing wrong or stale. `p1` is the first
  * version to carry the axis at all.
  *
+ * @remarks
+ * **`p2` = guarded numbers.** Index/sector changes render through a signed-percent
+ * helper (a missing change printed `NaN%`) and the volatility level is rounded to
+ * cents in both places the model is told to copy it verbatim.
+ *
  * @internal
  */
-export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 export function buildBriefingCacheKey(
     dateHour: string,
@@ -750,9 +765,30 @@ export function buildBriefingCacheKey(
 export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
 
 /**
+ * Prompt-template version for the macro (economy) briefing cache key.
+ *
+ * Same reason {@link MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION} exists: without
+ * this axis a change to `buildMacroBriefingPrompt`'s output takes up to a full
+ * TTL (1h) to take effect, because a cache HIT inside the same `dateHour`
+ * bucket returns a response the old prompt produced.
+ *
+ * Bump whenever `buildMacroBriefingPrompt`'s output changes in a way that would
+ * make a previously cached briefing wrong or stale.
+ *
+ * @remarks
+ * **`p1` = axis introduced with guarded figures.** Indicator values and
+ * calendar estimates render through `formatPlainNumber` (a non-finite value
+ * printed the literal `NaN`; binary float noise such as `0.30000000000000004`
+ * reached the model).
+ *
+ * @internal
+ */
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
  * @internal Build the Redis key for a cached macro (economy) briefing.
  *
- * Format: `briefing:macro:<dateHour>:<model>:<inputHash>`. Same bucketing
+ * Format: `briefing:macro:<dateHour>:<model>:<inputHash>:<promptVersion>`. Same bucketing
  * contract as {@link buildBriefingCacheKey} (date+hour share, model scopes,
  * input hash folds in the indicator/calendar snapshot) but a distinct `macro:`
  * namespace so market and economy briefings never collide.
@@ -762,7 +798,7 @@ export function buildMacroBriefingCacheKey(
     model: string,
     inputHash: string
 ): string {
-    return `briefing:macro:${dateHour}:${model}:${inputHash}`;
+    return `briefing:macro:${dateHour}:${model}:${inputHash}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
 /**
@@ -794,9 +830,16 @@ export function buildMacroBriefingCacheKey(
  * §3.4 — `stable` is `''` and `dynamic` is byte-identical to the previous
  * plain-string prompt). Both were no-op cache churn; this one is not.
  *
+ * @remarks
+ * **`p4` = guarded figures.** `actual` / `estimate` / `previous` render through
+ * `formatPlainNumber`: a non-finite value used to print the literal `NaN`, and
+ * binary float noise (`0.30000000000000004`) reached the model. Clean figures
+ * render byte-identically; the bump keeps entries generated from corrupt inputs
+ * from being served for the rest of their 1-day TTL.
+ *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
@@ -903,9 +946,17 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * `f1` starts the independent series. Bump it whenever the fundamental system
  * or user prompt template changes in a way that makes cached results stale.
  *
+ * @remarks
+ * **`f2` = currency-aware amounts.** Market caps, cash flow, and revenue
+ * estimates render scaled with their listing currency (a KRX cap arrived in
+ * won and printed as ~`1600000B USD`; a sub-$500M cap printed as `0B`), a
+ * missing cap renders `N/A`, percent metrics never print `N/A%`, the debt
+ * ratio carries its `%`, and a missing Piotroski score is `N/A` instead of
+ * `N/A/9`.
+ *
  * @internal
  */
-export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f1' as const;
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f2' as const;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.
@@ -991,9 +1042,14 @@ export function buildFundamentalCacheKey(
  * so free and non-free requests never share a cache entry. Bumped to
  * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
  *
+ * @remarks
+ * **`p6` = currency-aware amounts.** Statement amounts render as T/B/M with
+ * the listing currency (KRX statements are in won, previously printed as bare
+ * `B`), and non-finite margins/growth render `N/A` instead of `NaN%`.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -1187,9 +1243,14 @@ export function buildCongressTrendCacheKey(
  * take, so free and non-free requests never share a cache entry. Bumped to
  * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
  *
+ * @remarks
+ * **`p5` = listing framing + currency.** KRX symbols are framed as Korean
+ * listings instead of "a publicly traded U.S. equity", and earnings-calendar
+ * revenue estimates carry their currency.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
@@ -1274,10 +1335,36 @@ export function buildNewsCacheKey(
 }
 
 /**
+ * Prompt-template version for the overall (3-axis) analysis cache keys.
+ *
+ * Parallel to {@link FUNDAMENTAL_PROMPT_TEMPLATE_VERSION} /
+ * {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} but scoped to the overall
+ * analysis type, so a change to `buildOverallAnalysisPrompt`'s rendered output
+ * can be invalidated independently of the other analysis types.
+ *
+ * Bump this string whenever `buildOverallAnalysisPrompt`'s output changes in a
+ * way that would make previously cached results stale.
+ *
+ * @remarks
+ * **`p1` introduces this axis**, together with the numeric-rendering audit
+ * that changed `buildOverallAnalysisPrompt`'s rendered bytes: KRX symbols get
+ * Korean-listing framing instead of "U.S. equity", and level prices render at
+ * a magnitude-aware precision instead of a fixed two decimals. The key
+ * previously carried no template-version segment, so pre-change entries
+ * (1-day TTL) kept being served after the prompt changed; `p1` gives this
+ * builder the same invalidation lever its siblings already have.
+ *
+ * @internal
+ */
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
  * Build the Redis key for a cached overall (3-axis) analysis result.
  *
- * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<inputHash>`.
- * The `timeframe` distinguishes analyses run with different chart contexts.
+ * Format: `analysis:overall:<symbol>:<timeframe>:<modelId>:<promptVersion>:<inputHash>`.
+ * The `timeframe` distinguishes analyses run with different chart contexts;
+ * the {@link OVERALL_PROMPT_TEMPLATE_VERSION} segment invalidates the cache
+ * when the overall prompt template changes.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
  *   inside `submitOverallAnalysis`. Do not depend on this function from outside
@@ -1302,7 +1389,7 @@ export function buildOverallCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:${symbol}:${timeframe}:${modelId}:${OVERALL_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
@@ -1350,7 +1437,7 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  * feature would then appear to work while silently rendering nothing for the
  * first hours of every session.
  *
- * {@link TIMEFRAME_LOOKBACK_DAYS} over {@link TIMEFRAME_BARS_LIMIT} gives
+ * `TIMEFRAME_LOOKBACK_DAYS` over `TIMEFRAME_BARS_LIMIT` gives
  * calendar days per bar — but that ratio is an **average**, and the gap that
  * matters here is the **worst case**. Averaged over a year, a 5-minute bar is
  * ~3.5 calendar minutes apart; across a Friday close to a Monday open it is
@@ -1469,12 +1556,16 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
 /**
  * Build the **content-free** "peek" key for the latest cached overall analysis.
  *
- * Format: `{version}:analysis:overall:peek:<symbol>:<timeframe>:<modelId>`.
+ * Format: `{version}:analysis:overall:peek:<symbol>:<timeframe>:<modelId>:<promptVersion>`.
  *
  * Unlike {@link buildOverallCacheKey}, this key omits the input hash so it can
  * be reconstructed from `(symbol, timeframe, modelId)` alone — without
  * resolving the four dependency axes (which is the only way to derive the
- * input hash, and which would entail cache reads / potential generation).
+ * input hash, and which would entail cache reads / potential generation). The
+ * {@link OVERALL_PROMPT_TEMPLATE_VERSION} segment is still required here even
+ * though this is an overwrite-latest pointer: without it, a prompt-template
+ * change would leave this pointer serving the stale overall result until
+ * something else overwrites it.
  *
  * {@link pollOverallAnalysis} writes the normalized result under **both** keys:
  * the canonical hashed key (for the exact-input cache the submit path looks up)
@@ -1505,17 +1596,42 @@ export function buildOverallPeekCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:${symbol}:${timeframe}:${modelId}:${OVERALL_PROMPT_TEMPLATE_VERSION}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
+
+/**
+ * Prompt-template version for the options analysis cache keys.
+ *
+ * Parallel to {@link FUNDAMENTAL_PROMPT_TEMPLATE_VERSION} /
+ * {@link FINANCIALS_PROMPT_TEMPLATE_VERSION} but scoped to the options
+ * analysis type, so a change to `buildOptionsAnalysisPrompt`'s rendered output
+ * can be invalidated independently of the other analysis types.
+ *
+ * Bump this string whenever `buildOptionsAnalysisPrompt`'s output changes in a
+ * way that would make previously cached results stale.
+ *
+ * @remarks
+ * **`p1` introduces this axis**, together with the numeric-rendering audit
+ * that changed `buildOptionsAnalysisPrompt`'s rendered bytes: the current
+ * price renders with cents instead of a whole number, and the metric JSON
+ * values render at 4-decimal precision. The key previously carried no
+ * template-version segment, so pre-change entries (1-day TTL) kept being
+ * served after the prompt changed; `p1` gives this builder the same
+ * invalidation lever its siblings already have.
+ *
+ * @internal
+ */
+export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
 
 /**
  * @internal Build the Redis key for a cached options analysis result.
  *
- * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<snapshotInputHash>`.
+ * Format: `{version}:analysis:options:<symbol>:<expirationDate>:<modelId>:<promptVersion>:<snapshotInputHash>`.
  *
  * The schema-version prefix ({@link CACHE_KEY_SCHEMA_VERSION}) ensures future
  * shape changes invalidate the cache automatically, matching the sibling
- * analysis cache-key builders above.
+ * analysis cache-key builders above; the {@link OPTIONS_PROMPT_TEMPLATE_VERSION}
+ * segment invalidates the cache when the options prompt template changes.
  *
  * @param symbol - Underlying ticker (uppercase).
  * @param expirationDate - {@link OptionsExpirationFilter} — `'YYYY-MM-DD'` or the
@@ -1539,5 +1655,5 @@ export function buildOptionsCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${OPTIONS_PROMPT_TEMPLATE_VERSION}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }

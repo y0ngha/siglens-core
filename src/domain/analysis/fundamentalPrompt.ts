@@ -14,13 +14,37 @@ import {
 } from '@/domain/analysis/selectSkills';
 import type {
     AssembledPrompt,
+    CurrencyCode,
     FundamentalSnapshot,
     GradesConsensus,
     PriceTargetConsensus,
     PriceTargetSummary,
     Skill,
 } from '@/domain/types';
-import { formatNullableNumber as fmt } from './promptFormat';
+import {
+    formatLargeAmount,
+    formatNullableNumber as fmt,
+    formatPrice,
+    formatSignedPercent,
+    listingCurrency,
+} from './promptFormat';
+
+/** Maximum Piotroski F-score. */
+const PIOTROSKI_MAX_SCORE = 9;
+
+/** A percent-unit metric with its `%`, or a bare `N/A` (never `N/A%`). */
+function fmtPct(n: number | null | undefined): string {
+    const text = fmt(n);
+    return text === 'N/A' ? text : `${text}%`;
+}
+
+/**
+ * Market cap, or `N/A` when non-positive — the KRX adapter reports a missing cap as `0`,
+ * which used to render as a real `0B USD`.
+ */
+function formatMarketCap(n: number, currency: CurrencyCode): string {
+    return n > 0 ? formatLargeAmount(n, currency) : 'N/A';
+}
 
 const PEER_METRIC_DECIMAL_PLACES = 1;
 
@@ -47,15 +71,25 @@ function formatGrades(g: GradesConsensus | null): string {
 }
 
 /** Render price target data into a compact inline string. */
-function formatPriceTarget(consensus: PriceTargetConsensus | null): string {
+function formatPriceTarget(
+    consensus: PriceTargetConsensus | null,
+    currency: CurrencyCode
+): string {
     if (!consensus) return 'N/A';
-    return `Consensus: ${fmt(consensus.consensus)}, High: ${fmt(consensus.high)}, Low: ${fmt(consensus.low)}, Median: ${fmt(consensus.median)}`;
+    const px = (n: number | null | undefined): string =>
+        formatPrice(n, currency);
+    return `Consensus: ${px(consensus.consensus)}, High: ${px(consensus.high)}, Low: ${px(consensus.low)}, Median: ${px(consensus.median)}`;
 }
 
 /** Render rolling-average price targets (1-month / 3-month / 12-month) into a compact inline string. */
-function formatPriceTargetSummary(summary: PriceTargetSummary | null): string {
+function formatPriceTargetSummary(
+    summary: PriceTargetSummary | null,
+    currency: CurrencyCode
+): string {
     if (!summary) return 'N/A';
-    return `1M Avg: ${fmt(summary.month1Avg)}, 3M Avg: ${fmt(summary.month3Avg)}, 1Y Avg: ${fmt(summary.year1Avg)}`;
+    const px = (n: number | null | undefined): string =>
+        formatPrice(n, currency);
+    return `1M Avg: ${px(summary.month1Avg)}, 3M Avg: ${px(summary.month3Avg)}, 1Y Avg: ${px(summary.year1Avg)}`;
 }
 
 /** Format a peer valuation metric as a fixed-decimal string, or 'N/A' for non-finite / null / undefined values. */
@@ -70,16 +104,10 @@ function formatPeerMetric(
 function formatSectorDirection(
     sd: FundamentalSnapshot['sectorDirection']
 ): string {
-    const today =
-        sd.todayChangePct != null
-            ? `${sd.todayChangePct >= 0 ? '+' : ''}${sd.todayChangePct.toFixed(2)}%`
-            : 'N/A';
+    const today = formatSignedPercent(sd.todayChangePct);
     const history = sd.historical
         .slice(0, 3)
-        .map(
-            h =>
-                `${h.date}: ${h.changePct >= 0 ? '+' : ''}${h.changePct.toFixed(2)}%`
-        )
+        .map(h => `${h.date}: ${formatSignedPercent(h.changePct)}`)
         .join(', ');
     return `Today: ${today}${history ? `; Recent: ${history}` : ''}`;
 }
@@ -146,12 +174,15 @@ export function buildFundamentalAnalysisPrompt(
                   .join('\n\n')
             : 'No additional fundamental skills loaded.';
 
+    // Amounts arrive in the listing's currency: won for KRX, dollars otherwise.
+    const currency = listingCurrency(symbol);
+
     const peerLines =
         peers.length > 0
             ? peers
                   .map(
                       p =>
-                          `  - ${p.symbol} (${p.companyName}): Market Cap ${(p.marketCap / 1e9).toFixed(0)}B, PER ${formatPeerMetric(p.per)}, PSR ${formatPeerMetric(p.psr)}`
+                          `  - ${p.symbol} (${p.companyName}): Market Cap ${formatMarketCap(p.marketCap, currency)}, PER ${formatPeerMetric(p.per)}, PSR ${formatPeerMetric(p.psr)}`
                   )
                   .join('\n')
             : '  None';
@@ -175,7 +206,7 @@ ${skillsSection}`;
 - Name: ${profile.companyName}
 - Sector: ${profile.sector}
 - Industry: ${profile.industry}
-- Market Cap: ${(profile.marketCap / 1e9).toFixed(0)}B USD
+- Market Cap: ${formatMarketCap(profile.marketCap, currency)}
 - CEO: ${profile.ceo ?? 'N/A'}
 - Description: ${profile.description ?? 'N/A'}
 
@@ -185,35 +216,35 @@ ${skillsSection}`;
 - P/B: ${fmt(valuation.pbr)}
 - PEG: ${fmt(valuation.peg)}
 - EV/EBITDA: ${fmt(valuation.evToEbitda)}
-- EPS (TTM): ${fmt(valuation.eps)}
+- EPS (TTM, ${currency}): ${fmt(valuation.eps)}
 
 ## Comparable Peers
 ${peerLines}
 
 ## Profitability
-- ROE: ${fmt(profitability.roe)}%
-- ROA: ${fmt(profitability.roa)}%
-- Operating Margin: ${fmt(profitability.operatingMargin)}%
-- Net Margin: ${fmt(profitability.netMargin)}%
+- ROE: ${fmtPct(profitability.roe)}
+- ROA: ${fmtPct(profitability.roa)}
+- Operating Margin: ${fmtPct(profitability.operatingMargin)}
+- Net Margin: ${fmtPct(profitability.netMargin)}
 
 ## Growth (YoY)
-- Revenue: ${fmt(growth.revenueYoy)}%
-- EPS: ${fmt(growth.epsYoy)}%
+- Revenue: ${fmtPct(growth.revenueYoy)}
+- EPS: ${fmtPct(growth.epsYoy)}
 
 ## Financial Health
-- Debt Ratio: ${fmt(health.debtRatio)}
+- Debt Ratio (total debt / total assets): ${fmtPct(health.debtRatio)}
 - Current Ratio: ${fmt(health.currentRatio)}
-- Operating Cash Flow: ${health.operatingCashFlow != null ? (health.operatingCashFlow / 1e9).toFixed(1) + 'B' : 'N/A'}
+- Operating Cash Flow: ${formatLargeAmount(health.operatingCashFlow, currency)}
 - Altman Z-Score: ${fmt(health.altmanZScore)}
-- Piotroski Score: ${health.piotroskiScore ?? 'N/A'}/9
+- Piotroski Score: ${health.piotroskiScore != null ? `${health.piotroskiScore}/${PIOTROSKI_MAX_SCORE}` : 'N/A'}
 
 ## Forward / Analyst Outlook
 - Next Earnings: ${futureDirection.nextEarningsAt ?? 'N/A'}
-- Analyst EPS Estimate: ${fmt(futureDirection.analystEstimateEps)}
-- Analyst Revenue Estimate: ${futureDirection.analystEstimateRevenue != null ? (futureDirection.analystEstimateRevenue / 1e9).toFixed(1) + 'B' : 'N/A'}
+- Analyst EPS Estimate (${currency}): ${fmt(futureDirection.analystEstimateEps)}
+- Analyst Revenue Estimate: ${formatLargeAmount(futureDirection.analystEstimateRevenue, currency)}
 - Analyst Grades: ${formatGrades(futureDirection.gradesConsensus)}
-- Price Target: ${formatPriceTarget(futureDirection.priceTargetConsensus)}
-- Price Target Trend: ${formatPriceTargetSummary(futureDirection.priceTargetSummary)}
+- Price Target: ${formatPriceTarget(futureDirection.priceTargetConsensus, currency)}
+- Price Target Trend: ${formatPriceTargetSummary(futureDirection.priceTargetSummary, currency)}
 
 ## Sector Direction
 ${formatSectorDirection(sectorDirection)}

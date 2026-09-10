@@ -183,10 +183,10 @@ describe('buildFundamentalAnalysisPrompt', () => {
         );
 
         expect(prompt).toContain(
-            '  - MSFT (Microsoft Corp.): Market Cap 2800B, PER 34.2, PSR 12.6'
+            '  - MSFT (Microsoft Corp.): Market Cap 2.8T USD, PER 34.2, PSR 12.6'
         );
         expect(prompt).toContain(
-            '  - GOOGL (Alphabet Inc.): Market Cap 1900B, PER N/A, PSR N/A'
+            '  - GOOGL (Alphabet Inc.): Market Cap 1.9T USD, PER N/A, PSR N/A'
         );
     });
 
@@ -209,7 +209,7 @@ describe('buildFundamentalAnalysisPrompt', () => {
         );
 
         expect(prompt).toContain(
-            '  - XYZ (Xyz Corp): Market Cap 50B, PER N/A, PSR N/A'
+            '  - XYZ (Xyz Corp): Market Cap 50.0B USD, PER N/A, PSR N/A'
         );
     });
 
@@ -322,5 +322,81 @@ describe('buildFundamentalAnalysisPrompt — 출력 로케일', () => {
         expect(
             buildFundamentalAnalysisPrompt(TEST_SYMBOL, TEST_SNAPSHOT, [], 'ko')
         ).toContain('Korean (존댓말)');
+    });
+});
+
+describe('buildFundamentalAnalysisPrompt — currency and missing values', () => {
+    it('renders KRX amounts in won with a scaled suffix', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            '005930.KS',
+            {
+                ...TEST_SNAPSHOT,
+                profile: {
+                    ...TEST_SNAPSHOT.profile,
+                    marketCap: 1_600_000_000_000_000,
+                },
+                peers: [],
+            },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+        expect(prompt).toContain('- Market Cap: 1600.0T KRW');
+        expect(prompt).toContain('- Operating Cash Flow: 110.0B KRW');
+        expect(prompt).not.toContain('USD');
+    });
+
+    it('renders a missing market cap and Piotroski score as N/A, never 0B or N/A/9', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                profile: { ...TEST_SNAPSHOT.profile, marketCap: 0 },
+                health: {
+                    ...TEST_SNAPSHOT.health,
+                    piotroskiScore: null,
+                    debtRatio: null,
+                },
+            },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+        expect(prompt).toContain('- Market Cap: N/A\n');
+        expect(prompt).toContain('- Piotroski Score: N/A\n');
+        expect(prompt).toContain(
+            '- Debt Ratio (total debt / total assets): N/A\n'
+        );
+        expect(prompt).not.toContain('N/A%');
+        expect(prompt).not.toContain('N/A/9');
+    });
+
+    it('carries units on the debt ratio and scales the U.S. market cap', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+        expect(prompt).toContain(
+            '- Debt Ratio (total debt / total assets): 1.76%'
+        );
+        expect(prompt).toContain('- Market Cap: 3.0T USD');
+        expect(prompt).toContain('- Piotroski Score: 7/9');
+    });
+});
+
+describe('buildFundamentalAnalysisPrompt — sector direction formatting', () => {
+    it('renders a NaN today and a zero-rounding historical move as N/A / +0.00%, never NaN% or -0.00%', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                sectorDirection: {
+                    todayChangePct: Number.NaN,
+                    historical: [{ date: '2025-04-28', changePct: -0.001 }],
+                },
+            },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+
+        expect(prompt).toContain('Today: N/A; Recent: 2025-04-28: +0.00%');
+        expect(prompt).not.toContain('NaN%');
+        expect(prompt).not.toContain('-0.00%');
     });
 });
