@@ -144,6 +144,24 @@ inversely related to signal strength (median 1.27 in a middling composite-score 
 **0.00** in the highest). Strong confluence is therefore not evidence that entering now is
 attractive, and the model cannot notice that unless the ratio precedes its verdict.
 
+The ratio skips levels closer than **half the mean bar range of the last 14 bars**. Without
+that floor it divided by whichever level happened to touch the price — hourly AAPL paired a
+0.06% "resistance" with a 0.01% "support", a 15-minute NVDA chart printed 180.38 — which is
+noise divided by noise, and the model was then told to put stops on those levels. Two
+upstream fixes remove most such levels at the source: intraday pivots are computed from the
+**prior session** (not the prior bar, whose pivot sits on the price), and round-number steps
+scale to ~2% of price outside $1–$1,000 (a flat 10 put `Round 77110` next to BTC).
+
+## Prompt number rendering (`analysis/promptFormat.ts`)
+
+Every price-scale value in the chart prompt renders at one precision picked from the
+snapshot close by `priceDecimalPlaces`: cents at or above one unit, four significant digits
+below it, whole won for KRX symbols. A fixed two decimals rendered SHIBUSD's bars as
+`O:0.00 H:0.00 L:0.00 C:0.00`. `formatNullableNumber` renders non-finite values as `N/A` and
+drops the sign from a value that rounds to zero. KRX listings (`/^\d{6}\.(KS|KQ)$/`) travel
+with `assetClass: 'equity'`, so framing and currency come from the symbol
+(`equityListingContext`, `listingCurrency`) — the U.S. sentence stays byte-identical.
+
 ## Overall axis weighting (`analysis/overallScore.ts`)
 
 The overall prompt hands five axis reports to one model and asks it to synthesize. The only

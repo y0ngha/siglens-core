@@ -197,10 +197,6 @@
   Rule: MISTAKES.md §TypeScript 7 — `as` casts must include invariant comments at cast site
   Fixed in R2: added invariant comments at each cast site
 
-- Violation 3: `src/domain/indicators/marketFearGreed/align.ts` — `input[key] ?? []` guard branch had no dedicated test
-  Rule: MISTAKES.md §Tests 5.5 — guard branches need dedicated test coverage
-  Fixed in R2: added test deleting one series key, asserts empty join; now 100% coverage
-
 - Violation 4 (RECOMMENDED): `types.ts` — inline `'normal' | 'limited'` union duplicated sibling's `Exclude<FearGreedConfidence, 'insufficient'>`
   Rule: MISTAKES.md §TypeScript 6 — avoid duplicating named types; reuse instead
   Fixed in R2: replaced with reuse of named type
@@ -269,4 +265,11 @@
   Promoted: YES — add rule to MISTAKES.md Tests (negative assertions that confirm wrong behavior pin bugs)
 
 - Production impact (pre-fix, siglens-trader): ~30k-token prompt, indicatorResults[].signals empty in 824/824 analyses (gemini: 143/143 filled). Downstream axis degraded from 3 inputs to 1 while keeping full weight, measured inverted (top tercile −1.604% forward return). Bug pinned for 1 month by comment asserting "DeepSeek does not support strict json_schema" (half-true: chat endpoint doesn't, Responses endpoint does).
+
+## [fix/prompt-numeric-audit R1 | 2026-09-10] — Documentation gaps in domain logic
+
+- Violation 1 (RECOMMENDED, R1): `src/domain/analysis/referenceLevels.ts` — mathematically unreachable `??` fallback lacked explanatory comment
+  Rule: Documentation Sync — unreachable guards must document their rationale (matching sibling fallback style)
+  Context: A sibling fallback in the same module had a comment explaining why it exists despite being unreachable; this one had none.
+  Fixed: Added explanatory comment documenting the fallback's safety invariant.
 
