@@ -121,3 +121,11 @@
   Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
   Fixed in R2: Added dated changelog row documenting the new public exports
 
+## [PR #194 R3 | feat/prompt-numeric-audit | 2026-09-11] — Macro briefing cache key prompt-version blocker
+
+- Violation (BLOCKER R3): `src/infrastructure/cache/config.ts` — `buildMacroBriefingCacheKey` missing `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION` segment despite `macroBriefingPrompt.ts` output change in this PR (numeric format support added).
+- Rule: MISTAKES.md Infrastructure Functions 6 — cache builders' template/prompt versions must be incremented when rendered bytes change; keys must include version segment to bust stale entries.
+- Context: Sibling builder `buildBriefingCacheKey` was correctly bumped in same PR. Macro briefing was overlooked. Audit on review: all 14 `build*Key` functions in config.ts verified; macro-briefing was sole LLM-output key missing version interpolation.
+- Fixed in R3: Added `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1'`, appended to key interpolation, updated corresponding tests. Full sibling audit completed and documented in MISTAKES.md §Infrastructure Functions 6 recurrence note.
+
+

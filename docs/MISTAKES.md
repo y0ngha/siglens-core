@@ -419,8 +419,9 @@ and have been removed from this file.
    ❌ buildOverallCacheKey(symbol, modelId) without OVERALL_PROMPT_TEMPLATE_VERSION in the key; prompt output changes are invisible to cache
    ✅ buildOverallCacheKey(symbol, modelId, OVERALL_PROMPT_TEMPLATE_VERSION) with version incremented when prompt changes
    ✅ When prompt builder output changes (new fields, field order, logic), increment template version immediately in same commit
+   → **Sibling audit (MANDATORY after any version-bump fix):** grep every `export function build*Key` in `src/infrastructure/cache/config.ts` and confirm each LLM-output key interpolates a `*_PROMPT_TEMPLATE_VERSION` or a fingerprint that embeds one. Deterministic non-LLM keys (sector signals, identifier-only concatenation) are exempt. Do not rely on single-file review; exhaustively verify all siblings in the same config module.
    → Recurring (PR #194 R1–R2): ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION missed in R1, then three more builders (OVERALL, OPTIONS, peek key) missed in R2.
-      Lesson: when one builder version is flagged, audit all sibling builders in the same file/module for the same omission.
+   → Recurring (PR #194 R3): MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION missing from buildMacroBriefingCacheKey despite prompt output change. Sibling audit in R3 completed: all 14 `build*Key` functions now verified; macro-briefing was the sole omission.
 ```
 
 ---
