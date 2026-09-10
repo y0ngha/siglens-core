@@ -282,7 +282,16 @@ describe('callDeepSeek', () => {
         // `indicatorResults[].signals`가 824건 전부 빈 배열이었다.
         function responsesStream(
             text: string,
-            usage?: unknown
+            usage?: unknown,
+            /** 종료 이벤트. 기본은 정상 완료. */
+            terminal: {
+                type:
+                    | 'response.completed'
+                    | 'response.incomplete'
+                    | 'response.failed';
+                incompleteReason?: string;
+                errorMessage?: string;
+            } = { type: 'response.completed' }
         ): AsyncIterable<unknown> {
             return {
                 async *[Symbol.asyncIterator]() {
@@ -293,12 +302,22 @@ describe('callDeepSeek', () => {
                         delta: 'thinking out loud',
                     };
                     yield { type: 'response.output_text.delta', delta: text };
-                    if (usage !== undefined) {
-                        yield {
-                            type: 'response.completed',
-                            response: { usage },
-                        };
-                    }
+                    yield {
+                        type: terminal.type,
+                        response: {
+                            ...(usage !== undefined ? { usage } : {}),
+                            ...(terminal.incompleteReason !== undefined
+                                ? {
+                                      incomplete_details: {
+                                          reason: terminal.incompleteReason,
+                                      },
+                                  }
+                                : {}),
+                            ...(terminal.errorMessage !== undefined
+                                ? { error: { message: terminal.errorMessage } }
+                                : {}),
+                        },
+                    };
                 },
             };
         }
@@ -367,6 +386,75 @@ describe('callDeepSeek', () => {
             expect(usageLine).toContain('"promptTokens":900');
             expect(usageLine).toContain('"outputTokens":250');
             logSpy.mockRestore();
+        });
+
+        it('절단된 응답을 성공으로 반환하지 않는다 — max_output_tokens', async () => {
+            // `/responses`에는 finish_reason이 없어서, 종료 이벤트를 보지 않으면
+            // 절단 시점까지 흘러온 **부분 JSON**이 정상 응답으로 나간다.
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('{"indicatorResults":[{"indi', undefined, {
+                    type: 'response.incomplete',
+                    incompleteReason: 'max_output_tokens',
+                })
+            );
+
+            const promise = callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+            });
+
+            // chat 경로의 `length`와 같은 취급 — 재시도해도 같은 한도에 걸린다.
+            await expect(promise).rejects.toThrow(/output token limit/);
+            await expect(promise).rejects.not.toMatchObject({
+                retryable: true,
+            });
+        });
+
+        it('그 외 incomplete는 재시도 가능 오류로 올린다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('partial', undefined, {
+                    type: 'response.incomplete',
+                    incompleteReason: 'content_filter',
+                })
+            );
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
+        it('response.failed는 본문이 있어도 오류다', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(
+                responsesStream('{"partial":1}', undefined, {
+                    type: 'response.failed',
+                    errorMessage: 'upstream exploded',
+                })
+            );
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
+        it('본문이 비면 재시도 가능 오류다 — 정상 완료여도', async () => {
+            mockResponsesCreate.mockResolvedValueOnce(responsesStream(''));
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
         });
 
         it('스키마가 없으면 종전 경로(json_object)를 그대로 탄다', async () => {

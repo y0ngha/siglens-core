@@ -118,18 +118,12 @@ async function callDeepSeekResponses(
     spec: DeepSeekModelSpec,
     useThinking: boolean,
     signal: AbortSignal
-): Promise<{ text: string; usage: DeepSeekUsageLike | undefined }> {
+): Promise<DeepSeekResponsesResult> {
     const client = getClient(options.apiKey);
-    const stream = (await (
-        client as unknown as {
-            responses: {
-                create: (
-                    body: unknown,
-                    opts: unknown
-                ) => Promise<AsyncIterable<unknown>>;
-            };
-        }
-    ).responses.create(
+    // SDK 타입을 그대로 쓴다. body가 `unknown`이면 `text.format` 키 오타 같은 것이
+    // 컴파일에서 안 걸리고, 이벤트를 손으로 타이핑하면 아래 incomplete/failed 분기가
+    // 타입에서 보이지 않는다 — 실제로 첫 구현이 그래서 절단 감지를 빠뜨렸다.
+    const stream = await client.responses.create(
         {
             model: spec.apiModelId,
             input: prompt,
@@ -139,33 +133,56 @@ async function callDeepSeekResponses(
                 format: {
                     type: 'json_schema',
                     name: 'analysis_response',
-                    schema: options.responseSchema,
+                    schema: options.responseSchema as Record<string, unknown>,
                 },
             },
             reasoning: { effort: reasoningEffort(useThinking) },
             stream: true,
         },
         { signal }
-    )) as AsyncIterable<{
-        type?: string;
-        delta?: unknown;
-        response?: { usage?: unknown };
-    }>;
+    );
 
     let text = '';
     let usage: DeepSeekUsageLike | undefined;
+    // `/responses`에는 `finish_reason`이 없다. 대신 종료를 알리는 이벤트가 셋이고
+    // (`completed` / `incomplete` / `failed`), 그중 둘이 실패다. 잡지 않으면 부분
+    // 텍스트가 이미 흘렀을 때 잘린 JSON이 정상 응답으로 나간다.
+    let outcome: DeepSeekResponsesResult['outcome'] = 'completed';
+    let incompleteReason: string | undefined;
     for await (const event of stream) {
-        if (
-            event.type === OUTPUT_TEXT_DELTA &&
-            typeof event.delta === 'string'
-        ) {
+        if (event.type === OUTPUT_TEXT_DELTA) {
             text += event.delta;
         }
-        if (event.response?.usage) {
-            usage = normalizeResponsesUsage(event.response.usage);
+        if (
+            event.type === 'response.completed' ||
+            event.type === 'response.incomplete' ||
+            event.type === 'response.failed'
+        ) {
+            if (event.response.usage) {
+                usage = normalizeResponsesUsage(event.response.usage);
+            }
+            if (event.type === 'response.incomplete') {
+                outcome = 'incomplete';
+                incompleteReason = event.response.incomplete_details?.reason;
+            } else if (event.type === 'response.failed') {
+                outcome = 'failed';
+                incompleteReason = event.response.error?.message;
+            }
         }
     }
-    return { text, usage };
+    return { text, usage, outcome, incompleteReason };
+}
+
+/**
+ * Responses API 호출의 결과. `outcome`이 `completed`가 아니면 본문이 있어도 믿으면
+ * 안 된다 — 절단·실패 시점까지 스트리밍된 조각이 그대로 남아 있기 때문이다.
+ */
+interface DeepSeekResponsesResult {
+    text: string;
+    usage: DeepSeekUsageLike | undefined;
+    outcome: 'completed' | 'incomplete' | 'failed';
+    /** `incomplete_details.reason` 또는 `error.message`. */
+    incompleteReason: string | undefined;
 }
 
 /**
@@ -263,9 +280,26 @@ export async function callDeepSeek(
             );
             text = result.text;
             usage = result.usage;
-            // Responses API에는 `finish_reason`이 없다. 본문이 비면 아래 공통 처리가
-            // 재시도 가능 오류로 올리도록 'stop'으로 맞춘다.
-            finishReason = 'stop';
+            // `/responses`의 종료 이벤트를 chat의 `finish_reason`으로 옮긴다.
+            //
+            // 전량 'stop'으로 뭉개면 **절단이 성공으로 위장된다** — 부분 텍스트가 이미
+            // 흘렀으므로 아래 `text` 진리 분기가 잘린 JSON을 정상 반환한다. chat 경로가
+            // `length`를 비재시도 오류로 세우는 것과 같은 취급이 필요하다.
+            finishReason =
+                result.outcome === 'incomplete'
+                    ? result.incompleteReason === 'max_output_tokens'
+                        ? 'length'
+                        : 'incomplete'
+                    : result.outcome === 'failed'
+                      ? 'failed'
+                      : 'stop';
+            if (result.outcome !== 'completed') {
+                console.warn('[DeepSeek] Responses API did not complete', {
+                    model,
+                    outcome: result.outcome,
+                    reason: result.incompleteReason,
+                });
+            }
         } else {
             const stream = await client.chat.completions.create(params, {
                 signal: controller.signal,
@@ -308,11 +342,16 @@ export async function callDeepSeek(
             if (text) {
                 return text;
             }
-            // Documented DeepSeek quirk: json_object mode occasionally returns
-            // empty content — retryable, the retry wrapper handles it.
+            // Documented DeepSeek quirk: JSON output occasionally returns empty
+            // content — retryable, the retry wrapper handles it. 두 경로가 공유하는
+            // 분기이므로 어느 쪽에서 비었는지 `endpoint`로 구분해 남긴다.
             console.warn('[DeepSeek] Empty text response', {
                 model,
                 finishReason,
+                endpoint:
+                    options.responseSchema !== undefined
+                        ? 'responses'
+                        : 'chat.completions',
             });
             throw Object.assign(
                 new Error(
