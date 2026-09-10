@@ -99,3 +99,19 @@ describe('buildMacroBriefingPrompt', () => {
         expect(p).toContain('예상=N/A');
     });
 });
+
+describe('buildMacroBriefingPrompt numeric rendering', () => {
+    it('strips binary float noise from indicator values', () => {
+        const [first, ...rest] = SNAP.indicators;
+        const latest = first.latest!;
+        const p = buildMacroBriefingPrompt({
+            ...SNAP,
+            indicators: [
+                { ...first, latest: { ...latest, value: 3.4000000000000004 } },
+                ...rest,
+            ],
+        });
+        expect(p).not.toContain('3.4000000000000004');
+        expect(p).toContain(`: 3.4 (${latest.date})`);
+    });
+});

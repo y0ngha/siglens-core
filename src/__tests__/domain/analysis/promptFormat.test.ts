@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
+    equityListingContext,
     extractJsonFromLlmResponse,
     formatBarDateTime,
+    formatLargeAmount,
+    formatNullableNumber,
+    formatPlainNumber,
+    formatPrice,
+    formatSignedPercent,
+    isKrxListedSymbol,
+    listingCurrency,
     parseLlmPayload,
+    priceDecimalPlaces,
     stripLlmJsonFence,
 } from '@/domain/analysis/promptFormat';
 
@@ -140,5 +149,153 @@ describe('formatBarDateTime', () => {
         // 로컬 타임존으로 변환하면 봉 행과 문자열이 어긋나 매칭이 깨진다.
         const ms = Date.parse('2026-01-01T00:00:00Z');
         expect(formatBarDateTime(ms)).toBe('2026-01-01 00:00');
+    });
+});
+
+describe('formatNullableNumber', () => {
+    it('renders null, undefined, NaN and ±Infinity as N/A', () => {
+        for (const v of [null, undefined, Number.NaN, Infinity, -Infinity]) {
+            expect(formatNullableNumber(v)).toBe('N/A');
+        }
+    });
+
+    it('drops the sign from a value that rounds to zero', () => {
+        // `(-0.001).toFixed(2)` is "-0.00" — a direction the number does not carry.
+        expect(formatNullableNumber(-0.001)).toBe('0.00');
+        expect(formatNullableNumber(-0.0001, 3)).toBe('0.000');
+    });
+
+    it('keeps the sign and rounding of a non-zero value', () => {
+        expect(formatNullableNumber(-1.234)).toBe('-1.23');
+        expect(formatNullableNumber(3.14159, 3)).toBe('3.142');
+    });
+});
+
+describe('isKrxListedSymbol / listingCurrency', () => {
+    it('recognizes six-digit KOSPI and KOSDAQ symbols', () => {
+        expect(isKrxListedSymbol('005930.KS')).toBe(true);
+        expect(isKrxListedSymbol('247540.KQ')).toBe(true);
+        expect(listingCurrency('005930.KS')).toBe('KRW');
+    });
+
+    it('treats everything else as a USD listing', () => {
+        for (const symbol of ['AAPL', 'BTCUSD', '5930.KS', '005930.T']) {
+            expect(isKrxListedSymbol(symbol)).toBe(false);
+            expect(listingCurrency(symbol)).toBe('USD');
+        }
+    });
+});
+
+describe('equityListingContext', () => {
+    it('keeps the U.S. framing byte-identical', () => {
+        expect(equityListingContext('AAPL')).toBe(
+            'This is a publicly traded U.S. equity.'
+        );
+    });
+
+    it('frames a KRX symbol as a won-quoted Korean listing', () => {
+        const context = equityListingContext('005930.KS');
+        expect(context).toContain('KRX');
+        expect(context).toContain('KRW');
+        expect(context).not.toContain('publicly traded U.S. equity');
+    });
+});
+
+describe('priceDecimalPlaces', () => {
+    it('uses cent precision at or above one unit', () => {
+        expect(priceDecimalPlaces(320)).toBe(2);
+        expect(priceDecimalPlaces(1)).toBe(2);
+        expect(priceDecimalPlaces(77107)).toBe(2);
+    });
+
+    it('keeps four significant digits below one unit', () => {
+        expect(priceDecimalPlaces(0.5)).toBe(4);
+        expect(priceDecimalPlaces(0.08359)).toBe(5);
+        expect(priceDecimalPlaces(0.00000507)).toBe(9);
+    });
+
+    it('caps the decimals for a near-zero price', () => {
+        expect(priceDecimalPlaces(1e-12)).toBe(10);
+    });
+
+    it('renders KRW in whole won regardless of magnitude', () => {
+        expect(priceDecimalPlaces(269500, 'KRW')).toBe(0);
+        expect(priceDecimalPlaces(0.5, 'KRW')).toBe(0);
+    });
+
+    it('falls back to cent precision for an unusable reference', () => {
+        for (const v of [null, undefined, Number.NaN, 0, -3]) {
+            expect(priceDecimalPlaces(v)).toBe(2);
+        }
+    });
+});
+
+describe('formatPrice', () => {
+    it('renders each price at the precision its own magnitude calls for', () => {
+        expect(formatPrice(322.084)).toBe('322.08');
+        expect(formatPrice(0.08359)).toBe('0.08359');
+        expect(formatPrice(269500, 'KRW')).toBe('269500');
+        expect(formatPrice(null)).toBe('N/A');
+    });
+});
+
+describe('formatLargeAmount', () => {
+    it('scales to T / B / M with the currency', () => {
+        expect(formatLargeAmount(3_000_000_000_000, 'USD')).toBe('3.0T USD');
+        expect(formatLargeAmount(280_000_000_000, 'USD')).toBe('280.0B USD');
+        expect(formatLargeAmount(450_000_000, 'USD')).toBe('450.0M USD');
+        expect(formatLargeAmount(1_600_000_000_000_000, 'KRW')).toBe(
+            '1600.0T KRW'
+        );
+    });
+
+    it('keeps the sign of a negative amount', () => {
+        expect(formatLargeAmount(-2_500_000_000, 'USD')).toBe('-2.5B USD');
+    });
+
+    it('renders a small amount unscaled', () => {
+        expect(formatLargeAmount(12_345, 'USD')).toBe('12345 USD');
+    });
+
+    it('renders a missing or non-finite amount as N/A', () => {
+        expect(formatLargeAmount(null, 'USD')).toBe('N/A');
+        expect(formatLargeAmount(Number.NaN, 'KRW')).toBe('N/A');
+    });
+});
+
+describe('formatSignedPercent', () => {
+    it('prefixes + on non-negative values and keeps the minus sign', () => {
+        expect(formatSignedPercent(1.234)).toBe('+1.23%');
+        expect(formatSignedPercent(-0.456)).toBe('-0.46%');
+        expect(formatSignedPercent(0)).toBe('+0.00%');
+    });
+
+    it('never shows a minus sign on a change that rounds to zero', () => {
+        // Composed with formatNullableNumber's sign-stripping: -0.001 must not become -0.00%.
+        expect(formatSignedPercent(-0.001)).toBe('+0.00%');
+    });
+
+    it('renders a missing change as N/A without a percent sign', () => {
+        expect(formatSignedPercent(Number.NaN)).toBe('N/A');
+        expect(formatSignedPercent(null)).toBe('N/A');
+    });
+});
+
+describe('formatPlainNumber', () => {
+    it('renders clean published figures byte-identically to String()', () => {
+        for (const v of [0.3, 4.415, 29723.864, 250000, -1.5]) {
+            expect(formatPlainNumber(v)).toBe(String(v));
+        }
+    });
+
+    it('strips binary float noise', () => {
+        expect(formatPlainNumber(0.30000000000000004)).toBe('0.3');
+        expect(formatPlainNumber(3.4000000000000004)).toBe('3.4');
+    });
+
+    it('renders a missing or non-finite figure as N/A', () => {
+        expect(formatPlainNumber(null)).toBe('N/A');
+        expect(formatPlainNumber(undefined)).toBe('N/A');
+        expect(formatPlainNumber(Number.NaN)).toBe('N/A');
     });
 });

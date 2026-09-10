@@ -325,3 +325,25 @@ describe('buildMarketBriefingPrompt — 지어내기 차단', () => {
         expect(dynamic).not.toContain('risk-on / risk-off / neutral');
     });
 });
+
+describe('buildMarketBriefingPrompt numeric guards', () => {
+    it('renders a missing change as N/A instead of NaN%', () => {
+        const p = buildMarketBriefingPrompt(
+            [{ ...indices[0], changesPercentage: Number.NaN }],
+            sectors,
+            US_CONTEXT
+        );
+        expect(p).toContain('S&P 500: 5200.50 (N/A)');
+        expect(p).not.toContain('NaN');
+    });
+
+    it('rounds the volatility level the model is told to copy verbatim', () => {
+        const p = buildMarketBriefingPrompt(indices, sectors, {
+            marketLabel: '미국 증시',
+            volatility: { label: 'VIX', level: 18.345678 },
+        });
+        expect(p).toContain('"vixLevel": 18.35');
+        expect(p).toContain('level 18.35 given above');
+        expect(p).not.toContain('18.345678');
+    });
+});

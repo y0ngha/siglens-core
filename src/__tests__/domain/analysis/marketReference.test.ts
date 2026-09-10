@@ -296,3 +296,59 @@ describe('computeMarketReference', () => {
         expect(shortPrices).not.toEqual(longPrices);
     });
 });
+
+describe('computeMarketReference pivots', () => {
+    const HOUR = 3_600;
+    const DAY_1 = Date.UTC(2026, 8, 8, 14) / 1000;
+    const DAY_2 = Date.UTC(2026, 8, 9, 14) / 1000;
+    const bar = (
+        time: number,
+        high: number,
+        low: number,
+        close: number
+    ): Bar => ({
+        time,
+        open: close,
+        high,
+        low,
+        close,
+        volume: 1000,
+    });
+    // Prior session aggregates to H 111 / L 91 / C 101 → PP 101. The prior *bar*
+    // (H 105 / L 103 / C 104) would put PP at 104 — on top of the price.
+    const intradayBars: Bar[] = [
+        bar(DAY_1, 111, 95, 105),
+        bar(DAY_1 + HOUR, 108, 91, 99),
+        bar(DAY_1 + 2 * HOUR, 104, 97, 101),
+        bar(DAY_2, 105, 103, 104),
+        bar(DAY_2 + HOUR, 105, 103, 104),
+    ];
+    const pricesLabelled = (
+        ref: ReturnType<typeof computeMarketReference>,
+        label: string
+    ): number[] =>
+        [...ref.short.levels.support, ...ref.short.levels.resistance]
+            .filter(l => l.label === label)
+            .map(l => l.price);
+
+    it('computes intraday pivots from the prior session, not the prior bar', () => {
+        const ref = computeMarketReference(intradayBars, makeInd(), '1Hour');
+        expect(pricesLabelled(ref, 'Pivot PP')).toEqual([101]);
+    });
+
+    it('omits pivots when the chart holds no completed prior session', () => {
+        const ref = computeMarketReference(
+            intradayBars.slice(3),
+            makeInd(),
+            '1Hour'
+        );
+        expect(pricesLabelled(ref, 'Pivot PP')).toEqual([]);
+    });
+
+    it('keeps using the previous bar on a daily chart', () => {
+        const dailyBars = [bar(DAY_1, 111, 95, 105), bar(DAY_2, 108, 91, 99)];
+        const ref = computeMarketReference(dailyBars, makeInd(), '1Day');
+        const [pp] = pricesLabelled(ref, 'Pivot PP');
+        expect(pp).toBeCloseTo((111 + 95 + 105) / 3, 6);
+    });
+});

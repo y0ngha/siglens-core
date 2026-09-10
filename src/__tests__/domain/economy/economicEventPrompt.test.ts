@@ -322,3 +322,23 @@ describe('buildEconomicEventAnalysisPrompt — region', () => {
         expect(dynamic).toContain('an inflation or employment print');
     });
 });
+
+describe('buildEconomicEventAnalysisPrompt numeric rendering', () => {
+    it('strips binary float noise from released figures', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: 0.30000000000000004,
+        });
+        expect(p).not.toContain('0.30000000000000004');
+        expect(p).toMatch(/- Actual: 0\.3\b/);
+    });
+
+    it('renders a non-finite figure as N/A instead of NaN', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            estimate: Number.NaN,
+        });
+        expect(p).toMatch(/- Estimate: N\/A\n/);
+        expect(p).not.toContain('NaN');
+    });
+});

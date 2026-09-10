@@ -729,7 +729,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // because the constant has no per-history-presence axis.
         // p11 은 `## Market Events` 섹션을 추가한다 — 이벤트를 실은 요청에서만
         // 바이트가 바뀌지만 상수에 per-request 축이 없어 무효화는 fleet-wide다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p11');
+        // p12 는 숫자 렌더링 감사다 — 가격 정밀도·KRX 프레이밍·세션 피벗·R:R 노이즈 바닥이
+        // 모든 요청의 바이트를 바꾼다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p12');
     });
 });
 

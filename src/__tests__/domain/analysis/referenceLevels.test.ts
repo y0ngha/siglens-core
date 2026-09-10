@@ -49,6 +49,28 @@ describe('roundNumberLevels', () => {
         const prices = roundNumberLevels(0.6).map(l => l.price);
         expect(prices.every(p => p > 0)).toBe(true);
     });
+    it('scales the step to ~2% of price above 1,000 instead of a flat 10', () => {
+        // A flat 10 put `Round 77110` 0.00% from BTC and `Round 269510` next to a KRX price.
+        const btc = roundNumberLevels(77107).map(l => l.price);
+        expect(btc).toContain(75000);
+        expect(btc).toContain(77500);
+        expect(btc).not.toContain(77110);
+        const krw = roundNumberLevels(269500).map(l => l.price);
+        expect(krw).toContain(260000);
+        expect(krw).toContain(270000);
+        expect(krw).not.toContain(269510);
+    });
+    it('scales the step below 1 so sub-unit assets get levels near the price', () => {
+        const doge = roundNumberLevels(0.08359).map(l => l.price);
+        expect(doge).toContain(0.0825);
+        expect(doge).toContain(0.085);
+        const shibPrice = 0.00000507;
+        const shib = roundNumberLevels(shibPrice).map(l => l.price);
+        expect(shib.length).toBeGreaterThan(0);
+        expect(
+            shib.every(p => p > 0 && Math.abs(p - shibPrice) / shibPrice < 0.15)
+        ).toBe(true);
+    });
 });
 
 describe('splitBySide', () => {
