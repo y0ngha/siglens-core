@@ -409,6 +409,18 @@ and have been removed from this file.
       → updatedAt not refreshed; symbol/name not replaced with new values (references old table columns)
    ✅ .onConflictDoUpdate({ target: [table.id], set: { symbol: excluded.symbol, name: excluded.name, updatedAt: sql`now()` } })
       → updatedAt refreshed on conflict; new values applied from excluded row
+
+6. Cache builders' template/prompt versions not bumped when rendered bytes change
+   → When a prompt builder's output changes (new fields, logic changes, output formatting), the builder's `*_PROMPT_TEMPLATE_VERSION` must be incremented
+   → Without version increment, cache entries remain stale even though their rendered content is invalid — old output serves indefinitely until TTL expires
+   → Cache keys must include the version segment: `buildKey(input, modelId, templateVersion)` so output changes bust the cache
+   ❌ economicEventPrompt.ts output changes for NaN/float-noise handling, but ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION not bumped
+      → 1-day TTL entries served stale indefinitely; callers receive old output for new edge cases
+   ❌ buildOverallCacheKey(symbol, modelId) without OVERALL_PROMPT_TEMPLATE_VERSION in the key; prompt output changes are invisible to cache
+   ✅ buildOverallCacheKey(symbol, modelId, OVERALL_PROMPT_TEMPLATE_VERSION) with version incremented when prompt changes
+   ✅ When prompt builder output changes (new fields, field order, logic), increment template version immediately in same commit
+   → Recurring (PR #194 R1–R2): ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION missed in R1, then three more builders (OVERALL, OPTIONS, peek key) missed in R2.
+      Lesson: when one builder version is flagged, audit all sibling builders in the same file/module for the same omission.
 ```
 
 ---
