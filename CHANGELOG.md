@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/y0ngha/siglens-core/compare/v1.0.0...v1.0.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **deepseek:** 스키마를 Responses API로 강제한다 ([#193](https://github.com/y0ngha/siglens-core/issues/193)) ([e2e1d28](https://github.com/y0ngha/siglens-core/commit/e2e1d28da57ec490c31e2a8ba6ac01db19834de5))
+
 # [1.0.0](https://github.com/y0ngha/siglens-core/compare/v0.59.0...v1.0.0) (2026-09-10)
 
 
