@@ -3049,6 +3049,27 @@ export interface NewsItem {
  */
 export type NewsImpact = 'high' | 'medium' | 'low' | 'negligible';
 
+/**
+ * One market-moving news event, projected for prompt injection.
+ *
+ * Deliberately a FLAT, language-neutral projection rather than a full
+ * {@link NewsItem}: core must not know the consumer's storage shape, and the
+ * rendered section goes into prompts of every output locale, so no prose field
+ * may appear here. The model is told *that* an event happened and how it was
+ * classified — never the headline text. Reading the article is the news and
+ * overall axes' job; this axis only needs the fact to explain a bar move.
+ */
+export interface MarketEvent {
+    /** When the article was published. */
+    readonly publishedAt: Date;
+    /** Event classification (earnings, regulation, …). */
+    readonly category: NewsCategory;
+    /** Directional read the news analysis assigned. */
+    readonly sentiment: NewsSentiment;
+    /** Expected price impact the news analysis assigned. */
+    readonly impact: NewsImpact;
+}
+
 /** Per-card translation and sentiment result produced by the flash-lite model. */
 export interface NewsCardAnalysis {
     titleKo: string;

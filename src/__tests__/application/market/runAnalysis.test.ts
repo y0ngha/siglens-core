@@ -803,3 +803,97 @@ describe('runAnalysis', () => {
         );
     });
 });
+
+describe('marketEvents 주입', () => {
+    const BAR_START = 1_700_000_000;
+    const BAR_IV = 900;
+    const barProvider: MarketDataProvider = {
+        getBars: vi.fn().mockResolvedValue(
+            Array.from({ length: 20 }, (_, i) => ({
+                time: BAR_START + i * BAR_IV,
+                open: 100,
+                high: 101,
+                low: 99,
+                close: 100,
+                volume: 1000,
+            }))
+        ),
+        getQuote: vi.fn().mockResolvedValue(null),
+    };
+
+    const event = {
+        publishedAt: new Date((BAR_START + 10 * BAR_IV) * 1000),
+        category: 'earnings' as const,
+        sentiment: 'bullish' as const,
+        impact: 'high' as const,
+    };
+
+    /**
+     * `buildAnalysisPrompt`는 이 파일에서 모킹돼 있으므로 렌더 결과가 아니라
+     * **전달된 인자**를 본다. 실제 섹션 문자열은
+     * `marketEventsSection.test.ts`가 검증한다.
+     */
+    const eventsArg = () =>
+        mockBuildAnalysisPrompt.mock.calls.at(-1)?.[11] as unknown;
+
+    it('이벤트가 프롬프트 빌더의 12번째 인자로 전달된다', async () => {
+        await runAnalysis(
+            mockSymbol,
+            mockCompanyName,
+            mockTimeframe,
+            false,
+            undefined,
+            { marketDataProvider: barProvider, marketEvents: [event] }
+        );
+
+        expect(eventsArg()).toEqual([event]);
+    });
+
+    it('이벤트를 안 넘기면 빈 배열이 전달된다 — 섹션이 렌더되지 않는 조건', async () => {
+        await runAnalysis(
+            mockSymbol,
+            mockCompanyName,
+            mockTimeframe,
+            false,
+            undefined,
+            { marketDataProvider: barProvider }
+        );
+
+        expect(eventsArg()).toEqual([]);
+    });
+
+    it('고영향 이벤트가 있으면 캐시 키에 `:evt=` 가 붙는다', async () => {
+        mockCacheGet.mockClear();
+
+        await runAnalysis(
+            mockSymbol,
+            mockCompanyName,
+            mockTimeframe,
+            false,
+            undefined,
+            { marketDataProvider: barProvider, marketEvents: [event] }
+        );
+
+        const key = mockCacheGet.mock.calls.at(-1)?.[0] as string;
+        expect(key).toContain(':evt=');
+    });
+
+    it('영향도가 낮은 이벤트만 있으면 캐시 키가 갈리지 않는다', async () => {
+        mockCacheGet.mockClear();
+
+        await runAnalysis(
+            mockSymbol,
+            mockCompanyName,
+            mockTimeframe,
+            false,
+            undefined,
+            {
+                marketDataProvider: barProvider,
+                marketEvents: [{ ...event, impact: 'low' as const }],
+            }
+        );
+
+        const key = mockCacheGet.mock.calls.at(-1)?.[0] as string;
+        expect(key).not.toContain(':evt=');
+    });
+});

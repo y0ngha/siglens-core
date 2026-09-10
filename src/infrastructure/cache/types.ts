@@ -1,4 +1,4 @@
-import type { PriorAnalysis } from '@/domain/types';
+import type { MarketEvent, PriorAnalysis } from '@/domain/types';
 
 /** @internal Cached payload for a market briefing entry. */
 export interface CachedBriefingData {
@@ -27,6 +27,19 @@ export interface NarrowedPriorAnalyses {
     /** Window-filtered, capped, newest-first list. Feed to stage 2 (`selectPriorAnalyses`), unfiltered by bar. */
     candidates: readonly PriorAnalysis[];
     /** Cache-key segment for this set; `undefined` when `candidates` is empty (byte-identical to no history at all). */
+    fingerprint: string | undefined;
+}
+
+/**
+ * @internal
+ * Return type of `narrowMarketEventsForCacheKey` — see that function in
+ * `infrastructure/cache/config.ts` for the two-stage narrowing this is stage
+ * 1 of.
+ */
+export interface NarrowedMarketEvents {
+    /** Impact-filtered, newest-first list. Feed to stage 2 (`selectMarketEvents`), unfiltered by bar. */
+    candidates: readonly MarketEvent[];
+    /** Cache-key segment for this set; `undefined` when `candidates` is empty (byte-identical to no events at all). */
     fingerprint: string | undefined;
 }
 
