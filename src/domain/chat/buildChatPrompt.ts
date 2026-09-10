@@ -1,12 +1,18 @@
 // IMPORTANT: System prompt strings must be written in English.
 // Korean reduces LLM instruction-following consistency.
 
+import {
+    formatPrice,
+    isKrxListedSymbol,
+    listingCurrency,
+} from '@/domain/analysis/promptFormat';
 import type {
     AnalysisResponse,
     AssetClass,
     ChatMessage,
     ChatPromptPayload,
     CongressTrendResponse,
+    CurrencyCode,
     CurrentAnalysisContext,
     FinancialsAnalysisResponse,
     FundamentalAnalysisResponse,
@@ -16,13 +22,7 @@ import type {
     OverallAnalysisResponse,
     PriceScenario,
     Timeframe,
-    CurrencyCode,
 } from '@/domain/types';
-import {
-    formatPrice,
-    isKrxListedSymbol,
-    listingCurrency,
-} from '@/domain/analysis/promptFormat';
 
 const TIMEFRAMES: readonly Timeframe[] = [
     '5Min',

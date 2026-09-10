@@ -809,9 +809,16 @@ export function buildMacroBriefingCacheKey(
  * §3.4 — `stable` is `''` and `dynamic` is byte-identical to the previous
  * plain-string prompt). Both were no-op cache churn; this one is not.
  *
+ * @remarks
+ * **`p4` = guarded figures.** `actual` / `estimate` / `previous` render through
+ * `formatPlainNumber`: a non-finite value used to print the literal `NaN`, and
+ * binary float noise (`0.30000000000000004`) reached the model. Clean figures
+ * render byte-identically; the bump keeps entries generated from corrupt inputs
+ * from being served for the rest of their 1-day TTL.
+ *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
