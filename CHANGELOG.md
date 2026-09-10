@@ -1,5 +1,27 @@
 # Changelog
 
+# [1.0.0](https://github.com/y0ngha/siglens-core/compare/v0.59.0...v1.0.0) (2026-09-10)
+
+
+### Bug Fixes
+
+* ab-harness 모델 참조 정정 및 문서 동기화 ([5406631](https://github.com/y0ngha/siglens-core/commit/5406631c909869a606228565a777cec344235f64))
+* ab-harness 스크립트 모델 참조 업데이트 ([2ca654f](https://github.com/y0ngha/siglens-core/commit/2ca654f2b8be2ef8b6adeb0b71da02757998649d))
+
+
+### Features
+
+* 모델 레지스트리 및 접근 제어 체계 재정의 ([ffb6306](https://github.com/y0ngha/siglens-core/commit/ffb63066a13cd6cddaab09e310c24629f205e766))
+
+
+### BREAKING CHANGES
+
+* 모델 레지스트리 API 변경 (siglens, siglens-worker 영향)
+Note: package.json 버전 업데이트는 별도 릴리스 커밋에서 처리.
+deepseek-v4.1-pro는 2026-09-14부터 Flash 요청으로 라우팅되는 시간 제한 포함(주석 추가됨).
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+
 # [0.56.0](https://github.com/y0ngha/siglens-core/compare/v0.55.0...v0.56.0) (2026-09-03)
 
 
