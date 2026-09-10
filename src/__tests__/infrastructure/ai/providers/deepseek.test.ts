@@ -457,6 +457,29 @@ describe('callDeepSeek', () => {
             ).rejects.toMatchObject({ retryable: true });
         });
 
+        it('종료 이벤트 없이 스트림이 끝나면 완료로 치지 않는다', async () => {
+            // 연결이 조용히 닫히거나 SSE 프레이밍이 어긋나면 셋 중 무엇도 오지 않는다.
+            // `outcome` 기본값이 'completed'이면 그때도 부분 텍스트가 성공으로 나간다 —
+            // 절단 오분류와 같은 사고를 다른 입구로 내는 셈이다.
+            mockResponsesCreate.mockResolvedValueOnce({
+                async *[Symbol.asyncIterator]() {
+                    yield {
+                        type: 'response.output_text.delta',
+                        delta: '{"partial":',
+                    };
+                    // 종료 이벤트 없이 끝난다.
+                },
+            });
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.toMatchObject({ retryable: true });
+        });
+
         it('스키마가 없으면 종전 경로(json_object)를 그대로 탄다', async () => {
             mockCreate.mockResolvedValueOnce(successStream());
 
