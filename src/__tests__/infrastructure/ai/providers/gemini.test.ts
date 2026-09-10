@@ -233,3 +233,72 @@ describe('callGemini — usage telemetry', () => {
         infoSpy.mockRestore();
     });
 });
+
+describe('callGemini thinkingConfig', () => {
+    beforeEach(() => {
+        mockGenerateContent.mockClear();
+        mockedGoogleGenAI.mockClear();
+    });
+
+    /** Reads the thinkingConfig actually put on the wire. */
+    function sentThinkingConfig(): Record<string, unknown> {
+        return mockGenerateContent.mock.calls[0][0].config.thinkingConfig;
+    }
+
+    it('always sends thinkingConfig, even with no caller override', async () => {
+        // Omitting it lets the model's natural default through, which is
+        // reasoning ON for most Gemini models — that is exactly the silent
+        // behaviour this adapter was changed to prevent.
+        mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+        await callGemini('prompt', { model: MODEL, apiKey: 'key' });
+
+        expect(sentThinkingConfig()).toBeDefined();
+        expect(sentThinkingConfig().includeThoughts).toBe(false);
+    });
+
+    it("resolves the spec's default state when no override is given", async () => {
+        mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+        await callGemini('prompt', { model: MODEL, apiKey: 'key' });
+
+        // gemini-3.5-flash-lite is free class → `reasoning.default: 'off'` →
+        // `minimal`, which maps to the SDK's uppercase enum member.
+        expect(sentThinkingConfig().thinkingLevel).toBe('MINIMAL');
+    });
+
+    it('maps every domain thinking level to its SDK enum member', async () => {
+        // Guards the THINKING_LEVEL_TO_SDK table. A wrong entry here reaches
+        // the provider as an unknown level, and the wire format is the only
+        // place the mistake would show up.
+        const CASES = [
+            ['minimal', 'MINIMAL'],
+            ['low', 'LOW'],
+            ['medium', 'MEDIUM'],
+            ['high', 'HIGH'],
+        ] as const;
+
+        for (const [domain, sdk] of CASES) {
+            mockGenerateContent.mockClear();
+            mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+            await callGemini('prompt', {
+                model: MODEL,
+                apiKey: 'key',
+                thinkingLevel: domain,
+            });
+
+            expect(sentThinkingConfig().thinkingLevel, domain).toBe(sdk);
+        }
+    });
+
+    it('never sends a numeric thinkingBudget', async () => {
+        // Generation-3 models either reject the numeric budget or ignore it
+        // silently; the adapter must not fall back to it.
+        mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+        await callGemini('prompt', { model: MODEL, apiKey: 'key' });
+
+        expect(sentThinkingConfig()).not.toHaveProperty('thinkingBudget');
+    });
+});

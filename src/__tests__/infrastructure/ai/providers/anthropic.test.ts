@@ -46,6 +46,21 @@ vi.mock('@/domain/analysis/modelSpecs', () => ({
                 default: 'off',
             },
         },
+        // budget API + 토글 가능(budget > 0) — 프로덕션 스펙에는 아직 이런 행이
+        // 없어서, 이 mock이 없으면 어댑터의 `budget_tokens > 0` 분기가 어떤
+        // 테스트에서도 실행되지 않는다.
+        'claude-opus-4-8': {
+            provider: 'claude',
+            thinkingApi: 'budget',
+            apiModelId: 'claude-opus-4-8',
+            maxOutputTokens: 128_000,
+            temperature: 0,
+            reasoning: {
+                off: { budgetTokens: 0 },
+                on: { budgetTokens: 8_192 },
+                default: 'off',
+            },
+        },
         // budget API + 토글 불가.
         'claude-haiku-4-5': {
             provider: 'claude',
@@ -74,6 +89,8 @@ const MODEL_WITH_EFFORT: ClaudeModelId = 'claude-opus-5';
 /** 추론 기본 OFF인 adaptive 모델. */
 const MODEL_DEFAULT_OFF: ClaudeModelId = 'claude-sonnet-5';
 const MODEL_WITHOUT_THINKING: ClaudeModelId = 'claude-haiku-4-5';
+/** budget API를 쓰면서 추론을 켤 수 있는 모델(mock 전용). */
+const MODEL_BUDGET_THINKING: ClaudeModelId = 'claude-opus-4-8';
 
 function makeStream(response: object) {
     return {
@@ -810,5 +827,58 @@ describe('callClaude — usage telemetry', () => {
 
         expect(infoSpy).not.toHaveBeenCalled();
         infoSpy.mockRestore();
+    });
+});
+
+describe('callClaude budget thinking', () => {
+    beforeEach(() => {
+        mockStream.mockClear();
+        mockFinalMessage.mockClear();
+        mockedAnthropic.mockClear();
+    });
+
+    it('sends thinking:{type:"enabled"} with the configured budget when reasoning is on', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'end_turn',
+                content: [{ type: 'text', text: 'ok' }],
+            })
+        );
+
+        await callClaude('prompt', {
+            model: MODEL_BUDGET_THINKING,
+            apiKey: 'key',
+            reasoning: { budgetTokens: 8_192 },
+        });
+
+        const call = mockStream.mock.calls[0][0];
+        expect(call.thinking).toEqual({
+            type: 'enabled',
+            budget_tokens: 8_192,
+        });
+        // ⚠️ 미검증: pre-4.6 extended thinking이 `temperature: 0`과 양립하는지
+        // 실호출로 확인하지 않았다. 현재 프로덕션 스펙은 모두 budget 0이라 이
+        // 조합이 실제로 나가지 않는다. budget > 0인 행을 등재하기 전에 반드시
+        // 라이브로 확인할 것 — 필요하면 이 분기에서 temperature를 빼야 한다.
+        expect(call.temperature).toBe(0);
+    });
+
+    it('omits the thinking block entirely when the budget is zero', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'end_turn',
+                content: [{ type: 'text', text: 'ok' }],
+            })
+        );
+
+        await callClaude('prompt', {
+            model: MODEL_BUDGET_THINKING,
+            apiKey: 'key',
+            reasoning: { budgetTokens: 0 },
+        });
+
+        const call = mockStream.mock.calls[0][0];
+        expect(call).not.toHaveProperty('thinking');
+        expect(call.temperature).toBe(0);
     });
 });

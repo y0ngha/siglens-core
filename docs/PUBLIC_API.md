@@ -12,6 +12,26 @@
 > `claude-sonnet-4` / `claude-opus-4`도 제거되어 `ActiveModelId`가 `TierModel`과
 > 동일해졌다.
 >
+> **컨벤션 예외 — `@deprecated` alias 없이 삭제 (의도된 결정)**
+>
+> `docs/MISTAKES.md` "Public API & Module Exports" #3은 Tier 4 타입·union 멤버를
+> 지울 때 `@deprecated` alias를 남기라고 요구한다. 이번 릴리스는 그 규칙의 예외로
+> 처리하며, 근거는 셋이다.
+>
+> 1. **alias 복원이 컴파일 에러를 런타임 에러로 바꾼다.** 삭제된 11개 ID를
+>    `ModelId`에 `@deprecated`로 되살리면 그 값이 `getModelAccess`에 도달할 때
+>    throw한다. 지금은 호출부가 컴파일 단계에서 걸리고, 그편이 안전하다.
+> 2. **소비자가 전부 내부 레포다.** `siglens`와 `siglens-trader` 둘뿐이고 이 릴리스와
+>    같은 작업에서 함께 배선한다. 외부 소비자가 없으므로 "조용히 깨지는 제3자"가
+>    존재하지 않고, 컴파일 실패는 오히려 배선 누락을 잡아주는 신호다.
+> 3. **`EffortLevel`은 규칙대로 `@deprecated`로 남겼다.** 그 타입은 대체 타입이
+>    의미를 그대로 승계하므로 alias가 성립한다. 반면 삭제된 모델 ID와
+>    `supportsDisabledThinking`은 승계할 의미 자체가 없다 — 후자는 판정 기준이
+>    "400이 나는가"에서 "off가 진짜 0을 만드는가"로 바뀌어, 같은 이름을 남기면
+>    틀린 의미를 계속 수출하게 된다.
+>
+> 이 예외는 이번 재편에 한정한다. 이후 Tier 4 변경은 #3 규칙을 그대로 따를 것.
+>
 > **DeepSeek V4 → V4.1 개명** — 레지스트리 키가 `deepseek-v4-flash` /
 > `deepseek-v4-pro`에서 `deepseek-v4.1-flash` / `deepseek-v4.1-pro`로 바뀌고,
 > 상수도 `DEEPSEEK_V4_1_FLASH_MODEL` / `DEEPSEEK_V4_1_PRO_MODEL`로 개명됐다.

@@ -16,7 +16,7 @@ describe('getProviderForModel', () => {
             expect(getProviderForModel('gpt-5.6-luna')).toBe('openai');
         });
 
-        it('returns deepseek for deepseek-v4-flash', () => {
+        it('returns deepseek for deepseek-v4.1-flash', () => {
             expect(getProviderForModel('deepseek-v4.1-flash')).toBe('deepseek');
         });
     });
