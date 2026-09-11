@@ -165,4 +165,18 @@
   Rule: MISTAKES Tests #5.5 — new branch without dedicated test
   Context: roundLabel's `mantissaIsWhole ? 0 : 1` decimal choice in src/domain/analysis/referenceLevels.ts was covered only by 2.5-mantissa steps, so removing the branch stayed green. Added whole-mantissa label tests (250 → step 5, 50 → step 1, 0.25 → step 0.005), verified by reverting the branch. Third occurrence in this PR.
 
+## [PR feat/agent-loop | 2026-09-12] — Review cycle R1 → R2 (approved)
+
+- Violation 1: src/domain/ports/agentProvider.ts — port JSDoc contradiction
+  Rule: MISTAKES.md Documentation — port JSDoc field description mismatches actual usage
+  Context: `apiKey` field JSDoc claimed "single effective key" but only in-package caller `runAgentTurn` passes empty string ''. JSDoc must match caller behavior. Fixed in R2 by correcting JSDoc to reflect actual usage pattern.
+
+- Violation 2 (REQUIRED): src/application/agent/runAgentTurn.ts — Tier 1 export JSDoc lacked @param/@returns
+  Rule: MISTAKES.md Documentation #4 — Tier 1 public functions require @param and @returns JSDoc for IDE hover documentation
+  Context: Tier 1 entrypoint function `runAgentTurn` exported from src/index.ts without JSDoc @param/@returns tags, leaving IDE autocomplete undocumented. Fixed in R2 by adding full Tier 1 JSDoc with parameter and return type annotations.
+
+- Violation 3 (RECOMMENDED): Tier 2/3 exports lacking @param/@returns
+  Rule: MISTAKES.md Documentation #4.5 — Tier 2/3 public functions/methods require @param/@returns JSDoc
+  Context: Multiple Tier 2 and Tier 3 helper exports added without @param/@returns JSDoc tags. Fixed in R2 by upgrading JSDoc on all Tier 2/3 exports to include parameter and return type documentation.
+
 

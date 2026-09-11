@@ -186,6 +186,15 @@ class TurnBudget {
  * The turn deadline is a hard timer: when it fires (or the caller aborts)
  * the in-flight provider call or tool wait is abandoned immediately. Neither
  * `aborted` nor `deadline` refunds the turn — the work was already spent.
+ *
+ * @param params - Per-call inputs: user/tier identity, model, message, history,
+ * available tools, locale, and optional `signal`/`now` overrides.
+ * @param deps - Injected collaborators: the provider call, tool executor,
+ * per-user/global counters, event sink, and optional usage-log writer.
+ * @returns The turn result — either `{ ok: true, ... }` with the assistant
+ * message and updated quota/usage counters, or `{ ok: false, error }` with
+ * an `AgentErrorCode` (and any streamed `partialText`) when the turn was
+ * refused, stopped, or the provider/tool chain failed.
  */
 export async function runAgentTurn(
     params: RunAgentTurnParams,

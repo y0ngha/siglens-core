@@ -78,6 +78,11 @@ function checkProperty(
  * Validate model-supplied tool arguments against the tool's JSON Schema
  * subset. Pure; collects every issue instead of failing fast so the model
  * gets one corrective error message.
+ *
+ * @param schema - The tool's input schema (from `AgentToolSpec.inputSchema`).
+ * @param args - The raw, model-supplied argument value to validate.
+ * @returns `{ ok: true, value }` with the validated object on success, or
+ * `{ ok: false, issues }` listing every schema violation found.
  */
 export function validateArgs(
     schema: JsonSchemaObject,

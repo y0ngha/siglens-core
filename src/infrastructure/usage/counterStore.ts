@@ -38,6 +38,10 @@ function bucket(period: CounterPeriod, now: Date): string {
  * makes `consume` log the `[agent] quota store unavailable` alarm marker
  * once and throw {@link CounterStoreUnavailableError}, so callers answer
  * `server_busy` rather than a quota refusal.
+ *
+ * @param options - Key prefix, bucket period, failure policy, and an
+ * optional injectable clock (tests only; defaults to `new Date()`).
+ * @returns A {@link CounterStore} backed by Upstash Redis.
  */
 export function createCounterStore(options: CounterStoreOptions): CounterStore {
     const config = readUpstashConfig();

@@ -13,6 +13,9 @@ export interface HistoryWindowOptions {
  * Conservative token estimate: ASCII text runs ~3 chars/token; non-ASCII
  * (Korean, CJK, etc.) tokenizes far denser, ~1.2 tokens/char, so counting
  * every char at 1/3 badly underestimates Korean-heavy transcripts.
+ *
+ * @param text - The text to estimate a token count for.
+ * @returns The estimated token count.
  */
 export function estimateTokens(text: string): number {
     const nonAscii = text.replace(/[\x00-\x7F]/g, '').length;
@@ -64,6 +67,11 @@ function omitToolResult(m: AgentMessage): AgentMessage {
  *
  * ponytail: fixed window — replace with summarisation (P3) once a
  * conversation-length histogram shows long threads matter.
+ *
+ * @param history - The full transcript, oldest message first.
+ * @param options - Window sizing: user turns kept, verbatim tool-result
+ * turns, and the token budget.
+ * @returns The trimmed transcript slice to send to the model.
  */
 export function selectHistoryWindow(
     history: readonly AgentMessage[],

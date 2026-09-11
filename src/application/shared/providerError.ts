@@ -10,7 +10,13 @@ function getHttpErrorStatus(error: unknown): number | undefined {
     return typeof status === 'number' ? status : undefined;
 }
 
-/** Map an upstream SDK error to the UI-facing code shared by chat and agent. */
+/**
+ * Map an upstream SDK error to the UI-facing code shared by chat and agent.
+ *
+ * @param error - The error thrown/rejected by a provider SDK call.
+ * @returns `'rate_limited'` (429), `'server_busy'` (503), or the
+ * `'server_error'` fallback for anything else.
+ */
 export function classifyProviderError(error: unknown): ProviderErrorCode {
     const status = getHttpErrorStatus(error);
     if (status === constants.HTTP_STATUS_TOO_MANY_REQUESTS)

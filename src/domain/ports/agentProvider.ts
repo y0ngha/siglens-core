@@ -61,7 +61,13 @@ export type AgentStreamEvent =
     | { type: 'stop'; reason: AgentStopReason };
 
 export interface CallAgentProviderOptions {
-    /** Single effective key — the consumer resolves BYOK vs server key. */
+    /**
+     * Core's own `runAgentTurn` does not know about keys and always passes
+     * `''` — key resolution (BYOK vs server key) is the consumer's router's
+     * job, not core's. Consumer adapters extend this options type with the
+     * effective key before calling their provider SDK; do not rely on this
+     * field being populated by anything inside core.
+     */
     apiKey: string;
     /** Internal model key; the adapter maps it to the provider's apiModelId. */
     model: ModelId;

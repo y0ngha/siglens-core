@@ -18,6 +18,13 @@ export type AgentPerTierLimit = Exclude<
     'messagesPerConversation'
 >;
 
+/**
+ * Look up a per-tier daily quota from {@link AGENT_LIMITS}.
+ *
+ * @param tier - The caller's tier (`free`/`member`/`pro`).
+ * @param feature - Which `AGENT_LIMITS` quota to read.
+ * @returns The numeric quota for that tier/feature pair.
+ */
 export function agentLimit(tier: Tier, feature: AgentPerTierLimit): number {
     return AGENT_LIMITS[feature][tier];
 }

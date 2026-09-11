@@ -222,6 +222,12 @@ export const AGENT_TOOL_NAMES: readonly string[] = AGENT_TOOL_SPECS.map(
     s => s.name
 );
 
+/**
+ * Look up a tool's spec by name.
+ *
+ * @param name - The tool name (matches `AgentToolSpec.name`).
+ * @returns The matching spec, or `undefined` if no tool has that name.
+ */
 export function findToolSpec(name: string): AgentToolSpec | undefined {
     return AGENT_TOOL_SPECS.find(s => s.name === name);
 }
@@ -230,6 +236,9 @@ export function findToolSpec(name: string): AgentToolSpec | undefined {
  * Filter the catalog to the tools the consumer can actually execute right now
  * (e.g. `web_search` is absent without a Brave key or under E2E). The consumer
  * computes `available`; core never reads env.
+ *
+ * @param available - Names of tools the consumer can currently execute.
+ * @returns The subset of {@link AGENT_TOOL_SPECS} whose name is in `available`.
  */
 export function selectTools(available: ReadonlySet<string>): AgentToolSpec[] {
     return AGENT_TOOL_SPECS.filter(s => available.has(s.name));

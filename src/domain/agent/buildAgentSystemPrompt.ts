@@ -47,6 +47,10 @@ function formatClock(now: Date, timeZone: string): string {
  * System prompt for the ai.siglens.io agent (spec §4-3). Provider-neutral;
  * tool schemas are passed separately via the `tools` API field, so the
  * prompt only lists names and usage rules.
+ *
+ * @param input - Locale, selected tools, current time, ET session status,
+ * and the signed-in user's portfolio symbols (if any).
+ * @returns The assembled system prompt string.
  */
 export function buildAgentSystemPrompt(
     input: BuildAgentSystemPromptInput
