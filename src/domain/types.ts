@@ -3852,3 +3852,33 @@ export interface PatternCandidate {
     startIndex: number;
     endIndex: number;
 }
+
+// ─────────────────────────────────────────
+// LLM usage (provider-neutral)
+// ─────────────────────────────────────────
+
+/**
+ * Normalized per-call token counts. The three input buckets are disjoint:
+ * `promptTokens + cachedTokens + cacheWriteTokens` = provider-reported input.
+ * Field names are shared verbatim with siglens' `entities/llm-provider/lib/usage.ts`
+ * so a single CloudWatch query aggregates both.
+ *
+ * - `promptTokens`: standard-price, non-cached billable input tokens (1x).
+ * - `cachedTokens`: cache **reads** — input served from a prior cache write
+ *   (billed at ~0.1x by Anthropic).
+ * - `cacheWriteTokens`: cache **writes** — input persisted into the cache on
+ *   this call (billed at ~1.25x by Anthropic). Only Claude reports a separate
+ *   cache-write metric; Gemini and OpenAI have none, so this is always 0 for
+ *   them. Kept out of `promptTokens` so the standard-price bucket is not
+ *   distorted by the 1.25x cache-write premium.
+ */
+export interface NormalizedUsage {
+    /** Standard-price, non-cached input tokens. */
+    promptTokens: number;
+    /** Cache read tokens (~0.1x price). */
+    cachedTokens: number;
+    /** Cache write tokens (Claude only; others report 0). */
+    cacheWriteTokens: number;
+    /** Output tokens. */
+    outputTokens: number;
+}

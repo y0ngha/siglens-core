@@ -501,6 +501,7 @@ export type {
     UsageRepository,
 } from './domain/ports/usageRepository';
 export type {
+    NormalizedUsage,
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
@@ -928,3 +929,19 @@ export type {
     SubmitOptionsAnalysisApiKeyRequiredError,
     RunOptionsAnalysisResult,
 } from './application/options';
+
+// Agent chat — provider port (tool-calling capable, streaming)
+export type {
+    AgentRole,
+    AgentToolCall,
+    AgentMessage,
+    JsonSchemaProperty,
+    JsonSchemaObject,
+    AgentToolCostClass,
+    AgentToolSpec,
+    AgentStopReason,
+    AgentStreamEvent,
+    CallAgentProviderOptions,
+    AgentProviderResult,
+    CallAgentProvider,
+} from './domain/ports/agentProvider';
