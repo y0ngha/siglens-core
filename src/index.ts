@@ -945,3 +945,57 @@ export type {
     AgentProviderResult,
     CallAgentProvider,
 } from './domain/ports/agentProvider';
+
+// Agent chat (ai.siglens.io) — application use-case, policy, pure helpers
+export { runAgentTurn } from './application/agent/runAgentTurn';
+export {
+    AGENT_LIMITS,
+    AGENT_GLOBAL_LIMITS,
+    AGENT_TURN_CAPS,
+    TOOL_TIMEOUT_MS,
+    agentLimit,
+} from './application/agent/limits';
+export type { AgentPerTierLimit } from './application/agent/limits';
+export type {
+    AgentErrorCode,
+    RunAgentTurnParams,
+    RunAgentTurnDependencies,
+    RunAgentTurnResult,
+    AgentCounters,
+    AgentTurnEvent,
+    AgentTurnUsage,
+    AgentRemaining,
+    ExecuteTool,
+    ToolExecutionContext,
+} from './application/agent/types';
+export { classifyProviderError } from './application/shared/providerError';
+export type { ProviderErrorCode } from './application/shared/providerError';
+export {
+    AGENT_TOOL_SPECS,
+    AGENT_TOOL_NAMES,
+    findToolSpec,
+    selectTools,
+} from './domain/agent/tools';
+export { validateArgs } from './domain/agent/validateArgs';
+export type { ArgIssue, ValidateArgsResult } from './domain/agent/validateArgs';
+export {
+    buildAgentSystemPrompt,
+    AGENT_PROMPT_VERSION,
+} from './domain/agent/buildAgentSystemPrompt';
+export type {
+    AgentLocale,
+    BuildAgentSystemPromptInput,
+} from './domain/agent/buildAgentSystemPrompt';
+export {
+    selectHistoryWindow,
+    estimateTokens,
+} from './domain/agent/selectHistoryWindow';
+export type { HistoryWindowOptions } from './domain/agent/selectHistoryWindow';
+export { CounterStoreUnavailableError } from './domain/ports/counterStore';
+export type { CounterStore } from './domain/ports/counterStore';
+export { createCounterStore } from './infrastructure/usage/counterStore';
+export type {
+    CounterStoreOptions,
+    CounterPeriod,
+    CounterFailurePolicy,
+} from './infrastructure/usage/counterStore';

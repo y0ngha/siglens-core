@@ -224,7 +224,18 @@ no external imports, pure functions only.
 - `oauth/` — OAuth provider 타입 계약. 구체 OAuth 어댑터/플로우는 consumer 소유.
 - `skills/` — Skills 파일 로더 (filesystem → `Skill[]`)
 - `upstash/` — Upstash Redis 클라이언트 팩토리 (env-based)
-- `usage/` — `hashUsageIp` 같은 분석 사용량 보조 함수
+- `usage/` — `hashUsageIp` 같은 분석 사용량 보조 함수, 기간 카운터 `createCounterStore`(Upstash)
+
+### agent (ai.siglens.io)
+
+- `domain/agent/` — 툴 카탈로그·인자 검증(`validateArgs`)·시스템 프롬프트·이력 창 (순수)
+- `domain/ports/agentProvider.ts` — 툴 콜링 스트리밍 프로바이더 포트 (어댑터는 siglens 소유)
+- `domain/ports/counterStore.ts` — 기간 카운터 포트와 `CounterStoreUnavailableError` (fail-closed 장애 신호)
+- `application/agent/` — `runAgentTurn` 루프(상한·마감·환불·중단)와 `AGENT_LIMITS` 정책
+- `application/shared/providerError.ts` — 채팅·에이전트 공용 프로바이더 에러 분류 `classifyProviderError`
+- `infrastructure/usage/counterStore.ts` — Upstash 기간 카운터, `failurePolicy`(`open`/`closed`)
+
+설계: siglens `docs/superpowers/specs/2026-09-11-ai-siglens-agent-chat-design.md`
 
 ---
 
