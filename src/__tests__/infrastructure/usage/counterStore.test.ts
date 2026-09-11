@@ -192,6 +192,43 @@ describe('createCounterStore', () => {
         expect(mockDecr).toHaveBeenCalledWith('p:u1:2026-09-12');
     });
 
+    it('refund: config 없음이면 Redis 호출 없이 resolve', async () => {
+        process.env = { ...originalEnv };
+        const store = createCounterStore({
+            prefix: 'p',
+            period: 'day',
+            failurePolicy: 'closed',
+            clock: () => NOW,
+        });
+        await expect(store.refund('u1')).resolves.toBeUndefined();
+        expect(mockGet).not.toHaveBeenCalled();
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
+    it('refund: count가 null이면 DECR 없음', async () => {
+        mockGet.mockResolvedValue(null);
+        const store = createCounterStore({
+            prefix: 'p',
+            period: 'day',
+            failurePolicy: 'closed',
+            clock: () => NOW,
+        });
+        await store.refund('u1');
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
+    it('refund: GET이 reject해도 throw하지 않고 resolve, DECR 없음', async () => {
+        mockGet.mockRejectedValue(new Error('down'));
+        const store = createCounterStore({
+            prefix: 'p',
+            period: 'day',
+            failurePolicy: 'closed',
+            clock: () => NOW,
+        });
+        await expect(store.refund('u1')).resolves.toBeUndefined();
+        expect(mockDecr).not.toHaveBeenCalled();
+    });
+
     it('remaining: 키가 없으면(null) limit을 그대로 반환', async () => {
         mockGet.mockResolvedValue(null);
         const store = createCounterStore({
