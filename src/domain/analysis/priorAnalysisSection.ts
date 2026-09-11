@@ -14,7 +14,6 @@ import {
     formatBarDateTime,
     formatNullableNumber,
     formatSignedPercent,
-    listingCurrency,
     priceDecimalPlaces,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
@@ -226,21 +225,20 @@ export const PRIOR_ANALYSIS_GUARDRAIL =
  * @param bars - OHLCV history for the same symbol + timeframe, oldest-first.
  * @param symbol - Ticker symbol, for the section header.
  * @param timeframe - Chart timeframe, for the section header label.
+ * @param priceDp - Decimal places for prices. Pass the precision the rest of the
+ *   prompt renders bar prices at, so a past call's prices can be matched against
+ *   them verbatim (sub-dollar assets, whole-won KRX). Defaults to the USD equity
+ *   rule applied to the latest close.
  */
 export function formatPriorAnalysisSection(
     selected: readonly PriorAnalysis[],
     bars: readonly Bar[],
     symbol: string,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    priceDp = priceDecimalPlaces(bars.at(-1)?.close)
 ): string {
     if (selected.length === 0 || bars.length === 0) return '';
 
-    // Same precision rule the bar rows above use, so a past call's prices can be
-    // matched against them verbatim (sub-dollar assets, whole-won KRX).
-    const priceDp = priceDecimalPlaces(
-        bars[bars.length - 1].close,
-        listingCurrency(symbol)
-    );
     const entryLines = selected
         .map(entry => formatEntry(entry, bars, priceDp))
         .filter((line): line is string => line !== null);

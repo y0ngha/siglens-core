@@ -346,9 +346,117 @@ describe('computeMarketReference pivots', () => {
     });
 
     it('keeps using the previous bar on a daily chart', () => {
-        const dailyBars = [bar(DAY_1, 111, 95, 105), bar(DAY_2, 108, 91, 99)];
+        // The last bar is narrow so PP (+4.7%) clears the at-price band and stays listed.
+        const dailyBars = [bar(DAY_1, 111, 95, 105), bar(DAY_2, 100, 98.5, 99)];
         const ref = computeMarketReference(dailyBars, makeInd(), '1Day');
         const [pp] = pricesLabelled(ref, 'Pivot PP');
         expect(pp).toBeCloseTo((111 + 95 + 105) / 3, 6);
+    });
+
+    it('drops the daily pivot entirely when the prior bar has an unusable price', () => {
+        // `open: 0` fails hasUsablePrices, but pivot math only reads high/low/close,
+        // so it would still average into a finite, plausible-looking PP if the
+        // hasUsablePrices guard on the prior bar were removed — unlike a NaN
+        // high/low/close, which the pivot formula's own internal guard
+        // (`resolvePivotBase` in pivotLevels.ts) already turns into `null`
+        // regardless of this branch.
+        const dailyBars = [
+            {
+                time: DAY_1,
+                open: 0,
+                high: 111,
+                low: 95,
+                close: 105,
+                volume: 1000,
+            },
+            bar(DAY_2, 100, 98.5, 99),
+        ];
+        const ref = computeMarketReference(dailyBars, makeInd(), '1Day');
+        const allLevels = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        expect(
+            allLevels.filter(
+                l =>
+                    l.label.startsWith('Pivot') ||
+                    l.label.startsWith('Camarilla')
+            )
+        ).toEqual([]);
+    });
+
+    it('groups a U.S. after-hours bar past UTC midnight into its Eastern session', () => {
+        // 00:30 UTC on 9/9 is 20:30 ET on 9/8. By UTC date it was counted into the next
+        // session, so its high never reached the prior-session pivot.
+        const afterHours = Date.UTC(2026, 8, 9, 0, 30) / 1000;
+        // Half-hour spacing keeps every quiet bar inside 9/9 UTC as well as 9/9 ET.
+        const quiet = Array.from({ length: 10 }, (_, i) =>
+            bar(DAY_2 + ((i + 1) * HOUR) / 2, 104.1, 103.9, 104)
+        );
+        const bars = [
+            bar(DAY_1, 111, 95, 105),
+            bar(afterHours, 120, 100, 110),
+            bar(DAY_2, 104.1, 103.9, 104),
+            ...quiet,
+        ];
+
+        const et = computeMarketReference(bars, makeInd(), '1Hour');
+        expect(pricesLabelled(et, 'Pivot PP')[0]).toBeCloseTo(
+            (120 + 95 + 110) / 3,
+            6
+        );
+
+        const utc = computeMarketReference(bars, makeInd(), '1Hour', {
+            assetClass: 'crypto',
+        });
+        expect(pricesLabelled(utc, 'Pivot PP')[0]).toBeCloseTo(
+            (111 + 95 + 105) / 3,
+            6
+        );
+    });
+
+    it('builds the prior session from its usable bars when one carries a NaN high', () => {
+        // One NaN high used to make every pivot NaN, and each then dropped out of both sides.
+        const bars = intradayBars.map((b, i) =>
+            i === 1 ? { ...b, high: Number.NaN } : b
+        );
+        const ref = computeMarketReference(bars, makeInd(), '1Hour');
+        expect(pricesLabelled(ref, 'Pivot PP')[0]).toBeCloseTo(
+            (111 + 95 + 101) / 3,
+            6
+        );
+    });
+
+    it('groups a KRW listing by its KST date, which starts at 15:00 UTC', () => {
+        // 14:30 UTC is 23:30 KST on 9/8; 15:30 UTC is 00:30 KST on 9/9. By KST the second
+        // bar opens the current session, so only the first forms the prior one; by UTC
+        // both fall on 9/8 and aggregate together.
+        const beforeMidnightKst = Date.UTC(2026, 8, 8, 14, 30) / 1000;
+        const afterMidnightKst = Date.UTC(2026, 8, 8, 15, 30) / 1000;
+        const sessionOpen = Date.UTC(2026, 8, 9, 1) / 1000;
+        const quiet = Array.from({ length: 10 }, (_, i) =>
+            bar(sessionOpen + (i * HOUR) / 2, 104.1, 103.9, 104)
+        );
+        const bars = [
+            bar(beforeMidnightKst, 111, 95, 105),
+            bar(afterMidnightKst, 120, 100, 110),
+            ...quiet,
+        ];
+
+        const kst = computeMarketReference(bars, makeInd(), '1Hour', {
+            currency: 'KRW',
+        });
+        expect(pricesLabelled(kst, 'Pivot PP')[0]).toBeCloseTo(
+            (111 + 95 + 105) / 3,
+            6
+        );
+
+        const utc = computeMarketReference(bars, makeInd(), '1Hour', {
+            assetClass: 'crypto',
+        });
+        expect(pricesLabelled(utc, 'Pivot PP')[0]).toBeCloseTo(
+            (120 + 95 + 110) / 3,
+            6
+        );
     });
 });

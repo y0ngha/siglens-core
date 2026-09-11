@@ -525,11 +525,13 @@ describe('formatPriorAnalysisSection price precision', () => {
             entryPrices: [266000, 268000],
             stopLoss: 262000,
         });
+        // The caller passes the prompt's own precision (whole won for a KRW listing).
         const out = formatPriorAnalysisSection(
             [entry],
             krwBars,
             '005930.KS',
-            '1Day'
+            '1Day',
+            0
         );
         expect(out).toContain('entry 266000-268000, SL 262000');
         expect(out).toContain('now 269500');

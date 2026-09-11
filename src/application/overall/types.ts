@@ -25,6 +25,7 @@ import type {
     AnalysisResponse,
     AssembledPromptRecord,
     AssetClass,
+    CurrencyCode,
     EarningsCalendarItem,
     EnrichedNewsItem,
     FinancialsScorecard,
@@ -374,6 +375,15 @@ export interface OverallDependencyInputs {
      * Optional for backward compatibility — omit to keep equity behavior.
      */
     assetClass?: AssetClass;
+
+    /**
+     * Listing quote currency, supplied from the caller's market profile (core
+     * never derives it from the symbol — see {@link CurrencyCode}). Forwarded
+     * to the technical, fundamental, and news axes and used by the overall
+     * prompt's framing and level precision.
+     * Defaults to `'USD'`.
+     */
+    currency?: CurrencyCode;
 }
 
 // ─────────────────────────────────────────

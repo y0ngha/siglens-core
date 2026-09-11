@@ -7,6 +7,7 @@ import type {
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
     AssetClass,
+    CurrencyCode,
     EarningsCalendarItem,
     EnrichedNewsItem,
     ModelId,
@@ -83,6 +84,14 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * Defaults to `'equity'` for backward compatibility.
      */
     assetClass?: AssetClass;
+    /**
+     * Listing quote currency, supplied from the caller's market profile (core
+     * never derives it from the symbol — see {@link CurrencyCode}). `KRW`
+     * frames a Korean listing and labels calendar revenue estimates in won.
+     * Defaults to `'USD'`. Not part of the cache key: it is a fixed property of
+     * the symbol.
+     */
+    currency?: CurrencyCode;
     /**
      * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
      * `true` requests the model's default/spec reasoning depth; `false` or

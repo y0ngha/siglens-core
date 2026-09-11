@@ -1,5 +1,7 @@
 import type {
+    AssetClass,
     Bar,
+    CurrencyCode,
     HorizonKey,
     HorizonReference,
     IndicatorResult,
@@ -22,12 +24,16 @@ import {
     TREND_STRUCTURE_MA_LONG_PERIOD,
 } from '@/domain/analysis/marketReferenceConstants';
 import {
+    AT_PRICE_BAR_RANGE_FRACTION,
     collectIndicatorLevels,
     splitBySide,
     roundNumberLevels,
     makeReferenceLevel,
     lastFiniteNumber,
+    meanBarRangePercent,
 } from '@/domain/analysis/referenceLevels';
+import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
+import { etCalendarDate } from '@/domain/marketCalendar';
 import { anchoredVwap } from '@/domain/analysis/anchoredVwap';
 import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
 import {
@@ -41,16 +47,51 @@ import {
     classifyEmaStack,
     classifySwingStructure,
 } from '@/domain/analysis/trendStructure';
-import { SECONDS_PER_DAY } from '@/domain/constants/time';
+import {
+    KST_OFFSET_HOURS,
+    MS_PER_SECOND,
+    SECONDS_PER_DAY,
+    SECONDS_PER_HOUR,
+} from '@/domain/constants/time';
 import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 
 const EFFICIENCY_PERIOD = 20;
 
+/** Maps a bar to a key shared by every bar of the same trading session. */
+type SessionKey = (bar: Bar) => number;
+
+const DATE_KEY_YEAR_FACTOR = 10_000;
+const DATE_KEY_MONTH_FACTOR = 100;
+
+/** Crypto trades a UTC day. */
+const utcSessionDay: SessionKey = bar => Math.floor(bar.time / SECONDS_PER_DAY);
+
+/** KRX sessions (09:00–15:30 KST) fall inside one KST calendar date. */
+const kstSessionDay: SessionKey = bar =>
+    Math.floor(
+        (bar.time + KST_OFFSET_HOURS * SECONDS_PER_HOUR) / SECONDS_PER_DAY
+    );
+
 /**
- * UTC calendar day of a bar. U.S. regular hours (13:30–21:00 UTC), KRX (00:00–06:30 UTC)
- * and the crypto UTC day each fall inside a single UTC date, so the date is a session key.
+ * U.S. sessions fall inside one **Eastern** calendar date. A UTC date split them: after-hours
+ * bars run to 20:00 ET, which is 00:00–01:00 UTC the next day, so a chart that includes
+ * extended hours had the evening tail of one session counted into the next.
  */
-const utcDay = (bar: Bar): number => Math.floor(bar.time / SECONDS_PER_DAY);
+const etSessionDay: SessionKey = bar => {
+    const { year, month, day } = etCalendarDate(
+        new Date(bar.time * MS_PER_SECOND)
+    );
+    return year * DATE_KEY_YEAR_FACTOR + month * DATE_KEY_MONTH_FACTOR + day;
+};
+
+/** The session calendar of the listing: supplied, never inferred from the symbol. */
+const sessionKeyFor = (
+    assetClass: AssetClass,
+    currency: CurrencyCode
+): SessionKey => {
+    if (assetClass === 'crypto') return utcSessionDay;
+    return currency === 'KRW' ? kstSessionDay : etSessionDay;
+};
 
 /**
  * The bar floor pivots are computed from: the previous bar on a daily chart, the previous
@@ -62,22 +103,33 @@ const utcDay = (bar: Bar): number => Math.floor(bar.time / SECONDS_PER_DAY);
  * … 0.01% away` on hourly AAPL) and its "S3" can sit above the price. Those levels then
  * became the nearest support/resistance the prompt handed to the model for stops.
  * Aggregating the prior session's bars restores the levels traders actually watch.
+ *
+ * Bars without usable prices are left out of the aggregate: one NaN high made the session
+ * high NaN, every pivot NaN, and every pivot level then fell out of both sides silently.
  */
 function pivotSourceBar(
     bars: readonly Bar[],
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    sessionKey: SessionKey
 ): Bar | null {
     if (bars.length < 2) return null;
-    if (timeframe === '1Day') return bars[bars.length - 2];
+    if (timeframe === '1Day') {
+        const prior = bars[bars.length - 2];
+        return hasUsablePrices(prior) ? prior : null;
+    }
 
-    const lastDay = utcDay(bars[bars.length - 1]);
-    const priorEnd = bars.findLastIndex(b => utcDay(b) !== lastDay);
+    const lastDay = sessionKey(bars[bars.length - 1]);
+    const priorEnd = bars.findLastIndex(b => sessionKey(b) !== lastDay);
     if (priorEnd < 0) return null;
-    const priorDay = utcDay(bars[priorEnd]);
+    const priorDay = sessionKey(bars[priorEnd]);
     const priorStart =
-        bars.findLastIndex((b, i) => i < priorEnd && utcDay(b) !== priorDay) +
-        1;
-    const session = bars.slice(priorStart, priorEnd + 1);
+        bars.findLastIndex(
+            (b, i) => i < priorEnd && sessionKey(b) !== priorDay
+        ) + 1;
+    const session = bars
+        .slice(priorStart, priorEnd + 1)
+        .filter(hasUsablePrices);
+    if (session.length === 0) return null;
     return {
         time: session[0].time,
         open: session[0].open,
@@ -164,7 +216,8 @@ function buildHorizon(
     indicators: IndicatorResult,
     key: HorizonKey,
     windowBars: number,
-    pivotBar: Bar | null
+    pivotBar: Bar | null,
+    atPriceBandPercent: number
 ): HorizonReference {
     const barsLen = bars.length;
     const windowLen = Math.min(windowBars, barsLen);
@@ -293,7 +346,7 @@ function buildHorizon(
         },
         levels:
             currentPrice > 0
-                ? splitBySide(levels, currentPrice)
+                ? splitBySide(levels, currentPrice, atPriceBandPercent)
                 : { support: [], resistance: [] },
         structure: buildStructure(
             barWindow,
@@ -313,20 +366,40 @@ function buildHorizon(
  * structure over its own lookback window. Advisory context only — never a
  * directional prediction.
  *
+ * Levels closer to the price than half the recent mean bar range are flagged `atPrice` and
+ * kept outside the per-side cap (see `splitBySide`).
+ *
  * @param bars - OHLCV bars, oldest-first.
  * @param indicators - Precomputed indicator suite aligned with `bars`.
  * @param timeframe - Bar resolution driving per-horizon window sizing.
+ * @param options - Listing facts that pick the pivot session calendar: crypto uses the UTC
+ *   day, a `KRW` listing the KST date, anything else the U.S. Eastern date. Defaults to a
+ *   USD equity.
  * @returns The short/medium/long horizon references.
  */
 export function computeMarketReference(
     bars: Bar[],
     indicators: IndicatorResult,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    options: { assetClass?: AssetClass; currency?: CurrencyCode } = {}
 ): MarketReference {
     const w = HORIZON_WINDOWS_BY_TIMEFRAME[timeframe];
-    const pivotBar = pivotSourceBar(bars, timeframe);
+    const pivotBar = pivotSourceBar(
+        bars,
+        timeframe,
+        sessionKeyFor(options.assetClass ?? 'equity', options.currency ?? 'USD')
+    );
+    const atPriceBandPercent =
+        meanBarRangePercent(bars) * AT_PRICE_BAR_RANGE_FRACTION;
     const horizon = (key: HorizonKey): HorizonReference =>
-        buildHorizon(bars, indicators, key, w[key], pivotBar);
+        buildHorizon(
+            bars,
+            indicators,
+            key,
+            w[key],
+            pivotBar,
+            atPriceBandPercent
+        );
     return {
         short: horizon('short'),
         medium: horizon('medium'),

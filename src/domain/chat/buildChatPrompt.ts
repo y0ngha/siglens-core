@@ -2,9 +2,8 @@
 // Korean reduces LLM instruction-following consistency.
 
 import {
-    formatPrice,
-    isKrxListedSymbol,
-    listingCurrency,
+    formatNullableNumber,
+    sharedPriceDecimalPlaces,
 } from '@/domain/analysis/promptFormat';
 import type {
     AnalysisResponse,
@@ -40,28 +39,50 @@ function isTimeframe(value: unknown): value is Timeframe {
     );
 }
 
-// Level prices follow their own magnitude and the listing currency, so a
-// sub-dollar level is not flattened to `0.08` and a won level is not `269500.00`.
-function formatKeyLevels(levels: KeyLevel[], currency: CurrencyCode): string {
+/**
+ * One precision for every level in the analysis, from the finest one and the listing
+ * currency: a sub-dollar level is not flattened to `0.08`, a won level is not `269500.00`,
+ * and a list near $1 does not mix `0.9950` with `1.01`.
+ */
+function levelDecimalPlaces(
+    analysis: AnalysisResponse,
+    currency: CurrencyCode,
+    assetClass: AssetClass
+): number {
+    const { keyLevels, priceTargets } = analysis;
+    return sharedPriceDecimalPlaces(
+        [
+            ...keyLevels.resistance.map(l => l.price),
+            ...keyLevels.support.map(l => l.price),
+            ...(keyLevels.poc ? [keyLevels.poc.price] : []),
+            ...(priceTargets.bullish?.targets ?? []).map(t => t.price),
+            ...(priceTargets.bearish?.targets ?? []).map(t => t.price),
+        ],
+        currency,
+        assetClass
+    );
+}
+
+function formatKeyLevels(levels: KeyLevel[], dp: number): string {
     if (levels.length === 0) return 'None detected';
     return levels
-        .map(l => `${formatPrice(l.price, currency)} (${l.reason})`)
+        .map(l => `${formatNullableNumber(l.price, dp)} (${l.reason})`)
         .join(', ');
 }
 
-function formatPoc(poc: KeyLevel | undefined, currency: CurrencyCode): string {
+function formatPoc(poc: KeyLevel | undefined, dp: number): string {
     return poc
-        ? `${formatPrice(poc.price, currency)} (${poc.reason})`
+        ? `${formatNullableNumber(poc.price, dp)} (${poc.reason})`
         : 'None detected';
 }
 
 function formatPriceTargets(
     scenario: PriceScenario | null | undefined,
-    currency: CurrencyCode
+    dp: number
 ): string {
     if (!scenario || scenario.targets.length === 0) return 'None';
     return scenario.targets
-        .map(t => `${formatPrice(t.price, currency)} — ${t.basis}`)
+        .map(t => `${formatNullableNumber(t.price, dp)} — ${t.basis}`)
         .join('; ');
 }
 
@@ -292,6 +313,11 @@ function formatCurrentAnalysisContext(
  *   (role line + refusal example). Defaults to `'equity'`. Does NOT gate
  *   the `## Current analysis context` section — that is controlled solely
  *   by `currentAnalysisContext`.
+ * @param currency - Optional listing quote currency from the caller's market
+ *   profile (never derived from the symbol). `KRW` describes a Korean listing
+ *   and renders levels in whole won. Defaults to `'USD'`. The legacy
+ *   `(symbol, timeframe, …)` overload cannot carry it and always uses `'USD'`
+ *   — a `.KS` symbol is not read as Korean; use this overload for KRX listings.
  * @returns The prompt payload — see {@link ChatPromptPayload}.
  */
 export function buildChatPrompt(
@@ -310,7 +336,8 @@ export function buildChatPrompt(
     history: ChatMessage[],
     userMessage: string,
     currentAnalysisContext?: CurrentAnalysisContext,
-    assetClass?: AssetClass
+    assetClass?: AssetClass,
+    currency?: CurrencyCode
 ): ChatPromptPayload;
 export function buildChatPrompt(
     symbol: string,
@@ -320,7 +347,8 @@ export function buildChatPrompt(
     historyOrUserMessage: ChatMessage[] | string,
     userMessageOrContext?: string | CurrentAnalysisContext,
     maybeCurrentAnalysisContext?: CurrentAnalysisContext | AssetClass,
-    maybeAssetClass?: AssetClass
+    maybeAssetClass?: AssetClass,
+    maybeCurrency?: CurrencyCode
 ): ChatPromptPayload {
     const oldSignature = isTimeframe(companyNameOrTimeframe);
     const companyName = oldSignature ? symbol : companyNameOrTimeframe;
@@ -355,12 +383,16 @@ export function buildChatPrompt(
         ? 'equity'
         : (maybeAssetClass ?? 'equity');
     const isCrypto = assetClass === 'crypto';
-    const currency = listingCurrency(symbol);
+    // Supplied by the caller's market profile, never inferred from the symbol.
+    const currency: CurrencyCode = oldSignature
+        ? 'USD'
+        : (maybeCurrency ?? 'USD');
     const assetKind = isCrypto
         ? 'cryptocurrency'
-        : isKrxListedSymbol(symbol)
+        : currency === 'KRW'
           ? 'Korean equity listed on the KRX, priced in KRW'
           : 'U.S. equity';
+    const levelDp = levelDecimalPlaces(analysis, currency, assetClass);
     const refuseExample = isCrypto
         ? `- REFUSE (unrelated asset): "다른 코인은 지금 어때요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`
         : `- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`;
@@ -419,9 +451,9 @@ Trading Strategy:
         : ''
 }
 Key Levels:
-- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, currency)}
-- Support: ${formatKeyLevels(analysis.keyLevels.support, currency)}
-- POC: ${formatPoc(analysis.keyLevels.poc, currency)}
+- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, levelDp)}
+- Support: ${formatKeyLevels(analysis.keyLevels.support, levelDp)}
+- POC: ${formatPoc(analysis.keyLevels.poc, levelDp)}
 
 Detected Patterns: ${formatDetectedPatterns(analysis.patternSummaries)}
 
@@ -432,8 +464,8 @@ Indicator Signals:
 ${formatIndicatorSignals(analysis.indicatorResults) || 'None'}
 
 Price Targets:
-- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, currency)}
-- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, currency)}
+- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, levelDp)}
+- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, levelDp)}
 === END ANALYSIS DATA ===${formatCurrentAnalysisContext(currentAnalysisContext)}`;
 
     const messages = [

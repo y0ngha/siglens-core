@@ -231,3 +231,83 @@ describe('fetchBarsWithIndicators 함수는', () => {
         });
     });
 });
+
+describe('fetchBarsWithIndicators — bars without usable prices', () => {
+    beforeEach(() => {
+        mockGetBars.mockReset();
+    });
+
+    it('drops placeholder bars whose OHLC is zero or non-finite', async () => {
+        // Yahoo KRX daily rows like `O:0 H:0 L:0 C:285000 V:0` made Period Low 0
+        // and printed `Current vs Low: Infinity%` in the prompt.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce([
+            mockBar,
+            { ...mockBar, time: mockBar.time + 60, open: 0, high: 0, low: 0 },
+            { ...mockBar, time: mockBar.time + 120, high: Number.NaN },
+            { ...mockBar, time: mockBar.time + 180 },
+        ]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            '005930.KS',
+            DEFAULT_TIMEFRAME
+        );
+
+        expect(result.bars.map(b => b.time)).toEqual([
+            mockBar.time,
+            mockBar.time + 180,
+        ]);
+        expect(warn).toHaveBeenCalledWith(
+            '[barsApi] dropped bars without usable OHLC prices',
+            expect.objectContaining({ dropped: 2, kept: 2 })
+        );
+        warn.mockRestore();
+    });
+
+    it('does not warn when every bar is usable', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce([mockBar]);
+
+        await fetchBarsWithIndicators(fakeProvider, 'AAPL', DEFAULT_TIMEFRAME);
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+});
+
+describe('fetchBarsWithIndicators — every bar unusable', () => {
+    beforeEach(() => {
+        mockGetBars.mockReset();
+    });
+
+    it('returns empty bars and indicators without throwing', async () => {
+        // OTC names came back with all-zero rows; the whole history can drop out.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce([
+            { ...mockBar, open: 0, high: 0, low: 0, close: 0 },
+            {
+                ...mockBar,
+                time: mockBar.time + 60,
+                open: 0,
+                high: 0,
+                low: 0,
+                close: 0,
+            },
+        ]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'OTCX',
+            DEFAULT_TIMEFRAME
+        );
+
+        expect(result.bars).toEqual([]);
+        expect(result.indicators.rsi).toEqual([]);
+        expect(warn).toHaveBeenCalledWith(
+            '[barsApi] dropped bars without usable OHLC prices',
+            expect.objectContaining({ dropped: 2, kept: 0 })
+        );
+        warn.mockRestore();
+    });
+});

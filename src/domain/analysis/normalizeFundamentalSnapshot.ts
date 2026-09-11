@@ -118,5 +118,10 @@ export function normalizeFundamentalSnapshot(
             todayChangePct: input.sectorTodayChangePct,
             historical: input.sectorHistorical,
         },
+        // Spread only when known so snapshots from providers that do not report it keep
+        // their exact shape.
+        ...(input.cashFlow?.reportedCurrency
+            ? { reportedCurrency: input.cashFlow.reportedCurrency }
+            : {}),
     };
 }

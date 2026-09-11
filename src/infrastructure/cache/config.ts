@@ -624,9 +624,27 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * round-number steps scale outside $1–$1,000; and the structural risk:reward
  * skips levels inside half the mean bar range. Bytes change for every request.
  *
+ * @remarks
+ * **`p13` = placeholder bars dropped.** `fetchBarsWithIndicators` now removes
+ * bars whose OHLC is not a usable price (Yahoo KRX placeholder rows such as
+ * `O:0 H:0 L:0 C:285000 V:0`, which printed `Current vs Low: Infinity%`). Bytes
+ * change only for symbols whose history carried such rows, but analyses cached
+ * from them are wrong, and the constant has no per-symbol axis.
+ *
+ * The same bump also covers the follow-up audit shipped with it: MACD, ATR,
+ * squeeze momentum and Elder-Ray render at a difference precision (three
+ * significant digits of ATR) instead of the price precision; crypto prices keep
+ * five significant digits; at-price reference levels are tagged and kept
+ * outside the per-side cap; the risk:reward block says "not measurable" instead
+ * of vanishing; round-number
+ * steps follow one continuous 2% rule with plain-decimal labels; pivots group
+ * intraday bars by the listing's session date; listing framing and precision
+ * follow the supplied currency rather than the symbol suffix; and NaN volumes
+ * and ratios render `N/A`.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p12' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p13' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -781,9 +799,14 @@ export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
  * printed the literal `NaN`; binary float noise such as `0.30000000000000004`
  * reached the model).
  *
+ * @remarks
+ * **`p2` = 15-significant-digit precision.** `formatPlainNumber` now keeps 15
+ * significant digits instead of 10 — the 10-digit rule cut real digits off
+ * large published figures (`29723864123.45` rendered `29723864120`).
+ *
  * @internal
  */
-export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * @internal Build the Redis key for a cached macro (economy) briefing.
@@ -837,9 +860,14 @@ export function buildMacroBriefingCacheKey(
  * render byte-identically; the bump keeps entries generated from corrupt inputs
  * from being served for the rest of their 1-day TTL.
  *
+ * @remarks
+ * **`p5` = 15-significant-digit precision.** `formatPlainNumber` now keeps 15
+ * significant digits instead of 10 — the 10-digit rule cut real digits off
+ * large published figures (`29723864123.45` rendered `29723864120`).
+ *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
@@ -954,9 +982,17 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * ratio carries its `%`, and a missing Piotroski score is `N/A` instead of
  * `N/A/9`.
  *
+ * **`f3` = two currencies.** Statement and per-share figures (EPS, operating
+ * cash flow, analyst estimates) are labelled with the filer's reporting
+ * currency, or left unlabelled when the provider does not report it — an ADR
+ * files in its home currency, and TSM's TWD figures printed as `USD`. Market
+ * cap and price targets keep the listing currency, which is now supplied by
+ * the caller instead of inferred from the symbol. Amounts that round up to the
+ * next scale render there (`1.0B`, not `1000.0M`).
+ *
  * @internal
  */
-export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f2' as const;
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f3' as const;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.
@@ -1047,9 +1083,14 @@ export function buildFundamentalCacheKey(
  * the listing currency (KRX statements are in won, previously printed as bare
  * `B`), and non-finite margins/growth render `N/A` instead of `NaN%`.
  *
+ * **`p7` = reporting currency.** Statement amounts carry each row's reporting
+ * currency and stay unlabelled when it is unknown, instead of the listing
+ * currency inferred from the symbol (an ADR's TWD statements printed as
+ * `USD`). Amounts that round up to the next scale render there.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p7' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -1248,9 +1289,13 @@ export function buildCongressTrendCacheKey(
  * listings instead of "a publicly traded U.S. equity", and earnings-calendar
  * revenue estimates carry their currency.
  *
+ * **`p6` = supplied currency.** The Korean-listing framing and the calendar
+ * currency follow the caller-supplied listing currency instead of the symbol
+ * suffix, and amounts that round up to the next scale render there.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
@@ -1354,9 +1399,17 @@ export function buildNewsCacheKey(
  * (1-day TTL) kept being served after the prompt changed; `p1` gives this
  * builder the same invalidation lever its siblings already have.
  *
+ * **`p2` = one precision per list.** Technical levels and targets render at
+ * the precision the finest of them needs instead of each at its own magnitude
+ * (a list near $1 mixed `0.9950` with `1.01`); framing and precision follow
+ * the supplied listing currency instead of the symbol suffix. It also clears
+ * entries built from Fear & Greed and prior-analysis bars fetched before
+ * placeholder bars were dropped — those inputs are not folded into this key's
+ * `inputHash`.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

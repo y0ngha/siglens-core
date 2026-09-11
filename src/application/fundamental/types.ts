@@ -6,6 +6,7 @@ import type {
 } from '@/application/usage/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
+    CurrencyCode,
     FundamentalAnalysisResponse,
     ModelId,
     Tier,
@@ -84,6 +85,14 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * same cache key this request used before the field existed.
      */
     locale?: AnalysisLocale;
+    /**
+     * Listing quote currency, supplied from the caller's market profile (core
+     * never derives it from the symbol — see {@link CurrencyCode}). Labels
+     * market cap and price targets; statement figures use the snapshot's own
+     * reporting currency. Defaults to `'USD'`. Not part of the cache key: it is
+     * a fixed property of the symbol.
+     */
+    currency?: CurrencyCode;
     /**
      * Cancellation signal for the in-flight LLM call (used by `runFundamentalAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection

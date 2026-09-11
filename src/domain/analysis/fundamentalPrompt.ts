@@ -26,7 +26,6 @@ import {
     formatNullableNumber as fmt,
     formatPrice,
     formatSignedPercent,
-    listingCurrency,
 } from './promptFormat';
 
 /** Maximum Piotroski F-score. */
@@ -141,16 +140,24 @@ function formatSectorDirection(
  * The `Ko`/`KO` suffixes are schema field names, not a language claim —
  * their content follows the requested `locale`.
  *
+ * Two currencies are in play and neither is derived from the symbol. Listing-market
+ * figures (market cap, peer caps, price targets) take `currency`, the listing's quote
+ * currency. Statement and per-share figures (EPS, operating cash flow, analyst estimates)
+ * take `snapshot.reportedCurrency` and stay unlabelled when it is absent — an ADR reports
+ * in its home currency, so labelling TSM's TWD statements `USD` overstated them 30×.
+ *
  * @param symbol   - Stock ticker (e.g. `'AAPL'`).
  * @param snapshot - Normalised fundamental data for the symbol.
  * @param skills   - All loaded skills; non-fundamental entries are filtered out.
+ * @param currency - Listing quote currency from the consumer's market profile. Defaults to `'USD'`.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildFundamentalAnalysisPrompt(
     symbol: string,
     snapshot: FundamentalSnapshot,
     skills: readonly Skill[],
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    currency: CurrencyCode = 'USD'
 ): AssembledPrompt {
     const {
         profile,
@@ -174,8 +181,8 @@ export function buildFundamentalAnalysisPrompt(
                   .join('\n\n')
             : 'No additional fundamental skills loaded.';
 
-    // Amounts arrive in the listing's currency: won for KRX, dollars otherwise.
-    const currency = listingCurrency(symbol);
+    const reported = snapshot.reportedCurrency;
+    const reportedLabel = reported ? `, ${reported}` : '';
 
     const peerLines =
         peers.length > 0
@@ -216,7 +223,7 @@ ${skillsSection}`;
 - P/B: ${fmt(valuation.pbr)}
 - PEG: ${fmt(valuation.peg)}
 - EV/EBITDA: ${fmt(valuation.evToEbitda)}
-- EPS (TTM, ${currency}): ${fmt(valuation.eps)}
+- EPS (TTM${reportedLabel}): ${fmt(valuation.eps)}
 
 ## Comparable Peers
 ${peerLines}
@@ -234,14 +241,14 @@ ${peerLines}
 ## Financial Health
 - Debt Ratio (total debt / total assets): ${fmtPct(health.debtRatio)}
 - Current Ratio: ${fmt(health.currentRatio)}
-- Operating Cash Flow: ${formatLargeAmount(health.operatingCashFlow, currency)}
+- Operating Cash Flow: ${formatLargeAmount(health.operatingCashFlow, reported)}
 - Altman Z-Score: ${fmt(health.altmanZScore)}
 - Piotroski Score: ${health.piotroskiScore != null ? `${health.piotroskiScore}/${PIOTROSKI_MAX_SCORE}` : 'N/A'}
 
 ## Forward / Analyst Outlook
 - Next Earnings: ${futureDirection.nextEarningsAt ?? 'N/A'}
-- Analyst EPS Estimate (${currency}): ${fmt(futureDirection.analystEstimateEps)}
-- Analyst Revenue Estimate: ${formatLargeAmount(futureDirection.analystEstimateRevenue, currency)}
+- Analyst EPS Estimate${reported ? ` (${reported})` : ''}: ${fmt(futureDirection.analystEstimateEps)}
+- Analyst Revenue Estimate: ${formatLargeAmount(futureDirection.analystEstimateRevenue, reported)}
 - Analyst Grades: ${formatGrades(futureDirection.gradesConsensus)}
 - Price Target: ${formatPriceTarget(futureDirection.priceTargetConsensus, currency)}
 - Price Target Trend: ${formatPriceTargetSummary(futureDirection.priceTargetSummary, currency)}

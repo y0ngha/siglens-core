@@ -6,7 +6,7 @@
  * injection into prompt templates.
  */
 
-import type { CurrencyCode, Timeframe } from '@/domain/types';
+import type { AssetClass, CurrencyCode, Timeframe } from '@/domain/types';
 
 /**
  * Human-readable timeframe labels used in prompt headers.
@@ -96,8 +96,13 @@ export function formatSignedPercent(n: number | null | undefined): string {
     return text.startsWith('-') ? `${text}%` : `+${text}%`;
 }
 
-/** Significant digits kept when stripping binary float noise from a plain figure. */
-const PLAIN_NUMBER_SIGNIFICANT_DIGITS = 10;
+/**
+ * Significant digits kept when stripping binary float noise from a plain figure.
+ *
+ * 15 is the most a double round-trips exactly. Ten used to cut real digits off large
+ * published figures (`29723864123.45` became `29723864120`).
+ */
+const PLAIN_NUMBER_SIGNIFICANT_DIGITS = 15;
 
 /**
  * @internal
@@ -112,48 +117,58 @@ export function formatPlainNumber(n: number | null | undefined): string {
     return String(Number(n.toPrecision(PLAIN_NUMBER_SIGNIFICANT_DIGITS)));
 }
 
-/** Canonical KRX symbol: six digits plus the KOSPI (`.KS`) or KOSDAQ (`.KQ`) suffix. */
-const KRX_SYMBOL_PATTERN = /^\d{6}\.(KS|KQ)$/i;
-
 /**
  * @internal
- * Whether the symbol is a KRX (KOSPI/KOSDAQ) listing.
+ * Framing sentence for an equity listing — U.S. by default, Korean for a KRW quote.
  *
- * Consumers pass canonical symbols with the exchange suffix embedded
- * (`005930.KS`), so the suffix alone identifies the market. Prompts need this
- * for two things the asset class cannot express: the listing is not a U.S.
- * equity, and its prices are quoted in whole won.
+ * Keyed on the supplied quote currency, never on the symbol (see {@link CurrencyCode}).
+ * The U.S. sentence is kept byte-identical to the one every builder already emitted. The
+ * Korean sentence exists because Korean listings travel with `assetClass: 'equity'`, and
+ * the U.S. framing made models cite U.S.-only benchmarks (sector ETFs, VIX) on Korean
+ * charts.
  */
-export function isKrxListedSymbol(symbol: string): boolean {
-    return KRX_SYMBOL_PATTERN.test(symbol);
-}
-
-/** @internal Quote currency implied by the symbol's listing (KRX → KRW, else USD). */
-export function listingCurrency(symbol: string): CurrencyCode {
-    return isKrxListedSymbol(symbol) ? 'KRW' : 'USD';
-}
-
-/**
- * @internal
- * Framing sentence for an equity listing — U.S. by default, Korean for KRX.
- *
- * The U.S. sentence is kept byte-identical to the one every builder already
- * emitted. The KRX sentence exists because Korean listings travel with
- * `assetClass: 'equity'`, and the U.S. framing made models cite U.S.-only
- * benchmarks (sector ETFs, VIX) on Korean charts.
- */
-export function equityListingContext(symbol: string): string {
-    return isKrxListedSymbol(symbol)
+export function equityListingContext(currency: CurrencyCode = 'USD'): string {
+    return currency === 'KRW'
         ? 'This is a Korean equity listed on the KRX (KOSPI/KOSDAQ). Prices are quoted in KRW (whole won, no decimal ticks) and the regular session runs 09:00–15:30 KST. Do not describe it as a U.S. stock or cite U.S.-only benchmarks, indices, or sector ETFs.'
         : 'This is a publicly traded U.S. equity.';
 }
 
-/** Decimal places for prices of one unit or more (USD cent precision). */
+/** Decimal places for equity prices of one unit or more (USD cent precision). */
 const DEFAULT_PRICE_DECIMAL_PLACES = 2;
-/** Significant digits kept for sub-unit prices (e.g. `0.08359`). */
+/** Significant digits kept for sub-unit equity prices (e.g. `0.08359`). */
 const SUB_UNIT_PRICE_SIGNIFICANT_DIGITS = 4;
-/** Ceiling on decimals so a corrupt near-zero price cannot request absurd precision. */
-const MAX_PRICE_DECIMAL_PLACES = 10;
+/**
+ * Significant digits kept for crypto prices at every magnitude.
+ *
+ * Crypto has no cent tick: a 5-minute XRP bar near 2.50 moves in the third decimal, so two
+ * decimals printed whole runs of identical `O:2.50 H:2.50 L:2.50 C:2.50` rows.
+ */
+const CRYPTO_PRICE_SIGNIFICANT_DIGITS = 5;
+/**
+ * Significant digits kept for difference-scale values (MACD, ATR, momentum, Elder-Ray).
+ *
+ * Those values are a small fraction of the price, so the price's precision can erase them:
+ * at whole-won precision a KRX histogram of `-0.4` renders `0`, and the crossover it
+ * carries disappears.
+ */
+const DIFFERENCE_SIGNIFICANT_DIGITS = 3;
+/**
+ * Ceiling on decimals so a corrupt near-zero price cannot request absurd precision. High
+ * enough for meme-coin quotes near `1e-8`, which a ceiling of 10 truncated.
+ */
+const MAX_PRICE_DECIMAL_PLACES = 15;
+
+/** Decimals that keep `significantDigits` of a positive finite value. */
+const decimalsForSignificantDigits = (
+    value: number,
+    significantDigits: number
+): number => significantDigits - 1 - Math.floor(Math.log10(value));
+
+const clampDecimals = (dp: number, min: number): number =>
+    Math.min(MAX_PRICE_DECIMAL_PLACES, Math.max(min, dp));
+
+const isPositiveFinite = (n: number | null | undefined): n is number =>
+    n != null && Number.isFinite(n) && n > 0;
 
 /**
  * @internal
@@ -161,38 +176,85 @@ const MAX_PRICE_DECIMAL_PLACES = 10;
  *
  * A fixed two decimals erased every sub-dollar asset: SHIBUSD rendered every
  * bar as `O:0.00 H:0.00 L:0.00 C:0.00`, and DOGEUSD collapsed its moving
- * averages, ATR, and MACD to `0.08`/`0.00`. Sub-unit prices therefore keep four
- * significant digits. KRW is quoted in whole won, so it takes none — `269500.00`
- * claims precision the market does not have.
+ * averages to `0.08`. Sub-unit equity prices therefore keep four significant
+ * digits and crypto keeps five at every magnitude (never fewer than two
+ * decimals). KRW is quoted in whole won, so it takes none — `269500.00` claims
+ * precision the market does not have.
  *
  * Pick it **once per prompt** from the latest close and apply it to every
- * price-scale value, so a MACD line and its signal never render at different
- * precisions.
+ * price-scale value, so a band and the close it brackets never render at
+ * different precisions. Difference-scale values take
+ * {@link differenceDecimalPlaces} instead.
  */
 export function priceDecimalPlaces(
     referencePrice: number | null | undefined,
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    assetClass: AssetClass = 'equity'
 ): number {
     if (currency === 'KRW') return 0;
-    if (
-        referencePrice == null ||
-        !Number.isFinite(referencePrice) ||
-        referencePrice <= 0 ||
-        referencePrice >= 1
-    ) {
-        return DEFAULT_PRICE_DECIMAL_PLACES;
+    if (!isPositiveFinite(referencePrice)) return DEFAULT_PRICE_DECIMAL_PLACES;
+    if (assetClass === 'crypto') {
+        return clampDecimals(
+            decimalsForSignificantDigits(
+                referencePrice,
+                CRYPTO_PRICE_SIGNIFICANT_DIGITS
+            ),
+            DEFAULT_PRICE_DECIMAL_PLACES
+        );
     }
-    const magnitude = Math.floor(Math.log10(referencePrice));
-    return Math.min(
-        MAX_PRICE_DECIMAL_PLACES,
-        SUB_UNIT_PRICE_SIGNIFICANT_DIGITS - 1 - magnitude
+    if (referencePrice >= 1) return DEFAULT_PRICE_DECIMAL_PLACES;
+    return clampDecimals(
+        decimalsForSignificantDigits(
+            referencePrice,
+            SUB_UNIT_PRICE_SIGNIFICANT_DIGITS
+        ),
+        0
     );
 }
 
 /**
  * @internal
- * One price at the precision its own magnitude calls for — for builders that
- * receive isolated levels (overall, chat) rather than a bar series.
+ * Decimal places for difference-scale values (MACD line/signal/histogram, ATR, squeeze
+ * momentum, Elder-Ray), from a typical difference magnitude such as the latest ATR.
+ *
+ * Never fewer decimals than the prices themselves, and enough to keep three significant
+ * digits of `scale`. Falls back to `priceDp` when `scale` is unusable.
+ */
+export function differenceDecimalPlaces(
+    scale: number | null | undefined,
+    priceDp: number
+): number {
+    if (!isPositiveFinite(scale)) return priceDp;
+    return clampDecimals(
+        decimalsForSignificantDigits(scale, DIFFERENCE_SIGNIFICANT_DIGITS),
+        priceDp
+    );
+}
+
+/**
+ * @internal
+ * One precision for a set of isolated prices (overall key levels, chat targets).
+ *
+ * Formatting each level at its own magnitude printed `0.9950` next to `1.01` in one list;
+ * the smallest usable price decides, so every level gets the decimals the finest one needs.
+ */
+export function sharedPriceDecimalPlaces(
+    prices: readonly number[],
+    currency: CurrencyCode = 'USD',
+    assetClass: AssetClass = 'equity'
+): number {
+    const usable = prices.filter(isPositiveFinite);
+    return priceDecimalPlaces(
+        usable.length > 0 ? Math.min(...usable) : null,
+        currency,
+        assetClass
+    );
+}
+
+/**
+ * @internal
+ * One price at the precision its own magnitude calls for — for a lone figure (an options
+ * underlying, a fallback level) rather than a list or a bar series.
  */
 export function formatPrice(
     price: number | null | undefined,
@@ -201,35 +263,49 @@ export function formatPrice(
     return formatNullableNumber(price, priceDecimalPlaces(price, currency));
 }
 
-const TRILLION = 1e12;
-const BILLION = 1e9;
-const MILLION = 1e6;
-const SCALED_AMOUNT_DECIMAL_PLACES = 1;
+/** Largest first; the unit row renders sub-million amounts unscaled. */
+const LARGE_AMOUNT_SCALES = [
+    { divisor: 1e12, suffix: 'T', dp: 1 },
+    { divisor: 1e9, suffix: 'B', dp: 1 },
+    { divisor: 1e6, suffix: 'M', dp: 1 },
+    { divisor: 1, suffix: '', dp: 0 },
+] as const;
 
 /**
  * @internal
- * A large money amount scaled to T/B/M with its currency, or `'N/A'`.
+ * A large money amount scaled to T/B/M, suffixed with its currency when one is known, or
+ * `'N/A'`.
  *
- * The prompts used to print `(n / 1e9).toFixed(0)B USD` unconditionally. A KRX
- * market cap arrives in won, which rendered as roughly `1600000B USD`, and a
- * sub-$500M U.S. small cap rendered as `0B`.
+ * The prompts used to print `(n / 1e9).toFixed(0)B USD` unconditionally. A KRX market cap
+ * arrives in won, which rendered as roughly `1600000B USD`, and a sub-$500M U.S. small cap
+ * rendered as `0B`. An amount whose rounding reaches the next scale moves up to it, so
+ * `999_950_000` reads `1.0B` rather than `1000.0M` (while `960_000_000` stays `960.0M`).
+ *
+ * `currency` is a free ISO code, not {@link CurrencyCode}: statement amounts carry the
+ * filer's reporting currency, which for an ADR is not the listing's (TSM reports in TWD).
+ * Omit it when that currency is unknown — an unlabelled amount is honest, a wrong label is
+ * a 30× error.
  */
 export function formatLargeAmount(
     n: number | null | undefined,
-    currency: CurrencyCode
+    currency?: string
 ): string {
     if (n == null || !Number.isFinite(n)) return 'N/A';
-    const abs = Math.abs(n);
-    if (abs >= TRILLION) {
-        return `${formatNullableNumber(n / TRILLION, SCALED_AMOUNT_DECIMAL_PLACES)}T ${currency}`;
-    }
-    if (abs >= BILLION) {
-        return `${formatNullableNumber(n / BILLION, SCALED_AMOUNT_DECIMAL_PLACES)}B ${currency}`;
-    }
-    if (abs >= MILLION) {
-        return `${formatNullableNumber(n / MILLION, SCALED_AMOUNT_DECIMAL_PLACES)}M ${currency}`;
-    }
-    return `${formatNullableNumber(n, 0)} ${currency}`;
+    const unit = currency ? ` ${currency}` : '';
+    const render = (scale: (typeof LARGE_AMOUNT_SCALES)[number]): string =>
+        `${formatNullableNumber(n / scale.divisor, scale.dp)}${scale.suffix}${unit}`;
+    const index = LARGE_AMOUNT_SCALES.findIndex(s => Math.abs(n) >= s.divisor);
+    // Below one unit (including 0) nothing matches; render it unscaled.
+    const scale =
+        LARGE_AMOUNT_SCALES[index] ??
+        LARGE_AMOUNT_SCALES[LARGE_AMOUNT_SCALES.length - 1];
+    const larger = LARGE_AMOUNT_SCALES[index - 1];
+    const rounded = Math.abs(
+        Number(formatNullableNumber(n / scale.divisor, scale.dp))
+    );
+    return larger !== undefined && rounded >= larger.divisor / scale.divisor
+        ? render(larger)
+        : render(scale);
 }
 
 /**

@@ -15,8 +15,9 @@ import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     equityListingContext,
-    formatPrice,
-    listingCurrency,
+    formatNullableNumber,
+    priceDecimalPlaces,
+    sharedPriceDecimalPlaces,
 } from '@/domain/analysis/promptFormat';
 import type {
     AnalysisResponse,
@@ -80,11 +81,23 @@ const TIMEFRAME_CONFIG: Record<Timeframe, { label: string; context: string }> =
 /** Formats technical analysis fields (trend, risk, key levels, price targets, patterns) into prompt lines. */
 function formatTechnical(
     tech: AnalysisResponse,
-    currency: CurrencyCode
+    currency: CurrencyCode,
+    assetClass: AssetClass
 ): string {
-    // Precision follows each price's magnitude and the listing currency, so a
-    // sub-dollar target is not flattened to `0.08` and a won level is not `269500.00`.
-    const px = (n: number): string => formatPrice(n, currency);
+    // One precision for every level, from the finest one and the listing currency, so a
+    // sub-dollar target is not flattened to `0.08`, a won level is not `269500.00`, and a
+    // list near $1 does not mix `0.9950` with `1.01`.
+    const dp = sharedPriceDecimalPlaces(
+        [
+            ...tech.keyLevels.support.map(l => l.price),
+            ...tech.keyLevels.resistance.map(l => l.price),
+            ...(tech.priceTargets.bullish?.targets ?? []).map(t => t.price),
+            ...(tech.priceTargets.bearish?.targets ?? []).map(t => t.price),
+        ],
+        currency,
+        assetClass
+    );
+    const px = (n: number): string => formatNullableNumber(n, dp);
     const lines: string[] = [
         `- Overall Trend: ${tech.trend}`,
         `- Risk Level: ${tech.riskLevel}`,
@@ -453,7 +466,10 @@ export function buildOverallAnalysisPrompt(
     assetClass: AssetClass = 'equity',
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     bars?: readonly Bar[],
-    priorAnalyses?: readonly PriorAnalysis[]
+    priorAnalyses?: readonly PriorAnalysis[],
+    // Listing quote currency from the consumer's market profile — never derived from the
+    // symbol. `KRW` frames a Korean listing and renders levels in whole won.
+    currency: CurrencyCode = 'USD'
 ): AssembledPrompt {
     const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
     const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
@@ -492,7 +508,8 @@ export function buildOverallAnalysisPrompt(
                   selectPriorAnalyses(priorAnalyses, bars),
                   bars,
                   symbol,
-                  timeframe
+                  timeframe,
+                  priceDecimalPlaces(bars.at(-1)?.close, currency, assetClass)
               )
             : '';
     const priorAnalysisBlock =
@@ -500,7 +517,7 @@ export function buildOverallAnalysisPrompt(
 
     const assetContext = isCrypto
         ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
-        : equityListingContext(symbol);
+        : equityListingContext(currency);
 
     // "matching the exact schema below" — the schema now lives at the tail of
     // `dynamic` (after all four axis sections), so it is spatially below this
@@ -562,7 +579,7 @@ ${assetContext}
 ${context}
 
 ## Axis 1 — Technical Analysis
-${formatTechnical(technical, listingCurrency(symbol))}${fearGreedBlock}
+${formatTechnical(technical, currency, assetClass)}${fearGreedBlock}
 
 ${fundamentalSection}
 

@@ -746,7 +746,8 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 바이트가 바뀌지만 상수에 per-request 축이 없어 무효화는 fleet-wide다.
         // p12 는 숫자 렌더링 감사다 — 가격 정밀도·KRX 프레이밍·세션 피벗·R:R 노이즈 바닥이
         // 모든 요청의 바이트를 바꾼다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p12');
+        // p13 은 가격을 쓸 수 없는 봉(Yahoo KRX 자리표시 행)을 버린다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p13');
     });
 });
 

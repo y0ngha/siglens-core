@@ -76,10 +76,6 @@
 - Context: Round 3 Blocker B1 — `UsageCounts` is `UsageRepository.getUsageToday`'s return DTO, mirroring `UsageLogRecord` (already moved). Co-location is reserved for option/argument types (`RecordUsageInput`, `CreateUsageLogInput`). Moved interface to `domain/types.ts` Usage Tracking section, updated imports in `usageRepository.ts` + `application/usage/limits.ts`, and synced symbol tables in `domain/CLAUDE.md`, `docs/ARCHITECTURE.md`, and `src/index.ts` re-exports.
 
 ## [PR #92 | refactor/ports-ai-module | 2026-05-22]
-- Violation: `@deprecated` JSDoc migration hint points to a non-equivalent type (`ConversationTurn['text']` is `string`, but the deprecated alias `GeminiPart` is an object `{ text: string }`)
-- Rule: MISTAKES.md Documentation/JSDoc — deprecation notes must accurately describe the migration path; misleading guidance is worse than no guidance
-- Context: Suggestion S1 (round 3) — `GeminiPart` deprecation note "Use `ConversationTurn['text']` instead" would mislead consumers into replacing `{ text: string }` with `string`. Rewrote the JSDoc on both `src/index.ts` and `src/index.client.ts` to explain that `parts: GeminiPart[]` was flattened into `text: string` on `ConversationTurn` and that the type has no direct equivalent.
-
 - Violation: `@port` tag placed on file-level module JSDoc instead of the actual port interface/type JSDoc
 - Rule: domain/CLAUDE.md "Authoring rules" — "Tag the interface JSDoc with `@port` so adapters and reviewers can identify it"; the tag must annotate the port contract, not the module header
 - Context: Suggestion S2 (round 4) — `src/domain/ports/aiProvider.ts` had `@port` on the file-leading block comment, but the port contract is `CallAiProvider` at the bottom of the file. Tools / readers scanning for `@port` on type declarations (matching the `CacheProvider` example) would miss it. Moved the tag onto the `CallAiProvider` type JSDoc and kept the module-level prose as a plain header.
@@ -121,11 +117,52 @@
   Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
   Fixed in R2: Added dated changelog row documenting the new public exports
 
-## [PR #194 R3 | feat/prompt-numeric-audit | 2026-09-11] — Macro briefing cache key prompt-version blocker
+## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 hotfix: import, JSON parsing
 
-- Violation (BLOCKER R3): `src/infrastructure/cache/config.ts` — `buildMacroBriefingCacheKey` missing `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION` segment despite `macroBriefingPrompt.ts` output change in this PR (numeric format support added).
-- Rule: MISTAKES.md Infrastructure Functions 6 — cache builders' template/prompt versions must be incremented when rendered bytes change; keys must include version segment to bust stale entries.
-- Context: Sibling builder `buildBriefingCacheKey` was correctly bumped in same PR. Macro briefing was overlooked. Audit on review: all 14 `build*Key` functions in config.ts verified; macro-briefing was sole LLM-output key missing version interpolation.
-- Fixed in R3: Added `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1'`, appended to key interpolation, updated corresponding tests. Full sibling audit completed and documented in MISTAKES.md §Infrastructure Functions 6 recurrence note.
+- Violation 1: `import type` placed after declarations in analysisUtils.ts instead of at top of file
+  Rule: CONVENTIONS.md — import-types-at-top
+  Context: Import type statements must be grouped at the top of the file before other code and declarations. Fixed in Round 1 hotfix.
+
+- Violation 2: JSON salvage algorithm too broad — scanned for first `{` anywhere in text
+  Rule: Infrastructure safety — JSON parsing validation
+  Context: JSON salvage function risked false positives from prose containing `{}` stray pairs. Restricted scan to text starting with `{`, reducing false parse attempts. Fixed in Round 1 hotfix.
+
+## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 main: overloads
+
+- Violation 5: Legacy positional overloads (buildChatPrompt 6-arg, buildNewsAnalysisPrompt 4/5-arg) changed default behavior (currency) without JSDoc or tests
+  Rule: TypeScript — API contract documentation on silent behavior changes
+  Context: Functions support legacy positional call signatures for backwards compatibility, but currency default logic changed. JSDoc updates and test coverage added to document new behavior and prevent regression. Fixed in Round 1 main.
+
+## [Branch fix/prompt-precision-currency | 2026-09-11] — Lesson: Real-data validation required for prompt changes
+
+- Lesson (non-blocker, verification finding): Prompt-number changes must be validated by rendering real data and comparing distributions, not only by unit tests
+  Rule: Testing best practice — prompt logic verification scope
+  Context: Audit recommendation to floor structural risk:reward leg at one mean bar range passed all 90+ unit tests but, when rendered over real market data (90 charts), flipped 34 verdicts from >= 1.0 to < 1.0 and made verdict sentences false. Recommendation was removed post-R1. Unit test coverage is insufficient for prompt calculations involving conditional defaults or output transformations. Rendering real data distributions before deployment is mandatory.
+
+## [PR #196 | fix/prompt-precision-currency | 2026-09-11] — Round 1 findings
+
+- Violation 1: `PLAIN_NUMBER_SIGNIFICANT_DIGITS` constant changed from 10 to 15 in promptFormat.ts, affecting formatPlainNumber; importers macroBriefingPrompt.ts and economicEventPrompt.ts had cache version constants not updated (MACRO_BRIEFING p1→p2, ECONOMIC_EVENT p4→p5 missed)
+  Rule: MISTAKES Infrastructure Functions #6 — cache template version must be bumped when rendered bytes change
+  Context: Shared formatter constant change ripples to cache versions of all using prompts. Lesson: for every changed definition in a shared prompt-format module, `git grep -l <name>` its importers and verify each cache version constant reflects the output change. Fixed in R1 by bumping both cache versions.
+
+## [PR #196 | fix/prompt-precision-currency | 2026-09-11] — Round 2 findings
+
+- Violation 4: `callAnalysisAi` rethrow of non-SyntaxError from `normalizeJsonResponse` was untested
+  Rule: MISTAKES Infrastructure Functions #2 — unreachable-looking guard/throw branches still need a test
+  Context: Guard branches appear dead but handle edge cases; exhaustive test of error branches required. Fixed in R2 by adding test case exercising the rethrow path.
+
+- Violation 5: `meanBarRangePercent` reimplemented bar validity (`close > 0 && high >= low`) instead of reusing `hasUsablePrices` helper introduced by the same PR
+  Rule: Single-entry-point helper reuse — shared guard/utility helper must be called from all internal callers, not reimplemented
+  Context: Same PR introduced `hasUsablePrices` but one helper in the same module reimplemented the same logic. Fixed in R2 by calling `hasUsablePrices`.
+
+## [PR #196 R3 | fix/prompt-precision-currency | 2026-09-11] — Round 3 findings
+
+- Violation 1: Import members not alphabetically ordered
+  Rule: MISTAKES #13.5 — import members not alphabetically ordered
+  Context: CurrencyCode was inserted after AssetClass instead of between ChartPatternId and FearGreedSnapshot in src/domain/analysis/prompt.ts. Recurrence of same violation pattern.
+
+- Violation 2: New branch without dedicated test
+  Rule: MISTAKES Tests #5.5 — new branch without dedicated test
+  Context: roundLabel's `mantissaIsWhole ? 0 : 1` decimal choice in src/domain/analysis/referenceLevels.ts was covered only by 2.5-mantissa steps, so removing the branch stayed green. Added whole-mantissa label tests (250 → step 5, 50 → step 1, 0.25 → step 0.005), verified by reverting the branch. Third occurrence in this PR.
 
 

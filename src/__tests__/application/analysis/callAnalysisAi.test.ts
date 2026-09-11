@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as normalizeJsonResponseModule from '@/infrastructure/ai/normalizeJsonResponse';
 
 vi.mock('@/infrastructure/ai/retry/anthropicRetry', () => ({
     callClaudeWithRetry: vi.fn(),
@@ -349,5 +350,81 @@ describe('callAnalysisAi — 응답 처리', () => {
             correlationId: 'corr-1',
         });
         expect(geminiOptions().jobId).toBe('corr-1');
+    });
+});
+
+describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
+    // jsonrepair도 못 살리는 페이로드 — 실측으로 SyntaxError를 던진다.
+    const UNSALVAGEABLE = '{"a":1,,,,"b":}';
+
+    it('JSON으로 살릴 수 없는 응답이면 한 번 다시 생성한다', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.mocked(callDeepSeekWithRetry)
+            .mockResolvedValueOnce(UNSALVAGEABLE)
+            .mockResolvedValueOnce(OK);
+
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).resolves.toBe(OK);
+
+        expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
+        expect(warn).toHaveBeenCalledWith(
+            '[callAnalysisAi] response was not parseable JSON; regenerating once',
+            expect.objectContaining({ model: DEEPSEEK_FREE })
+        );
+        warn.mockRestore();
+    });
+
+    it('재생성도 살릴 수 없으면 SyntaxError를 던지고 세 번째 호출은 하지 않는다', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.mocked(callDeepSeekWithRetry).mockResolvedValue(UNSALVAGEABLE);
+
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).rejects.toBeInstanceOf(SyntaxError);
+
+        expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
+        warn.mockRestore();
+    });
+
+    it('뒤에 중복이 붙어도 살릴 수 있으면 재생성하지 않는다', async () => {
+        vi.mocked(callDeepSeekWithRetry).mockResolvedValueOnce(`${OK}\n${OK}`);
+
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).resolves.toBe(OK);
+
+        expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('빈 재생성 응답은 빈 응답 오류로 드러낸다', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.mocked(callDeepSeekWithRetry)
+            .mockResolvedValueOnce(UNSALVAGEABLE)
+            .mockResolvedValueOnce('   ');
+
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).rejects.toThrow('AI returned an empty response');
+        warn.mockRestore();
+    });
+
+    it('SyntaxError가 아닌 오류는 재생성 없이 그대로 다시 던진다', async () => {
+        // The `!(error instanceof SyntaxError)` guard exists precisely so a
+        // programming error inside normalization (not a malformed-JSON
+        // response) fails loudly instead of being spent on a wasted retry.
+        const normalizeSpy = vi
+            .spyOn(normalizeJsonResponseModule, 'normalizeJsonResponse')
+            .mockImplementation(() => {
+                throw new TypeError('boom');
+            });
+        vi.mocked(callDeepSeekWithRetry).mockResolvedValue(OK);
+
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).rejects.toThrow(TypeError);
+
+        expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(1);
+        normalizeSpy.mockRestore();
     });
 });

@@ -154,9 +154,20 @@ async function callDeepSeekResponses(
     // 다른 입구로 다시 내는 셈이다. 완료를 **관측했을 때만** 완료로 친다.
     let outcome: DeepSeekResponsesResult['outcome'] = 'no_terminal';
     let incompleteReason: string | undefined;
+    // Characters per (output_index:content_index) part. Diagnostic only — text is
+    // still concatenated in stream order. Production saw complete JSON followed by
+    // extra content after the Responses-API switch; if that comes from a second
+    // output part, this log says so. Dropping parts here instead would truncate a
+    // legitimately split answer, so the recovery lives in `normalizeJsonResponse`.
+    const charsByPart = new Map<string, number>();
     for await (const event of stream) {
         if (event.type === OUTPUT_TEXT_DELTA) {
             text += event.delta;
+            const part = `${event.output_index}:${event.content_index}`;
+            charsByPart.set(
+                part,
+                (charsByPart.get(part) ?? 0) + event.delta.length
+            );
         }
         if (
             event.type === 'response.completed' ||
@@ -176,6 +187,15 @@ async function callDeepSeekResponses(
                 incompleteReason = event.response.error?.message;
             }
         }
+    }
+    if (charsByPart.size > 1) {
+        console.warn(
+            '[DeepSeek] Responses stream emitted text in more than one output part',
+            {
+                model: spec.apiModelId,
+                parts: Object.fromEntries(charsByPart),
+            }
+        );
     }
     return { text, usage, outcome, incompleteReason };
 }

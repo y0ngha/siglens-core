@@ -1,3 +1,4 @@
+import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
 import { calculateIndicators } from '@/domain/indicators';
 import type { BarsData, Timeframe } from '@/domain/types';
 import {
@@ -53,12 +54,23 @@ export async function fetchBarsWithIndicators(
 ): Promise<BarsData> {
     const fromDay = computeFromDay(timeframe, now);
     const limit = TIMEFRAME_BARS_LIMIT[timeframe];
-    const bars = await provider.getBars({
+    const rawBars = await provider.getBars({
         symbol: fmpSymbol ?? symbol,
         timeframe,
         limit,
         from: fromDay,
     });
+    // Single choke point for every analysis path and both consumers — see
+    // `hasUsablePrices` for the placeholder bars this removes.
+    const bars = rawBars.filter(hasUsablePrices);
+    if (bars.length < rawBars.length) {
+        console.warn('[barsApi] dropped bars without usable OHLC prices', {
+            symbol,
+            timeframe,
+            dropped: rawBars.length - bars.length,
+            kept: bars.length,
+        });
+    }
 
     const indicators = calculateIndicators(bars);
     return { bars, indicators };

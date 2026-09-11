@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+    differenceDecimalPlaces,
     equityListingContext,
     extractJsonFromLlmResponse,
     formatBarDateTime,
@@ -8,10 +9,9 @@ import {
     formatPlainNumber,
     formatPrice,
     formatSignedPercent,
-    isKrxListedSymbol,
-    listingCurrency,
     parseLlmPayload,
     priceDecimalPlaces,
+    sharedPriceDecimalPlaces,
     stripLlmJsonFence,
 } from '@/domain/analysis/promptFormat';
 
@@ -171,30 +171,15 @@ describe('formatNullableNumber', () => {
     });
 });
 
-describe('isKrxListedSymbol / listingCurrency', () => {
-    it('recognizes six-digit KOSPI and KOSDAQ symbols', () => {
-        expect(isKrxListedSymbol('005930.KS')).toBe(true);
-        expect(isKrxListedSymbol('247540.KQ')).toBe(true);
-        expect(listingCurrency('005930.KS')).toBe('KRW');
-    });
-
-    it('treats everything else as a USD listing', () => {
-        for (const symbol of ['AAPL', 'BTCUSD', '5930.KS', '005930.T']) {
-            expect(isKrxListedSymbol(symbol)).toBe(false);
-            expect(listingCurrency(symbol)).toBe('USD');
-        }
-    });
-});
-
 describe('equityListingContext', () => {
-    it('keeps the U.S. framing byte-identical', () => {
-        expect(equityListingContext('AAPL')).toBe(
-            'This is a publicly traded U.S. equity.'
-        );
+    it('keeps the U.S. framing byte-identical for USD and by default', () => {
+        const us = 'This is a publicly traded U.S. equity.';
+        expect(equityListingContext()).toBe(us);
+        expect(equityListingContext('USD')).toBe(us);
     });
 
-    it('frames a KRX symbol as a won-quoted Korean listing', () => {
-        const context = equityListingContext('005930.KS');
+    it('frames a KRW quote as a won-quoted Korean listing', () => {
+        const context = equityListingContext('KRW');
         expect(context).toContain('KRX');
         expect(context).toContain('KRW');
         expect(context).not.toContain('publicly traded U.S. equity');
@@ -215,7 +200,18 @@ describe('priceDecimalPlaces', () => {
     });
 
     it('caps the decimals for a near-zero price', () => {
-        expect(priceDecimalPlaces(1e-12)).toBe(10);
+        expect(priceDecimalPlaces(1e-20)).toBe(15);
+        // A meme-coin quote the old ceiling of 10 truncated to two significant digits.
+        expect(priceDecimalPlaces(0.00000001234)).toBe(11);
+    });
+
+    it('keeps five significant digits for crypto, never below cent precision', () => {
+        // 5-minute XRP bars near 2.50 move in the third decimal.
+        expect(priceDecimalPlaces(2.5012, 'USD', 'crypto')).toBe(4);
+        expect(priceDecimalPlaces(15.2, 'USD', 'crypto')).toBe(3);
+        expect(priceDecimalPlaces(0.08359, 'USD', 'crypto')).toBe(6);
+        expect(priceDecimalPlaces(3000, 'USD', 'crypto')).toBe(2);
+        expect(priceDecimalPlaces(77107, 'USD', 'crypto')).toBe(2);
     });
 
     it('renders KRW in whole won regardless of magnitude', () => {
@@ -227,6 +223,43 @@ describe('priceDecimalPlaces', () => {
         for (const v of [null, undefined, Number.NaN, 0, -3]) {
             expect(priceDecimalPlaces(v)).toBe(2);
         }
+    });
+});
+
+describe('differenceDecimalPlaces', () => {
+    it('keeps three significant digits of the difference scale', () => {
+        // A 1,000-won KRX stock with ATR 30: whole won would print a -0.4 histogram as 0.
+        expect(differenceDecimalPlaces(30, 0)).toBe(1);
+        expect(differenceDecimalPlaces(0.05, 2)).toBe(4);
+    });
+
+    it('never uses fewer decimals than the prices', () => {
+        expect(differenceDecimalPlaces(5000, 0)).toBe(0);
+        expect(differenceDecimalPlaces(500, 2)).toBe(2);
+    });
+
+    it('falls back to the price precision for an unusable scale', () => {
+        for (const v of [null, undefined, Number.NaN, 0, -1]) {
+            expect(differenceDecimalPlaces(v, 3)).toBe(3);
+        }
+    });
+});
+
+describe('sharedPriceDecimalPlaces', () => {
+    it('takes the precision the smallest usable price needs', () => {
+        // Per-level precision printed `0.9950` beside `1.01` in one list.
+        expect(sharedPriceDecimalPlaces([1.01, 0.995, 1.2])).toBe(4);
+        expect(sharedPriceDecimalPlaces([320, 310.5])).toBe(2);
+    });
+
+    it('ignores unusable prices and falls back to cent precision when none remain', () => {
+        expect(sharedPriceDecimalPlaces([0, Number.NaN, 250])).toBe(2);
+        expect(sharedPriceDecimalPlaces([])).toBe(2);
+    });
+
+    it('honours the currency and asset class', () => {
+        expect(sharedPriceDecimalPlaces([269500, 0.5], 'KRW')).toBe(0);
+        expect(sharedPriceDecimalPlaces([2.5, 2.6], 'USD', 'crypto')).toBe(4);
     });
 });
 
@@ -255,6 +288,23 @@ describe('formatLargeAmount', () => {
 
     it('renders a small amount unscaled', () => {
         expect(formatLargeAmount(12_345, 'USD')).toBe('12345 USD');
+    });
+
+    it('picks the scale after rounding', () => {
+        expect(formatLargeAmount(999_950_000, 'USD')).toBe('1.0B USD');
+        expect(formatLargeAmount(-999_999_700, 'USD')).toBe('-1.0B USD');
+        expect(formatLargeAmount(999_949_999, 'USD')).toBe('999.9M USD');
+        // Rounding at the larger scale must not swallow real precision.
+        expect(formatLargeAmount(960_000_000, 'USD')).toBe('960.0M USD');
+        expect(formatLargeAmount(999_999.6, 'USD')).toBe('1.0M USD');
+        expect(formatLargeAmount(0, 'USD')).toBe('0 USD');
+    });
+
+    it('accepts any reporting currency and omits the label when unknown', () => {
+        // TSM files in TWD; labelling its statements USD was a 30× error.
+        expect(formatLargeAmount(2_900_000_000_000, 'TWD')).toBe('2.9T TWD');
+        expect(formatLargeAmount(2_900_000_000_000)).toBe('2.9T');
+        expect(formatLargeAmount(12_345)).toBe('12345');
     });
 
     it('renders a missing or non-finite amount as N/A', () => {
@@ -291,6 +341,12 @@ describe('formatPlainNumber', () => {
     it('strips binary float noise', () => {
         expect(formatPlainNumber(0.30000000000000004)).toBe('0.3');
         expect(formatPlainNumber(3.4000000000000004)).toBe('3.4');
+    });
+
+    it('keeps digits beyond the 10th significant digit on large published figures', () => {
+        // The old 10-significant-digit rule rendered this '29723864120',
+        // cutting off the real trailing '3.45'.
+        expect(formatPlainNumber(29723864123.45)).toBe('29723864123.45');
     });
 
     it('renders a missing or non-finite figure as N/A', () => {
