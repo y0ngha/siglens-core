@@ -143,4 +143,24 @@
   Rule: Testing best practice — prompt logic verification scope
   Context: Audit recommendation to floor structural risk:reward leg at one mean bar range passed all 90+ unit tests but, when rendered over real market data (90 charts), flipped 34 verdicts from >= 1.0 to < 1.0 and made verdict sentences false. Recommendation was removed post-R1. Unit test coverage is insufficient for prompt calculations involving conditional defaults or output transformations. Rendering real data distributions before deployment is mandatory.
 
+## [PR #196 | fix/prompt-precision-currency | 2026-09-11] — Round 1 findings
+
+- Violation 1: `PLAIN_NUMBER_SIGNIFICANT_DIGITS` constant changed from 10 to 15 in promptFormat.ts, affecting formatPlainNumber; importers macroBriefingPrompt.ts and economicEventPrompt.ts had cache version constants not updated (MACRO_BRIEFING p1→p2, ECONOMIC_EVENT p4→p5 missed)
+  Rule: MISTAKES Infrastructure Functions #6 — cache template version must be bumped when rendered bytes change
+  Context: Shared formatter constant change ripples to cache versions of all using prompts. Lesson: for every changed definition in a shared prompt-format module, `git grep -l <name>` its importers and verify each cache version constant reflects the output change. Fixed in R1 by bumping both cache versions.
+
+## [PR #196 | fix/prompt-precision-currency | 2026-09-11] — Round 2 findings
+
+- Violation 4: `callAnalysisAi` rethrow of non-SyntaxError from `normalizeJsonResponse` was untested
+  Rule: MISTAKES Infrastructure Functions #2 — unreachable-looking guard/throw branches still need a test
+  Context: Guard branches appear dead but handle edge cases; exhaustive test of error branches required. Fixed in R2 by adding test case exercising the rethrow path.
+
+- Violation 5: `meanBarRangePercent` reimplemented bar validity (`close > 0 && high >= low`) instead of reusing `hasUsablePrices` helper introduced by the same PR
+  Rule: Single-entry-point helper reuse — shared guard/utility helper must be called from all internal callers, not reimplemented
+  Context: Same PR introduced `hasUsablePrices` but one helper in the same module reimplemented the same logic. Fixed in R2 by calling `hasUsablePrices`.
+
+- Violation 6: `SubmitAnalysisOptions.currency` JSDoc still claimed old cache entries keep dollar text until TTL, which the p13 bump made false
+  Rule: MISTAKES Documentation/JSDoc — JSDoc must stay synchronized with code behavior changes
+  Context: Rewritten JSDoc as explicit caller contract (same currency per symbol) to reflect the cache bump truth. Fixed in R2.
+
 

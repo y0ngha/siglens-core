@@ -87,10 +87,11 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      *
      * ⚠️ Deliberately NOT part of the analysis cache key. Currency is a fixed
      * property of a symbol, so two requests for the same symbol cannot
-     * disagree on it, and folding it into the key would invalidate every
-     * existing entry for no benefit. The cost of that choice: entries written
-     * *before* this field existed keep the old dollar-prefixed text until
-     * their TTL expires.
+     * disagree on it, and folding it into the key would change the key shape
+     * every consumer peeks with for no benefit. That makes it a caller
+     * contract: always pass the same currency for a given symbol. A caller
+     * that varied it would have one symbol's framing, precision and pivot
+     * calendar served from whichever request wrote the entry first.
      */
     currency?: CurrencyCode;
     /**

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as normalizeJsonResponseModule from '@/infrastructure/ai/normalizeJsonResponse';
 
 vi.mock('@/infrastructure/ai/retry/anthropicRetry', () => ({
     callClaudeWithRetry: vi.fn(),
@@ -406,5 +407,24 @@ describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
             callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
         ).rejects.toThrow('AI returned an empty response');
         warn.mockRestore();
+    });
+
+    it('SyntaxError가 아닌 오류는 재생성 없이 그대로 다시 던진다', async () => {
+        // The `!(error instanceof SyntaxError)` guard exists precisely so a
+        // programming error inside normalization (not a malformed-JSON
+        // response) fails loudly instead of being spent on a wasted retry.
+        const normalizeSpy = vi
+            .spyOn(normalizeJsonResponseModule, 'normalizeJsonResponse')
+            .mockImplementation(() => {
+                throw new TypeError('boom');
+            });
+        vi.mocked(callDeepSeekWithRetry).mockResolvedValue(OK);
+
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).rejects.toThrow(TypeError);
+
+        expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(1);
+        normalizeSpy.mockRestore();
     });
 });

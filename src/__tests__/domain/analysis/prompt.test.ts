@@ -310,6 +310,46 @@ describe('prompt', () => {
             expect(prompt).not.toContain('## Current Market Status');
             expect(prompt).not.toContain('- Current Price:');
         });
+
+        it('마지막 봉의 거래량이 NaN이면 N/A로 표시된다 (NaN이 아니다)', () => {
+            const bars = [{ ...makeBar(0), volume: Number.NaN }];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain('Volume: N/A');
+            expect(result).not.toContain('Volume: NaN');
+        });
+    });
+
+    describe('장기 컨텍스트 섹션 - high/low에 NaN이 섞여 있을 때', () => {
+        it('유한한 값들만으로 계산한 최고/최저를 표시한다 (N/A나 NaN이 아니다)', () => {
+            const bars = [
+                makeBar(0),
+                { ...makeBar(1), high: Number.NaN },
+                { ...makeBar(2), low: Number.NaN },
+            ];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                []
+            );
+            // bar1.high is NaN → excluded; finite highs are bar0/bar2.
+            const expectedHigh = Math.max(bars[0].high, bars[2].high).toFixed(
+                2
+            );
+            // bar2.low is NaN → excluded; finite lows are bar0/bar1.
+            const expectedLow = Math.min(bars[0].low, bars[1].low).toFixed(2);
+            expect(result).toContain(`Period High: ${expectedHigh}`);
+            expect(result).toContain(`Period Low: ${expectedLow}`);
+            expect(result).not.toContain('Period High: N/A');
+            expect(result).not.toContain('Period Low: N/A');
+        });
     });
 
     describe('인디케이터 수치 섹션', () => {
@@ -1609,6 +1649,60 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain('cumulative');
+        });
+
+        it('매수+매도 거래량 합이 0이면 비율은 N/A다 (0%가 아니다)', () => {
+            const bars = [makeBar(0)];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({
+                    buySellVolume: [{ buyVolume: 0, sellVolume: 0 }],
+                }),
+                []
+            );
+            expect(result).toContain('Buy ratio: N/A');
+            expect(result).not.toContain('N/A%');
+            expect(result).not.toContain('NaN%');
+        });
+
+        it('매수 거래량이 NaN이면 비율은 N/A다 (NaN%가 아니다)', () => {
+            const bars = [makeBar(0)];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({
+                    buySellVolume: [{ buyVolume: Number.NaN, sellVolume: 0 }],
+                }),
+                []
+            );
+            expect(result).toContain('Buy ratio: N/A');
+            expect(result).not.toContain('N/A%');
+            expect(result).not.toContain('NaN%');
+        });
+
+        // A negative total (corrupt upstream volume data) is the case that
+        // actually exercises `shareOf`'s own `total > 0` guard: unlike the
+        // 0/NaN cases above — where `formatNullableNumber`'s own
+        // `Number.isFinite` check already renders 'N/A' regardless of this
+        // guard — a negative total divides to a finite, non-zero number that
+        // would otherwise print as a plausible (but meaningless) ratio.
+        it('총 거래량이 음수(오염된 데이터)면 비율은 N/A다 (유한한 오답이 아니다)', () => {
+            const bars = [makeBar(0)];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({
+                    buySellVolume: [{ buyVolume: 100, sellVolume: -150 }],
+                }),
+                []
+            );
+            expect(result).toContain('Buy ratio: N/A');
+            expect(result).not.toContain('N/A%');
+            expect(result).not.toContain('NaN%');
         });
     });
 

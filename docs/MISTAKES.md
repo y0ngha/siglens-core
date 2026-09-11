@@ -469,10 +469,15 @@ and have been removed from this file.
    → When code introduces a new if/guard condition (edge check, retry path, type narrowing), each branch needs an explicit test case
    → The test must directly assert the branch behavior; incidental exercising via other test cases is insufficient
    → Applies to guard conditions (atr <= 0, span <= 0), sentinel checks, retry/fallback paths, and type-narrowing branches
+   → Guard test must use an input that ONLY the guard rejects, not an input already rejected by earlier checks in the same function
+      Example: formatNullableNumber already converts NaN→'N/A', so NaN input doesn't prove shareOf's `total > 0` guard;
+      use negative total instead (only the guard rejects it). Verify guard necessity by reverting it; the test must fail.
    ❌ classifyHeadAndShoulders adds atr <= 0 guard, but no dedicated test case (sibling classifiers have this, H&S doesn't)
    ❌ Retry-window logic (-6,-1 pivot window) added but only exercised incidentally; never directly asserted
+   ❌ Test guards with inputs already handled upstream (NaN when formatNullableNumber handles NaN) — doesn't prove the guard
    ✅ Add test: classifyHeadAndShoulders(hdsBars) with atr <= 0 and atr > 0 both cases
    ✅ Add test: 6-pivot scenario where last-5-window fails but full-6-pivot window detects pattern (retry asserted)
+   ✅ Test guards with inputs ONLY the guard rejects (negative total for shareOf, open:0 for pivotSourceBar)
 
 6. Test duplication — each it() must test exactly one unique behavior
 

@@ -1,3 +1,4 @@
+import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
 import {
     MAX_REFERENCE_LEVELS_PER_SIDE,
     RATIO_TO_PERCENT,
@@ -253,7 +254,7 @@ const MAX_AT_PRICE_LEVELS_PER_SIDE = 2;
 export function meanBarRangePercent(bars: readonly Bar[]): number {
     const ranges = bars
         .slice(-ATR_DEFAULT_PERIOD)
-        .filter(b => b.close > 0 && b.high >= b.low)
+        .filter(b => hasUsablePrices(b) && b.high >= b.low)
         .map(b => ((b.high - b.low) / b.close) * RATIO_TO_PERCENT);
     if (ranges.length === 0) return 0;
     return ranges.reduce((sum, r) => sum + r, 0) / ranges.length;

@@ -147,6 +147,30 @@ describe('meanBarRangePercent', () => {
         expect(meanBarRangePercent([bar(102, 98, 0)])).toBe(0);
         expect(meanBarRangePercent([])).toBe(0);
     });
+
+    it('excludes a bar with an unusable open even when close/high/low are fine (reuses hasUsablePrices)', () => {
+        // A wide, distinct high/low on the bad-open bar makes an accidental
+        // inclusion visible in the mean instead of coincidentally matching.
+        const badZeroOpen: Bar = {
+            time: 0,
+            open: 0,
+            high: 110,
+            low: 90,
+            close: 100,
+            volume: 1,
+        };
+        const badNaNOpen: Bar = {
+            time: 0,
+            open: Number.NaN,
+            high: 110,
+            low: 90,
+            close: 100,
+            volume: 1,
+        };
+        const good = bar(102, 98, 100); // range% = 4
+        expect(meanBarRangePercent([badZeroOpen, good])).toBe(4);
+        expect(meanBarRangePercent([badNaNOpen, good])).toBe(4);
+    });
 });
 
 describe('collectIndicatorLevels', () => {
