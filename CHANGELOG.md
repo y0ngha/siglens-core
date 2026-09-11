@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.4](https://github.com/y0ngha/siglens-core/compare/v1.0.3...v1.0.4) (2026-09-11)
+
+
+### Bug Fixes
+
+* **ai:** DeepSeek 연결된 JSON 응답 복구·1회 재생성, 가격 없는 봉 필터 ([3a097f1](https://github.com/y0ngha/siglens-core/commit/3a097f12ed585b07c7603bf5ea0c03395781487f))
+* **cache:** 매크로 브리핑·경제 이벤트 프롬프트 버전 bump, 일봉 피벗 가드 테스트 ([a63b16e](https://github.com/y0ngha/siglens-core/commit/a63b16e918d141dedf6ac0ad86e21f25e3ab30ef))
+* **prompt:** 가격 정밀도·통화 공급 계약·at-price 레벨 (감사 P1/P2) ([7fbae69](https://github.com/y0ngha/siglens-core/commit/7fbae69580dbe379c9d7074e817259d712719117))
+
 ## [1.0.3](https://github.com/y0ngha/siglens-core/compare/v1.0.2...v1.0.3) (2026-09-11)
 
 
