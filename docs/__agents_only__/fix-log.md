@@ -76,10 +76,6 @@
 - Context: Round 3 Blocker B1 — `UsageCounts` is `UsageRepository.getUsageToday`'s return DTO, mirroring `UsageLogRecord` (already moved). Co-location is reserved for option/argument types (`RecordUsageInput`, `CreateUsageLogInput`). Moved interface to `domain/types.ts` Usage Tracking section, updated imports in `usageRepository.ts` + `application/usage/limits.ts`, and synced symbol tables in `domain/CLAUDE.md`, `docs/ARCHITECTURE.md`, and `src/index.ts` re-exports.
 
 ## [PR #92 | refactor/ports-ai-module | 2026-05-22]
-- Violation: `@deprecated` JSDoc migration hint points to a non-equivalent type (`ConversationTurn['text']` is `string`, but the deprecated alias `GeminiPart` is an object `{ text: string }`)
-- Rule: MISTAKES.md Documentation/JSDoc — deprecation notes must accurately describe the migration path; misleading guidance is worse than no guidance
-- Context: Suggestion S1 (round 3) — `GeminiPart` deprecation note "Use `ConversationTurn['text']` instead" would mislead consumers into replacing `{ text: string }` with `string`. Rewrote the JSDoc on both `src/index.ts` and `src/index.client.ts` to explain that `parts: GeminiPart[]` was flattened into `text: string` on `ConversationTurn` and that the type has no direct equivalent.
-
 - Violation: `@port` tag placed on file-level module JSDoc instead of the actual port interface/type JSDoc
 - Rule: domain/CLAUDE.md "Authoring rules" — "Tag the interface JSDoc with `@port` so adapters and reviewers can identify it"; the tag must annotate the port contract, not the module header
 - Context: Suggestion S2 (round 4) — `src/domain/ports/aiProvider.ts` had `@port` on the file-leading block comment, but the port contract is `CallAiProvider` at the bottom of the file. Tools / readers scanning for `@port` on type declarations (matching the `CacheProvider` example) would miss it. Moved the tag onto the `CallAiProvider` type JSDoc and kept the module-level prose as a plain header.
@@ -159,8 +155,14 @@
   Rule: Single-entry-point helper reuse — shared guard/utility helper must be called from all internal callers, not reimplemented
   Context: Same PR introduced `hasUsablePrices` but one helper in the same module reimplemented the same logic. Fixed in R2 by calling `hasUsablePrices`.
 
-- Violation 6: `SubmitAnalysisOptions.currency` JSDoc still claimed old cache entries keep dollar text until TTL, which the p13 bump made false
-  Rule: MISTAKES Documentation/JSDoc — JSDoc must stay synchronized with code behavior changes
-  Context: Rewritten JSDoc as explicit caller contract (same currency per symbol) to reflect the cache bump truth. Fixed in R2.
+## [PR #196 R3 | fix/prompt-precision-currency | 2026-09-11] — Round 3 findings
+
+- Violation 1: Import members not alphabetically ordered
+  Rule: MISTAKES #13.5 — import members not alphabetically ordered
+  Context: CurrencyCode was inserted after AssetClass instead of between ChartPatternId and FearGreedSnapshot in src/domain/analysis/prompt.ts. Recurrence of same violation pattern.
+
+- Violation 2: New branch without dedicated test
+  Rule: MISTAKES Tests #5.5 — new branch without dedicated test
+  Context: roundLabel's `mantissaIsWhole ? 0 : 1` decimal choice in src/domain/analysis/referenceLevels.ts was covered only by 2.5-mantissa steps, so removing the branch stayed green. Added whole-mantissa label tests (250 → step 5, 50 → step 1, 0.25 → step 0.005), verified by reverting the branch. Third occurrence in this PR.
 
 

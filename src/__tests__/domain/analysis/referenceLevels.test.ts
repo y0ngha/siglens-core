@@ -85,6 +85,20 @@ describe('roundNumberLevels', () => {
             shib.every(p => p > 0 && Math.abs(p - shibPrice) / shibPrice < 0.15)
         ).toBe(true);
     });
+    it('drops the trailing decimal for whole-mantissa steps (1x/5x10ⁿ)', () => {
+        // 250 -> step 5 (mantissa 5, whole): dp should be 0, not the 1 used for 2.5x steps.
+        expect(stepAt(250)).toBe(5);
+        expect(roundNumberLevels(250).map(l => l.label)).toContain('Round 250');
+        // 50 -> step 1 (mantissa 1, whole).
+        expect(stepAt(50)).toBe(1);
+        expect(roundNumberLevels(50).map(l => l.label)).toContain('Round 50');
+        // 0.25 -> step 0.005 (mantissa 5, whole, sub-unit): decimals follow the step's own
+        // precision (3dp), not the fixed 4dp a 2.5x step like 0.0825's gets.
+        expect(stepAt(0.25)).toBe(0.005);
+        expect(roundNumberLevels(0.25).map(l => l.label)).toContain(
+            'Round 0.250'
+        );
+    });
 });
 
 describe('splitBySide', () => {
