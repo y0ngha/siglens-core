@@ -3,15 +3,23 @@ import {
     buildAgentSystemPrompt,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
-import { findToolSpec, selectTools } from '@/domain/agent/tools';
+import {
+    findToolSpec,
+    isFreshAnalysisKind,
+    selectTools,
+    type FreshAnalysisKind,
+} from '@/domain/agent/tools';
 import { validateArgs } from '@/domain/agent/validateArgs';
 import type { AgentMessage, AgentToolCall } from '@/domain/ports/agentProvider';
-import type { CounterStore } from '@/domain/ports/counterStore';
-import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
+import {
+    CounterStoreUnavailableError,
+    type CounterStore,
+} from '@/domain/ports/counterStore';
 import { isPremiumModel } from '@/domain/tier';
 import type { NormalizedUsage } from '@/domain/types';
 import { getEtSessionStatus } from '@/domain/utils';
 import { classifyProviderError } from '@/application/shared/providerError';
+import { PREMIUM_MODEL_USAGE_ACTION } from '@/application/shared/usageActions';
 import {
     AGENT_GLOBAL_LIMITS,
     AGENT_TURN_CAPS,
@@ -34,13 +42,12 @@ const HISTORY_WINDOW = {
     budgetTokens: 32_000,
 } as const;
 /** Measured medians (spec §4-2) surfaced to the UI as a progress hint. */
-const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<string, number> = {
+const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<FreshAnalysisKind, number> = {
     technical: 40,
     overall: 120,
     news: 90,
     options: 60,
 };
-const PREMIUM_USAGE_ACTION = 'premium_model';
 const GLOBAL_SUBJECT = 'global';
 const MAX_SUMMARY_LENGTH = 120;
 
@@ -383,9 +390,10 @@ export async function runAgentTurn(
             return serialize({ error: 'aborted' });
         }
 
+        const kind = validated.value.kind;
         const estimatedSeconds =
-            call.name === 'run_fresh_analysis'
-                ? FRESH_ANALYSIS_ESTIMATED_SECONDS[String(validated.value.kind)]
+            call.name === 'run_fresh_analysis' && isFreshAnalysisKind(kind)
+                ? FRESH_ANALYSIS_ESTIMATED_SECONDS[kind]
                 : undefined;
         deps.onEvent({
             type: 'tool_start',
@@ -497,7 +505,7 @@ export async function runAgentTurn(
                             userId,
                             // Deliberate: the agent premium quota lives in the premiumTurns counter and a UUID never collides with IP-hash counts; revisit when premium models are enabled.
                             ipHash: userId,
-                            actionType: PREMIUM_USAGE_ACTION,
+                            actionType: PREMIUM_MODEL_USAGE_ACTION,
                             modelUsed: params.model,
                             date: now.toISOString().slice(0, 10),
                         });

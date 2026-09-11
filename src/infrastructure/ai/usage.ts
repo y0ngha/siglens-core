@@ -9,8 +9,6 @@
  */
 import type { NormalizedUsage } from '@/domain/types';
 
-export type { NormalizedUsage };
-
 // Frozen module-scoped singleton — extractors return a fresh spread copy
 // (`{ ...ZERO_USAGE }`) so no caller can mutate shared state; the freeze is a
 // defense-in-depth belt so a direct-reference regression fails loudly.

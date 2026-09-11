@@ -62,6 +62,41 @@ describe('selectHistoryWindow', () => {
         expect(out.some(m => m.toolCalls?.[0]?.id === 'c0')).toBe(true);
     });
 
+    it('오래된 턴의 툴 결과가 JSON이 아니면 symbol 없이 omitted 마커만 남긴다', () => {
+        const history: AgentMessage[] = [
+            { role: 'user', content: 'q0' },
+            {
+                role: 'assistant',
+                content: '',
+                toolCalls: [
+                    {
+                        id: 'c0',
+                        name: 'get_quote',
+                        args: { symbols: ['AAPL'] },
+                    },
+                ],
+            },
+            {
+                role: 'tool',
+                content: 'not json',
+                toolCallId: 'c0',
+                toolName: 'get_quote',
+            },
+            { role: 'assistant', content: 'a0' },
+            ...turn(1, true),
+            ...turn(2, true),
+        ];
+        const out = selectHistoryWindow(history, {
+            turns: 8,
+            toolResultTurns: 2,
+            budgetTokens: 32_000,
+        });
+        const tools = out.filter(m => m.role === 'tool');
+        const marker = JSON.parse(tools[0].content) as Record<string, unknown>;
+        expect(marker).toEqual({ omitted: true, tool: 'get_quote' });
+        expect('symbol' in marker).toBe(false);
+    });
+
     it('토큰 예산 초과 시 오래된 턴부터 탈락', () => {
         const big = 'x'.repeat(3_000);
         const history = Array.from({ length: 6 }, (_, i) => [

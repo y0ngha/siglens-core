@@ -358,6 +358,7 @@ export { classifyProviderError } from './application/shared/providerError';
 export {
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
+    FRESH_ANALYSIS_KINDS,
     findToolSpec,
     selectTools,
 } from './domain/agent/tools';
@@ -980,6 +981,7 @@ export type {
     AgentProviderResult,
     CallAgentProvider,
 } from './domain/ports/agentProvider';
+export type { FreshAnalysisKind } from './domain/agent/tools';
 
 // Agent chat (ai.siglens.io) — application use-case, policy, pure helper types
 export type { AgentPerTierLimit } from './application/agent/limits';

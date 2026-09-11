@@ -25,8 +25,7 @@ import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { type UsageRepository } from '@/domain/ports/usageRepository';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
 import { classifyProviderError } from '@/application/shared/providerError';
-
-const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
+import { PREMIUM_MODEL_USAGE_ACTION } from '@/application/shared/usageActions';
 
 const COMPENSATED_CHAT_ERRORS = [
     'server_busy',

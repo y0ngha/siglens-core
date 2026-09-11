@@ -445,6 +445,51 @@ describe('runAgentTurn', () => {
         });
     });
 
+    it('실행 결과가 순환 참조/BigInt면 직렬화 실패를 unserializable_result로 돌려준다', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [quoteCall],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        const d = deps(p, {
+            executeTool: vi.fn(async () => circular),
+        });
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { error: 'unserializable_result' },
+        ]);
+    });
+
+    it('한 스텝에서 web_search 3회 → 세 번째는 per_turn quota, 실행기는 최대 2회', async () => {
+        const search = (id: string) => ({
+            id,
+            name: 'web_search',
+            args: { query: 'x' },
+        });
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [search('w1'), search('w2'), search('w3')],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        await runAgentTurn(params(), d);
+        expect(d.executeTool).toHaveBeenCalledTimes(2);
+        expect(toolResults(p.calls[1]!)[2]).toEqual({
+            error: 'quota',
+            scope: 'per_turn',
+        });
+    });
+
     it('MAX_STEPS 초과 시 마지막 스텝은 tools 없이 호출되고 종료(stopReason end)', async () => {
         const loop = {
             text: '',
@@ -556,6 +601,24 @@ describe('runAgentTurn', () => {
             })
         );
         expect(d.counters.premiumTurns.count).toBe(1);
+    });
+
+    it('deps.maxOutputTokens가 프로바이더 호출에 그대로 전달된다', async () => {
+        const p = scriptedProvider([
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p, { maxOutputTokens: 1234 });
+        await runAgentTurn(params(), d);
+        expect(p.calls[0]!.maxOutputTokens).toBe(1234);
+    });
+
+    it('회원 모델 성공 + usageLogs 미주입 → ok, 예외 없음', async () => {
+        const p = scriptedProvider([
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p, { usageLogs: undefined });
+        const r = await runAgentTurn(params({ model: 'claude-sonnet-5' }), d);
+        expect(r.ok).toBe(true);
     });
 
     it('프로바이더 429 → rate_limited + 턴 환불', async () => {

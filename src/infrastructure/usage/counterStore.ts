@@ -1,7 +1,9 @@
 import { Redis } from '@upstash/redis';
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
-import type { CounterStore } from '@/domain/ports/counterStore';
-import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
+import {
+    CounterStoreUnavailableError,
+    type CounterStore,
+} from '@/domain/ports/counterStore';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 export type CounterPeriod = 'day' | 'month';

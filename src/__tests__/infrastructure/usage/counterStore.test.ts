@@ -138,6 +138,21 @@ describe('createCounterStore', () => {
         warn.mockRestore();
     });
 
+    it('failurePolicy open + config 없음: consume true, remaining limit, 경고 없음', async () => {
+        process.env = { ...originalEnv };
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const store = createCounterStore({
+            prefix: 'p',
+            period: 'day',
+            failurePolicy: 'open',
+            clock: () => NOW,
+        });
+        await expect(store.consume('u1', 5)).resolves.toBe(true);
+        await expect(store.remaining('u1', 5)).resolves.toBe(5);
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
     it('failurePolicy open: Redis 오류 → consume true, remaining limit', async () => {
         mockIncr.mockRejectedValue(new Error('down'));
         mockGet.mockRejectedValue(new Error('down'));

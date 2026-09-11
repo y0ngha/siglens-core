@@ -1,7 +1,30 @@
-import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import { TIMEFRAMES } from '@/domain/constants/market';
+import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 
-const TIMEFRAME_ENUM = TIMEFRAMES as readonly string[];
+const TIMEFRAME_ENUM: readonly string[] = TIMEFRAMES;
+
+/** Analysis kinds `run_fresh_analysis` can produce (spec §7). */
+export const FRESH_ANALYSIS_KINDS = [
+    'technical',
+    'overall',
+    'news',
+    'options',
+] as const;
+export type FreshAnalysisKind = (typeof FRESH_ANALYSIS_KINDS)[number];
+const FRESH_ANALYSIS_KIND_STRINGS: readonly string[] = FRESH_ANALYSIS_KINDS;
+
+/**
+ * @internal Narrows an already-schema-validated `kind` argument to
+ * {@link FreshAnalysisKind}; used by `runAgentTurn` to key
+ * `FRESH_ANALYSIS_ESTIMATED_SECONDS` without an unsafe cast.
+ */
+export function isFreshAnalysisKind(
+    value: unknown
+): value is FreshAnalysisKind {
+    return (
+        typeof value === 'string' && FRESH_ANALYSIS_KIND_STRINGS.includes(value)
+    );
+}
 
 const symbolProp = {
     type: 'string',
@@ -174,7 +197,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
                 symbol: symbolProp,
                 kind: {
                     type: 'string',
-                    enum: ['technical', 'overall', 'news', 'options'],
+                    enum: FRESH_ANALYSIS_KINDS,
                 },
                 timeframe: {
                     type: 'string',
