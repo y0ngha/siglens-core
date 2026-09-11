@@ -52,3 +52,47 @@ describe('normalizeJsonResponse', () => {
         expect(() => normalizeJsonResponse('')).toThrow(SyntaxError);
     });
 });
+
+describe('normalizeJsonResponse — complete object followed by extra content', () => {
+    it('keeps the first object when the provider streams the JSON twice', () => {
+        // DeepSeek Responses API: 41 prewarm units failed with
+        // "Unexpected non-whitespace character after JSON" the night it shipped.
+        const raw =
+            '{"summary":"a","trend":"bullish"}\n{"summary":"a","trend":"bullish"}';
+        expect(normalizeJsonResponse(raw)).toBe(
+            '{"summary":"a","trend":"bullish"}'
+        );
+    });
+
+    it('does not turn concatenated objects into an array', () => {
+        const raw = '{"a":1}{"b":2}';
+        const parsed: unknown = JSON.parse(normalizeJsonResponse(raw));
+        expect(Array.isArray(parsed)).toBe(false);
+        expect(parsed).toEqual({ a: 1 });
+    });
+
+    it('ignores trailing prose that itself contains braces', () => {
+        expect(normalizeJsonResponse('{"ok":true} note: {not json}')).toBe(
+            '{"ok":true}'
+        );
+    });
+
+    it('does not count braces inside string values', () => {
+        const raw = '{"text":"a } tricky { \\" brace"}\n{"text":"second"}';
+        expect(JSON.parse(normalizeJsonResponse(raw))).toEqual({
+            text: 'a } tricky { " brace',
+        });
+    });
+
+    it('still repairs a truncated object instead of returning a nested fragment', () => {
+        // A truncated object never closes at depth 0, so the salvage step must not
+        // pick an inner complete object; jsonrepair handles it as before.
+        const raw =
+            '{"summary":"x","keyLevels":{"support":[1,2]},"trend":"bull';
+        expect(JSON.parse(normalizeJsonResponse(raw))).toEqual({
+            summary: 'x',
+            keyLevels: { support: [1, 2] },
+            trend: 'bull',
+        });
+    });
+});

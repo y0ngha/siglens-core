@@ -108,7 +108,27 @@ export async function callAnalysisAi(
     if (raw.trim() === '') {
         throw new Error('AI returned an empty response');
     }
-    return normalizeJsonResponse(raw);
+    try {
+        return normalizeJsonResponse(raw);
+    } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        // One fresh generation when the provider returned text that no salvage step
+        // could turn into JSON. The provider retry wrappers only retry transport and
+        // status errors, so before this a malformed-but-200 response failed the whole
+        // analysis — 41 prewarm units in one night after DeepSeek moved to the
+        // Responses API. A second sample is independent of the first, so one retry
+        // clears the intermittent case without masking a systematic one: a model
+        // that always emits broken JSON still fails here, visibly.
+        console.warn(
+            '[callAnalysisAi] response was not parseable JSON; regenerating once',
+            { model, correlationId, message: error.message }
+        );
+        const retried = await dispatch();
+        if (retried.trim() === '') {
+            throw new Error('AI returned an empty response');
+        }
+        return normalizeJsonResponse(retried);
+    }
 
     function dispatch(): Promise<string> {
         // apiKey는 위 가드에서 이미 narrowing됐다.

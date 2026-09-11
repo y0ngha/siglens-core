@@ -624,9 +624,16 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * round-number steps scale outside $1–$1,000; and the structural risk:reward
  * skips levels inside half the mean bar range. Bytes change for every request.
  *
+ * @remarks
+ * **`p13` = placeholder bars dropped.** `fetchBarsWithIndicators` now removes
+ * bars whose OHLC is not a usable price (Yahoo KRX placeholder rows such as
+ * `O:0 H:0 L:0 C:285000 V:0`, which printed `Current vs Low: Infinity%`). Bytes
+ * change only for symbols whose history carried such rows, but analyses cached
+ * from them are wrong, and the constant has no per-symbol axis.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p12' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p13' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

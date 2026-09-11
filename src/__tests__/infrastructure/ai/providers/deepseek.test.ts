@@ -490,6 +490,42 @@ describe('callDeepSeek', () => {
                 type: 'json_object',
             });
         });
+
+        it('출력 파트가 둘 이상이면 진단 경고를 남기고 본문은 그대로 잇는다', async () => {
+            // 파트를 버리면 정상적으로 나뉜 응답이 잘린다 — 복구는 normalizeJsonResponse가
+            // 맡고, 여기서는 운영에서 원인을 가를 수 있게 파트별 글자 수만 남긴다.
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            mockResponsesCreate.mockResolvedValueOnce({
+                async *[Symbol.asyncIterator]() {
+                    yield {
+                        type: 'response.output_text.delta',
+                        delta: '{"a":1}',
+                        output_index: 1,
+                        content_index: 0,
+                    };
+                    yield {
+                        type: 'response.output_text.delta',
+                        delta: '{"a":1}',
+                        output_index: 2,
+                        content_index: 0,
+                    };
+                    yield { type: 'response.completed', response: {} };
+                },
+            });
+
+            const result = await callDeepSeek('prompt', {
+                model: FLASH_MODEL,
+                apiKey: 'key',
+                responseSchema: {},
+            });
+
+            expect(result).toBe('{"a":1}{"a":1}');
+            expect(warn).toHaveBeenCalledWith(
+                '[DeepSeek] Responses stream emitted text in more than one output part',
+                expect.objectContaining({ parts: { '1:0': 7, '2:0': 7 } })
+            );
+            warn.mockRestore();
+        });
     });
 
     it('throws non-retryable error when finish_reason is length (max tokens)', async () => {
