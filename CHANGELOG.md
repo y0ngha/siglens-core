@@ -1,5 +1,21 @@
 # Changelog
 
+# [1.1.0](https://github.com/y0ngha/siglens-core/compare/v1.0.4...v1.1.0) (2026-09-11)
+
+
+### Bug Fixes
+
+* **agent:** PR [#197](https://github.com/y0ngha/siglens-core/issues/197) 리뷰 반영 — 레이어 재노출 제거·상수 공유·커버리지·JSDoc ([685f9bb](https://github.com/y0ngha/siglens-core/commit/685f9bb01470d078e179d2830698226b68378197))
+
+
+### Features
+
+* **agent:** 에이전트 모듈 public export·engines >=20.3·ARCHITECTURE 갱신 ([706172f](https://github.com/y0ngha/siglens-core/commit/706172f83ff4bbe2c82d08e5bba1d9386fb671ce))
+* **agent:** 에이전트 포트 타입·NormalizedUsage domain 이동·인자 검증기 ([751e070](https://github.com/y0ngha/siglens-core/commit/751e070d0d49bc31b988ed9eebbe94843d2de796))
+* **agent:** 툴 카탈로그 9종·이력 창 선택·시스템 프롬프트 ([d0a26bb](https://github.com/y0ngha/siglens-core/commit/d0a26bb07b722a3a24cffbf521b576300e18a2a9))
+* **agent:** 프로바이더 에러 분류 추출·기간 카운터 스토어·에이전트 한도 정책 ([601608a](https://github.com/y0ngha/siglens-core/commit/601608afe9bff885247e6c8d20a115770d0a414a))
+* **agent:** runAgentTurn 에이전트 루프 ([c864311](https://github.com/y0ngha/siglens-core/commit/c864311c632ee043b591f14c0bce3ec9973dabbc))
+
 ## [1.0.4](https://github.com/y0ngha/siglens-core/compare/v1.0.3...v1.0.4) (2026-09-11)
 
 
