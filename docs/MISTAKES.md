@@ -622,6 +622,17 @@ and have been removed from this file.
    → Bare @throws description omits the type annotation needed by IDE tooling and consumers
    ❌ /** @throws description of error */ export function doSomething() { ... }
    ✅ /** @throws {Error} description of error */ export function doSomething() { ... }
+
+4.8. Explanatory comments/JSDoc stating algorithmic claims without recomputing verification
+   → When JSDoc or test comments make claims about algorithmic behavior, mathematical convergence, or regression causality, those claims must be verified through computation
+   → Comments describing root cause of a regression must enumerate all contributing factors; attributing to one source while ignoring others creates stale bugs
+   → JSDoc describing mathematical/algorithmic properties must be verified against actual edge cases (tie handling, boundary conditions, etc.)
+   ❌ /** 0.5 contribution converges away as sample size grows */ for no-tie data (actually converges to 0 with walk-forward samples)
+   ❌ // Entire score delta is due to buysell_imbalance ties (volume_z contributed 16/369 samples, unaccounted for)
+   ✅ /** mid-rank percentile: for ties, contribution is exactly 0 with walk-forward samples excluding current observation */
+   ✅ // Score delta from two tie sources: buysell_imbalance (primary) and volume_z (secondary, 16/369 samples)
+   → Recurring (fix/fear-greed-percentile-ties R1–R2): JSDoc claimed incorrect convergence behavior; test comment misattributed entire delta to one source.
+      Pattern: When attributing changes to a source or describing mathematical behavior, recompute all factors to avoid silent bias or false claims.
 ```
 
 ---
