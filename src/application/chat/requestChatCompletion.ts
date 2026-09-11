@@ -24,7 +24,7 @@ import {
 import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
 import { type UsageRepository } from '@/domain/ports/usageRepository';
 import { hashUsageIp } from '@/infrastructure/usage/hash';
-import { constants } from 'node:http2';
+import { classifyProviderError } from '@/application/shared/providerError';
 
 const PREMIUM_MODEL_USAGE_ACTION = 'premium_model';
 
@@ -33,27 +33,8 @@ const COMPENSATED_CHAT_ERRORS = [
     'server_error',
 ] as const satisfies readonly ChatErrorCode[];
 
-function getHttpErrorStatus(error: unknown): number | undefined {
-    if (typeof error !== 'object' || error === null || !('status' in error)) {
-        return undefined;
-    }
-
-    const status = error.status;
-    return typeof status === 'number' ? status : undefined;
-}
-
 function toChatErrorResult(error: unknown): ChatActionResult {
-    const status = getHttpErrorStatus(error);
-
-    if (status === constants.HTTP_STATUS_TOO_MANY_REQUESTS) {
-        return { ok: false, error: 'rate_limited' };
-    }
-
-    if (status === constants.HTTP_STATUS_SERVICE_UNAVAILABLE) {
-        return { ok: false, error: 'server_busy' };
-    }
-
-    return { ok: false, error: 'server_error' };
+    return { ok: false, error: classifyProviderError(error) };
 }
 
 /**
