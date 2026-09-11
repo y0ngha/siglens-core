@@ -90,14 +90,16 @@ describe('composeMarketSnapshot', () => {
     });
 
     it('weights the five factors equally', () => {
-        // Two factors rank at the top of their history, three at the bottom.
+        // Two factors rank at the top of their history; the other three tie
+        // their whole (all-zero) history and land at the mid-rank neutral
+        // point (50), not at the bottom (0).
         const sample = sampleOf(NORMAL, values({ momentum: 0, volatility: 0 }));
         const result = composeMarketSnapshot(
             values({ momentum: 1, volatility: 1 }),
             sample
         );
 
-        expect(result?.score).toBeCloseTo((100 + 100 + 0 + 0 + 0) / 5, 12);
+        expect(result?.score).toBeCloseTo((100 + 100 + 50 + 50 + 50) / 5, 12);
     });
 
     it('emits factors in display order with their raw values attached', () => {

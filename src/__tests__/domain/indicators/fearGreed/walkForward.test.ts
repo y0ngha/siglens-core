@@ -60,11 +60,38 @@ describe('computeFearGreedIndex', () => {
         // Deterministic regression assertions captured against the current
         // walk-forward composition. Anchors composeSnapshot wiring + factor
         // ordering so accidental drift in scoring math surfaces here.
-        expect(snap!.score).toBeCloseTo(63.73, 1);
+        // Two tie sources moved these anchors when percentile switched from
+        // strict-less to mid-rank (63.73 → 72.43, Flow 47.79 → 65.18):
+        //  - buysell_imbalance ties its whole sample (genBsv returns a
+        //    constant 600k/400k split, so buySellImb is identical at every
+        //    bar) and now ranks 50 instead of 0.
+        //  - volume_z ties 16 of the 369 samples (genBars' `i % 11` volume
+        //    cycle aliases against the 20-bar z-score window), moving that
+        //    factor's percentile ~63.7 → ~65.9.
+        // Trend group factors have no ties here, so its score is unchanged.
+        expect(snap!.score).toBeCloseTo(72.43, 1);
         expect(snap!.label).toBe('GREED');
-        expect(snap!.groups[0].score).toBeCloseTo(47.79, 1);
+        expect(snap!.groups[0].score).toBeCloseTo(65.18, 1);
         expect(snap!.groups[1].score).toBeCloseTo(79.67, 1);
         expect(snap!.sampleSize).toBe(369);
+    });
+
+    it('does not bias buysell_imbalance to 0 when buySellVolume is empty (tie mid-rank regression)', () => {
+        // An empty buySellVolume array makes buySellImb exactly 0 on every bar
+        // (see computeFactorsAtT: `bsv` is undefined for every index, so
+        // buySellImb falls back to 0). The current value then ties the whole
+        // walk-forward sample. Before the mid-rank fix, strict-less semantics
+        // ranked every tie at the bottom, permanently reading buysell_imbalance
+        // as maximally fearful; it must now read as neutral (50) instead.
+        const bars = genBars(400);
+        const snap = computeFearGreedIndex(bars, []);
+        expect(snap).not.toBeNull();
+        const buysellFactor = snap!.groups
+            .flatMap(g => g.factors)
+            .find(f => f.key === 'buysell_imbalance');
+        expect(buysellFactor).toBeDefined();
+        expect(buysellFactor!.rawValue).toBe(0);
+        expect(buysellFactor!.percentile).toBe(50);
     });
 
     it('returns confidence "limited" when sample is between LIMITED and NORMAL thresholds', () => {
