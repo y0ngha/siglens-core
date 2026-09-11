@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/y0ngha/siglens-core/compare/v1.0.2...v1.0.3) (2026-09-11)
+
+
+### Bug Fixes
+
+* **fear-greed:** 백분위 동률을 최하위가 아니라 중간 순위로 매긴다 ([eaf1c60](https://github.com/y0ngha/siglens-core/commit/eaf1c60f3057d7acf181aecc8b2059f30b3ba267))
+
 ## [1.0.2](https://github.com/y0ngha/siglens-core/compare/v1.0.1...v1.0.2) (2026-09-10)
 
 
