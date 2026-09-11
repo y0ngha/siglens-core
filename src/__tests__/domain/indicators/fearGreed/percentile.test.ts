@@ -11,7 +11,7 @@ describe('percentile', () => {
     it('returns 100 when value is above all samples', () => {
         expect(percentile(100, [0, 1, 2, 3])).toBe(100);
     });
-    it('returns mid-rank proportion when value has no ties', () => {
+    it('returns mid-rank proportion when value ties exactly one sample element', () => {
         // sample [0,1,2,3], value=2 → 2 below(0,1) + 0.5*1 equal(2) = 62.5
         expect(percentile(2, [0, 1, 2, 3])).toBe(62.5);
     });
