@@ -353,6 +353,38 @@ describe('computeMarketReference pivots', () => {
         expect(pp).toBeCloseTo((111 + 95 + 105) / 3, 6);
     });
 
+    it('drops the daily pivot entirely when the prior bar has an unusable price', () => {
+        // `open: 0` fails hasUsablePrices, but pivot math only reads high/low/close,
+        // so it would still average into a finite, plausible-looking PP if the
+        // hasUsablePrices guard on the prior bar were removed — unlike a NaN
+        // high/low/close, which the pivot formula's own internal guard
+        // (`resolvePivotBase` in pivotLevels.ts) already turns into `null`
+        // regardless of this branch.
+        const dailyBars = [
+            {
+                time: DAY_1,
+                open: 0,
+                high: 111,
+                low: 95,
+                close: 105,
+                volume: 1000,
+            },
+            bar(DAY_2, 100, 98.5, 99),
+        ];
+        const ref = computeMarketReference(dailyBars, makeInd(), '1Day');
+        const allLevels = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        expect(
+            allLevels.filter(
+                l =>
+                    l.label.startsWith('Pivot') ||
+                    l.label.startsWith('Camarilla')
+            )
+        ).toEqual([]);
+    });
+
     it('groups a U.S. after-hours bar past UTC midnight into its Eastern session', () => {
         // 00:30 UTC on 9/9 is 20:30 ET on 9/8. By UTC date it was counted into the next
         // session, so its high never reached the prior-session pivot.

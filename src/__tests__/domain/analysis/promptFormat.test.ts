@@ -343,6 +343,12 @@ describe('formatPlainNumber', () => {
         expect(formatPlainNumber(3.4000000000000004)).toBe('3.4');
     });
 
+    it('keeps digits beyond the 10th significant digit on large published figures', () => {
+        // The old 10-significant-digit rule rendered this '29723864120',
+        // cutting off the real trailing '3.45'.
+        expect(formatPlainNumber(29723864123.45)).toBe('29723864123.45');
+    });
+
     it('renders a missing or non-finite figure as N/A', () => {
         expect(formatPlainNumber(null)).toBe('N/A');
         expect(formatPlainNumber(undefined)).toBe('N/A');

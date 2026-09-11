@@ -799,9 +799,14 @@ export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
  * printed the literal `NaN`; binary float noise such as `0.30000000000000004`
  * reached the model).
  *
+ * @remarks
+ * **`p2` = 15-significant-digit precision.** `formatPlainNumber` now keeps 15
+ * significant digits instead of 10 — the 10-digit rule cut real digits off
+ * large published figures (`29723864123.45` rendered `29723864120`).
+ *
  * @internal
  */
-export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * @internal Build the Redis key for a cached macro (economy) briefing.
@@ -855,9 +860,14 @@ export function buildMacroBriefingCacheKey(
  * render byte-identically; the bump keeps entries generated from corrupt inputs
  * from being served for the rest of their 1-day TTL.
  *
+ * @remarks
+ * **`p5` = 15-significant-digit precision.** `formatPlainNumber` now keeps 15
+ * significant digits instead of 10 — the 10-digit rule cut real digits off
+ * large published figures (`29723864123.45` rendered `29723864120`).
+ *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
