@@ -7,27 +7,7 @@
  * model served a given job — see
  * siglens-core docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md §3.4.
  */
-/**
- * Invariant (holds across all three providers as of this normalization pass):
- * the three input buckets are disjoint and sum to the total input tokens
- * reported by the provider SDK for the call —
- * `promptTokens + cachedTokens + cacheWriteTokens` = total input.
- *
- * - `promptTokens`: standard-price, non-cached billable input tokens (1x).
- * - `cachedTokens`: cache **reads** — input served from a prior cache write
- *   (billed at ~0.1x by Anthropic).
- * - `cacheWriteTokens`: cache **writes** — input persisted into the cache on
- *   this call (billed at ~1.25x by Anthropic). Only Claude reports a separate
- *   cache-write metric; Gemini and OpenAI have none, so this is always 0 for
- *   them. Kept out of `promptTokens` so the standard-price bucket is not
- *   distorted by the 1.25x cache-write premium.
- */
-export interface NormalizedUsage {
-    promptTokens: number;
-    cachedTokens: number;
-    cacheWriteTokens: number;
-    outputTokens: number;
-}
+import type { NormalizedUsage } from '@/domain/types';
 
 // Frozen module-scoped singleton — extractors return a fresh spread copy
 // (`{ ...ZERO_USAGE }`) so no caller can mutate shared state; the freeze is a

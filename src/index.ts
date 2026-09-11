@@ -92,6 +92,9 @@ export { runFinancialsAnalysis } from './application/financials/runFinancialsAna
 // Overall analysis use-cases
 export { peekOverallAnalysisCache } from './application/overall/peekOverallAnalysisCache';
 
+// Agent chat (ai.siglens.io) — application use-case
+export { runAgentTurn } from './application/agent/runAgentTurn';
+
 // =============================================================================
 // Tier 2 — Domain Building Blocks
 // =============================================================================
@@ -343,6 +346,32 @@ export type {
     PollIndicatorTranslationDone,
 } from './application/economy/types';
 
+// Agent chat — policy limits, tool catalog, prompt/window builders, provider-error classifier
+export {
+    AGENT_LIMITS,
+    AGENT_GLOBAL_LIMITS,
+    AGENT_TURN_CAPS,
+    TOOL_TIMEOUT_MS,
+    agentLimit,
+} from './application/agent/limits';
+export { classifyProviderError } from './application/shared/providerError';
+export {
+    AGENT_TOOL_SPECS,
+    AGENT_TOOL_NAMES,
+    FRESH_ANALYSIS_KINDS,
+    findToolSpec,
+    selectTools,
+} from './domain/agent/tools';
+export { validateArgs } from './domain/agent/validateArgs';
+export {
+    buildAgentSystemPrompt,
+    AGENT_PROMPT_VERSION,
+} from './domain/agent/buildAgentSystemPrompt';
+export {
+    selectHistoryWindow,
+    estimateTokens,
+} from './domain/agent/selectHistoryWindow';
+
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
 // =============================================================================
@@ -382,6 +411,13 @@ export {
     releaseReanalyzeCooldown,
     tryAcquireReanalyzeCooldown,
 } from './infrastructure/market/reanalyzeCooldown';
+
+// Agent chat — period counter factory & its fail-closed error. Kept together:
+// consumers created via createCounterStore must catch CounterStoreUnavailableError,
+// so the two travel as one unit even though the error class is defined in
+// domain/ports/counterStore.ts (paired with the CounterStore port interface, Tier 4).
+export { createCounterStore } from './infrastructure/usage/counterStore';
+export { CounterStoreUnavailableError } from './domain/ports/counterStore';
 
 // =============================================================================
 // Tier 4 — Public Types & Constants
@@ -501,6 +537,7 @@ export type {
     UsageRepository,
 } from './domain/ports/usageRepository';
 export type {
+    NormalizedUsage,
     UsageActionType,
     UsageCounts,
     UsageLogRecord,
@@ -928,3 +965,48 @@ export type {
     SubmitOptionsAnalysisApiKeyRequiredError,
     RunOptionsAnalysisResult,
 } from './application/options';
+
+// Agent chat — provider port (tool-calling capable, streaming)
+export type {
+    AgentRole,
+    AgentToolCall,
+    AgentMessage,
+    JsonSchemaProperty,
+    JsonSchemaObject,
+    AgentToolCostClass,
+    AgentToolSpec,
+    AgentStopReason,
+    AgentStreamEvent,
+    CallAgentProviderOptions,
+    AgentProviderResult,
+    CallAgentProvider,
+} from './domain/ports/agentProvider';
+export type { FreshAnalysisKind } from './domain/agent/tools';
+
+// Agent chat (ai.siglens.io) — application use-case, policy, pure helper types
+export type { AgentPerTierLimit } from './application/agent/limits';
+export type {
+    AgentErrorCode,
+    RunAgentTurnParams,
+    RunAgentTurnDependencies,
+    RunAgentTurnResult,
+    AgentCounters,
+    AgentTurnEvent,
+    AgentTurnUsage,
+    AgentRemaining,
+    ExecuteTool,
+    ToolExecutionContext,
+} from './application/agent/types';
+export type { ProviderErrorCode } from './application/shared/providerError';
+export type { ArgIssue, ValidateArgsResult } from './domain/agent/validateArgs';
+export type {
+    AgentLocale,
+    BuildAgentSystemPromptInput,
+} from './domain/agent/buildAgentSystemPrompt';
+export type { HistoryWindowOptions } from './domain/agent/selectHistoryWindow';
+export type { CounterStore } from './domain/ports/counterStore';
+export type {
+    CounterStoreOptions,
+    CounterPeriod,
+    CounterFailurePolicy,
+} from './infrastructure/usage/counterStore';

@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import {
+    AGENT_TOOL_SPECS,
+    AGENT_TOOL_NAMES,
+    findToolSpec,
+    selectTools,
+} from '@/domain/agent/tools';
+import { validateArgs } from '@/domain/agent/validateArgs';
+
+describe('AGENT_TOOL_SPECS', () => {
+    it('9개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(9);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(9);
+        for (const spec of AGENT_TOOL_SPECS) {
+            expect(spec.inputSchema.additionalProperties).toBe(false);
+            expect(spec.description.length).toBeGreaterThan(20);
+        }
+    });
+
+    it('각 툴의 예시 인자가 자기 스키마를 통과한다', () => {
+        const samples: Record<string, unknown> = {
+            search_ticker: { query: '삼성전자' },
+            get_quote: { symbols: ['AAPL'] },
+            get_bars_indicators: {
+                symbol: 'AAPL',
+                timeframe: '1Day',
+                bars: 30,
+            },
+            get_cached_analysis: { symbol: 'AAPL', tab: 'technical' },
+            get_news: { symbol: 'AAPL', limit: 5 },
+            get_options_summary: { symbol: 'AAPL' },
+            run_fresh_analysis: { symbol: 'AAPL', kind: 'technical' },
+            web_search: { query: 'Apple earnings', freshness: 'week' },
+            get_my_portfolio: {},
+        };
+        for (const spec of AGENT_TOOL_SPECS) {
+            expect(validateArgs(spec.inputSchema, samples[spec.name]).ok).toBe(
+                true
+            );
+        }
+    });
+
+    it('selectTools는 가용 집합에 없는 툴을 뺀다', () => {
+        const names = selectTools(new Set(['search_ticker', 'get_quote'])).map(
+            s => s.name
+        );
+        expect(names).toEqual(['search_ticker', 'get_quote']);
+    });
+
+    it('findToolSpec', () => {
+        expect(findToolSpec('web_search')?.costClass).toBe('external');
+        expect(findToolSpec('nope')).toBeUndefined();
+    });
+});
