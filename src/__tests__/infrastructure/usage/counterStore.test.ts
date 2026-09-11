@@ -113,6 +113,10 @@ describe('createCounterStore', () => {
         await expect(store.consume('u1', 5)).rejects.toBeInstanceOf(
             CounterStoreUnavailableError
         );
+        // The error message must not duplicate the CloudWatch alarm marker.
+        await expect(store.consume('u1', 5)).rejects.toThrow(
+            'counter store unavailable (p)'
+        );
         expect(warn.mock.calls[0]![0]).toBe('[agent] quota store unavailable');
         await expect(store.remaining('u1', 5)).resolves.toBe(0);
         warn.mockRestore();

@@ -7,7 +7,7 @@ export class CounterStoreUnavailableError extends Error {
         readonly prefix: string,
         options?: { cause?: unknown }
     ) {
-        super(`[agent] quota store unavailable: ${prefix}`, options);
+        super(`counter store unavailable (${prefix})`, options);
         this.name = 'CounterStoreUnavailableError';
     }
 }
@@ -27,6 +27,6 @@ export interface CounterStore {
     consume(subject: string, limit: number): Promise<boolean>;
     /** Release one previously claimed unit (never below zero). */
     refund(subject: string): Promise<void>;
-    /** Units left in the current period. */
+    /** Units left in the current period. Never throws; fail-closed stores return 0 on outage. */
     remaining(subject: string, limit: number): Promise<number>;
 }

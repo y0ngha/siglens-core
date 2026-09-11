@@ -5,7 +5,7 @@ import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 export type CounterPeriod = 'day' | 'month';
-/** `open`: allow on outage (legacy chat). `closed`: deny on outage (agent). */
+/** `open`: allow on outage (legacy chat). `closed`: throw CounterStoreUnavailableError on outage (agent). */
 export type CounterFailurePolicy = 'open' | 'closed';
 
 export interface CounterStoreOptions {
@@ -33,6 +33,11 @@ function bucket(period: CounterPeriod, now: Date): string {
  * with the bucket in UTC (same convention as `hashUsageIp`). INCR + EXPIRE NX
  * keeps the first write atomic enough for quotas; an over-limit INCR is
  * immediately DECR'd so `remaining` never drifts negative.
+ *
+ * With `failurePolicy: 'closed'`, an outage (no config or a Redis error)
+ * makes `consume` log the `[agent] quota store unavailable` alarm marker
+ * once and throw {@link CounterStoreUnavailableError}, so callers answer
+ * `server_busy` rather than a quota refusal.
  */
 export function createCounterStore(options: CounterStoreOptions): CounterStore {
     const config = readUpstashConfig();

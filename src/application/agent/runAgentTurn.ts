@@ -1,0 +1,573 @@
+import {
+    AGENT_PROMPT_VERSION,
+    buildAgentSystemPrompt,
+} from '@/domain/agent/buildAgentSystemPrompt';
+import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
+import { findToolSpec, selectTools } from '@/domain/agent/tools';
+import { validateArgs } from '@/domain/agent/validateArgs';
+import type { AgentMessage, AgentToolCall } from '@/domain/ports/agentProvider';
+import type { CounterStore } from '@/domain/ports/counterStore';
+import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
+import { isPremiumModel } from '@/domain/tier';
+import type { NormalizedUsage } from '@/domain/types';
+import { getEtSessionStatus } from '@/domain/utils';
+import { classifyProviderError } from '@/application/shared/providerError';
+import {
+    AGENT_GLOBAL_LIMITS,
+    AGENT_TURN_CAPS,
+    TOOL_TIMEOUT_MS,
+    agentLimit,
+} from './limits';
+import type {
+    AgentErrorCode,
+    AgentRemaining,
+    AgentTurnUsage,
+    RunAgentTurnDependencies,
+    RunAgentTurnParams,
+    RunAgentTurnResult,
+} from './types';
+
+const DEFAULT_MAX_OUTPUT_TOKENS = 4_096;
+const HISTORY_WINDOW = {
+    turns: 8,
+    toolResultTurns: 2,
+    budgetTokens: 32_000,
+} as const;
+/** Measured medians (spec §4-2) surfaced to the UI as a progress hint. */
+const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<string, number> = {
+    technical: 40,
+    overall: 120,
+    news: 90,
+    options: 60,
+};
+const PREMIUM_USAGE_ACTION = 'premium_model';
+const GLOBAL_SUBJECT = 'global';
+const MAX_SUMMARY_LENGTH = 120;
+
+/**
+ * Sentinels for outcomes core produced itself, so an executor that returns
+ * its own `{ error: 'timeout' }` is still an executor refusal (refunded)
+ * rather than a core timeout.
+ */
+const TOOL_TIMEOUT: unique symbol = Symbol('tool_timeout');
+const TURN_STOPPED: unique symbol = Symbol('turn_stopped');
+
+type GateRefusal = Record<string, unknown>;
+type ToolQuotaResult =
+    | { refusal: GateRefusal }
+    /** Per-user counters claimed for this call (global counters excluded). */
+    | { perUser: CounterStore[] };
+
+function addUsage(a: NormalizedUsage, b: NormalizedUsage): NormalizedUsage {
+    return {
+        promptTokens: a.promptTokens + b.promptTokens,
+        cachedTokens: a.cachedTokens + b.cachedTokens,
+        cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
+        outputTokens: a.outputTokens + b.outputTokens,
+    };
+}
+
+function withTimeout<T>(
+    work: Promise<T>,
+    ms: number
+): Promise<T | typeof TOOL_TIMEOUT> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<typeof TOOL_TIMEOUT>(resolve => {
+        timer = setTimeout(() => resolve(TOOL_TIMEOUT), ms);
+    });
+    return Promise.race([work, timeout]).finally(() => {
+        clearTimeout(timer);
+    });
+}
+
+/**
+ * Settles with {@link TURN_STOPPED} as soon as `signal` aborts, even when
+ * `work` ignores the signal (siglens' `run_fresh_analysis` deliberately
+ * does, and a provider adapter might hang). The abandoned promise keeps a
+ * race handler attached, so a late rejection is not unhandled.
+ */
+function untilStopped<T>(
+    work: Promise<T>,
+    signal: AbortSignal
+): Promise<T | typeof TURN_STOPPED> {
+    let onAbort: () => void = () => {};
+    const stopped = new Promise<typeof TURN_STOPPED>(resolve => {
+        onAbort = () => resolve(TURN_STOPPED);
+        if (signal.aborted) onAbort();
+        else signal.addEventListener('abort', onAbort, { once: true });
+    });
+    return Promise.race([work, stopped]).finally(() => {
+        signal.removeEventListener('abort', onAbort);
+    });
+}
+
+function symbolsOf(args: Record<string, unknown>): string[] {
+    const out: string[] = [];
+    if (typeof args.symbol === 'string') out.push(args.symbol.toUpperCase());
+    if (Array.isArray(args.symbols)) {
+        for (const s of args.symbols)
+            if (typeof s === 'string') out.push(s.toUpperCase());
+    }
+    return out;
+}
+
+/**
+ * Tool messages must carry a string. `JSON.stringify(undefined)` returns
+ * `undefined` and circular/BigInt payloads throw, either of which would
+ * corrupt the transcript or escape as a provider failure (refunding a turn
+ * that actually ran).
+ */
+function serialize(payload: unknown): string {
+    try {
+        return JSON.stringify(payload) ?? 'null';
+    } catch {
+        return JSON.stringify({ error: 'unserializable_result' });
+    }
+}
+
+function summarize(content: string): string {
+    return content.length > MAX_SUMMARY_LENGTH
+        ? `${content.slice(0, MAX_SUMMARY_LENGTH)}…`
+        : content;
+}
+
+/** Refunds are best-effort: a failed refund must not turn into a turn error. */
+async function safeRefund(store: CounterStore, subject: string): Promise<void> {
+    try {
+        await store.refund(subject);
+    } catch (error) {
+        console.warn('[runAgentTurn] refund failed', { subject, error });
+    }
+}
+
+/** Per-turn budget: caps from `AGENT_TURN_CAPS`, all pure and local to one turn. */
+class TurnBudget {
+    private toolCalls = 0;
+    private webSearches = 0;
+    private freshRuns = 0;
+    private readonly symbols = new Set<string>();
+
+    /** Returns a quota scope when the call must be refused, else null. */
+    reserve(name: string, args: Record<string, unknown>): string | null {
+        if (this.toolCalls >= AGENT_TURN_CAPS.maxToolCalls)
+            return 'per_turn_tools';
+        if (
+            name === 'web_search' &&
+            this.webSearches >= AGENT_TURN_CAPS.maxWebSearch
+        )
+            return 'per_turn';
+        if (
+            name === 'run_fresh_analysis' &&
+            this.freshRuns >= AGENT_TURN_CAPS.maxFreshAnalysis
+        )
+            return 'per_turn';
+        const next = new Set(this.symbols);
+        for (const s of symbolsOf(args)) next.add(s);
+        if (next.size > AGENT_TURN_CAPS.maxDistinctSymbols)
+            return 'per_turn_symbols';
+        this.toolCalls += 1;
+        if (name === 'web_search') this.webSearches += 1;
+        if (name === 'run_fresh_analysis') this.freshRuns += 1;
+        for (const s of next) this.symbols.add(s);
+        return null;
+    }
+}
+
+/**
+ * One agent turn (spec §4-2): consume quota → build prompt/window → loop
+ * provider ⇄ tools up to `maxSteps` → return the final assistant message
+ * plus every intermediate message the consumer must persist.
+ *
+ * Never throws for provider/tool/counter failures; maps them to
+ * `AgentErrorCode`. A counter store outage (`CounterStoreUnavailableError`)
+ * is `server_busy` at the turn gate and `{ error: 'unavailable' }` at a tool
+ * gate — never a quota refusal.
+ *
+ * The turn deadline is a hard timer: when it fires (or the caller aborts)
+ * the in-flight provider call or tool wait is abandoned immediately. Neither
+ * `aborted` nor `deadline` refunds the turn — the work was already spent.
+ */
+export async function runAgentTurn(
+    params: RunAgentTurnParams,
+    deps: RunAgentTurnDependencies
+): Promise<RunAgentTurnResult> {
+    const startedAt = Date.now();
+    const now = params.now ?? new Date();
+    const { counters } = deps;
+    const { userId, tier } = params;
+
+    // 1. Daily quotas.
+    const premium = isPremiumModel(params.model);
+    try {
+        if (
+            !(await counters.turns.consume(
+                userId,
+                agentLimit(tier, 'turnsPerDay')
+            ))
+        ) {
+            return { ok: false, error: 'turn_limit' };
+        }
+    } catch {
+        return { ok: false, error: 'server_busy' };
+    }
+    if (premium) {
+        let allowed: boolean;
+        try {
+            allowed = await counters.premiumTurns.consume(
+                userId,
+                agentLimit(tier, 'premiumModelTurnsPerDay')
+            );
+        } catch {
+            await safeRefund(counters.turns, userId);
+            return { ok: false, error: 'server_busy' };
+        }
+        if (!allowed) {
+            await safeRefund(counters.turns, userId);
+            return { ok: false, error: 'premium_turn_limit' };
+        }
+    }
+    const refundTurn = async (): Promise<void> => {
+        await safeRefund(counters.turns, userId);
+        if (premium) await safeRefund(counters.premiumTurns, userId);
+    };
+
+    const deadline = new AbortController();
+    const turnSignal = params.signal
+        ? AbortSignal.any([params.signal, deadline.signal])
+        : deadline.signal;
+
+    // 2–3. Prompt and window.
+    const tools = selectTools(params.availableTools);
+    const system = buildAgentSystemPrompt({
+        locale: params.locale,
+        tools,
+        now,
+        etSessionStatus: getEtSessionStatus(now),
+        portfolioSymbols: params.portfolioSymbols,
+    });
+    const messages: AgentMessage[] = [
+        ...selectHistoryWindow(params.history, HISTORY_WINDOW),
+        { role: 'user', content: params.userMessage },
+    ];
+
+    const intermediate: AgentMessage[] = [];
+    const toolsUsed: string[] = [];
+    const budget = new TurnBudget();
+    let usage: NormalizedUsage = {
+        promptTokens: 0,
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+        outputTokens: 0,
+    };
+    let steps = 0;
+    let partialText = '';
+
+    const failure = (error: AgentErrorCode): RunAgentTurnResult => ({
+        ok: false,
+        error,
+        ...(partialText !== '' ? { partialText } : {}),
+    });
+    /** Caller abort wins over the deadline when both have fired. */
+    const stopped = (): RunAgentTurnResult =>
+        failure(params.signal?.aborted ? 'aborted' : 'deadline');
+
+    /**
+     * Daily/global counters for metered tools. Counters already consumed in
+     * this gate are refunded when a later one refuses or the store is down.
+     */
+    const consumeToolQuota = async (name: string): Promise<ToolQuotaResult> => {
+        const claimed: Array<[CounterStore, string]> = [];
+        const claim = async (
+            store: CounterStore,
+            subject: string,
+            limit: number
+        ): Promise<boolean> => {
+            const ok = await store.consume(subject, limit);
+            if (ok) claimed.push([store, subject]);
+            return ok;
+        };
+        const release = async (): Promise<void> => {
+            for (const [store, subject] of claimed)
+                await safeRefund(store, subject);
+        };
+        const refuse = async (
+            refusal: GateRefusal
+        ): Promise<ToolQuotaResult> => {
+            await release();
+            return { refusal };
+        };
+        try {
+            if (name === 'run_fresh_analysis') {
+                if (
+                    !(await claim(
+                        counters.freshAnalysis,
+                        userId,
+                        agentLimit(tier, 'freshAnalysisPerDay')
+                    ))
+                )
+                    return refuse({ error: 'quota', scope: 'daily' });
+            }
+            if (name === 'web_search') {
+                if (
+                    !(await claim(
+                        counters.webSearchUser,
+                        userId,
+                        agentLimit(tier, 'webSearchPerDay')
+                    ))
+                )
+                    return refuse({ error: 'quota', scope: 'daily' });
+                if (
+                    !(await claim(
+                        counters.webSearchGlobalDay,
+                        GLOBAL_SUBJECT,
+                        AGENT_GLOBAL_LIMITS.webSearchPerDay
+                    ))
+                )
+                    return refuse({ error: 'quota', scope: 'global_day' });
+                if (
+                    !(await claim(
+                        counters.webSearchGlobalMonth,
+                        GLOBAL_SUBJECT,
+                        AGENT_GLOBAL_LIMITS.webSearchPerMonth
+                    ))
+                )
+                    return refuse({ error: 'quota', scope: 'global_month' });
+            }
+            return {
+                perUser: claimed
+                    .filter(([, subject]) => subject !== GLOBAL_SUBJECT)
+                    .map(([store]) => store),
+            };
+        } catch (error) {
+            if (!(error instanceof CounterStoreUnavailableError)) {
+                console.warn('[runAgentTurn] tool quota check failed', {
+                    name,
+                    error,
+                });
+            }
+            return refuse({ error: 'unavailable' });
+        }
+    };
+
+    /** Returns the serialized tool message content. */
+    const executeOne = async (call: AgentToolCall): Promise<string> => {
+        const spec = findToolSpec(call.name);
+        if (spec === undefined || !params.availableTools.has(call.name)) {
+            return serialize({ error: 'unknown_tool' });
+        }
+        const validated = validateArgs(spec.inputSchema, call.args);
+        if (!validated.ok) {
+            return serialize({
+                error: 'invalid_args',
+                issues: validated.issues,
+            });
+        }
+        // Synchronous up to here, so parallel calls reserve in model order.
+        const scope = budget.reserve(call.name, validated.value);
+        if (scope !== null) return serialize({ error: 'quota', scope });
+        const quota = await consumeToolQuota(call.name);
+        if ('refusal' in quota) return serialize(quota.refusal);
+        // The turn may have stopped while the counters were being claimed:
+        // give the daily units back and never start the executor.
+        if (turnSignal.aborted) {
+            for (const store of quota.perUser) await safeRefund(store, userId);
+            return serialize({ error: 'aborted' });
+        }
+
+        const estimatedSeconds =
+            call.name === 'run_fresh_analysis'
+                ? FRESH_ANALYSIS_ESTIMATED_SECONDS[String(validated.value.kind)]
+                : undefined;
+        deps.onEvent({
+            type: 'tool_start',
+            id: call.id,
+            name: call.name,
+            args: validated.value,
+            ...(estimatedSeconds !== undefined ? { estimatedSeconds } : {}),
+        });
+        const t0 = Date.now();
+        let raw: unknown;
+        try {
+            // Stop settles the inner race, so the outer finally clears the
+            // (up to 300s) tool timer instead of leaving it armed.
+            raw = await withTimeout(
+                untilStopped(
+                    deps.executeTool(call.name, validated.value, {
+                        userId,
+                        tier,
+                        locale: params.locale,
+                        signal: turnSignal,
+                    }),
+                    turnSignal
+                ),
+                TOOL_TIMEOUT_MS[spec.costClass]
+            );
+        } catch (error) {
+            raw = {
+                error: 'tool_failed',
+                message: error instanceof Error ? error.message : String(error),
+            };
+        }
+        const coreStop = raw === TOOL_TIMEOUT || raw === TURN_STOPPED;
+        const payload: unknown =
+            raw === TOOL_TIMEOUT
+                ? { error: 'timeout' }
+                : raw === TURN_STOPPED
+                  ? { error: 'aborted' }
+                  : raw;
+        const failed =
+            typeof payload === 'object' &&
+            payload !== null &&
+            'error' in payload;
+        // Executor refusals (busy, search_failed, thrown errors) give back the
+        // user's daily unit. Core timeouts and turn stops keep it (the work may
+        // still be running); global Brave counters are never refunded because
+        // the upstream request may already have been billed.
+        if (failed && !coreStop && !turnSignal.aborted) {
+            for (const store of quota.perUser) await safeRefund(store, userId);
+        }
+        const content = serialize(payload);
+        deps.onEvent({
+            type: 'tool_end',
+            id: call.id,
+            name: call.name,
+            status: failed ? 'error' : 'ok',
+            ms: Date.now() - t0,
+            summary: summarize(content),
+        });
+        if (!failed) toolsUsed.push(call.name);
+        return content;
+    };
+
+    const deadlineTimer = setTimeout(
+        () => deadline.abort(),
+        AGENT_TURN_CAPS.turnDeadlineMs
+    );
+    try {
+        for (;;) {
+            if (turnSignal.aborted) return stopped();
+            steps += 1;
+            const lastStep = steps >= AGENT_TURN_CAPS.maxSteps;
+            let stepText = '';
+            const result = await untilStopped(
+                deps.callAgentProvider({
+                    // Key resolution (server vs BYOK) belongs to the consumer's router (spec §5).
+                    apiKey: '',
+                    model: params.model,
+                    system,
+                    // Copy: the loop keeps appending after the call returns.
+                    messages: [...messages],
+                    tools: lastStep ? [] : tools,
+                    maxOutputTokens:
+                        deps.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+                    signal: turnSignal,
+                    onEvent: event => {
+                        // A provider that ignores the signal must not stream
+                        // into a turn that has already returned.
+                        if (turnSignal.aborted) return;
+                        if (event.type === 'text') {
+                            stepText += event.delta;
+                            partialText += event.delta;
+                        }
+                        deps.onEvent(event);
+                    },
+                }),
+                turnSignal
+            );
+            if (result === TURN_STOPPED) return stopped();
+            usage = addUsage(usage, result.usage);
+
+            if (
+                result.stopReason !== 'tool_use' ||
+                result.toolCalls.length === 0 ||
+                lastStep
+            ) {
+                if (premium && deps.usageLogs !== undefined) {
+                    try {
+                        await deps.usageLogs.recordUsage({
+                            userId,
+                            // Deliberate: the agent premium quota lives in the premiumTurns counter and a UUID never collides with IP-hash counts; revisit when premium models are enabled.
+                            ipHash: userId,
+                            actionType: PREMIUM_USAGE_ACTION,
+                            modelUsed: params.model,
+                            date: now.toISOString().slice(0, 10),
+                        });
+                    } catch (error) {
+                        console.warn('[runAgentTurn] usage log failed', error);
+                    }
+                }
+                const [turns, fresh, search] = await Promise.all([
+                    counters.turns.remaining(
+                        userId,
+                        agentLimit(tier, 'turnsPerDay')
+                    ),
+                    counters.freshAnalysis.remaining(
+                        userId,
+                        agentLimit(tier, 'freshAnalysisPerDay')
+                    ),
+                    counters.webSearchUser.remaining(
+                        userId,
+                        agentLimit(tier, 'webSearchPerDay')
+                    ),
+                ]);
+                const remaining: AgentRemaining = { turns, fresh, search };
+                const turnUsage: AgentTurnUsage = {
+                    ...usage,
+                    steps,
+                    ms: Date.now() - startedAt,
+                };
+                return {
+                    ok: true,
+                    assistant: {
+                        role: 'assistant',
+                        content: result.text || stepText,
+                    },
+                    intermediate,
+                    usage: turnUsage,
+                    stopReason:
+                        result.stopReason === 'max_tokens'
+                            ? 'max_tokens'
+                            : 'end',
+                    remaining,
+                    promptVersion: AGENT_PROMPT_VERSION,
+                    toolsUsed,
+                };
+            }
+
+            const assistantMessage: AgentMessage = {
+                role: 'assistant',
+                content: result.text,
+                toolCalls: result.toolCalls,
+            };
+            messages.push(assistantMessage);
+            intermediate.push(assistantMessage);
+            const contents = await Promise.all(
+                result.toolCalls.map(executeOne)
+            );
+            result.toolCalls.forEach((call, index) => {
+                const toolMessage: AgentMessage = {
+                    role: 'tool',
+                    content: contents[index]!,
+                    toolCallId: call.id,
+                    toolName: call.name,
+                };
+                messages.push(toolMessage);
+                intermediate.push(toolMessage);
+            });
+        }
+    } catch (error) {
+        // Only our own signal means "stopped"; an SDK AbortError without it
+        // is an upstream failure and refunds like any other provider error.
+        if (turnSignal.aborted) return stopped();
+        const code = classifyProviderError(error);
+        console.warn('[runAgentTurn] provider failed', {
+            model: params.model,
+            code,
+            error,
+        });
+        await refundTurn();
+        return failure(code);
+    } finally {
+        clearTimeout(deadlineTimer);
+    }
+}
