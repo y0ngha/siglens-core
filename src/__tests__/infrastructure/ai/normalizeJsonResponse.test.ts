@@ -96,3 +96,20 @@ describe('normalizeJsonResponse — complete object followed by extra content', 
         });
     });
 });
+
+describe('normalizeJsonResponse — prose before the object', () => {
+    it('does not take a stray brace pair in leading prose as the answer', () => {
+        // First-object salvage applies only to text that starts with `{`; otherwise
+        // the `{}` in the note would win and the real answer would be dropped.
+        const raw = 'Note: {} is empty. {"trend":"bullish"} trailing';
+        // Prose-led text keeps the pre-existing path, which may throw; what it must never
+        // do is return the stray `{}`.
+        let out: string | null = null;
+        try {
+            out = normalizeJsonResponse(raw);
+        } catch {
+            out = null;
+        }
+        expect(out).not.toBe('{}');
+    });
+});

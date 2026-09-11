@@ -24,7 +24,6 @@ import {
     equityListingContext,
     formatLargeAmount,
     formatNullableNumber as fmt,
-    listingCurrency,
 } from './promptFormat';
 
 /**
@@ -118,6 +117,11 @@ function formatCalendarItems(
  * @param assetClass - Optional instrument asset class. `'crypto'` drops U.S. equity
  *   framing (earnings, analyst ratings) and adds cryptocurrency context. Defaults to
  *   `'equity'` for backward compatibility. Available on the 6-argument overload only.
+ * @param currency - Listing quote currency from the consumer's market profile (never
+ *   derived from the symbol). `KRW` frames the symbol as a Korean listing and labels
+ *   calendar revenue estimates in won. Defaults to `'USD'`. The 4- and 5-argument
+ *   overloads cannot carry it and always use `'USD'` — a `.KS` symbol is not read as
+ *   Korean; use the 7-argument form for KRX listings.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildNewsAnalysisPrompt(
@@ -140,7 +144,8 @@ export function buildNewsAnalysisPrompt(
     upcomingCalendar: readonly EarningsCalendarItem[],
     skills: readonly Skill[],
     assetClass: AssetClass,
-    locale?: AnalysisLocale
+    locale?: AnalysisLocale,
+    currency?: CurrencyCode
 ): AssembledPrompt;
 export function buildNewsAnalysisPrompt(
     symbol: string,
@@ -151,7 +156,8 @@ export function buildNewsAnalysisPrompt(
     calendarOrSkills: readonly EarningsCalendarItem[] | readonly Skill[],
     maybeSkills?: readonly Skill[],
     assetClass: AssetClass = 'equity',
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    currency: CurrencyCode = 'USD'
 ): AssembledPrompt {
     const companyName =
         typeof companyNameOrNews === 'string' ? companyNameOrNews : symbol;
@@ -183,15 +189,12 @@ export function buildNewsAnalysisPrompt(
             ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
             : 'No recent news articles available.';
 
-    const calendarSection = formatCalendarItems(
-        upcomingCalendar,
-        listingCurrency(symbol)
-    );
+    const calendarSection = formatCalendarItems(upcomingCalendar, currency);
 
     const assetContext =
         assetClass === 'crypto'
             ? `This is a cryptocurrency with no earnings reports, quarterly fundamentals, or analyst ratings. Focus on regulatory news, macro/liquidity context, protocol updates, and sentiment shifts.`
-            : equityListingContext(symbol);
+            : equityListingContext(currency);
 
     const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)

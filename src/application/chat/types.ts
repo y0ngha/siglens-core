@@ -4,6 +4,7 @@ import type {
     AnalysisResponse,
     AssetClass,
     ChatMessage,
+    CurrencyCode,
     CurrentAnalysisContext,
     ModelId,
     TierConfig,
@@ -75,6 +76,13 @@ export interface RequestChatCompletionParams {
      * Defaults to `'equity'` for backward compatibility.
      */
     assetClass?: AssetClass;
+    /**
+     * Listing quote currency, supplied from the caller's market profile (core
+     * never derives it from the symbol — see {@link CurrencyCode}). `KRW`
+     * describes a Korean listing and renders levels in whole won. Defaults to
+     * `'USD'`.
+     */
+    currency?: CurrencyCode;
 }
 
 /** Injectable dependencies for `requestChatCompletion`. */

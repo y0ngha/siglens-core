@@ -1,39 +1,53 @@
 import { describe, expect, it } from 'vitest';
 import {
+    meanBarRangePercent,
     roundNumberLevels,
     splitBySide,
     collectIndicatorLevels,
     lastFiniteNumber,
 } from '@/domain/analysis/referenceLevels';
 import { MAX_REFERENCE_LEVELS_PER_SIDE } from '@/domain/analysis/marketReferenceConstants';
-import type { IndicatorResult, ReferenceLevel } from '@/domain/types';
+import type { Bar, IndicatorResult, ReferenceLevel } from '@/domain/types';
 
-const lvl = (price: number): ReferenceLevel => ({
+const lvl = (price: number, currentPrice = 100): ReferenceLevel => ({
     price,
     label: `L${price}`,
     kind: 'ma',
-    distancePercent: 0,
+    distancePercent: ((price - currentPrice) / currentPrice) * 100,
 });
 
+/** Spacing between consecutive round levels for a price. */
+const stepAt = (price: number): number => {
+    const prices = roundNumberLevels(price)
+        .map(l => l.price)
+        .toSorted((a, b) => a - b);
+    return Number((prices[1] - prices[0]).toPrecision(6));
+};
+
 describe('roundNumberLevels', () => {
-    it('uses $5 increments in the 50–200 tier', () => {
-        const prices = roundNumberLevels(123)
-            .map(l => l.price)
-            .toSorted((a, b) => a - b);
-        expect(prices).toContain(120);
-        expect(prices).toContain(125);
+    it('steps by the smallest 1/2.5/5×10ⁿ at or above 2% of price', () => {
+        expect(stepAt(123)).toBe(2.5);
+        expect(stepAt(3.2)).toBe(0.1);
+        expect(stepAt(523)).toBe(25);
+        expect(stepAt(320)).toBe(10);
     });
-    it('uses $0.50 increments under $5', () => {
-        const prices = roundNumberLevels(3.2).map(l => l.price);
-        expect(prices).toContain(3);
-        expect(prices).toContain(3.5);
+    it('has no seam at the old tier boundaries', () => {
+        // The tier table stepped 0.025 at 0.99 but 0.5 at 1.00, and 10 at 1,000 but 25 above.
+        expect(stepAt(1)).toBe(stepAt(0.99));
+        expect(stepAt(1000)).toBe(stepAt(1000.01));
     });
-    it('uses $10 increments above $200', () => {
-        const prices = roundNumberLevels(523)
-            .map(l => l.price)
-            .toSorted((a, b) => a - b);
-        expect(prices).toContain(520);
-        expect(prices).toContain(530);
+    it('labels levels in plain decimal notation at the step precision', () => {
+        const tiny = roundNumberLevels(0.000000125).map(l => l.label);
+        expect(tiny.every(label => !label.includes('e'))).toBe(true);
+        expect(roundNumberLevels(123).map(l => l.label)).toContain(
+            'Round 122.5'
+        );
+        expect(roundNumberLevels(77107).map(l => l.label)).toContain(
+            'Round 77500'
+        );
+        expect(roundNumberLevels(0.08359).map(l => l.label)).toContain(
+            'Round 0.0825'
+        );
     });
     it('labels every level kind round', () => {
         expect(roundNumberLevels(123).every(l => l.kind === 'round')).toBe(
@@ -92,6 +106,46 @@ describe('splitBySide', () => {
         const out = splitBySide([...support, ...resistance], 100);
         expect(out.support).toHaveLength(MAX_REFERENCE_LEVELS_PER_SIDE);
         expect(out.resistance).toHaveLength(MAX_REFERENCE_LEVELS_PER_SIDE);
+    });
+    it('flags nothing and adds no atPrice key without a band', () => {
+        const out = splitBySide([lvl(99.9), lvl(90)], 100);
+        expect(out.support.every(l => !('atPrice' in l))).toBe(true);
+    });
+    it('keeps the cap for levels beyond the band so at-price clusters cannot fill it', () => {
+        // Six at-price levels used to take every slot, leaving the risk:reward block no
+        // support beyond noise on that side.
+        const atPrice = [99.95, 99.8, 99.65, 99.5, 99.35, 99.2].map(p =>
+            lvl(p)
+        );
+        const beyond = Array.from({ length: 8 }, (_, i) => lvl(95 - i));
+        const out = splitBySide([...atPrice, ...beyond], 100, 1);
+
+        const flagged = out.support.filter(l => l.atPrice);
+        expect(flagged.map(l => l.price)).toEqual([99.95, 99.8]);
+        const clear = out.support.filter(l => !l.atPrice);
+        expect(clear).toHaveLength(MAX_REFERENCE_LEVELS_PER_SIDE);
+        expect(clear[0].price).toBe(95);
+    });
+});
+
+describe('meanBarRangePercent', () => {
+    const bar = (high: number, low: number, close: number): Bar => ({
+        time: 0,
+        open: close,
+        high,
+        low,
+        close,
+        volume: 1,
+    });
+
+    it('averages the high–low range in percent of close', () => {
+        expect(
+            meanBarRangePercent([bar(102, 98, 100), bar(101, 99, 100)])
+        ).toBe(3);
+    });
+    it('skips unusable bars and returns 0 when none remain', () => {
+        expect(meanBarRangePercent([bar(102, 98, 0)])).toBe(0);
+        expect(meanBarRangePercent([])).toBe(0);
     });
 });
 

@@ -68,6 +68,7 @@ import type {
     AnalysisResponse,
     AssembledPrompt,
     AssetClass,
+    CurrencyCode,
     Bar,
     CandlePatternEntry,
     ChartPatternId,
@@ -101,10 +102,10 @@ import { formatPositionHintSection } from '@/domain/analysis/positionHintSection
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
+    differenceDecimalPlaces,
     equityListingContext,
     formatBarDateTime,
     formatNullableNumber,
-    listingCurrency,
     priceDecimalPlaces,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
@@ -230,17 +231,32 @@ interface PromptCandlePatternEntry {
 // Brevity alias used across the prompt-line templates below.
 const fmt = (n: number | null): string => formatNullableNumber(n, 2);
 
+/** A volume-scale figure grouped by thousands, or `'N/A'` (a NaN volume printed `NaN`). */
 const formatVolume = (n: number): string =>
-    Math.round(n)
-        .toString()
-        .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    Number.isFinite(n)
+        ? Math.round(n)
+              .toString()
+              .replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        : 'N/A';
 
 const lastNonNull = (arr: (number | null)[]): number | null =>
     arr.findLast((v): v is number => v !== null) ?? null;
 
+/** A percent-unit value with its `%`, or a bare `'N/A'` — never `N/A%`. */
+const fmtPercent = (n: number | null): string => {
+    const text = fmt(n);
+    return text === 'N/A' ? text : `${text}%`;
+};
+
 /** `value / base` as a percent, or `'N/A'` when the base cannot divide. */
 const percentOf = (value: number, base: number): string =>
-    base > 0 ? `${fmt((value / base) * PERCENTAGE_FACTOR)}%` : 'N/A';
+    base > 0 ? fmtPercent((value / base) * PERCENTAGE_FACTOR) : 'N/A';
+
+/** `part / total` as a percent, or null when the total is not a positive finite volume. */
+const shareOf = (part: number, total: number): number | null =>
+    Number.isFinite(total) && total > 0
+        ? (part / total) * PERCENTAGE_FACTOR
+        : null;
 
 const formatMarketSection = (bars: Bar[], priceDp: number): string => {
     if (bars.length === 0) {
@@ -271,10 +287,11 @@ const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
     }
 
     const px = (n: number): string => formatNullableNumber(n, priceDp);
-    const highs = bars.map(b => b.high);
-    const lows = bars.map(b => b.low);
-    const periodHigh = Math.max(...highs);
-    const periodLow = Math.min(...lows);
+    // One non-finite high or low would turn the whole period extreme into NaN.
+    const highs = bars.map(b => b.high).filter(Number.isFinite);
+    const lows = bars.map(b => b.low).filter(Number.isFinite);
+    const periodHigh = highs.length > 0 ? Math.max(...highs) : Number.NaN;
+    const periodLow = lows.length > 0 ? Math.min(...lows) : Number.NaN;
     const firstClose = bars[0].close;
     const lastClose = bars[bars.length - 1].close;
 
@@ -372,20 +389,18 @@ const formatBuySellVolumeSection = (
         { totalBuy: 0, totalSell: 0 }
     );
     const totalVolume = totalBuy + totalSell;
-    const buyRatio =
-        totalVolume > 0 ? (totalBuy / totalVolume) * PERCENTAGE_FACTOR : 0;
-    const sellRatio =
-        totalVolume > 0 ? (totalSell / totalVolume) * PERCENTAGE_FACTOR : 0;
-
     const last = lastOf(recentBuySell)!;
-    const lastTotal = last.buyVolume + last.sellVolume;
-    const lastBuyRatio =
-        lastTotal > 0 ? (last.buyVolume / lastTotal) * PERCENTAGE_FACTOR : 0;
+    // An undividable total is an unknown ratio, not a 0% one: a zero-volume or NaN bar
+    // used to render `Buy ratio: 0.00%`, which reads as all-sell pressure.
+    const lastBuyRatio = shareOf(
+        last.buyVolume,
+        last.buyVolume + last.sellVolume
+    );
 
     return [
         '## Volume Analysis (Buy/Sell)',
-        `- Current bar: Buy ${formatVolume(last.buyVolume)} / Sell ${formatVolume(last.sellVolume)} (Buy ratio: ${lastBuyRatio.toFixed(INDICATOR_DECIMAL_PLACES)}%)`,
-        `- Last ${recentBuySell.length}-bar cumulative: Buy ${formatVolume(totalBuy)} (${buyRatio.toFixed(INDICATOR_DECIMAL_PLACES)}%) / Sell ${formatVolume(totalSell)} (${sellRatio.toFixed(INDICATOR_DECIMAL_PLACES)}%)`,
+        `- Current bar: Buy ${formatVolume(last.buyVolume)} / Sell ${formatVolume(last.sellVolume)} (Buy ratio: ${fmtPercent(lastBuyRatio)})`,
+        `- Last ${recentBuySell.length}-bar cumulative: Buy ${formatVolume(totalBuy)} (${fmtPercent(shareOf(totalBuy, totalVolume))}) / Sell ${formatVolume(totalSell)} (${fmtPercent(shareOf(totalSell, totalVolume))})`,
     ].join('\n');
 };
 
@@ -442,7 +457,7 @@ const detectZeroCross = (
 const formatSqueezeMomentumLine = (
     indicators: IndicatorResult,
     config: PromptConfig,
-    priceDp: number
+    diffDp: number
 ): string => {
     const data = indicators.squeezeMomentum;
     const last = lastOf(data);
@@ -462,7 +477,7 @@ const formatSqueezeMomentumLine = (
             ? ` / ${cross.direction === 'bullish_cross' ? 'bullish' : 'bearish'} zero-cross (${cross.barsAgo} bars ago)`
             : '';
 
-    return `- Squeeze Momentum(BB:${SQUEEZE_MOMENTUM_BB_LENGTH},KC:${SQUEEZE_MOMENTUM_KC_LENGTH},mult:${SQUEEZE_MOMENTUM_KC_MULT}): momentum ${formatNullableNumber(last.momentum, priceDp)}${sqzDirectionLabel(last)}${trendLabel(momentumTrend)} / ${sqzStateLabel(last)}${durationStr}${crossStr}`;
+    return `- Squeeze Momentum(BB:${SQUEEZE_MOMENTUM_BB_LENGTH},KC:${SQUEEZE_MOMENTUM_KC_LENGTH},mult:${SQUEEZE_MOMENTUM_KC_MULT}): momentum ${formatNullableNumber(last.momentum, diffDp)}${sqzDirectionLabel(last)}${trendLabel(momentumTrend)} / ${sqzStateLabel(last)}${durationStr}${crossStr}`;
 };
 
 const barsAgoCount = (index: number, totalBars: number): number =>
@@ -766,11 +781,15 @@ const MARKET_REFERENCE_FRAMING =
 
 const EFFICIENCY_DECIMAL_PLACES = 2;
 
+/**
+ * One reference level. An at-price level is tagged rather than hidden: the price sitting on
+ * MA20 is useful context, but a stop or target placed on it is crossed by the next bar.
+ */
 const formatReferenceLevelLine = (
     level: ReferenceLevel,
     priceDp: number
 ): string =>
-    `- ${formatNullableNumber(level.price, priceDp)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away)`;
+    `- ${formatNullableNumber(level.price, priceDp)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away${level.atPrice ? '; at price — inside bar noise, not a stop or target' : ''})`;
 
 const HORIZON_LABEL: Record<HorizonKey, string> = {
     short: 'Short-term',
@@ -1056,7 +1075,7 @@ const formatRegimeContextSection = (
     // Both estimators return a per-bar σ as a fraction (~0.01). At two decimals that
     // rendered `0.01` for nearly every chart, so they are shown as percentages.
     const perBarPercent = (v: number | null): string =>
-        v === null ? 'N/A' : `${fmt(v * PERCENTAGE_FACTOR)}%`;
+        fmtPercent(v === null ? null : v * PERCENTAGE_FACTOR);
     const volLine = volAllNull
         ? '- Volatility: N/A (volatility estimators still in warm-up)'
         : `- Volatility (per-bar σ): Yang-Zhang ${perBarPercent(lastYangZhang)}${trendLabel(yzTrend)} / EWMA ${perBarPercent(lastEwma)}${trendLabel(ewmaTrend)} ${PRO_RELIABILITY_NOTE.volatility}`;
@@ -1161,13 +1180,13 @@ const formatForceIndexLine = (
 
 const formatElderRayLine = (
     indicators: IndicatorResult,
-    priceDp: number
+    diffDp: number
 ): string => {
     const last = lastOf(indicators.elderRay);
     if (!last || (last.bullPower === null && last.bearPower === null)) {
         return `- Elder-Ray: N/A ${PRO_RELIABILITY_NOTE.advisory}`;
     }
-    return `- Elder-Ray: Bull Power ${formatNullableNumber(last.bullPower, priceDp)} / Bear Power ${formatNullableNumber(last.bearPower, priceDp)} ${PRO_RELIABILITY_NOTE.advisory}`;
+    return `- Elder-Ray: Bull Power ${formatNullableNumber(last.bullPower, diffDp)} / Bear Power ${formatNullableNumber(last.bearPower, diffDp)} ${PRO_RELIABILITY_NOTE.advisory}`;
 };
 
 const formatElderImpulseLine = (indicators: IndicatorResult): string => {
@@ -1194,10 +1213,18 @@ const formatChandelierLine = (
     return `- Chandelier Exit: ${activeStop} (trend: ${last.trend}) ${PRO_RELIABILITY_NOTE.chandelier}`;
 };
 
+/** Decimal places for the two kinds of price-denominated value a prompt renders. */
+interface PricePrecision {
+    /** Levels on the price axis: bars, bands, averages, stops. */
+    price: number;
+    /** Differences of prices: MACD, ATR, momentum, Elder-Ray. See `differenceDecimalPlaces`. */
+    difference: number;
+}
+
 const formatProIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig,
-    priceDp: number
+    precision: PricePrecision
 ): string =>
     [
         PRO_INDICATOR_SECTION_HEADER,
@@ -1205,19 +1232,23 @@ const formatProIndicatorSection = (
         formatMacdVLine(indicators, config),
         formatConnorsRsiLine(indicators),
         formatForceIndexLine(indicators, config),
-        formatElderRayLine(indicators, priceDp),
+        formatElderRayLine(indicators, precision.difference),
         formatElderImpulseLine(indicators),
-        formatChandelierLine(indicators, priceDp),
+        formatChandelierLine(indicators, precision.price),
     ].join('\n');
 
 const formatIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig,
-    priceDp: number
+    precision: PricePrecision
 ): string => {
-    // Price-scale values (MACD, bands, averages, ATR, stops) render at the prompt's
-    // price precision; bounded oscillators (RSI, DMI, %K, CCI, MFI, CMF) keep `fmt`.
-    const px = (n: number | null): string => formatNullableNumber(n, priceDp);
+    // Price-axis values (bands, averages, stops) render at the price precision and
+    // differences (MACD, ATR) at the difference precision; bounded oscillators (RSI, DMI,
+    // %K, CCI, MFI, CMF) keep `fmt`.
+    const px = (n: number | null): string =>
+        formatNullableNumber(n, precision.price);
+    const dx = (n: number | null): string =>
+        formatNullableNumber(n, precision.difference);
     const lastRSI = lastNonNull(indicators.rsi);
     const lastMACD = lastOf(indicators.macd);
     const lastBollinger = lastOf(indicators.bollinger);
@@ -1253,7 +1284,7 @@ const formatIndicatorSection = (
     return [
         INDICATOR_VALUES_SECTION_HEADER,
         `- RSI(${RSI_DEFAULT_PERIOD}): ${fmt(lastRSI)}${trendLabel(rsiTrend)}`,
-        `- MACD: ${px(lastMACD?.macd ?? null)} / Signal ${px(lastMACD?.signal ?? null)} / Histogram ${px(lastMACD?.histogram ?? null)}${trendLabel(macdTrend)}`,
+        `- MACD: ${dx(lastMACD?.macd ?? null)} / Signal ${dx(lastMACD?.signal ?? null)} / Histogram ${dx(lastMACD?.histogram ?? null)}${trendLabel(macdTrend)}`,
         `- Bollinger Bands: Upper ${px(lastBollinger?.upper ?? null)} / Middle ${px(lastBollinger?.middle ?? null)} / Lower ${px(lastBollinger?.lower ?? null)}`,
         `- DMI: +DI ${fmt(lastDMI?.diPlus ?? null)} / -DI ${fmt(lastDMI?.diMinus ?? null)} / ADX ${fmt(lastDMI?.adx ?? null)}`,
         `- Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K ${fmt(lastStochastic?.percentK ?? null)} / %D ${fmt(lastStochastic?.percentD ?? null)}`,
@@ -1264,7 +1295,7 @@ const formatIndicatorSection = (
         `- MA: ${MA_DEFAULT_PERIODS.map(p => `MA(${p}): ${px(lastNonNull(indicators.ma[p] ?? []))}`).join(' / ')}`,
         `- EMA: ${EMA_DEFAULT_PERIODS.map(p => `EMA(${p}): ${px(lastNonNull(indicators.ema[p] ?? []))}`).join(' / ')}`,
         `- Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan ${px(lastIchimoku?.tenkan ?? null)} / Kijun ${px(lastIchimoku?.kijun ?? null)} / SpanA ${px(lastIchimoku?.senkouA ?? null)} / SpanB ${px(lastIchimoku?.senkouB ?? null)} / Chikou ${px(lastIchimoku?.chikou ?? null)}`,
-        `- ATR(${ATR_DEFAULT_PERIOD}): ${px(lastATR)}${trendLabel(atrTrend)}`,
+        `- ATR(${ATR_DEFAULT_PERIOD}): ${dx(lastATR)}${trendLabel(atrTrend)}`,
         `- OBV: ${lastOBV !== null ? formatVolume(lastOBV) : 'N/A'}${trendLabel(obvTrend)}`,
         `- Parabolic SAR: ${px(lastPSAR?.sar ?? null)} (${lastPSAR?.trend ?? 'N/A'})`,
         `- Williams %R(${WILLIAMS_R_DEFAULT_PERIOD}): ${fmt(lastWilliamsR)}`,
@@ -1273,7 +1304,7 @@ const formatIndicatorSection = (
         `- Keltner Channel(${KELTNER_EMA_PERIOD},${KELTNER_ATR_PERIOD},${KELTNER_MULTIPLIER}): Upper ${px(lastKeltner?.upper ?? null)} / Middle ${px(lastKeltner?.middle ?? null)} / Lower ${px(lastKeltner?.lower ?? null)}`,
         `- CMF(${CMF_DEFAULT_PERIOD}): ${fmt(lastCMF)}${trendLabel(cmfTrend)}`,
         `- Donchian Channel(${DONCHIAN_DEFAULT_PERIOD}): Upper ${px(lastDonchian?.upper ?? null)} / Middle ${px(lastDonchian?.middle ?? null)} / Lower ${px(lastDonchian?.lower ?? null)}`,
-        formatSqueezeMomentumLine(indicators, config, priceDp),
+        formatSqueezeMomentumLine(indicators, config, precision.difference),
     ].join('\n');
 };
 
@@ -1445,7 +1476,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Step 2 — Compute prices:',
         '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
         '  - entryPrices: [low, high] range near support — the actionable zone for "enter"/"wait", or the contingent trigger zone for "avoid". Must match the entry text field exactly.',
-        '  - stopLoss: single number below nearest support (real or contingent). Must match the exit text field exactly.',
+        '  - stopLoss: single number below the nearest support that lies beyond bar noise (real or contingent) — never on a level tagged "at price". Must match the exit text field exactly.',
         '  - takeProfitPrices: ascending order (lowest first). Must match the exit text field exactly.',
         `- Step 3 — Write text fields in plain ${outputLanguageName(locale)}:`,
         '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
@@ -1939,6 +1970,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   headlines and bodies never reach this prompt. Omitting it (or passing
  *   `[]`) renders no section, leaving `dynamic` byte-identical to what this
  *   builder produced before the parameter existed.
+ * @param currency - Quote currency of the listing, supplied by the consumer's
+ *   market profile (see {@link CurrencyCode} — core never derives it from the
+ *   symbol). Drives the listing framing sentence and price precision (`KRW` →
+ *   whole won). Defaults to `'USD'`.
  * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
  *
  * @see calculateIndicators
@@ -1956,7 +1991,8 @@ export function buildAnalysisPrompt(
     positionBucket?: PositionBucket,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     priorAnalyses?: readonly PriorAnalysis[],
-    marketEvents?: readonly MarketEvent[]
+    marketEvents?: readonly MarketEvent[],
+    currency: CurrencyCode = 'USD'
 ): AssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2000,20 +2036,34 @@ export function buildAnalysisPrompt(
     ]);
 
     const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
-    // One precision for every price-scale value in this prompt, taken from the
-    // snapshot close — see `priceDecimalPlaces` for why a fixed 2 was wrong.
+    // One precision for every price-axis value in this prompt, taken from the
+    // snapshot close — see `priceDecimalPlaces` for why a fixed 2 was wrong — and
+    // a second for differences of prices, scaled by the latest ATR.
     const priceDp = priceDecimalPlaces(
         bars.at(-1)?.close,
-        listingCurrency(symbol)
+        currency,
+        assetClass
     );
+    const precision: PricePrecision = {
+        price: priceDp,
+        difference: differenceDecimalPlaces(
+            lastNonNull(indicators.atr),
+            priceDp
+        ),
+    };
 
-    const marketReference = computeMarketReference(bars, indicators, timeframe);
+    const marketReference = computeMarketReference(
+        bars,
+        indicators,
+        timeframe,
+        { assetClass, currency }
+    );
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
 
     const assetContext =
         assetClass === 'crypto'
             ? `This is a cryptocurrency trading 24/7 with no market open/close. There are no earnings, fundamentals, or analyst ratings — focus purely on price action, technical structure, volatility, and macro/liquidity context.`
-            : equityListingContext(symbol);
+            : equityListingContext(currency);
 
     // Reunites the static output-rules preamble with the per-type
     // writing-rule instructions into one atomic block (see its own doc
@@ -2061,7 +2111,8 @@ export function buildAnalysisPrompt(
         selectPriorAnalyses(priorAnalyses ?? [], bars),
         bars,
         symbol,
-        timeframe
+        timeframe,
+        priceDp
     );
 
     // Faithful reproduction of the v0.31 production section order (see
@@ -2084,8 +2135,8 @@ export function buildAnalysisPrompt(
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),
-        formatIndicatorSection(indicators, config, priceDp),
-        formatProIndicatorSection(indicators, config, priceDp),
+        formatIndicatorSection(indicators, config, precision),
+        formatProIndicatorSection(indicators, config, precision),
         formatSMCSection(indicators, bars, priceDp),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatMarketReferenceSection(

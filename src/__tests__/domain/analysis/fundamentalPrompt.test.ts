@@ -336,12 +336,41 @@ describe('buildFundamentalAnalysisPrompt — currency and missing values', () =>
                     marketCap: 1_600_000_000_000_000,
                 },
                 peers: [],
+                reportedCurrency: 'KRW',
             },
-            [FUNDAMENTAL_SKILL_HIGH]
+            [FUNDAMENTAL_SKILL_HIGH],
+            'ko',
+            'KRW'
         );
         expect(prompt).toContain('- Market Cap: 1600.0T KRW');
         expect(prompt).toContain('- Operating Cash Flow: 110.0B KRW');
         expect(prompt).not.toContain('USD');
+    });
+
+    it('labels an ADR’s statement figures with its reporting currency, not its listing', () => {
+        // TSM lists in USD but files in TWD; `USD` on its cash flow overstated it ~30×.
+        const prompt = buildFundamentalAnalysisPrompt(
+            'TSM',
+            { ...TEST_SNAPSHOT, peers: [], reportedCurrency: 'TWD' },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+        expect(prompt).toContain('- Operating Cash Flow: 110.0B TWD');
+        expect(prompt).toContain('- EPS (TTM, TWD):');
+        expect(prompt).toContain('- Analyst EPS Estimate (TWD):');
+        expect(prompt).toMatch(/- Market Cap: [\d.]+[TBM] USD/);
+    });
+
+    it('leaves statement figures unlabelled when the reporting currency is unknown', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                peers: [],
+            },
+            [FUNDAMENTAL_SKILL_HIGH]
+        );
+        expect(prompt).toContain('- Operating Cash Flow: 110.0B\n');
+        expect(prompt).toContain('- EPS (TTM):');
     });
 
     it('renders a missing market cap and Piotroski score as N/A, never 0B or N/A/9', () => {

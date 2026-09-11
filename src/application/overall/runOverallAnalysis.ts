@@ -294,6 +294,7 @@ export async function runOverallAnalysis(
               userApiKey: topLevelUserApiKey,
               reasoning,
               locale: options.locale,
+              currency: options.currency,
               ...options.fundamental,
               skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
               force: effectiveAxisForce,
@@ -322,6 +323,7 @@ export async function runOverallAnalysis(
                      * 넓혀야 하고, 그때 네 축을 함께 바꿔야 한다.
                      */
                     locale: options.locale,
+                    currency: options.currency,
                     tierContext:
                         technicalRest.tierContext ??
                         (topLevelTier !== undefined
@@ -342,6 +344,7 @@ export async function runOverallAnalysis(
                 userApiKey: topLevelUserApiKey,
                 reasoning,
                 locale: options.locale,
+                currency: options.currency,
                 ...(newsFieldIsArray
                     ? undefined
                     : (newsField as object | undefined)),
@@ -608,7 +611,8 @@ export async function runOverallAnalysis(
         options.assetClass ?? 'equity',
         locale,
         priorAnalysisBars,
-        priorAnalysisCandidates
+        priorAnalysisCandidates,
+        options.currency
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.

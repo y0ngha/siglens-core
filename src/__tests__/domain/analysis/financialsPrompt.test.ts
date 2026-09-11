@@ -417,15 +417,42 @@ describe('buildFinancialsAnalysisPrompt — 출력 로케일', () => {
 describe('buildFinancialsAnalysisPrompt — currency and non-finite values', () => {
     const scorecard = computeFinancialsScorecard(empty);
 
-    it('renders statement amounts with the listing currency', () => {
-        const snapshot: FinancialsSnapshot = { ...empty, income: [incomeRow] };
+    it('labels statement amounts with the row’s reporting currency', () => {
+        const withCurrency = (
+            reportedCurrency: string
+        ): FinancialsSnapshot => ({
+            ...empty,
+            income: [{ ...incomeRow, reportedCurrency }],
+        });
         expect(
-            buildFinancialsAnalysisPrompt('AAPL', snapshot, scorecard, [])
+            buildFinancialsAnalysisPrompt(
+                'AAPL',
+                withCurrency('USD'),
+                scorecard,
+                []
+            )
         ).toContain('Revenue 383.3B USD');
-        // KRX statements arrive in won; the same figure must not be labelled as dollars.
+        // An ADR files in its home currency: TSM's statements are TWD, not its USD listing.
         expect(
-            buildFinancialsAnalysisPrompt('005930.KS', snapshot, scorecard, [])
-        ).toContain('Revenue 383.3B KRW');
+            buildFinancialsAnalysisPrompt(
+                'TSM',
+                withCurrency('TWD'),
+                scorecard,
+                []
+            )
+        ).toContain('Revenue 383.3B TWD');
+    });
+
+    it('leaves statement amounts unlabelled when the reporting currency is unknown', () => {
+        const snapshot: FinancialsSnapshot = { ...empty, income: [incomeRow] };
+        const p = buildFinancialsAnalysisPrompt(
+            '005930.KS',
+            snapshot,
+            scorecard,
+            []
+        );
+        expect(p).toContain('Revenue 383.3B,');
+        expect(p).not.toMatch(/383\.3B (USD|KRW)/);
     });
 
     it('renders a non-finite margin as N/A instead of NaN%', () => {

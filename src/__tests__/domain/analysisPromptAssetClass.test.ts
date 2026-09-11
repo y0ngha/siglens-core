@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildAnalysisPrompt as buildAnalysisPromptRaw } from '@/domain/analysis/prompt';
 import { calculateIndicators } from '@/domain/indicators';
 import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
-import type { AssetClass, Bar, Timeframe } from '@/domain/types';
+import type { AssetClass, Bar, CurrencyCode, Timeframe } from '@/domain/types';
 
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
 // return with a flattening wrapper (spec §3.4 assembly split).
@@ -71,7 +71,8 @@ const renderDynamic = (
     symbol: string,
     series: Bar[],
     timeframe: Timeframe,
-    assetClass: AssetClass = 'equity'
+    assetClass: AssetClass = 'equity',
+    currency: CurrencyCode = 'USD'
 ): string =>
     buildAnalysisPromptRaw(
         symbol,
@@ -81,18 +82,30 @@ const renderDynamic = (
         [],
         timeframe,
         undefined,
-        assetClass
+        assetClass,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        currency
     ).dynamic;
 
 describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
-    it('frames a KRX symbol as a Korean listing, not a U.S. equity', () => {
+    it('frames a KRW listing as Korean, not a U.S. equity', () => {
         const p = buildAnalysisPrompt(
             '005930.KS',
             '삼성전자',
             bars,
             indicators,
             [],
-            '1Day'
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'KRW'
         );
         expect(p).toContain('Korean equity listed on the KRX');
         expect(p).not.toContain('U.S. equity');
@@ -106,17 +119,58 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
             'crypto'
         );
         expect(p).not.toMatch(/O:0\.00 H:0\.00 L:0\.00 C:0\.00/);
-        expect(p).toMatch(/C:0\.00000\d{4} V:/);
+        // Crypto keeps five significant digits.
+        expect(p).toMatch(/C:0\.00000\d{5} V:/);
     });
 
     it('renders KRX prices in whole won', () => {
         const p = renderDynamic(
             '005930.KS',
             syntheticBars(260, 269500, 86_400),
-            '1Day'
+            '1Day',
+            'equity',
+            'KRW'
         );
         expect(p).toMatch(/C:\d{6} V:/);
         expect(p).not.toMatch(/C:\d+\.\d{2} V:/);
+    });
+
+    it('renders differences below the price precision so a whole-won chart keeps its MACD', () => {
+        // A 1,000-won listing moves ~10 won a bar; whole-won MACD and ATR erased crossovers.
+        const p = renderDynamic(
+            '000000.KQ',
+            syntheticBars(260, 1000, 86_400),
+            '1Day',
+            'equity',
+            'KRW'
+        );
+        expect(p).toMatch(/C:\d{3,4} V:/);
+        expect(p).not.toMatch(/C:\d+\.\d+ V:/);
+        expect(p).toMatch(/- ATR\(\d+\): \d+\.\d+/);
+        expect(p).toMatch(/- MACD: -?\d+\.\d+ \/ Signal -?\d+\.\d+/);
+    });
+
+    it('gives crypto between $1 and $10 more than cent precision', () => {
+        // 5-minute XRP bars near 2.50 printed runs of identical `C:2.50` rows.
+        const p = renderDynamic(
+            'XRPUSD',
+            syntheticBars(260, 2.5, 300),
+            '5Min',
+            'crypto'
+        );
+        expect(p).toMatch(/C:\d\.\d{4} V:/);
+    });
+
+    it('tags at-price reference levels instead of offering them as stops', () => {
+        const p = renderDynamic(
+            'AAPL',
+            syntheticBars(260, 230, 86_400),
+            '1Day'
+        );
+        expect(p).toContain(
+            'at price — inside bar noise, not a stop or target'
+        );
+        expect(p).toContain('never on a level tagged "at price"');
     });
 
     it('describes crypto horizon spans in wall-clock time, not trading sessions', () => {

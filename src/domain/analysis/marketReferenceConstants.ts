@@ -1,4 +1,4 @@
-import type { HorizonKey, RoundNumberTier, Timeframe } from '@/domain/types';
+import type { HorizonKey, Timeframe } from '@/domain/types';
 
 /** @internal Trailing-bar lookback window per horizon, per timeframe (capped at bars.length). */
 export const HORIZON_WINDOWS_BY_TIMEFRAME: Record<
@@ -22,14 +22,6 @@ export const HORIZON_MA_PERIODS: Record<
     medium: { ma: [60], ema: [60] },
     long: { ma: [120, 200], ema: [] },
 };
-
-/** @internal Round-number increments by price tier (ascending ceiling). */
-export const ROUND_NUMBER_TIERS: readonly RoundNumberTier[] = [
-    { maxPrice: 5, increment: 0.5 },
-    { maxPrice: 50, increment: 1 },
-    { maxPrice: 200, increment: 5 },
-    { maxPrice: Number.POSITIVE_INFINITY, increment: 10 },
-];
 
 /** @internal ADX threshold above which a horizon is labelled trending. */
 export const ADX_TRENDING_THRESHOLD = 25;

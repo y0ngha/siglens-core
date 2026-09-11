@@ -149,18 +149,35 @@ that floor it divided by whichever level happened to touch the price — hourly 
 0.06% "resistance" with a 0.01% "support", a 15-minute NVDA chart printed 180.38 — which is
 noise divided by noise, and the model was then told to put stops on those levels. Two
 upstream fixes remove most such levels at the source: intraday pivots are computed from the
-**prior session** (not the prior bar, whose pivot sits on the price), and round-number steps
-scale to ~2% of price outside $1–$1,000 (a flat 10 put `Round 77110` next to BTC).
+**prior session** (not the prior bar, whose pivot sits on the price) grouped by the
+listing's own calendar date (Eastern for U.S. equities, KST for KRW, UTC for crypto), and
+round-number steps follow one continuous rule — the smallest 1/2.5/5×10ⁿ at or above 2% of
+price (a flat 10 put `Round 77110` next to BTC; the old $1–$1,000 tier table jumped 20× at
+its seams).
+
+`splitBySide` flags levels inside that band `atPrice` and keeps at most two of them **outside**
+the six-per-side cap. Capping first let an at-price cluster fill every slot, and the
+risk:reward block then found no usable level and vanished; it now says "not measurable"
+instead. Its legs use raw distances — the noise band already bounds both. A full-bar-range
+floor on the risk leg alone was tried and removed: it flipped 34 of 90 real-chart verdicts
+below 1.0 and made the verdict sentence false.
 
 ## Prompt number rendering (`analysis/promptFormat.ts`)
 
-Every price-scale value in the chart prompt renders at one precision picked from the
-snapshot close by `priceDecimalPlaces`: cents at or above one unit, four significant digits
-below it, whole won for KRX symbols. A fixed two decimals rendered SHIBUSD's bars as
-`O:0.00 H:0.00 L:0.00 C:0.00`. `formatNullableNumber` renders non-finite values as `N/A` and
-drops the sign from a value that rounds to zero. KRX listings (`/^\d{6}\.(KS|KQ)$/`) travel
-with `assetClass: 'equity'`, so framing and currency come from the symbol
-(`equityListingContext`, `listingCurrency`) — the U.S. sentence stays byte-identical.
+Every price-axis value in the chart prompt renders at one precision picked from the
+snapshot close by `priceDecimalPlaces`: cents at or above one unit and four significant
+digits below it for equities, five significant digits for crypto, whole won for `KRW`. A
+fixed two decimals rendered SHIBUSD's bars as `O:0.00 H:0.00 L:0.00 C:0.00`. Differences of
+prices (MACD, ATR, momentum, Elder-Ray) take `differenceDecimalPlaces` instead — three
+significant digits of ATR, never fewer decimals than the prices — because whole-won
+precision erased KRX crossovers. `formatNullableNumber` renders non-finite values as `N/A`
+and drops the sign from a value that rounds to zero.
+
+Currency is **supplied**, never inferred from the symbol (see `CurrencyCode`): builders take
+the listing currency as a parameter and `equityListingContext(currency)` picks the framing —
+the U.S. sentence stays byte-identical. Statement amounts are a second currency: they carry
+the filer's `reportedCurrency` (an ADR files in its home currency — TSM in TWD) and stay
+unlabelled when it is unknown.
 
 ## Overall axis weighting (`analysis/overallScore.ts`)
 

@@ -340,7 +340,8 @@ export async function requestChatCompletion(
         params.history,
         params.userMessage,
         params.currentAnalysisContext,
-        params.assetClass
+        params.assetClass,
+        params.currency
     );
 
     const {

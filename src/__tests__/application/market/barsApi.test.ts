@@ -275,3 +275,39 @@ describe('fetchBarsWithIndicators — bars without usable prices', () => {
         warn.mockRestore();
     });
 });
+
+describe('fetchBarsWithIndicators — every bar unusable', () => {
+    beforeEach(() => {
+        mockGetBars.mockReset();
+    });
+
+    it('returns empty bars and indicators without throwing', async () => {
+        // OTC names came back with all-zero rows; the whole history can drop out.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce([
+            { ...mockBar, open: 0, high: 0, low: 0, close: 0 },
+            {
+                ...mockBar,
+                time: mockBar.time + 60,
+                open: 0,
+                high: 0,
+                low: 0,
+                close: 0,
+            },
+        ]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'OTCX',
+            DEFAULT_TIMEFRAME
+        );
+
+        expect(result.bars).toEqual([]);
+        expect(result.indicators.rsi).toEqual([]);
+        expect(warn).toHaveBeenCalledWith(
+            '[barsApi] dropped bars without usable OHLC prices',
+            expect.objectContaining({ dropped: 2, kept: 0 })
+        );
+        warn.mockRestore();
+    });
+});

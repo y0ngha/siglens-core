@@ -304,7 +304,8 @@ async function runAnalysisImpl(
         options.positionBucket,
         locale,
         priorAnalysisCandidates,
-        marketEventCandidates
+        marketEventCandidates,
+        options.currency
     );
 
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so

@@ -1,5 +1,8 @@
-import { RATIO_TO_PERCENT } from '@/domain/analysis/marketReferenceConstants';
 import { structuralRiskReward } from '@/domain/analysis/planCheck';
+import {
+    AT_PRICE_BAR_RANGE_FRACTION,
+    meanBarRangePercent,
+} from '@/domain/analysis/referenceLevels';
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import {
@@ -180,35 +183,16 @@ function formatConfluence(
 }
 
 /**
- * Share of the recent mean bar range inside which a level counts as "at price".
- *
- * Without a floor the ratio divided by whatever level happened to sit closest, and on real
- * charts that was routinely a level the price was already touching: a 15-minute NVDA chart
- * rendered `Pivot PP … (-0.00%)` and a risk:reward of 180.38, a 5-won KRX round number gave
- * exactly 1.00, and hourly AAPL paired a 0.06% "resistance" with a 0.01% "support". Those
- * numbers are noise divided by noise. A level closer than half an ordinary bar's range is
- * crossed by the next bar either way, so it can serve neither as a stop nor as a target.
+ * Levels beyond the at-price band on each side: not flagged `atPrice` by the reference
+ * builder, and at least `floorPercent` away (the distance check also covers a reference
+ * assembled without flags).
  */
-const AT_PRICE_NOISE_BAR_RANGE_FRACTION = 0.5;
-
-/** Half the mean high–low range of the last {@link ATR_DEFAULT_PERIOD} bars, in percent of close. */
-function atPriceNoisePercent(bars: readonly Bar[]): number {
-    const ranges = bars
-        .slice(-ATR_DEFAULT_PERIOD)
-        .filter(b => b.close > 0 && b.high >= b.low)
-        .map(b => ((b.high - b.low) / b.close) * RATIO_TO_PERCENT);
-    if (ranges.length === 0) return 0;
-    const meanRange = ranges.reduce((sum, r) => sum + r, 0) / ranges.length;
-    return meanRange * AT_PRICE_NOISE_BAR_RANGE_FRACTION;
-}
-
-/** Levels at least `floorPercent` away from price on each side. */
 function levelsBeyondNoise(
     levels: ReferenceLevels,
     floorPercent: number
 ): ReferenceLevels {
     const clear = (l: ReferenceLevel): boolean =>
-        Math.abs(l.distancePercent) >= floorPercent;
+        !l.atPrice && Math.abs(l.distancePercent) >= floorPercent;
     return {
         support: levels.support.filter(clear),
         resistance: levels.resistance.filter(clear),
@@ -236,23 +220,44 @@ function nearestLevels(
  * downstream failure was not that analyses described the upside inaccurately — it was that
  * `entryRecommendation` said "enter" while the nearest obstacle was half a percent away.
  */
+const RISK_REWARD_HEADER = '### Risk:Reward From Current Price';
+
 function formatRiskReward(
     reference: MarketReference,
     bars: readonly Bar[],
     priceDp: number
 ): string[] {
-    const floorPercent = atPriceNoisePercent(bars);
-    const levels = nearestLevels(reference, floorPercent);
-    if (!levels) return [];
+    const meanRangePercent = meanBarRangePercent(bars);
+    const floorPercent = meanRangePercent * AT_PRICE_BAR_RANGE_FRACTION;
+    const noiseNote =
+        floorPercent > 0
+            ? [
+                  `Levels within ${formatNullableNumber(floorPercent)}% of the current price (half the mean bar range over the last ${ATR_DEFAULT_PERIOD} bars) sit inside ordinary bar noise and are skipped here. Do not anchor a stop-loss or an entry trigger on such an at-price level.`,
+              ]
+            : [];
+    // Said explicitly rather than dropping the block: a silently absent ratio reads to the
+    // model as "nothing to worry about", which is a claim, not an absence of measurement.
+    const notMeasurable = [
+        RISK_REWARD_HEADER,
+        ...noiseNote,
+        'Not measurable: no horizon has both a support and a resistance level beyond bar noise. This is an absence of measurement, not a favourable or unfavourable ratio — do not derive one from at-price levels.',
+    ];
 
-    const up = levels.resistance[0];
-    const down = levels.support[0];
-    if (!up || !down) return [];
+    const levels = nearestLevels(reference, floorPercent);
+    const up = levels?.resistance[0];
+    const down = levels?.support[0];
+    if (!levels || !up || !down) return notMeasurable;
 
     // Can still be null after the guard above: a zero-distance support or a "resistance"
     // the collector placed at or below the price makes the ratio undefined, not zero.
+    //
+    // Both legs use their raw distances. The noise band above already bounds each leg from
+    // below at the same half bar range, so the ratio cannot explode. Flooring only the risk
+    // leg at a full bar range was tried and rejected: across 90 real charts it pushed 34
+    // verdicts from >= 1.0 to below 1.0, where the verdict sentence ("the nearest obstacle
+    // above is closer than the nearest support below") became false.
     const ratio = structuralRiskReward(levels);
-    if (ratio === null) return [];
+    if (ratio === null) return notMeasurable;
 
     const verdict =
         ratio < 1
@@ -260,12 +265,8 @@ function formatRiskReward(
             : 'At or above 1.0: there is more room to the next obstacle above than to the support below.';
 
     return [
-        '### Risk:Reward From Current Price',
-        ...(floorPercent > 0
-            ? [
-                  `Levels within ${formatNullableNumber(floorPercent)}% of the current price (half the mean bar range over the last ${ATR_DEFAULT_PERIOD} bars) sit inside ordinary bar noise and are skipped here. Do not anchor a stop-loss or an entry trigger on such an at-price level.`,
-              ]
-            : []),
+        RISK_REWARD_HEADER,
+        ...noiseNote,
         `Nearest resistance ${up.label} at ${formatNullableNumber(up.price, priceDp)} (${formatNullableNumber(up.distancePercent)}%)`,
         `Nearest support ${down.label} at ${formatNullableNumber(down.price, priceDp)} (${formatNullableNumber(down.distancePercent)}%)`,
         `Structural risk:reward from current price = ${fmtRatio(ratio)}`,

@@ -18,14 +18,18 @@ const JSON_CODE_FENCE_END = '```';
  * fails downstream as the wrong shape. A truncated object never returns to depth
  * 0, so it yields `null` here and still reaches jsonrepair as before. The scan is
  * string- and escape-aware so braces inside string values do not count.
+ *
+ * Only text that **starts** with the object qualifies. The failure this handles
+ * always puts the answer first; with leading prose, a stray `{}` inside that prose
+ * would otherwise be taken as "the first object" and the real answer discarded.
+ * Prose-led text keeps the pre-existing jsonrepair path.
  */
 function firstCompleteObjectWithTrailingContent(text: string): string | null {
-    const start = text.indexOf('{');
-    if (start === -1) return null;
+    if (!text.startsWith('{')) return null;
     let depth = 0;
     let inString = false;
     let escaped = false;
-    for (let i = start; i < text.length; i++) {
+    for (let i = 0; i < text.length; i++) {
         const ch = text[i];
         if (inString) {
             if (escaped) escaped = false;
@@ -37,7 +41,7 @@ function firstCompleteObjectWithTrailingContent(text: string): string | null {
         else if (ch === '{') depth++;
         else if (ch === '}' && --depth === 0) {
             const rest = text.slice(i + 1);
-            return rest.trim() === '' ? null : text.slice(start, i + 1);
+            return rest.trim() === '' ? null : text.slice(0, i + 1);
         }
     }
     return null;

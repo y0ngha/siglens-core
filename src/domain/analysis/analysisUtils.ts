@@ -1,8 +1,8 @@
+import type { Bar } from '@/domain/types';
+
 /** @internal Last element of the array, or null when the array is empty. */
 export const lastOf = <T>(arr: T[]): T | null =>
     arr.length > 0 ? arr[arr.length - 1] : null;
-
-import type { Bar } from '@/domain/types';
 
 /** @internal A price usable for level math: finite and strictly positive. */
 export const isUsablePrice = (price: number): boolean =>

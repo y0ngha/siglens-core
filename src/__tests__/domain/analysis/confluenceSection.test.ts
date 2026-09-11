@@ -308,14 +308,31 @@ describe('formatDeterministicMetricsSection', () => {
         );
     });
 
-    it('drops the risk:reward block entirely when no horizon has both sides', () => {
+    it('says the risk:reward is not measurable when no horizon has both sides', () => {
+        // A silently missing block reads to the model as "nothing to worry about".
         const out = formatDeterministicMetricsSection(
             enough,
             '30Min',
             EMPTY_REFERENCE
         );
         expect(out).toContain('### Indicator Confluence');
-        expect(out).not.toContain('### Risk:Reward From Current Price');
+        expect(out).toContain('### Risk:Reward From Current Price');
+        expect(out).toContain('Not measurable:');
+        expect(out).not.toContain('Structural risk:reward from current price');
+    });
+
+    it('skips levels the reference builder flagged at price', () => {
+        const flagged: MarketReference = {
+            short: horizon(
+                [{ ...level(100.1, 0.1), atPrice: true }, level(104, 4)],
+                [{ ...level(99.9, -0.1), atPrice: true }, level(99, -1)]
+            ),
+            medium: horizon([], []),
+            long: horizon([], []),
+        };
+        const out = formatDeterministicMetricsSection(enough, '30Min', flagged);
+        expect(out).toContain('at 104');
+        expect(out).not.toContain('at 100.1');
     });
 
     it('renders the bearish side of the trend filter on a falling chart', () => {
@@ -352,5 +369,22 @@ describe('formatDeterministicMetricsSection', () => {
         expect(() =>
             formatDeterministicMetricsSection([], '1Day', EMPTY_REFERENCE)
         ).not.toThrow();
+    });
+});
+
+describe('formatDeterministicMetricsSection — risk leg', () => {
+    it('divides by the support distance itself, with no extra floor', () => {
+        // `bars()` ranges ±0.2%: mean range 0.4%, at-price band 0.2%. A support 0.3% away
+        // clears the band, so the ratio is 4 / 0.3 = 13.33. A full-bar-range floor on the
+        // risk leg alone flipped 34 of 90 real-chart verdicts and was removed.
+        const out = formatDeterministicMetricsSection(
+            bars(CONFLUENCE_MIN_BARS + 5),
+            '30Min',
+            reference([level(104, 4)], [level(99.7, -0.3)])
+        );
+        expect(out).toContain(
+            'Structural risk:reward from current price = 13.33'
+        );
+        expect(out).not.toContain('floored');
     });
 });

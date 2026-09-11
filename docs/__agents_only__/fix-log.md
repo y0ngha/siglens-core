@@ -121,11 +121,26 @@
   Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
   Fixed in R2: Added dated changelog row documenting the new public exports
 
-## [PR #194 R3 | feat/prompt-numeric-audit | 2026-09-11] — Macro briefing cache key prompt-version blocker
+## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 hotfix: import, JSON parsing
 
-- Violation (BLOCKER R3): `src/infrastructure/cache/config.ts` — `buildMacroBriefingCacheKey` missing `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION` segment despite `macroBriefingPrompt.ts` output change in this PR (numeric format support added).
-- Rule: MISTAKES.md Infrastructure Functions 6 — cache builders' template/prompt versions must be incremented when rendered bytes change; keys must include version segment to bust stale entries.
-- Context: Sibling builder `buildBriefingCacheKey` was correctly bumped in same PR. Macro briefing was overlooked. Audit on review: all 14 `build*Key` functions in config.ts verified; macro-briefing was sole LLM-output key missing version interpolation.
-- Fixed in R3: Added `MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p1'`, appended to key interpolation, updated corresponding tests. Full sibling audit completed and documented in MISTAKES.md §Infrastructure Functions 6 recurrence note.
+- Violation 1: `import type` placed after declarations in analysisUtils.ts instead of at top of file
+  Rule: CONVENTIONS.md — import-types-at-top
+  Context: Import type statements must be grouped at the top of the file before other code and declarations. Fixed in Round 1 hotfix.
+
+- Violation 2: JSON salvage algorithm too broad — scanned for first `{` anywhere in text
+  Rule: Infrastructure safety — JSON parsing validation
+  Context: JSON salvage function risked false positives from prose containing `{}` stray pairs. Restricted scan to text starting with `{`, reducing false parse attempts. Fixed in Round 1 hotfix.
+
+## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 main: overloads
+
+- Violation 5: Legacy positional overloads (buildChatPrompt 6-arg, buildNewsAnalysisPrompt 4/5-arg) changed default behavior (currency) without JSDoc or tests
+  Rule: TypeScript — API contract documentation on silent behavior changes
+  Context: Functions support legacy positional call signatures for backwards compatibility, but currency default logic changed. JSDoc updates and test coverage added to document new behavior and prevent regression. Fixed in Round 1 main.
+
+## [Branch fix/prompt-precision-currency | 2026-09-11] — Lesson: Real-data validation required for prompt changes
+
+- Lesson (non-blocker, verification finding): Prompt-number changes must be validated by rendering real data and comparing distributions, not only by unit tests
+  Rule: Testing best practice — prompt logic verification scope
+  Context: Audit recommendation to floor structural risk:reward leg at one mean bar range passed all 90+ unit tests but, when rendered over real market data (90 charts), flipped 34 verdicts from >= 1.0 to < 1.0 and made verdict sentences false. Recommendation was removed post-R1. Unit test coverage is insufficient for prompt calculations involving conditional defaults or output transformations. Rendering real data distributions before deployment is mandatory.
 
 

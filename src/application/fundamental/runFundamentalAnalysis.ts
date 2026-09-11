@@ -249,7 +249,8 @@ export async function runFundamentalAnalysis(
         symbol,
         snapshot,
         skillSampling.skills,
-        locale
+        locale,
+        options.currency
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

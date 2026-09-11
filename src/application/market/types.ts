@@ -79,10 +79,11 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * Currency used to render prices in the generated analysis text.
      *
      * Supplied by the caller, which owns the exchange→currency catalog; core
-     * never infers it from the symbol (see {@link CurrencyCode}). It affects
-     * only the stop-loss and take-profit figures in `reconciledLevels.exit`.
-     * Omitted callers get `'USD'` and the exact output produced before this
-     * field existed.
+     * never infers it from the symbol (see {@link CurrencyCode}). It sets the
+     * prompt's listing framing and price precision (`KRW` → a Korean listing
+     * quoted in whole won), its pivot session calendar, and the stop-loss and
+     * take-profit figures in `reconciledLevels.exit`. Omitted callers get
+     * `'USD'`.
      *
      * ⚠️ Deliberately NOT part of the analysis cache key. Currency is a fixed
      * property of a symbol, so two requests for the same symbol cannot

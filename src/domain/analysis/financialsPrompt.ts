@@ -17,7 +17,6 @@ import type {
     BalanceSheetRow,
     CashFlowGrowthRow,
     CashFlowRow,
-    CurrencyCode,
     FinancialGrowthRow,
     FinancialsScorecard,
     FinancialsSnapshot,
@@ -25,11 +24,17 @@ import type {
     IncomeStatementRow,
     Skill,
 } from '@/domain/types';
-import {
-    formatLargeAmount,
-    formatNullableNumber as fmt,
-    listingCurrency,
-} from './promptFormat';
+import { formatLargeAmount, formatNullableNumber as fmt } from './promptFormat';
+
+/**
+ * A statement amount labelled with its row's reporting currency, or unlabelled when the
+ * provider did not say. Never the listing currency: an ADR files in its home currency, and
+ * labelling TSM's TWD statements `USD` overstated them 30×.
+ */
+const statementAmount =
+    (row: { reportedCurrency?: string | null }) =>
+    (n: number | null | undefined): string =>
+        formatLargeAmount(n, row.reportedCurrency ?? undefined);
 
 const PERCENT_DECIMAL_PLACES = 1;
 const FRACTION_TO_PERCENT = 100;
@@ -64,19 +69,14 @@ function fmtGrowthPct(n: number | null | undefined): string {
  *
  * Covers revenue, grossProfit, operatingIncome, netIncome, EPS, and margin fields.
  */
-function formatIncomeSection(
-    rows: IncomeStatementRow[],
-    currency: CurrencyCode
-): string {
+function formatIncomeSection(rows: IncomeStatementRow[]): string {
     if (rows.length === 0) return '  (No income statement data available)';
-    const amount = (n: number | null | undefined): string =>
-        formatLargeAmount(n, currency);
     return rows
         .slice(0, 3)
-        .map(
-            r =>
-                `  ${r.fiscalYear} (${r.period}): Revenue ${amount(r.revenue)}, Gross Profit ${amount(r.grossProfit)}, Operating Income ${amount(r.operatingIncome)}, Net Income ${amount(r.netIncome)}, EPS ${fmt(r.eps)} | Gross Margin ${fmtPct(r.grossMargin)}, Op. Margin ${fmtPct(r.operatingMargin)}, Net Margin ${fmtPct(r.netMargin)}`
-        )
+        .map(r => {
+            const amount = statementAmount(r);
+            return `  ${r.fiscalYear} (${r.period}): Revenue ${amount(r.revenue)}, Gross Profit ${amount(r.grossProfit)}, Operating Income ${amount(r.operatingIncome)}, Net Income ${amount(r.netIncome)}, EPS ${fmt(r.eps)} | Gross Margin ${fmtPct(r.grossMargin)}, Op. Margin ${fmtPct(r.operatingMargin)}, Net Margin ${fmtPct(r.netMargin)}`;
+        })
         .join('\n');
 }
 
@@ -85,19 +85,14 @@ function formatIncomeSection(
  *
  * Covers total assets, liabilities, net debt, cash, equity, and current ratio.
  */
-function formatBalanceSection(
-    rows: BalanceSheetRow[],
-    currency: CurrencyCode
-): string {
+function formatBalanceSection(rows: BalanceSheetRow[]): string {
     if (rows.length === 0) return '  (No balance sheet data available)';
-    const amount = (n: number | null | undefined): string =>
-        formatLargeAmount(n, currency);
     return rows
         .slice(0, 2)
-        .map(
-            r =>
-                `  ${r.fiscalYear} (${r.period}): Total Assets ${amount(r.totalAssets)}, Total Liabilities ${amount(r.totalLiabilities)}, Net Debt ${amount(r.netDebt)}, Cash ${amount(r.cashAndShortTermInvestments)}, Equity ${amount(r.totalStockholdersEquity)}, Current Ratio ${fmt(r.currentRatio)}`
-        )
+        .map(r => {
+            const amount = statementAmount(r);
+            return `  ${r.fiscalYear} (${r.period}): Total Assets ${amount(r.totalAssets)}, Total Liabilities ${amount(r.totalLiabilities)}, Net Debt ${amount(r.netDebt)}, Cash ${amount(r.cashAndShortTermInvestments)}, Equity ${amount(r.totalStockholdersEquity)}, Current Ratio ${fmt(r.currentRatio)}`;
+        })
         .join('\n');
 }
 
@@ -106,19 +101,14 @@ function formatBalanceSection(
  *
  * Covers operating cash flow, capex, free cash flow, and FCF margin.
  */
-function formatCashFlowSection(
-    rows: CashFlowRow[],
-    currency: CurrencyCode
-): string {
+function formatCashFlowSection(rows: CashFlowRow[]): string {
     if (rows.length === 0) return '  (No cash flow data available)';
-    const amount = (n: number | null | undefined): string =>
-        formatLargeAmount(n, currency);
     return rows
         .slice(0, 2)
-        .map(
-            r =>
-                `  ${r.fiscalYear} (${r.period}): Operating Cash Flow ${amount(r.operatingCashFlow)}, CapEx ${amount(r.capitalExpenditure)}, Free Cash Flow ${amount(r.freeCashFlow)}, FCF Margin ${fmtPct(r.fcfMargin)}`
-        )
+        .map(r => {
+            const amount = statementAmount(r);
+            return `  ${r.fiscalYear} (${r.period}): Operating Cash Flow ${amount(r.operatingCashFlow)}, CapEx ${amount(r.capitalExpenditure)}, Free Cash Flow ${amount(r.freeCashFlow)}, FCF Margin ${fmtPct(r.fcfMargin)}`;
+        })
         .join('\n');
 }
 
@@ -237,8 +227,6 @@ export function buildFinancialsAnalysisPrompt(
             : 'No additional fundamental skills loaded.';
 
     const { growth, quality, solvency, cash, composite } = scorecard;
-    // Statement amounts arrive in the listing's currency: won for KRX, dollars otherwise.
-    const currency = listingCurrency(symbol);
 
     const axisRows = (
         [
@@ -268,13 +256,13 @@ ${skillsSection}`;
 - Do not fabricate missing financial metrics, analyst grades, price targets, or macro catalysts.
 
 ## Income Statement (Revenue / Gross Profit / Operating Income / Net Income / EPS + Margins)
-${formatIncomeSection(snapshot.income, currency)}
+${formatIncomeSection(snapshot.income)}
 
 ## Balance Sheet (Total Assets / Total Liabilities / Net Debt / Cash / Equity / Current Ratio)
-${formatBalanceSection(snapshot.balance, currency)}
+${formatBalanceSection(snapshot.balance)}
 
 ## Cash Flow (Operating Cash Flow / CapEx / Free Cash Flow / FCF Margin)
-${formatCashFlowSection(snapshot.cashFlow, currency)}
+${formatCashFlowSection(snapshot.cashFlow)}
 
 ## Growth (Revenue / Net Income / EPS / FCF Growth + 3Y/5Y/10Y)
 ${formatGrowthSection(snapshot.financialGrowth)}

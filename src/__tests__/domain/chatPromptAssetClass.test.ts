@@ -306,7 +306,10 @@ describe('KRX listing framing (chat / news)', () => {
                 },
             },
             [],
-            '어때요?'
+            '어때요?',
+            undefined,
+            'equity',
+            'KRW'
         );
         expect(payload.systemPrompt).toContain(
             'Korean equity listed on the KRX'
@@ -315,17 +318,42 @@ describe('KRX listing framing (chat / news)', () => {
         expect(payload.systemPrompt).toContain('- Support: 264000 (지지선)');
     });
 
-    it('news frames a KRX symbol as a Korean listing', () => {
+    it('news frames a KRW listing as Korean', () => {
         const prompt = buildNewsAnalysisPrompt(
             '005930.KS',
             '삼성전자',
             [],
             [],
             [],
-            'equity'
+            'equity',
+            undefined,
+            'KRW'
         );
         expect(prompt).toContain('Korean equity listed on the KRX');
         expect(prompt).not.toContain('U.S. equity');
+    });
+
+    it('does not infer the listing from the symbol suffix', () => {
+        // The currency is supplied by the consumer's market profile, never derived.
+        const chat = buildChatPrompt(
+            '005930.KS',
+            '삼성전자',
+            '1Day',
+            analysis,
+            [],
+            '어때요?'
+        );
+        expect(chat.systemPrompt).toContain('U.S. equity');
+        expect(
+            buildNewsAnalysisPrompt(
+                '005930.KS',
+                '삼성전자',
+                [],
+                [],
+                [],
+                'equity'
+            )
+        ).toContain('publicly traded U.S. equity');
     });
 });
 
@@ -348,7 +376,11 @@ describe('buildOverallAnalysisPrompt listing framing and level precision', () =>
             null,
             false,
             null,
-            'equity'
+            'equity',
+            undefined,
+            undefined,
+            undefined,
+            'KRW'
         );
         expect(prompt).toContain('Korean equity listed on the KRX');
         expect(prompt).not.toContain('publicly traded U.S. equity');
@@ -375,6 +407,59 @@ describe('buildOverallAnalysisPrompt listing framing and level precision', () =>
             null,
             'crypto'
         );
-        expect(prompt).toContain('- Key Support Levels: 0.08260 (swing low)');
+        // Crypto keeps five significant digits.
+        expect(prompt).toContain('- Key Support Levels: 0.082600 (swing low)');
+    });
+
+    it('renders every level at the precision the finest one needs', () => {
+        // Per-level precision printed `0.9950` next to `1.01` in one list.
+        const prompt = buildOverallAnalysisPrompt(
+            'XYZ',
+            'XYZ Corp',
+            {
+                ...analysis,
+                keyLevels: {
+                    support: [{ price: 0.995, reason: 'swing low' }],
+                    resistance: [{ price: 1.01, reason: 'swing high' }],
+                },
+            },
+            mockFundamental,
+            mockNews,
+            '1Day'
+        );
+        expect(prompt).toContain('- Key Support Levels: 0.9950 (swing low)');
+        expect(prompt).toContain(
+            '- Key Resistance Levels: 1.0100 (swing high)'
+        );
+    });
+});
+
+describe('legacy overloads never infer the listing from the symbol', () => {
+    // The pre-assetClass overloads cannot carry a currency. Core does not derive one
+    // from the `.KS` suffix (see `CurrencyCode`), so they frame every symbol as the
+    // USD default; callers that need Korean framing use the overloads that take it.
+    it('chat 6-argument overload frames a KRX symbol with the USD default', () => {
+        const payload = buildChatPrompt(
+            '005930.KS',
+            '1Day',
+            analysis,
+            [],
+            '어때요?'
+        );
+        expect(payload.systemPrompt).toContain('U.S. equity');
+        expect(payload.systemPrompt).not.toContain('Korean equity');
+    });
+
+    it('news 4-argument overload frames a KRX symbol with the USD default', () => {
+        // The local wrapper's Parameters<> only sees the last overload, so call the raw builder.
+        const { stable, dynamic } = buildNewsAnalysisPromptRaw(
+            '005930.KS',
+            [],
+            [],
+            []
+        );
+        const prompt = `${stable}\n\n${dynamic}`;
+        expect(prompt).toContain('publicly traded U.S. equity');
+        expect(prompt).not.toContain('Korean equity');
     });
 });
