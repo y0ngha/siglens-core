@@ -1,17 +1,12 @@
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
+import { LANGUAGE_NAME, formatNowLine } from './promptShared';
+import type { AgentLocale } from './promptShared';
+
+export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-12.2';
-
-export type AgentLocale = 'ko' | 'en' | 'ja' | 'zh';
-
-const LANGUAGE_NAME: Record<AgentLocale, string> = {
-    ko: 'Korean',
-    en: 'English',
-    ja: 'Japanese',
-    zh: 'Chinese',
-};
+export const AGENT_PROMPT_VERSION = '2026-09-12.3';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -25,22 +20,6 @@ export interface BuildAgentSystemPromptInput {
      * into the system prompt.
      */
     portfolioSymbols?: readonly string[];
-}
-
-/** `YYYY-MM-DD, HH:MM` in the given zone, independent of locale-pattern quirks across Intl implementations. */
-function formatClock(now: Date, timeZone: string): string {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-    }).formatToParts(now);
-    const get = (type: Intl.DateTimeFormatPartTypes): string =>
-        parts.find(p => p.type === type)?.value ?? '';
-    return `${get('year')}-${get('month')}-${get('day')}, ${get('hour')}:${get('minute')}`;
 }
 
 /**
@@ -89,14 +68,15 @@ Rules:
 ## Output
 - Answer in ${language}.
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
-- Cite which tool the numbers came from and the asOf time, in plain words (e.g. source get_quote, asOf <time> ET).
+- Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: siglens 시세, 2026-09-12 08:57 ET 기준)").
+- Never write internal tool names (get_quote, get_news, run_fresh_analysis, …) or function-call syntax in the answer. Call them siglens quotes / bars & indicators / analysis / news / options / portfolio / web search, in the answer language.
 - Short paragraphs, bullets for lists, no tables wider than 4 columns. Do not emit markdown images.
 
 ## User
 ${input.portfolioSymbols && input.portfolioSymbols.length > 0 ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).` : '- No holdings on file.'}
 
 ## Now
-- ET: ${formatClock(input.now, 'America/New_York')} · KST: ${formatClock(input.now, 'Asia/Seoul')}
+- ${formatNowLine(input.now)}
 - US regular session: ${input.etSessionStatus}
 - Prompt version: ${AGENT_PROMPT_VERSION}`;
 }
