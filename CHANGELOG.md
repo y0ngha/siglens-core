@@ -1,5 +1,12 @@
 # Changelog
 
+# [1.2.0](https://github.com/y0ngha/siglens-core/compare/v1.1.0...v1.2.0) (2026-09-12)
+
+
+### Features
+
+* **agent:** 첫 화면 제안 질문 프롬프트·파서 추가, 답변 출처 표기를 서비스 이름으로 강제 ([fc56bd9](https://github.com/y0ngha/siglens-core/commit/fc56bd96e0c44b2a5c01f734ed97bc9a0e399fb0))
+
 # [1.1.0](https://github.com/y0ngha/siglens-core/compare/v1.0.4...v1.1.0) (2026-09-11)
 
 
