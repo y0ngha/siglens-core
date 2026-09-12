@@ -371,6 +371,13 @@ export {
     selectHistoryWindow,
     estimateTokens,
 } from './domain/agent/selectHistoryWindow';
+export {
+    buildSuggestionsPrompt,
+    parseSuggestions,
+    SUGGESTIONS_PROMPT_VERSION,
+    SUGGESTION_COUNT,
+    SUGGESTION_MAX_CHARS,
+} from './domain/agent/buildSuggestionsPrompt';
 
 // =============================================================================
 // Tier 3 — Infrastructure Factories & Config
@@ -1004,6 +1011,12 @@ export type {
     BuildAgentSystemPromptInput,
 } from './domain/agent/buildAgentSystemPrompt';
 export type { HistoryWindowOptions } from './domain/agent/selectHistoryWindow';
+export type {
+    SuggestionHeadline,
+    BuildSuggestionsPromptInput,
+    SuggestionsPrompt,
+    ParseSuggestionsOptions,
+} from './domain/agent/buildSuggestionsPrompt';
 export type { CounterStore } from './domain/ports/counterStore';
 export type {
     CounterStoreOptions,

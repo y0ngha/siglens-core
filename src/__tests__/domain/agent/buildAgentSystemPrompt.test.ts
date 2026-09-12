@@ -58,4 +58,13 @@ describe('buildAgentSystemPrompt', () => {
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
+
+    it('내부 툴 이름 인용을 금지하고 출처를 서비스 이름으로 부르게 한다', () => {
+        expect(prompt).toContain('Never write internal tool names');
+        expect(prompt).toContain(
+            'siglens quotes / bars & indicators / analysis / news / options / portfolio / web search'
+        );
+        expect(prompt).not.toContain('source get_quote');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-12.3');
+    });
 });
