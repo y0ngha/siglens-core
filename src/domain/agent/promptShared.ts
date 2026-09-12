@@ -1,3 +1,4 @@
+/** Supported answer languages for the agent and suggestion prompts. */
 export type AgentLocale = 'ko' | 'en' | 'ja' | 'zh';
 
 /** @internal Display name per {@link AgentLocale}, for the "Answer in ${language}" instruction. */
