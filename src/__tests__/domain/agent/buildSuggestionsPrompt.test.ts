@@ -104,4 +104,23 @@ describe('parseSuggestions', () => {
             parseSuggestions('["abc","de","f"]', { count: 2, maxChars: 2 })
         ).toEqual(['de', 'f']);
     });
+    it('낱개 대괄호 쌍이 MAX_BRACKET_CANDIDATES(8)개를 채우면 그 뒤 실배열을 못 찾는다', () => {
+        // 9 stray `[n]` pairs exhaust the 8-slot open cap before the real
+        // array's own `[` is ever collected as a candidate.
+        const strayPairs = Array.from({ length: 9 }, (_, i) => `[${i}]`).join(
+            ' noise '
+        );
+        expect(parseSuggestions(`${strayPairs} noise ["a","b"]`)).toEqual([]);
+    });
+    it('낱개 대괄호 쌍이 7개까지는 캡 안에 들어와 실배열을 찾는다', () => {
+        // 7 stray pairs + the real array's `[` is exactly 8 — still within
+        // the cap, so the real array is found.
+        const strayPairs = Array.from({ length: 7 }, (_, i) => `[${i}]`).join(
+            ' noise '
+        );
+        expect(parseSuggestions(`${strayPairs} noise ["a","b"]`)).toEqual([
+            'a',
+            'b',
+        ]);
+    });
 });

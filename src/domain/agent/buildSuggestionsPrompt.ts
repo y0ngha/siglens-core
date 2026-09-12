@@ -1,16 +1,23 @@
 import type { EtSessionStatus } from '@/domain/types';
-import type { AgentLocale } from './promptShared';
-import { LANGUAGE_NAME, formatNowLine } from './promptShared';
+import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
 
+/** One recent headline offered to the model as suggestion-topic material. */
 export interface SuggestionHeadline {
+    /** Headline text, verbatim. */
     readonly title: string;
+    /** Ticker the headline is about, when known. */
     readonly symbol?: string;
+    /** Headline category/section label, when known. */
     readonly category?: string;
 }
 
+/** Input to {@link buildSuggestionsPrompt}. */
 export interface BuildSuggestionsPromptInput {
+    /** Output language for the generated questions. */
     readonly locale: AgentLocale;
+    /** Current time, stamped into the `## Now` block. */
     readonly now: Date;
+    /** US regular session state, stamped into the `## Now` block. */
     readonly etSessionStatus: EtSessionStatus;
     /** Newest first, at most a handful (siglens passes <= 8). */
     readonly headlines: readonly SuggestionHeadline[];
@@ -18,8 +25,11 @@ export interface BuildSuggestionsPromptInput {
     readonly portfolioSymbols?: readonly string[];
 }
 
+/** System/user prompt pair returned by {@link buildSuggestionsPrompt}. */
 export interface SuggestionsPrompt {
+    /** System prompt: rules for writing the questions. */
     readonly system: string;
+    /** User prompt: current time, headlines, and holdings context. */
     readonly user: string;
 }
 
@@ -35,6 +45,10 @@ export const SUGGESTION_MAX_CHARS = 60;
  * (single-shot chat completion, no tools). Provider-neutral like
  * `buildAgentSystemPrompt`; siglens calls the provider and runs
  * `parseSuggestions` on the text.
+ *
+ * @param input - Locale, current time, ET session status, recent headlines,
+ * and the signed-in user's portfolio symbols (if any).
+ * @returns The system/user prompt pair — see {@link SuggestionsPrompt}.
  */
 export function buildSuggestionsPrompt(
     input: BuildSuggestionsPromptInput
@@ -123,14 +137,29 @@ function extractJsonArray(raw: string): unknown[] | null {
     return null;
 }
 
+/** Parsing limits for {@link parseSuggestions}. */
+export interface ParseSuggestionsOptions {
+    /** Max number of suggestions to keep. Defaults to `SUGGESTION_COUNT` (6). */
+    readonly count?: number;
+    /** Max length (UTF-16 units) per suggestion; longer entries are dropped. Defaults to `SUGGESTION_MAX_CHARS` (60). */
+    readonly maxChars?: number;
+}
+
 /**
  * Extracts the JSON string array from a model reply. Tolerates prose and
  * ```json fences around it; anything that is not a JSON array yields `[]` so
  * the caller falls back to its static list instead of showing garbage.
+ *
+ * @param raw - The raw model completion text.
+ * @param options - Optional overrides for the suggestion count and per-item
+ * character cap; defaults to `SUGGESTION_COUNT` (6) and `SUGGESTION_MAX_CHARS`
+ * (60) respectively.
+ * @returns Deduplicated (case-insensitive), trimmed suggestion strings,
+ * capped at `count`; `[]` when no JSON array was found in `raw`.
  */
 export function parseSuggestions(
     raw: string,
-    options: { count?: number; maxChars?: number } = {}
+    options: ParseSuggestionsOptions = {}
 ): string[] {
     const count = options.count ?? SUGGESTION_COUNT;
     const maxChars = options.maxChars ?? SUGGESTION_MAX_CHARS;

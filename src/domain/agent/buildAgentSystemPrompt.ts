@@ -1,7 +1,6 @@
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
-import { LANGUAGE_NAME, formatNowLine } from './promptShared';
-import type { AgentLocale } from './promptShared';
+import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
 
 export type { AgentLocale };
 

@@ -1015,6 +1015,7 @@ export type {
     SuggestionHeadline,
     BuildSuggestionsPromptInput,
     SuggestionsPrompt,
+    ParseSuggestionsOptions,
 } from './domain/agent/buildSuggestionsPrompt';
 export type { CounterStore } from './domain/ports/counterStore';
 export type {

@@ -1,5 +1,6 @@
 export type AgentLocale = 'ko' | 'en' | 'ja' | 'zh';
 
+/** @internal Display name per {@link AgentLocale}, for the "Answer in ${language}" instruction. */
 export const LANGUAGE_NAME: Record<AgentLocale, string> = {
     ko: 'Korean',
     en: 'English',
@@ -23,7 +24,7 @@ function formatClock(now: Date, timeZone: string): string {
     return `${get('year')}-${get('month')}-${get('day')}, ${get('hour')}:${get('minute')}`;
 }
 
-/** ET·KST on one line, same wording in every prompt that states the current time. */
+/** @internal ET·KST on one line, same wording in every prompt that states the current time. */
 export function formatNowLine(now: Date): string {
     return `ET: ${formatClock(now, 'America/New_York')} · KST: ${formatClock(now, 'Asia/Seoul')}`;
 }
