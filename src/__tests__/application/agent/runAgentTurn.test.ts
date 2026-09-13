@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AGENT_TURN_CAPS } from '@/application/agent/limits';
 import { runAgentTurn } from '@/application/agent/runAgentTurn';
 import type {
     AgentCounters,
@@ -163,7 +164,7 @@ describe('runAgentTurn', () => {
         expect(r.intermediate).toEqual([]);
         expect(r.usage.steps).toBe(1);
         expect(r.promptVersion).toBe(AGENT_PROMPT_VERSION);
-        expect(r.remaining).toEqual({ turns: 59, fresh: 6, search: 5 });
+        expect(r.remaining).toEqual({ turns: 59, fresh: 15, search: 5 });
         expect(d.counters.turns.count).toBe(1);
         expect(d.events.map(e => e.type)).toEqual(['text', 'usage', 'stop']);
         expect(p.calls[0]!.messages.at(-1)).toEqual({
@@ -303,7 +304,8 @@ describe('runAgentTurn', () => {
         ).toEqual(['c1', 'c2']);
     });
 
-    it('run_fresh_analysis는 턴당 1회·일일 한도 소비, 두 번째는 quota 오류', async () => {
+    it('run_fresh_analysis는 턴당 상한까지 실행·일일 한도 소비, 초과분은 quota 오류', async () => {
+        const cap = AGENT_TURN_CAPS.maxFreshAnalysis;
         const fresh = (id: string) => ({
             id,
             name: 'run_fresh_analysis',
@@ -312,7 +314,9 @@ describe('runAgentTurn', () => {
         const p = scriptedProvider([
             {
                 text: '',
-                toolCalls: [fresh('f1'), fresh('f2')],
+                toolCalls: Array.from({ length: cap + 1 }, (_, i) =>
+                    fresh(`f${i}`)
+                ),
                 stopReason: 'tool_use',
                 usage: USAGE,
             },
@@ -320,9 +324,9 @@ describe('runAgentTurn', () => {
         ]);
         const d = deps(p);
         await runAgentTurn(params(), d);
-        expect(d.executeTool).toHaveBeenCalledTimes(1);
-        expect(d.counters.freshAnalysis.count).toBe(1);
-        expect(toolResults(p.calls[1]!)[1]).toEqual({
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
+        expect(d.counters.freshAnalysis.count).toBe(cap);
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
             error: 'quota',
             scope: 'per_turn',
         });
@@ -453,8 +457,12 @@ describe('runAgentTurn', () => {
         expect(toolResults(p.calls[1]!)).toEqual([{ error: 'unavailable' }]);
     });
 
-    it('턴당 심볼 3개 초과 → quota per_turn_symbols', async () => {
-        const many = ['A', 'B', 'C', 'D'].map((s, i) => ({
+    it('턴당 심볼 상한 초과 → quota per_turn_symbols', async () => {
+        const cap = AGENT_TURN_CAPS.maxDistinctSymbols;
+        const letters = Array.from({ length: cap + 1 }, (_, i) =>
+            String.fromCharCode(65 + i)
+        );
+        const many = letters.map((s, i) => ({
             id: `q${i}`,
             name: 'get_options_summary',
             args: { symbol: s },
@@ -465,20 +473,21 @@ describe('runAgentTurn', () => {
         ]);
         const d = deps(p);
         await runAgentTurn(params(), d);
-        expect(d.executeTool).toHaveBeenCalledTimes(3);
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
         expect(d.executeTool).not.toHaveBeenCalledWith(
             'get_options_summary',
-            { symbol: 'D' },
+            { symbol: letters[cap] },
             expect.anything()
         );
-        expect(toolResults(p.calls[1]!)[3]).toEqual({
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
             error: 'quota',
             scope: 'per_turn_symbols',
         });
     });
 
-    it('턴당 툴 호출 8회 초과 → quota per_turn_tools', async () => {
-        const nine = Array.from({ length: 9 }, (_, i) => ({
+    it('턴당 툴 호출 상한 초과 → quota per_turn_tools', async () => {
+        const cap = AGENT_TURN_CAPS.maxToolCalls;
+        const nine = Array.from({ length: cap + 1 }, (_, i) => ({
             ...quoteCall,
             id: `q${i}`,
         }));
@@ -488,8 +497,8 @@ describe('runAgentTurn', () => {
         ]);
         const d = deps(p);
         await runAgentTurn(params(), d);
-        expect(d.executeTool).toHaveBeenCalledTimes(8);
-        expect(toolResults(p.calls[1]!)[8]).toEqual({
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
             error: 'quota',
             scope: 'per_turn_tools',
         });
@@ -516,7 +525,8 @@ describe('runAgentTurn', () => {
         ]);
     });
 
-    it('한 스텝에서 web_search 3회 → 세 번째는 per_turn quota, 실행기는 최대 2회', async () => {
+    it('한 스텝에서 web_search 상한+1회 → 초과분은 per_turn quota, 실행기는 상한까지만', async () => {
+        const cap = AGENT_TURN_CAPS.maxWebSearch;
         const search = (id: string) => ({
             id,
             name: 'web_search',
@@ -525,7 +535,9 @@ describe('runAgentTurn', () => {
         const p = scriptedProvider([
             {
                 text: '',
-                toolCalls: [search('w1'), search('w2'), search('w3')],
+                toolCalls: Array.from({ length: cap + 1 }, (_, i) =>
+                    search(`w${i}`)
+                ),
                 stopReason: 'tool_use',
                 usage: USAGE,
             },
@@ -533,8 +545,8 @@ describe('runAgentTurn', () => {
         ]);
         const d = deps(p);
         await runAgentTurn(params(), d);
-        expect(d.executeTool).toHaveBeenCalledTimes(2);
-        expect(toolResults(p.calls[1]!)[2]).toEqual({
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
             error: 'quota',
             scope: 'per_turn',
         });
@@ -547,16 +559,17 @@ describe('runAgentTurn', () => {
             stopReason: 'tool_use' as const,
             usage: USAGE,
         };
+        const steps = AGENT_TURN_CAPS.maxSteps;
         const p = scriptedProvider(
-            Array.from({ length: 7 }, () => ({ ...loop }))
+            Array.from({ length: steps + 1 }, () => ({ ...loop }))
         );
         const d = deps(p);
         const r = await runAgentTurn(params(), d);
         expect(r.ok).toBe(true);
         expect(r.ok && r.stopReason).toBe('end');
-        expect(p.call).toHaveBeenCalledTimes(6);
+        expect(p.call).toHaveBeenCalledTimes(steps);
         expect(p.calls[0]!.tools.length).toBeGreaterThan(0);
-        expect(p.calls[5]!.tools).toEqual([]);
+        expect(p.calls[steps - 1]!.tools).toEqual([]);
     });
 
     it('툴 타임아웃 → {error:"timeout"}', async () => {

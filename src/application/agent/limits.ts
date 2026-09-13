@@ -13,7 +13,7 @@ type PerTier = Readonly<Record<Tier, number>>;
 export const AGENT_LIMITS = {
     turnsPerDay: { free: 10, member: 60, pro: 200 } satisfies PerTier,
     premiumModelTurnsPerDay: { free: 0, member: 10, pro: 20 } satisfies PerTier,
-    freshAnalysisPerDay: { free: 0, member: 6, pro: 20 } satisfies PerTier,
+    freshAnalysisPerDay: { free: 0, member: 15, pro: 30 } satisfies PerTier,
     webSearchPerDay: { free: 0, member: 5, pro: 10 } satisfies PerTier,
     conversationsMax: { free: 0, member: 100, pro: 300 } satisfies PerTier,
     messagesPerConversation: 200,
@@ -41,13 +41,20 @@ export const AGENT_GLOBAL_LIMITS = {
     webSearchPerMonth: 1000,
 } as const;
 
-/** Per-turn hard caps (spec §4-2). */
+/**
+ * Per-turn hard caps (spec §4-2). Ceilings, not targets: the model decides how
+ * many lookups a question needs, so simple questions still end in one or two
+ * steps. Raised 2026-09-13 so a "news + overall + options + technical +
+ * fundamentals" question on a few symbols fits in one turn. `maxWebSearch`
+ * stays well below the daily quotas because the global Brave budget
+ * (`AGENT_GLOBAL_LIMITS`) is shared by every user.
+ */
 export const AGENT_TURN_CAPS = {
-    maxSteps: 6,
-    maxToolCalls: 8,
-    maxWebSearch: 2,
-    maxFreshAnalysis: 1,
-    maxDistinctSymbols: 3,
+    maxSteps: 10,
+    maxToolCalls: 30,
+    maxWebSearch: 4,
+    maxFreshAnalysis: 3,
+    maxDistinctSymbols: 5,
     turnDeadlineMs: 600_000,
 } as const;
 
