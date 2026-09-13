@@ -632,6 +632,24 @@ describe('runAgentTurn', () => {
         expect(p.call).not.toHaveBeenCalled();
     });
 
+    it('무제한 턴(member)은 턴 카운터 장애와 무관하게 정상 완료된다 — 세지 않으므로 server_busy가 아니다', async () => {
+        const p = scriptedProvider([
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        d.counters.turns = unavailableCounter();
+        d.counters.freshAnalysis = unavailableCounter();
+        d.counters.webSearchUser = unavailableCounter();
+        const r = await runAgentTurn(params({ tier: 'member' }), d);
+        expect(r.ok).toBe(true);
+        expect(r.ok && r.remaining).toEqual({
+            turns: null,
+            fresh: null,
+            search: null,
+        });
+        expect(p.call).toHaveBeenCalledTimes(1);
+    });
+
     it('턴 카운터 장애 → server_busy, 프로바이더 미호출', async () => {
         const p = scriptedProvider([]);
         const d = deps(p);

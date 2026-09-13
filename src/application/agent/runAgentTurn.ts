@@ -330,6 +330,12 @@ export async function runAgentTurn(
             await release();
             return { refusal };
         };
+        // Per-user daily fresh-analysis / web-search quotas are uncapped for
+        // every tier today (`AGENT_LIMITS`), so `claim` returns before touching
+        // those counters and the `daily` refusals below cannot fire. They stay
+        // on purpose: a finite tier limit can come back by changing one number
+        // in `limits.ts`, without re-plumbing counters or refusal shapes. The
+        // shared Brave budget (`AGENT_GLOBAL_LIMITS`) is still enforced here.
         try {
             if (name === 'run_fresh_analysis') {
                 if (

@@ -5,7 +5,7 @@ import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-13.5';
+export const AGENT_PROMPT_VERSION = '2026-09-13.4';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
