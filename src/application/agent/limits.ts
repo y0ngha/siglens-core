@@ -4,28 +4,33 @@ import type { Tier } from '@/domain/types';
 type PerTier = Readonly<Record<Tier, number>>;
 
 /**
- * Per-user daily quotas (spec §4-5). `free` = anonymous visitor, counted per
- * IP by the consumer: a few plain turns to try the assistant, and every
- * metered tool at 0 — `runAgentTurn` turns a 0 guest quota into
- * `{"error":"login_required"}` so the answer offers sign-in instead of
- * "come back tomorrow".
+ * Per-user daily quotas (spec §4-5). SIGLENS sets no daily analysis or
+ * chatbot count limit (`TIER_CONFIG.limits` are `Infinity`), so the agent does
+ * not invent one either: fresh analyses and web search are uncapped for every
+ * tier, guests included, and so are signed-in turns. What still bounds cost
+ * is structural — the per-turn caps (`AGENT_TURN_CAPS`), the shared Brave
+ * budget (`AGENT_GLOBAL_LIMITS`) and the consumer's concurrency limits.
+ * `free` = anonymous visitor: a small daily turn allowance (counted per guest
+ * by the consumer). `runAgentTurn` skips the counter for an `Infinity` quota
+ * and still answers `{"error":"login_required"}` for a guest quota set to 0.
  */
 export const AGENT_LIMITS = {
-    turnsPerDay: { free: 10, member: 60, pro: 200 } satisfies PerTier,
-    premiumModelTurnsPerDay: { free: 0, member: 10, pro: 20 } satisfies PerTier,
-    /**
-     * Uncapped for signed-in users: SIGLENS itself sets no daily analysis
-     * limit (`TIER_CONFIG.limits.analysisPerDay` is `Infinity`), so the agent
-     * must not invent one. Per-turn (`AGENT_TURN_CAPS.maxFreshAnalysis`) and
-     * per-instance concurrency caps still bound a single turn. Guests stay 0
-     * (`login_required`).
-     */
-    freshAnalysisPerDay: {
-        free: 0,
+    turnsPerDay: {
+        free: 10,
         member: Infinity,
         pro: Infinity,
     } satisfies PerTier,
-    webSearchPerDay: { free: 0, member: 5, pro: 10 } satisfies PerTier,
+    premiumModelTurnsPerDay: { free: 0, member: 10, pro: 20 } satisfies PerTier,
+    freshAnalysisPerDay: {
+        free: Infinity,
+        member: Infinity,
+        pro: Infinity,
+    } satisfies PerTier,
+    webSearchPerDay: {
+        free: Infinity,
+        member: Infinity,
+        pro: Infinity,
+    } satisfies PerTier,
     conversationsMax: { free: 0, member: 100, pro: 300 } satisfies PerTier,
     messagesPerConversation: 200,
 } as const;
