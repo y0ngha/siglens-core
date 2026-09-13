@@ -718,6 +718,21 @@ describe('runAgentTurn', () => {
         expect(d.counters.turns.count).toBe(0);
     });
 
+    it('프리미엄 모델 턴의 프로바이더 실패 → premium 카운터 환불(pro: 턴은 무제한, premium은 유한)', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const p = failingProvider(
+            Object.assign(new Error('rl'), { status: 429 })
+        );
+        const d = deps(p);
+        const r = await runAgentTurn(
+            params({ tier: 'pro', model: 'claude-sonnet-5' }),
+            d
+        );
+        expect(r).toEqual({ ok: false, error: 'rate_limited' });
+        expect(d.counters.premiumTurns.count).toBe(0);
+        expect(d.counters.turns.count).toBe(0);
+    });
+
     it('abort → aborted, 부분 텍스트 반환, 환불 없음', async () => {
         const controller = new AbortController();
         const p = {
@@ -880,7 +895,7 @@ describe('runAgentTurn', () => {
         expect(d.counters.turns.count).toBe(0);
     });
 
-    it('web_search 실행 실패 → 유저 카운터만 환불, 전역 카운터는 유지', async () => {
+    it('web_search 실행 실패 → 유저 일일 한도는 무제한이라 소비되지 않고, 전역 카운터는 유지', async () => {
         const p = scriptedProvider([
             {
                 text: '',
