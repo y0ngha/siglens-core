@@ -3,9 +3,15 @@ import type { Tier } from '@/domain/types';
 
 type PerTier = Readonly<Record<Tier, number>>;
 
-/** Per-user daily quotas (spec §4-5). `free` = anonymous/unauthenticated → 0. */
+/**
+ * Per-user daily quotas (spec §4-5). `free` = anonymous visitor, counted per
+ * IP by the consumer: a few plain turns to try the assistant, and every
+ * metered tool at 0 — `runAgentTurn` turns a 0 guest quota into
+ * `{"error":"login_required"}` so the answer offers sign-in instead of
+ * "come back tomorrow".
+ */
 export const AGENT_LIMITS = {
-    turnsPerDay: { free: 0, member: 60, pro: 200 } satisfies PerTier,
+    turnsPerDay: { free: 10, member: 60, pro: 200 } satisfies PerTier,
     premiumModelTurnsPerDay: { free: 0, member: 10, pro: 20 } satisfies PerTier,
     freshAnalysisPerDay: { free: 0, member: 6, pro: 20 } satisfies PerTier,
     webSearchPerDay: { free: 0, member: 5, pro: 10 } satisfies PerTier,

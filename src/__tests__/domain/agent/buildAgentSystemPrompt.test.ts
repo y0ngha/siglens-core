@@ -44,6 +44,25 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).not.toContain('currently holds');
     });
 
+    it('게스트면 로그인이 필요한 기능을 알리고, login_required 처리 규칙과 브랜드 표기를 담는다', () => {
+        const guest = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+            guest: true,
+        });
+        expect(guest).toContain('The user is not signed in');
+        expect(prompt).not.toContain('The user is not signed in');
+        expect(prompt).toContain('{"error":"login_required"}');
+        expect(prompt).toContain('You are SIGLENS AI');
+        expect(prompt).toContain('출처: SIGLENS 시세');
+        // Brand rule aside, no lowercase product name leaks into the prompt.
+        expect(
+            prompt.replace(/never "siglens", "Siglens" or "SiglensAI"/, '')
+        ).not.toMatch(/\bsiglens\b(?!\.io)/);
+    });
+
     it('가용 툴 이름만 나열한다', () => {
         const p = buildAgentSystemPrompt({
             locale: 'en',
@@ -62,10 +81,10 @@ describe('buildAgentSystemPrompt', () => {
     it('내부 툴 이름 인용을 금지하고 출처를 서비스 이름으로 부르게 한다', () => {
         expect(prompt).toContain('Never write internal tool names');
         expect(prompt).toContain(
-            'siglens quotes / bars & indicators / analysis / news / options / portfolio / web search'
+            'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-13.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-13.2');
     });
 
     it('범위 밖 요청(코드 작성 등)은 짧게 거절하고 코드 블록을 쓰지 않게 한다', () => {
@@ -90,7 +109,7 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'Do not write any text before or between tool calls'
         );
-        expect(prompt).toContain('Do not describe siglens internals');
+        expect(prompt).toContain('Do not describe SIGLENS internals');
         expect(prompt).toContain('never recommend position sizing');
         expect(prompt).toContain(
             'Every number, date and named fact must come from a tool result'
@@ -122,6 +141,6 @@ describe('buildAgentSystemPrompt', () => {
             etSessionStatus: 'open',
         });
         expect(noSearch).not.toContain('web_search');
-        expect(noSearch).toContain('siglens news has nothing on it yet');
+        expect(noSearch).toContain('SIGLENS news has nothing on it yet');
     });
 });

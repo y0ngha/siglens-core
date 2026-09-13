@@ -8,9 +8,12 @@ import {
 } from '@/application/agent/limits';
 
 describe('AGENT_LIMITS', () => {
-    it('free 티어는 전부 0(회원 전용)', () => {
-        expect(agentLimit('free', 'turnsPerDay')).toBe(0);
+    it('free(게스트)는 턴만 소량 허용하고 계량 툴·대화 저장은 0', () => {
+        expect(agentLimit('free', 'turnsPerDay')).toBe(10);
+        expect(agentLimit('free', 'premiumModelTurnsPerDay')).toBe(0);
         expect(agentLimit('free', 'freshAnalysisPerDay')).toBe(0);
+        expect(agentLimit('free', 'webSearchPerDay')).toBe(0);
+        expect(agentLimit('free', 'conversationsMax')).toBe(0);
     });
     it('스펙 §4-5 값', () => {
         expect(agentLimit('member', 'turnsPerDay')).toBe(60);

@@ -25,6 +25,7 @@ import {
     AGENT_TURN_CAPS,
     TOOL_TIMEOUT_MS,
     agentLimit,
+    type AgentPerTierLimit,
 } from './limits';
 import type {
     AgentErrorCode,
@@ -260,6 +261,7 @@ export async function runAgentTurn(
         now,
         etSessionStatus: getEtSessionStatus(now),
         portfolioSymbols: params.portfolioSymbols,
+        guest: tier === 'free',
     });
     const messages: AgentMessage[] = [
         ...selectHistoryWindow(params.history, HISTORY_WINDOW),
@@ -312,6 +314,15 @@ export async function runAgentTurn(
             await release();
             return { refusal };
         };
+        /**
+         * A guest's metered tools are 0 by policy, not exhausted: refuse with
+         * `login_required` so the answer offers
+         * sign-in rather than "try again tomorrow".
+         */
+        const dailyRefusal = (feature: AgentPerTierLimit): GateRefusal =>
+            tier === 'free' && agentLimit(tier, feature) === 0
+                ? { error: 'login_required' }
+                : { error: 'quota', scope: 'daily' };
         try {
             if (name === 'run_fresh_analysis') {
                 if (
@@ -321,7 +332,7 @@ export async function runAgentTurn(
                         agentLimit(tier, 'freshAnalysisPerDay')
                     ))
                 )
-                    return refuse({ error: 'quota', scope: 'daily' });
+                    return refuse(dailyRefusal('freshAnalysisPerDay'));
             }
             if (name === 'web_search') {
                 if (
@@ -331,7 +342,7 @@ export async function runAgentTurn(
                         agentLimit(tier, 'webSearchPerDay')
                     ))
                 )
-                    return refuse({ error: 'quota', scope: 'daily' });
+                    return refuse(dailyRefusal('webSearchPerDay'));
                 if (
                     !(await claim(
                         counters.webSearchGlobalDay,
