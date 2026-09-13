@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/y0ngha/siglens-core/compare/v1.2.0...v1.2.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **agent:** 답변 위생 — UTC 시각·내부 구조 노출·툴 전 내레이션·범위 밖 코드 작성 차단 ([ac3a7dd](https://github.com/y0ngha/siglens-core/commit/ac3a7dd06e9d245899eb65301371c29855e6c23d))
+
 # [1.2.0](https://github.com/y0ngha/siglens-core/compare/v1.1.0...v1.2.0) (2026-09-12)
 
 
