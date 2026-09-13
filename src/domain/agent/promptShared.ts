@@ -25,7 +25,7 @@ function formatClock(now: Date, timeZone: string): string {
     return `${get('year')}-${get('month')}-${get('day')}, ${get('hour')}:${get('minute')}`;
 }
 
-/** @internal UTC·ET·KST on one line, same wording in every prompt that states the current time. UTC is there so the model can convert UTC tool timestamps without knowing whether ET is on daylight time. */
+/** @internal UTC·ET·KST on one line, same wording in every prompt that states the current time. UTC is there so the model can convert UTC timestamps without knowing whether ET is on daylight time. */
 export function formatNowLine(now: Date): string {
     return `UTC: ${formatClock(now, 'UTC')} · ET: ${formatClock(now, 'America/New_York')} · KST: ${formatClock(now, 'Asia/Seoul')}`;
 }

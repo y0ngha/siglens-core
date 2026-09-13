@@ -9,6 +9,10 @@ import {
     selectTools,
     type FreshAnalysisKind,
 } from '@/domain/agent/tools';
+import {
+    localizeTimestamps,
+    resolveAgentTimeZone,
+} from '@/domain/agent/userTimeZone';
 import { validateArgs } from '@/domain/agent/validateArgs';
 import type { AgentMessage, AgentToolCall } from '@/domain/ports/agentProvider';
 import {
@@ -268,10 +272,12 @@ export async function runAgentTurn(
 
     // 2–3. Prompt and window.
     const tools = selectTools(params.availableTools);
+    const timeZone = resolveAgentTimeZone(params.timeZone, params.locale);
     const system = buildAgentSystemPrompt({
         locale: params.locale,
         tools,
         now,
+        timeZone,
         etSessionStatus: getEtSessionStatus(now),
         portfolioSymbols: params.portfolioSymbols,
         guest: tier === 'free',
@@ -477,7 +483,7 @@ export async function runAgentTurn(
         if (failed && !coreStop && !turnSignal.aborted) {
             for (const store of quota.perUser) await safeRefund(store, userId);
         }
-        const content = serialize(payload);
+        const content = serialize(localizeTimestamps(payload, timeZone));
         deps.onEvent({
             type: 'tool_end',
             id: call.id,

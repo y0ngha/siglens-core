@@ -39,6 +39,13 @@ export interface RunAgentTurnParams {
     portfolioSymbols?: readonly string[];
     /** Injectable clock for tests; defaults to `new Date()`. */
     now?: Date;
+    /**
+     * The reader's IANA time zone (e.g. the browser's
+     * `Intl.DateTimeFormat().resolvedOptions().timeZone`). Untrusted: invalid
+     * or missing values fall back to the locale's zone. Every ISO instant in
+     * tool results is rewritten to this zone before the model reads it.
+     */
+    timeZone?: string;
     /** Caller-side abort signal; combined with the internal turn deadline. */
     signal?: AbortSignal;
 }
