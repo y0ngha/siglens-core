@@ -5,7 +5,7 @@ import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-13.3';
+export const AGENT_PROMPT_VERSION = '2026-09-13.4';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -20,9 +20,9 @@ export interface BuildAgentSystemPromptInput {
      */
     portfolioSymbols?: readonly string[];
     /**
-     * `true` for an anonymous visitor (tier `free`). Holdings, fresh analyses
-     * and web search refuse guests with `{"error":"login_required"}`; the
-     * prompt says so up front so the model offers sign-in instead of
+     * `true` for an anonymous visitor (tier `free`). Holdings refuse guests
+     * with `{"error":"login_required"}` (there is no account to hold them);
+     * the prompt says so up front so the model offers logging in instead of
      * promising data it cannot get.
      */
     guest?: boolean;
@@ -103,7 +103,7 @@ Rules:
 ## User
 ${
     input.guest
-        ? '- The user is not logged in. Their holdings, fresh analyses and web search need logging in; quotes, indicators, existing SIGLENS analyses, news and options work without it.'
+        ? '- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, web search) works without it.'
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'

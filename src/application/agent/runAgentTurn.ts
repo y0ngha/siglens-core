@@ -139,6 +139,15 @@ function summarize(content: string): string {
         : content;
 }
 
+/**
+ * @internal Log marker for the shared web-search budget running out. Consumers
+ * alarm on the literal string (siglens `infra/aws/07-alarms.sh`) — it is the
+ * operator's cue to move the search provider to a paid plan. Renaming it
+ * silently kills that alarm.
+ */
+export const WEB_SEARCH_BUDGET_EXHAUSTED_LOG =
+    '[agent] web search budget exhausted';
+
 /** Refunds are best-effort: a failed refund must not turn into a turn error. */
 async function safeRefund(store: CounterStore, subject: string): Promise<void> {
     try {
@@ -213,20 +222,24 @@ export async function runAgentTurn(
     const { counters } = deps;
     const { userId, tier } = params;
 
-    // 1. Daily quotas.
+    // 1. Daily quotas. An uncapped (`Infinity`) quota is not counted at all:
+    // there is nothing to enforce, so a counter-store outage must not turn it
+    // into `server_busy`, and there is no unit to refund later.
     const premium = isPremiumModel(params.model);
-    try {
-        if (
-            !(await counters.turns.consume(
-                userId,
-                agentLimit(tier, 'turnsPerDay')
-            ))
-        ) {
-            return { ok: false, error: 'turn_limit' };
+    const turnLimit = agentLimit(tier, 'turnsPerDay');
+    const turnCounted = turnLimit !== Infinity;
+    if (turnCounted) {
+        try {
+            if (!(await counters.turns.consume(userId, turnLimit))) {
+                return { ok: false, error: 'turn_limit' };
+            }
+        } catch {
+            return { ok: false, error: 'server_busy' };
         }
-    } catch {
-        return { ok: false, error: 'server_busy' };
     }
+    const refundTurnUnit = async (): Promise<void> => {
+        if (turnCounted) await safeRefund(counters.turns, userId);
+    };
     if (premium) {
         let allowed: boolean;
         try {
@@ -235,16 +248,16 @@ export async function runAgentTurn(
                 agentLimit(tier, 'premiumModelTurnsPerDay')
             );
         } catch {
-            await safeRefund(counters.turns, userId);
+            await refundTurnUnit();
             return { ok: false, error: 'server_busy' };
         }
         if (!allowed) {
-            await safeRefund(counters.turns, userId);
+            await refundTurnUnit();
             return { ok: false, error: 'premium_turn_limit' };
         }
     }
     const refundTurn = async (): Promise<void> => {
-        await safeRefund(counters.turns, userId);
+        await refundTurnUnit();
         if (premium) await safeRefund(counters.premiumTurns, userId);
     };
 
@@ -300,6 +313,9 @@ export async function runAgentTurn(
             subject: string,
             limit: number
         ): Promise<boolean> => {
+            // An uncapped quota needs no counter — and must not fail closed on
+            // a counter-store outage for a feature that has no limit to enforce.
+            if (limit === Infinity) return true;
             const ok = await store.consume(subject, limit);
             if (ok) claimed.push([store, subject]);
             return ok;
@@ -314,15 +330,12 @@ export async function runAgentTurn(
             await release();
             return { refusal };
         };
-        /**
-         * A guest's metered tools are 0 by policy, not exhausted: refuse with
-         * `login_required` so the answer offers
-         * sign-in rather than "try again tomorrow".
-         */
-        const dailyRefusal = (feature: AgentPerTierLimit): GateRefusal =>
-            tier === 'free' && agentLimit(tier, feature) === 0
-                ? { error: 'login_required' }
-                : { error: 'quota', scope: 'daily' };
+        // Per-user daily fresh-analysis / web-search quotas are uncapped for
+        // every tier today (`AGENT_LIMITS`), so `claim` returns before touching
+        // those counters and the `daily` refusals below cannot fire. They stay
+        // on purpose: a finite tier limit can come back by changing one number
+        // in `limits.ts`, without re-plumbing counters or refusal shapes. The
+        // shared Brave budget (`AGENT_GLOBAL_LIMITS`) is still enforced here.
         try {
             if (name === 'run_fresh_analysis') {
                 if (
@@ -332,7 +345,7 @@ export async function runAgentTurn(
                         agentLimit(tier, 'freshAnalysisPerDay')
                     ))
                 )
-                    return refuse(dailyRefusal('freshAnalysisPerDay'));
+                    return refuse({ error: 'quota', scope: 'daily' });
             }
             if (name === 'web_search') {
                 if (
@@ -342,23 +355,33 @@ export async function runAgentTurn(
                         agentLimit(tier, 'webSearchPerDay')
                     ))
                 )
-                    return refuse(dailyRefusal('webSearchPerDay'));
+                    return refuse({ error: 'quota', scope: 'daily' });
                 if (
                     !(await claim(
                         counters.webSearchGlobalDay,
                         GLOBAL_SUBJECT,
                         AGENT_GLOBAL_LIMITS.webSearchPerDay
                     ))
-                )
+                ) {
+                    console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+                        scope: 'global_day',
+                        limit: AGENT_GLOBAL_LIMITS.webSearchPerDay,
+                    });
                     return refuse({ error: 'quota', scope: 'global_day' });
+                }
                 if (
                     !(await claim(
                         counters.webSearchGlobalMonth,
                         GLOBAL_SUBJECT,
                         AGENT_GLOBAL_LIMITS.webSearchPerMonth
                     ))
-                )
+                ) {
+                    console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+                        scope: 'global_month',
+                        limit: AGENT_GLOBAL_LIMITS.webSearchPerMonth,
+                    });
                     return refuse({ error: 'quota', scope: 'global_month' });
+                }
             }
             return {
                 perUser: claimed
@@ -524,19 +547,21 @@ export async function runAgentTurn(
                         console.warn('[runAgentTurn] usage log failed', error);
                     }
                 }
+                const remainingOf = (
+                    store: CounterStore,
+                    feature: AgentPerTierLimit
+                ): Promise<number | null> => {
+                    const limit = agentLimit(tier, feature);
+                    // `null` = uncapped. Not `Infinity`: it would serialize as
+                    // `null` anyway, but only after lying in the type.
+                    return limit === Infinity
+                        ? Promise.resolve(null)
+                        : store.remaining(userId, limit);
+                };
                 const [turns, fresh, search] = await Promise.all([
-                    counters.turns.remaining(
-                        userId,
-                        agentLimit(tier, 'turnsPerDay')
-                    ),
-                    counters.freshAnalysis.remaining(
-                        userId,
-                        agentLimit(tier, 'freshAnalysisPerDay')
-                    ),
-                    counters.webSearchUser.remaining(
-                        userId,
-                        agentLimit(tier, 'webSearchPerDay')
-                    ),
+                    remainingOf(counters.turns, 'turnsPerDay'),
+                    remainingOf(counters.freshAnalysis, 'freshAnalysisPerDay'),
+                    remainingOf(counters.webSearchUser, 'webSearchPerDay'),
                 ]);
                 const remaining: AgentRemaining = { turns, fresh, search };
                 const turnUsage: AgentTurnUsage = {
