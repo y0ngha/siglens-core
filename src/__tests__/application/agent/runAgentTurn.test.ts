@@ -360,7 +360,7 @@ describe('runAgentTurn', () => {
             { error: 'login_required' },
         ]);
         expect(d.counters.webSearchGlobalDay.count).toBe(0);
-        expect(p.calls[0]!.system).toContain('The user is not signed in');
+        expect(p.calls[0]!.system).toContain('The user is not logged in');
     });
 
     it('회원의 일일 한도 소진은 login_required가 아니라 quota daily', async () => {
@@ -381,7 +381,7 @@ describe('runAgentTurn', () => {
         expect(toolResults(p.calls[1]!)).toEqual([
             { error: 'quota', scope: 'daily' },
         ]);
-        expect(p.calls[0]!.system).not.toContain('The user is not signed in');
+        expect(p.calls[0]!.system).not.toContain('The user is not logged in');
     });
 
     it('web_search는 유저·전역 일·전역 월 카운터를 모두 소비하고 하나라도 막히면 quota', async () => {

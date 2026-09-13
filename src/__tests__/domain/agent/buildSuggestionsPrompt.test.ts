@@ -42,12 +42,13 @@ describe('buildSuggestionsPrompt', () => {
             'When the headlines concentrate on one company'
         );
     });
-    it('서비스 이름은 SIGLENS로만 부른다', () => {
+    it('서비스 이름은 SIGLENS로 부르고, 추천 질문에는 넣지 않게 한다', () => {
         const { system } = buildSuggestionsPrompt(base);
         expect(system).toContain('SIGLENS AI');
-        expect(system.replace(/never "siglens" or "Siglens"/, '')).not.toMatch(
-            /\bsiglens\b(?!\.io)/
+        expect(system).toContain(
+            'Never mention the service name (SIGLENS) in a question'
         );
+        expect(system).not.toMatch(/\bsiglens\b(?!\.io)/);
     });
 
     it('헤드라인·시각·장 상태를 user에 넣는다', () => {

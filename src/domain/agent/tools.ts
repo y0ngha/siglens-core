@@ -223,7 +223,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'web_search',
         description:
-            'Web search (top 5 results with snippets) for facts SIGLENS data does not hold: corporate events, regulation, macro headlines. Do not use for prices or indicators. At most 2 per turn.',
+            'Web search (top 5 results with snippets) for market, company or economic facts SIGLENS data does not hold: corporate events, regulation, macro headlines. Never for unrelated topics, code repositories or search operators (site:, filetype:). Do not use for prices or indicators. At most 2 per turn.',
         costClass: 'external',
         inputSchema: {
             type: 'object',
