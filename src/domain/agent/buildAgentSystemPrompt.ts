@@ -1,11 +1,12 @@
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
 import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
+import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-13.4';
+export const AGENT_PROMPT_VERSION = '2026-09-14.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -26,6 +27,14 @@ export interface BuildAgentSystemPromptInput {
      * promising data it cannot get.
      */
     guest?: boolean;
+    /**
+     * The reader's IANA time zone. May be raw (unvalidated) input: it is
+     * resolved here with `resolveAgentTimeZone`, so an invalid or missing
+     * value falls back to the locale's zone. `runAgentTurn` resolves it once
+     * for tool-result conversion and passes the result, which resolves to
+     * itself — the prompt and the tool timestamps can never disagree.
+     */
+    timeZone?: string;
 }
 
 /**
@@ -44,10 +53,8 @@ export function buildAgentSystemPrompt(
     const toolList = input.tools.map(t => `- ${t.name}`).join('\n');
     const hasFresh = input.tools.some(t => t.name === 'run_fresh_analysis');
     const hasSearch = input.tools.some(t => t.name === 'web_search');
-    // Korean readers think in KST. Every other locale gets ET, the clock the
-    // US market (the bulk of the data) runs on — the Now block states UTC,
-    // ET and KST only, so a ja/zh reader's own zone is out of reach anyway.
-    const timestampZone = input.locale === 'ko' ? 'KST' : 'ET';
+    const timeZone = resolveAgentTimeZone(input.timeZone, input.locale);
+    const localNow = formatAgentTimestamp(input.now, timeZone);
     const newsGapRule = hasSearch
         ? 'use web_search for the gap and mention the gap at most once, in one short clause'
         : 'say once, in one short clause, that SIGLENS news has nothing on it yet';
@@ -90,7 +97,7 @@ Rules:
 - Answer in ${language}.
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
 - Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: SIGLENS 시세, 2026-09-12 21:57 KST 기준)").
-- Tool timestamps (asOf, generatedAt, publishedAt) are UTC ISO strings. Never show UTC or a raw ISO string: convert with the offsets in the Now block, to ${timestampZone} — except Korean equities (.KS/.KQ), which always use KST.
+- Tool timestamps are already converted to the user's local time and labelled (e.g. "${localNow}"). Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.
 - Answer the user's question, not the plumbing. Do not describe SIGLENS internals (stores, indexes, coverage flags, field names, null values, result counts, bar counts). When data is missing or clearly out of date, say in one short sentence that it is not available right now.
@@ -110,6 +117,7 @@ ${
 }
 
 ## Now
+- User's local time: ${localNow}
 - ${formatNowLine(input.now)}
 - US regular session: ${input.etSessionStatus}
 - Prompt version: ${AGENT_PROMPT_VERSION}`;

@@ -520,6 +520,29 @@ describe('runAgentTurn', () => {
         });
     });
 
+    it('툴 결과의 ISO 시각은 사용자 시간대로 바뀐 채 모델에 전달된다', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [quoteCall],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p, {
+            executeTool: vi.fn(async () => ({
+                price: 332.27,
+                asOf: '2026-09-11T21:42:00.000Z',
+            })),
+        });
+        await runAgentTurn(params({ timeZone: 'America/Los_Angeles' }), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { price: 332.27, asOf: '2026-09-11 14:42 PDT' },
+        ]);
+        expect(p.calls[0]!.system).toContain("User's local time:");
+    });
+
     it('실행 결과가 순환 참조/BigInt면 직렬화 실패를 unserializable_result로 돌려준다', async () => {
         const p = scriptedProvider([
             {

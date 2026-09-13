@@ -101,7 +101,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-13.4');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-14.1');
     });
 
     it('범위 밖 요청(코드 작성 등)은 짧게 거절하고 코드 블록을 쓰지 않게 한다', () => {
@@ -109,17 +109,28 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('Never write code blocks');
     });
 
-    it('UTC 타임스탬프를 로케일 기준 시간대로 바꿔 쓰게 한다 — ko는 KST, 그 외는 ET', () => {
-        expect(prompt).toContain('Never show UTC');
-        expect(prompt).toContain('to KST');
-        const en = buildAgentSystemPrompt({
+    it('사용자 시간대의 현재 시각을 알리고, 이미 변환된 타임스탬프를 그대로 옮기게 한다', () => {
+        // NOW = 2026-09-12T15:00Z
+        expect(prompt).toContain("User's local time: 2026-09-13 00:00 KST");
+        expect(prompt).toContain('Copy them exactly as written');
+        expect(prompt).toContain('never write UTC');
+        const la = buildAgentSystemPrompt({
             locale: 'en',
             tools: AGENT_TOOL_SPECS,
             now: NOW,
             etSessionStatus: 'open',
+            timeZone: 'America/Los_Angeles',
         });
-        expect(en).toContain('to ET');
-        expect(en).toContain('Korean equities (.KS/.KQ), which always use KST');
+        expect(la).toContain("User's local time: 2026-09-12 08:00 PDT");
+        // Invalid zone from the browser → the locale's default (en → ET).
+        const bogus = buildAgentSystemPrompt({
+            locale: 'en',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+            timeZone: 'Mars/Olympus',
+        });
+        expect(bogus).toContain("User's local time: 2026-09-12 11:00 EDT");
     });
 
     it('툴 호출 전 내레이션·내부 구조 설명·매매 전술 권유를 금지한다', () => {
