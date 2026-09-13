@@ -1,4 +1,3 @@
-import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { describe, expect, it } from 'vitest';
 import {
     AGENT_TOOL_SPECS,
@@ -6,6 +5,7 @@ import {
     findToolSpec,
     selectTools,
 } from '@/domain/agent/tools';
+import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {

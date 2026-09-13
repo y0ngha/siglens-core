@@ -645,7 +645,10 @@ describe('runAgentTurn', () => {
         const p = scriptedProvider([]);
         const d = deps(p);
         d.counters.premiumTurns = memoryCounter(0);
-        const r = await runAgentTurn(params({ model: 'claude-sonnet-5' }), d);
+        const r = await runAgentTurn(
+            params({ tier: 'free', model: 'claude-sonnet-5' }),
+            d
+        );
         expect(r).toEqual({ ok: false, error: 'premium_turn_limit' });
         expect(d.counters.turns.count).toBe(0);
     });
@@ -654,7 +657,10 @@ describe('runAgentTurn', () => {
         const p = scriptedProvider([]);
         const d = deps(p);
         d.counters.premiumTurns = unavailableCounter();
-        const r = await runAgentTurn(params({ model: 'claude-sonnet-5' }), d);
+        const r = await runAgentTurn(
+            params({ tier: 'free', model: 'claude-sonnet-5' }),
+            d
+        );
         expect(r).toEqual({ ok: false, error: 'server_busy' });
         expect(d.counters.turns.count).toBe(0);
         expect(p.call).not.toHaveBeenCalled();
@@ -706,10 +712,10 @@ describe('runAgentTurn', () => {
             Object.assign(new Error('rl'), { status: 429 })
         );
         const d = deps(p);
-        const r = await runAgentTurn(params({ model: 'claude-sonnet-5' }), d);
+        // `free` so the turn is actually counted and the refund is observable.
+        const r = await runAgentTurn(params({ tier: 'free' }), d);
         expect(r).toEqual({ ok: false, error: 'rate_limited' });
         expect(d.counters.turns.count).toBe(0);
-        expect(d.counters.premiumTurns.count).toBe(0);
     });
 
     it('abort → aborted, 부분 텍스트 반환, 환불 없음', async () => {
@@ -869,7 +875,7 @@ describe('runAgentTurn', () => {
             Object.assign(new Error('aborted'), { name: 'AbortError' })
         );
         const d = deps(p);
-        const r = await runAgentTurn(params(), d);
+        const r = await runAgentTurn(params({ tier: 'free' }), d);
         expect(r).toEqual({ ok: false, error: 'server_error' });
         expect(d.counters.turns.count).toBe(0);
     });

@@ -1,5 +1,5 @@
-import { TIMEFRAMES } from '@/domain/constants/market';
 import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 
 const TIMEFRAME_ENUM: readonly string[] = TIMEFRAMES;
