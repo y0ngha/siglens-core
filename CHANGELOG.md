@@ -1,5 +1,21 @@
 # Changelog
 
+# [1.4.0](https://github.com/y0ngha/siglens-core/compare/v1.3.1...v1.4.0) (2026-09-13)
+
+
+### Bug Fixes
+
+* **agent:** PR [#202](https://github.com/y0ngha/siglens-core/issues/202) 리뷰 반영 — 무제한 한도 장애 무관 테스트, 유지하는 일일 한도 분기 의도 주석, 프롬프트 버전 연속화(.4) ([4f4a3ec](https://github.com/y0ngha/siglens-core/commit/4f4a3ec1224b80f075763912673820654c2dc702))
+* **agent:** PR [#202](https://github.com/y0ngha/siglens-core/issues/202) 리뷰 반영 — AgentRemaining 무제한은 null, AGENT_TURN_CAPS를 domain으로 옮겨 툴 설명과 단일 소스화, 로그 마커 [@internal](https://github.com/internal), 죽은 login_required 분기 제거 ([449d6b5](https://github.com/y0ngha/siglens-core/commit/449d6b5f4eda3e89f5975fd750d3c56e4a0f30e2))
+* **agent:** PR [#202](https://github.com/y0ngha/siglens-core/issues/202) 리뷰 반영 — import 정렬, 턴 카운트 환불 경로(free) 테스트 복구 ([5f75e7d](https://github.com/y0ngha/siglens-core/commit/5f75e7dcdf79477e1bd61874b3fd75680fb4a12e))
+
+
+### Features
+
+* **agent:** 로그인 사용자의 새 분석 일일 한도 제거(Infinity) — SIGLENS 분석 정책과 일치, 무제한 한도는 카운터 미사용 ([00296c6](https://github.com/y0ngha/siglens-core/commit/00296c616838ab3a65fe5aea3969715e52053a96))
+* **agent:** 분석·웹 검색 일일 한도 전 등급 제거, 로그인 사용자 턴 무제한(비회원 10회 유지), 공용 검색 예산 소진 로그 마커 ([abdeea6](https://github.com/y0ngha/siglens-core/commit/abdeea6bc042f75b4d204c30bb4a59d9053deb9e))
+* **agent:** 턴당 상한 상향 — 단계 10·툴 30·웹검색 4·새 분석 3·종목 5, 새 분석 일일 한도 회원 15·Pro 30 ([a1f4abb](https://github.com/y0ngha/siglens-core/commit/a1f4abb3b3373b1df5e5a102f4d59322f2523256))
+
 ## [1.3.1](https://github.com/y0ngha/siglens-core/compare/v1.3.0...v1.3.1) (2026-09-13)
 
 
