@@ -53,10 +53,14 @@ describe('buildAgentSystemPrompt', () => {
             guest: true,
         });
         expect(guest).toContain('The user is not signed in');
+        expect(guest).not.toContain('No holdings on file');
         expect(prompt).not.toContain('The user is not signed in');
         expect(prompt).toContain('{"error":"login_required"}');
         expect(prompt).toContain('You are SIGLENS AI');
         expect(prompt).toContain('출처: SIGLENS 시세');
+        // Tool descriptions are model input too — same casing rule.
+        for (const spec of AGENT_TOOL_SPECS)
+            expect(JSON.stringify(spec)).not.toMatch(/\bsiglens\b(?![-.])/);
         // Brand rule aside, no lowercase product name leaks into the prompt.
         expect(
             prompt.replace(/never "siglens", "Siglens" or "SiglensAI"/, '')

@@ -100,7 +100,13 @@ Rules:
 - Short paragraphs, bullets for lists, no tables wider than 4 columns. Do not emit markdown images.
 
 ## User
-${input.guest ? '- The user is not signed in. Their holdings, fresh analyses and web search need a free SIGLENS sign-in; quotes, indicators, existing SIGLENS analyses, news and options work without it.\n' : ''}${input.portfolioSymbols && input.portfolioSymbols.length > 0 ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).` : '- No holdings on file.'}
+${
+    input.guest
+        ? '- The user is not signed in. Their holdings, fresh analyses and web search need a free SIGLENS sign-in; quotes, indicators, existing SIGLENS analyses, news and options work without it.'
+        : input.portfolioSymbols && input.portfolioSymbols.length > 0
+          ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
+          : '- No holdings on file.'
+}
 
 ## Now
 - ${formatNowLine(input.now)}

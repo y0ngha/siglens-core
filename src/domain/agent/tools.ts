@@ -29,7 +29,7 @@ export function isFreshAnalysisKind(
 const symbolProp = {
     type: 'string',
     description:
-        'Ticker symbol as used on siglens (e.g. AAPL, 005930.KS, BTCUSD). Use search_ticker first when unsure.',
+        'Ticker symbol as used on SIGLENS (e.g. AAPL, 005930.KS, BTCUSD). Use search_ticker first when unsure.',
 } as const;
 
 /**
@@ -101,7 +101,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_cached_analysis',
         description:
-            'Most recent siglens AI analysis for a symbol and tab, read from cache/snapshot/history. Call this FIRST for any "what does siglens think" question; if it returns stale:true or found:false, call run_fresh_analysis when that tool is available.',
+            'Most recent SIGLENS AI analysis for a symbol and tab, read from cache/snapshot/history. Call this FIRST for any "what does SIGLENS think" question; if it returns stale:true or found:false, call run_fresh_analysis when that tool is available.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -132,7 +132,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_news',
         description:
-            'News already ingested by siglens for a symbol or a market category, with sentiment and Korean summary. If the result is empty or older than the question needs, say coverage is limited and use web_search if available.',
+            'News already ingested by SIGLENS for a symbol or a market category, with sentiment and Korean summary. If the result is empty or older than the question needs, say coverage is limited and use web_search if available.',
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -189,7 +189,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'run_fresh_analysis',
         description:
-            'Run a NEW siglens AI analysis now (30–250 seconds). Call only after get_cached_analysis returned found:false or stale:true, at most once per turn. The result is the same structure as get_cached_analysis.',
+            'Run a NEW SIGLENS AI analysis now (30–250 seconds). Call only after get_cached_analysis returned found:false or stale:true, at most once per turn. The result is the same structure as get_cached_analysis.',
         costClass: 'expensive',
         inputSchema: {
             type: 'object',
@@ -212,7 +212,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_my_portfolio',
         description:
-            "The signed-in user's own holdings on siglens: symbol, quantity, average price, currency. Call when the user asks about 'my stocks', 'my position', profit/loss, or what they hold. Never guess holdings.",
+            "The signed-in user's own holdings on SIGLENS: symbol, quantity, average price, currency. Call when the user asks about 'my stocks', 'my position', profit/loss, or what they hold. Never guess holdings.",
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -223,7 +223,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'web_search',
         description:
-            'Web search (top 5 results with snippets) for facts siglens data does not hold: corporate events, regulation, macro headlines. Do not use for prices or indicators. At most 2 per turn.',
+            'Web search (top 5 results with snippets) for facts SIGLENS data does not hold: corporate events, regulation, macro headlines. Do not use for prices or indicators. At most 2 per turn.',
         costClass: 'external',
         inputSchema: {
             type: 'object',
