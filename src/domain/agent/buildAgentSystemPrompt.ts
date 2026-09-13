@@ -1,10 +1,7 @@
-import {
-    formatAgentTimestamp,
-    resolveAgentTimeZone,
-} from '@/domain/agent/userTimeZone';
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
 import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
+import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };
 
@@ -57,6 +54,7 @@ export function buildAgentSystemPrompt(
     const hasFresh = input.tools.some(t => t.name === 'run_fresh_analysis');
     const hasSearch = input.tools.some(t => t.name === 'web_search');
     const timeZone = resolveAgentTimeZone(input.timeZone, input.locale);
+    const localNow = formatAgentTimestamp(input.now, timeZone);
     const newsGapRule = hasSearch
         ? 'use web_search for the gap and mention the gap at most once, in one short clause'
         : 'say once, in one short clause, that SIGLENS news has nothing on it yet';
@@ -99,7 +97,7 @@ Rules:
 - Answer in ${language}.
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
 - Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: SIGLENS 시세, 2026-09-12 21:57 KST 기준)").
-- Tool timestamps are already converted to the user's local time and labelled (e.g. "${formatAgentTimestamp(input.now, timeZone)}"). Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
+- Tool timestamps are already converted to the user's local time and labelled (e.g. "${localNow}"). Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.
 - Answer the user's question, not the plumbing. Do not describe SIGLENS internals (stores, indexes, coverage flags, field names, null values, result counts, bar counts). When data is missing or clearly out of date, say in one short sentence that it is not available right now.
@@ -119,7 +117,7 @@ ${
 }
 
 ## Now
-- User's local time: ${formatAgentTimestamp(input.now, timeZone)}
+- User's local time: ${localNow}
 - ${formatNowLine(input.now)}
 - US regular session: ${input.etSessionStatus}
 - Prompt version: ${AGENT_PROMPT_VERSION}`;

@@ -9,8 +9,14 @@ export const LANGUAGE_NAME: Record<AgentLocale, string> = {
     zh: 'Chinese',
 };
 
-/** `YYYY-MM-DD, HH:MM` in the given zone, independent of locale-pattern quirks across Intl implementations. */
-function formatClock(now: Date, timeZone: string): string {
+/** @internal `YYYY-MM-DD` and `HH:MM` of one instant in one zone. */
+export interface ClockParts {
+    date: string;
+    time: string;
+}
+
+/** @internal Date and time parts in the given zone, independent of locale-pattern quirks across Intl implementations. */
+export function clockParts(now: Date, timeZone: string): ClockParts {
     const parts = new Intl.DateTimeFormat('en-US', {
         timeZone,
         year: 'numeric',
@@ -22,7 +28,16 @@ function formatClock(now: Date, timeZone: string): string {
     }).formatToParts(now);
     const get = (type: Intl.DateTimeFormatPartTypes): string =>
         parts.find(p => p.type === type)?.value ?? '';
-    return `${get('year')}-${get('month')}-${get('day')}, ${get('hour')}:${get('minute')}`;
+    return {
+        date: `${get('year')}-${get('month')}-${get('day')}`,
+        time: `${get('hour')}:${get('minute')}`,
+    };
+}
+
+/** `YYYY-MM-DD, HH:MM` in the given zone. */
+function formatClock(now: Date, timeZone: string): string {
+    const { date, time } = clockParts(now, timeZone);
+    return `${date}, ${time}`;
 }
 
 /** @internal UTC·ET·KST on one line, same wording in every prompt that states the current time. UTC is there so the model can convert UTC timestamps without knowing whether ET is on daylight time. */

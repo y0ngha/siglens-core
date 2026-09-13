@@ -1,4 +1,4 @@
-import type { AgentLocale } from '@/domain/agent/promptShared';
+import { clockParts, type AgentLocale } from '@/domain/agent/promptShared';
 
 /** Zone used when the consumer sends none (or an invalid one): the reader's usual market clock. */
 const DEFAULT_TIME_ZONE: Record<AgentLocale, string> = {
@@ -17,6 +17,9 @@ const KNOWN_LABELS: Readonly<Record<string, string>> = {
     'Asia/Seoul': 'KST',
     'Asia/Tokyo': 'JST',
 };
+
+/** Longest IANA zone name accepted; real ones are well under this, anything longer is junk input. */
+const MAX_TIME_ZONE_LENGTH = 64;
 
 /** An ISO-8601 instant with an explicit zone (`Z` or `±HH:MM`) — what tool results carry. */
 const ISO_INSTANT_RE =
@@ -44,7 +47,9 @@ export function resolveAgentTimeZone(
     locale: AgentLocale
 ): string {
     const candidate = raw?.trim();
-    return candidate && candidate.length <= 64 && isValidTimeZone(candidate)
+    return candidate &&
+        candidate.length <= MAX_TIME_ZONE_LENGTH &&
+        isValidTimeZone(candidate)
         ? candidate
         : DEFAULT_TIME_ZONE[locale];
 }
@@ -69,18 +74,8 @@ function timeZoneLabel(date: Date, timeZone: string): string {
  * @returns The localized, labelled timestamp.
  */
 export function formatAgentTimestamp(date: Date, timeZone: string): string {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-    }).formatToParts(date);
-    const get = (type: Intl.DateTimeFormatPartTypes): string =>
-        parts.find(p => p.type === type)?.value ?? '';
-    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')} ${timeZoneLabel(date, timeZone)}`;
+    const { date: day, time } = clockParts(date, timeZone);
+    return `${day} ${time} ${timeZoneLabel(date, timeZone)}`;
 }
 
 /**
