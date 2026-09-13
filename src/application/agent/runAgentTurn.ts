@@ -300,6 +300,9 @@ export async function runAgentTurn(
             subject: string,
             limit: number
         ): Promise<boolean> => {
+            // An uncapped quota needs no counter — and must not fail closed on
+            // a counter-store outage for a feature that has no limit to enforce.
+            if (limit === Infinity) return true;
             const ok = await store.consume(subject, limit);
             if (ok) claimed.push([store, subject]);
             return ok;

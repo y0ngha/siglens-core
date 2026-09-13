@@ -20,8 +20,9 @@ describe('AGENT_LIMITS', () => {
         expect(agentLimit('pro', 'turnsPerDay')).toBe(200);
         expect(agentLimit('member', 'premiumModelTurnsPerDay')).toBe(10);
         expect(agentLimit('pro', 'premiumModelTurnsPerDay')).toBe(20);
-        expect(agentLimit('member', 'freshAnalysisPerDay')).toBe(15);
-        expect(agentLimit('pro', 'freshAnalysisPerDay')).toBe(30);
+        // SIGLENS sets no daily analysis limit for signed-in users.
+        expect(agentLimit('member', 'freshAnalysisPerDay')).toBe(Infinity);
+        expect(agentLimit('pro', 'freshAnalysisPerDay')).toBe(Infinity);
         expect(agentLimit('member', 'webSearchPerDay')).toBe(5);
         expect(AGENT_LIMITS.messagesPerConversation).toBe(200);
         expect(AGENT_GLOBAL_LIMITS).toEqual({

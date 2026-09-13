@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AGENT_TURN_CAPS } from '@/application/agent/limits';
+import { AGENT_TURN_CAPS, TOOL_TIMEOUT_MS } from '@/application/agent/limits';
 import { runAgentTurn } from '@/application/agent/runAgentTurn';
 import type {
     AgentCounters,
@@ -164,7 +164,7 @@ describe('runAgentTurn', () => {
         expect(r.intermediate).toEqual([]);
         expect(r.usage.steps).toBe(1);
         expect(r.promptVersion).toBe(AGENT_PROMPT_VERSION);
-        expect(r.remaining).toEqual({ turns: 59, fresh: 15, search: 5 });
+        expect(r.remaining).toEqual({ turns: 59, fresh: Infinity, search: 5 });
         expect(d.counters.turns.count).toBe(1);
         expect(d.events.map(e => e.type)).toEqual(['text', 'usage', 'stop']);
         expect(p.calls[0]!.messages.at(-1)).toEqual({
@@ -325,7 +325,8 @@ describe('runAgentTurn', () => {
         const d = deps(p);
         await runAgentTurn(params(), d);
         expect(d.executeTool).toHaveBeenCalledTimes(cap);
-        expect(d.counters.freshAnalysis.count).toBe(cap);
+        // Uncapped daily quota: no counter is touched at all.
+        expect(d.counters.freshAnalysis.count).toBe(0);
         expect(toolResults(p.calls[1]!)[cap]).toEqual({
             error: 'quota',
             scope: 'per_turn',
@@ -433,7 +434,7 @@ describe('runAgentTurn', () => {
         expect(d.counters.turns.count).toBe(1);
     });
 
-    it('신선 분석 일일 카운터 장애 → unavailable', async () => {
+    it('신선 분석은 일일 한도가 없어 카운터 장애와 무관하게 실행된다', async () => {
         const p = scriptedProvider([
             {
                 text: '',
@@ -453,8 +454,7 @@ describe('runAgentTurn', () => {
         d.counters.freshAnalysis = unavailableCounter();
         const r = await runAgentTurn(params(), d);
         expect(r.ok).toBe(true);
-        expect(d.executeTool).not.toHaveBeenCalled();
-        expect(toolResults(p.calls[1]!)).toEqual([{ error: 'unavailable' }]);
+        expect(d.executeTool).toHaveBeenCalledTimes(1);
     });
 
     it('턴당 심볼 상한 초과 → quota per_turn_symbols', async () => {
@@ -789,7 +789,6 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({ ok: false, error: 'aborted' });
         expect(p.call).toHaveBeenCalledTimes(1);
         expect(d.counters.turns.count).toBe(1);
-        expect(d.counters.freshAnalysis.count).toBe(1);
     });
 
     it('시그널을 무시하는 프로바이더가 abort 후 보낸 이벤트는 전달되지 않는다', async () => {
@@ -812,26 +811,22 @@ describe('runAgentTurn', () => {
         expect(d.events).toEqual([]);
     });
 
-    it('쿼터 소비 중 abort → 실행기 미호출, 신선 분석 카운터 환불', async () => {
+    it('쿼터 소비 중 abort → 실행기 미호출, 유저 일일 카운터 환불', async () => {
         const controller = new AbortController();
         const p = scriptedProvider([
             {
                 text: '',
                 toolCalls: [
-                    {
-                        id: 'f1',
-                        name: 'run_fresh_analysis',
-                        args: { symbol: 'AAPL', kind: 'technical' },
-                    },
+                    { id: 'w1', name: 'web_search', args: { query: 'x' } },
                 ],
                 stopReason: 'tool_use',
                 usage: USAGE,
             },
         ]);
         const d = deps(p);
-        const fresh = d.counters.freshAnalysis;
-        const consume = fresh.consume.bind(fresh);
-        fresh.consume = async (subject, limit) => {
+        const month = d.counters.webSearchGlobalMonth;
+        const consume = month.consume.bind(month);
+        month.consume = async (subject, limit) => {
             const ok = await consume(subject, limit);
             controller.abort();
             return ok;
@@ -839,7 +834,7 @@ describe('runAgentTurn', () => {
         const r = await runAgentTurn(params({ signal: controller.signal }), d);
         expect(r).toEqual({ ok: false, error: 'aborted' });
         expect(d.executeTool).not.toHaveBeenCalled();
-        expect(fresh.count).toBe(0);
+        expect(d.counters.webSearchUser.count).toBe(0);
         expect(d.events.some(e => e.type === 'tool_start')).toBe(false);
     });
 
@@ -852,29 +847,6 @@ describe('runAgentTurn', () => {
         const r = await runAgentTurn(params(), d);
         expect(r).toEqual({ ok: false, error: 'server_error' });
         expect(d.counters.turns.count).toBe(0);
-    });
-
-    it('실행기 거절(run_fresh_analysis busy) → 신선 분석 일일 카운터 환불', async () => {
-        const p = scriptedProvider([
-            {
-                text: '',
-                toolCalls: [
-                    {
-                        id: 'f1',
-                        name: 'run_fresh_analysis',
-                        args: { symbol: 'AAPL', kind: 'technical' },
-                    },
-                ],
-                stopReason: 'tool_use',
-                usage: USAGE,
-            },
-            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
-        ]);
-        const d = deps(p, {
-            executeTool: vi.fn(async () => ({ error: 'busy' })),
-        });
-        await runAgentTurn(params(), d);
-        expect(d.counters.freshAnalysis.count).toBe(0);
     });
 
     it('web_search 실행 실패 → 유저 카운터만 환불, 전역 카운터는 유지', async () => {
@@ -898,17 +870,13 @@ describe('runAgentTurn', () => {
         expect(d.counters.webSearchGlobalMonth.count).toBe(1);
     });
 
-    it('신선 분석 타임아웃 → 일일 카운터는 소비된 채 유지', async () => {
+    it('웹 검색 타임아웃 → 유저 일일 카운터는 소비된 채 유지(요청이 이미 나갔을 수 있음)', async () => {
         vi.useFakeTimers();
         const p = scriptedProvider([
             {
                 text: '',
                 toolCalls: [
-                    {
-                        id: 'f1',
-                        name: 'run_fresh_analysis',
-                        args: { symbol: 'AAPL', kind: 'overall' },
-                    },
+                    { id: 'w1', name: 'web_search', args: { query: 'x' } },
                 ],
                 stopReason: 'tool_use',
                 usage: USAGE,
@@ -917,11 +885,11 @@ describe('runAgentTurn', () => {
         ]);
         const d = deps(p, { executeTool: () => new Promise(() => {}) });
         const pending = runAgentTurn(params(), d);
-        await vi.advanceTimersByTimeAsync(300_001);
+        await vi.advanceTimersByTimeAsync(TOOL_TIMEOUT_MS.external + 1);
         const r = await pending;
         expect(r.ok).toBe(true);
         expect(toolResults(p.calls[1]!)).toEqual([{ error: 'timeout' }]);
-        expect(d.counters.freshAnalysis.count).toBe(1);
+        expect(d.counters.webSearchUser.count).toBe(1);
     });
 
     it('max_tokens 종료는 ok + stopReason max_tokens', async () => {

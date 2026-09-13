@@ -13,7 +13,18 @@ type PerTier = Readonly<Record<Tier, number>>;
 export const AGENT_LIMITS = {
     turnsPerDay: { free: 10, member: 60, pro: 200 } satisfies PerTier,
     premiumModelTurnsPerDay: { free: 0, member: 10, pro: 20 } satisfies PerTier,
-    freshAnalysisPerDay: { free: 0, member: 15, pro: 30 } satisfies PerTier,
+    /**
+     * Uncapped for signed-in users: SIGLENS itself sets no daily analysis
+     * limit (`TIER_CONFIG.limits.analysisPerDay` is `Infinity`), so the agent
+     * must not invent one. Per-turn (`AGENT_TURN_CAPS.maxFreshAnalysis`) and
+     * per-instance concurrency caps still bound a single turn. Guests stay 0
+     * (`login_required`).
+     */
+    freshAnalysisPerDay: {
+        free: 0,
+        member: Infinity,
+        pro: Infinity,
+    } satisfies PerTier,
     webSearchPerDay: { free: 0, member: 5, pro: 10 } satisfies PerTier,
     conversationsMax: { free: 0, member: 100, pro: 300 } satisfies PerTier,
     messagesPerConversation: 200,
