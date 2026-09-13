@@ -1,5 +1,17 @@
 # Changelog
 
+# [1.3.0](https://github.com/y0ngha/siglens-core/compare/v1.2.1...v1.3.0) (2026-09-13)
+
+
+### Bug Fixes
+
+* **agent:** PR [#200](https://github.com/y0ngha/siglens-core/issues/200) 리뷰 반영 — 툴 설명 SIGLENS 표기, 게스트 User 블록 중복 제거 ([2616325](https://github.com/y0ngha/siglens-core/commit/26163252792f1231070d5ac0d3af95c2f82b8a3e))
+
+
+### Features
+
+* **agent:** 게스트 턴 허용·login_required 거절·SIGLENS 표기 ([fe57460](https://github.com/y0ngha/siglens-core/commit/fe574601979b69fcfd9fb01c0745346eee6bdea9))
+
 ## [1.2.1](https://github.com/y0ngha/siglens-core/compare/v1.2.0...v1.2.1) (2026-09-13)
 
 
