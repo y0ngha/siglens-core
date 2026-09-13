@@ -72,6 +72,18 @@ describe('localizeTimestamps', () => {
             note: null,
         });
     });
+    it.each([
+        '2026-13-01T10:00:00Z',
+        '2026-01-32T10:00:00Z',
+        '2026-01-01T10:99:00Z',
+        '2026-01-01T10:00:00+99:99',
+    ])(
+        '형식은 맞지만 실제로는 없는 시각(%s)은 원본 문자열을 그대로 둔다',
+        bad => {
+            expect(localizeTimestamps({ bad }, 'Asia/Seoul')).toEqual({ bad });
+        }
+    );
+
     it('순환 참조가 있어도 멈추지 않는다', () => {
         const cyclic: Record<string, unknown> = {
             asOf: '2026-09-11T21:42:00Z',

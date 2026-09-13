@@ -31,10 +31,11 @@ export interface BuildAgentSystemPromptInput {
      */
     guest?: boolean;
     /**
-     * The reader's IANA time zone, already resolved by
-     * `resolveAgentTimeZone`. Tool results reach the model with their
-     * timestamps converted to it (`runAgentTurn`), and the Now block states
-     * the local time in it. Defaults to the locale's zone when omitted.
+     * The reader's IANA time zone. May be raw (unvalidated) input: it is
+     * resolved here with `resolveAgentTimeZone`, so an invalid or missing
+     * value falls back to the locale's zone. `runAgentTurn` resolves it once
+     * for tool-result conversion and passes the result, which resolves to
+     * itself — the prompt and the tool timestamps can never disagree.
      */
     timeZone?: string;
 }
