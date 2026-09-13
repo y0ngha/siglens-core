@@ -334,6 +334,56 @@ describe('runAgentTurn', () => {
         ).toBeGreaterThan(0);
     });
 
+    it('게스트(free): 턴은 허용, 신선 분석·웹 검색은 login_required로 거절하고 실행기 미호출', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [
+                    {
+                        id: 'f1',
+                        name: 'run_fresh_analysis',
+                        args: { symbol: 'AAPL', kind: 'technical' },
+                    },
+                    { id: 'w1', name: 'web_search', args: { query: 'x' } },
+                ],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        const r = await runAgentTurn(params({ tier: 'free' }), d);
+        expect(r.ok).toBe(true);
+        expect(d.executeTool).not.toHaveBeenCalled();
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { error: 'login_required' },
+            { error: 'login_required' },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+        expect(p.calls[0]!.system).toContain('The user is not signed in');
+    });
+
+    it('회원의 일일 한도 소진은 login_required가 아니라 quota daily', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [
+                    { id: 'w1', name: 'web_search', args: { query: 'x' } },
+                ],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        d.counters.webSearchUser = memoryCounter(0);
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { error: 'quota', scope: 'daily' },
+        ]);
+        expect(p.calls[0]!.system).not.toContain('The user is not signed in');
+    });
+
     it('web_search는 유저·전역 일·전역 월 카운터를 모두 소비하고 하나라도 막히면 quota', async () => {
         const p = scriptedProvider([
             {

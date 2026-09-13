@@ -42,6 +42,14 @@ describe('buildSuggestionsPrompt', () => {
             'When the headlines concentrate on one company'
         );
     });
+    it('서비스 이름은 SIGLENS로만 부른다', () => {
+        const { system } = buildSuggestionsPrompt(base);
+        expect(system).toContain('SIGLENS AI');
+        expect(system.replace(/never "siglens" or "Siglens"/, '')).not.toMatch(
+            /\bsiglens\b(?!\.io)/
+        );
+    });
+
     it('헤드라인·시각·장 상태를 user에 넣는다', () => {
         const { user } = buildSuggestionsPrompt(base);
         expect(user).toContain('Fed holds rates (general)');
