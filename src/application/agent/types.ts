@@ -116,13 +116,14 @@ export interface AgentTurnUsage extends NormalizedUsage {
     ms: number;
 }
 
+/** Daily allowance left; `null` means the tier has no daily limit for it (never `Infinity`, so it serializes as-is). */
 export interface AgentRemaining {
-    /** Turns left in the user's daily turn quota. */
-    turns: number;
-    /** `run_fresh_analysis` calls left in the user's daily quota. */
-    fresh: number;
-    /** `web_search` calls left in the user's daily quota. */
-    search: number;
+    /** Turns left in the user's daily turn quota, or `null` when uncapped. */
+    turns: number | null;
+    /** `run_fresh_analysis` calls left today, or `null` when uncapped. */
+    fresh: number | null;
+    /** `web_search` calls left today, or `null` when uncapped. */
+    search: number | null;
 }
 
 export type RunAgentTurnResult =

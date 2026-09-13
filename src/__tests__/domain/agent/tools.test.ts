@@ -1,3 +1,4 @@
+import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { describe, expect, it } from 'vitest';
 import {
     AGENT_TOOL_SPECS,
@@ -50,5 +51,18 @@ describe('AGENT_TOOL_SPECS', () => {
     it('findToolSpec', () => {
         expect(findToolSpec('web_search')?.costClass).toBe('external');
         expect(findToolSpec('nope')).toBeUndefined();
+    });
+
+    it('툴 설명의 턴당 숫자는 AGENT_TURN_CAPS에서 온다 — 상한을 바꾸면 모델이 읽는 문장도 따라간다', () => {
+        const fresh = AGENT_TOOL_SPECS.find(
+            t => t.name === 'run_fresh_analysis'
+        );
+        const web = AGENT_TOOL_SPECS.find(t => t.name === 'web_search');
+        expect(fresh?.description).toContain(
+            `at most ${AGENT_TURN_CAPS.maxFreshAnalysis} per turn`
+        );
+        expect(web?.description).toContain(
+            `At most ${AGENT_TURN_CAPS.maxWebSearch} per turn`
+        );
     });
 });

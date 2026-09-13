@@ -168,12 +168,8 @@ describe('runAgentTurn', () => {
         expect(r.usage.steps).toBe(1);
         expect(r.promptVersion).toBe(AGENT_PROMPT_VERSION);
         // Signed-in turns, fresh analyses and web search are uncapped: nothing
-        // is counted and every allowance reads Infinity.
-        expect(r.remaining).toEqual({
-            turns: Infinity,
-            fresh: Infinity,
-            search: Infinity,
-        });
+        // is counted and every allowance reads null (JSON-safe "no limit").
+        expect(r.remaining).toEqual({ turns: null, fresh: null, search: null });
         expect(d.counters.turns.count).toBe(0);
         expect(d.events.map(e => e.type)).toEqual(['text', 'usage', 'stop']);
         expect(p.calls[0]!.messages.at(-1)).toEqual({

@@ -1,4 +1,5 @@
 import { TIMEFRAMES } from '@/domain/constants/market';
+import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 
 const TIMEFRAME_ENUM: readonly string[] = TIMEFRAMES;
@@ -188,8 +189,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     },
     {
         name: 'run_fresh_analysis',
-        description:
-            'Run a NEW SIGLENS AI analysis now (30–250 seconds). Call only after get_cached_analysis returned found:false or stale:true, at most 3 per turn. The result is the same structure as get_cached_analysis.',
+        description: `Run a NEW SIGLENS AI analysis now (30–250 seconds). Call only after get_cached_analysis returned found:false or stale:true, at most ${AGENT_TURN_CAPS.maxFreshAnalysis} per turn. The result is the same structure as get_cached_analysis.`,
         costClass: 'expensive',
         inputSchema: {
             type: 'object',
@@ -222,8 +222,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     },
     {
         name: 'web_search',
-        description:
-            'Web search (top 5 results with snippets) for market, company or economic facts SIGLENS data does not hold: corporate events, regulation, macro headlines. Never for unrelated topics, code repositories or search operators (site:, filetype:). Do not use for prices or indicators. At most 4 per turn.',
+        description: `Web search (top 5 results with snippets) for market, company or economic facts SIGLENS data does not hold: corporate events, regulation, macro headlines. Never for unrelated topics, code repositories or search operators (site:, filetype:). Do not use for prices or indicators. At most ${AGENT_TURN_CAPS.maxWebSearch} per turn.`,
         costClass: 'external',
         inputSchema: {
             type: 'object',
