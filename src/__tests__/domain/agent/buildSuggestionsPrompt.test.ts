@@ -36,6 +36,12 @@ describe('buildSuggestionsPrompt', () => {
         expect(system).toContain('not investment advice');
         expect(system).toContain(SUGGESTIONS_PROMPT_VERSION);
     });
+    it('헤드라인이 한 회사에 몰리면 나머지는 시장 전반으로 분산하게 한다', () => {
+        const { system } = buildSuggestionsPrompt(base);
+        expect(system).toContain(
+            'When the headlines concentrate on one company'
+        );
+    });
     it('헤드라인·시각·장 상태를 user에 넣는다', () => {
         const { user } = buildSuggestionsPrompt(base);
         expect(user).toContain('Fed holds rates (general)');

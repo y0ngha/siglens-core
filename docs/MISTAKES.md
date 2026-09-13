@@ -335,6 +335,22 @@ and have been removed from this file.
    ✅ import type { DynamicType, PromiseType } from './module';
       type Result = T extends SomeCondition ? DynamicType : null;
       function process<T>(input: T): Promise<PromiseType>
+
+10. Generic string/number types for constants with closed value sets; API behavior changes undocumented
+   → Constants and options with restricted values must use precise literal union types, not generic string/ReadonlySet<string>
+   → Backward-compatible function overloads that change defaults (or silent behavior) must document changes in JSDoc and add test assertions
+   ❌ const ALLOWED_MODELS = new ReadonlySet<string>(['gemini-2.0-flash', 'gemini-1.5-pro'])  // generic string type
+   ✅ type GeminiModelId = 'gemini-2.0-flash' | 'gemini-1.5-pro'; const ALLOWED_MODELS = new ReadonlySet<GeminiModelId>(...)
+   ❌ // Legacy overload: buildChatPrompt(args, currency?) changes default behavior
+      export function buildChatPrompt(...): string { const curr = currency ?? DEFAULT_CURRENCY; ... }
+      // No JSDoc; test coverage missing for default case
+   ✅ /**
+      * @param {string} args - prompt arguments
+      * @param {CurrencyCode} [currency] - currency for formatting; defaults to KST if omitted
+      */
+      export function buildChatPrompt(args, currency = DEFAULT_CURRENCY): string { ... }
+      // + test case asserting default behavior
+   → When changing shared constants used across multiple prompts (e.g. formatters), bump cache version of all downstream consumers
 ```
 
 ---

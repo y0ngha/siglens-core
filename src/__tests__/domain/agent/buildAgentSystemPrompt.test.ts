@@ -27,7 +27,7 @@ describe('buildAgentSystemPrompt', () => {
 
     it('현재 시각(ET·KST)과 장 상태를 주입한다', () => {
         expect(prompt).toContain(
-            'ET: 2026-09-12, 11:00 · KST: 2026-09-13, 00:00'
+            'UTC: 2026-09-12, 15:00 · ET: 2026-09-12, 11:00 · KST: 2026-09-13, 00:00'
         );
         expect(prompt).toContain('US regular session: open');
     });
@@ -65,6 +65,63 @@ describe('buildAgentSystemPrompt', () => {
             'siglens quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-12.3');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-13.1');
+    });
+
+    it('범위 밖 요청(코드 작성 등)은 짧게 거절하고 코드 블록을 쓰지 않게 한다', () => {
+        expect(prompt).toContain('## Scope');
+        expect(prompt).toContain('Never write code blocks');
+    });
+
+    it('UTC 타임스탬프를 로케일 기준 시간대로 바꿔 쓰게 한다 — ko는 KST, 그 외는 ET', () => {
+        expect(prompt).toContain('Never show UTC');
+        expect(prompt).toContain('to KST');
+        const en = buildAgentSystemPrompt({
+            locale: 'en',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(en).toContain('to ET');
+        expect(en).toContain('Korean equities (.KS/.KQ), which always use KST');
+    });
+
+    it('툴 호출 전 내레이션·내부 구조 설명·매매 전술 권유를 금지한다', () => {
+        expect(prompt).toContain(
+            'Do not write any text before or between tool calls'
+        );
+        expect(prompt).toContain('Do not describe siglens internals');
+        expect(prompt).toContain('never recommend position sizing');
+        expect(prompt).toContain(
+            'Every number, date and named fact must come from a tool result'
+        );
+    });
+
+    it('인용 예시가 시간대 규칙과 어긋나지 않는다 — ko 예시는 KST', () => {
+        expect(prompt).toContain('2026-09-12 21:57 KST 기준');
+        expect(prompt).not.toMatch(/\d{2}:\d{2} ET 기준/);
+    });
+
+    it('웹 스니펫 출처·시점 표기와 면책 문구 억제 규칙이 들어 있다', () => {
+        expect(prompt).toContain('Web search results are snippets');
+        expect(prompt).toContain('newest result is older than the period');
+        expect(prompt).toContain(
+            'Do not end every answer with a generic disclaimer'
+        );
+        expect(prompt).toContain(
+            'only when the user asks for a prediction or a buy/sell decision'
+        );
+    });
+
+    it('뉴스 공백 안내는 web_search 유무에 따라 한 번만 짧게', () => {
+        expect(prompt).toContain('use web_search for the gap');
+        const noSearch = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(t => t.name !== 'web_search'),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noSearch).not.toContain('web_search');
+        expect(noSearch).toContain('siglens news has nothing on it yet');
     });
 });

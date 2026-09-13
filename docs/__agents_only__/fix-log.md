@@ -107,11 +107,6 @@
 
 ## [PR | refactor/cheap-jobs-back-to-gemini | 2026-08-20] — Cheap jobs model migration R1→R2
 
-- Violation 1 (RECOMMENDED): `src/domain/analysis/modelSpecs.ts` — `ReadonlySet<string>` used for constant with restricted values when precise literal union `GeminiModelId` already existed in same file
-  Rule: TypeScript — use precise literal unions (not generic string) for constants with a closed set of valid values; repo precedent uses `ReadonlySet<CandlePattern>` etc.
-  Context: Imprecise type lost compile-time protection; test required `as ActiveModelId` cast to accommodate string type
-  Fixed in R2: Changed to `ReadonlySet<GeminiModelId>` for type precision and eliminated cast
-
 - Violation 2 (RECOMMENDED): `docs/PUBLIC_API.md` — new public exports added to inline inventory without dated changelog row
   Rule: MISTAKES.md §Public API 1 — PUBLIC_API.md convention requires a dated changelog row appended for every additive public-API change; inline list alone is insufficient
   Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
@@ -128,10 +123,6 @@
   Context: JSON salvage function risked false positives from prose containing `{}` stray pairs. Restricted scan to text starting with `{`, reducing false parse attempts. Fixed in Round 1 hotfix.
 
 ## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 main: overloads
-
-- Violation 5: Legacy positional overloads (buildChatPrompt 6-arg, buildNewsAnalysisPrompt 4/5-arg) changed default behavior (currency) without JSDoc or tests
-  Rule: TypeScript — API contract documentation on silent behavior changes
-  Context: Functions support legacy positional call signatures for backwards compatibility, but currency default logic changed. JSDoc updates and test coverage added to document new behavior and prevent regression. Fixed in Round 1 main.
 
 ## [Branch fix/prompt-precision-currency | 2026-09-11] — Lesson: Real-data validation required for prompt changes
 
@@ -164,5 +155,16 @@
 - Violation 2: New branch without dedicated test
   Rule: MISTAKES Tests #5.5 — new branch without dedicated test
   Context: roundLabel's `mantissaIsWhole ? 0 : 1` decimal choice in src/domain/analysis/referenceLevels.ts was covered only by 2.5-mantissa steps, so removing the branch stayed green. Added whole-mantissa label tests (250 → step 5, 50 → step 1, 0.25 → step 0.005), verified by reverting the branch. Third occurrence in this PR.
+
+
+## [Branch fix/agent-answer-hygiene | Round 1→2 | 2026-09-13]
+
+- Violation 1: Prompt citation example showed ET (Eastern Time) while a new adjacent rule mandates KST (Korean Standard Time) for Korean answers
+  Rule: Documentation Consistency — when documentation includes examples, all examples must be synchronized when new rules are added
+  Context: The instruction for prompt citation was updated in one location but a sibling example showing time format still used ET. Fixed in Round 2 by updating example to show KST to match the new rule.
+
+- Violation 2: Two new prompt rules (web snippet attribution/staleness, disclaimer suppression) added without test assertions
+  Rule: Test Coverage for New Rules — when introducing new rules or logic, add test assertions to verify the rule is enforced
+  Context: The new rules lacked any test cases verifying their behavior. Fixed in Round 2 by adding assertions for each new rule.
 
 
