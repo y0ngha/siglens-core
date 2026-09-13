@@ -1,5 +1,17 @@
 # Changelog
 
+# [1.5.0](https://github.com/y0ngha/siglens-core/compare/v1.4.0...v1.5.0) (2026-09-13)
+
+
+### Bug Fixes
+
+* **agent:** PR [#203](https://github.com/y0ngha/siglens-core/issues/203) 리뷰 반영 — 형식만 맞는 무효 시각 가드 테스트, timeZone JSDoc 계약 정정 ([6f990fd](https://github.com/y0ngha/siglens-core/commit/6f990fdd2f849689d078716c3ddd0df7e2159223))
+
+
+### Features
+
+* **agent:** 답변 시각을 사용자 시간대로 — 툴 결과 ISO 시각 사전 변환, 프롬프트에 사용자 현지 시각 ([76afc52](https://github.com/y0ngha/siglens-core/commit/76afc52796369a19200b2234bc1d298c30f86b54))
+
 # [1.4.0](https://github.com/y0ngha/siglens-core/compare/v1.3.1...v1.4.0) (2026-09-13)
 
 
