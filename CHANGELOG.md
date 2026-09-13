@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/y0ngha/siglens-core/compare/v1.3.0...v1.3.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **agent:** 로그인 워딩·범위 밖/내부정보 가드레일·답변 중 추가 툴 호출 금지·추천 질문 브랜드 제거 ([47ae9a7](https://github.com/y0ngha/siglens-core/commit/47ae9a7685ba3035f8dbb27893c008d9244e8024))
+
 # [1.3.0](https://github.com/y0ngha/siglens-core/compare/v1.2.1...v1.3.0) (2026-09-13)
 
 
