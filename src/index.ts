@@ -363,6 +363,7 @@ export {
     selectTools,
 } from './domain/agent/tools';
 export { validateArgs } from './domain/agent/validateArgs';
+export { findUngroundedNumbers } from './domain/agent/groundedNumbers';
 export {
     buildAgentSystemPrompt,
     AGENT_PROMPT_VERSION,

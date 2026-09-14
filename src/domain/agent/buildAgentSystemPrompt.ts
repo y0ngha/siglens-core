@@ -6,7 +6,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-14.1';
+export const AGENT_PROMPT_VERSION = '2026-09-14.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -53,6 +53,14 @@ export function buildAgentSystemPrompt(
     const toolList = input.tools.map(t => `- ${t.name}`).join('\n');
     const hasFresh = input.tools.some(t => t.name === 'run_fresh_analysis');
     const hasSearch = input.tools.some(t => t.name === 'web_search');
+    const hasFundamentals = input.tools.some(
+        t => t.name === 'get_fundamentals'
+    );
+    const hasMarketOverview = input.tools.some(
+        t => t.name === 'get_market_overview'
+    );
+    const hasEconomy = input.tools.some(t => t.name === 'get_economy');
+    const hasCongress = input.tools.some(t => t.name === 'get_congress_trades');
     const timeZone = resolveAgentTimeZone(input.timeZone, input.locale);
     const localNow = formatAgentTimestamp(input.now, timeZone);
     const newsGapRule = hasSearch
@@ -83,7 +91,24 @@ Rules:
             ? ' If it returns found:false or stale:true, call run_fresh_analysis right away (do not ask permission); it takes up to a few minutes and the UI shows progress.'
             : ''
     }
-- If get_news returns nothing useful for the period the user asks about, ${newsGapRule}.
+- If get_news returns nothing useful for the period the user asks about, ${newsGapRule}.${
+        hasFundamentals
+            ? ' For valuation, earnings, "is it expensive" or growth/balance-sheet questions on a stock, call get_fundamentals.'
+            : ''
+    }${
+        hasMarketOverview
+            ? ' For "how is the market", market mood, index or sector questions, call get_market_overview.'
+            : ''
+    }${
+        hasEconomy
+            ? ' For rates, inflation, macro calendar or "what\'s coming up this week" questions, call get_economy.'
+            : ''
+    }${
+        hasCongress
+            ? ' For congressional or insider political trading questions on a US stock, call get_congress_trades.'
+            : ''
+    }
+- If a quote's quoteDelayMinutes is greater than 0, say the quote is delayed by that many minutes; never present it as real-time.
 - Call several independent tools in parallel in one step when the question needs more than one.
 - If a tool returns an error, tell the user what could not be fetched; never fabricate a substitute.
 - If a tool returns {"error":"login_required"}, say in one sentence that this needs logging in (never call the login "free"), then answer with what you could fetch. Do not call that tool again in this turn.
@@ -110,7 +135,7 @@ Rules:
 ## User
 ${
     input.guest
-        ? '- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, web search) works without it.'
+        ? '- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, web search) works without it.'
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'
