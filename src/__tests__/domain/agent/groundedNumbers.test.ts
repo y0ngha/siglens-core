@@ -153,4 +153,36 @@ describe('findUngroundedNumbers', () => {
         // 복합 단위는 변환하지 않고 건드리지 않는 알려진 한계.
         expect(findUngroundedNumbers(jo, ['{"revenue":3e12}'])).toEqual([]);
     });
+    it('JSON 파싱 시 Infinity가 되는 값(1e400)은 근거 집합에 넣지 않고, 나머지 값은 그대로 근거로 쓴다', () => {
+        const results = ['{"huge":1e400,"price":187.25}'];
+        expect(
+            findUngroundedNumbers('가격은 187.25달러입니다.', results)
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('가격은 999.5달러입니다.', results)
+        ).toEqual(['999.5']);
+    });
+
+    it('JSON의 null 리프는 건너뛰고 형제 값은 JSON 경로로 계속 수집한다', () => {
+        const results = [
+            '{"price":null,"nested":{"close":null,"open":71200},"values":[1,2,3]}',
+        ];
+        expect(
+            findUngroundedNumbers('시가는 71,200원입니다.', results)
+        ).toEqual([]);
+        // null에서 던지고 정규식 폴백으로 떨어지면 "[1,2,3]"이 123으로 합쳐져
+        // 근거로 잡힌다 — JSON 경로가 유지되어야 123은 근거 없음이다.
+        expect(findUngroundedNumbers('값은 123입니다.', results)).toEqual([
+            '123',
+        ]);
+    });
+
+    it('숫자가 답변 문자열의 맨 끝에 와도(다음 문자 없음) 정상 판정한다', () => {
+        expect(
+            findUngroundedNumbers('종가 71200', ['{"close":71200}'])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('종가 71300', ['{"close":71200}'])
+        ).toEqual(['71300']);
+    });
 });
