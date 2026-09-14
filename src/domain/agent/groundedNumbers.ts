@@ -5,16 +5,91 @@ const TIME_RE = /\b\d{1,3}:\d{2}(?::\d{2})?\b/g;
 /** Markdown-style ordered list marker ("1. " / "12) "), excluded. */
 const LIST_MARKER_RE = /^[ \t]*(\d+)[.)][ \t]/gm;
 /**
+ * Index/benchmark names paired with the numbers that are actually part of
+ * their name (not a value claim) — "S&P 500" names an index, "나스닥 100"
+ * names an index. Deliberately NOT "any number after the name": a real
+ * value claim routinely follows the same name ("나스닥 26,655.16에 마감",
+ * "코스피 2,650선") and must still be checked. Kept as one documented map so
+ * a new benchmark/constituent-count is a one-line addition.
+ */
+const INDEX_NAME_NUMBERS: Readonly<Record<string, readonly number[]>> = {
+    'S&P': [100, 400, 500, 600],
+    Nasdaq: [100],
+    나스닥: [100],
+    Russell: [1000, 2000, 3000],
+    KOSPI: [50, 100, 200],
+    코스피: [50, 100, 200],
+    KOSDAQ: [150],
+    코스닥: [150],
+    Dow: [30],
+    다우: [30],
+    FTSE: [100, 250],
+    Nikkei: [225],
+    니케이: [225],
+    Stoxx: [50, 600],
+    DAX: [40],
+    CAC: [40],
+};
+/** Escapes regex metacharacters in a literal string for embedding inside a `RegExp` source (e.g. a "." in a future prefix like "U.S. 30"). */
+function escapeRegExp(literal: string): string {
+    return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+/**
+ * One alternative per index name, each requiring the number that directly
+ * (optionally with one space) follows the name to be exactly one of that
+ * name's own numbers — not followed by another digit, a decimal point, or a
+ * comma-then-digit (the next thousands group of a longer number), so
+ * "코스피 200" (the name) is distinct from "코스피 200.5" / "코스피 2005" /
+ * "다우 30,214.55" (a value that merely starts the same digits). Matching is
+ * case-insensitive (`i`) so one English key covers "Nasdaq"/"NASDAQ"/"nasdaq"
+ * — safe here since neither Hangul characters nor digits have a case, so `i`
+ * only affects the ASCII/Latin prefixes. No capturing group is needed: the
+ * trailing digit run of the whole match is always the number span (see its
+ * use in {@link ignorableSpans}, which also requires an *exact* span match
+ * rather than mere overlap — see that function's doc for why).
+ * Known accepted ceiling: a genuine value claim that happens to exactly
+ * equal the name's number right after the name (e.g. "코스피 200선 돌파"
+ * meaning the index crossed exactly 200) is still skipped — indistinguishable
+ * from the name itself with a regex, and the result only feeds a
+ * non-blocking log.
+ */
+const INDEX_NAME_NUMBER_RE = new RegExp(
+    Object.entries(INDEX_NAME_NUMBERS)
+        .map(
+            ([prefix, numbers]) =>
+                `${escapeRegExp(prefix)}[ \\t]?(?:${numbers.join('|')})(?!\\d|\\.|,\\d)`
+        )
+        .join('|'),
+    'giu'
+);
+/**
+ * A period-length indicator label, not a claim: "200일선", "50-day",
+ * "20일 이동평균". The optional decimal part matches the full digit run
+ * `NUMBER_RE` itself would extract (e.g. "12.5-day"), so the ignorable span
+ * covers the whole token instead of only its integer part.
+ */
+const DAY_PERIOD_SUFFIX_RE = /\d+(?:\.\d+)?(?=일선|-day|일 이동평균)/g;
+/**
+ * "MA200" / "EMA50" need no dedicated pattern: {@link NUMBER_RE}'s own
+ * `(?<![\d\p{L}])` lookbehind already refuses to start a number match right
+ * after a letter, so the digits in "MA200"/"EMA50" (immediately preceded by
+ * "A") are never extracted as a claim in the first place.
+ */
+/**
  * A signed, comma-grouped, optionally decimal, optionally percent number.
  * The leading sign is only consumed when NOT immediately preceded by a digit
  * or letter, so a range/subtraction separator ("5-10%", "5~10%") is not
  * mistaken for a unary minus on the second number — a genuine negative
  * ("총합은 -3입니다") is still preceded by whitespace/punctuation and matches.
+ * The digit body is `\d(?:[\d,]*\d)?` rather than `\d[\d,]*` so it always
+ * ends on a digit: a bare trailing comma (as in "S&P 500, 나스닥 100", where
+ * "," is prose punctuation, not a thousands separator) is never swallowed
+ * into the token.
  */
-const NUMBER_RE = /(?<![\d\p{L}])[+-]?\d[\d,]*(?:\.\d+)?%?/gu;
-/** Same leading-sign rule as {@link NUMBER_RE}, plus an optional exponent — used only as a fallback over non-JSON tool-result text (see {@link collectToolNumbers}). */
+const NUMBER_RE = /(?<![\d\p{L}])[+-]?\d(?:[\d,]*\d)?(?:\.\d+)?%?/gu;
+/** Same leading-sign and no-trailing-comma rule as {@link NUMBER_RE}, plus an optional exponent — used only as a fallback over non-JSON tool-result text (see {@link collectToolNumbers}). */
 const TOOL_NUMBER_RE =
-    /(?<![\d\p{L}])[+-]?\d[\d,]*(?:\.\d+)?(?:[eE][+-]?\d+)?/gu;
+    /(?<![\d\p{L}])[+-]?\d(?:[\d,]*\d)?(?:\.\d+)?(?:[eE][+-]?\d+)?/gu;
 /** Korean magnitude units immediately adjacent to a number, e.g. "1.2억원". */
 const KOREAN_UNIT_MULTIPLIER: Readonly<Record<string, number>> = {
     만: 1e4,
@@ -31,13 +106,37 @@ function overlaps(a: Span, b: Span): boolean {
     return a[0] < b[1] && a[1] > b[0];
 }
 
-/** Character ranges in `text` that look like dates, times or list markers. */
-function ignorableSpans(text: string): Span[] {
-    const spans: Span[] = [];
+function sameSpan(a: Span, b: Span): boolean {
+    return a[0] === b[0] && a[1] === b[1];
+}
+
+/**
+ * Ignorable spans come in two flavors with different matching rules:
+ * - `overlap`: a date/time/list-marker fragment may only ever be a *part* of
+ *   a larger digit run the model wrote by coincidence (there is no such
+ *   coincidence in practice for these patterns), so any overlap is enough.
+ * - `exact`: an index-name number or a day-period label is a short digit run
+ *   that can legitimately sit right next to a much longer, unrelated number
+ *   ("다우 30,214.55" — "30" is the name, "214.55" is the next thousands
+ *   group of the real value). Matching by overlap would let that short span
+ *   swallow the entire longer `NUMBER_RE` token it merely touches; requiring
+ *   the ignorable span to *exactly* equal the candidate token's span (see
+ *   {@link sameSpan}) makes that impossible — the candidate is skipped only
+ *   when the ignorable pattern matched the whole thing, never a prefix of it.
+ */
+interface IgnorableSpans {
+    overlap: Span[];
+    exact: Span[];
+}
+
+/** Character ranges in `text` that look like dates, times, list markers, index-name numbers or day-period labels — see {@link IgnorableSpans} for how each is matched. */
+function ignorableSpans(text: string): IgnorableSpans {
+    const overlap: Span[] = [];
+    const exact: Span[] = [];
     for (const re of [DATE_RE, TIME_RE]) {
         re.lastIndex = 0;
         for (let m = re.exec(text); m !== null; m = re.exec(text)) {
-            spans.push([m.index, m.index + m[0].length]);
+            overlap.push([m.index, m.index + m[0].length]);
         }
     }
     LIST_MARKER_RE.lastIndex = 0;
@@ -47,9 +146,29 @@ function ignorableSpans(text: string): Span[] {
         m = LIST_MARKER_RE.exec(text)
     ) {
         const digitsStart = m.index + m[0].indexOf(m[1]);
-        spans.push([digitsStart, digitsStart + m[1].length]);
+        overlap.push([digitsStart, digitsStart + m[1].length]);
     }
-    return spans;
+    INDEX_NAME_NUMBER_RE.lastIndex = 0;
+    for (
+        let m = INDEX_NAME_NUMBER_RE.exec(text);
+        m !== null;
+        m = INDEX_NAME_NUMBER_RE.exec(text)
+    ) {
+        // No capture group (see the regex's own doc) — the number is always
+        // the trailing digit run of the whole match.
+        const digits = /\d+$/.exec(m[0])![0];
+        const digitsStart = m.index + m[0].length - digits.length;
+        exact.push([digitsStart, digitsStart + digits.length]);
+    }
+    DAY_PERIOD_SUFFIX_RE.lastIndex = 0;
+    for (
+        let m = DAY_PERIOD_SUFFIX_RE.exec(text);
+        m !== null;
+        m = DAY_PERIOD_SUFFIX_RE.exec(text)
+    ) {
+        exact.push([m.index, m.index + m[0].length]);
+    }
+    return { overlap, exact };
 }
 
 /** A plain integer (no separators) is not a meaningful claim below 3 digits. */
@@ -163,6 +282,75 @@ function isGroundedWithUnit(
     );
 }
 
+/** A tool ratio expressed as a fraction (0.3317) is the same fact as the model stating it as a percent (33.17%) — dividing by this "unit" converts fraction → percent, reusing {@link isGroundedWithUnit}'s n/multiplier math. */
+const PERCENT_FRACTION_UNIT = 0.01;
+
+/**
+ * Upper bound (absolute value) for a tool number to plausibly be a fraction
+ * meant for ×100 percent conversion. A financial ratio like a margin or ROE
+ * fits comfortably under this (ROE of 1000% would still be 10.0); an actual
+ * count, price or PE ratio does not.
+ */
+const PERCENT_FRACTION_MAX_ABS = 10;
+
+/**
+ * Whether `n` plausibly represents a fraction the model could restate as a
+ * percent by multiplying by 100. Excludes integers outright — a whole number
+ * like `count: 3` is never a fraction, so it must not back a fabricated
+ * "300%" — and excludes anything whose magnitude is implausible for a ratio
+ * (e.g. a PE ratio of 37.93 must not back "3793%").
+ */
+function isPlausiblePercentFraction(n: number): boolean {
+    return !Number.isInteger(n) && Math.abs(n) <= PERCENT_FRACTION_MAX_ABS;
+}
+
+/**
+ * A "%" token grounds against a tool number directly, or against a tool
+ * fraction × 100 (e.g. operatingMargin: 0.3317 backs "33.17%") — restricted
+ * to tool numbers that plausibly are such a fraction (see
+ * {@link isPlausiblePercentFraction}) so an unrelated integer count or a
+ * large ratio (PE, price) cannot ground an arbitrary percent claim.
+ */
+function isGroundedPercent(
+    parsed: ParsedNumber,
+    toolNumbers: readonly number[],
+    percentFractionToolNumbers: readonly number[]
+): boolean {
+    return (
+        isGrounded(parsed, toolNumbers) ||
+        isGroundedWithUnit(
+            parsed,
+            PERCENT_FRACTION_UNIT,
+            percentFractionToolNumbers
+        )
+    );
+}
+
+/**
+ * Picks the right grounding check for a candidate token: a Korean-unit
+ * number converts by that unit's multiplier, a "%" token allows the ×100
+ * fraction fallback, anything else is a plain exact/rounded match.
+ */
+function isTokenGrounded(
+    token: string,
+    parsed: ParsedNumber,
+    unitMultiplier: number | undefined,
+    toolNumbers: readonly number[],
+    percentFractionToolNumbers: readonly number[]
+): boolean {
+    if (unitMultiplier !== undefined) {
+        return isGroundedWithUnit(parsed, unitMultiplier, toolNumbers);
+    }
+    if (token.endsWith('%')) {
+        return isGroundedPercent(
+            parsed,
+            toolNumbers,
+            percentFractionToolNumbers
+        );
+    }
+    return isGrounded(parsed, toolNumbers);
+}
+
 /**
  * Finds numeric claims in an agent's answer that do not trace back to any
  * tool result — a lightweight grounding check for a "never quote a number
@@ -184,6 +372,28 @@ function isGroundedWithUnit(
  *   A compound form ("3조 5천억") is not decomposed; its leftover digits
  *   ("5") are handled as plain digits, typically too short to be flagged
  *   either way — the claim is effectively skipped rather than mis-graded.
+ * - A "%" claim also grounds against a tool fraction × 100, but only when
+ *   that fraction is non-integer and its absolute value is ≤ 10 (see
+ *   {@link isPlausiblePercentFraction}) — a plain integer count or a large
+ *   ratio (PE, price) is never treated as a percent-fraction source, so it
+ *   cannot ground an arbitrary/fabricated percent claim. The gate cannot tell
+ *   a margin/ROE fraction from any other small decimal ratio, though: a tool
+ *   P/B or current ratio of 2.5 still grounds a fabricated "250%". Accepted
+ *   because the result only feeds a non-blocking log.
+ * - The integer exclusion above is a blunt instrument: a ratio that happens
+ *   to be a whole number (ROE exactly `1.0` meaning 100%) is excluded from
+ *   the ×100 path along with genuine non-ratio integers, so "ROE 100%" can
+ *   be reported ungrounded even though the underlying fact is real. Accepted
+ *   for the same reason — a false "ungrounded" here is far cheaper than the
+ *   `count: 3` → "300%" false negative the exclusion prevents.
+ * - `toolResults` is trusted verbatim. If the caller's tool executor
+ *   truncates a result string mid-number before it reaches here (cutting
+ *   "26333.0391" down to "26333.0"), `JSON.parse` fails, the regex fallback
+ *   extracts the truncated (wrong) number, and a genuinely-grounded value can
+ *   be reported as ungrounded. This function cannot detect or repair
+ *   truncation — the fix is for the caller to truncate at a JSON-safe
+ *   boundary (or not truncate) before appending a tool message to the
+ *   transcript passed in as `toolResults`.
  *
  * @param answer - The assistant's final answer text.
  * @param toolResults - Raw tool result strings from the same turn (as
@@ -197,6 +407,10 @@ export function findUngroundedNumbers(
 ): string[] {
     const skip = ignorableSpans(answer);
     const toolNumbers = collectToolNumbers(toolResults);
+    // Filtered once per call — every "%" token in the answer reuses it.
+    const percentFractionToolNumbers = toolNumbers.filter(
+        isPlausiblePercentFraction
+    );
     const seen = new Set<string>();
     const ungrounded: string[] = [];
 
@@ -226,16 +440,20 @@ export function findUngroundedNumbers(
         }
 
         const span: Span = [start, end];
-        if (skip.some(s => overlaps(s, span))) continue;
+        if (skip.overlap.some(s => overlaps(s, span))) continue;
+        if (skip.exact.some(s => sameSpan(s, span))) continue;
         if (unitMultiplier === undefined && isIgnorableToken(token)) continue;
         if (seen.has(displayToken)) continue;
         seen.add(displayToken);
 
         const parsed = parseToken(token);
-        const grounded =
-            unitMultiplier === undefined
-                ? isGrounded(parsed, toolNumbers)
-                : isGroundedWithUnit(parsed, unitMultiplier, toolNumbers);
+        const grounded = isTokenGrounded(
+            token,
+            parsed,
+            unitMultiplier,
+            toolNumbers,
+            percentFractionToolNumbers
+        );
         if (!grounded) ungrounded.push(displayToken);
     }
     return ungrounded;

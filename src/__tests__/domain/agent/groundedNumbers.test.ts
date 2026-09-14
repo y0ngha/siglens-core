@@ -185,4 +185,164 @@ describe('findUngroundedNumbers', () => {
             findUngroundedNumbers('종가 71300', ['{"close":71200}'])
         ).toEqual(['71300']);
     });
+
+    it('지수 이름 자체의 숫자(구성종목 수 등)만 근거 확인 대상에서 뺀다', () => {
+        // "S&P 500"의 500은 이름이므로 스킵되지만, 뒤따르는 실제 지수값은
+        // 그대로 검사 대상이다.
+        expect(
+            findUngroundedNumbers('S&P 500 지수는 7,656.98 (+0.86%)', [
+                '{"price":7656.98,"changesPercentage":0.86}',
+            ])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('S&P 500 지수는 7,656.98 입니다.', [])
+        ).toEqual(['7,656.98']);
+        expect(
+            findUngroundedNumbers('나스닥100 지수가 상승했습니다.', [])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('코스피 200 지수가 상승했습니다.', [])
+        ).toEqual([]);
+    });
+
+    it('지수 이름 뒤에 오는 실제 지수값(구성종목 수가 아닌 숫자)은 이름과 무관하게 그대로 검사한다', () => {
+        // 회귀 방지: 예전 구현은 이름 뒤에 오는 "아무 숫자"를 다 스킵해
+        // 가장 중요한 주장 유형(지수 종가 자체)을 놓쳤다.
+        expect(
+            findUngroundedNumbers('나스닥 26,655.16에 마감했습니다.', [])
+        ).toEqual(['26,655.16']);
+        expect(
+            findUngroundedNumbers('나스닥 26,655.16에 마감했습니다.', [
+                '{"price":26655.16}',
+            ])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('코스피 2,650선을 돌파했습니다.', [])
+        ).toEqual(['2,650']);
+        expect(
+            findUngroundedNumbers('코스피 2,650선을 돌파했습니다.', [
+                '{"price":2650}',
+            ])
+        ).toEqual([]);
+    });
+
+    it('알려진 한계: 이름 뒤 숫자가 이름의 구성종목 수와 정확히 같은 값이면 진짜 지수값이어도 스킵된다', () => {
+        // "코스피 200"은 이름(코스피 200 지수)과 "지수가 정확히 200을 돌파"라는
+        // 실제 주장을 정규식으로 구분할 수 없다 — 결과가 비차단 로그에만
+        // 쓰이므로 받아들이는 한계다.
+        expect(findUngroundedNumbers('코스피 200선 돌파했습니다.', [])).toEqual(
+            []
+        );
+    });
+
+    it('회귀 방지: 이름 번호 뒤에 쉼표로 이어지는 값은 이름 스팬이 값 전체를 삼키지 않는다', () => {
+        // "다우 30,214.55"에서 "30"은 다우지수(Dow 30)의 이름이지만, 뒤에
+        // 쉼표+숫자("214.55")가 바로 이어지므로 이는 이름이 아니라 실제
+        // 값("30,214.55")의 천단위 구분자다 — 이름 스팬은 여기서 매치되면
+        // 안 되고, NUMBER_RE가 뽑아낸 전체 토큰이 그대로 검사돼야 한다.
+        expect(
+            findUngroundedNumbers('다우 30,214.55에 마감했습니다.', [])
+        ).toEqual(['30,214.55']);
+        expect(
+            findUngroundedNumbers('다우 30,214.55에 마감했습니다.', [
+                '{"price":30214.55}',
+            ])
+        ).toEqual([]);
+    });
+
+    it('이름 번호 여러 개가 쉼표로 나열돼도 각각 이름으로 스킵된다', () => {
+        expect(
+            findUngroundedNumbers('S&P 500, 나스닥 100 모두 상승했습니다.', [])
+        ).toEqual([]);
+    });
+
+    it('기간 라벨 뒤에 이어지는 별개의 실제 값은 라벨과 무관하게 그대로 검사한다', () => {
+        expect(
+            findUngroundedNumbers('20일선 12,345 부근에서 지지받았습니다.', [])
+        ).toEqual(['12,345']);
+    });
+
+    it('지수 이름이 아닌 일반 숫자는 여전히 근거 확인 대상이다', () => {
+        expect(findUngroundedNumbers('총 500명이 참여했습니다.', [])).toEqual([
+            '500',
+        ]);
+    });
+
+    it('이동평균/기간 라벨(200일선, MA200, EMA50, 50-day)은 값 주장이 아니므로 무시한다', () => {
+        expect(
+            findUngroundedNumbers('200일선을 상향 돌파했습니다.', [])
+        ).toEqual([]);
+        // MA200/EMA50은 숫자가 문자 "A" 바로 뒤에 붙어 있어 NUMBER_RE 자체가
+        // 애초에 매치하지 않는다 — 별도 패턴 없이도 이미 무시 대상이다.
+        expect(
+            findUngroundedNumbers('MA200을 지지선으로 삼고 있습니다.', [])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('EMA50 아래에서 거래되고 있습니다.', [])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('50-day 이동평균선을 회복했습니다.', [])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('200일 이동평균선 위에 있습니다.', [])
+        ).toEqual([]);
+    });
+
+    it('진짜 날짜 기준 주장("300일 기준 종가")은 기간 라벨과 달리 그대로 검사한다', () => {
+        expect(
+            findUngroundedNumbers('300일 기준 종가는 187달러입니다.', [])
+        ).toEqual(['300', '187']);
+    });
+
+    it('소수점이 있는 기간 라벨("12.5-day")도 소수부까지 통째로 무시한다', () => {
+        expect(
+            findUngroundedNumbers('12.5-day 이동평균을 회복했습니다.', [])
+        ).toEqual([]);
+    });
+
+    it('퍼센트 토큰은 툴이 비율(소수)로 반환해도 ×100 환산으로 근거를 확인한다', () => {
+        const answer = '영업이익률 33.17%, 순이익률 27.62%, ROE 137.18%';
+        const results = [
+            '{"operatingMargin":0.3317,"netMargin":0.2762,"roe":1.3718}',
+        ];
+        expect(findUngroundedNumbers(answer, results)).toEqual([]);
+    });
+
+    it('퍼센트 ×100 환산은 대응하는 비율이 없으면 여전히 근거 없음으로 남긴다', () => {
+        const answer = '영업이익률 33.17%입니다.';
+        expect(
+            findUngroundedNumbers(answer, ['{"operatingMargin":0.5}'])
+        ).toEqual(['33.17%']);
+    });
+
+    it('정수 툴 값은 ×100 환산 대상에서 제외한다 — count:3이 300%를 근거해주면 안 된다', () => {
+        expect(
+            findUngroundedNumbers('참여율은 300%입니다.', ['{"count":3}'])
+        ).toEqual(['300%']);
+    });
+
+    it('절댓값이 10을 넘는 큰 비율은 ×100 환산 대상에서 제외한다 — PE 37.93이 3793%를 근거해주면 안 된다', () => {
+        expect(
+            findUngroundedNumbers('상승률은 3793%입니다.', ['{"pe":37.93}'])
+        ).toEqual(['3793%']);
+    });
+
+    it('절댓값 10 이하 소수 비율은 ×100 환산으로 근거를 확인한다 — ROE 1.3718 → 137.18%, margin 0.5 → 50%', () => {
+        expect(
+            findUngroundedNumbers('ROE는 137.18%입니다.', ['{"roe":1.3718}'])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('마진은 50%입니다.', ['{"margin":0.5}'])
+        ).toEqual([]);
+    });
+
+    it('알려진 한계: 툴 결과 JSON이 숫자 중간에서 잘리면 실제로 근거 있는 값도 근거 없음으로 보고된다', () => {
+        // "26333.0391"가 "26333.0"에서 잘려 JSON.parse가 실패하고, 정규식
+        // 폴백이 잘린 값을 그대로 읽어 "26,333.04"와 어긋난다 — 호출자의
+        // 툴 실행기가 JSON-safe 경계에서 자르지 않는 한 이 함수로는 복구 불가능.
+        const truncated = '{"price":26333.0';
+        expect(findUngroundedNumbers('나스닥: 26,333.04', [truncated])).toEqual(
+            ['26,333.04']
+        );
+    });
 });
