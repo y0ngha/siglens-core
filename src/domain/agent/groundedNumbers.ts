@@ -5,6 +5,50 @@ const TIME_RE = /\b\d{1,3}:\d{2}(?::\d{2})?\b/g;
 /** Markdown-style ordered list marker ("1. " / "12) "), excluded. */
 const LIST_MARKER_RE = /^[ \t]*(\d+)[.)][ \t]/gm;
 /**
+ * Index/benchmark names whose numeric suffix is part of the name, not a
+ * claim — "S&P 500", "나스닥 100" name an index, they don't assert a value.
+ * Kept as one documented list so a new benchmark is a one-line addition.
+ */
+const INDEX_NAME_PREFIXES = [
+    'S&P',
+    'NASDAQ',
+    'Nasdaq',
+    '나스닥',
+    'Russell',
+    'KOSDAQ',
+    'KOSPI',
+    '코스닥',
+    '코스피',
+    'Dow',
+    'FTSE',
+    'Nikkei',
+    '니케이',
+    'Stoxx',
+    'DAX',
+    'CAC',
+] as const;
+function escapeRegExp(literal: string): string {
+    return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+/** An index-name prefix directly (optionally one space) followed by its number, e.g. "S&P 500" / "나스닥100". Group 1 is the number span to ignore. */
+const INDEX_NAME_NUMBER_RE = new RegExp(
+    `(?:${INDEX_NAME_PREFIXES.map(escapeRegExp).join('|')})[ \\t]?(\\d[\\d,]*(?:\\.\\d+)?)`,
+    'gu'
+);
+/**
+ * A period-length indicator label, not a claim: "200일선", "50-day",
+ * "20일 이동평균". The optional decimal part matches the full digit run
+ * `NUMBER_RE` itself would extract (e.g. "12.5-day"), so the ignorable span
+ * covers the whole token instead of only its integer part.
+ */
+const DAY_PERIOD_SUFFIX_RE = /\d+(?:\.\d+)?(?=일선|-day|일 이동평균)/g;
+/**
+ * "MA200" / "EMA50" need no dedicated pattern: {@link NUMBER_RE}'s own
+ * `(?<![\d\p{L}])` lookbehind already refuses to start a number match right
+ * after a letter, so the digits in "MA200"/"EMA50" (immediately preceded by
+ * "A") are never extracted as a claim in the first place.
+ */
+/**
  * A signed, comma-grouped, optionally decimal, optionally percent number.
  * The leading sign is only consumed when NOT immediately preceded by a digit
  * or letter, so a range/subtraction separator ("5-10%", "5~10%") is not
@@ -48,6 +92,23 @@ function ignorableSpans(text: string): Span[] {
     ) {
         const digitsStart = m.index + m[0].indexOf(m[1]);
         spans.push([digitsStart, digitsStart + m[1].length]);
+    }
+    INDEX_NAME_NUMBER_RE.lastIndex = 0;
+    for (
+        let m = INDEX_NAME_NUMBER_RE.exec(text);
+        m !== null;
+        m = INDEX_NAME_NUMBER_RE.exec(text)
+    ) {
+        const digitsStart = m.index + m[0].length - m[1].length;
+        spans.push([digitsStart, digitsStart + m[1].length]);
+    }
+    DAY_PERIOD_SUFFIX_RE.lastIndex = 0;
+    for (
+        let m = DAY_PERIOD_SUFFIX_RE.exec(text);
+        m !== null;
+        m = DAY_PERIOD_SUFFIX_RE.exec(text)
+    ) {
+        spans.push([m.index, m.index + m[0].length]);
     }
     return spans;
 }
@@ -163,6 +224,49 @@ function isGroundedWithUnit(
     );
 }
 
+/** A tool ratio expressed as a fraction (0.3317) is the same fact as the model stating it as a percent (33.17%) — dividing by this "unit" converts fraction → percent, reusing {@link isGroundedWithUnit}'s n/multiplier math. */
+const PERCENT_FRACTION_UNIT = 0.01;
+
+/**
+ * Upper bound (absolute value) for a tool number to plausibly be a fraction
+ * meant for ×100 percent conversion. A financial ratio like a margin or ROE
+ * fits comfortably under this (ROE of 1000% would still be 10.0); an actual
+ * count, price or PE ratio does not.
+ */
+const PERCENT_FRACTION_MAX_ABS = 10;
+
+/**
+ * Whether `n` plausibly represents a fraction the model could restate as a
+ * percent by multiplying by 100. Excludes integers outright — a whole number
+ * like `count: 3` is never a fraction, so it must not back a fabricated
+ * "300%" — and excludes anything whose magnitude is implausible for a ratio
+ * (e.g. a PE ratio of 37.93 must not back "3793%").
+ */
+function isPlausiblePercentFraction(n: number): boolean {
+    return !Number.isInteger(n) && Math.abs(n) <= PERCENT_FRACTION_MAX_ABS;
+}
+
+/**
+ * A "%" token grounds against a tool number directly, or against a tool
+ * fraction × 100 (e.g. operatingMargin: 0.3317 backs "33.17%") — restricted
+ * to tool numbers that plausibly are such a fraction (see
+ * {@link isPlausiblePercentFraction}) so an unrelated integer count or a
+ * large ratio (PE, price) cannot ground an arbitrary percent claim.
+ */
+function isGroundedPercent(
+    parsed: ParsedNumber,
+    toolNumbers: readonly number[]
+): boolean {
+    return (
+        isGrounded(parsed, toolNumbers) ||
+        isGroundedWithUnit(
+            parsed,
+            PERCENT_FRACTION_UNIT,
+            toolNumbers.filter(isPlausiblePercentFraction)
+        )
+    );
+}
+
 /**
  * Finds numeric claims in an agent's answer that do not trace back to any
  * tool result — a lightweight grounding check for a "never quote a number
@@ -184,6 +288,22 @@ function isGroundedWithUnit(
  *   A compound form ("3조 5천억") is not decomposed; its leftover digits
  *   ("5") are handled as plain digits, typically too short to be flagged
  *   either way — the claim is effectively skipped rather than mis-graded.
+ * - A "%" claim also grounds against a tool fraction × 100, but only when
+ *   that fraction is non-integer and its absolute value is ≤ 10 (see
+ *   {@link isPlausiblePercentFraction}) — a plain integer count or a large
+ *   ratio (PE, price) is never treated as a percent-fraction source, so it
+ *   cannot ground an arbitrary/fabricated percent claim. The gate cannot tell
+ *   a margin/ROE fraction from any other small decimal ratio, though: a tool
+ *   P/B or current ratio of 2.5 still grounds a fabricated "250%". Accepted
+ *   because the result only feeds a non-blocking log.
+ * - `toolResults` is trusted verbatim. If the caller's tool executor
+ *   truncates a result string mid-number before it reaches here (cutting
+ *   "26333.0391" down to "26333.0"), `JSON.parse` fails, the regex fallback
+ *   extracts the truncated (wrong) number, and a genuinely-grounded value can
+ *   be reported as ungrounded. This function cannot detect or repair
+ *   truncation — the fix is for the caller to truncate at a JSON-safe
+ *   boundary (or not truncate) before appending a tool message to the
+ *   transcript passed in as `toolResults`.
  *
  * @param answer - The assistant's final answer text.
  * @param toolResults - Raw tool result strings from the same turn (as
@@ -233,9 +353,11 @@ export function findUngroundedNumbers(
 
         const parsed = parseToken(token);
         const grounded =
-            unitMultiplier === undefined
-                ? isGrounded(parsed, toolNumbers)
-                : isGroundedWithUnit(parsed, unitMultiplier, toolNumbers);
+            unitMultiplier !== undefined
+                ? isGroundedWithUnit(parsed, unitMultiplier, toolNumbers)
+                : token.endsWith('%')
+                  ? isGroundedPercent(parsed, toolNumbers)
+                  : isGrounded(parsed, toolNumbers);
         if (!grounded) ungrounded.push(displayToken);
     }
     return ungrounded;
