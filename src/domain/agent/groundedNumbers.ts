@@ -14,7 +14,6 @@ const LIST_MARKER_RE = /^[ \t]*(\d+)[.)][ \t]/gm;
  */
 const INDEX_NAME_NUMBERS: Readonly<Record<string, readonly number[]>> = {
     'S&P': [100, 400, 500, 600],
-    NASDAQ: [100],
     Nasdaq: [100],
     나스닥: [100],
     Russell: [1000, 2000, 3000],
@@ -31,18 +30,23 @@ const INDEX_NAME_NUMBERS: Readonly<Record<string, readonly number[]>> = {
     DAX: [40],
     CAC: [40],
 };
-/** Escapes regex metacharacters in a literal string for embedding inside a `RegExp` source (e.g. the "&" in "S&P" or a "." in a future prefix). */
+/** Escapes regex metacharacters in a literal string for embedding inside a `RegExp` source (e.g. a "." in a future prefix like "U.S. 30"). */
 function escapeRegExp(literal: string): string {
     return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 /**
  * One alternative per index name, each requiring the number that directly
  * (optionally with one space) follows the name to be exactly one of that
- * name's own numbers — not followed by another digit or a decimal point, so
- * "코스피 200" (the name) is distinct from "코스피 200.5"/"코스피 2005" (a
- * value that merely starts the same way). No capturing group is needed:
- * the trailing digit run of the whole match is always the number span
- * (see its use in {@link ignorableSpans}).
+ * name's own numbers — not followed by another digit, a decimal point, or a
+ * comma-then-digit (the next thousands group of a longer number), so
+ * "코스피 200" (the name) is distinct from "코스피 200.5" / "코스피 2005" /
+ * "다우 30,214.55" (a value that merely starts the same digits). Matching is
+ * case-insensitive (`i`) so one English key covers "Nasdaq"/"NASDAQ"/"nasdaq"
+ * — safe here since neither Hangul characters nor digits have a case, so `i`
+ * only affects the ASCII/Latin prefixes. No capturing group is needed: the
+ * trailing digit run of the whole match is always the number span (see its
+ * use in {@link ignorableSpans}, which also requires an *exact* span match
+ * rather than mere overlap — see that function's doc for why).
  * Known accepted ceiling: a genuine value claim that happens to exactly
  * equal the name's number right after the name (e.g. "코스피 200선 돌파"
  * meaning the index crossed exactly 200) is still skipped — indistinguishable
@@ -53,10 +57,10 @@ const INDEX_NAME_NUMBER_RE = new RegExp(
     Object.entries(INDEX_NAME_NUMBERS)
         .map(
             ([prefix, numbers]) =>
-                `${escapeRegExp(prefix)}[ \\t]?(?:${numbers.join('|')})(?!\\d|\\.)`
+                `${escapeRegExp(prefix)}[ \\t]?(?:${numbers.join('|')})(?!\\d|\\.|,\\d)`
         )
         .join('|'),
-    'gu'
+    'giu'
 );
 /**
  * A period-length indicator label, not a claim: "200일선", "50-day",
@@ -77,11 +81,15 @@ const DAY_PERIOD_SUFFIX_RE = /\d+(?:\.\d+)?(?=일선|-day|일 이동평균)/g;
  * or letter, so a range/subtraction separator ("5-10%", "5~10%") is not
  * mistaken for a unary minus on the second number — a genuine negative
  * ("총합은 -3입니다") is still preceded by whitespace/punctuation and matches.
+ * The digit body is `\d(?:[\d,]*\d)?` rather than `\d[\d,]*` so it always
+ * ends on a digit: a bare trailing comma (as in "S&P 500, 나스닥 100", where
+ * "," is prose punctuation, not a thousands separator) is never swallowed
+ * into the token.
  */
-const NUMBER_RE = /(?<![\d\p{L}])[+-]?\d[\d,]*(?:\.\d+)?%?/gu;
-/** Same leading-sign rule as {@link NUMBER_RE}, plus an optional exponent — used only as a fallback over non-JSON tool-result text (see {@link collectToolNumbers}). */
+const NUMBER_RE = /(?<![\d\p{L}])[+-]?\d(?:[\d,]*\d)?(?:\.\d+)?%?/gu;
+/** Same leading-sign and no-trailing-comma rule as {@link NUMBER_RE}, plus an optional exponent — used only as a fallback over non-JSON tool-result text (see {@link collectToolNumbers}). */
 const TOOL_NUMBER_RE =
-    /(?<![\d\p{L}])[+-]?\d[\d,]*(?:\.\d+)?(?:[eE][+-]?\d+)?/gu;
+    /(?<![\d\p{L}])[+-]?\d(?:[\d,]*\d)?(?:\.\d+)?(?:[eE][+-]?\d+)?/gu;
 /** Korean magnitude units immediately adjacent to a number, e.g. "1.2억원". */
 const KOREAN_UNIT_MULTIPLIER: Readonly<Record<string, number>> = {
     만: 1e4,
@@ -98,13 +106,37 @@ function overlaps(a: Span, b: Span): boolean {
     return a[0] < b[1] && a[1] > b[0];
 }
 
-/** Character ranges in `text` that look like dates, times or list markers. */
-function ignorableSpans(text: string): Span[] {
-    const spans: Span[] = [];
+function sameSpan(a: Span, b: Span): boolean {
+    return a[0] === b[0] && a[1] === b[1];
+}
+
+/**
+ * Ignorable spans come in two flavors with different matching rules:
+ * - `overlap`: a date/time/list-marker fragment may only ever be a *part* of
+ *   a larger digit run the model wrote by coincidence (there is no such
+ *   coincidence in practice for these patterns), so any overlap is enough.
+ * - `exact`: an index-name number or a day-period label is a short digit run
+ *   that can legitimately sit right next to a much longer, unrelated number
+ *   ("다우 30,214.55" — "30" is the name, "214.55" is the next thousands
+ *   group of the real value). Matching by overlap would let that short span
+ *   swallow the entire longer `NUMBER_RE` token it merely touches; requiring
+ *   the ignorable span to *exactly* equal the candidate token's span (see
+ *   {@link sameSpan}) makes that impossible — the candidate is skipped only
+ *   when the ignorable pattern matched the whole thing, never a prefix of it.
+ */
+interface IgnorableSpans {
+    overlap: Span[];
+    exact: Span[];
+}
+
+/** Character ranges in `text` that look like dates, times, list markers, index-name numbers or day-period labels — see {@link IgnorableSpans} for how each is matched. */
+function ignorableSpans(text: string): IgnorableSpans {
+    const overlap: Span[] = [];
+    const exact: Span[] = [];
     for (const re of [DATE_RE, TIME_RE]) {
         re.lastIndex = 0;
         for (let m = re.exec(text); m !== null; m = re.exec(text)) {
-            spans.push([m.index, m.index + m[0].length]);
+            overlap.push([m.index, m.index + m[0].length]);
         }
     }
     LIST_MARKER_RE.lastIndex = 0;
@@ -114,7 +146,7 @@ function ignorableSpans(text: string): Span[] {
         m = LIST_MARKER_RE.exec(text)
     ) {
         const digitsStart = m.index + m[0].indexOf(m[1]);
-        spans.push([digitsStart, digitsStart + m[1].length]);
+        overlap.push([digitsStart, digitsStart + m[1].length]);
     }
     INDEX_NAME_NUMBER_RE.lastIndex = 0;
     for (
@@ -126,7 +158,7 @@ function ignorableSpans(text: string): Span[] {
         // the trailing digit run of the whole match.
         const digits = /\d+$/.exec(m[0])![0];
         const digitsStart = m.index + m[0].length - digits.length;
-        spans.push([digitsStart, digitsStart + digits.length]);
+        exact.push([digitsStart, digitsStart + digits.length]);
     }
     DAY_PERIOD_SUFFIX_RE.lastIndex = 0;
     for (
@@ -134,9 +166,9 @@ function ignorableSpans(text: string): Span[] {
         m !== null;
         m = DAY_PERIOD_SUFFIX_RE.exec(text)
     ) {
-        spans.push([m.index, m.index + m[0].length]);
+        exact.push([m.index, m.index + m[0].length]);
     }
-    return spans;
+    return { overlap, exact };
 }
 
 /** A plain integer (no separators) is not a meaningful claim below 3 digits. */
@@ -294,6 +326,26 @@ function isGroundedPercent(
 }
 
 /**
+ * Picks the right grounding check for a candidate token: a Korean-unit
+ * number converts by that unit's multiplier, a "%" token allows the ×100
+ * fraction fallback, anything else is a plain exact/rounded match.
+ */
+function isTokenGrounded(
+    token: string,
+    parsed: ParsedNumber,
+    unitMultiplier: number | undefined,
+    toolNumbers: readonly number[]
+): boolean {
+    if (unitMultiplier !== undefined) {
+        return isGroundedWithUnit(parsed, unitMultiplier, toolNumbers);
+    }
+    if (token.endsWith('%')) {
+        return isGroundedPercent(parsed, toolNumbers);
+    }
+    return isGrounded(parsed, toolNumbers);
+}
+
+/**
  * Finds numeric claims in an agent's answer that do not trace back to any
  * tool result — a lightweight grounding check for a "never quote a number
  * from memory" policy. Pure and side-effect free: it does not log, block or
@@ -378,18 +430,19 @@ export function findUngroundedNumbers(
         }
 
         const span: Span = [start, end];
-        if (skip.some(s => overlaps(s, span))) continue;
+        if (skip.overlap.some(s => overlaps(s, span))) continue;
+        if (skip.exact.some(s => sameSpan(s, span))) continue;
         if (unitMultiplier === undefined && isIgnorableToken(token)) continue;
         if (seen.has(displayToken)) continue;
         seen.add(displayToken);
 
         const parsed = parseToken(token);
-        const grounded =
-            unitMultiplier !== undefined
-                ? isGroundedWithUnit(parsed, unitMultiplier, toolNumbers)
-                : token.endsWith('%')
-                  ? isGroundedPercent(parsed, toolNumbers)
-                  : isGrounded(parsed, toolNumbers);
+        const grounded = isTokenGrounded(
+            token,
+            parsed,
+            unitMultiplier,
+            toolNumbers
+        );
         if (!grounded) ungrounded.push(displayToken);
     }
     return ungrounded;
