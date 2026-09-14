@@ -186,20 +186,53 @@ describe('findUngroundedNumbers', () => {
         ).toEqual(['71300']);
     });
 
-    it('지수/벤치마크 이름에 붙은 숫자는 이름의 일부로 보아 근거 확인 대상에서 뺀다', () => {
+    it('지수 이름 자체의 숫자(구성종목 수 등)만 근거 확인 대상에서 뺀다', () => {
+        // "S&P 500"의 500은 이름이므로 스킵되지만, 뒤따르는 실제 지수값은
+        // 그대로 검사 대상이다.
         expect(
-            findUngroundedNumbers('S&P 500: 7,656.98 (+0.86%)', [
+            findUngroundedNumbers('S&P 500 지수는 7,656.98 (+0.86%)', [
                 '{"price":7656.98,"changesPercentage":0.86}',
             ])
         ).toEqual([]);
         expect(
+            findUngroundedNumbers('S&P 500 지수는 7,656.98 입니다.', [])
+        ).toEqual(['7,656.98']);
+        expect(
             findUngroundedNumbers('나스닥100 지수가 상승했습니다.', [])
         ).toEqual([]);
         expect(
-            findUngroundedNumbers('코스피 지수는 2,650입니다.', [
+            findUngroundedNumbers('코스피 200 지수가 상승했습니다.', [])
+        ).toEqual([]);
+    });
+
+    it('지수 이름 뒤에 오는 실제 지수값(구성종목 수가 아닌 숫자)은 이름과 무관하게 그대로 검사한다', () => {
+        // 회귀 방지: 예전 구현은 이름 뒤에 오는 "아무 숫자"를 다 스킵해
+        // 가장 중요한 주장 유형(지수 종가 자체)을 놓쳤다.
+        expect(
+            findUngroundedNumbers('나스닥 26,655.16에 마감했습니다.', [])
+        ).toEqual(['26,655.16']);
+        expect(
+            findUngroundedNumbers('나스닥 26,655.16에 마감했습니다.', [
+                '{"price":26655.16}',
+            ])
+        ).toEqual([]);
+        expect(
+            findUngroundedNumbers('코스피 2,650선을 돌파했습니다.', [])
+        ).toEqual(['2,650']);
+        expect(
+            findUngroundedNumbers('코스피 2,650선을 돌파했습니다.', [
                 '{"price":2650}',
             ])
         ).toEqual([]);
+    });
+
+    it('알려진 한계: 이름 뒤 숫자가 이름의 구성종목 수와 정확히 같은 값이면 진짜 지수값이어도 스킵된다', () => {
+        // "코스피 200"은 이름(코스피 200 지수)과 "지수가 정확히 200을 돌파"라는
+        // 실제 주장을 정규식으로 구분할 수 없다 — 결과가 비차단 로그에만
+        // 쓰이므로 받아들이는 한계다.
+        expect(findUngroundedNumbers('코스피 200선 돌파했습니다.', [])).toEqual(
+            []
+        );
     });
 
     it('지수 이름이 아닌 일반 숫자는 여전히 근거 확인 대상이다', () => {
