@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.1](https://github.com/y0ngha/siglens-core/compare/v1.6.0...v1.6.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **agent:** 툴 타임아웃 상향 — free/cached 10s→30s, external 8s→15s ([85c0fc8](https://github.com/y0ngha/siglens-core/commit/85c0fc8f41502e7ddaf9af080bee4db7c542995c))
+* **agent:** findUngroundedNumbers 오탐 감소 — 지수명·기간 표기 숫자 제외, 비율×100 퍼센트 허용(분수형 한정) ([d57293c](https://github.com/y0ngha/siglens-core/commit/d57293c00d469642420b41948b427d39ebc19bf7))
+* **agent:** PR [#205](https://github.com/y0ngha/siglens-core/issues/205) 리뷰 반영 — 지수명 숫자를 명칭 숫자 목록으로 한정해 실제 지수 값은 대조 ([13739d1](https://github.com/y0ngha/siglens-core/commit/13739d17eb3a7f79e9e8761650ba17099eca9446))
+* **agent:** PR [#205](https://github.com/y0ngha/siglens-core/issues/205) 재리뷰 반영 — 지수명·기간 제외는 토큰 전체 일치일 때만, 천단위 쉼표 지수값 대조 ([46075fc](https://github.com/y0ngha/siglens-core/commit/46075fc5e88fe6a88d7e94311f96a126863e4e97))
+
 # [1.6.0](https://github.com/y0ngha/siglens-core/compare/v1.5.0...v1.6.0) (2026-09-14)
 
 
