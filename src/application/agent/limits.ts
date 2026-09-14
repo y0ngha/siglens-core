@@ -59,10 +59,21 @@ export const AGENT_GLOBAL_LIMITS = {
 
 export { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 
-/** Per-tool execution timeout by cost class. `expensive` ≥ measured 248s. */
+/**
+ * Per-tool execution timeout by cost class. `expensive` ≥ measured 248s.
+ *
+ * Raised 2026-09-14 (free/cached 10s → 30s, external 8s → 15s) after a
+ * production turn where `get_market_overview` timed out at 10,001ms on a cold
+ * cache and its retry took 8,967ms. "Cached" tools still hit the provider on a
+ * cache miss, and the consumer's FMP client backs off 10/15/20s on 429, so a
+ * 10s cap turned one slow-but-successful lookup into a failed tool call plus a
+ * wasted model step. These are ceilings, not targets: a fast tool returns as
+ * soon as it resolves, and the turn deadline (`AGENT_TURN_CAPS.turnDeadlineMs`)
+ * still bounds the whole turn.
+ */
 export const TOOL_TIMEOUT_MS: Readonly<Record<AgentToolCostClass, number>> = {
-    free: 10_000,
-    cached: 10_000,
-    external: 8_000,
+    free: 30_000,
+    cached: 30_000,
+    external: 15_000,
     expensive: 300_000,
 };

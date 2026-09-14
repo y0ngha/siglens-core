@@ -624,7 +624,8 @@ describe('runAgentTurn', () => {
         ]);
         const d = deps(p, { executeTool: () => new Promise(() => {}) });
         const pending = runAgentTurn(params(), d);
-        await vi.advanceTimersByTimeAsync(10_001);
+        // get_quote is costClass 'free' — advance past that class's ceiling.
+        await vi.advanceTimersByTimeAsync(TOOL_TIMEOUT_MS.free + 1);
         const r = await pending;
         expect(r.ok).toBe(true);
         expect(toolResults(p.calls[1]!)).toEqual([{ error: 'timeout' }]);
