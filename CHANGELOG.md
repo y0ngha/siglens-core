@@ -1,5 +1,12 @@
 # Changelog
 
+# [1.6.0](https://github.com/y0ngha/siglens-core/compare/v1.5.0...v1.6.0) (2026-09-14)
+
+
+### Features
+
+* **agent:** 데이터 도구 4종 추가·도구 설명 정합화·답변 숫자 근거 대조 헬퍼 ([3e369ce](https://github.com/y0ngha/siglens-core/commit/3e369cec80bb4d8701cb5f6f76821a40f1e240a3))
+
 # [1.5.0](https://github.com/y0ngha/siglens-core/compare/v1.4.0...v1.5.0) (2026-09-13)
 
 
