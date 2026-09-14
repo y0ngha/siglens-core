@@ -70,6 +70,13 @@ export { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
  * wasted model step. These are ceilings, not targets: a fast tool returns as
  * soon as it resolves, and the turn deadline (`AGENT_TURN_CAPS.turnDeadlineMs`)
  * still bounds the whole turn.
+ *
+ * The FMP backoff applies to `free`/`cached` tools (quotes, bars, fundamentals,
+ * market data). 30s covers the first retries but deliberately not the full
+ * 10+15+20s ladder: a provider that is still rate-limiting after that is better
+ * reported as a failed tool call the model can explain than held for 45s+.
+ * `external` is `web_search` (Brave), which has no such backoff; 15s only
+ * absorbs its slow tail.
  */
 export const TOOL_TIMEOUT_MS: Readonly<Record<AgentToolCostClass, number>> = {
     free: 30_000,
