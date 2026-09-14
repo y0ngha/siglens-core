@@ -313,14 +313,15 @@ function isPlausiblePercentFraction(n: number): boolean {
  */
 function isGroundedPercent(
     parsed: ParsedNumber,
-    toolNumbers: readonly number[]
+    toolNumbers: readonly number[],
+    percentFractionToolNumbers: readonly number[]
 ): boolean {
     return (
         isGrounded(parsed, toolNumbers) ||
         isGroundedWithUnit(
             parsed,
             PERCENT_FRACTION_UNIT,
-            toolNumbers.filter(isPlausiblePercentFraction)
+            percentFractionToolNumbers
         )
     );
 }
@@ -334,13 +335,18 @@ function isTokenGrounded(
     token: string,
     parsed: ParsedNumber,
     unitMultiplier: number | undefined,
-    toolNumbers: readonly number[]
+    toolNumbers: readonly number[],
+    percentFractionToolNumbers: readonly number[]
 ): boolean {
     if (unitMultiplier !== undefined) {
         return isGroundedWithUnit(parsed, unitMultiplier, toolNumbers);
     }
     if (token.endsWith('%')) {
-        return isGroundedPercent(parsed, toolNumbers);
+        return isGroundedPercent(
+            parsed,
+            toolNumbers,
+            percentFractionToolNumbers
+        );
     }
     return isGrounded(parsed, toolNumbers);
 }
@@ -401,6 +407,10 @@ export function findUngroundedNumbers(
 ): string[] {
     const skip = ignorableSpans(answer);
     const toolNumbers = collectToolNumbers(toolResults);
+    // Filtered once per call — every "%" token in the answer reuses it.
+    const percentFractionToolNumbers = toolNumbers.filter(
+        isPlausiblePercentFraction
+    );
     const seen = new Set<string>();
     const ungrounded: string[] = [];
 
@@ -441,7 +451,8 @@ export function findUngroundedNumbers(
             token,
             parsed,
             unitMultiplier,
-            toolNumbers
+            toolNumbers,
+            percentFractionToolNumbers
         );
         if (!grounded) ungrounded.push(displayToken);
     }
