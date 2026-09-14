@@ -101,7 +101,43 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-14.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-14.2');
+    });
+
+    it('신규 데이터 툴 4종은 가용할 때만 호출 규칙을 넣는다', () => {
+        expect(prompt).toContain('call get_fundamentals');
+        expect(prompt).toContain('call get_market_overview');
+        expect(prompt).toContain('call get_economy');
+        expect(prompt).toContain('call get_congress_trades');
+        const guest = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+            guest: true,
+        });
+        expect(guest).toContain(
+            'fundamentals, market overview, economy, congress trades'
+        );
+        expect(prompt).toContain("quote's quoteDelayMinutes is greater than 0");
+        const withoutNewTools = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t =>
+                    ![
+                        'get_fundamentals',
+                        'get_market_overview',
+                        'get_economy',
+                        'get_congress_trades',
+                    ].includes(t.name)
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(withoutNewTools).not.toContain('call get_fundamentals');
+        expect(withoutNewTools).not.toContain('call get_market_overview');
+        expect(withoutNewTools).not.toContain('call get_economy');
+        expect(withoutNewTools).not.toContain('call get_congress_trades');
     });
 
     it('범위 밖 요청(코드 작성 등)은 짧게 거절하고 코드 블록을 쓰지 않게 한다', () => {

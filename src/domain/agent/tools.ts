@@ -59,7 +59,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_quote',
         description:
-            'Latest price, day change and volume for up to 3 symbols. Always call this instead of quoting a price from memory.',
+            'Latest price and day change for up to 3 symbols. Always call this instead of quoting a price from memory. Each quote carries quoteDelayMinutes; when it is greater than 0 the quote is delayed by that many minutes and must not be called real-time.',
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -77,7 +77,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_bars_indicators',
         description:
-            'Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages), detected signals and trend state. Use for any question about price action, momentum or chart setup.',
+            'Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state and recent candle patterns with their dates. Use for any question about price action, momentum or chart setup.',
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -102,7 +102,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_cached_analysis',
         description:
-            'Most recent SIGLENS AI analysis for a symbol and tab, read from cache/snapshot/history. Call this FIRST for any "what does SIGLENS think" question; if it returns stale:true or found:false, call run_fresh_analysis when that tool is available.',
+            'Most recent SIGLENS AI analysis for a symbol and tab, read from cache/snapshot/history. Call this FIRST for any "what does SIGLENS think" question, including chart pattern questions: technical results include detected chart patterns, candle patterns and strategy verdicts. If it returns stale:true or found:false, call run_fresh_analysis when that tool is available.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -179,6 +179,59 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
         name: 'get_options_summary',
         description:
             'Options market summary: ATM implied volatility, max pain, put/call ratio, top open-interest strikes, nearest expirations. Use for volatility, expected move or positioning questions.',
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: { symbol: symbolProp },
+            required: ['symbol'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_fundamentals',
+        description:
+            'Company profile, valuation ratios (P/E, P/B, market cap and similar), profitability, growth, financial health scores, analyst consensus and price targets, and the upcoming earnings date/estimates. Stocks only (US and Korean); not for crypto. Use for valuation, earnings, "is it expensive", growth or balance-sheet questions.',
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: { symbol: symbolProp },
+            required: ['symbol'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_market_overview',
+        description:
+            'Market-wide fear & greed index with its factor breakdown, major index levels and day change, and for \'us\' the sector signal scan (golden crosses, RSI divergences, squeezes across large caps). Use for "how is the market", market mood, index or sector questions.',
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                market: {
+                    type: 'string',
+                    enum: ['us', 'kr'],
+                    description: 'Which market to summarize',
+                },
+            },
+            required: ['market'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_economy',
+        description:
+            'US macro indicators (policy rate, CPI, employment, GDP), Treasury yields, upcoming high-impact economic calendar events, and the latest SIGLENS macro briefing if available. Use for rates, inflation, macro calendar or "what\'s coming up this week" questions.',
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: {},
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_congress_trades',
+        description:
+            'Recent disclosed US congressional trades in a US stock, with a buy/sell trend summary. US stocks only. Use when the user asks about congressional or insider political trading in a symbol.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
