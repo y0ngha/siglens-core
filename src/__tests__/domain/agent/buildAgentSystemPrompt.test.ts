@@ -5,6 +5,12 @@ import {
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
 
+const NEW_TOOLS: readonly string[] = [
+    'get_fundamentals',
+    'get_market_overview',
+    'get_economy',
+    'get_congress_trades',
+];
 const NOW = new Date('2026-09-12T15:00:00Z'); // 11:00 ET (open), 2026-09-13 00:00 KST
 
 describe('buildAgentSystemPrompt', () => {
@@ -91,6 +97,36 @@ describe('buildAgentSystemPrompt', () => {
         expect(p).not.toContain('- web_search');
     });
 
+    it('도구 선택은 질문 유형 표로, 가용한 도구를 가리키는 행만 넣는다', () => {
+        expect(prompt).toContain('### Which tools to call');
+        expect(prompt).toContain('call the union of all matching rows');
+        expect(prompt).toContain('→ search_ticker first');
+        expect(prompt).toContain('→ get_my_portfolio.');
+        const noSearch = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_options_summary'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noSearch).not.toContain('get_options_summary');
+        // 표의 각 행은 한 줄 — 여러 규칙을 한 불릿에 이어 붙이지 않는다.
+        const table = prompt.slice(
+            prompt.indexOf('### Which tools to call'),
+            prompt.indexOf('### Rules')
+        );
+        for (const line of table.split('\n').filter(l => l.startsWith('- ')))
+            expect(line.match(/→/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    });
+
+    it('도구를 부르는 메시지는 텍스트 없이 도구 호출만 담게 하고, 끝에서 한 번 더 상기시킨다', () => {
+        expect(prompt).toContain('its text content stays empty');
+        expect(prompt.trimEnd()).toMatch(
+            /Reminder: when you call tools, send only the tool calls — no text in that message\.$/
+        );
+    });
+
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
@@ -101,24 +137,23 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-15.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-15.2');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
     it('종목 분석 질문에는 get_bars_indicators 컨플루언스를 부르고 답에 밝히게 한다', () => {
-        expect(prompt).toContain('call get_bars_indicators');
+        expect(prompt).toContain(
+            'about a symbol → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
+        );
         expect(prompt).toContain('state its confluence reading');
         // 방향을 묻지 않는 질문(실적·재무·뉴스·의회 거래만)에는 붙이지 않는다.
         expect(prompt).toContain(
-            'Skip it when the question is only about earnings, financials, news or congressional trades'
+            'A question only about earnings, financials, news or congressional trades does not need get_bars_indicators'
         );
     });
 
     it('신규 데이터 툴 4종은 가용할 때만 호출 규칙을 넣는다', () => {
-        expect(prompt).toContain('call get_fundamentals');
-        expect(prompt).toContain('call get_market_overview');
-        expect(prompt).toContain('call get_economy');
-        expect(prompt).toContain('call get_congress_trades');
+        for (const name of NEW_TOOLS) expect(prompt).toContain(`→ ${name}.`);
         const guest = buildAgentSystemPrompt({
             locale: 'ko',
             tools: AGENT_TOOL_SPECS,
@@ -132,22 +167,12 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain("quote's quoteDelayMinutes is greater than 0");
         const withoutNewTools = buildAgentSystemPrompt({
             locale: 'ko',
-            tools: AGENT_TOOL_SPECS.filter(
-                t =>
-                    ![
-                        'get_fundamentals',
-                        'get_market_overview',
-                        'get_economy',
-                        'get_congress_trades',
-                    ].includes(t.name)
-            ),
+            tools: AGENT_TOOL_SPECS.filter(t => !NEW_TOOLS.includes(t.name)),
             now: NOW,
             etSessionStatus: 'open',
         });
-        expect(withoutNewTools).not.toContain('call get_fundamentals');
-        expect(withoutNewTools).not.toContain('call get_market_overview');
-        expect(withoutNewTools).not.toContain('call get_economy');
-        expect(withoutNewTools).not.toContain('call get_congress_trades');
+        for (const name of NEW_TOOLS)
+            expect(withoutNewTools).not.toContain(name);
     });
 
     it('범위 밖 요청(코드 작성 등)은 짧게 거절하고 코드 블록을 쓰지 않게 한다', () => {

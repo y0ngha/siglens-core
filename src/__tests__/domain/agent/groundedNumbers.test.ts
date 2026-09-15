@@ -187,6 +187,20 @@ describe('findUngroundedNumbers', () => {
         // 복합 단위는 변환하지 않고 건드리지 않는 알려진 한계.
         expect(findUngroundedNumbers(jo, ['{"revenue":3e12}'])).toEqual([]);
     });
+
+    it('도구 문장에 이미 한국 단위로 적힌 수치("1,132억")를 답이 그대로 옮기면 근거로 본다', () => {
+        // 2026-09-15 운영: overall 분석 요약의 "매출 1,132억 달러"를 답이 옮겼는데
+        // 도구 숫자가 1132로만 수집돼 단위 경로(1132÷1e8)와 어긋나 오탐이 났다.
+        const results = ['{"summary":"10월 29일 실적 매출 1,132억 달러 예상"}'];
+        expect(findUngroundedNumbers('매출 1,132억 달러', results)).toEqual([]);
+        expect(
+            findUngroundedNumbers('매출 1.2만 달러', ['{"summary":"1.2만"}'])
+        ).toEqual([]);
+        // 단위 없는 같은 숫자는 여전히 단위 수치를 근거하지 못한다.
+        expect(
+            findUngroundedNumbers('매출 1,132억 달러', ['{"count":1132}'])
+        ).toEqual(['1,132억']);
+    });
     it('JSON 파싱 시 Infinity가 되는 값(1e400)은 근거 집합에 넣지 않고, 나머지 값은 그대로 근거로 쓴다', () => {
         const results = ['{"huge":1e400,"price":187.25}'];
         expect(
