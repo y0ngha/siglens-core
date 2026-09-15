@@ -1,5 +1,19 @@
 # Changelog
 
+# [1.7.0](https://github.com/y0ngha/siglens-core/compare/v1.6.1...v1.7.0) (2026-09-15)
+
+
+### Bug Fixes
+
+* **agent:** 근거 수치 비교를 반 단위 허용 오차로 바꿔 반올림 경계 오탐 제거 ([155bd57](https://github.com/y0ngha/siglens-core/commit/155bd57d6c406243c1deaec7515509cd060e0b05))
+* **agent:** 컨플루언스 확인 규칙을 방향성 질문으로 한정 ([b82969b](https://github.com/y0ngha/siglens-core/commit/b82969bbe22882af93df49e36f7201493a424750))
+
+
+### Features
+
+* **agent:** 종목 분석 질문에 컨플루언스 확인을 필수화 (프롬프트 2026-09-15.1) ([e53c082](https://github.com/y0ngha/siglens-core/commit/e53c0827fb71e36ff86870defffd15b16b0718c7))
+* **ai:** DeepSeek 스트림 무응답 감시 + 옵트인 Gemini 3.6 폴백 ([bfe56d0](https://github.com/y0ngha/siglens-core/commit/bfe56d00f687529c3c2dc3d5234dcd377e1a864c))
+
 ## [1.6.1](https://github.com/y0ngha/siglens-core/compare/v1.6.0...v1.6.1) (2026-09-14)
 
 
