@@ -108,6 +108,10 @@ describe('buildAgentSystemPrompt', () => {
     it('종목 분석 질문에는 get_bars_indicators 컨플루언스를 부르고 답에 밝히게 한다', () => {
         expect(prompt).toContain('call get_bars_indicators');
         expect(prompt).toContain('state its confluence reading');
+        // 방향을 묻지 않는 질문(실적·재무·뉴스·의회 거래만)에는 붙이지 않는다.
+        expect(prompt).toContain(
+            'Skip it when the question is only about earnings, financials, news or congressional trades'
+        );
     });
 
     it('신규 데이터 툴 4종은 가용할 때만 호출 규칙을 넣는다', () => {
