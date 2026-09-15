@@ -101,7 +101,13 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-14.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-15.1');
+    });
+
+    /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
+    it('종목 분석 질문에는 get_bars_indicators 컨플루언스를 부르고 답에 밝히게 한다', () => {
+        expect(prompt).toContain('call get_bars_indicators');
+        expect(prompt).toContain('state its confluence reading');
     });
 
     it('신규 데이터 툴 4종은 가용할 때만 호출 규칙을 넣는다', () => {
