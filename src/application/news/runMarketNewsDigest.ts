@@ -169,6 +169,7 @@ export async function runMarketNewsDigest(
             model: callModelId,
             tier,
             signal: options.signal,
+            fallbackOnProviderFailure: options.providerFallback,
             system,
             responseSchema: NEWS_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),

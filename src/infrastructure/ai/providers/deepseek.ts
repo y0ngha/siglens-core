@@ -16,6 +16,30 @@ const DEEPSEEK_TIMEOUT_MS = 3600_000;
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 
 /**
+ * Longest silence tolerated from DeepSeek — no response headers and no stream
+ * event (text, reasoning, usage) for this long aborts the call.
+ *
+ * The 1h {@link DEEPSEEK_TIMEOUT_MS} only bounds the *total* duration, and a
+ * stalled connection never trips it in any useful time: on 2026-09-14
+ * 20:30–21:28 UTC DeepSeek sent neither a response nor an error for ~an hour,
+ * every prewarm unit waited out its own 2-minute cap, and the abandoned calls
+ * stayed open in the background. A live call streams continuously (reasoning
+ * deltas included), so 90s of silence is a stall, not a slow answer — the
+ * slowest observed healthy call (248s, pro model) streamed the whole time.
+ *
+ * @internal
+ */
+export const DEEPSEEK_STALL_TIMEOUT_MS = 90_000;
+
+/**
+ * Error code for a call aborted by the stall watchdog. Not retryable — the
+ * same provider just went silent; callers may route to another provider.
+ *
+ * @internal
+ */
+export const DEEPSEEK_STALLED_CODE = 'DEEPSEEK_STALLED';
+
+/**
  * DeepSeek-specific top-level body field. Non-standard for the `openai` SDK's
  * `ChatCompletionCreateParams` types — DeepSeek toggles reasoning via this
  * field instead of OpenAI's `reasoning.effort`. Declared as an intersection
@@ -117,7 +141,8 @@ async function callDeepSeekResponses(
     options: DeepSeekCallOptions,
     spec: DeepSeekModelSpec,
     useThinking: boolean,
-    signal: AbortSignal
+    signal: AbortSignal,
+    onActivity: () => void
 ): Promise<DeepSeekResponsesResult> {
     const client = getClient(options.apiKey);
     // SDK 타입을 그대로 쓴다. body가 `unknown`이면 `text.format` 키 오타 같은 것이
@@ -161,6 +186,7 @@ async function callDeepSeekResponses(
     // legitimately split answer, so the recovery lives in `normalizeJsonResponse`.
     const charsByPart = new Map<string, number>();
     for await (const event of stream) {
+        onActivity();
         if (event.type === OUTPUT_TEXT_DELTA) {
             text += event.delta;
             const part = `${event.output_index}:${event.content_index}`;
@@ -261,6 +287,17 @@ export async function callDeepSeek(
     const propagateAbort = (): void => controller.abort();
     options.signal?.addEventListener('abort', propagateAbort, { once: true });
 
+    // Stall watchdog: re-armed on every stream event, so only silence aborts.
+    let stalled = false;
+    let stallTimerId: ReturnType<typeof setTimeout> | undefined;
+    const armStallWatchdog = (): void => {
+        clearTimeout(stallTimerId);
+        stallTimerId = setTimeout(() => {
+            stalled = true;
+            controller.abort();
+        }, DEEPSEEK_STALL_TIMEOUT_MS).unref();
+    };
+
     // Mirrors claude.ts/chatgpt.ts/gemini.ts: falls back to AI_SYSTEM_PROMPT
     // when no per-call system prompt is supplied, so a system message is
     // always present.
@@ -292,6 +329,7 @@ export async function callDeepSeek(
     };
 
     const start = Date.now();
+    armStallWatchdog();
     try {
         let text = '';
         let finishReason: string | null | undefined;
@@ -304,7 +342,8 @@ export async function callDeepSeek(
                 options,
                 spec,
                 useThinking,
-                controller.signal
+                controller.signal,
+                armStallWatchdog
             );
             text = result.text;
             usage = result.usage;
@@ -338,6 +377,7 @@ export async function callDeepSeek(
             // required (see the type comment) — the connection stays alive as tokens
             // flow, avoiding DeepSeek's ~50-60s non-streaming termination.
             for await (const chunk of stream) {
+                armStallWatchdog();
                 const choice = chunk.choices?.[0];
                 if (choice?.delta?.content) {
                     text += choice.delta.content;
@@ -420,8 +460,22 @@ export async function callDeepSeek(
             new Error(`Unexpected DeepSeek finish_reason: ${finishReason}`),
             { retryable: true }
         );
+    } catch (error) {
+        if (!stalled) throw error;
+        console.warn('[DeepSeek] Stalled: no stream activity, aborting', {
+            model,
+            silenceMs: DEEPSEEK_STALL_TIMEOUT_MS,
+            elapsedMs: Date.now() - start,
+        });
+        throw Object.assign(
+            new Error(
+                `DeepSeek stalled: no response for ${DEEPSEEK_STALL_TIMEOUT_MS}ms (model: ${model})`
+            ),
+            { code: DEEPSEEK_STALLED_CODE }
+        );
     } finally {
         clearTimeout(timeoutId);
+        clearTimeout(stallTimerId);
         options.signal?.removeEventListener('abort', propagateAbort);
     }
 }

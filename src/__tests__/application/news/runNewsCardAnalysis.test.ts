@@ -65,6 +65,17 @@ describe('runNewsCardAnalysis', () => {
             );
         });
 
+        it('providerFallback is forwarded to callAnalysisAi as fallbackOnProviderFailure', async () => {
+            await runNewsCardAnalysis({
+                item: testNewsItem,
+                providerFallback: true,
+            });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ fallbackOnProviderFailure: true })
+            );
+        });
+
         it('추론을 항상 끈 채로 callAnalysisAi를 호출한다', async () => {
             // 호출자가 정할 수 있는 값이 아니라 이 use-case의 고정 정책이다:
             // 번역 + 라벨링은 결정적 변환이라 추론 이득이 없다. `reasoning`은

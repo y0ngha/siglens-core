@@ -29,6 +29,13 @@ export interface CallAnalysisAiOptions {
      * 거짓이 되므로 개명했다. AI 호출 자체에는 영향을 주지 않는다.
      */
     correlationId?: string;
+    /**
+     * `true`면 서버 키 DeepSeek 호출이 공급자 사유로 실패했을 때 `DEEPSEEK_FALLBACK_MODEL`
+     * (Gemini)로 한 번 재시도한다. **기본은 끔.** 사용자가 모델을 고를 수 없는 경로
+     * (SEO 프리웜, ai.siglens.io 에이전트)만 켠다 — 사용자가 고른 모델은 조용히 바뀌면
+     * 안 되고, 실패를 드러내 모델 변경을 안내해야 한다(사용자 결정 2026-09-15).
+     */
+    fallbackOnProviderFailure?: boolean;
 }
 
 /**

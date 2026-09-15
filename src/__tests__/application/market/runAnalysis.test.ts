@@ -355,6 +355,24 @@ describe('runAnalysis', () => {
                 expect.objectContaining({ signal })
             );
         });
+
+        it('providerFallback is forwarded to callAnalysisAi as fallbackOnProviderFailure', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    providerFallback: true,
+                }
+            );
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ fallbackOnProviderFailure: true })
+            );
+        });
     });
 
     describe('onPromptAssembled', () => {

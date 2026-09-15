@@ -168,3 +168,18 @@
   Context: The new rules lacked any test cases verifying their behavior. Fixed in Round 2 by adding assertions for each new rule.
 
 
+## [PR | feat/deepseek-stall-gemini-fallback | 2026-09-15] — Fallback provider routing & model dispatch R1→R3
+
+- Violation 1 (R1 REQUIRED c/d): Exports DEEPSEEK_STALL_TIMEOUT_MS, DEEPSEEK_STALLED_CODE, DEEPSEEK_FALLBACK_MODEL added to src/index.ts without @internal JSDoc tags
+  Rule: MISTAKES.md #9.5 — Module-internal exports missing @internal JSDoc tag
+  Context: Three fallback routing internals exported from package entrypoint without @internal marking. Recurring pattern (cited in MISTAKES.md as PR #110, PR #5 R1/R2).
+
+- Violation 2 (R1 REQUIRED b): groundedNumbers epsilon constant scaled by value magnitude (±3500 at 3.5e12) instead of fixed tolerance
+  Rule: Infrastructure Functions — numeric parsing tolerance scaling
+  Context: Epsilon defense against float rounding in structured LLM output parsing. Depends on asset price order of magnitude; accepted as design.
+
+- Violation 3 (R2 RECOMMENDED): SubmitMarketNewsDigestOptions interface missing new providerFallback option field
+  Rule: MISTAKES.md #6.5 — State/function/documentation divergence; related types not synchronized
+  Context: providerFallback option added to AnalysisOptions, ChatOptions, and other dispatch option siblings; SubmitMarketNewsDigestOptions omitted. Fixed in R2.
+
+

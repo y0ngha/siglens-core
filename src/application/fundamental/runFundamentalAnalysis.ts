@@ -277,6 +277,7 @@ export async function runFundamentalAnalysis(
             tier,
             userApiKey: options.userApiKey,
             signal: options.signal,
+            fallbackOnProviderFailure: options.providerFallback,
             system,
             responseSchema: FUNDAMENTAL_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),

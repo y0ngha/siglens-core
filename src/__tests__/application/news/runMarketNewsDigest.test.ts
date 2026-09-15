@@ -120,6 +120,17 @@ describe('runMarketNewsDigest', () => {
             );
         });
 
+        it('providerFallback을 fallbackOnProviderFailure로 전달한다', async () => {
+            await runMarketNewsDigest({
+                ...baseArgs(),
+                providerFallback: true,
+            });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ fallbackOnProviderFailure: true })
+            );
+        });
+
         it('reasoning을 callAnalysisAi에 그대로 전달한다', async () => {
             // `true`는 모델 스펙을 오버라이드한다 — 스펙상 non-thinking인
             // deepseek-v4-flash에서도 추론이 켜져야 한다(그래야 추론 티어
