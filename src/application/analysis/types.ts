@@ -30,10 +30,11 @@ export interface CallAnalysisAiOptions {
      */
     correlationId?: string;
     /**
-     * `true`면 서버 키 DeepSeek 호출이 공급자 사유로 실패했을 때 `DEEPSEEK_FALLBACK_MODEL`
-     * (Gemini)로 한 번 재시도한다. **기본은 끔.** 사용자가 모델을 고를 수 없는 경로
-     * (SEO 프리웜, ai.siglens.io 에이전트)만 켠다 — 사용자가 고른 모델은 조용히 바뀌면
-     * 안 되고, 실패를 드러내 모델 변경을 안내해야 한다(사용자 결정 2026-09-15).
+     * When `true`, a server-key DeepSeek call that fails for provider reasons is
+     * retried once on the Gemini fallback model. **Off by default.** Only callers
+     * where the user cannot choose the model (SEO prewarm, the ai.siglens.io agent)
+     * set it — a user-chosen model must not change silently; its failure should
+     * surface so the user can switch models (product decision 2026-09-15).
      */
     fallbackOnProviderFailure?: boolean;
 }
