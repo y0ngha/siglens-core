@@ -29,6 +29,14 @@ export interface CallAnalysisAiOptions {
      * 거짓이 되므로 개명했다. AI 호출 자체에는 영향을 주지 않는다.
      */
     correlationId?: string;
+    /**
+     * When `true`, a server-key DeepSeek call that fails for provider reasons is
+     * retried once on the Gemini fallback model. **Off by default.** Only callers
+     * where the user cannot choose the model (SEO prewarm, the ai.siglens.io agent)
+     * set it — a user-chosen model must not change silently; its failure should
+     * surface so the user can switch models (product decision 2026-09-15).
+     */
+    fallbackOnProviderFailure?: boolean;
 }
 
 /**

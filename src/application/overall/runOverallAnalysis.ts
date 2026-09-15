@@ -268,6 +268,7 @@ export async function runOverallAnalysis(
                   skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                   force: effectiveAxisForce,
                   signal,
+                  providerFallback: options.providerFallback,
               })
             : Promise.resolve({
                   status: 'no_chains_error' as const,
@@ -299,6 +300,7 @@ export async function runOverallAnalysis(
               skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
               force: effectiveAxisForce,
               signal,
+              providerFallback: options.providerFallback,
           });
 
     const [technicalResult, fundamentalResult, newsResult, optionsResult] =
@@ -331,6 +333,7 @@ export async function runOverallAnalysis(
                             : undefined),
                     skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                     signal,
+                    providerFallback: options.providerFallback,
                 }
             ),
             fundamentalRun,
@@ -351,6 +354,7 @@ export async function runOverallAnalysis(
                 skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                 force: effectiveAxisForce,
                 signal,
+                providerFallback: options.providerFallback,
             }),
             optionsRun,
         ]);
@@ -655,6 +659,7 @@ export async function runOverallAnalysis(
             tier,
             userApiKey: options.userApiKey,
             signal,
+            fallbackOnProviderFailure: options.providerFallback,
             system,
             responseSchema: OVERALL_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),

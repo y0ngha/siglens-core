@@ -187,6 +187,7 @@ export async function runCongressTrend(
             tier,
             userApiKey: options.userApiKey,
             signal: options.signal,
+            fallbackOnProviderFailure: options.providerFallback,
             system,
             responseSchema: CONGRESS_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),

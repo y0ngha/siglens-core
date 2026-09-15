@@ -1,6 +1,6 @@
 import type { CallAnalysisAiOptions } from '@/application/analysis/types';
 import { MODEL_SPECS, supportsHardOff } from '@/domain/analysis/modelSpecs';
-import type { ModelSpec } from '@/domain/types';
+import type { ActiveModelId, ModelSpec } from '@/domain/types';
 import { resolveReasoningConfig } from '@/domain/types';
 import type {
     ChatGPTModelId,
@@ -26,6 +26,35 @@ import { resolveServerApiKey } from '@/infrastructure/ai/serverKeys';
  * 오인해 Claude/ChatGPT에 추가하지 않도록 명시한다.
  */
 const ANALYSIS_MAX_RETRY_DELAY_MS = 30_000;
+
+/**
+ * Model a failed server-key DeepSeek analysis is retried on, once.
+ *
+ * DeepSeek is the default free-tier analysis provider, so when it degrades the
+ * whole prewarm and every free analysis degrades with it — 2026-09-14 20:30–21:28
+ * UTC it went silent for an hour and four prewarm batches hit their deadline
+ * with nothing harvested. Gemini is on a separate vendor, already a server-key
+ * analysis model with the same response contract, and the flash tier keeps the
+ * fallback cheap (사용자 결정 2026-09-15: Gemini 3.6).
+ *
+ * @internal
+ */
+export const DEEPSEEK_FALLBACK_MODEL: GeminiModelId = 'gemini-3.6-flash';
+
+/**
+ * Whether a DeepSeek failure is worth one attempt on the fallback provider.
+ *
+ * Yes for provider trouble — stall watchdog, exhausted 5xx/429 retries, network
+ * errors without an HTTP status, truncation or empty output. No for a 4xx other
+ * than 429: that is a malformed request (bad schema, oversized prompt), and a
+ * second vendor would reject or mangle the same request.
+ */
+function isFallbackEligible(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return true;
+    const status = (error as { status?: unknown }).status;
+    if (typeof status !== 'number') return true;
+    return status === 429 || status >= 500;
+}
 
 /**
  * Models already warned about via {@link warnPartialHardOff}, so a batch of
@@ -85,6 +114,7 @@ export async function callAnalysisAi(
         seed,
         reasoning,
         correlationId,
+        fallbackOnProviderFailure = false,
     } = options;
 
     const useServerKey = shouldUseServerKey(model, tier);
@@ -104,7 +134,7 @@ export async function callAnalysisAi(
         warnPartialHardOff(model);
     }
 
-    const raw = await dispatch();
+    const raw = await generate();
     if (raw.trim() === '') {
         throw new Error('AI returned an empty response');
     }
@@ -123,29 +153,81 @@ export async function callAnalysisAi(
             '[callAnalysisAi] response was not parseable JSON; regenerating once',
             { model, correlationId, message: error.message }
         );
-        const retried = await dispatch();
+        const retried = await generate();
         if (retried.trim() === '') {
             throw new Error('AI returned an empty response');
         }
         return normalizeJsonResponse(retried);
     }
 
-    function dispatch(): Promise<string> {
-        // apiKey는 위 가드에서 이미 narrowing됐다.
-        const key = apiKey as string;
+    /**
+     * {@link dispatch} on the requested model, with one {@link DEEPSEEK_FALLBACK_MODEL}
+     * attempt when a server-key DeepSeek call fails for provider reasons — only when
+     * the caller opted in with `fallbackOnProviderFailure` (model not user-chosen).
+     *
+     * Server key only: a BYOK user chose and pays for DeepSeek, so silently billing
+     * our Gemini key instead would be wrong in both directions. A caller abort is
+     * final, and a missing Gemini key rethrows the original DeepSeek error — the
+     * fallback must never hide the real failure behind a config error.
+     *
+     * Callers still record usage under the **requested** model. That row is request
+     * accounting (per-user daily quota/abuse, `usageLogRepository`), and the user
+     * asked for DeepSeek — a provider outage must not move the request into another
+     * model's quota. Which model actually generated and was billed is recorded by
+     * the provider `[Usage]` telemetry (same `correlationId`) and the warn below.
+     */
+    async function generate(): Promise<string> {
+        try {
+            return await dispatch(model, apiKey as string);
+        } catch (error) {
+            if (
+                !fallbackOnProviderFailure ||
+                MODEL_SPECS[model].provider !== 'deepseek' ||
+                !useServerKey ||
+                signal?.aborted === true ||
+                !isFallbackEligible(error)
+            ) {
+                throw error;
+            }
+            let fallbackKey: string;
+            try {
+                fallbackKey = resolveServerApiKey(
+                    getProviderForModel(DEEPSEEK_FALLBACK_MODEL)
+                );
+            } catch {
+                throw error;
+            }
+            console.warn(
+                '[callAnalysisAi] DeepSeek failed; retrying once on fallback model',
+                {
+                    model,
+                    fallbackModel: DEEPSEEK_FALLBACK_MODEL,
+                    correlationId,
+                    message:
+                        error instanceof Error ? error.message : String(error),
+                }
+            );
+            return dispatch(DEEPSEEK_FALLBACK_MODEL, fallbackKey);
+        }
+    }
+
+    function dispatch(
+        targetModel: ActiveModelId,
+        key: string
+    ): Promise<string> {
         // 스펙이 OFF/ON 두 상태를 모두 들고 있어 provider별 번역 분기가 필요 없다.
         // `resolveReasoningConfig`가 호출자의 `reasoning`(또는 스펙 기본)을 해석해
         // 그 provider가 이해하는 설정을 그대로 돌려준다. 이 덕분에
         // `reasoning === true`가 전 provider에서 스펙을 오버라이드한다 — 예전에는
         // DeepSeek만 그랬고, 그래서 스펙 기본이 OFF가 되면 토글을 켜도 아무 일도
         // 일어나지 않았다.
-        const spec: ModelSpec = MODEL_SPECS[model];
+        const spec: ModelSpec = MODEL_SPECS[targetModel];
 
         switch (spec.provider) {
             case 'claude':
                 return callClaudeWithRetry(
                     prompt,
-                    model as ClaudeModelId,
+                    targetModel as ClaudeModelId,
                     key,
                     {
                         signal,
@@ -161,7 +243,7 @@ export async function callAnalysisAi(
             case 'chatgpt':
                 return callChatGPTWithRetry(
                     prompt,
-                    model as ChatGPTModelId,
+                    targetModel as ChatGPTModelId,
                     key,
                     {
                         signal,
@@ -177,7 +259,7 @@ export async function callAnalysisAi(
             case 'gemini':
                 return callGeminiWithRetry(
                     prompt,
-                    model as GeminiModelId,
+                    targetModel as GeminiModelId,
                     key,
                     {
                         signal,
@@ -198,7 +280,7 @@ export async function callAnalysisAi(
             case 'deepseek':
                 return callDeepSeekWithRetry(
                     prompt,
-                    model as DeepSeekModelId,
+                    targetModel as DeepSeekModelId,
                     key,
                     {
                         signal,

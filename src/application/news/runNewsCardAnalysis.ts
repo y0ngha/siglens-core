@@ -94,6 +94,7 @@ export async function runNewsCardAnalysis(
             prompt,
             model: NEWS_CARD_MODEL_ID,
             signal: options.signal,
+            fallbackOnProviderFailure: options.providerFallback,
             system,
             responseSchema: NEWS_CARD_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),

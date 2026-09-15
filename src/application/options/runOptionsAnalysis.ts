@@ -242,6 +242,7 @@ export async function runOptionsAnalysis(
             tier,
             userApiKey: options.userApiKey,
             signal: options.signal,
+            fallbackOnProviderFailure: options.providerFallback,
             system,
             responseSchema: OPTIONS_RESPONSE_SCHEMA,
             seed: analysisSeed(`${system}\n\n${prompt}`),

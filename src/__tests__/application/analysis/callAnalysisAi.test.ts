@@ -17,6 +17,7 @@ vi.mock('@/infrastructure/ai/retry/deepseekRetry', () => ({
 import {
     _resetPartialHardOffWarningsForTest,
     callAnalysisAi,
+    DEEPSEEK_FALLBACK_MODEL,
 } from '@/application/analysis/callAnalysisAi';
 import { callClaudeWithRetry } from '@/infrastructure/ai/retry/anthropicRetry';
 import { callDeepSeekWithRetry } from '@/infrastructure/ai/retry/deepseekRetry';
@@ -426,5 +427,154 @@ describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
 
         expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(1);
         normalizeSpy.mockRestore();
+    });
+});
+
+describe('callAnalysisAi — DeepSeek 장애 시 Gemini 1회 폴백', () => {
+    const FALLBACK_ON = { fallbackOnProviderFailure: true } as const;
+    const stalled = Object.assign(new Error('DeepSeek stalled'), {
+        code: 'DEEPSEEK_STALLED',
+    });
+
+    beforeEach(() => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        // `clearAllMocks` leaves queued `*Once` values behind; start each case clean.
+        vi.mocked(callDeepSeekWithRetry).mockReset().mockResolvedValue(OK);
+        vi.mocked(callGeminiWithRetry).mockReset().mockResolvedValue(OK);
+    });
+
+    /** 사용자가 모델을 고른 경로(기본)는 폴백하지 않는다 — 실패를 드러내 모델 변경을 안내한다. */
+    it('옵트인하지 않으면 DeepSeek 실패를 그대로 던진다', async () => {
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(stalled);
+        await expect(
+            callAnalysisAi({ prompt: 'p', model: DEEPSEEK_FREE, tier: 'free' })
+        ).rejects.toBe(stalled);
+        expect(callGeminiWithRetry).not.toHaveBeenCalled();
+    });
+
+    it('JSON 재생성까지 합쳐도 Gemini 호출은 최대 2번이다', async () => {
+        vi.mocked(callDeepSeekWithRetry)
+            .mockRejectedValueOnce(stalled)
+            .mockRejectedValueOnce(stalled);
+        vi.mocked(callGeminiWithRetry)
+            .mockResolvedValueOnce('{"a":1,,,,"b":}')
+            .mockResolvedValueOnce(OK);
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+            })
+        ).resolves.toBe(OK);
+        expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
+        expect(callGeminiWithRetry).toHaveBeenCalledTimes(2);
+    });
+
+    it('서버 키 DeepSeek 호출이 멈추면 서버 Gemini 키로 폴백 모델을 한 번 부른다', async () => {
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(stalled);
+
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+            })
+        ).resolves.toBe(OK);
+
+        expect(callGeminiWithRetry).toHaveBeenCalledTimes(1);
+        const [, model, key] = vi.mocked(callGeminiWithRetry).mock.calls[0];
+        expect(model).toBe(DEEPSEEK_FALLBACK_MODEL);
+        expect(model).toBe('gemini-3.6-flash');
+        expect(key).toBe('server-gemini');
+    });
+
+    it('5xx 재시도 소진·네트워크 오류도 폴백한다', async () => {
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(
+            Object.assign(new Error('bad gateway'), { status: 502 })
+        );
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+            })
+        ).resolves.toBe(OK);
+
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(
+            new Error('socket hang up')
+        );
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+            })
+        ).resolves.toBe(OK);
+        expect(callGeminiWithRetry).toHaveBeenCalledTimes(2);
+    });
+
+    it('429 외 4xx(잘못된 요청)는 폴백하지 않는다', async () => {
+        const badRequest = Object.assign(new Error('bad request'), {
+            status: 400,
+        });
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(badRequest);
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+            })
+        ).rejects.toBe(badRequest);
+        expect(callGeminiWithRetry).not.toHaveBeenCalled();
+    });
+
+    it('호출자가 abort했으면 폴백하지 않는다', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(stalled);
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+                signal: controller.signal,
+            })
+        ).rejects.toBe(stalled);
+        expect(callGeminiWithRetry).not.toHaveBeenCalled();
+    });
+
+    it('Gemini 서버 키가 없으면 원래 DeepSeek 오류를 그대로 던진다', async () => {
+        vi.stubEnv('GEMINI_API_KEY', '');
+        vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(stalled);
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: DEEPSEEK_FREE,
+                tier: 'free',
+            })
+        ).rejects.toBe(stalled);
+        expect(callGeminiWithRetry).not.toHaveBeenCalled();
+    });
+
+    it('DeepSeek이 아닌 모델의 실패는 폴백하지 않는다', async () => {
+        const failure = Object.assign(new Error('down'), { status: 503 });
+        vi.mocked(callGeminiWithRetry).mockRejectedValueOnce(failure);
+        await expect(
+            callAnalysisAi({
+                ...FALLBACK_ON,
+                prompt: 'p',
+                model: GEMINI_FREE,
+                tier: 'free',
+            })
+        ).rejects.toBe(failure);
+        expect(callGeminiWithRetry).toHaveBeenCalledTimes(1);
+        expect(callDeepSeekWithRetry).not.toHaveBeenCalled();
     });
 });

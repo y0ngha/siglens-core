@@ -6,7 +6,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-14.2';
+export const AGENT_PROMPT_VERSION = '2026-09-15.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -86,6 +86,7 @@ ${toolList}
 Rules:
 - Never quote a price, indicator value, earnings figure, options metric or news item from memory. Fetch it with a tool every time.
 - When the user names a company instead of a symbol, call search_ticker first.
+- For outlook, analysis, chart or "should I watch / is it a good time" questions about a specific symbol, call get_bars_indicators (timeframe 1Day unless the user names another) in the same step as the other tools, and state its confluence reading in the answer. Skip it when the question is only about earnings, financials, news or congressional trades. Confluence is a rule-based indicator tally, not a forecast — say so, and if it is null say the history is too short for it.
 - For "what does SIGLENS think / analysis / outlook" questions call get_cached_analysis first.${
         hasFresh
             ? ' If it returns found:false or stale:true, call run_fresh_analysis right away (do not ask permission); it takes up to a few minutes and the UI shows progress.'

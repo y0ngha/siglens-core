@@ -1,7 +1,11 @@
 import OpenAI from 'openai';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
-import { callDeepSeek } from '@/infrastructure/ai/providers/deepseek';
+import {
+    callDeepSeek,
+    DEEPSEEK_STALL_TIMEOUT_MS,
+    DEEPSEEK_STALLED_CODE,
+} from '@/infrastructure/ai/providers/deepseek';
 import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
 
 const mockCreate = vi.hoisted(() => vi.fn());
@@ -618,20 +622,41 @@ describe('callDeepSeek', () => {
     });
 
     it('aborts the request after DEEPSEEK_TIMEOUT_MS via the internal timeout', async () => {
+        // The stall watchdog fires first on a silent call, so the 1h total bound
+        // is exercised by a call that keeps trickling events (never silent long
+        // enough to stall) but never finishes.
         vi.useFakeTimers();
         try {
             let capturedSignal: AbortSignal | undefined;
             mockCreate.mockImplementationOnce(
                 (_params: unknown, options: { signal: AbortSignal }) => {
                     capturedSignal = options.signal;
-                    // Never resolves on its own — only the internal timeout's
-                    // controller.abort() can settle it.
-                    return new Promise((_resolve, reject) => {
-                        options.signal.addEventListener(
-                            'abort',
-                            () => reject(new Error('aborted by timeout')),
-                            { once: true }
-                        );
+                    return Promise.resolve({
+                        async *[Symbol.asyncIterator]() {
+                            for (;;) {
+                                await new Promise<void>((resolve, reject) => {
+                                    const id = setTimeout(resolve, 60_000);
+                                    options.signal.addEventListener(
+                                        'abort',
+                                        () => {
+                                            clearTimeout(id);
+                                            reject(
+                                                new Error('aborted by timeout')
+                                            );
+                                        },
+                                        { once: true }
+                                    );
+                                });
+                                yield {
+                                    choices: [
+                                        {
+                                            delta: { content: '.' },
+                                            finish_reason: null,
+                                        },
+                                    ],
+                                };
+                            }
+                        },
                     });
                 }
             );
@@ -644,7 +669,7 @@ describe('callDeepSeek', () => {
                 expect(promise).rejects.toThrow('aborted by timeout');
 
             // 1h internal timeout fires → controller.abort() → SDK signal aborts.
-            vi.advanceTimersByTime(3600_000);
+            await vi.advanceTimersByTimeAsync(3600_000);
 
             await assertion;
             expect(capturedSignal?.aborted).toBe(true);
@@ -700,5 +725,101 @@ describe('callDeepSeek — usage telemetry', () => {
 
         expect(infoSpy).not.toHaveBeenCalled();
         infoSpy.mockRestore();
+    });
+});
+
+/**
+ * 2026-09-14 20:30–21:28 UTC DeepSeek sent neither a response nor an error for
+ * an hour; the 1h total timeout never helped. The watchdog aborts on silence
+ * only — a call that keeps streaming is never cut, however long it runs.
+ */
+describe('callDeepSeek — stall watchdog', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        mockCreate.mockReset();
+        mockResponsesCreate.mockReset();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    /** A `create` that never responds but honours the abort signal, like the SDK. */
+    function neverRespond(
+        _params: unknown,
+        { signal }: { signal: AbortSignal }
+    ): Promise<never> {
+        return new Promise((_, reject) => {
+            signal.addEventListener('abort', () =>
+                reject(
+                    Object.assign(new Error('aborted'), { name: 'AbortError' })
+                )
+            );
+        });
+    }
+
+    it('aborts a silent call with the stalled code after the stall timeout', async () => {
+        mockCreate.mockImplementationOnce(neverRespond);
+        const call = callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+        });
+        const assertion = expect(call).rejects.toMatchObject({
+            code: DEEPSEEK_STALLED_CODE,
+        });
+        await vi.advanceTimersByTimeAsync(DEEPSEEK_STALL_TIMEOUT_MS);
+        await assertion;
+    });
+
+    it('does not cut a call that keeps streaming past the stall timeout', async () => {
+        const gap = DEEPSEEK_STALL_TIMEOUT_MS - 1_000;
+        mockCreate.mockResolvedValueOnce({
+            async *[Symbol.asyncIterator]() {
+                for (const piece of ['{"a":', '1', '}']) {
+                    await new Promise(resolve => setTimeout(resolve, gap));
+                    yield {
+                        choices: [
+                            { delta: { content: piece }, finish_reason: null },
+                        ],
+                    };
+                }
+                yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
+            },
+        });
+        const call = callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+        });
+        await vi.advanceTimersByTimeAsync(gap * 3 + 10);
+        await expect(call).resolves.toBe('{"a":1}');
+    });
+
+    it('covers the Responses API path too', async () => {
+        mockResponsesCreate.mockImplementationOnce(neverRespond);
+        const call = callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+            responseSchema: { type: 'object' },
+        });
+        const assertion = expect(call).rejects.toMatchObject({
+            code: DEEPSEEK_STALLED_CODE,
+        });
+        await vi.advanceTimersByTimeAsync(DEEPSEEK_STALL_TIMEOUT_MS);
+        await assertion;
+    });
+
+    it("keeps a caller's own abort as a plain abort, not a stall", async () => {
+        mockCreate.mockImplementationOnce(neverRespond);
+        const controller = new AbortController();
+        const call = callDeepSeek('prompt', {
+            model: FLASH_MODEL,
+            apiKey: 'key',
+            signal: controller.signal,
+        });
+        const assertion = expect(call).rejects.toSatisfy(
+            (error: unknown) =>
+                (error as { code?: string }).code !== DEEPSEEK_STALLED_CODE
+        );
+        controller.abort();
+        await assertion;
     });
 });

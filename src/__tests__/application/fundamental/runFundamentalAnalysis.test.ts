@@ -192,6 +192,19 @@ describe('runFundamentalAnalysis', () => {
                 expect.objectContaining({ signal })
             );
         });
+
+        it('providerFallback is forwarded to callAnalysisAi as fallbackOnProviderFailure', async () => {
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                providerFallback: true,
+            });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ fallbackOnProviderFailure: true })
+            );
+        });
     });
 
     describe('cache write', () => {

@@ -672,6 +672,13 @@ export interface RunOverallAnalysisOptions extends SubmitOverallAnalysisOptions 
      * the same signal, so no in-flight LLM call leaks after the request ends.
      */
     signal?: AbortSignal;
+    /**
+     * Retry a failed server-key DeepSeek generation once on the fallback Gemini
+     * model (see `callAnalysisAi`). Default off — set only by callers where the
+     * user could not choose the model (SEO prewarm, the ai.siglens.io agent);
+     * a user-selected model must fail visibly instead.
+     */
+    providerFallback?: boolean;
 }
 
 /**

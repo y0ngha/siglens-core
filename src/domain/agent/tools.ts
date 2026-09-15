@@ -77,7 +77,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_bars_indicators',
         description:
-            'Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state and recent candle patterns with their dates. Use for any question about price action, momentum or chart setup.',
+            "Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state, recent candle patterns with their dates, and `confluence` — the rule-based indicator-family agreement score (0–100, 50 neutral; entry/exit triggers; bullish/bearish and newly lit signals; null below 120 bars; no AI involved). Use for any question about price action, momentum, chart setup, or a symbol's outlook.",
         costClass: 'free',
         inputSchema: {
             type: 'object',

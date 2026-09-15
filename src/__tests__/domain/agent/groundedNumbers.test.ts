@@ -14,6 +14,40 @@ describe('findUngroundedNumbers', () => {
         expect(findUngroundedNumbers(answer, results)).toEqual([]);
     });
 
+    /**
+     * 정확히 반 단위(26333.035)는 이진 부동소수로 26333.03499…라 `toFixed(2)`가
+     * `26333.03`을 낸다. 모델은 반올림해 `26,333.04`라고 쓰므로 문자열 비교는
+     * 멀쩡한 지수 값을 근거 없음으로 찍었다(2026-09-14 운영, NASDAQ).
+     */
+    it('반 단위 경계값은 양쪽 반올림 표기 모두 근거 있음으로 본다', () => {
+        const tool = [JSON.stringify({ price: 26333.035 })];
+        expect(findUngroundedNumbers('나스닥 26,333.04', tool)).toEqual([]);
+        expect(findUngroundedNumbers('나스닥 26,333.03', tool)).toEqual([]);
+    });
+
+    it('반 단위를 넘어서는 차이는 여전히 근거 없음으로 본다', () => {
+        const tool = [JSON.stringify({ price: 26333.046 })];
+        expect(findUngroundedNumbers('나스닥 26,333.04', tool)).toEqual([
+            '26,333.04',
+        ]);
+    });
+
+    /** 허용 오차는 부동소수 해상도만큼만 — 값 크기에 비례해 넓어지면 안 된다. */
+    it('큰 정수 금액은 1 차이도 근거 없음으로 본다', () => {
+        const tool = [JSON.stringify({ marketCap: 3_500_000_000_000 })];
+        expect(
+            findUngroundedNumbers('시가총액 3,500,000,000,002달러', tool)
+        ).toEqual(['3,500,000,000,002']);
+        expect(
+            findUngroundedNumbers('시가총액 3,500,000,000,000달러', tool)
+        ).toEqual([]);
+    });
+
+    it('단위 환산(억) 비교도 반 단위 경계를 허용한다', () => {
+        const tool = [JSON.stringify({ volume: 150_000_000 })];
+        expect(findUngroundedNumbers('거래량 1.5억', tool)).toEqual([]);
+    });
+
     it('₩ 원화 인접 표기와 쉼표 구분자를 정규화해 비교한다', () => {
         const answer = '목표가는 ₩71,000 입니다.';
         const results = ['{"targetPrice":71000}'];

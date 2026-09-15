@@ -133,6 +133,19 @@ describe('runFinancialsAnalysis', () => {
             );
         });
 
+        it('providerFallback is forwarded to callAnalysisAi as fallbackOnProviderFailure', async () => {
+            await runFinancialsAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                providerFallback: true,
+            });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ fallbackOnProviderFailure: true })
+            );
+        });
+
         it('결과를 FINANCIALS_CACHE_TTL_SECONDS로 캐시에 기록한다', async () => {
             await runFinancialsAnalysis({
                 symbol: mockSymbol,

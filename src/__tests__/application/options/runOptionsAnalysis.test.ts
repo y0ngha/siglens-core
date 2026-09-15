@@ -166,6 +166,17 @@ describe('runOptionsAnalysis', () => {
             );
         });
 
+        it('providerFallback is forwarded to callAnalysisAi as fallbackOnProviderFailure', async () => {
+            await runOptionsAnalysis({
+                ...baseArgs(),
+                providerFallback: true,
+            });
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ fallbackOnProviderFailure: true })
+            );
+        });
+
         it('결과를 OPTIONS_CACHE_TTL_SECONDS로 캐시에 기록한다', async () => {
             await runOptionsAnalysis(baseArgs());
 

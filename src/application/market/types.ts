@@ -236,6 +236,13 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * submit/poll pair does not accept a signal).
      */
     signal?: AbortSignal;
+    /**
+     * Retry a failed server-key DeepSeek generation once on the fallback Gemini
+     * model (see `callAnalysisAi`). Default off — set only by callers where the
+     * user could not choose the model (SEO prewarm, the ai.siglens.io agent);
+     * a user-selected model must fail visibly instead.
+     */
+    providerFallback?: boolean;
 }
 
 /**

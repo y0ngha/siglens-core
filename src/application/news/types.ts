@@ -117,6 +117,13 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * accept a signal).
      */
     signal?: AbortSignal;
+    /**
+     * Retry a failed server-key DeepSeek generation once on the fallback Gemini
+     * model (see `callAnalysisAi`). Default off — set only by callers where the
+     * user could not choose the model (SEO prewarm, the ai.siglens.io agent);
+     * a user-selected model must fail visibly instead.
+     */
+    providerFallback?: boolean;
 }
 
 /**
@@ -204,6 +211,13 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
      * Has no effect on `submitNewsCardAnalysis` (the worker-based path).
      */
     signal?: AbortSignal;
+    /**
+     * Retry a failed server-key DeepSeek generation once on the fallback Gemini
+     * model (see `callAnalysisAi`). Default off — set only by callers where the
+     * user could not choose the model (SEO prewarm, the ai.siglens.io agent);
+     * a user-selected model must fail visibly instead.
+     */
+    providerFallback?: boolean;
     /**
      * Output language for the generated analysis text.
      *
