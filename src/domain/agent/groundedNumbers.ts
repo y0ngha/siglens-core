@@ -259,15 +259,45 @@ function collectToolNumbers(results: readonly string[]): number[] {
 
 /**
  * A token is grounded when some tool number equals it exactly, or rounds to
- * it at the token's own decimal precision — `toFixed` covers both cases in
- * one comparison (an exact value fixed to its own precision is unchanged).
+ * it at the token's own decimal precision — {@link roundsTo} covers both cases
+ * in one comparison (an exact value is within half a step of itself).
  */
 function isGrounded(
     parsed: ParsedNumber,
     toolNumbers: readonly number[]
 ): boolean {
-    const target = parsed.value.toFixed(parsed.decimals);
-    return toolNumbers.some(n => n.toFixed(parsed.decimals) === target);
+    return toolNumbers.some(n => roundsTo(n, parsed));
+}
+
+/**
+ * Float-noise slack on the half-step bound, in units of the value's own
+ * representable precision (`Number.EPSILON` × magnitude), so an exact half
+ * stored as 26333.03499… cannot land on the wrong side of the comparison.
+ *
+ * Must scale with **float resolution**, never as a fixed fraction of the value:
+ * `1e-9 × |value|` widened a 3.5e12 market cap's `decimals: 0` tolerance to
+ * ±3,500 and grounded numbers thousands apart. Float error at 3.5e12 is ~5e-4,
+ * so a few ulps is enough and stays far below any displayed step.
+ */
+const FLOAT_NOISE_ULPS = 8;
+
+/**
+ * Whether `n` rounds to the token at the token's own precision — the tool value
+ * lies within half a display step of the stated number.
+ *
+ * Not `toFixed` string equality: `toFixed` rounds the binary value, so an exact
+ * half like 26333.035 came out as `26333.03` while the model wrote the
+ * half-up `26,333.04`, and a correct index level was logged as ungrounded
+ * (2026-09-14 production, NASDAQ via `get_market_overview`). Both neighbours
+ * of an exact half are accepted — either rounding convention states the fact.
+ */
+function roundsTo(n: number, parsed: ParsedNumber): boolean {
+    const halfStep = 0.5 * 10 ** -parsed.decimals;
+    const floatNoise =
+        FLOAT_NOISE_ULPS *
+        Number.EPSILON *
+        Math.max(1, Math.abs(n), Math.abs(parsed.value));
+    return Math.abs(n - parsed.value) <= halfStep + floatNoise;
 }
 
 /** Same comparison as {@link isGrounded}, but the tool number is first converted into the answer's magnitude unit (e.g. 억 = ÷1e8) before rounding. */
@@ -276,10 +306,7 @@ function isGroundedWithUnit(
     multiplier: number,
     toolNumbers: readonly number[]
 ): boolean {
-    const target = parsed.value.toFixed(parsed.decimals);
-    return toolNumbers.some(
-        n => (n / multiplier).toFixed(parsed.decimals) === target
-    );
+    return toolNumbers.some(n => roundsTo(n / multiplier, parsed));
 }
 
 /** A tool ratio expressed as a fraction (0.3317) is the same fact as the model stating it as a percent (33.17%) — dividing by this "unit" converts fraction → percent, reusing {@link isGroundedWithUnit}'s n/multiplier math. */
