@@ -131,17 +131,6 @@
   Rule: Single-entry-point helper reuse — shared guard/utility helper must be called from all internal callers, not reimplemented
   Context: Same PR introduced `hasUsablePrices` but one helper in the same module reimplemented the same logic. Fixed in R2 by calling `hasUsablePrices`.
 
-## [PR #196 R3 | fix/prompt-precision-currency | 2026-09-11] — Round 3 findings
-
-- Violation 1: Import members not alphabetically ordered
-  Rule: MISTAKES #13.5 — import members not alphabetically ordered
-  Context: CurrencyCode was inserted after AssetClass instead of between ChartPatternId and FearGreedSnapshot in src/domain/analysis/prompt.ts. Recurrence of same violation pattern.
-
-- Violation 2: New branch without dedicated test
-  Rule: MISTAKES Tests #5.5 — new branch without dedicated test
-  Context: roundLabel's `mantissaIsWhole ? 0 : 1` decimal choice in src/domain/analysis/referenceLevels.ts was covered only by 2.5-mantissa steps, so removing the branch stayed green. Added whole-mantissa label tests (250 → step 5, 50 → step 1, 0.25 → step 0.005), verified by reverting the branch. Third occurrence in this PR.
-
-
 ## [Branch fix/agent-answer-hygiene | Round 1→2 | 2026-09-13]
 
 - Violation 1: Prompt citation example showed ET (Eastern Time) while a new adjacent rule mandates KST (Korean Standard Time) for Korean answers
@@ -168,4 +157,23 @@
   Context: providerFallback option added to AnalysisOptions, ChatOptions, and other dispatch option siblings; SubmitMarketNewsDigestOptions omitted. Fixed in R2.
 
 
+
+
+## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R1
+
+- Violation 1: Parameter type of public function tagged @internal but not exported from index
+  Rule: MISTAKES.md Public API #8 — Public discriminated union variant types wrongly tagged @internal
+  Context: Tier 1 public function parameter type was marked @internal despite being part of public contract. Removed @internal tag and ensured type is re-exported from src/index.ts.
+
+- Violation 2: Import members not in alphabetical order
+  Rule: MISTAKES.md #13.5 — Import statements not alphabetically sorted
+  Context: Imports from same module not alphabetically ordered. Fixed by reordering members alphabetically within import block.
+
+- Violation 3: New helper module without dedicated unit test file
+  Rule: Test conventions — new helper module requires dedicated .test.ts file
+  Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
+
+- Violation 4: Untested conditional branch (undefined case)
+  Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
+  Context: Branch handling undefined case added but not covered by test. Fixed by adding test case exercising the undefined path explicitly.
 

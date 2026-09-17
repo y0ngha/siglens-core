@@ -1,6 +1,7 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
+import { resolveMarketNewsDigestCacheKey } from '@/application/news/marketNewsDigestCacheKey';
 import type {
     RunMarketNewsDigestResult,
     SubmitMarketNewsDigestOptions,
@@ -19,7 +20,6 @@ import type { ActiveModelId, NewsAnalysisResponse } from '@/domain/types';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
-import { resolveMarketNewsDigestCacheKey } from '@/application/news/marketNewsDigestCacheKey';
 
 const LOG_TAG = '[RunMarketNewsDigest]' as const;
 

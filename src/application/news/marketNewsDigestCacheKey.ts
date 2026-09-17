@@ -12,9 +12,11 @@ import {
 } from '@/infrastructure/skills/sampling';
 
 /**
- * @internal Subset of {@link SubmitMarketNewsDigestOptions} that participates
- * in the digest cache key. Runtime-only options (`force`, `signal`, …) are
- * excluded so a peek caller cannot accidentally shift the key.
+ * Subset of {@link SubmitMarketNewsDigestOptions} that participates in the
+ * digest cache key. Runtime-only options (`force`, `signal`, …) are excluded
+ * so a peek caller cannot accidentally shift the key.
+ *
+ * This is the parameter type of the public {@link peekMarketNewsDigestCache}.
  */
 export type MarketNewsDigestCacheKeyOptions = Pick<
     SubmitMarketNewsDigestOptions,

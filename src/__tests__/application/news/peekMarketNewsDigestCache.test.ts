@@ -93,6 +93,11 @@ describe('peekMarketNewsDigestCache 함수는', () => {
         expect(await peekMarketNewsDigestCache(baseArgs())).toBeNull();
     });
 
+    it('캐시가 undefined를 반환해도 null(null과 동일 취급)', async () => {
+        mockCacheGet.mockResolvedValueOnce(undefined);
+        expect(await peekMarketNewsDigestCache(baseArgs())).toBeNull();
+    });
+
     it('캐시 읽기가 throw하면 로깅 후 null', async () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mockCacheGet.mockRejectedValueOnce(new Error('cache down'));
