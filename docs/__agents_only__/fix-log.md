@@ -183,3 +183,9 @@
   Rule: MISTAKES.md Tests 10 — Type field added but test mock objects not updated
   Context: News digest cache test fixture included provider field absent from interface. Fixed by removing extra field from mock fixture to match type contract.
 
+## [Branch fix/prompt-descriptive-framing | 2026-09-18] — Shared test table incomplete enumeration R1→R2
+
+- Violation: src/__tests__/domain/analysis/systemPrompt.test.ts — Shared PROMPTS array covered only 6 of 8 system prompts built on analysisSystemBase (FINANCIALS and CONGRESS missing)
+  Rule: Tests — shared test table must enumerate all cases of the thing it claims to cover
+  Context: R1 recommendation finding. Parameterized test using it.each(PROMPTS) relied on a partial array that didn't include all analysisSystemBase-derived prompts. Fixed in R2 by adding FINANCIALS and CONGRESS with their persona first lines pinned as literals, ensuring all 8 prompts are exercised by the shared test table.
+

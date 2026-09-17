@@ -1337,7 +1337,7 @@ const ANALYSIS_FIELD_GUIDANCE: Record<
     strategyResults:
         "Each entry's summary is Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes.",
     actionRecommendation:
-        'positionAnalysis: Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n. entry: Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n. exit: Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n. riskReward: Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence.',
+        'Every text field here is descriptive, never an instruction to the reader (CORE PRINCIPLES). positionAnalysis: Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n. entry: Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n. exit: Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n. riskReward: Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence.',
 };
 
 const ANALYSIS_INTENT_BLOCK = [
@@ -1465,6 +1465,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- If signals conflict, state the mixed picture and which side has stronger confluence.',
         '',
         '### Action Recommendation Decision Tree',
+        '- Framing (see CORE PRINCIPLES → Descriptive, not prescriptive): this section maps price levels into a conditional plan. Describe the plan as structure and conditions, never as an instruction to the reader. Write "이 구간을 회복하기 전까지 구조는 유효하지 않습니다" or "손절 기준으로 삼는 자리는 122,000원입니다", not "사는 편이 낫습니다"/"기다리세요"/"나눠서 매수하세요". The entryRecommendation enum carries the verdict; the prose carries the reasoning.',
         '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
         '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
         '- Step 1 — Determine entryRecommendation:',
