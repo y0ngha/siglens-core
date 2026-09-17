@@ -59,7 +59,6 @@ const CACHED_RAW = {
 function baseArgs() {
     return {
         category: 'crypto' as const,
-        categoryLabel: '미국 암호화폐',
         modelId: 'gemini-3.6-flash' as const,
         news: [ITEM],
     };
@@ -110,6 +109,19 @@ describe('peekMarketNewsDigestCache 함수는', () => {
         spy.mockRestore();
     });
 
+    it('캐시된 값이 손상된 문자열이면(정규화가 throw) 로깅 후 null', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockCacheGet.mockResolvedValueOnce('not-json{');
+        const result = await peekMarketNewsDigestCache(baseArgs());
+        expect(result).toBeNull();
+        expect(spy).toHaveBeenCalledWith(
+            '[MarketNewsDigest/Peek]',
+            'Cached payload normalize failed:',
+            expect.any(Error)
+        );
+        spy.mockRestore();
+    });
+
     it('hit이면 정규화된 다이제스트를 반환한다', async () => {
         // 누락 필드가 정규화로 채워지는지까지 확인한다.
         mockCacheGet.mockResolvedValueOnce({
@@ -143,7 +155,10 @@ describe('peekMarketNewsDigestCache 함수는', () => {
             async (_label, extra) => {
                 const options = { ...baseArgs(), ...extra };
 
-                await runMarketNewsDigest(options);
+                await runMarketNewsDigest({
+                    ...options,
+                    categoryLabel: '미국 암호화폐',
+                });
                 const writtenKey = mockCacheSet.mock.calls[0]?.[0] as string;
                 expect(writtenKey).toBeTypeOf('string');
 

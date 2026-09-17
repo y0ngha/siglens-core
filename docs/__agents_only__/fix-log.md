@@ -152,10 +152,6 @@
   Rule: Infrastructure Functions — numeric parsing tolerance scaling
   Context: Epsilon defense against float rounding in structured LLM output parsing. Depends on asset price order of magnitude; accepted as design.
 
-- Violation 3 (R2 RECOMMENDED): SubmitMarketNewsDigestOptions interface missing new providerFallback option field
-  Rule: MISTAKES.md #6.5 — State/function/documentation divergence; related types not synchronized
-  Context: providerFallback option added to AnalysisOptions, ChatOptions, and other dispatch option siblings; SubmitMarketNewsDigestOptions omitted. Fixed in R2.
-
 
 
 
@@ -176,4 +172,14 @@
 - Violation 4: Untested conditional branch (undefined case)
   Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
   Context: Branch handling undefined case added but not covered by test. Fixed by adding test case exercising the undefined path explicitly.
+
+## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R2
+
+- Violation 1: Function documented as "never throws" but catches and re-throws SyntaxError from JSON parser on corrupted payload
+  Rule: MISTAKES.md Documentation Sync 4.5 — JSDoc statements must match actual implementation behavior
+  Context: parseJsonFromCache function had incomplete @throws documentation; callers assumed no-throw contract. Fixed by adding explicit @throws {SyntaxError} JSDoc tag and verifying throw path with test case for corrupted cache payload.
+
+- Violation 3: Test fixture carried provider field not present in CachedNewsDigest interface type
+  Rule: MISTAKES.md Tests 10 — Type field added but test mock objects not updated
+  Context: News digest cache test fixture included provider field absent from interface. Fixed by removing extra field from mock fixture to match type contract.
 

@@ -66,7 +66,14 @@ export async function peekMarketNewsDigestCache(
         });
     if (cached === null || cached === undefined) return null;
 
-    // normalizeNewsAnalysisResponse는 parseLlmPayload로 스스로 방어하며 throw하지
-    // 않는다 — runMarketNewsDigest의 cached 분기와 동일한 처리.
-    return normalizeNewsAnalysisResponse(cached);
+    // normalizeNewsAnalysisResponse parses via parseLlmPayload, which throws
+    // SyntaxError on a corrupted/non-JSON cached string. This is an SSR seed
+    // that must never throw, so any failure here is swallowed to a miss —
+    // same posture as the cache.get().catch() above.
+    try {
+        return normalizeNewsAnalysisResponse(cached);
+    } catch (error: unknown) {
+        console.error(LOG_TAG, 'Cached payload normalize failed:', error);
+        return null;
+    }
 }
