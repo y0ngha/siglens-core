@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/y0ngha/siglens-core/compare/v1.10.0...v1.10.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **prompt:** 분석 산문이 독자에게 행동을 지시하지 않게 한다 ([72b18fe](https://github.com/y0ngha/siglens-core/commit/72b18fe56456c48da4233f854bcaa68a6b30d81a))
+
 # [1.10.0](https://github.com/y0ngha/siglens-core/compare/v1.9.0...v1.10.0) (2026-09-17)
 
 
