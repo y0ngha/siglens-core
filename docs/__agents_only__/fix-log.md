@@ -81,11 +81,6 @@
 - Context: Round 3 suggestion on src/domain/ports/jobStateStore.ts JobStateStore interface — split `@port @internal` into two separate lines so TypeDoc honors the `@internal` exclusion when generating docs
 
 ## [PR #104 | refactor/fear-greed-public-api | 2026-05-28]
-- Violation: `scoreToLabel` function promoted from `@internal` to public API (Tier 2) without upgrading JSDoc to Tier 2 standard
-- Rule: MISTAKES.md §Documentation 4.5 — Tier 2 public functions require @param and @returns JSDoc tags for IDE hover documentation; @returns type must match actual implementation
-- Context: Round 1 required finding — when promoting an `@internal` function to public, its JSDoc must be upgraded from bare description to full Tier 2 format (@param input, @returns type). Applied in Round 2 by adding @param and @returns tags to scoreToLabel JSDoc.
-- Pattern note: This violation type is systematic when promoting internal functions. When promoting `@internal` to public, always upgrade JSDoc tags: add missing @param blocks for each parameter and @returns for the function's return type. Easy to miss during refactoring.
-
 - Violation: New public exports added to src/index.ts and src/index.client.ts without smoke test assertions
 - Rule: Public API Smoke Tests — when wiring new public symbols through entrypoints, add basic assertions in corresponding .test.ts and .client.test.ts files to verify exports are present and callable
 - Context: Round 2 recommended findings — scoreToLabel, FEAR_GREED_LABEL_CUTOFFS, POC_WINDOW_DEFAULT were added to entrypoints but had no entrypoint smoke tests. Added 3 assertions to index.test.ts (scoreToLabel callability, CUTOFFS presence/type) and 3 to index.client.test.ts verifying all three symbols export correctly.
@@ -136,17 +131,6 @@
   Rule: Single-entry-point helper reuse — shared guard/utility helper must be called from all internal callers, not reimplemented
   Context: Same PR introduced `hasUsablePrices` but one helper in the same module reimplemented the same logic. Fixed in R2 by calling `hasUsablePrices`.
 
-## [PR #196 R3 | fix/prompt-precision-currency | 2026-09-11] — Round 3 findings
-
-- Violation 1: Import members not alphabetically ordered
-  Rule: MISTAKES #13.5 — import members not alphabetically ordered
-  Context: CurrencyCode was inserted after AssetClass instead of between ChartPatternId and FearGreedSnapshot in src/domain/analysis/prompt.ts. Recurrence of same violation pattern.
-
-- Violation 2: New branch without dedicated test
-  Rule: MISTAKES Tests #5.5 — new branch without dedicated test
-  Context: roundLabel's `mantissaIsWhole ? 0 : 1` decimal choice in src/domain/analysis/referenceLevels.ts was covered only by 2.5-mantissa steps, so removing the branch stayed green. Added whole-mantissa label tests (250 → step 5, 50 → step 1, 0.25 → step 0.005), verified by reverting the branch. Third occurrence in this PR.
-
-
 ## [Branch fix/agent-answer-hygiene | Round 1→2 | 2026-09-13]
 
 - Violation 1: Prompt citation example showed ET (Eastern Time) while a new adjacent rule mandates KST (Korean Standard Time) for Korean answers
@@ -168,8 +152,34 @@
   Rule: Infrastructure Functions — numeric parsing tolerance scaling
   Context: Epsilon defense against float rounding in structured LLM output parsing. Depends on asset price order of magnitude; accepted as design.
 
-- Violation 3 (R2 RECOMMENDED): SubmitMarketNewsDigestOptions interface missing new providerFallback option field
-  Rule: MISTAKES.md #6.5 — State/function/documentation divergence; related types not synchronized
-  Context: providerFallback option added to AnalysisOptions, ChatOptions, and other dispatch option siblings; SubmitMarketNewsDigestOptions omitted. Fixed in R2.
 
+
+
+## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R1
+
+- Violation 1: Parameter type of public function tagged @internal but not exported from index
+  Rule: MISTAKES.md Public API #8 — Public discriminated union variant types wrongly tagged @internal
+  Context: Tier 1 public function parameter type was marked @internal despite being part of public contract. Removed @internal tag and ensured type is re-exported from src/index.ts.
+
+- Violation 2: Import members not in alphabetical order
+  Rule: MISTAKES.md #13.5 — Import statements not alphabetically sorted
+  Context: Imports from same module not alphabetically ordered. Fixed by reordering members alphabetically within import block.
+
+- Violation 3: New helper module without dedicated unit test file
+  Rule: Test conventions — new helper module requires dedicated .test.ts file
+  Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
+
+- Violation 4: Untested conditional branch (undefined case)
+  Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
+  Context: Branch handling undefined case added but not covered by test. Fixed by adding test case exercising the undefined path explicitly.
+
+## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R2
+
+- Violation 1: Function documented as "never throws" but catches and re-throws SyntaxError from JSON parser on corrupted payload
+  Rule: MISTAKES.md Documentation Sync 4.5 — JSDoc statements must match actual implementation behavior
+  Context: parseJsonFromCache function had incomplete @throws documentation; callers assumed no-throw contract. Fixed by adding explicit @throws {SyntaxError} JSDoc tag and verifying throw path with test case for corrupted cache payload.
+
+- Violation 3: Test fixture carried provider field not present in CachedNewsDigest interface type
+  Rule: MISTAKES.md Tests 10 — Type field added but test mock objects not updated
+  Context: News digest cache test fixture included provider field absent from interface. Fixed by removing extra field from mock fixture to match type contract.
 
