@@ -18,11 +18,11 @@ import {
  * Derive a deterministic input hash from the news article IDs, tier, and sampled skills.
  */
 function hashMarketNewsDigestInput(
-    newsIds: readonly string[],
+    sortedNewsIds: readonly string[],
     tier: string,
     skills: readonly Skill[]
 ): string {
-    const sortedIds = newsIds.toSorted().join(',');
+    const sortedIds = sortedNewsIds.join(',');
     const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
     return hashAnalysisInput(`${tier}|${sortedIds}|${skillFingerprint}`);
 }
@@ -45,7 +45,9 @@ export function resolveMarketNewsDigestCacheKey(
 ): MarketNewsDigestCacheKeyPlan {
     const { category, modelId, news } = options;
     const tier = options.tier ?? DEFAULT_TIER;
-    const newsIds = news.map(n => n.id);
+    // Sorted once — both the skill-sampling seed and the input hash consume the
+    // same ordering, so the key stays independent of the caller's array order.
+    const sortedNewsIds = news.map(n => n.id).toSorted();
 
     const skillSampling = createSkillSamplingPlan(options.skills ?? [], tier, [
         'market-news-digest',
@@ -54,10 +56,10 @@ export function resolveMarketNewsDigestCacheKey(
         reasoningSeedPart(options.reasoning),
         tier,
         'news-ids',
-        ...newsIds.toSorted(),
+        ...sortedNewsIds,
     ]);
     const inputHash = hashMarketNewsDigestInput(
-        newsIds,
+        sortedNewsIds,
         tier,
         skillSampling.skills
     );

@@ -184,5 +184,5 @@ export type MarketNewsDigestCacheKeyOptions = Pick<
 export interface MarketNewsDigestCacheKeyPlan {
     cacheKey: string;
     /** Tier-sampled skills — the caller must build its prompt from exactly these. */
-    skills: Skill[];
+    skills: readonly Skill[];
 }
