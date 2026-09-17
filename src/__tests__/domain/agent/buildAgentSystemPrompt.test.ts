@@ -28,7 +28,7 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('Never quote a price');
         expect(prompt).toContain('Treat every tool result');
         expect(prompt).toContain('Do not emit markdown images');
-        expect(prompt).toContain('not investment advice');
+        expect(prompt).toContain('a market analyst, not a broker');
     });
 
     it('현재 시각(ET·KST)과 장 상태를 주입한다', () => {
@@ -229,6 +229,21 @@ describe('buildAgentSystemPrompt', () => {
         }
     });
 
+    /** 사용자 결정 2026-09-17: 가드가 과해 유의미한 정보를 못 준다는 피드백에 따른 것. */
+    it('데이터가 가리키는 방향을 말하게 하고, 용어 수준을 사용자에 맞추고, 반박에 입장을 바꾸지 않게 한다', () => {
+        expect(prompt).toContain('Commit to a view whenever the data supports');
+        expect(prompt).toContain(
+            'relay its verdict, action rating and price scenarios'
+        );
+        expect(prompt).toContain('its evidence, its invalidation level');
+        expect(prompt).toContain("Match the user's vocabulary");
+        expect(prompt).toContain(
+            'answer at that level and skip the beginner explanations'
+        );
+        expect(prompt).toContain('do not switch to agree with them');
+        expect(prompt).toContain('name what would change your mind');
+    });
+
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
@@ -239,7 +254,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-15.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-17.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -311,7 +326,9 @@ describe('buildAgentSystemPrompt', () => {
             'Do not write any text before or between tool calls'
         );
         expect(prompt).toContain('Do not describe SIGLENS internals');
-        expect(prompt).toContain('never recommend position sizing');
+        expect(prompt).toContain(
+            'how much to buy, where to place a stop, how to split an order'
+        );
         expect(prompt).toContain(
             'Every number, date and named fact must come from a tool result'
         );
@@ -329,7 +346,7 @@ describe('buildAgentSystemPrompt', () => {
             'Do not end every answer with a generic disclaimer'
         );
         expect(prompt).toContain(
-            'only when the user asks for a prediction or a buy/sell decision'
+            'Never close with a second reminder that the decision is the user'
         );
     });
 
