@@ -1,4 +1,5 @@
 import type {
+    ConfluenceHtfMode,
     ConfluenceParams,
     ConfluenceSnapshot,
     EvaluateConfluenceOptions,
@@ -10,6 +11,7 @@ import type {
 } from '@/index';
 import {
     calculateMA,
+    CONFLUENCE_HTF_MODE,
     CONFLUENCE_MIN,
     CONFLUENCE_SPAN,
     CONFLUENCE_TRIGGER_SCORE,
@@ -93,7 +95,14 @@ describe('public API exports', () => {
             htf: null,
             requireVolume: true,
         };
-        const opts: EvaluateConfluenceOptions = { timeframe: '30Min' };
+        // `htfMode` is optional on stored params (older snapshots lack it) but a consumer
+        // must be able to name the type to read it back from config.
+        const mode: ConfluenceHtfMode = CONFLUENCE_HTF_MODE;
+        expect(mode).toBe('uptrend');
+        const opts: EvaluateConfluenceOptions = {
+            timeframe: '30Min',
+            htfMode: 'notUptrend',
+        };
         const snap: ConfluenceSnapshot | null = evaluateConfluence([], opts);
         expect(params.min).toBe(3);
         expect(snap).toBeNull();

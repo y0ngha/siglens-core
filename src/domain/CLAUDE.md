@@ -97,6 +97,19 @@ Three things it does that a naive "count the signals" version does not:
   narrow for that reason, and `scoreConfluence` clamps a corrupt `span` or
   `expectedWeight` rather than letting a round-tripped snapshot invert the score.
 
+**The higher-timeframe gate has a mode (`htfMode`), and the default is not the measured
+one.** `'uptrend'` (default) requires the higher timeframe to be rising; `'notUptrend'`
+requires it *not* to be. The default exists because it is what every consumer already
+runs — but the only forward-return measurement of this gate (16 US symbols × one year of
+1-hour bars, entry window, first trigger per symbol-day, excess over each symbol's own
+mean) found the uptrend requirement selecting entries at **−0.54% next-day** (n=230,
+t −2.1), the gate off at +0.10% (noise) and the uptrend excluded at +0.45% (n=413,
+t 2.2, median ≈ 0). Bullish hourly confluence on top of an already-extended daily trend
+is a late chase; elsewhere it behaves like bounce confirmation. One year, one regime —
+so it is an opt-in recorded in `params.htfMode`, not a new default. `params.htfMode` is
+optional because snapshots stored before the option existed lack it (they all ran as
+`'uptrend'`).
+
 **Every tightening is entry-only, by design.** The higher-timeframe and volume gates make
 a trigger harder to reach — the point for entries, exactly backwards for exits. A missed
 entry costs opportunity; a missed exit costs money. `exitTrigger` therefore references

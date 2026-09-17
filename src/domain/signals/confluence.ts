@@ -97,6 +97,38 @@ export const CONFLUENCE_TREND_MA_PERIOD = 50;
 export const VOLUME_FAMILIES: ReadonlySet<string> = new Set(['cmf', 'mfi']);
 
 /**
+ * How the higher-timeframe trend gates the entry trigger.
+ *
+ * - `'uptrend'` — the entry requires the higher timeframe to be in an uptrend
+ *   ("trade with the larger trend").
+ * - `'notUptrend'` — the entry requires it **not** to be in an uptrend: bullish
+ *   confluence on top of an already-extended higher timeframe is treated as a late chase.
+ *
+ * Either way an unclassifiable trend (`null`) passes, and the exit trigger ignores the
+ * mode entirely — every tightening here is entry-only.
+ */
+export type ConfluenceHtfMode = 'uptrend' | 'notUptrend';
+
+/**
+ * Default {@link ConfluenceHtfMode}. Kept at `'uptrend'` so existing consumers and the
+ * daily backtest are unchanged.
+ *
+ * **Measurement does not back this default on intraday bars** — it is the default only
+ * because changing it silently would move every consumer at once. Measured on 16 US
+ * symbols × one year of completed 1-hour bars (27,190 bars, 2025-09 → 2026-09, entry
+ * window only, first trigger per symbol-day, excess return over each symbol's own mean):
+ * requiring a daily uptrend selected entries at **−0.54% over the next day** (n=230,
+ * t −2.1, negative with any one symbol left out) and −1.03% over two; turning the gate
+ * off measured +0.10% (n=641, noise); excluding the uptrend measured +0.45% (n=413,
+ * t 2.2, median ≈ 0 — the mean comes from the right tail). The direction holds without
+ * any confluence at all: a daily `uptrend` state preceded −0.19% next-day excess (3 of
+ * 16 symbols positive), a `downtrend` state +0.18% (15 of 16). One year and one regime —
+ * which is why this is an option a consumer opts into and compares via `params`, not a
+ * new default.
+ */
+export const CONFLUENCE_HTF_MODE: ConfluenceHtfMode = 'uptrend';
+
+/**
  * Signal type → indicator family. Signals sharing an indicator collapse to one vote.
  *
  * Unlisted types (a detector added after this map was written) fall back to their own
@@ -175,6 +207,11 @@ export interface ConfluenceParams {
     htf: string | null;
     /** Whether the entry trigger required a volume-family signal. */
     requireVolume: boolean;
+    /**
+     * How the higher-timeframe trend gated the entry. Absent on snapshots stored before
+     * the option existed, which all ran as `'uptrend'`.
+     */
+    htfMode?: ConfluenceHtfMode;
 }
 
 /** Indicator-confluence state of one symbol at one bar. */
@@ -199,7 +236,7 @@ export interface ConfluenceSnapshot {
     htfTrend: TrendState | null;
     /** Effective parameters this snapshot was produced with. */
     params: ConfluenceParams;
-    /** Bullish rule held: weighted families ≥ min, ≥1 fresh, close > MA, HTF aligned, volume backed. */
+    /** Bullish rule held: weighted families ≥ min, ≥1 fresh, close > MA, HTF gate passed ({@link ConfluenceHtfMode}), volume backed. */
     entryTrigger: boolean;
     /** Bearish inverse held. Deliberately free of the HTF and volume gates — see {@link evaluateConfluence}. */
     exitTrigger: boolean;
@@ -242,6 +279,12 @@ export interface EvaluateConfluenceOptions {
      * has not earned being on by default.
      */
     requireVolume?: boolean;
+    /**
+     * Which higher-timeframe state the entry trigger accepts. Default
+     * {@link CONFLUENCE_HTF_MODE}; any unrecognised value falls back to it. Ignored when
+     * `htfBars` is absent (the gate is off). Entry-only — see {@link ConfluenceHtfMode}.
+     */
+    htfMode?: ConfluenceHtfMode;
     /** SMA period for the same-timeframe filter. Default {@link CONFLUENCE_TREND_MA_PERIOD}. */
     trendMaPeriod?: number;
     /** Minimum bars before scoring is attempted. Default {@link CONFLUENCE_MIN_BARS}. */
@@ -355,7 +398,8 @@ export function isConfluenceExit(snapshot: ConfluenceSnapshot | null): boolean {
  *
  * The entry rule is: **≥ `min` weighted indicator families bullish, at least one of
  * them newly lit versus the previous bar, close above the same-timeframe SMA, the
- * higher timeframe in an uptrend, and at least one volume-family signal present.** The
+ * higher timeframe in the state `htfMode` asks for (an uptrend by default), and at least
+ * one volume-family signal present when `requireVolume` is set.** The
  * "newly lit" clause is what timestamps the entry — three signals that have been on for
  * twenty bars are already in the price.
  *
@@ -413,7 +457,11 @@ export function evaluateConfluence(
 
     const htfTrend = htfTrendOf(options.htfBars, params.htf, minBars);
     // Absent trend means the gate could not be evaluated, not that it failed.
-    const htfAligned = htfTrend === null || htfTrend === 'uptrend';
+    const htfAligned =
+        htfTrend === null ||
+        (params.htfMode === 'notUptrend'
+            ? htfTrend !== 'uptrend'
+            : htfTrend === 'uptrend');
     const volumeOk =
         !params.requireVolume ||
         bullish.some(t => VOLUME_FAMILIES.has(signalFamily(t)));
@@ -460,6 +508,10 @@ function resolveParams(options: EvaluateConfluenceOptions): ConfluenceParams {
         ),
         htf: gateOn ? (options.htfLabel ?? 'htf') : null,
         requireVolume: options.requireVolume ?? false,
+        htfMode:
+            options.htfMode === 'notUptrend'
+                ? 'notUptrend'
+                : CONFLUENCE_HTF_MODE,
     };
 }
 

@@ -124,6 +124,7 @@ export {
     CONFLUENCE_EXIT_MIN,
     CONFLUENCE_EXIT_SCORE,
     CONFLUENCE_EXPECTED_WEIGHT,
+    CONFLUENCE_HTF_MODE,
     CONFLUENCE_MIN,
     CONFLUENCE_MIN_BARS,
     CONFLUENCE_SHRINK,
@@ -138,6 +139,7 @@ export {
     VOLUME_FAMILIES,
 } from './domain/signals/confluence';
 export type {
+    ConfluenceHtfMode,
     ConfluenceParams,
     ConfluenceSnapshot,
     EvaluateConfluenceOptions,
