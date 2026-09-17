@@ -29,6 +29,7 @@ export { runBriefing } from './application/market/runBriefing';
 export { runNewsAnalysis } from './application/news/runNewsAnalysis';
 export { runNewsCardAnalysis } from './application/news/runNewsCardAnalysis';
 export { runMarketNewsDigest } from './application/news/runMarketNewsDigest';
+export { peekMarketNewsDigestCache } from './application/news/peekMarketNewsDigestCache';
 
 // Overall / congress
 export { runOverallAnalysis } from './application/overall/runOverallAnalysis';

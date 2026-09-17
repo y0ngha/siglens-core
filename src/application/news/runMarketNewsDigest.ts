@@ -15,44 +15,13 @@ import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER } from '@/domain/tier';
-import type {
-    ActiveModelId,
-    NewsAnalysisResponse,
-    Skill,
-} from '@/domain/types';
-import {
-    buildMarketNewsDigestCacheKey,
-    NEWS_CACHE_TTL_SECONDS,
-} from '@/infrastructure/cache/config';
+import type { ActiveModelId, NewsAnalysisResponse } from '@/domain/types';
+import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import {
-    analysisSeed,
-    hashAnalysisInput,
-    normalizeSkillsForHash,
-} from '@/infrastructure/hash/analysisInput';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
+import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+import { resolveMarketNewsDigestCacheKey } from '@/application/news/marketNewsDigestCacheKey';
 
 const LOG_TAG = '[RunMarketNewsDigest]' as const;
-
-/**
- * Derive a deterministic input hash from the news article IDs, tier, and sampled skills.
- *
- * Mirrors `submitMarketNewsDigest`'s private helper — cache keys produced by
- * both paths are byte-identical for the same input so a cache entry written by
- * one path is readable by the other.
- */
-function hashMarketNewsDigestInput(
-    newsIds: readonly string[],
-    tier: string,
-    skills: readonly Skill[]
-): string {
-    const sortedIds = newsIds.toSorted().join(',');
-    const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
-    return hashAnalysisInput(`${tier}|${sortedIds}|${skillFingerprint}`);
-}
 
 /**
  * Run a market-news category digest end-to-end: empty-news guard → cache
@@ -83,7 +52,6 @@ export async function runMarketNewsDigest(
     options: SubmitMarketNewsDigestOptions
 ): Promise<RunMarketNewsDigestResult> {
     const { category, categoryLabel, modelId, news } = options;
-    const skills = options.skills ?? [];
     const tier = options.tier ?? DEFAULT_TIER;
 
     // ── 1. Empty news guard ──
@@ -92,33 +60,10 @@ export async function runMarketNewsDigest(
     }
 
     // ── 2. Hash (news IDs + skills) → build cache key → check cache ──
-    const newsIds = news.map(n => n.id);
-    const skillSampling = createSkillSamplingPlan(skills, tier, [
-        'market-news-digest',
-        category,
-        modelId,
-        reasoningSeedPart(options.reasoning),
-        tier,
-        'news-ids',
-        ...newsIds.toSorted(),
-    ]);
-    const inputHash = hashMarketNewsDigestInput(
-        newsIds,
-        tier,
-        skillSampling.skills
-    );
-    // `reasoning`은 캐시 키에 반드시 들어가야 한다 — 추론 on/off는 같은 기사
-    // 집합에서도 결과 깊이를 바꾸므로, 빠뜨리면 먼저 캐시를 채운 쪽이 TTL 동안
-    // 반대 모드 호출자의 결과까지 결정해버린다(runNewsAnalysis의 buildNewsCacheKey와
-    // 동일한 이유). `false`/`undefined`는 접미사를 붙이지 않으므로 이 옵션이
-    // 생기기 전에 쓰인 엔트리는 그대로 히트한다.
-    const cacheKey = buildMarketNewsDigestCacheKey(
-        category,
-        modelId,
-        inputHash,
-        options.reasoning,
-        options.locale
-    );
+    // 키 파생은 `resolveMarketNewsDigestCacheKey` 한 곳에만 있다 — peek 경로와
+    // 바이트 단위로 같은 키를 읽고 쓰기 위한 유일한 출처.
+    const { cacheKey, skills: sampledSkills } =
+        resolveMarketNewsDigestCacheKey(options);
     const cache = createCacheProvider();
 
     if (!options.force && cache !== null) {
@@ -142,7 +87,7 @@ export async function runMarketNewsDigest(
     const { stable, dynamic } = buildMarketNewsDigestPrompt(
         categoryLabel,
         news,
-        skillSampling.skills,
+        sampledSkills,
         locale
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
