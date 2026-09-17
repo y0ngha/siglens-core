@@ -208,6 +208,28 @@ describe('prompt', () => {
         });
     });
 
+    /**
+     * 2026-09-17 운영 크롤: actionRecommendation에서 나온 산문이 "나눠서 사는 편이
+     * 낫습니다"처럼 독자에게 행동을 지시했다. 레벨·조건은 유지하되 문형만 조건형으로
+     * 되돌리는 규칙이 이 섹션에 있어야 한다(시스템 프롬프트의 CORE PRINCIPLES와 짝).
+     */
+    describe('액션 추천 서술 규칙', () => {
+        it('명령형 조언을 금지하고 조건형 서술을 요구한다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain('Descriptive, not prescriptive');
+            expect(result).toContain('사는 편이 낫습니다');
+            expect(result).toContain(
+                'The entryRecommendation enum carries the verdict'
+            );
+        });
+    });
+
     describe('종목명 섹션', () => {
         it('symbol이 프롬프트에 포함된다', () => {
             const result = buildAnalysisPrompt(
