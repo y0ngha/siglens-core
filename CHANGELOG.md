@@ -1,5 +1,18 @@
 # Changelog
 
+# [1.8.0](https://github.com/y0ngha/siglens-core/compare/v1.7.0...v1.8.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* **agent:** 전망 질문 라우팅 행이 두 툴 중 하나만 있어도 남게 하고 툴별 규칙을 가용성에 맞춘다 ([32fe6b7](https://github.com/y0ngha/siglens-core/commit/32fe6b7a2fd067b3138c4846e7bd39387af5cee5)), closes [#208](https://github.com/y0ngha/siglens-core/issues/208)
+* **agent:** Rules 섹션을 배열 필터링으로 바꿔 빈 줄 렌더링을 없애고 부재 분기 테스트를 채운다 ([0261f88](https://github.com/y0ngha/siglens-core/commit/0261f88721a2453179fe941539fb83b15caab805)), closes [#208](https://github.com/y0ngha/siglens-core/issues/208)
+
+
+### Features
+
+* **agent:** 데이터가 가리키는 방향을 말하고 사용자 용어 수준에 맞추며 입장을 유지한다 ([b0d55c0](https://github.com/y0ngha/siglens-core/commit/b0d55c0f0fa065dc1c3d5976fbc5f4a2bae154d8))
+
 # [1.7.0](https://github.com/y0ngha/siglens-core/compare/v1.6.1...v1.7.0) (2026-09-15)
 
 
