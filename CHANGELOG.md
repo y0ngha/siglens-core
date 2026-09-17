@@ -1,5 +1,18 @@
 # Changelog
 
+# [1.9.0](https://github.com/y0ngha/siglens-core/compare/v1.8.0...v1.9.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* **news:** peek never throws on a corrupted cache payload; PUBLIC_API option list corrected ([49111f6](https://github.com/y0ngha/siglens-core/commit/49111f6d2f0279f42bf3661a86d0135e9ade8531))
+* **news:** review follow-ups — export MarketNewsDigestCacheKeyOptions, import order, key helper tests ([beab811](https://github.com/y0ngha/siglens-core/commit/beab811431a5b78b7c617975ba9bdd0a3505ca10))
+
+
+### Features
+
+* **news:** add peekMarketNewsDigestCache read-only cache peek ([d69e992](https://github.com/y0ngha/siglens-core/commit/d69e99238ed2fd98b89c484bf8a3ed2cd0403db9))
+
 # [1.8.0](https://github.com/y0ngha/siglens-core/compare/v1.7.0...v1.8.0) (2026-09-17)
 
 
