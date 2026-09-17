@@ -1,4 +1,7 @@
-import type { SubmitMarketNewsDigestOptions } from '@/application/news/marketNewsDigestTypes';
+import type {
+    MarketNewsDigestCacheKeyOptions,
+    MarketNewsDigestCacheKeyPlan,
+} from '@/application/news/marketNewsDigestTypes';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { Skill } from '@/domain/types';
 import { buildMarketNewsDigestCacheKey } from '@/infrastructure/cache/config';
@@ -10,25 +13,6 @@ import {
     createSkillSamplingPlan,
     reasoningSeedPart,
 } from '@/infrastructure/skills/sampling';
-
-/**
- * Subset of {@link SubmitMarketNewsDigestOptions} that participates in the
- * digest cache key. Runtime-only options (`force`, `signal`, …) are excluded
- * so a peek caller cannot accidentally shift the key.
- *
- * This is the parameter type of the public {@link peekMarketNewsDigestCache}.
- */
-export type MarketNewsDigestCacheKeyOptions = Pick<
-    SubmitMarketNewsDigestOptions,
-    'category' | 'modelId' | 'news' | 'locale' | 'reasoning' | 'skills' | 'tier'
->;
-
-/** @internal Cache key plus the sampled skills the key was derived from. */
-export interface MarketNewsDigestCacheKeyPlan {
-    cacheKey: string;
-    /** Tier-sampled skills — the caller must build its prompt from exactly these. */
-    skills: Skill[];
-}
 
 /**
  * Derive a deterministic input hash from the news article IDs, tier, and sampled skills.

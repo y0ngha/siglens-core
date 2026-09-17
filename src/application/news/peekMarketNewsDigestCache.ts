@@ -1,7 +1,5 @@
-import {
-    resolveMarketNewsDigestCacheKey,
-    type MarketNewsDigestCacheKeyOptions,
-} from '@/application/news/marketNewsDigestCacheKey';
+import { resolveMarketNewsDigestCacheKey } from '@/application/news/marketNewsDigestCacheKey';
+import type { MarketNewsDigestCacheKeyOptions } from '@/application/news/marketNewsDigestTypes';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import type { NewsAnalysisResponse } from '@/domain/types';
 import { createCacheProvider } from '@/infrastructure/cache/redis';

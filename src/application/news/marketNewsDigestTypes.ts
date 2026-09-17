@@ -167,3 +167,22 @@ export type RunMarketNewsDigestResult =
     | RunMarketNewsDigestDone
     | SubmitMarketNewsDigestMissNoTrigger
     | SubmitMarketNewsDigestNoNewsError;
+
+/**
+ * Subset of {@link SubmitMarketNewsDigestOptions} that participates in the
+ * digest cache key. Runtime-only options (`force`, `signal`, …) are excluded
+ * so a peek caller cannot accidentally shift the key.
+ *
+ * This is the parameter type of the public `peekMarketNewsDigestCache`.
+ */
+export type MarketNewsDigestCacheKeyOptions = Pick<
+    SubmitMarketNewsDigestOptions,
+    'category' | 'modelId' | 'news' | 'locale' | 'reasoning' | 'skills' | 'tier'
+>;
+
+/** @internal Cache key plus the sampled skills the key was derived from. */
+export interface MarketNewsDigestCacheKeyPlan {
+    cacheKey: string;
+    /** Tier-sampled skills — the caller must build its prompt from exactly these. */
+    skills: Skill[];
+}
