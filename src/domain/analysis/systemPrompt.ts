@@ -7,9 +7,9 @@ import {
 /**
  * Shared principles and output contract appended to every per-analysis system
  * prompt. Defines five core principles (deterministic, grounded, conservative,
- * descriptive-not-prescriptive, schema-faithful) and the output contract: a single JSON object with
- * Korean-language text fields in formal speech (존댓말). Each analysis composes
- * its own persona in front of this base.
+ * descriptive-not-prescriptive, schema-faithful) and the output contract: a
+ * single JSON object with Korean-language text fields in formal speech
+ * (존댓말). Each analysis composes its own persona in front of this base.
  */
 function analysisSystemBase(locale: AnalysisLocale): string {
     return `CORE PRINCIPLES
