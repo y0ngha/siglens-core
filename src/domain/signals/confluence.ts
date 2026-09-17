@@ -210,6 +210,9 @@ export interface ConfluenceParams {
     /**
      * How the higher-timeframe trend gated the entry. Absent on snapshots stored before
      * the option existed, which all ran as `'uptrend'`.
+     *
+     * Always recorded, even when the gate was off — it is only meaningful when
+     * {@link htf} is non-null. `htf: null` is what says "no gate was applied".
      */
     htfMode?: ConfluenceHtfMode;
 }

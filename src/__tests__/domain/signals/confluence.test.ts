@@ -668,6 +668,16 @@ describe('evaluateConfluence', () => {
             })!;
             expect(snap.params.htfMode).toBe('uptrend');
             expect(snap.entryTrigger).toBe(true);
+
+            // 폴백이 실제로 uptrend 요건을 **강제**하는지 — 상승 봉만으로는 "게이트가 통째로
+            // 우회됐다"와 구분되지 않는다.
+            const blocked = evaluateConfluence(breakout, {
+                timeframe: '1Hour',
+                htfBars: htfFlat,
+                htfLabel: '1Day',
+                htfMode: 'downtrend' as unknown as 'uptrend',
+            })!;
+            expect(blocked.entryTrigger).toBe(false);
         });
     });
 
