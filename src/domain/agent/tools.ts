@@ -59,7 +59,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_quote',
         description:
-            'Latest price and day change for up to 3 symbols. Always call this instead of quoting a price from memory. Each quote carries quoteDelayMinutes; when it is greater than 0 the quote is delayed by that many minutes and must not be called real-time.',
+            "Latest price and day change for up to 3 symbols. Call for any current-price or today's-move question, and always instead of quoting a price from memory. Each quote carries quoteDelayMinutes; when it is greater than 0 the quote is delayed by that many minutes and must not be called real-time.",
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -77,7 +77,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_bars_indicators',
         description:
-            "Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state, recent candle patterns with their dates, and `confluence` — the rule-based indicator-family agreement score (0–100, 50 neutral; entry/exit triggers; bullish/bearish and newly lit signals; null below 120 bars; no AI involved). Use for any question about price action, momentum, chart setup, or a symbol's outlook.",
+            "Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state, recent candle patterns with their dates, and `confluence` — the rule-based indicator-family agreement score (0–100, 50 neutral; entry/exit triggers; bullish/bearish and newly lit signals; null below 120 bars; no AI involved). Call for any question about price action, momentum, indicator values, chart setup, or a symbol's outlook; not needed for questions only about earnings, financials, news or congressional trades.",
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -133,7 +133,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_news',
         description:
-            'News already ingested by SIGLENS for a symbol or a market category, with sentiment and Korean summary. If the result is empty or older than the question needs, say coverage is limited and use web_search if available.',
+            'News already ingested by SIGLENS for a symbol or a market category, with sentiment and Korean summary. Call for news, events, rulings or "why did it move / what happened" questions. If the result is empty or older than the question needs, say coverage is limited and use web_search if available.',
         costClass: 'free',
         inputSchema: {
             type: 'object',

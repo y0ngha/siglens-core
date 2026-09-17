@@ -203,7 +203,13 @@ function parseToken(token: string): ParsedNumber {
     };
 }
 
-/** Extracts numbers from free text via regex — the fallback path for non-JSON tool output. */
+/**
+ * Extracts numbers from free text via regex — the fallback path for non-JSON
+ * tool output and for string leaves. A number written with a Korean magnitude
+ * unit ("매출 1,132억 달러" inside an analysis summary) is also pushed at its
+ * full value, so the answer restating it as "1,132억" grounds through the unit
+ * path (which compares full value ÷ multiplier) instead of being flagged.
+ */
 function collectRegexNumbers(text: string, out: number[]): void {
     TOOL_NUMBER_RE.lastIndex = 0;
     for (
@@ -211,7 +217,10 @@ function collectRegexNumbers(text: string, out: number[]): void {
         m !== null;
         m = TOOL_NUMBER_RE.exec(text)
     ) {
-        out.push(Number(m[0].replace(/,/g, '')));
+        const value = Number(m[0].replace(/,/g, ''));
+        out.push(value);
+        const multiplier = KOREAN_UNIT_MULTIPLIER[text[m.index + m[0].length]];
+        if (multiplier !== undefined) out.push(value * multiplier);
     }
 }
 
