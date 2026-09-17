@@ -161,6 +161,74 @@ describe('buildAgentSystemPrompt', () => {
         );
     });
 
+    it.each([
+        ['search_ticker', '→ search_ticker first'],
+        ['get_quote', "Current price or today's move"],
+        ['get_news', 'why did it move / what happened'],
+        ['get_my_portfolio', '→ get_my_portfolio.'],
+    ])('%s가 없으면 그 행이 사라진다', (tool, line) => {
+        expect(prompt).toContain(line);
+        const without = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(t => t.name !== tool),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(without).not.toContain(line);
+        // 툴 이름 자체는 다른 규칙(예: 답변에 내부 툴 이름 금지 목록)에도 나오므로
+        // 행 문장이 사라졌는지만 본다.
+        expect(without).not.toContain(`→ ${tool}`);
+    });
+
+    it.each([
+        ['get_news', 'If get_news returns nothing useful'],
+        ['get_bars_indicators', 'state its confluence reading'],
+        ['get_quote', 'quoteDelayMinutes is greater than 0'],
+        ['run_fresh_analysis', 'call run_fresh_analysis right away'],
+    ])(
+        'Rules의 %s 규칙은 그 툴이 없으면 빠지고 빈 줄도 남기지 않는다',
+        (tool, rule) => {
+            expect(prompt).toContain(rule);
+            const without = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(t => t.name !== tool),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            expect(without).not.toContain(rule);
+            const rules = without.slice(
+                without.indexOf('### Rules'),
+                without.indexOf('## Data boundary')
+            );
+            expect(rules).not.toMatch(/\n\s*\n\s*-/);
+        }
+    );
+
+    it('어떤 툴 조합에서도 Rules 섹션에 빈 줄이 생기지 않는다', () => {
+        const optional = [
+            'run_fresh_analysis',
+            'get_news',
+            'get_bars_indicators',
+            'get_quote',
+            'web_search',
+        ];
+        // 5개 선택 툴의 32가지 조합 전부 — 빈 줄 버그는 특정 조합에서만 났다.
+        for (let mask = 0; mask < 1 << optional.length; mask++) {
+            const dropped = optional.filter((_, i) => (mask & (1 << i)) !== 0);
+            const p = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(t => !dropped.includes(t.name)),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            const rules = p.slice(
+                p.indexOf('### Rules'),
+                p.indexOf('## Data boundary')
+            );
+            expect(rules.trim()).not.toMatch(/\n\s*\n\s*-/);
+        }
+    });
+
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
