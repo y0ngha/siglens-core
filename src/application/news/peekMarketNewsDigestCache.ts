@@ -64,7 +64,10 @@ export async function peekMarketNewsDigestCache(
             console.error(LOG_TAG, 'Cache read failed:', error);
             return null;
         });
-    if (cached === null || cached === undefined) return null;
+    // `== null` covers both null and a provider that resolves undefined (loose
+    // equality on purpose — the port types `T | null`, runtime may still hand back
+    // undefined, and a strict double comparison drew a TS2367 review question).
+    if (cached == null) return null;
 
     // normalizeNewsAnalysisResponse parses via parseLlmPayload, which throws
     // SyntaxError on a corrupted/non-JSON cached string. This is an SSR seed
