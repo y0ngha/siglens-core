@@ -3,6 +3,7 @@ import {
     CONFLUENCE_EXIT_MIN,
     CONFLUENCE_EXIT_SCORE,
     CONFLUENCE_EXPECTED_WEIGHT,
+    CONFLUENCE_HTF_MODE,
     CONFLUENCE_MIN,
     CONFLUENCE_MIN_BARS,
     CONFLUENCE_SPAN,
@@ -366,7 +367,17 @@ describe('기본값 — 실측으로 정한 값이라 조용히 바뀌면 안 �
         expect(snap.params.requireVolume).toBe(false);
     });
 
-    it('상위 시간축 게이트는 봉을 주면 켜진다 — 이쪽은 실측에서 값을 했다', () => {
+    it('상위 시간축 모드 기본값은 uptrend — 기존 소비자와 일봉 백테스트를 움직이지 않는다', () => {
+        // 1시간봉 실측은 이 기본값을 지지하지 않는다(`CONFLUENCE_HTF_MODE` 주석). 그래도
+        // 기본값을 조용히 바꾸면 모든 소비자가 한꺼번에 움직이므로 옵트인으로 둔다.
+        expect(CONFLUENCE_HTF_MODE).toBe('uptrend');
+        const snap = evaluateConfluence(risingBars(CONFLUENCE_MIN_BARS + 1), {
+            timeframe: '30Min',
+        })!;
+        expect(snap.params.htfMode).toBe('uptrend');
+    });
+
+    it('상위 시간축 게이트는 봉을 주면 켜진다', () => {
         const snap = evaluateConfluence(risingBars(CONFLUENCE_MIN_BARS + 1), {
             timeframe: '30Min',
             htfBars: risingBars(200, 50, 1),
@@ -438,6 +449,7 @@ describe('evaluateConfluence', () => {
                 expectedWeight: 0.25,
                 htf: null,
                 requireVolume: false,
+                htfMode: 'uptrend',
             });
         });
 
@@ -580,6 +592,95 @@ describe('evaluateConfluence', () => {
         });
     });
 
+    describe('상위 시간축 모드 (htfMode)', () => {
+        /**
+         * 횡보 뒤 마지막 봉 급등 — 게이트 없이 진입 룰이 성립하는 봉.
+         * 신규 강세 신호 다수 + 종가 > SMA50이라 상위 추세만이 판정을 가른다.
+         */
+        const breakout = buildBars([
+            ...Array.from(
+                { length: CONFLUENCE_MIN_BARS + 5 },
+                (_, i) => 100 + Math.sin(i / 3) * 0.5
+            ),
+            104,
+        ]);
+        const htfUp = risingBars(200, 50, 1);
+        const htfDown = buildBars(
+            Array.from({ length: 200 }, (_, i) => 300 - i)
+        );
+        const htfFlat = buildBars(Array.from({ length: 200 }, () => 100));
+
+        const entry = (
+            htfBars: Bar[] | null,
+            htfMode?: 'uptrend' | 'notUptrend'
+        ): boolean =>
+            evaluateConfluence(breakout, {
+                timeframe: '1Hour',
+                htfBars,
+                htfLabel: '1Day',
+                ...(htfMode ? { htfMode } : {}),
+            })!.entryTrigger;
+
+        it('전제 — 게이트가 꺼져 있으면 이 봉에서 진입 룰이 성립한다', () => {
+            expect(entry(null)).toBe(true);
+        });
+
+        describe('uptrend (기본)', () => {
+            it('상위 추세가 상승일 때만 허용한다', () => {
+                expect(entry(htfUp)).toBe(true);
+                expect(entry(htfFlat)).toBe(false);
+                expect(entry(htfDown)).toBe(false);
+            });
+        });
+
+        describe('notUptrend', () => {
+            it('상위 추세가 상승이면 막는다 — 이미 뻗은 자리의 추격', () => {
+                expect(entry(htfUp, 'notUptrend')).toBe(false);
+            });
+
+            it('횡보·하락이면 허용한다', () => {
+                expect(entry(htfFlat, 'notUptrend')).toBe(true);
+                expect(entry(htfDown, 'notUptrend')).toBe(true);
+            });
+
+            it('추세를 판정할 수 없으면 통과시킨다 (fail-open)', () => {
+                expect(entry(risingBars(5), 'notUptrend')).toBe(true);
+            });
+
+            it('적용 모드를 params에 기록한다 — 전후 비교의 근거', () => {
+                const snap = evaluateConfluence(breakout, {
+                    timeframe: '1Hour',
+                    htfBars: htfFlat,
+                    htfLabel: '1Day',
+                    htfMode: 'notUptrend',
+                })!;
+                expect(snap.params.htfMode).toBe('notUptrend');
+                expect(snap.htfTrend).toBe('sideways');
+            });
+        });
+
+        it('모르는 값은 기본 모드로 되돌린다 — 설정 오타가 게이트를 뒤집지 않는다', () => {
+            const snap = evaluateConfluence(breakout, {
+                timeframe: '1Hour',
+                htfBars: htfUp,
+                htfLabel: '1Day',
+                htfMode: 'downtrend' as unknown as 'uptrend',
+            })!;
+            expect(snap.params.htfMode).toBe('uptrend');
+            expect(snap.entryTrigger).toBe(true);
+
+            // 폴백이 실제로 uptrend 요건을 **강제**하는지 — 상승 봉만으로는 "게이트가 통째로
+            // 우회됐다"와 구분되지 않는다.
+            const blocked = evaluateConfluence(breakout, {
+                timeframe: '1Hour',
+                htfBars: htfFlat,
+                htfLabel: '1Day',
+                htfMode: 'downtrend' as unknown as 'uptrend',
+            })!;
+            expect(blocked.entryTrigger).toBe(false);
+        });
+    });
+
     describe('진입 전용 게이트 — 원칙 7', () => {
         /**
          * 하락 국면의 봉. 약세 시그널이 서고 종가가 MA 아래로 내려간다.
@@ -607,6 +708,18 @@ describe('evaluateConfluence', () => {
 
             // 상위 추세를 주든 말든 청산 판정은 같아야 한다.
             expect(gated.exitTrigger).toBe(ungated.exitTrigger);
+        });
+
+        it('청산 트리거는 상위 시간축 모드와 무관하다', () => {
+            const byMode = (htfMode: 'uptrend' | 'notUptrend'): boolean =>
+                evaluateConfluence(fallingThenCrash, {
+                    timeframe: '30Min',
+                    htfBars: risingBars(200, 50, 1),
+                    htfLabel: '1Day',
+                    htfMode,
+                })!.exitTrigger;
+
+            expect(byMode('notUptrend')).toBe(byMode('uptrend'));
         });
 
         it('청산 트리거는 거래량 확인을 요구하지 않는다', () => {
