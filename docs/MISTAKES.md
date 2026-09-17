@@ -381,6 +381,16 @@ and have been removed from this file.
       // ignores options.now, so tests cannot control time
    ✅ function analyzeSnapshot(snapshot, options: { now?: Date }) { const time = options.now ?? new Date(); ... }
    ✅ Better: if now is required, make it non-optional: (snapshot, options: { now: Date }) => { const time = options.now; ... }
+
+5. Port authoring must follow domain/CLAUDE.md conventions
+   → Port return/receive DTOs must be defined in domain/types.ts, not co-located in port files
+   → @port documentation tags annotate the interface/type contract, not file-level module JSDoc
+   → Centralization of DTOs ensures clean separation and prevents redundant type copies across ports
+   ❌ interface UsageRepository defined in domain/ports/usageRepository.ts with UsageCounts return DTO co-located in same file
+   ❌ /** @port ... */ placed at file header, but actual port interface CallAiProvider is at bottom; scanning for @port on types misses it
+   ✅ Return/receive DTOs (UsageCounts, CallAiProvider, etc.) defined in domain/types.ts; port files import them
+   ✅ @port tag on interface JSDoc: /** @port ... */ interface CallAiProvider { ... }
+   → Recurring (PR #98, PR #92): DTOs co-located in port files; @port tags at wrong scope level
 ```
 
 ---

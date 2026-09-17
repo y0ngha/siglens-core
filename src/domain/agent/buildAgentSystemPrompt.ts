@@ -46,21 +46,44 @@ export interface BuildAgentSystemPromptInput {
  */
 interface RoutingRow {
     requires: readonly string[];
-    text: string;
+    /**
+     * A function when the row's wording depends on WHICH of several tools are
+     * available (see the outlook row): it receives the available set and
+     * returns the line, or an empty string when no wording applies and the row
+     * should be dropped.
+     */
+    text: string | ((available: ReadonlySet<string>) => string);
 }
 
 const ROUTING_ROWS: readonly RoutingRow[] = [
     {
         requires: ['search_ticker'],
-        text: 'The user names a company instead of a symbol (삼성전자, 엔비디아, Apple) → search_ticker first, then the rows below for the resolved symbol.',
+        text: 'The user names a company instead of a symbol (삼성전자, 엔비디아, Apple) → search_ticker first, even when you believe you know the ticker, then the rows below for the resolved symbol.',
     },
     {
-        requires: ['get_cached_analysis', 'get_bars_indicators'],
-        text: 'Outlook, "how is it doing", "should I buy / is it a good time", rebound, top/bottom, trading-setup or "analyze it" questions about a symbol → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together.',
+        // Outlook questions want both tools, but either one alone still answers
+        // them — so the row adapts instead of vanishing when only one is
+        // available (a row that required both left those questions unrouted).
+        requires: [],
+        text: available => {
+            const hasAnalysis = available.has('get_cached_analysis');
+            const hasBars = available.has('get_bars_indicators');
+            const tools =
+                hasAnalysis && hasBars
+                    ? 'get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
+                    : hasBars
+                      ? 'get_bars_indicators (timeframe 1Day unless the user names another)'
+                      : hasAnalysis
+                        ? 'get_cached_analysis'
+                        : '';
+            return tools === ''
+                ? ''
+                : `Outlook, "how is it doing", "should I buy / is it a good time", rebound, top/bottom, trading-setup or "analyze it" questions about a symbol → ${tools}.`;
+        },
     },
     {
         requires: ['get_bars_indicators'],
-        text: 'Chart, trend, price-flow, momentum or indicator-value questions (RSI, MACD, Bollinger, moving averages, overbought) about a symbol → get_bars_indicators.',
+        text: 'Chart, trend, price-flow, momentum or indicator-value questions (RSI, MACD, Bollinger, moving averages, overbought) about a symbol → get_bars_indicators; a question only about earnings, financials, news or congressional trades does not need it.',
     },
     {
         requires: ['get_cached_analysis'],
@@ -107,10 +130,6 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         text: 'Comparing several symbols → apply the matching rows to each symbol.',
     },
     {
-        requires: ['get_bars_indicators'],
-        text: 'A question only about earnings, financials, news or congressional trades does not need get_bars_indicators; add it only when the same question also asks about outlook, chart or price flow.',
-    },
-    {
         requires: [],
         text: 'Out-of-scope requests (code, homework, unrelated topics) → no tools.',
     },
@@ -118,7 +137,11 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
 
 function routingTable(available: ReadonlySet<string>): string {
     return ROUTING_ROWS.filter(row => row.requires.every(t => available.has(t)))
-        .map(row => `- ${row.text}`)
+        .map(row =>
+            typeof row.text === 'string' ? row.text : row.text(available)
+        )
+        .filter(text => text !== '')
+        .map(text => `- ${text}`)
         .join('\n');
 }
 
@@ -176,9 +199,20 @@ ${routingTable(available)}
             ? '\n- If get_cached_analysis returns found:false or stale:true, call run_fresh_analysis right away (do not ask permission); it takes up to a few minutes and the UI shows progress.'
             : ''
     }
-- If get_news returns nothing useful for the period the user asks about, ${newsGapRule}.
-- When you called get_bars_indicators for a symbol question, state its confluence reading in the answer. Confluence is a rule-based indicator tally, not a forecast — say so, and if it is null say the history is too short for it.
-- If a quote's quoteDelayMinutes is greater than 0, say the quote is delayed by that many minutes; never present it as real-time.
+${
+    available.has('get_news')
+        ? `- If get_news returns nothing useful for the period the user asks about, ${newsGapRule}.`
+        : ''
+}
+${
+    available.has('get_bars_indicators')
+        ? '- When you called get_bars_indicators for a symbol question, state its confluence reading in the answer. Confluence is a rule-based indicator tally, not a forecast — say so, and if it is null say the history is too short for it.\n'
+        : ''
+}${
+        available.has('get_quote')
+            ? "- If a quote's quoteDelayMinutes is greater than 0, say the quote is delayed by that many minutes; never present it as real-time."
+            : ''
+    }
 - If a tool returns an error, tell the user what could not be fetched; never fabricate a substitute.
 - If a tool returns {"error":"login_required"}, say in one sentence that this needs logging in (never call the login "free"), then answer with what you could fetch. Do not call that tool again in this turn.
 

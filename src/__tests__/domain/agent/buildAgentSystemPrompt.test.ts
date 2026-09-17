@@ -120,6 +120,40 @@ describe('buildAgentSystemPrompt', () => {
             expect(line.match(/→/g)?.length ?? 0).toBeLessThanOrEqual(1);
     });
 
+    it('전망 질문 행은 두 툴 중 하나만 가용해도 남은 툴로 안내한다', () => {
+        const outlook = /Outlook, "how is it doing".*→ ([^\n]+)\./;
+        expect(prompt.match(outlook)?.[1]).toBe(
+            'get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
+        );
+        const only = (drop: string): string | undefined =>
+            buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(t => t.name !== drop),
+                now: NOW,
+                etSessionStatus: 'open',
+            }).match(outlook)?.[1];
+        expect(only('get_cached_analysis')).toBe(
+            'get_bars_indicators (timeframe 1Day unless the user names another)'
+        );
+        expect(only('get_bars_indicators')).toBe('get_cached_analysis');
+        // 둘 다 없으면 행 자체가 사라진다(남은 안내가 가리킬 툴이 없다).
+        const neither = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t =>
+                    ![
+                        'get_cached_analysis',
+                        'get_bars_indicators',
+                        'run_fresh_analysis',
+                    ].includes(t.name)
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(neither).not.toMatch(outlook);
+        expect(neither).not.toContain('get_bars_indicators');
+    });
+
     it('도구를 부르는 메시지는 텍스트 없이 도구 호출만 담게 하고, 끝에서 한 번 더 상기시킨다', () => {
         expect(prompt).toContain('its text content stays empty');
         expect(prompt.trimEnd()).toMatch(
@@ -148,7 +182,7 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('state its confluence reading');
         // 방향을 묻지 않는 질문(실적·재무·뉴스·의회 거래만)에는 붙이지 않는다.
         expect(prompt).toContain(
-            'A question only about earnings, financials, news or congressional trades does not need get_bars_indicators'
+            'a question only about earnings, financials, news or congressional trades does not need it'
         );
     });
 
