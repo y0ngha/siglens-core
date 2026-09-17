@@ -1,5 +1,12 @@
 # Changelog
 
+# [1.10.0](https://github.com/y0ngha/siglens-core/compare/v1.9.0...v1.10.0) (2026-09-17)
+
+
+### Features
+
+* 컨플루언스 HTF 게이트 모드 옵션(htfMode) 추가 ([234b389](https://github.com/y0ngha/siglens-core/commit/234b38943366dd64b32b4b7cbdc1a6f2d315b3ad)), closes [#211](https://github.com/y0ngha/siglens-core/issues/211)
+
 # [1.9.0](https://github.com/y0ngha/siglens-core/compare/v1.8.0...v1.9.0) (2026-09-17)
 
 
