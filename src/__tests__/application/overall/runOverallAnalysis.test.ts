@@ -169,6 +169,33 @@ describe('runOverallAnalysis', () => {
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
         });
 
+        it('캐시 히트 결과가 analyzedAt을 이미 가지고 있으면 그대로 통과시킨다 (스펙 §2.5)', async () => {
+            mockCacheGet.mockResolvedValueOnce({
+                ...mockOverallResult,
+                analyzedAt: '2026-05-30T00:00:00.000Z',
+            });
+
+            const result = await runOverallAnalysis(baseOptions());
+
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                expect(result.result.analyzedAt).toBe(
+                    '2026-05-30T00:00:00.000Z'
+                );
+            }
+        });
+
+        it('캐시 히트 결과에 analyzedAt이 없으면(과거 항목) 생략된 채로 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockOverallResult);
+
+            const result = await runOverallAnalysis(baseOptions());
+
+            expect(result.status).toBe('cached');
+            if (result.status === 'cached') {
+                expect(result.result.analyzedAt).toBeUndefined();
+            }
+        });
+
         it('캐시 히트 시 recordAnalysisUsageSafely가 호출된다', async () => {
             mockCacheGet.mockResolvedValueOnce(mockOverallResult);
 
@@ -256,6 +283,32 @@ describe('runOverallAnalysis', () => {
 
             expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
             expect(result.status).toBe('done');
+        });
+
+        it('새로 생성된 결과에 analyzedAt(ISO 문자열)을 부착한다 (스펙 §2.5)', async () => {
+            const before = Date.now();
+            const result = await runOverallAnalysis(baseOptions());
+            const after = Date.now();
+
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.analyzedAt).toBeDefined();
+                const t = new Date(result.result.analyzedAt!).getTime();
+                expect(t).toBeGreaterThanOrEqual(before);
+                expect(t).toBeLessThanOrEqual(after);
+            }
+        });
+
+        it('캐시에 쓰는 결과에도 analyzedAt이 포함된다', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            expect(mockCacheSet).toHaveBeenCalled();
+            const [, cachedValue] = mockCacheSet.mock.calls.find(
+                call => typeof call[1] === 'object' && call[1] !== null
+            )!;
+            expect(
+                (cachedValue as OverallAnalysisResponse).analyzedAt
+            ).toBeDefined();
         });
 
         it('signal을 callAnalysisAi에 그대로 전달한다', async () => {
@@ -375,7 +428,28 @@ describe('runOverallAnalysis', () => {
                 expect.stringContaining('onPromptAssembled'),
                 expect.any(Error)
             );
-            expect(withCallback).toEqual(withoutCallback);
+            // `analyzedAt` (spec 2026-09-18 §2.5) is a real wall-clock
+            // timestamp attached fresh on each call — two genuinely separate
+            // `runOverallAnalysis` invocations can land in different
+            // milliseconds, which is not the thing this test is checking.
+            // Compare everything else exactly, and only assert both have
+            // SOME defined `analyzedAt` (not that it's numerically identical).
+            expect(withCallback.status).toBe('done');
+            expect(withoutCallback.status).toBe('done');
+            if (
+                withCallback.status === 'done' &&
+                withoutCallback.status === 'done'
+            ) {
+                const { analyzedAt: withCallbackAt, ...withCallbackRest } =
+                    withCallback.result;
+                const {
+                    analyzedAt: withoutCallbackAt,
+                    ...withoutCallbackRest
+                } = withoutCallback.result;
+                expect(withCallbackRest).toEqual(withoutCallbackRest);
+                expect(withCallbackAt).toBeDefined();
+                expect(withoutCallbackAt).toBeDefined();
+            }
 
             consoleErrorSpy.mockRestore();
         });

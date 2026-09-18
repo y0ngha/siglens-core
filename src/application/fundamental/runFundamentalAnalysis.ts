@@ -136,6 +136,27 @@ async function fetchProviderData(
 }
 
 /**
+ * Resolves the optional `currentPrice` enrichment. A lazy getter that rejects
+ * (quote provider outage) degrades to "no price" — the price only feeds the
+ * target-upside line, so it must never fail an analysis whose provider data
+ * was already fetched.
+ */
+async function resolveCurrentPriceOption(
+    currentPrice: SubmitFundamentalAnalysisOptions['currentPrice']
+): Promise<number | null | undefined> {
+    if (typeof currentPrice !== 'function') return currentPrice;
+    try {
+        return await currentPrice();
+    } catch (error) {
+        console.error(
+            '[RunFundamental] currentPrice getter failed; continuing without it:',
+            error
+        );
+        return undefined;
+    }
+}
+
+/**
  * Run a fundamental analysis end-to-end: tier gate → cache lookup → provider
  * fetch → LLM call → normalisation → cache write → return.
  *
@@ -242,7 +263,25 @@ export async function runFundamentalAnalysis(
         occurredAt
     );
     if (providerData.status === 'error') return providerData;
-    const { snapshot } = providerData;
+    // `currentPrice` may be a lazy getter (spec 2026-09-18 coordinator item
+    // C3) — resolved here, only after the cache-hit early return above, so a
+    // cache HIT never pays for the caller's quote fetch. Invalid (non-finite
+    // / <= 0 — a quote failure renders `0` in this codebase, never a real
+    // price) is treated as absent so `## Derived Metrics`'s price-relative
+    // lines fall back to `N/A` rather than computing against a bad number.
+    const resolvedCurrentPrice = await resolveCurrentPriceOption(
+        options.currentPrice
+    );
+    const currentPrice =
+        typeof resolvedCurrentPrice === 'number' &&
+        Number.isFinite(resolvedCurrentPrice) &&
+        resolvedCurrentPrice > 0
+            ? resolvedCurrentPrice
+            : undefined;
+    const snapshot =
+        currentPrice === undefined
+            ? providerData.snapshot
+            : { ...providerData.snapshot, currentPrice };
 
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildFundamentalAnalysisPrompt(
@@ -250,7 +289,8 @@ export async function runFundamentalAnalysis(
         snapshot,
         skillSampling.skills,
         locale,
-        options.currency
+        options.currency,
+        occurredAt
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

@@ -361,7 +361,8 @@ async function runAnalysisImpl(
         enriched,
         lastClose,
         atr,
-        options.currency
+        options.currency,
+        locale
     );
 
     const now = new Date();

@@ -14,6 +14,7 @@ vi.mock('@/domain/analysis/fundamentalPrompt', () => ({
 }));
 
 import { runFundamentalAnalysis } from '@/application/fundamental/runFundamentalAnalysis';
+import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FUNDAMENTAL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
@@ -22,6 +23,8 @@ import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
+const mockBuildFundamentalAnalysisPrompt =
+    buildFundamentalAnalysisPrompt as Mock;
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
@@ -204,6 +207,169 @@ describe('runFundamentalAnalysis', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
                 expect.objectContaining({ fallbackOnProviderFailure: true })
             );
+        });
+    });
+
+    describe('currentPrice wiring (review round 1 fix — was never populated)', () => {
+        it('threads a valid options.currentPrice onto the snapshot passed to buildFundamentalAnalysisPrompt', async () => {
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                currentPrice: 190.5,
+            });
+
+            const snapshotArg =
+                mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                    call => call[0] === mockSymbol
+                )?.[1];
+            expect(snapshotArg?.currentPrice).toBe(190.5);
+        });
+
+        it('omits currentPrice from the snapshot when options.currentPrice is not supplied', async () => {
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+
+            const snapshotArg =
+                mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                    call => call[0] === mockSymbol
+                )?.[1];
+            expect(snapshotArg?.currentPrice).toBeUndefined();
+        });
+
+        it.each([
+            ['zero', 0],
+            ['negative', -50],
+            ['NaN', Number.NaN],
+            ['null', null],
+        ])(
+            'treats an invalid currentPrice (%s) as absent, not as a real price',
+            async (_label, badPrice) => {
+                await runFundamentalAnalysis({
+                    symbol: mockSymbol,
+                    modelId: mockModelId,
+                    dataProvider: mockDataProvider,
+                    currentPrice: badPrice,
+                });
+
+                const snapshotArg =
+                    mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                        call => call[0] === mockSymbol
+                    )?.[1];
+                expect(snapshotArg?.currentPrice).toBeUndefined();
+            }
+        );
+
+        it('does not affect the cache key', async () => {
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                currentPrice: 190.5,
+            });
+            const withPriceKey = mockCacheSet.mock.calls[0]?.[0];
+
+            vi.clearAllMocks();
+            mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
+            mockLoadSkillsCached.mockResolvedValue({
+                skills: [] as Skill[],
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockResolvedValue(null);
+            mockCacheSet.mockResolvedValue(undefined);
+            mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+            (mockDataProvider.getProfile as Mock).mockResolvedValue(
+                validProfile
+            );
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+            const withoutPriceKey = mockCacheSet.mock.calls[0]?.[0];
+
+            expect(withPriceKey).toBe(withoutPriceKey);
+        });
+    });
+
+    describe('currentPrice as a lazy getter (spec 2026-09-18 coordinator item C3)', () => {
+        it('calls the getter and threads its resolved value onto the snapshot on a cache MISS', async () => {
+            mockCacheGet.mockResolvedValue(null);
+            const getter = vi.fn().mockResolvedValue(190.5);
+
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                currentPrice: getter,
+            });
+
+            expect(getter).toHaveBeenCalledTimes(1);
+            const snapshotArg =
+                mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                    call => call[0] === mockSymbol
+                )?.[1];
+            expect(snapshotArg?.currentPrice).toBe(190.5);
+        });
+
+        it('never calls the getter on a cache HIT — the whole point of C3', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+            const getter = vi.fn().mockResolvedValue(190.5);
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                currentPrice: getter,
+            });
+
+            expect(result.status).toBe('cached');
+            expect(getter).not.toHaveBeenCalled();
+        });
+
+        it('a getter that REJECTS (quote outage) degrades to no price — the analysis still completes', async () => {
+            mockCacheGet.mockResolvedValue(null);
+            const getter = vi.fn().mockRejectedValue(new Error('quote down'));
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                currentPrice: getter,
+            });
+
+            expect(result.status).not.toBe('error');
+            const snapshotArg =
+                mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                    call => call[0] === mockSymbol
+                )?.[1];
+            expect(snapshotArg).toBeDefined();
+            expect(snapshotArg?.currentPrice).toBeUndefined();
+            errorSpy.mockRestore();
+        });
+
+        it('treats a getter that resolves to an invalid price as absent, same as a plain number', async () => {
+            mockCacheGet.mockResolvedValue(null);
+            const getter = vi.fn().mockResolvedValue(null);
+
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                currentPrice: getter,
+            });
+
+            const snapshotArg =
+                mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                    call => call[0] === mockSymbol
+                )?.[1];
+            expect(snapshotArg?.currentPrice).toBeUndefined();
         });
     });
 

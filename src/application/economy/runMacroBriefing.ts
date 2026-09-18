@@ -75,7 +75,7 @@ export async function runMacroBriefing(
 
     // This builder has no skills catalog and no separate system prompt —
     // `stable` is always '' (Design C), so `prompt` is `dynamic` alone.
-    const { dynamic } = buildMacroBriefingPrompt(data);
+    const { dynamic } = buildMacroBriefingPrompt(data, now);
     const prompt = dynamic;
 
     const raw = await dedupeInFlight(cacheKey, () =>

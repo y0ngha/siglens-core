@@ -669,12 +669,21 @@ export async function runOverallAnalysis(
     });
 
     // ── 11. Normalize and cache ──
-    const result = normalizeOverallAnalysisResponse(
+    const normalized = normalizeOverallAnalysisResponse(
         JSON.parse(raw) as unknown,
         {
             optionsOiStale,
         }
     );
+    // `analyzedAt` marks when THIS result was produced, so a peek/cache hit
+    // can report its age (spec 2026-09-18 §2.5 / B11) — mirrors
+    // `runAnalysis.ts`'s `analyzedAt` on the technical axis. A fresh clock
+    // read here (not the request-start `occurredAt`) because the LLM call
+    // above can take up to the poll timeout.
+    const result: OverallAnalysisResponse = {
+        ...normalized,
+        analyzedAt: new Date().toISOString(),
+    };
 
     if (result.headlineKo === '' && result.scenarios.length === 0) {
         console.warn('[RunOverallAnalysis] Empty overall analysis', { symbol });
