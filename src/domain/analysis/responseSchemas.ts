@@ -504,6 +504,25 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                         required: ['show', 'type', 'color', 'label'],
                         additionalProperties: false,
                     },
+                    // Measured-move anchor for THIS pattern (spec 2026-09-18
+                    // §A6) — the app computes 측정 목표가/보수 목표가(50%)
+                    // from it; the model never computes a target itself.
+                    geometry: {
+                        type: ['object', 'null'],
+                        properties: {
+                            breakoutLevel: { type: 'number' },
+                            extremeLevel: { type: 'number' },
+                            direction: { type: 'string', enum: ['up', 'down'] },
+                            invalidationLevel: { type: ['number', 'null'] },
+                        },
+                        required: [
+                            'breakoutLevel',
+                            'extremeLevel',
+                            'direction',
+                            'invalidationLevel',
+                        ],
+                        additionalProperties: false,
+                    },
                 },
                 required: [
                     'id',
@@ -517,6 +536,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     'timeRange',
                     'confidenceWeight',
                     'renderConfig',
+                    'geometry',
                 ],
                 additionalProperties: false,
             },

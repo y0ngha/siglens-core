@@ -22,7 +22,8 @@ import {
     TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
 
-interface Point {
+/** @internal Shared by `patternGeometry.ts`'s trendline-value evaluator. */
+export interface Point {
     x: number;
     y: number;
 }
@@ -31,8 +32,11 @@ interface Point {
  * Ordinary least-squares slope of `y` over `x`. Returns `0` for fewer than 2
  * points or a degenerate (zero-variance) `x` series — a flat/undefined slope
  * is the conservative (non-triggering) default for the trendline family.
+ *
+ * @internal Exported so `patternGeometry.ts` can evaluate the same fitted
+ * line at the current last bar without re-deriving the OLS math.
  */
-function leastSquaresSlope(points: readonly Point[]): number {
+export function leastSquaresSlope(points: readonly Point[]): number {
     const n = points.length;
     if (n < 2) return 0;
 
@@ -150,6 +154,14 @@ function extremeMatchClassifier(
 
         const results: PatternCandidate[] = [];
 
+        // The exact pivots between (and including) two same-kind extremes,
+        // in original ascending order — both the extremes themselves and
+        // every opposite-kind pivot the neckline is drawn from. Numeric
+        // index bounds rather than array-position slicing: `same`/`opposite`
+        // are separately-filtered views, not contiguous sub-arrays of `pivots`.
+        const windowBetween = (a: PivotPoint, b: PivotPoint): PivotPoint[] =>
+            pivots.filter(p => p.index >= a.index && p.index <= b.index);
+
         if (same.length >= 3) {
             const [p1, p2, p3] = same.slice(-3);
             if (
@@ -163,6 +175,7 @@ function extremeMatchClassifier(
                     id: tripleId,
                     startIndex: p1.index,
                     endIndex: p3.index,
+                    pivots: windowBetween(p1, p3),
                 });
             }
         }
@@ -173,6 +186,7 @@ function extremeMatchClassifier(
                 id: doubleId,
                 startIndex: q1.index,
                 endIndex: q2.index,
+                pivots: windowBetween(q1, q2),
             });
         }
 
@@ -237,7 +251,14 @@ function fivePivotHeadAndShouldersClassifier(
             if (Math.abs(ls.price - rs.price) > HS_SHOULDER_TOLERANCE * height)
                 continue;
 
-            return [{ id, startIndex: ls.index, endIndex: rs.index }];
+            return [
+                {
+                    id,
+                    startIndex: ls.index,
+                    endIndex: rs.index,
+                    pivots: window,
+                },
+            ];
         }
 
         return [];
@@ -296,6 +317,7 @@ export const classifyTrendlinePatterns: PatternClassifier = (
             id,
             startIndex: window[0].index,
             endIndex: window[window.length - 1].index,
+            pivots: window,
         },
     ];
 };
@@ -607,6 +629,7 @@ export const classifyCurvaturePatterns: PatternClassifier = (
                         id: 'cup_and_handle',
                         startIndex: cup.startIndex,
                         endIndex: handleLow.index,
+                        pivots: lows,
                     },
                 ];
             }
@@ -620,6 +643,7 @@ export const classifyCurvaturePatterns: PatternClassifier = (
             id: 'rounding_bottom',
             startIndex: rounding.startIndex,
             endIndex: rounding.endIndex,
+            pivots: lows,
         },
     ];
 };

@@ -369,15 +369,18 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         scenarios: [nestedSample],
         riskFactorsKo: ['리스크'],
         optionsOiStale: false,
+        analyzedAt: '2026-05-30T00:00:00Z',
     };
+    // `analyzedAt` is server-set by `runOverallAnalysis` (spec 2026-09-18 §2.5),
+    // never emitted by the LLM — same pattern as `AnalysisResponse.analyzedAt`
+    // below. The expected LLM-output key-set is the response's keys minus it.
+    const llmSampleKeys = sortedKeys(sample).filter(
+        key => key !== 'analyzedAt'
+    );
 
-    it('schema key-set matches the response interface', () => {
-        expect(sortedRequired(OVERALL_RESPONSE_SCHEMA)).toEqual(
-            sortedKeys(sample)
-        );
-        expect(propertyKeys(OVERALL_RESPONSE_SCHEMA)).toEqual(
-            sortedKeys(sample)
-        );
+    it('schema key-set matches the response interface (minus server-set analyzedAt)', () => {
+        expect(sortedRequired(OVERALL_RESPONSE_SCHEMA)).toEqual(llmSampleKeys);
+        expect(propertyKeys(OVERALL_RESPONSE_SCHEMA)).toEqual(llmSampleKeys);
     });
 
     it('models the optional optionsOiStale field as a boolean|null union', () => {
@@ -497,6 +500,12 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             type: 'line',
             color: '#fff',
             label: '라벨',
+        },
+        geometry: {
+            breakoutLevel: 140,
+            extremeLevel: 160,
+            direction: 'down',
+            invalidationLevel: 155,
         },
     };
     const strategySample: StrategyResult = {
