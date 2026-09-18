@@ -145,6 +145,48 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
         });
     });
 
+    // `analyzedAt`은 LLM이 절대 채우지 않는 필드다 — `runOverallAnalysis`가
+    // 생성 시점에 한 번 써 넣고, 이 정규화 함수는 캐시에서 읽어온 값을 그대로
+    // 통과시키는 역할만 한다(스펙 2026-09-18 §2.5).
+    describe('analyzedAt (캐시에서 읽어온 값을 그대로 통과)', () => {
+        it('입력에 있으면 그대로 통과시킨다', () => {
+            const result = normalizeOverallAnalysisResponse({
+                ...validPayload,
+                analyzedAt: '2026-05-30T00:00:00Z',
+            });
+            expect(result.analyzedAt).toBe('2026-05-30T00:00:00Z');
+        });
+
+        it('입력에 없으면 필드 자체를 생략한다(과거 캐시 항목과의 호환)', () => {
+            const result = normalizeOverallAnalysisResponse(validPayload);
+            expect(result.analyzedAt).toBeUndefined();
+        });
+
+        it('빈 문자열이면 생략한다', () => {
+            const result = normalizeOverallAnalysisResponse({
+                ...validPayload,
+                analyzedAt: '',
+            });
+            expect(result.analyzedAt).toBeUndefined();
+        });
+
+        it('문자열이 아니면(숫자 등) 생략한다', () => {
+            const result = normalizeOverallAnalysisResponse({
+                ...validPayload,
+                analyzedAt: 12345,
+            });
+            expect(result.analyzedAt).toBeUndefined();
+        });
+
+        it('null이면 생략한다', () => {
+            const result = normalizeOverallAnalysisResponse({
+                ...validPayload,
+                analyzedAt: null,
+            });
+            expect(result.analyzedAt).toBeUndefined();
+        });
+    });
+
     describe('잘못된 enum 값이 주어졌을 때', () => {
         it('scenario name이 유효하지 않으면 neutral로 정규화한다', () => {
             const invalid = {

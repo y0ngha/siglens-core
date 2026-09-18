@@ -108,12 +108,30 @@ export interface TopOiQuote {
     putMidPrice: number | null;
     /** Bid-ask spread `ask - bid` of the put side, or `null` when bid/ask is missing or crossed. */
     putSpread: number | null;
+    /** Call-side spread as a % of `callMidPrice` (`spread / mid × 100`). `null` when either input is unusable. */
+    callSpreadPct: number | null;
+    /** Put-side spread as a % of `putMidPrice` (`spread / mid × 100`). `null` when either input is unusable. */
+    putSpreadPct: number | null;
+}
+
+/**
+ * A {@link StrikeOpenInterest} row annotated with its distance from the
+ * underlying price — LLM-facing only (`summarizeChainForLlm`'s output), so
+ * the model never subtracts strike from spot itself.
+ */
+export interface LlmStrikeOpenInterest extends StrikeOpenInterest {
+    /** Signed % distance of `strike` from the underlying price. `null` when the price is unavailable. */
+    distancePct: number | null;
+    /** `'above'` / `'below'` the underlying price, or `'at'` when `|distancePct| < 0.5`. `null` when `distancePct` is `null`. */
+    side: 'above' | 'below' | 'at' | null;
 }
 
 /** Per-expiration computed metrics derived from a single {@link OptionsChain}. */
 export interface OptionsExpirationMetrics {
     /** Expiration date in ISO `'YYYY-MM-DD'` form. */
     expirationDate: string;
+    /** Calendar days until this expiration, copied from {@link OptionsChain.daysToExpiration}. */
+    daysToExpiration: number;
     /**
      * Strike at which total options-writer payoff is minimized (USD).
      * `null` when the chain has no contracts on either side (no strikes to
@@ -121,6 +139,8 @@ export interface OptionsExpirationMetrics {
      * without producing the misleading literal `null` from a `NaN` value.
      */
     maxPain: number | null;
+    /** Signed % distance of {@link maxPain} from the underlying price (positive = above). `null` when either input is unusable. */
+    maxPainDistancePct: number | null;
     /**
      * `sum(put OI) / sum(call OI)`. `null` when call OI is 0 (ratio is
      * mathematically undefined) or when both sides have zero OI (nothing to
@@ -132,9 +152,11 @@ export interface OptionsExpirationMetrics {
     /** ATM IV as fraction (e.g., 0.28). null if unavailable. */
     atmImpliedVolatility: number | null;
     /** Top 3 strikes by combined OI, sorted descending. */
-    topOpenInterestStrikes: ReadonlyArray<StrikeOpenInterest>;
+    topOpenInterestStrikes: ReadonlyArray<LlmStrikeOpenInterest>;
     /** Implied move in ±% units (4.2 means ±4.2%). null if unavailable. */
     impliedMovePercent: number | null;
+    /** `underlyingPrice × (1 ∓ impliedMovePercent / 100)` — the price band the market implies by expiration. `null` when the underlying price or {@link impliedMovePercent} is unavailable. */
+    impliedMoveRange: { low: number; high: number } | null;
     /** Top 3 strikes by combined (call + put) volume — today's most-traded levels. */
     topVolumeStrikes: ReadonlyArray<StrikeVolumeAggregate>;
     /** Bid/ask snapshot for each strike in `topOpenInterestStrikes` — liquidity around the heaviest OI levels. */

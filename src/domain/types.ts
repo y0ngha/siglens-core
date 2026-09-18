@@ -108,6 +108,13 @@ export interface MarketQuote {
     changesPercentage: number;
     /** Display name returned by the provider. */
     name: string;
+    /**
+     * Unix seconds of the provider's quote time, when it reports one (spec
+     * 2026-09-18 coordinator item C2) — used to compute an `asOf` freshness
+     * label for the quote. Optional and additive: a provider adapter that
+     * does not carry a timestamp through simply omits it.
+     */
+    timestamp?: number;
 }
 
 /** Quote-enriched index entry used by the dashboard summary. */
@@ -1138,6 +1145,7 @@ export type HorizonKey = 'short' | 'medium' | 'long';
 export type ReferenceLevelKind =
     | 'fib_retracement'
     | 'fib_extension'
+    | 'fib_abc_extension'
     | 'vp_poc'
     | 'vp_vah'
     | 'vp_val'
@@ -1148,6 +1156,9 @@ export type ReferenceLevelKind =
     | 'round'
     | 'pivot_standard'
     | 'pivot_camarilla'
+    | 'pivot_fibonacci'
+    | 'pivot_woodie'
+    | 'pivot_demark'
     | 'ichimoku'
     | 'donchian'
     | 'bollinger'
@@ -1237,6 +1248,41 @@ export interface HorizonReference {
     levels: ReferenceLevels;
     /** Descriptive trend structure for the window. */
     structure: TrendStructure;
+    /**
+     * The swing high/low this horizon's `Fib …%` / `Fib ext …%` levels (in
+     * `levels`) are anchored on, or `null` when there were not enough swing
+     * points in the window to compute one. Optional so existing
+     * `HorizonReference` literals (tests, older snapshots) keep compiling —
+     * added so the prompt can print the anchor instead of leaving the Fib
+     * skill's "cite the swing it's anchored on" instruction with nothing to
+     * cite (spec 2026-09-18 §2.2 addendum).
+     */
+    fibProjection?: FibonacciProjection | null;
+    /**
+     * The A→B→C swing triplet this horizon's `Fib ABC ext …%` levels are
+     * anchored on, or `null`/`undefined` when the window has fewer than 3
+     * alternating confirmed swing points after B (spec 2026-09-18 §A3). Most
+     * charts will not have a confirmed C most of the time — the retracement
+     * swing after the latest extreme needs bars to confirm — so `null` here
+     * is the common case, not a bug.
+     */
+    abcExtension?: AbcExtensionProjection | null;
+}
+
+/**
+ * Every pivot family computed from the shared pivot bar (spec 2026-09-18
+ * analysis-prompt decision). The per-horizon level lists keep only the levels
+ * nearest price, so a far pivot the model may need for a second target could be
+ * missing there; the prompt renders these complete sets as a table instead of
+ * letting the model compute one. `null` per family when the pivot bar was
+ * missing or unusable.
+ */
+export interface PivotTables {
+    standard: StandardPivotLevels | null;
+    camarilla: CamarillaPivotLevels | null;
+    fibonacci: FibonacciPivotLevels | null;
+    woodie: WoodiePivotLevels | null;
+    demark: DeMarkPivotLevels | null;
 }
 
 /** Deterministic, multi-horizon advisory reference for the chart prompt. */
@@ -1247,10 +1293,14 @@ export interface MarketReference {
     medium: HorizonReference;
     /** Long-lookback horizon reference. */
     long: HorizonReference;
+    /**
+     * Complete pivot sets from the shared pivot bar. Optional so existing
+     * `MarketReference` literals (tests, older snapshots) keep compiling.
+     */
+    pivots?: PivotTables;
 }
 
 /**
- * @internal
  * Standard pivot point set derived from a prior period's high/low/close.
  *
  * `pp` is the central pivot; `r1`–`r3` are resistance levels above it and
@@ -1275,7 +1325,7 @@ export interface StandardPivotLevels {
     s3: number;
 }
 
-/** @internal Camarilla pivot levels (the four most-watched). */
+/** Camarilla pivot levels (the four most-watched). */
 export interface CamarillaPivotLevels {
     /** Central pivot: (high + low + close) / 3. */
     pp: number;
@@ -1289,8 +1339,34 @@ export interface CamarillaPivotLevels {
     s4: number;
 }
 
+/** Fibonacci pivot levels: `pp ± 0.382/0.618/1.000 × range` (spec 2026-09-18 §A2). */
+export interface FibonacciPivotLevels {
+    pp: number;
+    r1: number;
+    r2: number;
+    r3: number;
+    s1: number;
+    s2: number;
+    s3: number;
+}
+
+/** Woodie pivot levels: `pp = (H + L + 2C) / 4`. */
+export interface WoodiePivotLevels {
+    pp: number;
+    r1: number;
+    r2: number;
+    s1: number;
+    s2: number;
+}
+
+/** DeMark pivot levels — the "X" rule's PP/R1/S1. */
+export interface DeMarkPivotLevels {
+    pp: number;
+    r1: number;
+    s1: number;
+}
+
 /**
- * @internal
  * One Fibonacci retracement or extension level (ratio + resulting price).
  */
 export interface FibonacciLevel {
@@ -1301,7 +1377,6 @@ export interface FibonacciLevel {
 }
 
 /**
- * @internal
  * Fibonacci retracement/extension levels anchored on a swing high and low.
  *
  * `direction` reflects the swing the projection is based on: `up` when the most
@@ -1322,10 +1397,27 @@ export interface FibonacciProjection {
 }
 
 /**
- * @internal
  * Direction of the most recent swing leg used for Fibonacci projection.
  */
 export type SwingLegDirection = 'up' | 'down';
+
+/**
+ * ABC extension levels (spec 2026-09-18 §A3) — Fibonacci extension ratios
+ * projected from point C, using the A→B leg's measured distance, in the
+ * A→B leg's own direction (continuation past the B→C retracement).
+ */
+export interface AbcExtensionProjection {
+    /** Price at point A (the older of the two A→B anchor swings). */
+    a: number;
+    /** Price at point B (the newer of the two A→B anchor swings). */
+    b: number;
+    /** Price at point C — the confirmed retracement swing after B. */
+    c: number;
+    /** Direction of the A→B leg (the leg the extension continues). */
+    direction: SwingLegDirection;
+    /** Extension levels (100%–261.8%) projected from C in the A→B direction. */
+    extensions: FibonacciLevel[];
+}
 
 /**
  * A single price target (price + rationale string).
@@ -1388,6 +1480,32 @@ export interface PatternSummary {
     timeRange?: { start: number; end: number };
     /** Confidence weight inherited from the matching skill. */
     confidenceWeight: number;
+    /**
+     * Model-authored geometry for THIS pattern (spec 2026-09-18 §A6) — the
+     * app computes `측정 목표가`/`보수 목표가(50%)` from it and appends them
+     * to `keyPrices`; the model must never compute a target itself. Copied
+     * verbatim from `## Chart Pattern Candidates (computed)` when the
+     * pattern is listed there; for a pattern the pre-screener missed, the
+     * model reads the chart itself and fills this in.
+     */
+    geometry?: PatternTargetGeometry;
+}
+
+/**
+ * Model-authored measured-move anchor for one detected chart pattern
+ * (`PatternSummary.geometry`, spec 2026-09-18 §A6). `domain/analysis/ai-levels.ts`
+ * derives `측정 목표가`/`보수 목표가(50%)` from this — never trust a
+ * model-computed target string.
+ */
+export interface PatternTargetGeometry {
+    /** Neckline / boundary / rim / handle resistance / flag channel edge the pattern breaks through. */
+    breakoutLevel: number;
+    /** Textbook measured-move anchor: head, peak/trough average, cup/saucer bottom, flagpole start, or the opposite boundary. */
+    extremeLevel: number;
+    /** Expected breakout direction. */
+    direction: PatternBreakoutDirection;
+    /** Right-shoulder high / second peak / opposite boundary / handle low, when the model can name one. */
+    invalidationLevel?: number;
 }
 
 /** Pattern summary enriched with chart-render configuration from the skill. */
@@ -1846,6 +1964,8 @@ export interface RawOverallAnalysisResponse {
     integratedConclusionKo?: unknown;
     scenarios?: unknown;
     riskFactorsKo?: unknown;
+    /** Echoed straight through by {@link normalizeOverallAnalysisResponse} when a cached entry already carries it — never emitted by the LLM. */
+    analyzedAt?: unknown;
 }
 
 // --- Job Result Types (submit + poll 패턴) ---
@@ -2811,6 +2931,13 @@ export interface FundamentalSnapshot {
      * (market cap, price targets) with the listing currency.
      */
     reportedCurrency?: string;
+    /**
+     * Current price in the listing's quote currency, filled by the consumer
+     * (siglens). Optional so existing callers keep compiling; without it,
+     * every price-relative derived metric (target upside, etc.) renders
+     * `N/A` rather than guessing.
+     */
+    currentPrice?: number | null;
 }
 
 // ─────────────────────────────────────────
@@ -3181,6 +3308,13 @@ export interface OverallAnalysisResponse {
     riskFactorsKo: string[];
     /** OI snapshot staleness marker echoed from caller input. */
     optionsOiStale?: boolean;
+    /**
+     * ISO datetime this result was produced, set where the result is
+     * produced/cached (`runOverallAnalysis`). Optional so existing cache
+     * entries written before this field existed stay valid — consumers that
+     * read `analyzedAt` from an old entry get `undefined`, not a wrong time.
+     */
+    analyzedAt?: string;
 }
 
 /**
@@ -3268,6 +3402,7 @@ export type {
     OptionsChain,
     OptionsSnapshot,
     StrikeOpenInterest,
+    LlmStrikeOpenInterest,
     StrikeVolumeAggregate,
     TopOiQuote,
     OptionsExpirationMetrics,
@@ -3834,10 +3969,10 @@ export type ChartPatternId =
     | 'cup_and_handle'
     | 'rounding_bottom';
 
-/** @internal Swing direction of a confirmed pivot extreme. */
+/** Swing direction of a confirmed pivot extreme (public: reachable via {@link PatternCandidate.pivots}). */
 export type PivotKind = 'high' | 'low';
 
-/** @internal A confirmed zigzag extreme — a local high or low that survived the ATR-relative reversal threshold. */
+/** A confirmed zigzag extreme — a local high or low that survived the ATR-relative reversal threshold (public: reachable via {@link PatternCandidate.pivots}). */
 export interface PivotPoint {
     /** bars 배열 인덱스. */
     index: number;
@@ -3851,6 +3986,59 @@ export interface PatternCandidate {
     /** 판정에 사용된 피벗들의 bar 인덱스 범위. */
     startIndex: number;
     endIndex: number;
+    /**
+     * The exact pivots the classifier matched on, ascending by index —
+     * present whenever a `classifiers.ts` shape matcher produced this
+     * candidate. `patternGeometry.ts` computes geometry directly from these
+     * (never by re-extracting pivots over `[startIndex, endIndex]`, which
+     * could reconstruct a different pivot set than the one actually
+     * matched). Absent only for a hand-built candidate (e.g. a test
+     * fixture) — `computeCandidateGeometry` returns `null` in that case.
+     */
+    pivots?: readonly PivotPoint[];
+}
+
+/**
+ * @internal
+ * A named price anchor in a pattern's geometry (peak, trough, neckline,
+ * flagpole end, rim, …). `index`/`time` are the source bar's array index and
+ * Unix-seconds timestamp, so a renderer can cite the bar date without
+ * re-indexing into `bars`.
+ */
+export interface PatternKeyPoint {
+    /** Human-readable role, e.g. `"head"`, `"neckline"`, `"left shoulder"`. */
+    label: string;
+    price: number;
+    index: number;
+    time: number;
+}
+
+/**
+ * Breakout direction implied by a pattern's textbook resolution. Reachable
+ * from the public API via {@link PatternTargetGeometry.direction}.
+ */
+export type PatternBreakoutDirection = 'up' | 'down';
+
+/**
+ * @internal
+ * Deterministic measured-move geometry for one {@link PatternCandidate} —
+ * computed by `domain/patterns/patternGeometry.ts` from the exact bars/ATR
+ * the candidate was matched on (spec 2026-09-18 §A1). Consumers render this
+ * instead of asking the model to compute a measured move itself.
+ */
+export interface PatternGeometry {
+    keyPoints: PatternKeyPoint[];
+    /** Neckline / boundary / handle resistance / rim / flag channel edge the pattern breaks through. */
+    breakoutLevel: number;
+    /** Textbook measured-move height (head→neckline, flagpole length, cup depth, …). Always > 0. */
+    height: number;
+    /** `breakoutLevel ± height` in the breakout direction. */
+    measuredTarget: number;
+    /** `breakoutLevel ± height / 2` — the 50% partial target. */
+    conservativeTarget: number;
+    /** Right-shoulder high / second peak / opposite boundary / handle low, per pattern. */
+    invalidationLevel: number;
+    direction: PatternBreakoutDirection;
 }
 
 // ─────────────────────────────────────────

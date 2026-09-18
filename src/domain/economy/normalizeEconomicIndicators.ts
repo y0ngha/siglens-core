@@ -17,12 +17,17 @@ import type { EconomicIndicatorPoint, EconomicIndicatorSeries } from './types';
  *   verbatim in the result.
  * @param raw - FMP response (arbitrary shape; non-arrays resolve to an empty series).
  * @param trendLength - Maximum number of most-recent-to-oldest points to include in `trend`.
- * @returns Normalized indicator series with `latest`, `previous`, and `trend`.
+ * @param unit - Unit label for the series' values (e.g. `'%'`), when the
+ *   caller's own registry knows it. This module has no such registry itself
+ *   (spec 2026-09-18 §B3) — omit when unknown; the macro-briefing prompt
+ *   then formats the series as level-type rather than rate-type.
+ * @returns Normalized indicator series with `latest`, `previous`, `trend`, and `unit`.
  */
 export function normalizeEconomicIndicatorSeries(
     name: string,
     raw: unknown,
-    trendLength: number
+    trendLength: number,
+    unit?: string
 ): EconomicIndicatorSeries {
     const points: EconomicIndicatorPoint[] = asArray(raw)
         .map(item => {
@@ -41,5 +46,6 @@ export function normalizeEconomicIndicatorSeries(
         latest: points[0] ?? null,
         previous: points[1] ?? null,
         trend: points.slice(0, trendLength),
+        ...(unit !== undefined ? { unit } : {}),
     };
 }

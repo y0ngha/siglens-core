@@ -26,6 +26,16 @@ export interface EconomicIndicatorSeries {
     previous: EconomicIndicatorPoint | null;
     /** Most-recent-to-oldest points for the mini-trend (capped to a fixed length). */
     trend: EconomicIndicatorPoint[];
+    /**
+     * Unit label for `latest`/`previous`/`trend` values (e.g. `'%'`, `'K'`),
+     * mirroring {@link EconomicCalendarEvent.unit}. Optional and caller-
+     * supplied — this series carries no built-in per-`name` registry, so the
+     * caller (which does know each indicator's unit) is the only source.
+     * Drives the macro-briefing prompt's rate-type (`%` -> percentage-point
+     * delta) vs level-type (delta + `%` change) formatting (spec 2026-09-18
+     * §B3/§B7). `undefined` renders as level-type.
+     */
+    unit?: string;
 }
 
 /** Selected yields extracted from the most recent treasury-rates row. */

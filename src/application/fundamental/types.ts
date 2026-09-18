@@ -94,6 +94,24 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      */
     currency?: CurrencyCode;
     /**
+     * Current price in the listing's quote currency, supplied by the caller
+     * (core has no quote provider of its own — the fundamental data provider
+     * carries no live price). Threaded onto `FundamentalSnapshot.currentPrice`
+     * so `## Derived Metrics`'s price-relative lines (target upside) can
+     * compute instead of reading `N/A` on every request. Invalid values
+     * (non-finite, zero, or negative — a quote failure renders `0` in this
+     * codebase) are treated as absent, never as a real price. Not part of the
+     * cache key: like `currentPrice` on the analogous technical-axis path,
+     * this is a point-in-time reading, not a property the cached prompt
+     * should be keyed on.
+     *
+     * May also be a lazy getter (spec 2026-09-18 coordinator item C3):
+     * `runFundamentalAnalysis` only calls it AFTER the cache check misses, so
+     * a cache HIT never pays for a quote fetch the caller would otherwise
+     * have to do eagerly on every call regardless of whether it was needed.
+     */
+    currentPrice?: number | null | (() => Promise<number | null>);
+    /**
      * Cancellation signal for the in-flight LLM call (used by `runFundamentalAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
      * can abort the underlying AI provider request. Has no effect on
