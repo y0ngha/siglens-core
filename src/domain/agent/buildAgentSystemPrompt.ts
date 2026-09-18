@@ -6,7 +6,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-17.1';
+export const AGENT_PROMPT_VERSION = '2026-09-19.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -148,6 +148,15 @@ function ruleLines(
     return [
         '- Never quote a price, indicator value, earnings figure, options metric or news item from memory. Fetch it with a tool every time.',
         '- Call every tool the answer needs in parallel in one step; do not wait for one result to decide the next unless a rule below says so.',
+        '- Computed figures: when a tool result carries a computed figure (derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp, options maxPainDistancePct/impliedMoveRange, other …Pct fields), quote it as given — never recompute it or replace it with your own figure. When the user needs a figure no tool provides, you may compute it from numbers that appear in tool results in this conversation: show the inputs and the operation in one short clause (e.g. "335.26 × 100 = 33,526") so it can be checked. Never use a number that is not in a tool result as an input.',
+        available.has('get_bars_indicators') &&
+            '- Horizon: every directional read names its horizon from the timeframe it came from — 1Day bars → days to a few weeks; 4Hour/1Hour → a few days; 30Min and shorter → intraday to a day or two.',
+        available.has('get_cached_analysis') &&
+            "- Analysis vs now: get_cached_analysis carries sinceAnalysis. When sinceAnalysis.levelsBroken is non-empty, or sinceAnalysis.planNow.belowStopLoss or sinceAnalysis.planNow.exceedsEntryZone is true, say SIGLENS's analysis predates that move and lead with the current bars/indicators — quote movePct as the move since the analysis; relay the analysis as the earlier view.",
+        available.has('get_bars_indicators') &&
+            '- Confluence rules: confluence.entryRuleMet / exitRuleMet are rule states of an indicator tally, never a buy/sell instruction — name them that way in the answer.',
+        available.has('get_bars_indicators') &&
+            "- Higher timeframe: a bars result's higherTimeframe is the next larger timeframe's trend and tally; when it disagrees with the requested timeframe, say so.",
         available.has('run_fresh_analysis') &&
             '- If get_cached_analysis returns found:false or stale:true, call run_fresh_analysis right away (do not ask permission); it takes up to a few minutes and the UI shows progress.',
         available.has('get_news') &&
@@ -235,6 +244,7 @@ ${ruleLines(available, newsGapRule)}
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
 - Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: SIGLENS 시세, 2026-09-12 21:57 KST 기준)").
 - Tool timestamps are already converted to the user's local time and labelled (e.g. "${localNow}"). Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
+- A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.
 - Answer the user's question, not the plumbing. Do not describe SIGLENS internals (stores, indexes, coverage flags, field names, null values, result counts, bar counts). When data is missing or clearly out of date, say in one short sentence that it is not available right now.
