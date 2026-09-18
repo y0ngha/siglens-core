@@ -382,6 +382,19 @@ and have been removed from this file.
    ✅ function analyzeSnapshot(snapshot, options: { now?: Date }) { const time = options.now ?? new Date(); ... }
    ✅ Better: if now is required, make it non-optional: (snapshot, options: { now: Date }) => { const time = options.now; ... }
 
+4.6. Calendar-date arithmetic using Math.round((dateOnly - now) / MS_PER_DAY) produces off-by-one after 12:00 UTC
+   → Day count calculations using millisecond-to-day conversion round incorrectly across time zone boundaries
+   → Use calendar-date arithmetic (comparing year/month/day components) instead of rounding millisecond durations
+   → Recurring pattern (newsPrompt, fundamentalPrompt, macroBriefingPrompt): all three prompts used Math.round(ms/86400000) which gave wrong results after noon UTC
+   ❌ const daysUntilExpiry = Math.round((expiryDate - now) / MS_PER_DAY);  // off-by-one after 12:00 UTC
+      // If now = 2026-09-19 13:00:00 UTC and expiryDate = 2026-09-20 00:00:00, result is 0 (should be 1)
+   ✅ function daysUntilCalendarDate(futureDate: Date, now: Date): number {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const future = new Date(futureDate.getFullYear(), futureDate.getMonth(), futureDate.getDate());
+        return Math.ceil((future.getTime() - today.getTime()) / MS_PER_DAY);
+      }
+   → Always compute calendar dates (by zeroing time components) before comparing, never round milliseconds
+
 5. Port authoring must follow domain/CLAUDE.md conventions
    → Port return/receive DTOs must be defined in domain/types.ts, not co-located in port files
    → @port documentation tags annotate the interface/type contract, not file-level module JSDoc

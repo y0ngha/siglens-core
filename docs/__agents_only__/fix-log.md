@@ -189,3 +189,21 @@
   Rule: Tests — shared test table must enumerate all cases of the thing it claims to cover
   Context: R1 recommendation finding. Parameterized test using it.each(PROMPTS) relied on a partial array that didn't include all analysisSystemBase-derived prompts. Fixed in R2 by adding FINANCIALS and CONGRESS with their persona first lines pinned as literals, ensuring all 8 prompts are exercised by the shared test table.
 
+## [Branch feat/precomputed-prompt-data | 2026-09-19] — Precomputed prompt data R1→R6
+
+- Violation 3 (R1→R6 REQUIRED, multiple locations): Null/NaN handling — NaN changesPercentage misranked and printed, price 0 treated as valid, negative Fib extensions stored as prices
+  Rule: Output validation — domain functions must enforce null/NaN guardrails before returning to prompt/cache
+  Context: New prompt helpers introduced by precomputation exposed intermediate calculations to prompts without proper bounds checking. NaN changesPercentage broke sorting; price 0 and negative targets corrupted cached results. Fixed by adding null checks and clamping bounds before returning.
+
+- Violation 4 (R2 REQUIRED): Printed numbers computed from different inputs than numbers the app later recomputes (candidates section vs ai-levels divergence)
+  Rule: Infrastructure Functions — prompt output must match app-computed values; round inputs to printed precision first and share one computePatternTargets function
+  Context: Pattern targets and risk:reward in prompts were computed on-the-fly from raw price data; app recomputed from model's text output with different rounding, causing mismatches. Fixed by pre-rounding all inputs to printed precision and sharing the calculation.
+
+- Violation 5 (R2 REQUIRED, multiple locations): Prompt-rule contradictions — guideline instructing model to compute (measured move / pattern height) next to rule forbidding it; keyPrices label examples inviting target entries vs. no-target rule
+  Rule: MISTAKES.md Documentation Sync — prompt rules and examples must be synchronized when new rules are added
+  Context: Precomputed data prompts mixed computed-move guidance (old pattern) with a strict no-synthesis rule (new); examples showed trade targets while rule forbade them. Fixed by removing contradictory instructions and updating all examples to match enforced rule.
+
+- Violation 8 (R5 REQUIRED): Geometry defined from wrong pivot kind — cup/rounding-bottom rim calculated from low pivots instead of bounding high pivot
+  Rule: Pattern geometry — boundary pivots must use the correct type (high for cup rim, low for valley bottom)
+  Context: Cup/rounding-bottom patterns used findMin (low pivots) to define rim, conflating interior low with boundary definition. Fixed by using correct high-pivot bounding logic to define rim position.
+
