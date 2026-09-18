@@ -1,4 +1,5 @@
 import type {
+    AbcExtensionProjection,
     FibonacciLevel,
     FibonacciProjection,
     SMCResult,
@@ -59,6 +60,70 @@ const buildExtensions = (
         ratio,
         price: direction === 'up' ? low + ratio * range : high - ratio * range,
     }));
+};
+
+/** One merged, chronologically-ordered swing point with its own type tag. */
+interface TypedSwingPoint extends SMCSwingPoint {
+    type: 'high' | 'low';
+}
+
+/**
+ * @internal
+ * Compute Fibonacci extension levels projected from point C of an A→B→C
+ * swing triplet: the last three confirmed swing points in the window,
+ * alternating high/low, continuing the A→B leg's own direction past C.
+ *
+ * Returns `null` when the window has fewer than 3 confirmed swing points,
+ * the last three do not alternate type (A≠B≠C by type), any price is
+ * unusable, or the A→B range is non-positive (spec 2026-09-18 §A3 — the
+ * "next opposite swing after B" the fibonacci skill's ABC guidance asks the
+ * model to cite).
+ *
+ * @param smc - SMC result whose swing points (already window-filtered by the
+ *   caller) supply the A/B/C triplet.
+ */
+export const computeAbcExtension = (
+    smc: SMCResult
+): AbcExtensionProjection | null => {
+    const merged: TypedSwingPoint[] = [
+        ...smc.swingHighs.map(s => ({ ...s, type: 'high' as const })),
+        ...smc.swingLows.map(s => ({ ...s, type: 'low' as const })),
+    ].toSorted((x, y) => x.index - y.index);
+
+    if (merged.length < 3) return null;
+    const [a, b, c] = merged.slice(-3);
+    if (a.type === b.type || b.type === c.type) return null;
+    if (
+        !isUsablePrice(a.price) ||
+        !isUsablePrice(b.price) ||
+        !isUsablePrice(c.price)
+    ) {
+        return null;
+    }
+
+    const direction: SwingLegDirection = b.type === 'high' ? 'up' : 'down';
+    const range = Math.abs(b.price - a.price);
+    if (range <= 0) return null;
+
+    // C must be a real retracement — strictly between A and B — not an
+    // overshoot past A (the leg never actually reversed) or a continuation
+    // past B (2026-09-18 review R18). Equality at either edge is also
+    // rejected: it is not a retracement, just a re-test of the anchor.
+    const cIsRealRetracement =
+        direction === 'up'
+            ? c.price > a.price && c.price < b.price
+            : c.price < a.price && c.price > b.price;
+    if (!cIsRealRetracement) return null;
+
+    const extensions = FIB_EXTENSION_RATIOS.map(ratio => ({
+        ratio,
+        price:
+            direction === 'up'
+                ? c.price + ratio * range
+                : c.price - ratio * range,
+    }));
+
+    return { a: a.price, b: b.price, c: c.price, direction, extensions };
 };
 
 /**

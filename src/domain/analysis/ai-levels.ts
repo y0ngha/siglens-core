@@ -1,9 +1,19 @@
 import { buildPlanCheck } from '@/domain/analysis/planCheck';
-import { formatPrice } from '@/domain/analysis/promptFormat';
+import { computePatternTargets } from '@/domain/analysis/patternTargets';
+import {
+    formatNullableNumber,
+    formatPrice,
+} from '@/domain/analysis/promptFormat';
+import {
+    DEFAULT_ANALYSIS_LOCALE,
+    type AnalysisLocale,
+} from '@/domain/analysis/outputLocale';
 import type {
     ActionRecommendation,
     AnalysisResponse,
     CurrencyCode,
+    KeyPrice,
+    PatternResult,
     ReconciledActionLevels,
     ReconcileResult,
     ResolvedLevel,
@@ -222,13 +232,37 @@ export function buildBullishExitText(
 }
 
 /**
- * @internal Builds the bullish risk:reward text.
+ * @internal Per-locale template for the deterministic risk:reward line. Kept
+ * separate from AI prose (which is not re-translated from Korean on the
+ * reconcile path — see {@link buildBullishRiskRewardText}'s doc comment):
+ * this line is domain-authored, not model output, so it can be localized
+ * directly instead of inheriting whatever language the prose happens to be in.
+ */
+const RISK_REWARD_TEMPLATE: Record<
+    AnalysisLocale,
+    (slLabel: string, tpLabel: string, ratio: string) => string
+> = {
+    ko: (sl, tp, ratio) => `손절 ${sl} vs 목표 ${tp} → 위험:보상 = 1:${ratio}`,
+    en: (sl, tp, ratio) =>
+        `Stop ${sl} vs target ${tp} → risk:reward = 1:${ratio}`,
+    ja: (sl, tp, ratio) =>
+        `損切り ${sl} vs 目標 ${tp} → リスク・リワード = 1:${ratio}`,
+    zh: (sl, tp, ratio) => `止损 ${sl} vs 目标 ${tp} → 风险回报比 = 1:${ratio}`,
+};
+
+/**
+ * @internal Builds the deterministic bullish risk:reward line.
  * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL/TP 중 하나라도 무효면 빈 문자열.
+ *
+ * `locale` defaults to `'ko'` so every existing call site (including
+ * {@link reconcileBullishActionRecommendation}'s internal use for
+ * `reconciledLevels.riskReward`) keeps producing byte-identical Korean text.
  */
 export function buildBullishRiskRewardText(
     entryPrice: number,
     stopLoss: number | undefined,
-    takeProfitPrices: readonly number[] | undefined
+    takeProfitPrices: readonly number[] | undefined,
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string {
     if (
         stopLoss === undefined ||
@@ -246,12 +280,17 @@ export function buildBullishRiskRewardText(
     const riskAbs = Math.abs(slPct);
     if (riskAbs === 0) return '';
 
-    const slLabel = `${slPct.toFixed(1)}%`;
+    // `slPct` is always < 0 here (the `stopLoss >= entryPrice` guard above
+    // returns '' otherwise) — but a stop only fractionally below entry can
+    // still round to `-0.0%` at 1dp. `formatNullableNumber` strips that sign
+    // the same way every other delta in this codebase does (spec §0/§B6).
+    const slLabel = `${formatNullableNumber(slPct, 1)}%`;
     const tpLabel =
         tpPct >= 0 ? `+${tpPct.toFixed(1)}%` : `${tpPct.toFixed(1)}%`;
     const ratio = (tpPct / riskAbs).toFixed(1);
 
-    return `손절 ${slLabel} vs 목표 ${tpLabel} → 위험:보상 = 1:${ratio}`;
+    const template = RISK_REWARD_TEMPLATE[locale] ?? RISK_REWARD_TEMPLATE.ko;
+    return template(slLabel, tpLabel, ratio);
 }
 
 /** 보정 경위 문장 생성 (SL·TP 누락·무효 여부 조합 4가지). */
@@ -372,18 +411,121 @@ export function reconcileBullishActionRecommendation(
     };
 }
 
-/** entryPrices 중 유효한 양수의 산술 평균. 유효 원소가 없으면 fallback 반환. */
-function computeEntryPriceMid(
-    entryPrices: readonly number[] | undefined,
-    fallback: number | undefined
+/**
+ * The entry-price reference `postProcessAnalysisWithReconcile`/`buildPlanCheck`
+ * use throughout this module: the arithmetic mean of `rec.entryPrices`'
+ * finite-positive elements, or `fallback` when there are none. Exported so
+ * consumers building their OWN plan check against a live price (e.g.
+ * siglens's `sinceAnalysis.planNow`) use the exact same entry reference
+ * `planCheck.riskRewardAtEntry` was computed from, instead of re-deriving a
+ * second, possibly different one.
+ *
+ * @param rec - The recommendation whose `entryPrices` to average.
+ * @param fallback - Used when `rec.entryPrices` is empty/absent or has no
+ *   usable (finite, positive) element — typically the last close.
+ * @returns The entry reference, or `undefined` when neither source is usable.
+ */
+export function planEntryPrice(
+    rec: ActionRecommendation,
+    fallback: number | null | undefined
 ): number | undefined {
+    const entryPrices = rec.entryPrices;
     if (entryPrices && entryPrices.length > 0) {
         const valid = entryPrices.filter(p => Number.isFinite(p) && p > 0);
         if (valid.length > 0) {
             return valid.reduce((sum, p) => sum + p, 0) / valid.length;
         }
     }
-    return fallback;
+    return fallback ?? undefined;
+}
+
+/**
+ * @internal
+ * Localized `keyPrices` labels for the two pattern-geometry-derived targets
+ * (spec 2026-09-18 §A6). Exact-match strings — {@link applyPatternGeometryTarget}
+ * filters `keyPrices` by these exact labels before re-appending, so
+ * re-running this over an already-processed response is idempotent.
+ */
+const PATTERN_TARGET_LABELS: Record<
+    AnalysisLocale,
+    { readonly measured: string; readonly conservative: string }
+> = {
+    ko: { measured: '측정 목표가', conservative: '보수 목표가(50%)' },
+    en: {
+        measured: 'Measured target',
+        conservative: 'Conservative target (50%)',
+    },
+    ja: { measured: '測定目標値', conservative: '保守的目標値（50%）' },
+    zh: { measured: '测算目标价', conservative: '保守目标价（50%）' },
+};
+
+/**
+ * @internal
+ * Derives `측정 목표가`/`보수 목표가(50%)` from one pattern's model-authored
+ * `geometry` and appends them to its `keyPrices` — never trust a
+ * model-computed target string. Any existing entries carrying these exact
+ * labels are dropped first, so re-processing (e.g. a cache round-trip) does
+ * not duplicate them. Returns `pattern` unchanged when it has no `geometry`
+ * OR the pattern is `detected: false` (spec 2026-09-18 review R7 — a
+ * not-detected entry has no real breakout to project a target from; the
+ * schema still allows `geometry` there and a model occasionally fills it).
+ */
+function applyPatternGeometryTarget(
+    pattern: PatternResult,
+    locale: AnalysisLocale
+): PatternResult {
+    const geometry = pattern.geometry;
+    if (!geometry || !pattern.detected) return pattern;
+
+    const labels = PATTERN_TARGET_LABELS[locale] ?? PATTERN_TARGET_LABELS.ko;
+    const { measuredTarget, conservativeTarget } = computePatternTargets(
+        geometry.breakoutLevel,
+        geometry.extremeLevel,
+        geometry.direction
+    );
+
+    const carriedOver = (pattern.keyPrices ?? []).filter(
+        kp => kp.label !== labels.measured && kp.label !== labels.conservative
+    );
+    // A down pattern taller than its breakout level projects a target at or
+    // below zero — not a price, so it is not stored as one.
+    const isPrice = (n: number): boolean => Number.isFinite(n) && n > 0;
+    const keyPrices: KeyPrice[] = [
+        ...carriedOver,
+        ...(isPrice(measuredTarget)
+            ? [{ label: labels.measured, price: measuredTarget }]
+            : []),
+        ...(isPrice(conservativeTarget)
+            ? [{ label: labels.conservative, price: conservativeTarget }]
+            : []),
+    ];
+
+    return { ...pattern, keyPrices };
+}
+
+/**
+ * @internal
+ * Applies {@link applyPatternGeometryTarget} to every pattern in
+ * `patternSummaries`. Returns `response` unchanged (same reference) when no
+ * `detected: true` pattern carries `geometry` — preserves the "no-op
+ * returns the original object" contract {@link postProcessAnalysisWithReconcile}'s
+ * early returns already promise callers (spec 2026-09-18 review R7: a
+ * `detected: false` pattern with `geometry` alone must not trip this either
+ * — {@link applyPatternGeometryTarget} would leave it unchanged anyway, but
+ * `.map()` still allocates a new array).
+ */
+function withPatternGeometryTargets<T extends AnalysisResponse>(
+    response: T,
+    locale: AnalysisLocale
+): T {
+    if (!response.patternSummaries.some(p => p.geometry && p.detected))
+        return response;
+    return {
+        ...response,
+        patternSummaries: response.patternSummaries.map(p =>
+            applyPatternGeometryTarget(p, locale)
+        ),
+    };
 }
 
 /**
@@ -399,17 +541,25 @@ export function postProcessAnalysisWithReconcile(
      * 이 모듈에서 통화 기본값이 정해지는 **유일한** 지점. 하위 헬퍼들은
      * 값을 요구하기만 한다.
      */
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    /**
+     * Output locale for the deterministic risk:reward line (spec 2026-09-18
+     * §2.3). Defaults to `'ko'` so callers that omit it keep the pre-existing
+     * Korean line.
+     */
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): AnalysisResponse {
-    const rec = response.actionRecommendation;
-    if (!rec) return response;
+    // Independent of the action-recommendation reconciliation below — applies
+    // (or no-ops, preserving identity) regardless of whether `actionRecommendation`
+    // exists at all, so it must run before either early return.
+    const withTargets = withPatternGeometryTargets(response, locale);
 
-    const entryPrice = computeEntryPriceMid(
-        rec.entryPrices,
-        fallbackEntryPrice
-    );
+    const rec = withTargets.actionRecommendation;
+    if (!rec) return withTargets;
+
+    const entryPrice = planEntryPrice(rec, fallbackEntryPrice);
     if (entryPrice === undefined || !Number.isFinite(entryPrice))
-        return response;
+        return withTargets;
 
     const { recommendation } = reconcileBullishActionRecommendation(
         rec,
@@ -417,6 +567,37 @@ export function postProcessAnalysisWithReconcile(
         atr,
         currency
     );
+
+    // Deterministic risk:reward line — only when `reconciledLevels` is
+    // ABSENT. `reconcileBullishActionRecommendation` already computes the
+    // exact same line into `reconciledLevels.riskReward` whenever it
+    // reconciles (see its own `buildBullishRiskRewardText` call above); the
+    // UI renders both `riskReward` and `reconciledLevels.riskReward`, so
+    // prepending here too duplicated the line on every reconciled analysis.
+    // This still closes the original gap: `reconcileBullishActionRecommendation`
+    // returns early (no reconciledLevels) whenever the AI's own SL/TP already
+    // pass validation, which used to mean the ratio was missing from every
+    // *healthy* analysis (same gap `buildPlanCheck` closes for the numeric
+    // fields; this closes it for the `riskReward` prose field) — that is
+    // exactly the case handled here.
+    const deterministicRiskReward = recommendation.reconciledLevels
+        ? ''
+        : buildBullishRiskRewardText(
+              entryPrice,
+              recommendation.stopLoss,
+              recommendation.takeProfitPrices,
+              locale
+          );
+    const recommendationWithRiskReward =
+        deterministicRiskReward === ''
+            ? recommendation
+            : {
+                  ...recommendation,
+                  riskReward:
+                      recommendation.riskReward === ''
+                          ? deterministicRiskReward
+                          : `${deterministicRiskReward}\n\n${recommendation.riskReward}`,
+              };
 
     // Attached outside the reconcile branch on purpose. `reconciledLevels` — and with it
     // the only deterministic risk:reward this module used to produce — exists solely when
@@ -437,9 +618,9 @@ export function postProcessAnalysisWithReconcile(
     );
 
     return {
-        ...response,
+        ...withTargets,
         actionRecommendation: planCheck
-            ? { ...recommendation, planCheck }
-            : recommendation,
+            ? { ...recommendationWithRiskReward, planCheck }
+            : recommendationWithRiskReward,
     };
 }

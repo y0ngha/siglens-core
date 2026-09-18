@@ -103,6 +103,45 @@ describe('computeMarketReference', () => {
         expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
     });
 
+    it('never puts Fibonacci/Woodie/DeMark pivots in the capped nearest-level lists (spec 2026-09-18 review R17 — Pivot table: line only)', () => {
+        const ref = computeMarketReference(makeBars(5), makeInd(), '1Day');
+        const all = [
+            ...ref.short.levels.support,
+            ...ref.short.levels.resistance,
+        ];
+        expect(all.some(l => l.kind === 'pivot_fibonacci')).toBe(false);
+        expect(all.some(l => l.kind === 'pivot_woodie')).toBe(false);
+        expect(all.some(l => l.kind === 'pivot_demark')).toBe(false);
+        // Standard/Camarilla still do — this is the list they had before the
+        // 3 new pivot families started competing with them for the cap.
+        expect(all.some(l => l.kind === 'pivot_standard')).toBe(true);
+        expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
+    });
+
+    it('emits the complete Standard/Camarilla/Fibonacci/Woodie/DeMark pivot sets on `pivots` (spec 2026-09-18 review R17), shared once from the prior bar', () => {
+        const ref = computeMarketReference(makeBars(5), makeInd(), '1Day');
+        expect(ref.pivots?.standard).not.toBeNull();
+        expect(ref.pivots?.camarilla).not.toBeNull();
+        expect(ref.pivots?.fibonacci).not.toBeNull();
+        expect(ref.pivots?.woodie).not.toBeNull();
+        expect(ref.pivots?.demark).not.toBeNull();
+        expect(ref.pivots?.fibonacci?.pp).toBeCloseTo(
+            ref.pivots!.standard!.pp,
+            6
+        );
+    });
+
+    it('`pivots` is all-null when the window has a single bar (no prior bar)', () => {
+        const ref = computeMarketReference(makeBars(1), makeInd(), '1Day');
+        expect(ref.pivots).toEqual({
+            standard: null,
+            camarilla: null,
+            fibonacci: null,
+            woodie: null,
+            demark: null,
+        });
+    });
+
     it('emits no pivot levels when the window has a single bar', () => {
         // windowLen === 1 -> priorBar is null -> no standard/camarilla pivots.
         const ref = computeMarketReference(makeBars(1), makeInd(), '1Day');
@@ -144,6 +183,69 @@ describe('computeMarketReference', () => {
                 l => l.kind === 'fib_retracement' || l.kind === 'fib_extension'
             )
         ).toBe(true);
+        // `fibProjection` carries the anchor swing the levels above are computed
+        // from — the low (index 48) forms before the high (index 50), so this
+        // is an up-leg.
+        expect(ref.long.fibProjection).toEqual({
+            high: 220,
+            low: 158.9,
+            direction: 'up',
+            retracements: expect.any(Array),
+            extensions: expect.any(Array),
+        });
+    });
+
+    it('fibProjection is null when the window has fewer than 2 swing points', () => {
+        const ref = computeMarketReference(makeBars(60), makeInd(), '1Day');
+        expect(ref.short.fibProjection).toBeNull();
+        expect(ref.long.fibProjection).toBeNull();
+    });
+
+    it('emits fib_abc_extension levels and an abcExtension triplet once a 3rd (C) swing confirms (spec 2026-09-18 §A3)', () => {
+        // low(10,100) -> high(20,120) -> low(30,112): up leg A->B, C confirmed after B.
+        const swingHighs = [swing(20, 120)];
+        const swingLows = [
+            { index: 10, price: 100, type: 'low' } as unknown as SMCSwingPoint,
+            { index: 30, price: 112, type: 'low' } as unknown as SMCSwingPoint,
+        ];
+        const ref = computeMarketReference(
+            makeBars(60),
+            makeInd({ swingHighs, swingLows }),
+            '1Day'
+        );
+        expect(ref.long.abcExtension).toEqual({
+            a: 100,
+            b: 120,
+            c: 112,
+            direction: 'up',
+            extensions: expect.any(Array),
+        });
+        const longLevels = [
+            ...ref.long.levels.support,
+            ...ref.long.levels.resistance,
+        ];
+        // `splitBySide`'s per-side cap (see the Fibonacci-pivot test above)
+        // keeps only the levels closest to price out of every competing
+        // level kind — which of the 5 ABC-extension ratios survives is
+        // fixture-dependent, not a wiring signal. The ratio -> price math
+        // itself is covered directly, independent of any cap, by
+        // `fibLevels.test.ts`. This only confirms the new level kind reaches
+        // `computeMarketReference`'s output at all.
+        const abcLevel = longLevels.find(l => l.kind === 'fib_abc_extension');
+        expect(abcLevel?.label).toMatch(/^Fib ABC ext /);
+    });
+
+    it('abcExtension is null when the window has fewer than 3 confirmed swing points', () => {
+        const ref = computeMarketReference(
+            makeBars(60),
+            makeInd({
+                swingHighs: [swing(20, 120)],
+                swingLows: [swing(10, 100)],
+            }),
+            '1Day'
+        );
+        expect(ref.short.abcExtension).toBeNull();
+        expect(ref.long.abcExtension).toBeNull();
     });
 
     it('surfaces anchored-VWAP levels anchored to the window extreme swings', () => {
@@ -334,6 +436,32 @@ describe('computeMarketReference pivots', () => {
     it('computes intraday pivots from the prior session, not the prior bar', () => {
         const ref = computeMarketReference(intradayBars, makeInd(), '1Hour');
         expect(pricesLabelled(ref, 'Pivot PP')).toEqual([101]);
+    });
+
+    it('attaches every pivot family from the same prior session as the complete pivot table', () => {
+        const ref = computeMarketReference(intradayBars, makeInd(), '1Hour');
+        // H 111 / L 91 / C 101 → PP 101, the same source the level rows use.
+        expect(ref.pivots?.standard?.pp).toBe(101);
+        expect(ref.pivots?.fibonacci?.pp).toBe(101);
+        expect(ref.pivots?.fibonacci?.r1).toBeCloseTo(101 + 0.382 * 20, 6);
+        expect(ref.pivots?.woodie?.pp).toBeCloseTo((111 + 91 + 2 * 101) / 4, 6);
+        expect(ref.pivots?.camarilla).not.toBeNull();
+        expect(ref.pivots?.demark).not.toBeNull();
+    });
+
+    it('sets every pivot family to null when there is no completed prior session', () => {
+        const ref = computeMarketReference(
+            intradayBars.slice(3),
+            makeInd(),
+            '1Hour'
+        );
+        expect(ref.pivots).toEqual({
+            standard: null,
+            camarilla: null,
+            fibonacci: null,
+            woodie: null,
+            demark: null,
+        });
     });
 
     it('omits pivots when the chart holds no completed prior session', () => {

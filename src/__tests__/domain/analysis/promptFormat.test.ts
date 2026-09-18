@@ -8,6 +8,7 @@ import {
     formatNullableNumber,
     formatPlainNumber,
     formatPrice,
+    formatSignedNumber,
     formatSignedPercent,
     parseLlmPayload,
     priceDecimalPlaces,
@@ -310,6 +311,29 @@ describe('formatLargeAmount', () => {
     it('renders a missing or non-finite amount as N/A', () => {
         expect(formatLargeAmount(null, 'USD')).toBe('N/A');
         expect(formatLargeAmount(Number.NaN, 'KRW')).toBe('N/A');
+    });
+});
+
+describe('formatSignedNumber (spec 2026-09-18 §A5/§B6)', () => {
+    it('prefixes + on non-negative values and keeps the minus sign, at dp precision', () => {
+        expect(formatSignedNumber(1.234, 1)).toBe('+1.2');
+        expect(formatSignedNumber(-0.456, 1)).toBe('-0.5');
+        expect(formatSignedNumber(0, 1)).toBe('+0.0');
+    });
+
+    it('defaults to 2 decimal places', () => {
+        expect(formatSignedNumber(3.14159)).toBe('+3.14');
+    });
+
+    it('never shows a minus sign on a value that rounds to zero at the given dp', () => {
+        expect(formatSignedNumber(-0.001, 1)).toBe('+0.0');
+    });
+
+    it('renders a non-finite/nullish value as N/A', () => {
+        expect(formatSignedNumber(Number.NaN)).toBe('N/A');
+        expect(formatSignedNumber(Number.POSITIVE_INFINITY)).toBe('N/A');
+        expect(formatSignedNumber(undefined)).toBe('N/A');
+        expect(formatSignedNumber(null)).toBe('N/A');
     });
 });
 

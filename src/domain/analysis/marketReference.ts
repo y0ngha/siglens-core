@@ -35,10 +35,16 @@ import {
 import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
 import { etCalendarDate } from '@/domain/marketCalendar';
 import { anchoredVwap } from '@/domain/analysis/anchoredVwap';
-import { computeFibonacciProjection } from '@/domain/analysis/fibLevels';
+import {
+    computeFibonacciProjection,
+    computeAbcExtension,
+} from '@/domain/analysis/fibLevels';
 import {
     computeStandardPivot,
     computeCamarillaPivot,
+    computeFibonacciPivot,
+    computeWoodiePivot,
+    computeDeMarkPivot,
     STANDARD_PIVOT_KEYS,
     CAMARILLA_LEVEL_KEYS,
 } from '@/domain/analysis/pivotLevels';
@@ -141,6 +147,16 @@ function pivotSourceBar(
 }
 const MIN_EFFICIENCY_PERIOD = 2;
 const FIB_RATIO_DECIMAL_PLACES = 1;
+
+/**
+ * @internal `0.618` → `61.8%`, `1.0` → `100%` (no trailing `.0`) — the one
+ * ratio label format shared by the `Fib …%` level rows and the prompt's
+ * `Fib table:`/`Fib ABC table:` lines, so all three always read alike.
+ */
+export const formatFibRatio = (ratio: number): string => {
+    const text = (ratio * RATIO_TO_PERCENT).toFixed(FIB_RATIO_DECIMAL_PLACES);
+    return `${text.endsWith('.0') ? text.slice(0, -2) : text}%`;
+};
 
 // `price === level` resolves to 'above' (tie-breaking — PriceVsLevel has no 'at').
 const priceVs = (price: number, level: number | null): PriceVsLevel =>
@@ -246,7 +262,7 @@ function buildHorizon(
               ...fib.retracements.map(r =>
                   makeReferenceLevel(
                       r.price,
-                      `Fib ${(r.ratio * RATIO_TO_PERCENT).toFixed(FIB_RATIO_DECIMAL_PLACES)}%`,
+                      `Fib ${formatFibRatio(r.ratio)}`,
                       'fib_retracement',
                       currentPrice
                   )
@@ -254,12 +270,28 @@ function buildHorizon(
               ...fib.extensions.map(e =>
                   makeReferenceLevel(
                       e.price,
-                      `Fib ext ${(e.ratio * RATIO_TO_PERCENT).toFixed(FIB_RATIO_DECIMAL_PLACES)}%`,
+                      `Fib ext ${formatFibRatio(e.ratio)}`,
                       'fib_extension',
                       currentPrice
                   )
               ),
           ]
+        : [];
+
+    // ABC extension — a separate, longer-tail swing triplet from the same
+    // window (spec 2026-09-18 §A3): only renders once a real retracement
+    // swing (C) has confirmed after B, so it is `null` far more often than
+    // `fib` above.
+    const abc = computeAbcExtension(windowSmc);
+    const abcExtensionLevels: ReferenceLevel[] = abc
+        ? abc.extensions.map(e =>
+              makeReferenceLevel(
+                  e.price,
+                  `Fib ABC ext ${formatFibRatio(e.ratio)}`,
+                  'fib_abc_extension',
+                  currentPrice
+              )
+          )
         : [];
 
     const sp = pivotBar ? computeStandardPivot(pivotBar) : null;
@@ -284,7 +316,6 @@ function buildHorizon(
               )
           )
         : [];
-
     const swingLevels: ReferenceLevel[] = [
         ...windowSwingHighs.map(s =>
             makeReferenceLevel(
@@ -324,6 +355,11 @@ function buildHorizon(
         ),
     ];
 
+    // Fibonacci/Woodie/DeMark pivots (spec 2026-09-18 review R17) live ONLY
+    // in the `Pivot table:` line, not in this capped nearest-level list —
+    // `splitBySide`'s ~6/side cap meant Standard/Camarilla (the levels
+    // traders actually watch) were competing with, and sometimes losing to,
+    // three more pivot families for the same handful of slots.
     const levels: ReferenceLevel[] = [
         ...collectIndicatorLevels(currentPrice, indicators, {
             volumeProfile: windowVp,
@@ -332,6 +368,7 @@ function buildHorizon(
         }),
         ...roundNumberLevels(currentPrice),
         ...fibLevels,
+        ...abcExtensionLevels,
         ...standardPivotLevels,
         ...camarillaLevels,
         ...swingLevels,
@@ -355,6 +392,8 @@ function buildHorizon(
             windowSwingHighs,
             windowSwingLows
         ),
+        fibProjection: fib,
+        abcExtension: abc,
     };
 }
 
@@ -404,5 +443,12 @@ export function computeMarketReference(
         short: horizon('short'),
         medium: horizon('medium'),
         long: horizon('long'),
+        pivots: {
+            standard: pivotBar ? computeStandardPivot(pivotBar) : null,
+            camarilla: pivotBar ? computeCamarillaPivot(pivotBar) : null,
+            fibonacci: pivotBar ? computeFibonacciPivot(pivotBar) : null,
+            woodie: pivotBar ? computeWoodiePivot(pivotBar) : null,
+            demark: pivotBar ? computeDeMarkPivot(pivotBar) : null,
+        },
     };
 }

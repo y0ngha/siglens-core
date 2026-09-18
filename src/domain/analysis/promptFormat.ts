@@ -7,6 +7,7 @@
  */
 
 import type { AssetClass, CurrencyCode, Timeframe } from '@/domain/types';
+import { MS_PER_DAY } from '@/domain/constants/time';
 
 /**
  * Human-readable timeframe labels used in prompt headers.
@@ -58,6 +59,31 @@ export function formatBarDateTime(timeMs: number): string {
 }
 
 /**
+ * @internal Whole calendar days from `now`'s UTC date to `targetIso`'s UTC
+ * date — today is `0`, tomorrow `1`, yesterday `-1` — regardless of either
+ * timestamp's time-of-day (spec 2026-09-18 review R1). A raw `Math.round(ms
+ * diff / MS_PER_DAY)` drifted: at `now = …T20:00Z`, a target dated "today"
+ * (parsed as UTC midnight) is 20 hours in the PAST, rounding to `-1` — "1 day
+ * ago" for an event still happening today. `null` when `targetIso` cannot be
+ * parsed.
+ */
+export function calendarDayDiff(targetIso: string, now: Date): number | null {
+    const target = new Date(targetIso);
+    if (Number.isNaN(target.getTime())) return null;
+    const targetDateOnly = Date.UTC(
+        target.getUTCFullYear(),
+        target.getUTCMonth(),
+        target.getUTCDate()
+    );
+    const nowDateOnly = Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate()
+    );
+    return Math.round((targetDateOnly - nowDateOnly) / MS_PER_DAY);
+}
+
+/**
  * Format a nullable number for prompt injection.
  *
  * Returns the number rounded to `dp` decimal places, or the literal string
@@ -85,15 +111,33 @@ export function formatNullableNumber(
 
 /**
  * @internal
+ * A signed number (`+1.23` / `-0.45`), or `'N/A'` for a non-finite value.
+ *
+ * Shared by every signed-delta formatter in this codebase (percent, pp,
+ * ATR-multiples, raw diffs) so the sign/zero handling lives in one place —
+ * {@link formatNullableNumber} already drops the sign for a value that
+ * rounds to exactly zero (never `-0.00`); this only adds the `+` a plain
+ * `toFixed` does not.
+ */
+export function formatSignedNumber(
+    n: number | null | undefined,
+    dp = 2
+): string {
+    const text = formatNullableNumber(n, dp);
+    if (text === 'N/A') return text;
+    return text.startsWith('-') ? text : `+${text}`;
+}
+
+/**
+ * @internal
  * A signed percent (`+1.23%` / `-0.45%`), or `'N/A'` for a non-finite value.
  *
  * Replaces the `n >= 0 ? '+' : ''` + `toFixed` pattern, which printed `NaN%` (and no
  * sign) for a missing change and `+-0.00%`-style noise near zero.
  */
 export function formatSignedPercent(n: number | null | undefined): string {
-    const text = formatNullableNumber(n);
-    if (text === 'N/A') return text;
-    return text.startsWith('-') ? `${text}%` : `+${text}%`;
+    const text = formatSignedNumber(n);
+    return text === 'N/A' ? text : `${text}%`;
 }
 
 /**

@@ -135,8 +135,6 @@ export function entryZoneTop(
 }
 
 /**
- * @internal
- *
  * Build the deterministic plan check for one recommendation.
  *
  * `entryPrice` is the plan's own reference (the mid of its entry zone), `currentPrice` the
@@ -145,6 +143,12 @@ export function entryZoneTop(
  *
  * Returns `null` only when `currentPrice` is unusable — with no price to compare against,
  * every field would be a guess.
+ *
+ * @param rec - The recommendation to check; its reconciled levels win over the AI's own.
+ * @param currentPrice - The price to measure against (a live quote or the last close).
+ * @param entryPrice - The plan's entry reference — use {@link planEntryPrice} for the same
+ *   reference the analysis pipeline uses.
+ * @returns The plan check, or `null` when `currentPrice` is not a finite positive number.
  */
 export function buildPlanCheck(
     rec: ActionRecommendation,
