@@ -11,11 +11,13 @@ import {
     computeOverallScore,
     type OverallScore,
 } from '@/domain/analysis/overallScore';
+import { isUsablePrice } from '@/domain/analysis/analysisUtils';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     equityListingContext,
     formatNullableNumber,
+    formatSignedPercent,
     priceDecimalPlaces,
     sharedPriceDecimalPlaces,
 } from '@/domain/analysis/promptFormat';
@@ -78,11 +80,34 @@ const TIMEFRAME_CONFIG: Record<Timeframe, { label: string; context: string }> =
         },
     };
 
+/**
+ * @internal `(+x.xx% from snapshot)` for `price` vs a positive `snapshotPrice`,
+ * or `''` when the snapshot price is unavailable (null rule — omit, never
+ * render an `N/A` suffix on an otherwise-normal level line).
+ */
+function snapshotDistanceSuffix(
+    price: number,
+    snapshotPrice: number | undefined
+): string {
+    if (
+        snapshotPrice === undefined ||
+        !Number.isFinite(snapshotPrice) ||
+        snapshotPrice <= 0 ||
+        !Number.isFinite(price)
+    ) {
+        return '';
+    }
+    const pct = ((price - snapshotPrice) / snapshotPrice) * 100;
+    return ` (${formatSignedPercent(pct)} from snapshot)`;
+}
+
 /** Formats technical analysis fields (trend, risk, key levels, price targets, patterns) into prompt lines. */
 function formatTechnical(
     tech: AnalysisResponse,
     currency: CurrencyCode,
-    assetClass: AssetClass
+    assetClass: AssetClass,
+    /** Last bar close, when the caller has bars for this symbol/timeframe (spec §2.5). */
+    bars?: readonly Bar[]
 ): string {
     // One precision for every level, from the finest one and the listing currency, so a
     // sub-dollar target is not flattened to `0.08`, a won level is not `269500.00`, and a
@@ -98,29 +123,43 @@ function formatTechnical(
         assetClass
     );
     const px = (n: number): string => formatNullableNumber(n, dp);
+    // Null rule (spec §0): a 0/negative/non-finite close is "unknown", never
+    // a real snapshot price — `isUsablePrice` mirrors the same gate `prompt.ts`
+    // uses for the analogous Analysis Snapshot section.
+    const lastClose =
+        bars && bars.length > 0 ? bars[bars.length - 1].close : undefined;
+    const snapshotPrice =
+        lastClose !== undefined && isUsablePrice(lastClose)
+            ? lastClose
+            : undefined;
+    const dist = (price: number): string =>
+        snapshotDistanceSuffix(price, snapshotPrice);
     const lines: string[] = [
         `- Overall Trend: ${tech.trend}`,
         `- Risk Level: ${tech.riskLevel}`,
+        ...(snapshotPrice !== undefined
+            ? [`- Snapshot Price: ${px(snapshotPrice)}`]
+            : []),
         `- Summary: ${tech.summary}`,
     ];
 
     if (tech.keyLevels.support.length > 0) {
         const supports = tech.keyLevels.support
-            .map(l => `${px(l.price)} (${l.reason})`)
+            .map(l => `${px(l.price)}${dist(l.price)} (${l.reason})`)
             .join(', ');
         lines.push(`- Key Support Levels: ${supports}`);
     }
 
     if (tech.keyLevels.resistance.length > 0) {
         const resistances = tech.keyLevels.resistance
-            .map(l => `${px(l.price)} (${l.reason})`)
+            .map(l => `${px(l.price)}${dist(l.price)} (${l.reason})`)
             .join(', ');
         lines.push(`- Key Resistance Levels: ${resistances}`);
     }
 
     if (tech.priceTargets.bullish) {
         const targets = tech.priceTargets.bullish.targets
-            .map(t => px(t.price))
+            .map(t => `${px(t.price)}${dist(t.price)}`)
             .join(', ');
         lines.push(
             `- Bullish Targets: ${targets} — ${tech.priceTargets.bullish.condition}`
@@ -129,7 +168,7 @@ function formatTechnical(
 
     if (tech.priceTargets.bearish) {
         const targets = tech.priceTargets.bearish.targets
-            .map(t => px(t.price))
+            .map(t => `${px(t.price)}${dist(t.price)}`)
             .join(', ');
         lines.push(
             `- Bearish Targets: ${targets} — ${tech.priceTargets.bearish.condition}`
@@ -579,7 +618,7 @@ ${assetContext}
 ${context}
 
 ## Axis 1 — Technical Analysis
-${formatTechnical(technical, currency, assetClass)}${fearGreedBlock}
+${formatTechnical(technical, currency, assetClass, bars)}${fearGreedBlock}
 
 ${fundamentalSection}
 
@@ -640,6 +679,7 @@ ${localizedFieldDirective(locale)}
 - integratedConclusionKo: synthesise all available axes (technical, fundamental, news, plus options and financials when present) into a cohesive directional verdict appropriate for the ${timeframe} timeframe context described above.
 - In integratedConclusionKo, attribute each claim to its source axis (e.g. "기술적 분석에 따르면…", "펀더멘털 분석에서는…", "뉴스 분석에서는…", "옵션 시장에서는…", "재무제표 분석에서는…") so the reader can see which axis each point came from. This reduces blending and hallucination.
 - When axes genuinely conflict, preserve the conflict explicitly rather than averaging it into a single smoothed verdict.
+- Computed figures in the axis sections (distances from the snapshot price, the composite, scorecard grades) must be quoted as given, never recomputed. In prose you may do simple arithmetic from numbers that appear in this prompt when no computed figure covers it; keep percentages to one decimal place. Scenario price ranges still come only from provided levels and targets.
 - The composite in ## Axis Weighting is arithmetic that has already been done. Do not recompute it, restate it as a different number, or convert it into a buy/sell call. If integratedConclusionKo leans against it, name the axis you are overriding and the reason — a conclusion that silently contradicts the weighting is the failure this section exists to catch.
 
 ## Few-Shot — conflict preservation + axis attribution

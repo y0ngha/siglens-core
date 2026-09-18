@@ -390,4 +390,262 @@ describe('summarizeChainForLlm', () => {
         expect(quote!.putMidPrice).toBeCloseTo(0.9, 5);
         expect(quote!.putSpread).toBeCloseTo(0.2, 5);
     });
+
+    describe('daysToExpiration', () => {
+        it('copies daysToExpiration from the chain', () => {
+            const c = chain([90, 100, 110]);
+            expect(summarizeChainForLlm(c, 100).daysToExpiration).toBe(30);
+        });
+    });
+
+    describe('maxPainDistancePct', () => {
+        it('computes a signed % distance from the underlying price (positive = above)', () => {
+            const c = chain([90, 100, 110]);
+            const summary = summarizeChainForLlm(c, 100);
+            const expected = ((summary.maxPain! - 100) / 100) * 100;
+            // spec 2026-09-18 §B5 — rounded to 2dp at the source.
+            expect(summary.maxPainDistancePct).toBeCloseTo(expected, 2);
+        });
+
+        it('is null when the underlying price is 0 (zero base)', () => {
+            const c = chain([90, 100, 110]);
+            expect(summarizeChainForLlm(c, 0).maxPainDistancePct).toBeNull();
+        });
+
+        it('is null when the underlying price is negative', () => {
+            const c = chain([90, 100, 110]);
+            expect(summarizeChainForLlm(c, -100).maxPainDistancePct).toBeNull();
+        });
+
+        it('is null when the underlying price is NaN', () => {
+            const c = chain([90, 100, 110]);
+            expect(summarizeChainForLlm(c, NaN).maxPainDistancePct).toBeNull();
+        });
+
+        it('is null when maxPain itself is null (empty chain)', () => {
+            const c: OptionsChain = {
+                expirationDate: '2026-06-20',
+                daysToExpiration: 30,
+                calls: [],
+                puts: [],
+            };
+            expect(summarizeChainForLlm(c, 100).maxPainDistancePct).toBeNull();
+        });
+    });
+
+    describe('impliedMoveRange', () => {
+        it('computes underlyingPrice × (1 ∓ impliedMovePercent / 100)', () => {
+            const c = chain([90, 100, 110]);
+            const summary = summarizeChainForLlm(c, 100);
+            const pct = summary.impliedMovePercent!;
+            expect(summary.impliedMoveRange).not.toBeNull();
+            // spec 2026-09-18 review R10 — rounded to 2dp at the source now.
+            expect(summary.impliedMoveRange!.low).toBeCloseTo(
+                100 * (1 - pct / 100),
+                2
+            );
+            expect(summary.impliedMoveRange!.high).toBeCloseTo(
+                100 * (1 + pct / 100),
+                2
+            );
+        });
+
+        it('is null when the underlying price is omitted', () => {
+            const c = chain([90, 100, 110]);
+            expect(summarizeChainForLlm(c).impliedMoveRange).toBeNull();
+        });
+
+        it('is null when the underlying price is 0', () => {
+            const c = chain([90, 100, 110]);
+            expect(summarizeChainForLlm(c, 0).impliedMoveRange).toBeNull();
+        });
+
+        it('is null when impliedMovePercent is null (no ATM IV)', () => {
+            const c: OptionsChain = {
+                expirationDate: '2026-06-20',
+                daysToExpiration: 30,
+                calls: [contract(150, null, 50, 0, 'call')],
+                puts: [contract(150, null, 0, 50, 'put')],
+            };
+            expect(summarizeChainForLlm(c, 150).impliedMoveRange).toBeNull();
+        });
+
+        it('is null when impliedMovePercent >= 100 — low would sit at or below zero (spec 2026-09-18 review R10)', () => {
+            // atmIv 1.5 (150% IV) over a full year -> impliedMovePercent = 150.
+            const c: OptionsChain = {
+                expirationDate: '2027-06-20',
+                daysToExpiration: 365,
+                calls: [contract(100, 1.5, 50, 0, 'call')],
+                puts: [contract(100, 1.5, 0, 50, 'put')],
+            };
+            const summary = summarizeChainForLlm(c, 100);
+            expect(summary.impliedMovePercent).toBeGreaterThanOrEqual(100);
+            expect(summary.impliedMoveRange).toBeNull();
+        });
+
+        it('rounds bounds to 2 decimal places at the source (spec 2026-09-18 review R10)', () => {
+            const c: OptionsChain = {
+                expirationDate: '2026-06-20',
+                daysToExpiration: 33,
+                calls: [contract(100, 0.333, 50, 0, 'call')],
+                puts: [contract(100, 0.333, 0, 50, 'put')],
+            };
+            const summary = summarizeChainForLlm(c, 100);
+            expect(summary.impliedMoveRange).not.toBeNull();
+            const { low, high } = summary.impliedMoveRange!;
+            expect(low).toBe(Math.round(low * 100) / 100);
+            expect(high).toBe(Math.round(high * 100) / 100);
+        });
+    });
+
+    describe('topOpenInterestStrikes[].distancePct/side', () => {
+        it('marks a strike above the underlying price, with a positive distancePct', () => {
+            const c = chain([90, 100, 110]);
+            const summary = summarizeChainForLlm(c, 90);
+            const above = summary.topOpenInterestStrikes.find(
+                s => s.strike === 110
+            )!;
+            // spec 2026-09-18 §B5 — rounded to 2dp at the source.
+            expect(above.distancePct).toBeCloseTo(((110 - 90) / 90) * 100, 2);
+            expect(above.side).toBe('above');
+        });
+
+        it('marks a strike below the underlying price, with a negative distancePct', () => {
+            const c = chain([90, 100, 110]);
+            const summary = summarizeChainForLlm(c, 110);
+            const below = summary.topOpenInterestStrikes.find(
+                s => s.strike === 90
+            )!;
+            expect(below.distancePct).toBeCloseTo(((90 - 110) / 110) * 100, 2);
+            expect(below.side).toBe('below');
+        });
+
+        it("marks a strike within 0.5% of price as 'at'", () => {
+            const c = chain([100]);
+            const summary = summarizeChainForLlm(c, 100.1);
+            expect(summary.topOpenInterestStrikes[0].side).toBe('at');
+        });
+
+        it('is null (distancePct and side) when the underlying price is omitted', () => {
+            const c = chain([90, 100, 110]);
+            const summary = summarizeChainForLlm(c);
+            for (const s of summary.topOpenInterestStrikes) {
+                expect(s.distancePct).toBeNull();
+                expect(s.side).toBeNull();
+            }
+        });
+
+        it('is null when the underlying price is NaN', () => {
+            const c = chain([90, 100, 110]);
+            const summary = summarizeChainForLlm(c, NaN);
+            for (const s of summary.topOpenInterestStrikes) {
+                expect(s.distancePct).toBeNull();
+                expect(s.side).toBeNull();
+            }
+        });
+
+        it('rounds distancePct to exactly 2 decimal places (spec 2026-09-18 §B5)', () => {
+            // (91 - 90) / 90 * 100 = 1.1111...% -> 1.11.
+            const c = chain([91]);
+            const summary = summarizeChainForLlm(c, 90);
+            expect(summary.topOpenInterestStrikes[0].distancePct).toBe(1.11);
+        });
+
+        it('never emits -0 for a distance that rounds to exactly zero (spec §0)', () => {
+            // (100.001 - 100) / 100 * 100 = 0.001% -> rounds to 0, not -0.
+            const c = chain([99.999]);
+            const summary = summarizeChainForLlm(c, 100);
+            const distancePct = summary.topOpenInterestStrikes[0].distancePct;
+            expect(distancePct).toBe(0);
+            expect(Object.is(distancePct, -0)).toBe(false);
+        });
+    });
+
+    describe('topOiBidAskSummary[].callSpreadPct/putSpreadPct', () => {
+        it('computes spread / mid × 100 for both sides', () => {
+            const c: OptionsChain = {
+                expirationDate: '2026-06-20',
+                daysToExpiration: 30,
+                calls: [
+                    {
+                        contractSymbol: '100C',
+                        strike: 100,
+                        lastPrice: null,
+                        bid: 1.0,
+                        ask: 1.2,
+                        volume: 0,
+                        openInterest: 500,
+                        impliedVolatility: 0.3,
+                        inTheMoney: false,
+                    },
+                ],
+                puts: [
+                    {
+                        contractSymbol: '100P',
+                        strike: 100,
+                        lastPrice: null,
+                        bid: 0.8,
+                        ask: 1.0,
+                        volume: 0,
+                        openInterest: 500,
+                        impliedVolatility: 0.3,
+                        inTheMoney: false,
+                    },
+                ],
+            };
+            const summary = summarizeChainForLlm(c, 100);
+            const quote = summary.topOiBidAskSummary[0];
+            // spec 2026-09-18 §B5 — rounded to 2dp at the source.
+            expect(quote.callSpreadPct).toBeCloseTo((0.2 / 1.1) * 100, 2);
+            expect(quote.putSpreadPct).toBeCloseTo((0.2 / 0.9) * 100, 2);
+        });
+
+        it('rounds callSpreadPct/putSpreadPct to exactly 2 decimal places (spec 2026-09-18 §B5)', () => {
+            const c: OptionsChain = {
+                expirationDate: '2026-06-20',
+                daysToExpiration: 30,
+                calls: [
+                    {
+                        contractSymbol: '100C',
+                        strike: 100,
+                        lastPrice: null,
+                        bid: 1.0,
+                        ask: 1.3,
+                        volume: 0,
+                        openInterest: 500,
+                        impliedVolatility: 0.3,
+                        inTheMoney: false,
+                    },
+                ],
+                puts: [],
+            };
+            const summary = summarizeChainForLlm(c, 100);
+            // mid = 1.15, spread = 0.3 -> 0.3 / 1.15 * 100 = 26.0869...% -> 26.09.
+            expect(summary.topOiBidAskSummary[0].callSpreadPct).toBe(26.09);
+        });
+
+        it('is null when mid/spread are null (missing bid)', () => {
+            const c: OptionsChain = {
+                expirationDate: '2026-06-20',
+                daysToExpiration: 30,
+                calls: [
+                    {
+                        contractSymbol: '100C',
+                        strike: 100,
+                        lastPrice: null,
+                        bid: null,
+                        ask: 1.2,
+                        volume: 0,
+                        openInterest: 100,
+                        impliedVolatility: 0.3,
+                        inTheMoney: false,
+                    },
+                ],
+                puts: [],
+            };
+            const summary = summarizeChainForLlm(c, 100);
+            expect(summary.topOiBidAskSummary[0].callSpreadPct).toBeNull();
+            expect(summary.topOiBidAskSummary[0].putSpreadPct).toBeNull();
+        });
+    });
 });

@@ -61,9 +61,9 @@ describe('buildEconomicEventAnalysisPrompt', () => {
         const p = buildEconomicEventAnalysisPrompt(BASE_INPUT);
         // 보간되는 `Event Details` 줄을 직접 본다 — `0.2`만 보면 옛 헬퍼가 만들던
         // `0.20`에도 걸려 아무것도 검증하지 못한다.
-        expect(p).toContain('- Actual: 0.2 %');
-        expect(p).toContain('- Estimate: 0.3 %');
-        expect(p).toContain('- Previous: 0.4 %');
+        expect(p).toContain('- Actual: 0.2%');
+        expect(p).toContain('- Estimate: 0.3%');
+        expect(p).toContain('- Previous: 0.4%');
     });
 
     it('3자리 소수를 잘라내지 않는다', () => {
@@ -75,7 +75,7 @@ describe('buildEconomicEventAnalysisPrompt', () => {
         });
 
         // few-shot에도 `4.415`가 정적으로 들어 있으므로, 보간 줄을 앵커로 삼는다.
-        expect(p).toContain('- Actual: 4.415 %');
+        expect(p).toContain('- Actual: 4.415%');
         expect(p).not.toContain('- Actual: 4.42');
     });
 
@@ -340,5 +340,119 @@ describe('buildEconomicEventAnalysisPrompt numeric rendering', () => {
         });
         expect(p).toMatch(/- Estimate: N\/A\n/);
         expect(p).not.toContain('NaN');
+    });
+});
+
+describe('buildEconomicEventAnalysisPrompt — Actual vs Estimate/Previous (spec 2026-09-18 §2.11)', () => {
+    it('renders "below" and "lower" when actual missed and decelerated', () => {
+        // actual 0.2, estimate 0.3, previous 0.4 (BASE_INPUT)
+        const p = buildEconomicEventAnalysisPrompt(BASE_INPUT);
+        expect(p).toContain('- Actual vs Estimate: -0.10pp (below)');
+        expect(p).toContain('- Actual vs Previous: -0.20pp (lower)');
+    });
+
+    it('renders "above" and "higher" when actual beat and accelerated', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: 0.5,
+            estimate: 0.3,
+            previous: 0.4,
+        });
+        expect(p).toContain('- Actual vs Estimate: +0.20pp (above)');
+        expect(p).toContain('- Actual vs Previous: +0.10pp (higher)');
+    });
+
+    it('renders "in line" / "unchanged" within the tolerance band', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: 0.301,
+            estimate: 0.3,
+            previous: 0.301,
+        });
+        expect(p).toContain('(in line)');
+        expect(p).toContain('(unchanged)');
+    });
+
+    it('is N/A when actual is null (release pending)', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: null,
+        });
+        expect(p).toContain('- Actual vs Estimate: N/A');
+        expect(p).toContain('- Actual vs Previous: N/A');
+    });
+
+    it('is N/A vs estimate when estimate is null, but still computes vs previous', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            estimate: null,
+        });
+        expect(p).toContain('- Actual vs Estimate: N/A');
+        expect(p).toContain('- Actual vs Previous: -0.20pp (lower)');
+    });
+
+    it('is N/A vs previous when previous is null', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            previous: null,
+        });
+        expect(p).toContain('- Actual vs Previous: N/A');
+    });
+
+    it('is N/A when actual is NaN', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: Number.NaN,
+        });
+        expect(p).toContain('- Actual vs Estimate: N/A');
+        expect(p).toContain('- Actual vs Previous: N/A');
+    });
+
+    it('the Key signal line points at the precomputed fields instead of asking the model to compare', () => {
+        const p = buildEconomicEventAnalysisPrompt(BASE_INPUT);
+        expect(p).toContain('already computed');
+        expect(p).toContain('never recompute the deviation yourself');
+    });
+
+    it('never renders -0.00pp for a delta that rounds to exactly zero (spec §B6)', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: 0.3001,
+            estimate: 0.3,
+            previous: 0.3001,
+        });
+        expect(p).not.toContain('-0.00pp');
+        expect(p).toContain('+0.00pp');
+    });
+
+    it('a non-percent unit renders the delta as "value unit" (with space), never pp (spec §B7 addendum)', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            event: 'Nonfarm Payrolls',
+            actual: 150,
+            estimate: 180,
+            previous: 200,
+            unit: 'K',
+        });
+        expect(p).toContain('- Actual vs Estimate: -30.00 K (below)');
+        expect(p).toContain('- Actual vs Previous: -50.00 K (lower)');
+        expect(p).not.toMatch(/-30\.00pp|-50\.00pp/);
+    });
+
+    it('a percent unit attaches to Actual/Estimate/Previous with no leading space (spec §B7 addendum)', () => {
+        const p = buildEconomicEventAnalysisPrompt(BASE_INPUT);
+        expect(p).toContain('- Actual: 0.2%');
+        expect(p).not.toContain('- Actual: 0.2 %');
+    });
+
+    it('a non-percent unit attaches to Actual/Estimate/Previous with a leading space', () => {
+        const p = buildEconomicEventAnalysisPrompt({
+            ...BASE_INPUT,
+            actual: 150,
+            estimate: 180,
+            previous: 200,
+            unit: 'K',
+        });
+        expect(p).toContain('- Actual: 150 K');
     });
 });

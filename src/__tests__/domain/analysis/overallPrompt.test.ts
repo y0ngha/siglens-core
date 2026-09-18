@@ -126,6 +126,26 @@ describe('buildOverallAnalysisPrompt', () => {
         );
     });
 
+    it('states the computed-figures rule and allows simple prose arithmetic (2026-09-19)', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+        expect(prompt).toContain(
+            'Computed figures in the axis sections (distances from the snapshot price, the composite, scorecard grades) must be quoted as given, never recomputed.'
+        );
+        expect(prompt).toContain(
+            'In prose you may do simple arithmetic from numbers that appear in this prompt'
+        );
+        expect(prompt).toContain(
+            'Scenario price ranges still come only from provided levels and targets.'
+        );
+    });
+
     it('축 출처 라벨 지침과 갈등 보존 few-shot 예시를 포함한다 (C5-3 + C6)', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,
@@ -893,6 +913,137 @@ describe('buildOverallAnalysisPrompt', () => {
     });
 });
 
+describe('buildOverallAnalysisPrompt — Snapshot Price + distance-from-snapshot (spec 2026-09-18 §2.5)', () => {
+    const snapshotBars = (close: number): Bar[] => [
+        {
+            time: 1_700_000_000,
+            open: close,
+            high: close,
+            low: close,
+            close,
+            volume: 1000,
+        },
+    ];
+
+    it('omits the Snapshot Price line and distance suffixes when bars is omitted', () => {
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe
+        );
+        expect(dynamic).not.toContain('- Snapshot Price:');
+        expect(dynamic).not.toContain('from snapshot');
+    });
+
+    it('renders Snapshot Price from the last bar close, and a signed % suffix on every level/target', () => {
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'equity',
+            'ko',
+            snapshotBars(190)
+        );
+        expect(dynamic).toContain('- Snapshot Price: 190.00');
+        // Support 170 vs snapshot 190 -> (170-190)/190*100 = -10.53%
+        expect(dynamic).toContain('170.00 (-10.53% from snapshot)');
+        // Resistance 200 vs snapshot 190 -> +5.26%
+        expect(dynamic).toContain('200.00 (+5.26% from snapshot)');
+        // Bullish target 210 vs snapshot 190 -> +10.53%
+        expect(dynamic).toContain('210.00 (+10.53% from snapshot)');
+        // Bearish target 160 vs snapshot 190 -> -15.79%
+        expect(dynamic).toContain('160.00 (-15.79% from snapshot)');
+    });
+
+    it('omits the Snapshot Price line when bars is an empty array (zero-length, not just undefined)', () => {
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'equity',
+            'ko',
+            []
+        );
+        expect(dynamic).not.toContain('- Snapshot Price:');
+    });
+
+    it('omits the distance suffix (zero base) when the last bar close is 0', () => {
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'equity',
+            'ko',
+            snapshotBars(0)
+        );
+        expect(dynamic).not.toContain('from snapshot');
+        expect(dynamic).not.toContain('- Snapshot Price:');
+    });
+
+    it('omits the distance suffix (negative base) when the last bar close is negative', () => {
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'equity',
+            'ko',
+            snapshotBars(-10)
+        );
+        expect(dynamic).not.toContain('from snapshot');
+    });
+
+    it('omits the distance suffix when the last bar close is NaN', () => {
+        const { dynamic } = buildOverallAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day' as Timeframe,
+            undefined,
+            null,
+            false,
+            null,
+            'equity',
+            'ko',
+            snapshotBars(Number.NaN)
+        );
+        expect(dynamic).not.toContain('from snapshot');
+        expect(dynamic).not.toContain('- Snapshot Price:');
+    });
+});
+
 describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-context spec)', () => {
     /** Bars sorted oldest-first, 1 day apart, starting at a fixed Unix-seconds base. */
     const makePriorBars = (
@@ -949,7 +1100,7 @@ describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-
         expect(explicitlyUndefined).toEqual(preExisting);
     });
 
-    it('bars without priorAnalyses renders nothing and stays byte-identical', () => {
+    it('bars without priorAnalyses renders no "## Prior Analyses" section (but bars alone still drives Snapshot Price, spec §2.5)', () => {
         const bars = makePriorBars(10);
         const withoutHistory = buildOverallAnalysisPromptRaw(...baseArgs);
         const withBarsOnly = buildOverallAnalysisPromptRaw(
@@ -957,7 +1108,11 @@ describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-
             bars,
             undefined
         );
-        expect(withBarsOnly).toEqual(withoutHistory);
+        expect(withBarsOnly.dynamic).not.toContain('## Prior Analyses');
+        // Bars alone (no history) is no longer a no-op: the Snapshot Price
+        // line and per-level distance suffixes read straight off `bars`.
+        expect(withBarsOnly.dynamic).toContain('- Snapshot Price:');
+        expect(withoutHistory.dynamic).not.toContain('- Snapshot Price:');
     });
 
     it('priorAnalyses without bars renders nothing and stays byte-identical', () => {
@@ -1059,7 +1214,7 @@ describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-
         expect(priorIndex).toBeGreaterThan(fgIndex);
     });
 
-    it('a history that narrows to nothing (outside the bar window) renders no section and stays byte-identical', () => {
+    it('a history that narrows to nothing (outside the bar window) renders no "## Prior Analyses" section (bars still drive Snapshot Price, spec §2.5)', () => {
         // 10 bars is well inside the always-anchor-to-bars[0] fallback, so to
         // exercise the "narrowed to empty" path, use candidates that all
         // predate every bar entirely.
@@ -1075,7 +1230,9 @@ describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-
             bars,
             tooOldHistory
         );
-        expect(withTooOldHistory).toEqual(withoutHistory);
+        expect(withTooOldHistory.dynamic).not.toContain('## Prior Analyses');
+        expect(withTooOldHistory.dynamic).toContain('- Snapshot Price:');
+        expect(withoutHistory.dynamic).not.toContain('- Snapshot Price:');
     });
 });
 

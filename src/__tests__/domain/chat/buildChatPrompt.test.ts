@@ -759,3 +759,288 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
         expect(congressSection).not.toContain('Notable Members:');
     });
 });
+
+describe('buildChatPrompt — analysis-time price, computed distances, structured plan (spec 2026-09-18 §2.12)', () => {
+    const analysisWithPlan: AnalysisResponse = {
+        ...MINIMAL_ANALYSIS,
+        analyzedAt: '2026-05-30T00:00:00Z',
+        keyLevels: {
+            resistance: [{ price: 200, reason: 'Round number' }],
+            support: [{ price: 180, reason: 'Prior low' }],
+            poc: { price: 190, reason: 'Volume node' },
+        },
+        priceTargets: {
+            bullish: {
+                targets: [{ price: 210, basis: 'Breakout measured move' }],
+                condition: '200 돌파 시',
+            },
+            bearish: {
+                targets: [{ price: 170, basis: 'Support break' }],
+                condition: '180 이탈 시',
+            },
+        },
+        actionRecommendation: {
+            entryRecommendation: 'enter',
+            positionAnalysis: 'test',
+            entry: 'test',
+            exit: 'test',
+            riskReward: 'test',
+            entryPrices: [188, 190],
+            stopLoss: 182,
+            takeProfitPrices: [200, 210],
+            planCheck: {
+                currentPrice: 190,
+                entryZoneTop: 190,
+                exceedsEntryZone: false,
+                belowStopLoss: false,
+                riskRewardAtEntry: 2.5,
+                riskRewardAtCurrent: 1.25,
+            },
+        },
+    };
+
+    it('renders "Analysis generated" from analyzedAt when present', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        // spec 2026-09-18 §B1 — `YYYY-MM-DD HH:MM UTC`, not the raw ISO string.
+        expect(result.systemPrompt).toContain(
+            'Analysis generated: 2026-05-30 00:00 UTC'
+        );
+        expect(result.systemPrompt).not.toContain('2026-05-30T00:00:00Z');
+    });
+
+    it('falls back to the raw string for an unparseable analyzedAt instead of throwing', () => {
+        const badDate: AnalysisResponse = {
+            ...analysisWithPlan,
+            analyzedAt: 'not-a-date',
+        };
+        const result = buildChatPrompt('AAPL', '1Day', badDate, [], 'q');
+        expect(result.systemPrompt).toContain('Analysis generated: not-a-date');
+    });
+
+    it('omits "Analysis generated" when analyzedAt is absent', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).not.toContain('Analysis generated:');
+    });
+
+    it('renders "Analysis-time price" from planCheck.currentPrice', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).toContain('Analysis-time price: 190.00');
+    });
+
+    it('omits "Analysis-time price" when there is no planCheck', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).not.toContain('Analysis-time price:');
+    });
+
+    it('appends a signed % distance from the analysis-time price to each key level and target', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        // Resistance 200 vs price 190 -> +5.26%
+        expect(result.systemPrompt).toContain(
+            '200.00 (+5.26% from analysis-time price) (Round number)'
+        );
+        // Support 180 vs 190 -> -5.26%
+        expect(result.systemPrompt).toContain(
+            '180.00 (-5.26% from analysis-time price) (Prior low)'
+        );
+        // POC 190 vs 190 -> +0.00%
+        expect(result.systemPrompt).toContain(
+            '190.00 (+0.00% from analysis-time price) (Volume node)'
+        );
+        // Bullish target 210 vs 190 -> +10.53%
+        expect(result.systemPrompt).toContain(
+            '210.00 (+10.53% from analysis-time price) — Breakout measured move'
+        );
+    });
+
+    it('the entry mid is the mean of ALL entryPrices, not the midpoint of the displayed range (spec §B1 — matches planEntryPrice)', () => {
+        // entryPrices=[100, 110, 130]: mean=113.33, but the naive midpoint of
+        // the displayed range endpoints (100, 130) would be 115 — a different
+        // number. `entryRef` must come from `planEntryPrice`'s true mean.
+        const threeEntries: AnalysisResponse = {
+            ...analysisWithPlan,
+            actionRecommendation: {
+                ...analysisWithPlan.actionRecommendation!,
+                entryPrices: [100, 110, 130],
+                planCheck: {
+                    ...analysisWithPlan.actionRecommendation!.planCheck!,
+                    entryZoneTop: 130,
+                },
+            },
+        };
+        const result = buildChatPrompt('AAPL', '1Day', threeEntries, [], 'q');
+        expect(result.systemPrompt).toContain(
+            '- Entry range: 100.00 ~ 130.00 (mid 113.33)'
+        );
+        expect(result.systemPrompt).not.toContain('(mid 115.00)');
+    });
+
+    it('omits the distance suffix on key levels when there is no analysis-time price (null rule)', () => {
+        const noplan: AnalysisResponse = {
+            ...analysisWithPlan,
+            actionRecommendation: {
+                ...analysisWithPlan.actionRecommendation!,
+                planCheck: undefined,
+            },
+        };
+        const result = buildChatPrompt('AAPL', '1Day', noplan, [], 'q');
+        expect(result.systemPrompt).not.toContain('from analysis-time price');
+    });
+
+    it('renders the Structured Plan block with entry range, stop, targets, and computed distances from entry', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).toContain('Structured Plan (computed):');
+        // entry mid = mean(188, 190) = 189 — the same reference `planCheck`'s
+        // riskRewardAtEntry uses (spec 2026-09-18 §B1), not entryZoneTop (190).
+        expect(result.systemPrompt).toContain(
+            '- Entry range: 188.00 ~ 190.00 (mid 189.00)'
+        );
+        // Stop 182 vs entry mid 189 -> -3.70%
+        expect(result.systemPrompt).toContain(
+            '- Stop: 182.00 (-3.70% from entry)'
+        );
+        // Targets 200 (+5.82%), 210 (+11.11%) from entry mid 189
+        expect(result.systemPrompt).toContain(
+            '- Targets: 200.00 (+5.82% from entry), 210.00 (+11.11% from entry)'
+        );
+    });
+
+    it('Stop/Targets use reconciledLevels when present, not the raw AI values (spec 2026-09-18 review R12 — same preference planCheck applies)', () => {
+        const reconciled: AnalysisResponse = {
+            ...analysisWithPlan,
+            actionRecommendation: {
+                ...analysisWithPlan.actionRecommendation!,
+                stopLoss: 999, // raw AI value — must NOT appear
+                takeProfitPrices: [999], // raw AI value — must NOT appear
+                reconciledLevels: {
+                    stopLoss: 180,
+                    takeProfitPrices: [205, 215],
+                    exit: 'test',
+                    riskReward: 'test',
+                    reason: 'test',
+                },
+            },
+        };
+        const result = buildChatPrompt('AAPL', '1Day', reconciled, [], 'q');
+        expect(result.systemPrompt).toContain('- Stop: 180.00');
+        expect(result.systemPrompt).toContain('205.00');
+        expect(result.systemPrompt).toContain('215.00');
+        expect(result.systemPrompt).not.toContain('999.00');
+    });
+
+    it('renders the planCheck risk:reward ratios (at entry / at analysis-time price)', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).toContain(
+            'Risk:Reward — at entry: 2.50, at analysis-time price: 1.25'
+        );
+    });
+
+    it('renders the belowStopLoss / exceedsEntryZone flags', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).toContain(
+            'Flags — belowStopLoss: false, exceedsEntryZone: false'
+        );
+    });
+
+    it('renders true flags when the plan check reports them', () => {
+        const stoppedOut: AnalysisResponse = {
+            ...analysisWithPlan,
+            actionRecommendation: {
+                ...analysisWithPlan.actionRecommendation!,
+                planCheck: {
+                    currentPrice: 175,
+                    entryZoneTop: 190,
+                    exceedsEntryZone: false,
+                    belowStopLoss: true,
+                    riskRewardAtEntry: 2.5,
+                    riskRewardAtCurrent: null,
+                },
+            },
+        };
+        const result = buildChatPrompt('AAPL', '1Day', stoppedOut, [], 'q');
+        expect(result.systemPrompt).toContain(
+            'Flags — belowStopLoss: true, exceedsEntryZone: false'
+        );
+        expect(result.systemPrompt).toContain(
+            'Risk:Reward — at entry: 2.50, at analysis-time price: N/A'
+        );
+    });
+
+    it('renders the "distances and ratios are computed" rule', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            analysisWithPlan,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).toContain(
+            'Distances and ratios in the analysis data below are computed — quote them as given, never recompute them.'
+        );
+        expect(result.systemPrompt).toContain(
+            'you may compute it only from numbers in the ANALYSIS DATA: show the inputs and the operation briefly'
+        );
+        expect(result.systemPrompt).toContain('never invent an input');
+        expect(result.systemPrompt).not.toContain(
+            "say it isn't in the analysis"
+        );
+    });
+
+    it('omits the Structured Plan block entirely when there is no actionRecommendation', () => {
+        const result = buildChatPrompt(
+            'AAPL',
+            '1Day',
+            MINIMAL_ANALYSIS,
+            [],
+            'q'
+        );
+        expect(result.systemPrompt).not.toContain('Structured Plan');
+    });
+});
