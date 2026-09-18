@@ -642,9 +642,55 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * follow the supplied currency rather than the symbol suffix; and NaN volumes
  * and ratios render `N/A`.
  *
+ * @remarks
+ * **`p14` = precomputed prompt data (spec 2026-09-18 §2.2/§2.3).** A new
+ * `## Indicator State (computed)` section renders right after `## Indicator
+ * Values` — every above/below, cross and zone comparison (MA/EMA distance,
+ * MACD vs signal/zero, DMI/ADX regime, Stochastic zone, Ichimoku cloud
+ * position, Bollinger position, Supertrend/PSAR distance, ATR % of price)
+ * precomputed instead of left to the model. `analysisGuidelines` gained a
+ * matching "do not re-derive" rule. Separately, `riskReward` no longer asks
+ * the model for a ratio/percentage — `postProcessAnalysisWithReconcile` now
+ * prepends a deterministic risk:reward line (`buildBullishRiskRewardText`) to
+ * `actionRecommendation.riskReward` on every path, not only the reconciled
+ * one, and the Contingent Plan Mandate / Step 3 prose rules were reworded to
+ * match. Bytes change for every request. Each `## Market Reference` horizon
+ * that produced a Fibonacci projection also gains a `Fib anchor: swing low
+ * X → swing high Y (up leg)` (or down-leg) line, so the fibonacci skill's
+ * "cite the swing you're anchored on" instruction has something to cite.
+ *
+ * @remarks
+ * **`p15`** — precomputed prompt data, wave 2 (spec 2026-09-18 §A1–A5). A new
+ * `## Chart Pattern Candidates (computed)` section renders the pre-screener's
+ * hits with deterministic measured-move geometry (key points, breakout
+ * level, height, measured/conservative targets, invalidation level, status);
+ * `## Market Reference` pivots gain Fibonacci/Woodie/DeMark rows and an
+ * `Fib ABC anchor`/extension block when an ABC leg exists; `## Indicator
+ * State` gains a MACD-cycle stage line, `Bollinger %B`, and a volume-vs-
+ * 20-bar-average line; the SMC section gains `(±x.xx% / y.y ATR from price)`
+ * on every listed level, plus `[nearest above]`/`[nearest below]` tags on
+ * the single closest unmitigated order block and FVG on each side.
+ * `patternSummaries[].geometry` is a new schema field (the model reads it
+ * from the candidates section or the chart itself; the app computes the
+ * targets from it — see `ai-levels.ts`). The Chart Pattern Candidates intro
+ * now states explicitly that the pre-screener's hits are hints, not a cap —
+ * the model may report any other clearly-visible pattern, listed or not
+ * (`patternSummaries Writing Rules` dropped its "do not include any patterns
+ * not listed" line for the same reason); `analysisGuidelines` gained a
+ * matching "skills are guidance, not a boundary" rule. Bytes change for
+ * every request.
+ *
+ * @remarks
+ * Same round, response-shaping only (spec §B6) — not a prompt-byte change,
+ * but bundled here since it touches the same post-processing path `p14`
+ * introduced: `buildBullishRiskRewardText`'s stop-loss percent (`slLabel`)
+ * now goes through `formatNullableNumber` instead of a raw `toFixed`, so a
+ * stop only fractionally below entry no longer prepends the deterministic
+ * `reconciledLevels.riskReward` line with `-0.0%`.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p13' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p15' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -767,9 +813,23 @@ export function buildAnalysisCacheKey(
  * helper (a missing change printed `NaN%`) and the volatility level is rounded to
  * cents in both places the model is told to copy it verbatim.
  *
+ * **`p3`** — precomputed prompt data (spec 2026-09-18 §2.9). Sector rows are
+ * sorted by change descending and prefixed with rank, and the prompt gains
+ * `Breadth: N up / N down / N flat`, `Best − worst sector spread: x.xxpp`,
+ * and `Index average change: ±x.xx%` lines, plus a rule that leading/lagging
+ * sectors must come from the top/bottom of the ranked list. Bytes change for
+ * every request.
+ *
+ * @remarks
+ * **`p4`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B2).
+ * `Index average change` now excludes the volatility-index (`symbol ===
+ * 'VIX'`) row — the VIX's own daily swing is several times an equity
+ * index's, so folding it in reported a number that tracked VIX noise more
+ * than the market. Bytes change whenever `indices` includes a VIX row.
+ *
  * @internal
  */
-export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 export function buildBriefingCacheKey(
     dateHour: string,
@@ -804,9 +864,25 @@ export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
  * significant digits instead of 10 — the 10-digit rule cut real digits off
  * large published figures (`29723864123.45` rendered `29723864120`).
  *
+ * **`p3`** — precomputed prompt data (spec 2026-09-18 §2.10). Indicator rows
+ * gain a `(Δ ±x.xx)` delta next to the previous value, and calendar rows gain
+ * an `(in N days)` suffix. Bytes change for every request.
+ *
+ * @remarks
+ * **`p4`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B3). A
+ * rate-type indicator (`unit === '%'`) now renders its delta as `±x.xxpp`
+ * with no `%` term; a level-type indicator (no `%` unit) renders `±delta[,
+ * ±x.xx%]` — the percent term only when `previous > 0` (null rule §0) — and
+ * an integer-valued series (e.g. payroll counts) formats its delta with
+ * thousands separators and no forced decimals (`-10,000`, not `-10000.00`).
+ * The calendar `(in N days)` suffix now reads `(today, in Nh)` / `(in Nh)`
+ * for an event inside the next 24 hours, and parses FMP's naive `YYYY-MM-DD
+ * HH:mm:ss` timestamp as UTC instead of the runtime's local zone. Bytes
+ * change for every request.
+ *
  * @internal
  */
-export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal Build the Redis key for a cached macro (economy) briefing.
@@ -865,9 +941,24 @@ export function buildMacroBriefingCacheKey(
  * significant digits instead of 10 — the 10-digit rule cut real digits off
  * large published figures (`29723864123.45` rendered `29723864120`).
  *
+ * **`p6`** — precomputed prompt data (spec 2026-09-18 §2.11). `## Event
+ * Details` gains `Actual vs Estimate: ±x.xx (above/below/in line)` and
+ * `Actual vs Previous: ±x.xx (higher/lower/unchanged)` lines, and the "Key
+ * signal" sentence points at them instead of asking the model to compare the
+ * figures itself. Bytes change for every request.
+ *
+ * @remarks
+ * **`p7`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B7). When
+ * `unit === '%'`, the Actual-vs-Estimate/Previous deltas now render as
+ * `±x.xxpp` (a delta of two percentages is a percentage-point figure, not a
+ * percent) instead of `±x.xx %`. `Actual`/`Estimate`/`Previous` themselves
+ * attach a `%` unit with no leading space (`0.20%`, not `0.20 %`); every
+ * other unit keeps the space (`150 K`). Bytes change for every `%`-unit
+ * request; unchanged for every other unit.
+ *
  * @internal
  */
-export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION = 'p7' as const;
 
 /**
  * @internal TTL for cached economic-event AI analysis results.
@@ -990,9 +1081,29 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * the caller instead of inferred from the symbol. Amounts that round up to the
  * next scale render there (`1.0B`, not `1000.0M`).
  *
+ * **`f4`** — precomputed prompt data (spec 2026-09-18 §2.6). A new
+ * `## Derived Metrics (computed)` section renders target upside vs current
+ * price, price-target trend (1M vs 1Y avg), peer P/E and P/S medians with
+ * premium/discount, analyst buy share, EPS estimate vs TTM, and days to next
+ * earnings — all previously left for the model to work out. Bytes change for
+ * every request.
+ *
+ * @remarks
+ * **`f5`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B4). The
+ * computed `## Derived Metrics (computed)` line is relabelled `Price Target
+ * Momentum` — it collided with the raw `## Forward / Analyst Outlook`
+ * section's own `Price Target Trend` line (the priceTargetSummary readout),
+ * two different numbers under one identical label. Bytes change for every
+ * request.
+ *
+ * Same bump, spec §B6: `formatPeerMetric` (`## Comparable Peers` PER/PSR)
+ * now delegates to `formatNullableNumber` instead of a raw `toFixed`, so a
+ * loss-making peer's negative P/E no longer renders `-0.0` when it rounds
+ * to exactly zero.
+ *
  * @internal
  */
-export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f3' as const;
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f5' as const;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.
@@ -1088,9 +1199,15 @@ export function buildFundamentalCacheKey(
  * currency inferred from the symbol (an ADR's TWD statements printed as
  * `USD`). Amounts that round up to the next scale render there.
  *
+ * **`p8`** — precomputed prompt data (spec 2026-09-18 §2.7). Income Statement
+ * and Cash Flow gain a `Margin Trend (latest vs prior same-period row)` line
+ * (gross/operating/net/FCF change in `pp`), and Balance Sheet gains a
+ * `Liabilities / Equity` line for the latest row. Bytes change for every
+ * request that has at least one statement row.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p7' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p8' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -1293,9 +1410,15 @@ export function buildCongressTrendCacheKey(
  * currency follow the caller-supplied listing currency instead of the symbol
  * suffix, and amounts that round up to the next scale render there.
  *
+ * **`p7`** — precomputed prompt data (spec 2026-09-18 §2.8). Both builders
+ * gain a `Sentiment tally: N bullish / N bearish / N neutral (high impact: …)`
+ * header, each item's `Published:` line gains an `(Nh ago | Nd ago)` suffix,
+ * and news-analysis calendar rows gain `(in N days | N days ago)`. Bytes
+ * change for every request.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p7' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
@@ -1407,9 +1530,16 @@ export function buildNewsCacheKey(
  * placeholder bars were dropped — those inputs are not folded into this key's
  * `inputHash`.
  *
+ * **`p3`** — precomputed prompt data (spec 2026-09-18 §2.5): `formatTechnical`
+ * gains a `- Snapshot Price: X` line (when `bars` was supplied) and every
+ * support/resistance/target row gains a `(±x.xx% from snapshot)` suffix, so
+ * the model no longer has to guess distance from a price it was never given.
+ * Bytes change only when the caller supplies `bars`; the constant has no
+ * per-request axis to scope the bump to, so it is fleet-wide anyway.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.
@@ -1672,9 +1802,23 @@ export function buildOverallPeekCacheKey(
  * served after the prompt changed; `p1` gives this builder the same
  * invalidation lever its siblings already have.
  *
+ * **`p2`** — precomputed prompt data (spec 2026-09-18 §2.4):
+ * `summarizeChainForLlm` gained `daysToExpiration`, `maxPainDistancePct`,
+ * `impliedMoveRange`, per-strike `distancePct`/`side`, and per-quote
+ * `callSpreadPct`/`putSpreadPct`, and the Interpretation Guide gained one
+ * line per field — the rendered Key Metrics JSON and guide text both
+ * changed, so pre-`p2` cache entries would serve stale metrics.
+ *
+ * @remarks
+ * **`p3`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B5).
+ * `summarizeChainForLlm`'s `distancePct` / `maxPainDistancePct` /
+ * `callSpreadPct` / `putSpreadPct` now round to exactly 2 decimal places at
+ * the source (previously unrounded floating-point ratios) — the rendered
+ * Key Metrics JSON changes for every request.
+ *
  * @internal
  */
-export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * @internal Build the Redis key for a cached options analysis result.

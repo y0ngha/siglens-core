@@ -5,6 +5,7 @@ import {
     normalizeCachedAnalysisResponse,
     EMPTY_ANALYSIS_FALLBACK_SUMMARY,
 } from '@/domain/analysis/confidence';
+import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import type {
     AnalysisResponse,
     CandlePatternSummary,
@@ -1023,5 +1024,43 @@ describe('confidence', () => {
                 })
             ).toBe(true);
         });
+    });
+});
+
+describe('unlisted chart pattern with geometry survives end-to-end (spec 2026-09-18 addendum — skills are guidance, not a boundary)', () => {
+    it('keeps a pattern whose skillName matches no active skill (UNMATCHED weight, not dropped), and appends its measured/conservative targets after post-processing', () => {
+        const raw = makeAnalysisResponse({
+            patternSummaries: [
+                makePatternSummary({
+                    patternName: 'Broadening Formation',
+                    skillName: 'Broadening Formation', // not present in the active `skills` list below
+                    geometry: {
+                        breakoutLevel: 100,
+                        extremeLevel: 85,
+                        direction: 'up',
+                    },
+                }),
+            ],
+        });
+
+        const enriched = enrichAnalysisWithConfidence(raw, [makeSkill()]);
+        expect(enriched.patternSummaries[0].confidenceWeight).toBe(
+            UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+        );
+        expect(enriched.patternSummaries[0].geometry).toEqual({
+            breakoutLevel: 100,
+            extremeLevel: 85,
+            direction: 'up',
+        });
+
+        const reconciled = postProcessAnalysisWithReconcile(
+            enriched,
+            undefined,
+            undefined
+        );
+        expect(reconciled.patternSummaries[0].keyPrices).toEqual([
+            { label: '측정 목표가', price: 115 }, // height 15, up -> breakout + height
+            { label: '보수 목표가(50%)', price: 107.5 }, // breakout + height / 2
+        ]);
     });
 });

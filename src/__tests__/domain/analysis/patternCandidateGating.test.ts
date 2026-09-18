@@ -103,6 +103,7 @@ describe('buildAnalysisPrompt — pattern-screener exception safety', () => {
             screenChartPatterns: () => {
                 throw new Error('boom: classifier bug');
             },
+            computeCandidateGeometry: () => null,
         }));
 
         const { buildAnalysisPrompt: buildWithThrowingScreener } =
@@ -134,7 +135,7 @@ describe('buildAnalysisPrompt — pattern-screener exception safety', () => {
 });
 
 describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_on catalog (regression)', () => {
-    it('produces byte-identical output whether or not the screener finds candidates', async () => {
+    it('selects the identical skill catalog whether or not the screener finds candidates (spec 2026-09-18 §A1 narrowed this — see comments below)', async () => {
         const skills = [
             makeSkill({ name: 'B Pattern', type: 'pattern', gating: alwaysOn }),
             makeSkill({ name: 'A Pattern', type: 'pattern', gating: alwaysOn }),
@@ -150,6 +151,7 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         vi.resetModules();
         vi.doMock('@/domain/patterns', () => ({
             screenChartPatterns: () => [],
+            computeCandidateGeometry: () => null,
         }));
         const { buildAnalysisPrompt: buildWithNoCandidates } =
             await import('@/domain/analysis/prompt');
@@ -170,6 +172,7 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
                 { id: 'double_top', startIndex: 0, endIndex: 1 },
                 { id: 'bull_flag', startIndex: 2, endIndex: 3 },
             ],
+            computeCandidateGeometry: () => null,
         }));
         const { buildAnalysisPrompt: buildWithCandidates } =
             await import('@/domain/analysis/prompt');
@@ -184,6 +187,29 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
             )
         );
 
-        expect(withCandidates).toBe(withNoCandidates);
+        // The active-skill catalog (and everything selection derives — the
+        // stable prefix, patternSummaries Writing Rules skill list, etc.) is
+        // unaffected: `patternCandidates` only reaches `selectSkills` for
+        // `gated`/`event` skills, and every skill here is `always_on`. Scope
+        // the equality check to that portion — everything up to the first
+        // per-call value (`Symbol:`) — rather than the whole prompt, since
+        // `## Chart Pattern Candidates (computed)` now legitimately renders
+        // the screener's raw findings (spec 2026-09-18 §A1) and is expected
+        // to differ.
+        const skillPortion = (s: string): string =>
+            s.slice(0, s.indexOf('Symbol:'));
+        expect(skillPortion(withCandidates)).toBe(
+            skillPortion(withNoCandidates)
+        );
+
+        // Document (not silently drop) the new, intentional difference: the
+        // candidates section itself does react to the screener's findings.
+        expect(withCandidates).not.toBe(withNoCandidates);
+        expect(withNoCandidates).toContain(
+            '- None detected by the pre-screener'
+        );
+        expect(withCandidates).not.toContain(
+            '- None detected by the pre-screener'
+        );
     });
 });
