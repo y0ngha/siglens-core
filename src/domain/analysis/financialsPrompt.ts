@@ -24,7 +24,11 @@ import type {
     IncomeStatementRow,
     Skill,
 } from '@/domain/types';
-import { formatLargeAmount, formatNullableNumber as fmt } from './promptFormat';
+import {
+    formatLargeAmount,
+    formatNullableNumber as fmt,
+    formatSignedNumber,
+} from './promptFormat';
 
 /**
  * A statement amount labelled with its row's reporting currency, or unlabelled when the
@@ -65,19 +69,95 @@ function fmtGrowthPct(n: number | null | undefined): string {
 }
 
 /**
+ * A percentage-point delta (`+x.xpp` / `-x.xpp`), or `'N/A'` for a
+ * non-finite value. Delegates to {@link formatSignedNumber} for the sign/
+ * `-0` handling (spec §0) — a raw `n.toFixed()` printed `-0.0pp` for a tiny
+ * negative delta that rounds to zero.
+ */
+function fmtPp(n: number | null): string {
+    const text = formatSignedNumber(n, PERCENT_DECIMAL_PLACES);
+    return text === 'N/A' ? text : `${text}pp`;
+}
+
+/**
+ * The prior row sharing `rows[0]`'s `period` (e.g. both `"FY"`, both `"Q3"`)
+ * — comparing an annual row to a quarterly one would be a margin change that
+ * isn't real, only a seasonality artifact. `null` when there are fewer than
+ * 2 rows or no earlier row shares the period.
+ */
+function findPriorSamePeriodRow<T extends { period: string }>(
+    rows: readonly T[]
+): T | null {
+    if (rows.length < 2) return null;
+    const latestPeriod = rows[0].period;
+    return rows.slice(1).find(r => r.period === latestPeriod) ?? null;
+}
+
+/** `latest - prior` in percentage points, or `null` when either side is unusable (null rule). */
+function marginDeltaPp(
+    latest: number | null | undefined,
+    prior: number | null | undefined
+): number | null {
+    if (typeof latest !== 'number' || !Number.isFinite(latest)) return null;
+    if (typeof prior !== 'number' || !Number.isFinite(prior)) return null;
+    return latest - prior;
+}
+
+const MARGIN_TREND_LABEL = '  Margin Trend (latest vs prior same-period row):';
+
+/** Income-statement margin trend line (gross / operating / net), or `'N/A'` without a comparable prior row. */
+function formatIncomeMarginTrendLine(
+    rows: readonly IncomeStatementRow[]
+): string {
+    const prior = findPriorSamePeriodRow(rows);
+    if (!prior) return `${MARGIN_TREND_LABEL} N/A`;
+    const latest = rows[0];
+    return `${MARGIN_TREND_LABEL} Gross ${fmtPp(marginDeltaPp(latest.grossMargin, prior.grossMargin))}, Operating ${fmtPp(marginDeltaPp(latest.operatingMargin, prior.operatingMargin))}, Net ${fmtPp(marginDeltaPp(latest.netMargin, prior.netMargin))}`;
+}
+
+/** Cash-flow FCF margin trend line, or `'N/A'` without a comparable prior row. */
+function formatCashFlowMarginTrendLine(rows: readonly CashFlowRow[]): string {
+    const prior = findPriorSamePeriodRow(rows);
+    if (!prior) return `${MARGIN_TREND_LABEL} N/A`;
+    const latest = rows[0];
+    return `${MARGIN_TREND_LABEL} FCF ${fmtPp(marginDeltaPp(latest.fcfMargin, prior.fcfMargin))}`;
+}
+
+const LIABILITIES_EQUITY_DECIMAL_PLACES = 2;
+
+/** `Total Liabilities / Total Equity` for the latest balance row, or `'N/A'` when equity ≤ 0 (null rule). */
+function formatLiabilitiesToEquityLine(
+    rows: readonly BalanceSheetRow[]
+): string {
+    const latest = rows[0];
+    const liabilities = latest?.totalLiabilities;
+    const equity = latest?.totalStockholdersEquity;
+    const ratio =
+        typeof liabilities === 'number' &&
+        Number.isFinite(liabilities) &&
+        typeof equity === 'number' &&
+        Number.isFinite(equity) &&
+        equity > 0
+            ? liabilities / equity
+            : null;
+    return `  Liabilities / Equity: ${ratio === null ? 'N/A' : ratio.toFixed(LIABILITIES_EQUITY_DECIMAL_PLACES)}`;
+}
+
+/**
  * Render income statement rows (newest first, up to 3 years) into a markdown section.
  *
  * Covers revenue, grossProfit, operatingIncome, netIncome, EPS, and margin fields.
  */
 function formatIncomeSection(rows: IncomeStatementRow[]): string {
     if (rows.length === 0) return '  (No income statement data available)';
-    return rows
+    const rowLines = rows
         .slice(0, 3)
         .map(r => {
             const amount = statementAmount(r);
             return `  ${r.fiscalYear} (${r.period}): Revenue ${amount(r.revenue)}, Gross Profit ${amount(r.grossProfit)}, Operating Income ${amount(r.operatingIncome)}, Net Income ${amount(r.netIncome)}, EPS ${fmt(r.eps)} | Gross Margin ${fmtPct(r.grossMargin)}, Op. Margin ${fmtPct(r.operatingMargin)}, Net Margin ${fmtPct(r.netMargin)}`;
         })
         .join('\n');
+    return `${rowLines}\n${formatIncomeMarginTrendLine(rows)}`;
 }
 
 /**
@@ -87,13 +167,14 @@ function formatIncomeSection(rows: IncomeStatementRow[]): string {
  */
 function formatBalanceSection(rows: BalanceSheetRow[]): string {
     if (rows.length === 0) return '  (No balance sheet data available)';
-    return rows
+    const rowLines = rows
         .slice(0, 2)
         .map(r => {
             const amount = statementAmount(r);
             return `  ${r.fiscalYear} (${r.period}): Total Assets ${amount(r.totalAssets)}, Total Liabilities ${amount(r.totalLiabilities)}, Net Debt ${amount(r.netDebt)}, Cash ${amount(r.cashAndShortTermInvestments)}, Equity ${amount(r.totalStockholdersEquity)}, Current Ratio ${fmt(r.currentRatio)}`;
         })
         .join('\n');
+    return `${rowLines}\n${formatLiabilitiesToEquityLine(rows)}`;
 }
 
 /**
@@ -103,13 +184,14 @@ function formatBalanceSection(rows: BalanceSheetRow[]): string {
  */
 function formatCashFlowSection(rows: CashFlowRow[]): string {
     if (rows.length === 0) return '  (No cash flow data available)';
-    return rows
+    const rowLines = rows
         .slice(0, 2)
         .map(r => {
             const amount = statementAmount(r);
             return `  ${r.fiscalYear} (${r.period}): Operating Cash Flow ${amount(r.operatingCashFlow)}, CapEx ${amount(r.capitalExpenditure)}, Free Cash Flow ${amount(r.freeCashFlow)}, FCF Margin ${fmtPct(r.fcfMargin)}`;
         })
         .join('\n');
+    return `${rowLines}\n${formatCashFlowMarginTrendLine(rows)}`;
 }
 
 /**

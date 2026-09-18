@@ -21,10 +21,12 @@ import type {
     Skill,
 } from '@/domain/types';
 import {
+    calendarDayDiff,
     equityListingContext,
     formatLargeAmount,
     formatNullableNumber as fmt,
 } from './promptFormat';
+import { MS_PER_HOUR } from '@/domain/constants/time';
 
 /**
  * Select the news-category skills via the shared selection engine (whitelist +
@@ -41,11 +43,40 @@ function selectNewsSkills(skills: readonly Skill[]): Skill[] {
     return [...core, ...selected];
 }
 
+/**
+ * @internal
+ * `<N>h ago` (under 24h) or `<N>d ago` relative to `now`, or `''` when the
+ * timestamp cannot be parsed — spec 2026-09-18 §2.8. A future-dated item
+ * (clock skew) still renders `0h ago` rather than a negative age. Exported so
+ * {@link buildMarketNewsDigestPrompt} (`marketNewsDigestPrompt.ts`) reuses
+ * the exact same rendering instead of a second implementation drifting apart.
+ */
+export function formatAgeSuffix(
+    isoTimestamp: string,
+    now: Date | undefined
+): string {
+    // No reference clock → no relative age. The domain never reads the wall
+    // clock itself; production callers always pass `now`.
+    if (now === undefined) return '';
+    const publishedMs = new Date(isoTimestamp).getTime();
+    if (Number.isNaN(publishedMs)) return '';
+    const hoursAgo = Math.max(0, (now.getTime() - publishedMs) / MS_PER_HOUR);
+    const label =
+        hoursAgo < 24
+            ? `${Math.round(hoursAgo)}h ago`
+            : `${Math.round(hoursAgo / 24)}d ago`;
+    return ` (${label})`;
+}
+
 /** Format a single enriched news item into a compact block for the prompt. */
-function formatNewsItem(item: EnrichedNewsItem, index: number): string {
+function formatNewsItem(
+    item: EnrichedNewsItem,
+    index: number,
+    now: Date | undefined
+): string {
     const lines = [
         `[${index + 1}] ${item.titleEn}`,
-        `    Source: ${item.source} | Published: ${item.publishedAt}`,
+        `    Source: ${item.source} | Published: ${item.publishedAt}${formatAgeSuffix(item.publishedAt, now)}`,
         `    Sentiment: ${item.card.sentiment} | Category: ${item.card.category}`,
         `    Summary (KO): ${item.card.summaryKo}`,
     ];
@@ -58,10 +89,27 @@ function formatNewsItem(item: EnrichedNewsItem, index: number): string {
     return lines.join('\n');
 }
 
+/**
+ * `today`, `in N day(s)` (future), or `N day(s) ago` (past) — a calendar-date
+ * diff against `now`'s UTC date, not a raw ms/24h round (spec 2026-09-18
+ * review R1: the ms form rounded a same-day event to "1 day ago" late in the
+ * day). `''` when the date cannot be parsed — spec 2026-09-18 §2.8.
+ */
+function formatDayOffset(isoDate: string, now: Date | undefined): string {
+    if (now === undefined) return '';
+    const days = calendarDayDiff(isoDate, now);
+    if (days === null) return '';
+    if (days === 0) return 'today';
+    if (days > 0) return days === 1 ? 'in 1 day' : `in ${days} days`;
+    const abs = Math.abs(days);
+    return abs === 1 ? '1 day ago' : `${abs} days ago`;
+}
+
 /** Format upcoming earnings calendar items into a compact block. */
 function formatCalendarItems(
     items: readonly EarningsCalendarItem[],
-    currency: CurrencyCode
+    currency: CurrencyCode,
+    now: Date | undefined
 ): string {
     if (items.length === 0) return '  None scheduled.';
     return items
@@ -72,9 +120,37 @@ function formatCalendarItems(
                 item.epsActual != null
                     ? `Actual EPS: ${fmt(item.epsActual)}`
                     : '';
-            return `  - ${item.earningsDate}: EPS est. ${eps}${actEps ? ` | ${actEps}` : ''} | Rev est. ${rev}`;
+            const offset = formatDayOffset(item.earningsDate, now);
+            const dateLabel = offset
+                ? `${item.earningsDate} (${offset})`
+                : item.earningsDate;
+            return `  - ${dateLabel}: EPS est. ${eps}${actEps ? ` | ${actEps}` : ''} | Rev est. ${rev}`;
         })
         .join('\n');
+}
+
+/**
+ * @internal
+ * `Sentiment tally: N bullish / N bearish / N neutral (high impact: N
+ * bullish / N bearish)` — computed from the enriched cards so the model
+ * never has to count sentiment itself (spec 2026-09-18 §2.8). Exported for
+ * reuse by {@link buildMarketNewsDigestPrompt}.
+ */
+export function formatSentimentTally(
+    news: ReadonlyArray<EnrichedNewsItem>
+): string {
+    const count = (pred: (item: EnrichedNewsItem) => boolean): number =>
+        news.filter(pred).length;
+    const bullish = count(n => n.card.sentiment === 'bullish');
+    const bearish = count(n => n.card.sentiment === 'bearish');
+    const neutral = count(n => n.card.sentiment === 'neutral');
+    const highBullish = count(
+        n => n.card.sentiment === 'bullish' && n.card.priceImpact === 'high'
+    );
+    const highBearish = count(
+        n => n.card.sentiment === 'bearish' && n.card.priceImpact === 'high'
+    );
+    return `Sentiment tally: ${bullish} bullish / ${bearish} bearish / ${neutral} neutral (high impact: ${highBullish} bullish / ${highBearish} bearish)`;
 }
 
 /**
@@ -145,7 +221,8 @@ export function buildNewsAnalysisPrompt(
     skills: readonly Skill[],
     assetClass: AssetClass,
     locale?: AnalysisLocale,
-    currency?: CurrencyCode
+    currency?: CurrencyCode,
+    now?: Date
 ): AssembledPrompt;
 export function buildNewsAnalysisPrompt(
     symbol: string,
@@ -157,7 +234,14 @@ export function buildNewsAnalysisPrompt(
     maybeSkills?: readonly Skill[],
     assetClass: AssetClass = 'equity',
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    /**
+     * Reference clock for the per-item age suffix and calendar day offsets
+     * (spec 2026-09-18 §2.8). Optional without a wall-clock default: the
+     * domain layer never reads the clock itself (every production caller
+     * passes it); when omitted, the relative-time annotations are left out.
+     */
+    now?: Date
 ): AssembledPrompt {
     const companyName =
         typeof companyNameOrNews === 'string' ? companyNameOrNews : symbol;
@@ -186,10 +270,14 @@ export function buildNewsAnalysisPrompt(
 
     const newsSection =
         news.length > 0
-            ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
+            ? news.map((item, i) => formatNewsItem(item, i, now)).join('\n\n')
             : 'No recent news articles available.';
 
-    const calendarSection = formatCalendarItems(upcomingCalendar, currency);
+    const calendarSection = formatCalendarItems(
+        upcomingCalendar,
+        currency,
+        now
+    );
 
     const assetContext =
         assetClass === 'crypto'
@@ -212,6 +300,7 @@ ${assetContext} Respond with a JSON object matching the exact schema below. No m
 - No current price, price change, or volume data is provided in this prompt. Do not claim that news caused an actual price move unless explicit price-movement data is provided here.
 
 ## Recent News Articles (${news.length} items)
+${formatSentimentTally(news)}
 ${newsSection}
 
 ## Upcoming / Recent Earnings Calendar

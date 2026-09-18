@@ -10,6 +10,63 @@ import type {
 } from '@/domain/types';
 
 /**
+ * @internal `N up / N down / N flat` from a list of percent changes (spec
+ * 2026-09-18 §2.9). Filters to finite values first (spec 2026-09-18 review
+ * R2 — a non-finite change matches none of `>0`/`<0`/`===0`, so it silently
+ * dropped out of the count without the caller's `MIN_FINITE_SECTORS`-style
+ * intent being visible at this call site too).
+ */
+function formatBreadth(changes: readonly number[]): string {
+    const finite = changes.filter(Number.isFinite);
+    const up = finite.filter(c => c > 0).length;
+    const down = finite.filter(c => c < 0).length;
+    const flat = finite.filter(c => c === 0).length;
+    return `Breadth: ${up} up / ${down} down / ${flat} flat`;
+}
+
+const SPREAD_DECIMAL_PLACES = 2;
+/** A spread needs 2 points to mean anything — one row reads as a fake 0.00%p spread. */
+const MIN_ROWS_FOR_SPREAD = 2;
+
+/**
+ * @internal `Best − worst sector spread: x.xx%p`, or `'N/A'` (fewer than
+ * {@link MIN_ROWS_FOR_SPREAD} finite rows — null rule, spec 2026-09-18
+ * review R2). `%p` matches this file's existing percentage-point suffix.
+ */
+function formatBestWorstSpread(changes: readonly number[]): string {
+    const finite = changes.filter(Number.isFinite);
+    if (finite.length < MIN_ROWS_FOR_SPREAD) {
+        return 'Best − worst sector spread: N/A';
+    }
+    const spread = Math.max(...finite) - Math.min(...finite);
+    return `Best − worst sector spread: ${spread.toFixed(SPREAD_DECIMAL_PLACES)}%p`;
+}
+
+/**
+ * Canonical `symbol` of the volatility-index row inside `indices` (spec
+ * 2026-09-18 §B2) — the VIX is a fear gauge, not a directional market
+ * index, and it dominates every other index's move (its typical daily swing
+ * runs several times an equity index's), so folding it into the average
+ * reports a number that tracks VIX's own noise more than the market.
+ */
+const VOLATILITY_INDEX_SYMBOL = 'VIX';
+
+/**
+ * @internal `Index average change: ±x.xx%`, or `'N/A'` (no non-volatility
+ * indices — null rule). Excludes the {@link VOLATILITY_INDEX_SYMBOL} row —
+ * spec 2026-09-18 §B2.
+ */
+function formatIndexAverageChange(indices: readonly MarketIndexData[]): string {
+    const changes = indices
+        .filter(i => i.symbol !== VOLATILITY_INDEX_SYMBOL)
+        .map(i => i.changesPercentage)
+        .filter(Number.isFinite);
+    if (changes.length === 0) return 'Index average change: N/A';
+    const avg = changes.reduce((sum, c) => sum + c, 0) / changes.length;
+    return `Index average change: ${formatSignedPercent(avg)}`;
+}
+
+/**
  * @internal Builds the market-briefing LLM prompt.
  *
  * Build the AI market-briefing prompt from the dashboard summary data. This
@@ -71,11 +128,32 @@ export function buildMarketBriefingPrompt(
      * 티커는 그대로 둔다 — 어느 행을 가리키는지 앵커가 되고, 값이 붙어 있으면
      * 모델이 행을 헷갈리지 않는다.
      */
-    const sectorLines = sectors
-        .map(s => {
-            return `${s.koreanName} (${s.symbol}): ${formatSignedPercent(s.changesPercentage)}`;
-        })
-        .join('\n');
+    // A non-finite change (a quote the provider failed to fill) cannot be
+    // ranked against real numbers — listed after the ranked rows, with no
+    // `#N`, rather than sorting arbitrarily among the real ones (spec
+    // 2026-09-18 review R2).
+    const finiteSectors = sectors.filter(s =>
+        Number.isFinite(s.changesPercentage)
+    );
+    const nonFiniteSectors = sectors.filter(
+        s => !Number.isFinite(s.changesPercentage)
+    );
+    // Ranked desc by change so "leading"/"lagging" reads straight off rank 1
+    // and rank N — the model no longer has to scan+sort the rows itself.
+    const rankedSectors = finiteSectors.toSorted(
+        (a, b) => b.changesPercentage - a.changesPercentage
+    );
+    const sectorChanges = finiteSectors.map(s => s.changesPercentage);
+    const sectorLines = [
+        ...rankedSectors.map(
+            (s, i) =>
+                `#${i + 1} ${s.koreanName} (${s.symbol}): ${formatSignedPercent(s.changesPercentage)}`
+        ),
+        ...nonFiniteSectors.map(s => `${s.koreanName} (${s.symbol}): N/A`),
+    ].join('\n');
+    const breadthLine = formatBreadth(sectorChanges);
+    const spreadLine = formatBestWorstSpread(sectorChanges);
+    const indexAverageLine = formatIndexAverageChange(indices);
 
     /*
      * 비유한값·0은 "값이 없다"로 취급한다.
@@ -130,13 +208,17 @@ Schema (string fields are Korean 존댓말; numeric fields are JSON numbers, not
 
 Rules:
 - Every entry in "leadingSectors"/"laggingSectors" must match, character for character, a 섹터명 appearing before the parentheses in the 섹터 등락률 rows below. Never emit a name that is not in that list.
+- The 섹터 등락률 rows below are already ranked by change, best to worst (rank #1 = leading). "leadingSectors" must come from the TOP of that ranked list, "laggingSectors" from the BOTTOM — do not re-sort or re-rank them yourself.
 ${volatilityRule}
 
 주요 지수:
 ${indexLines}
+${indexAverageLine}
 
-섹터 등락률:
-${sectorLines}`;
+섹터 등락률 (rank #1 = 최고 상승):
+${sectorLines}
+${breadthLine}
+${spreadLine}`;
 
     // `stable` is empty — this builder has no skills and no other
     // catalog-level knowledge to cache (spec §3.2/Design C).

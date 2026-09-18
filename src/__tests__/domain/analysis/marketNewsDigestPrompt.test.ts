@@ -123,3 +123,36 @@ describe('buildMarketNewsDigestPrompt — 출력 로케일', () => {
         ).toContain('Korean (존댓말)');
     });
 });
+
+describe('buildMarketNewsDigestPrompt — sentiment tally + age (spec 2026-09-18 §2.8)', () => {
+    const NOW = new Date('2026-06-15T18:00:00Z');
+
+    it("renders the sentiment tally header and each item's age suffix", () => {
+        const { dynamic } = buildMarketNewsDigestPromptRaw(
+            '미국 암호화폐',
+            [ITEM],
+            [],
+            'ko',
+            NOW
+        );
+        expect(dynamic).toContain(
+            'Sentiment tally: 1 bullish / 0 bearish / 0 neutral (high impact: 1 bullish / 0 bearish)'
+        );
+        // ITEM published 2026-06-15T12:00:00Z, NOW 18:00:00Z -> 6h ago
+        expect(dynamic).toContain('Published: 2026-06-15T12:00:00Z (6h ago)');
+    });
+
+    it('omits the age suffix when `now` is omitted — the domain never reads the wall clock', () => {
+        const recent: EnrichedNewsItem = {
+            ...ITEM,
+            publishedAt: '2026-09-18T12:00:00.000Z',
+        };
+        const { dynamic } = buildMarketNewsDigestPromptRaw(
+            '미국 암호화폐',
+            [recent],
+            []
+        );
+        expect(dynamic).toContain('Published: 2026-09-18T12:00:00.000Z\n');
+        expect(dynamic).not.toMatch(/\(\d+[hd] ago\)/);
+    });
+});

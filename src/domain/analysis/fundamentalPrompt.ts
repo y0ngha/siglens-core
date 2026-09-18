@@ -22,9 +22,11 @@ import type {
     Skill,
 } from '@/domain/types';
 import {
+    calendarDayDiff,
     formatLargeAmount,
     formatNullableNumber as fmt,
     formatPrice,
+    formatSignedNumber,
     formatSignedPercent,
 } from './promptFormat';
 
@@ -91,12 +93,18 @@ function formatPriceTargetSummary(
     return `1M Avg: ${px(summary.month1Avg)}, 3M Avg: ${px(summary.month3Avg)}, 1Y Avg: ${px(summary.year1Avg)}`;
 }
 
-/** Format a peer valuation metric as a fixed-decimal string, or 'N/A' for non-finite / null / undefined values. */
+/**
+ * Format a peer valuation metric as a fixed-decimal string, or 'N/A' for
+ * non-finite / null / undefined values. Delegates to `fmt` (shared
+ * {@link formatNullableNumber}) instead of a raw `toFixed` so a negative P/E
+ * (a loss-making peer) that rounds to exactly zero never prints `-0.00`
+ * (spec §0/§B6) — a raw `toFixed` does not strip that sign.
+ */
 function formatPeerMetric(
     n: number | null | undefined,
     dp = PEER_METRIC_DECIMAL_PLACES
 ): string {
-    return typeof n === 'number' && Number.isFinite(n) ? n.toFixed(dp) : 'N/A';
+    return fmt(n, dp);
 }
 
 /** Render sector direction as a compact inline string. */
@@ -109,6 +117,157 @@ function formatSectorDirection(
         .map(h => `${h.date}: ${formatSignedPercent(h.changePct)}`)
         .join(', ');
     return `Today: ${today}${history ? `; Recent: ${history}` : ''}`;
+}
+
+const DERIVED_PERCENT_FACTOR = 100;
+/** Decimal places for every `±x.x%` derived-metric line (spec §2.6). */
+const DERIVED_PCT_DP = 1;
+
+function isFiniteNumber(n: number | null | undefined): n is number {
+    return typeof n === 'number' && Number.isFinite(n);
+}
+
+function isFinitePositive(n: number | null | undefined): n is number {
+    return isFiniteNumber(n) && n > 0;
+}
+
+/**
+ * `+x.x%` / `-x.x%`, or `'N/A'` for a non-finite value — one decimal (spec
+ * §2.6), not `fmt`'s default two. Delegates to the shared
+ * {@link formatSignedNumber} (spec 2026-09-18 review R11) instead of a
+ * hand-rolled sign check, so it never prints `-0.0%` either.
+ */
+function fmtSignedPct1(n: number | null): string {
+    const text = formatSignedNumber(n, DERIVED_PCT_DP);
+    return text === 'N/A' ? text : `${text}%`;
+}
+
+/** `((value - base) / base) × 100`, or `null` when either input cannot support a ratio (null rule). */
+function percentDelta(
+    value: number | null | undefined,
+    base: number | null | undefined
+): number | null {
+    if (!isFiniteNumber(value) || !isFinitePositive(base)) return null;
+    return ((value - base) / base) * DERIVED_PERCENT_FACTOR;
+}
+
+/**
+ * Premium/discount of the subject's own metric vs the peer median — N/A when
+ * either side is non-positive (spec 2026-09-18 review R11). `percentDelta`
+ * alone only guards the BASE (peer median); a subject P/E or P/S that is
+ * itself ≤ 0 (a loss-making company) is not a valuation multiple a "premium"
+ * or "discount" reads meaningfully against.
+ */
+function peerPremiumPct(
+    subjectValue: number | null | undefined,
+    peerMedian: number | null
+): number | null {
+    if (!isFinitePositive(subjectValue)) return null;
+    return percentDelta(subjectValue, peerMedian);
+}
+
+/** Median of a numeric array (sorted ascending internally), or `null` for an empty input. */
+function median(values: readonly number[]): number | null {
+    if (values.length === 0) return null;
+    const sorted = values.toSorted((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
+}
+
+/** Minimum peer count for `peerMedian` — a "median" of 1 is just that one peer's value, so it is withheld rather than presented as a peer comparison. */
+const MIN_PEERS_FOR_MEDIAN = 2;
+
+/**
+ * Median of `peers[metric]` across peers with a finite, positive value for
+ * that metric — a negative or zero P/E is a distressed-earnings artifact,
+ * not a valuation the model should average in. `null` when fewer than
+ * {@link MIN_PEERS_FOR_MEDIAN} peers qualify.
+ */
+function peerMedian(
+    peers: readonly { per: number | null; psr: number | null }[],
+    metric: 'per' | 'psr'
+): number | null {
+    const values = peers
+        .map(p => p[metric])
+        .filter((v): v is number => isFinitePositive(v));
+    return values.length >= MIN_PEERS_FOR_MEDIAN ? median(values) : null;
+}
+
+/** Analyst buy share: `(strongBuy + buy) / total × 100`, or `null` when the total is not usable. */
+function computeAnalystBuySharePct(g: GradesConsensus | null): number | null {
+    if (!g) return null;
+    const total = g.strongBuy + g.buy + g.hold + g.sell + g.strongSell;
+    if (!Number.isFinite(total) || total <= 0) return null;
+    return ((g.strongBuy + g.buy) / total) * DERIVED_PERCENT_FACTOR;
+}
+
+/**
+ * Calendar-date days from `now`'s UTC date to `nextEarningsAt`'s UTC date
+ * (today is `0`, not a raw ms/24h round — spec 2026-09-18 review R1);
+ * negative when the date has already passed. `null` when the date is
+ * missing or unparseable.
+ */
+function computeDaysToEarnings(
+    nextEarningsAt: string | null,
+    now: Date | undefined
+): number | null {
+    if (!nextEarningsAt || now === undefined) return null;
+    return calendarDayDiff(nextEarningsAt, now);
+}
+
+/** @internal Section header — exported so callers/tests reference the exact string. */
+export const DERIVED_METRICS_SECTION_HEADER = '## Derived Metrics (computed)';
+
+/**
+ * Renders the deterministic metrics the model used to compute itself: target
+ * upside vs current price, price-target trend, peer valuation premium, the
+ * analyst buy share, and days to the next earnings report (spec 2026-09-18
+ * §2.6). Every line is `N/A` when its inputs are missing or non-finite (null
+ * rule, spec §0).
+ *
+ * No EPS-estimate-vs-TTM line: the analyst estimate's fiscal period is not
+ * knowable from this snapshot (FMP's estimate is an unspecified fiscal year;
+ * the Yahoo/KR path's is the current quarter), so a computed delta against
+ * annual TTM EPS would silently compare mismatched periods (a quarterly
+ * estimate read against annual TTM reads as ≈ -75%) — see decision 2026-09-18.
+ */
+function formatDerivedMetricsSection(
+    snapshot: FundamentalSnapshot,
+    now: Date | undefined
+): string {
+    const { valuation, peers, futureDirection, currentPrice } = snapshot;
+    const targetUpsidePct = percentDelta(
+        futureDirection.priceTargetConsensus?.consensus,
+        currentPrice
+    );
+    const targetTrendPct = percentDelta(
+        futureDirection.priceTargetSummary?.month1Avg,
+        futureDirection.priceTargetSummary?.year1Avg
+    );
+    const peerMedianPer = peerMedian(peers, 'per');
+    const peerMedianPsr = peerMedian(peers, 'psr');
+    const perPremiumPct = peerPremiumPct(valuation.per, peerMedianPer);
+    const psrPremiumPct = peerPremiumPct(valuation.psr, peerMedianPsr);
+    const buySharePct = computeAnalystBuySharePct(
+        futureDirection.gradesConsensus
+    );
+    const daysToEarnings = computeDaysToEarnings(
+        futureDirection.nextEarningsAt,
+        now
+    );
+
+    return [
+        DERIVED_METRICS_SECTION_HEADER,
+        'These figures are already computed; do not recompute them yourself.',
+        `- Price Target Upside: ${fmtSignedPct1(targetUpsidePct)} (consensus target vs price at analysis time)`,
+        `- Price Target Momentum: ${fmtSignedPct1(targetTrendPct)} (1M avg vs 1Y avg)`,
+        `- Peer Median P/E: ${formatPeerMetric(peerMedianPer)} (premium/discount vs peers: ${fmtSignedPct1(perPremiumPct)})`,
+        `- Peer Median P/S: ${formatPeerMetric(peerMedianPsr)} (premium/discount vs peers: ${fmtSignedPct1(psrPremiumPct)})`,
+        `- Analyst Grades Buy Share: ${fmtPct(buySharePct)}`,
+        `- Days to Next Earnings: ${daysToEarnings === null ? 'N/A' : daysToEarnings}`,
+    ].join('\n');
 }
 
 /**
@@ -150,6 +309,10 @@ function formatSectorDirection(
  * @param snapshot - Normalised fundamental data for the symbol.
  * @param skills   - All loaded skills; non-fundamental entries are filtered out.
  * @param currency - Listing quote currency from the consumer's market profile. Defaults to `'USD'`.
+ * @param now - Reference clock for `## Derived Metrics`'s days-to-earnings line
+ *   (spec 2026-09-18 §2.6). Optional without a wall-clock default — the domain
+ *   never reads the clock itself; production callers pass it, and without it
+ *   the days-to-earnings line reads `N/A`.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildFundamentalAnalysisPrompt(
@@ -157,7 +320,8 @@ export function buildFundamentalAnalysisPrompt(
     snapshot: FundamentalSnapshot,
     skills: readonly Skill[],
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    now?: Date
 ): AssembledPrompt {
     const {
         profile,
@@ -255,6 +419,8 @@ ${peerLines}
 
 ## Sector Direction
 ${formatSectorDirection(sectorDirection)}
+
+${formatDerivedMetricsSection(snapshot, now)}
 
 ${CORE_SKILL_REFERENCE_POINTER}
 

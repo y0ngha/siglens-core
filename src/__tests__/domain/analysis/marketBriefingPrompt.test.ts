@@ -347,3 +347,119 @@ describe('buildMarketBriefingPrompt numeric guards', () => {
         expect(p).not.toContain('18.345678');
     });
 });
+
+describe('buildMarketBriefingPrompt — sector rank + breadth + spread (spec 2026-09-18 §2.9)', () => {
+    it('sorts sector rows by change descending and prefixes each with a rank', () => {
+        const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
+        const xlkIdx = p.indexOf('#1 기술 (XLK): +1.20%');
+        const xleIdx = p.indexOf('#2 에너지 (XLE): -0.75%');
+        expect(xlkIdx).toBeGreaterThan(-1);
+        expect(xleIdx).toBeGreaterThan(xlkIdx);
+    });
+
+    it('re-ranks when the input order does not already match change descending', () => {
+        const reversedInput = [sectors[1], sectors[0]]; // XLE then XLK
+        const p = buildMarketBriefingPrompt(indices, reversedInput, US_CONTEXT);
+        // Still XLK (higher change) first, despite XLE appearing first in the input.
+        const xlkIdx = p.indexOf('#1 기술 (XLK)');
+        const xleIdx = p.indexOf('#2 에너지 (XLE)');
+        expect(xlkIdx).toBeGreaterThan(-1);
+        expect(xleIdx).toBeGreaterThan(xlkIdx);
+    });
+
+    it('renders breadth (up/down/flat)', () => {
+        const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
+        expect(p).toContain('Breadth: 1 up / 1 down / 0 flat');
+    });
+
+    it('counts a zero change as flat, not up or down', () => {
+        const withFlat: MarketSectorData[] = [
+            ...sectors,
+            { ...sectors[0], symbol: 'XLF', changesPercentage: 0 },
+        ];
+        const p = buildMarketBriefingPrompt(indices, withFlat, US_CONTEXT);
+        expect(p).toContain('Breadth: 1 up / 1 down / 1 flat');
+    });
+
+    it('renders the best-worst sector spread in pp', () => {
+        const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
+        // 1.2 - (-0.75) = 1.95
+        expect(p).toContain('Best − worst sector spread: 1.95%p');
+    });
+
+    it('spread is N/A with no sectors (null rule)', () => {
+        const p = buildMarketBriefingPrompt(indices, [], US_CONTEXT);
+        expect(p).toContain('Best − worst sector spread: N/A');
+    });
+
+    it('spread is N/A with only 1 sector — a single point has no spread (spec 2026-09-18 review R2)', () => {
+        const p = buildMarketBriefingPrompt(indices, [sectors[0]], US_CONTEXT);
+        expect(p).toContain('Best − worst sector spread: N/A');
+    });
+
+    it('excludes a non-finite sector change from ranking/breadth/spread, and lists it after the ranked rows with no rank (spec 2026-09-18 review R2)', () => {
+        const withBroken: MarketSectorData[] = [
+            ...sectors,
+            {
+                symbol: 'XLU',
+                sectorName: 'Utilities',
+                koreanName: '유틸리티',
+                price: 60,
+                changesPercentage: Number.NaN,
+            },
+        ];
+        const p = buildMarketBriefingPrompt(indices, withBroken, US_CONTEXT);
+        // Only 2 finite sectors -> breadth/spread computed over those two only.
+        expect(p).toContain('Breadth: 1 up / 1 down / 0 flat');
+        expect(p).toContain('Best − worst sector spread: 1.95%p');
+        // The broken row is listed, unranked, with no NaN anywhere.
+        expect(p).toContain('유틸리티 (XLU): N/A');
+        expect(p).not.toContain('#3 유틸리티');
+        expect(p).not.toContain('NaN');
+    });
+
+    it('renders the index average change, excluding the VIX row (spec 2026-09-18 §B2)', () => {
+        const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
+        // `indices` fixture is [S&P 500 +0.45%, VIX -2.1%] -> VIX excluded,
+        // so the average is just S&P 500's own change, not (0.45 + -2.1) / 2.
+        expect(p).toContain('Index average change: +0.45%');
+    });
+
+    it('index average is N/A when every non-VIX index is missing (null rule)', () => {
+        const onlyVix: MarketIndexData[] = indices.filter(
+            i => i.symbol === 'VIX'
+        );
+        const p = buildMarketBriefingPrompt(onlyVix, sectors, US_CONTEXT);
+        expect(p).toContain('Index average change: N/A');
+    });
+
+    it('index average is N/A with no indices at all (null rule)', () => {
+        const p = buildMarketBriefingPrompt([], sectors, US_CONTEXT);
+        expect(p).toContain('Index average change: N/A');
+    });
+
+    it('averages multiple non-VIX indices while still excluding VIX', () => {
+        const threeIndices: MarketIndexData[] = [
+            ...indices, // S&P 500 +0.45%, VIX -2.1%
+            {
+                symbol: 'IXIC',
+                fmpSymbol: '^IXIC',
+                displayName: 'Nasdaq',
+                koreanName: '나스닥',
+                price: 16000,
+                changesPercentage: 0.75,
+            },
+        ];
+        const p = buildMarketBriefingPrompt(threeIndices, sectors, US_CONTEXT);
+        // (0.45 + 0.75) / 2 = 0.60 -> VIX's -2.1 never enters the average.
+        expect(p).toContain('Index average change: +0.60%');
+    });
+
+    it('rule text says leading/lagging must come from the ranked list, not be re-sorted by the model', () => {
+        const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
+        expect(p).toContain('already ranked by change');
+        expect(p).toContain(
+            '"leadingSectors" must come from the TOP of that ranked list, "laggingSectors" from the BOTTOM'
+        );
+    });
+});
