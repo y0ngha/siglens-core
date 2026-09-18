@@ -442,7 +442,7 @@ describe('computeCandidateGeometry', () => {
             expect(geometry).not.toBeNull();
             expect(geometry!.direction).toBe('up');
             // Rim = the highest bar HIGH across the saucer (20), not the
-            // highest of the matched low pivots (10) — review round 2: the lip
+            // highest of the matched low pivots (10) — the lip
             // is the swing high bounding the cup.
             expect(geometry!.breakoutLevel).toBe(20);
             expect(geometry!.height).toBe(18); // 20 - 2
@@ -456,7 +456,7 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
-    describe('curvature family: rim span bounds (review round 3/4)', () => {
+    describe('curvature family: rim span bounds', () => {
         // The bar IMMEDIATELY outside each bound is higher than the lip (23 at
         // index 7), so widening the max-high scan by even one bar on either
         // side picks the wrong rim.

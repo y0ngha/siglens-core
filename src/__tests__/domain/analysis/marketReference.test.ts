@@ -103,7 +103,7 @@ describe('computeMarketReference', () => {
         expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
     });
 
-    it('never puts Fibonacci/Woodie/DeMark pivots in the capped nearest-level lists (spec 2026-09-18 review R17 — Pivot table: line only)', () => {
+    it('never puts Fibonacci/Woodie/DeMark pivots in the capped nearest-level lists (spec 2026-09-18 — Pivot table: line only)', () => {
         const ref = computeMarketReference(makeBars(5), makeInd(), '1Day');
         const all = [
             ...ref.short.levels.support,
@@ -118,7 +118,7 @@ describe('computeMarketReference', () => {
         expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
     });
 
-    it('emits the complete Standard/Camarilla/Fibonacci/Woodie/DeMark pivot sets on `pivots` (spec 2026-09-18 review R17), shared once from the prior bar', () => {
+    it('emits the complete Standard/Camarilla/Fibonacci/Woodie/DeMark pivot sets on `pivots` (spec 2026-09-18), shared once from the prior bar', () => {
         const ref = computeMarketReference(makeBars(5), makeInd(), '1Day');
         expect(ref.pivots?.standard).not.toBeNull();
         expect(ref.pivots?.camarilla).not.toBeNull();

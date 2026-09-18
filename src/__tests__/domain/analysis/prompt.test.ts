@@ -5348,7 +5348,7 @@ describe('prompt', () => {
             const anchor = lines[anchorIdx]!;
             const table = lines[anchorIdx + 1]!;
             expect(table.startsWith('Fib table: ')).toBe(true);
-            // C1 (spec 2026-09-18 review): a trailing `.0` is dropped —
+            // (spec 2026-09-18): a trailing `.0` is dropped —
             // `50%`/`100%`/`200%`, not `50.0%`/`100.0%`/`200.0%`.
             for (const ratio of ['23.6%', '38.2%', '50%', '61.8%', '78.6%'])
                 expect(table).toContain(`${ratio} `);
@@ -5397,7 +5397,7 @@ describe('prompt', () => {
             expect(line).toMatch(
                 /Standard PP [\d.]+ R1 [\d.]+ R2 [\d.]+ R3 [\d.]+ S1/
             );
-            // "Pivot Fib" (not "Fib") — spec 2026-09-18 review R17: must not
+            // "Pivot Fib" (not "Fib") — spec 2026-09-18: must not
             // be confusable with a Fib retracement/extension row.
             expect(line).toContain('| Pivot Fib PP ');
             expect(line).not.toContain('| Fib PP ');
@@ -5898,7 +5898,7 @@ describe('formatTablePrice', () => {
     });
 });
 
-describe('Fib table lines never print a non-positive level (review round 3)', () => {
+describe('Fib table lines never print a non-positive level', () => {
     it("Fib table: a deep down-leg's far extensions render N/A", () => {
         // High 100 → low 30 (down leg, range 70): ext 161.8% = 100 − 113.26 < 0.
         const line = formatFibTableLine(

@@ -439,7 +439,7 @@ describe('summarizeChainForLlm', () => {
             const summary = summarizeChainForLlm(c, 100);
             const pct = summary.impliedMovePercent!;
             expect(summary.impliedMoveRange).not.toBeNull();
-            // spec 2026-09-18 review R10 — rounded to 2dp at the source now.
+            // spec 2026-09-18 — rounded to 2dp at the source now.
             expect(summary.impliedMoveRange!.low).toBeCloseTo(
                 100 * (1 - pct / 100),
                 2
@@ -470,7 +470,7 @@ describe('summarizeChainForLlm', () => {
             expect(summarizeChainForLlm(c, 150).impliedMoveRange).toBeNull();
         });
 
-        it('is null when impliedMovePercent >= 100 — low would sit at or below zero (spec 2026-09-18 review R10)', () => {
+        it('is null when impliedMovePercent >= 100 — low would sit at or below zero (spec 2026-09-18)', () => {
             // atmIv 1.5 (150% IV) over a full year -> impliedMovePercent = 150.
             const c: OptionsChain = {
                 expirationDate: '2027-06-20',
@@ -483,7 +483,7 @@ describe('summarizeChainForLlm', () => {
             expect(summary.impliedMoveRange).toBeNull();
         });
 
-        it('rounds bounds to 2 decimal places at the source (spec 2026-09-18 review R10)', () => {
+        it('rounds bounds to 2 decimal places at the source (spec 2026-09-18)', () => {
             const c: OptionsChain = {
                 expirationDate: '2026-06-20',
                 daysToExpiration: 33,

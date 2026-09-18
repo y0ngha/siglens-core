@@ -5,7 +5,7 @@ import {
     roundToInputPrecision,
 } from '@/domain/analysis/patternTargets';
 
-describe('computePatternTargets (spec 2026-09-18 review R6)', () => {
+describe('computePatternTargets (spec 2026-09-18)', () => {
     it('up: height = extreme→breakout distance, measured/conservative project above breakout', () => {
         const t = computePatternTargets(100, 90, 'up');
         expect(t.height).toBe(10);

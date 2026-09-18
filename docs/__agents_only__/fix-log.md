@@ -161,10 +161,6 @@
   Rule: MISTAKES.md Public API #8 — Public discriminated union variant types wrongly tagged @internal
   Context: Tier 1 public function parameter type was marked @internal despite being part of public contract. Removed @internal tag and ensured type is re-exported from src/index.ts.
 
-- Violation 2: Import members not in alphabetical order
-  Rule: MISTAKES.md #13.5 — Import statements not alphabetically sorted
-  Context: Imports from same module not alphabetically ordered. Fixed by reordering members alphabetically within import block.
-
 - Violation 3: New helper module without dedicated unit test file
   Rule: Test conventions — new helper module requires dedicated .test.ts file
   Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
@@ -206,4 +202,14 @@
 - Violation 8 (R5 REQUIRED): Geometry defined from wrong pivot kind — cup/rounding-bottom rim calculated from low pivots instead of bounding high pivot
   Rule: Pattern geometry — boundary pivots must use the correct type (high for cup rim, low for valley bottom)
   Context: Cup/rounding-bottom patterns used findMin (low pivots) to define rim, conflating interior low with boundary definition. Fixed by using correct high-pivot bounding logic to define rim position.
+
+## [PR #214 | feat/precomputed-prompt-data | 2026-09-19] — Precomputed prompt data R6 review findings
+
+- Violation 1 (R6 BLOCKER): Tier 4 public type exports (PivotTables, FibonacciPivotLevels, WoodiePivotLevels, DeMarkPivotLevels) missing per-field JSDoc
+  Rule: CONVENTIONS.md — Tier 4 public types require one-line JSDoc per field
+  Context: Types were marked @internal but export removed; types are now public without per-field documentation. Added per-field JSDoc to each Tier 4 type field.
+
+- Violation 3 (R6 CLEANUP): Internal review-round reference tags left in production comments and test names
+  Rule: Production code — internal development/coordination tags must not be committed
+  Context: Tags like "review R6", "review round 2", "coordinator item C3" were used during development reviews but left in code. Removed all internal reference tags from comments and test names.
 

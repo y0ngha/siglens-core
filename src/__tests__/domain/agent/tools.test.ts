@@ -122,8 +122,8 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_market_overview')?.description).toContain(
             'rank'
         );
-        // `sectorBreadth`, not `breadth` (spec 2026-09-18 coordinator item
-        // C4) — the field is the sector ETFs' own up/down/flat counts, not
+        // `sectorBreadth`, not `breadth` (spec 2026-09-18) — the field is
+        // the sector ETFs' own up/down/flat counts, not
         // market-wide advancers/decliners, and the old name read as the latter.
         expect(findToolSpec('get_market_overview')?.description).toContain(
             'sectorBreadth'

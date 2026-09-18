@@ -210,7 +210,7 @@ describe('runFundamentalAnalysis', () => {
         });
     });
 
-    describe('currentPrice wiring (review round 1 fix — was never populated)', () => {
+    describe('currentPrice wiring (fix — was never populated)', () => {
         it('threads a valid options.currentPrice onto the snapshot passed to buildFundamentalAnalysisPrompt', async () => {
             await runFundamentalAnalysis({
                 symbol: mockSymbol,
@@ -295,7 +295,7 @@ describe('runFundamentalAnalysis', () => {
         });
     });
 
-    describe('currentPrice as a lazy getter (spec 2026-09-18 coordinator item C3)', () => {
+    describe('currentPrice as a lazy getter (spec 2026-09-18)', () => {
         it('calls the getter and threads its resolved value onto the snapshot on a cache MISS', async () => {
             mockCacheGet.mockResolvedValue(null);
             const getter = vi.fn().mockResolvedValue(190.5);

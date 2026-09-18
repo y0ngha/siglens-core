@@ -392,12 +392,12 @@ describe('buildMarketBriefingPrompt — sector rank + breadth + spread (spec 202
         expect(p).toContain('Best − worst sector spread: N/A');
     });
 
-    it('spread is N/A with only 1 sector — a single point has no spread (spec 2026-09-18 review R2)', () => {
+    it('spread is N/A with only 1 sector — a single point has no spread (spec 2026-09-18)', () => {
         const p = buildMarketBriefingPrompt(indices, [sectors[0]], US_CONTEXT);
         expect(p).toContain('Best − worst sector spread: N/A');
     });
 
-    it('excludes a non-finite sector change from ranking/breadth/spread, and lists it after the ranked rows with no rank (spec 2026-09-18 review R2)', () => {
+    it('excludes a non-finite sector change from ranking/breadth/spread, and lists it after the ranked rows with no rank (spec 2026-09-18)', () => {
         const withBroken: MarketSectorData[] = [
             ...sectors,
             {

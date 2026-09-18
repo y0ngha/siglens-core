@@ -13,7 +13,7 @@ const buildMacroBriefingPrompt = (
     return `${stable}\n\n${dynamic}`;
 };
 
-// `now` is required (spec 2026-09-18 review R13 — domain must never read the
+// `now` is required (spec 2026-09-18 — domain must never read the
 // wall clock itself); this file's date-agnostic assertions pin an arbitrary
 // fixed instant rather than depending on real time.
 const DEFAULT_NOW = new Date('2026-06-15T00:00:00Z');
@@ -369,7 +369,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         expect(p).not.toContain('2026-06-20 UTC');
     });
 
-    it('`now` is required — domain never reads the wall clock itself (spec 2026-09-18 review R13)', () => {
+    it('`now` is required — domain never reads the wall clock itself (spec 2026-09-18)', () => {
         // A fixed 3-day-out date against a fixed `now`, not `Date.now()` —
         // this used to default `now` silently; that default is gone.
         const p = buildMacroBriefingPromptRaw(

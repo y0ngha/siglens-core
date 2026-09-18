@@ -608,7 +608,7 @@ describe('postProcessAnalysisWithReconcile', () => {
             );
         });
 
-        it('보정된 SL/TP로 결정론적 줄을 계산한다 — AI 원본이 아니라 (spec 2026-09-18 review R5: reconciledLevels.riskReward에 실린다)', () => {
+        it('보정된 SL/TP로 결정론적 줄을 계산한다 — AI 원본이 아니라 (spec 2026-09-18: reconciledLevels.riskReward에 실린다)', () => {
             const response: AnalysisResponse = {
                 ...baseResponse,
                 actionRecommendation: {

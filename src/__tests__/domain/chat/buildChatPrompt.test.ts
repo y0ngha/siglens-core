@@ -940,7 +940,7 @@ describe('buildChatPrompt — analysis-time price, computed distances, structure
         );
     });
 
-    it('Stop/Targets use reconciledLevels when present, not the raw AI values (spec 2026-09-18 review R12 — same preference planCheck applies)', () => {
+    it('Stop/Targets use reconciledLevels when present, not the raw AI values (spec 2026-09-18 — same preference planCheck applies)', () => {
         const reconciled: AnalysisResponse = {
             ...analysisWithPlan,
             actionRecommendation: {

@@ -14,7 +14,7 @@ import type { Bar, PatternCandidate } from '@/domain/types';
 
 /**
  * `formatChartPatternCandidatesSection` no longer screens internally (spec
- * 2026-09-18 review R19 — the caller screens once and shares the result) —
+ * 2026-09-18 — the caller screens once and shares the result) —
  * this mirrors exactly what `prompt.ts` now does at its own call site.
  */
 const candidatesFor = (
@@ -157,7 +157,7 @@ describe('formatChartPatternCandidatesSection', () => {
         }
     );
 
-    it('never prints a negative target and takes the status from the printed (rounded) breakout (review round 3)', () => {
+    it('never prints a negative target and takes the status from the printed (rounded) breakout', () => {
         // Reviewer's probe: a down pattern taller than its breakout projects a
         // negative measured target, and a raw neckline of 19.9951 printed as
         // 20.00 must not read "broken" against a last close of 20.00.
