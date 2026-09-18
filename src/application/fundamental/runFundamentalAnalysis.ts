@@ -263,8 +263,8 @@ export async function runFundamentalAnalysis(
         occurredAt
     );
     if (providerData.status === 'error') return providerData;
-    // `currentPrice` may be a lazy getter (spec 2026-09-18 coordinator item
-    // C3) — resolved here, only after the cache-hit early return above, so a
+    // `currentPrice` may be a lazy getter (spec 2026-09-18) — resolved here,
+    // only after the cache-hit early return above, so a
     // cache HIT never pays for the caller's quote fetch. Invalid (non-finite
     // / <= 0 — a quote failure renders `0` in this codebase, never a real
     // price) is treated as absent so `## Derived Metrics`'s price-relative

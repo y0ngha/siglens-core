@@ -97,7 +97,7 @@ function formatCandidate(
 
     // Recompute the anchor/targets through `computePatternTargets` — the ONE
     // shared math `ai-levels.ts` uses when a model copies breakout/extreme/
-    // direction into its own `geometry` (spec 2026-09-18 review R6). Reusing
+    // direction into its own `geometry` (spec 2026-09-18). Reusing
     // `geometry.measuredTarget`/`conservativeTarget` here (each family's own
     // raw, unrounded formula in `patternGeometry.ts`) could byte-mismatch
     // what the app later appends from the exact same two numbers.
@@ -173,7 +173,7 @@ function formatCandidate(
  * gets a one-line block rather than being dropped.
  *
  * @param candidates - Pre-screener hits, already screened once by the caller
- *   (spec 2026-09-18 review R19 — this used to run `screenChartPatterns`
+ *   (spec 2026-09-18 — this used to run `screenChartPatterns`
  *   itself, a second, redundant screener pass every prompt build already
  *   paid for once during skill selection).
  * @param bars - Full bar series, oldest-first (same series the technical

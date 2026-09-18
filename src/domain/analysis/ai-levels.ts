@@ -466,7 +466,7 @@ const PATTERN_TARGET_LABELS: Record<
  * model-computed target string. Any existing entries carrying these exact
  * labels are dropped first, so re-processing (e.g. a cache round-trip) does
  * not duplicate them. Returns `pattern` unchanged when it has no `geometry`
- * OR the pattern is `detected: false` (spec 2026-09-18 review R7 — a
+ * OR the pattern is `detected: false` (spec 2026-09-18 — a
  * not-detected entry has no real breakout to project a target from; the
  * schema still allows `geometry` there and a model occasionally fills it).
  */
@@ -509,7 +509,7 @@ function applyPatternGeometryTarget(
  * `patternSummaries`. Returns `response` unchanged (same reference) when no
  * `detected: true` pattern carries `geometry` — preserves the "no-op
  * returns the original object" contract {@link postProcessAnalysisWithReconcile}'s
- * early returns already promise callers (spec 2026-09-18 review R7: a
+ * early returns already promise callers (spec 2026-09-18: a
  * `detected: false` pattern with `geometry` alone must not trip this either
  * — {@link applyPatternGeometryTarget} would leave it unchanged anyway, but
  * `.map()` still allocates a new array).

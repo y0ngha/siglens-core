@@ -110,9 +110,9 @@ export interface MarketQuote {
     name: string;
     /**
      * Unix seconds of the provider's quote time, when it reports one (spec
-     * 2026-09-18 coordinator item C2) — used to compute an `asOf` freshness
-     * label for the quote. Optional and additive: a provider adapter that
-     * does not carry a timestamp through simply omits it.
+     * 2026-09-18) — used to compute an `asOf` freshness label for the quote.
+     * Optional and additive: a provider adapter that does not carry a
+     * timestamp through simply omits it.
      */
     timestamp?: number;
 }
@@ -1278,10 +1278,15 @@ export interface HorizonReference {
  * missing or unusable.
  */
 export interface PivotTables {
+    /** Standard pivot set (classic PP/R1–R3/S1–S3), or `null` when the pivot bar was missing or unusable. */
     standard: StandardPivotLevels | null;
+    /** Camarilla pivot set (R3/R4/S3/S4), or `null` when the pivot bar was missing or unusable. */
     camarilla: CamarillaPivotLevels | null;
+    /** Fibonacci pivot set (PP, R1–R3, S1–S3), or `null` when the pivot bar was missing or unusable. */
     fibonacci: FibonacciPivotLevels | null;
+    /** Woodie pivot set (PP, R1–R2, S1–S2), or `null` when the pivot bar was missing or unusable. */
     woodie: WoodiePivotLevels | null;
+    /** DeMark pivot set (PP, R1, S1), or `null` when the pivot bar was missing or unusable. */
     demark: DeMarkPivotLevels | null;
 }
 
@@ -1341,28 +1346,43 @@ export interface CamarillaPivotLevels {
 
 /** Fibonacci pivot levels: `pp ± 0.382/0.618/1.000 × range` (spec 2026-09-18 §A2). */
 export interface FibonacciPivotLevels {
+    /** Central pivot: (high + low + close) / 3. */
     pp: number;
+    /** First resistance level: pp + 0.382 × (high − low). */
     r1: number;
+    /** Second resistance level: pp + 0.618 × (high − low). */
     r2: number;
+    /** Third resistance level: pp + 1.000 × (high − low). */
     r3: number;
+    /** First support level: pp − 0.382 × (high − low). */
     s1: number;
+    /** Second support level: pp − 0.618 × (high − low). */
     s2: number;
+    /** Third support level: pp − 1.000 × (high − low). */
     s3: number;
 }
 
 /** Woodie pivot levels: `pp = (H + L + 2C) / 4`. */
 export interface WoodiePivotLevels {
+    /** Central pivot: (high + low + 2 × close) / 4. */
     pp: number;
+    /** First resistance level: 2·pp − low. */
     r1: number;
+    /** Second resistance level: pp + (high − low). */
     r2: number;
+    /** First support level: 2·pp − high. */
     s1: number;
+    /** Second support level: pp − (high − low). */
     s2: number;
 }
 
 /** DeMark pivot levels — the "X" rule's PP/R1/S1. */
 export interface DeMarkPivotLevels {
+    /** Central pivot: X / 4, where X is the close-vs-open weighted high/low/close sum. */
     pp: number;
+    /** First resistance level: X/2 − low. */
     r1: number;
+    /** First support level: X/2 − high. */
     s1: number;
 }
 

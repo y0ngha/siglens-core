@@ -91,8 +91,8 @@ function formatNewsItem(
 
 /**
  * `today`, `in N day(s)` (future), or `N day(s) ago` (past) — a calendar-date
- * diff against `now`'s UTC date, not a raw ms/24h round (spec 2026-09-18
- * review R1: the ms form rounded a same-day event to "1 day ago" late in the
+ * diff against `now`'s UTC date, not a raw ms/24h round (spec 2026-09-18:
+ * the ms form rounded a same-day event to "1 day ago" late in the
  * day). `''` when the date cannot be parsed — spec 2026-09-18 §2.8.
  */
 function formatDayOffset(isoDate: string, now: Date | undefined): string {

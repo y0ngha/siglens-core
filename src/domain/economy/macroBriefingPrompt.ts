@@ -143,7 +143,7 @@ export function buildMacroBriefingPrompt(
     /**
      * Reference clock for the calendar relative-time suffix (spec
      * 2026-09-18 §2.10). Required — domain code must never read the wall
-     * clock itself (spec 2026-09-18 review R13); the one caller
+     * clock itself (spec 2026-09-18); the one caller
      * (`runMacroBriefing.ts`) already passes it.
      */
     now: Date

@@ -84,7 +84,7 @@ function spreadPct(mid: number | null, spread: number | null): number | null {
 /**
  * @internal `underlyingPrice × (1 ∓ impliedMovePercent / 100)`, rounded to
  * {@link PCT_DECIMAL_PLACES} like every other field in this module (spec
- * 2026-09-18 review R10), or `null` when the price or the implied move is
+ * 2026-09-18), or `null` when the price or the implied move is
  * unavailable — or when `impliedMovePercent >= 100`, which would put `low`
  * at or below zero (an implied move that size is itself an unusable/bad
  * input, not a real "the stock could go to $0 or below" range).

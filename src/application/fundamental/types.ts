@@ -105,7 +105,7 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * this is a point-in-time reading, not a property the cached prompt
      * should be keyed on.
      *
-     * May also be a lazy getter (spec 2026-09-18 coordinator item C3):
+     * May also be a lazy getter (spec 2026-09-18):
      * `runFundamentalAnalysis` only calls it AFTER the cache check misses, so
      * a cache HIT never pays for a quote fetch the caller would otherwise
      * have to do eagerly on every call regardless of whether it was needed.

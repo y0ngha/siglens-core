@@ -44,8 +44,8 @@ export interface PatternTargets {
  * @internal
  * Deterministic measured-move targets from a breakout level + extreme level
  * + direction — the ONE piece of math shared by `## Chart Pattern Candidates
- * (computed)` and the app-appended `keyPrices` entries (spec 2026-09-18
- * review R6). Before this was extracted, `patternGeometry.ts`'s own
+ * (computed)` and the app-appended `keyPrices` entries (spec 2026-09-18).
+ * Before this was extracted, `patternGeometry.ts`'s own
  * family-specific formulas computed the candidates-section numbers with no
  * rounding, while `ai-levels.ts` rounded to input precision when a model
  * copies `breakoutLevel`/`extremeLevel` into its own `geometry` — the two

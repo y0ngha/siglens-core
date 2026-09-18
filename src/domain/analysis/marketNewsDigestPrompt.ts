@@ -7,15 +7,15 @@ import {
     type AnalysisLocale,
 } from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    formatAgeSuffix,
+    formatSentimentTally,
+} from '@/domain/analysis/newsPrompt';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
     NO_CHART_SELECTION_CONTEXT,
     selectSkills,
 } from '@/domain/analysis/selectSkills';
-import {
-    formatAgeSuffix,
-    formatSentimentTally,
-} from '@/domain/analysis/newsPrompt';
 import type { AssembledPrompt, EnrichedNewsItem, Skill } from '@/domain/types';
 
 /**

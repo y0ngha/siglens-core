@@ -1059,7 +1059,7 @@ export const formatPivotTableLine = (
     const parts = [
         pivots.standard &&
             `Standard PP ${px(pivots.standard.pp)} R1 ${px(pivots.standard.r1)} R2 ${px(pivots.standard.r2)} R3 ${px(pivots.standard.r3)} S1 ${px(pivots.standard.s1)} S2 ${px(pivots.standard.s2)} S3 ${px(pivots.standard.s3)}`,
-        // "Pivot Fib" (not "Fib") — spec 2026-09-18 review R17: this label
+        // "Pivot Fib" (not "Fib") — spec 2026-09-18: this label
         // must not read as a Fib retracement/extension row.
         pivots.fibonacci &&
             `Pivot Fib PP ${px(pivots.fibonacci.pp)} R1 ${px(pivots.fibonacci.r1)} R2 ${px(pivots.fibonacci.r2)} R3 ${px(pivots.fibonacci.r3)} S1 ${px(pivots.fibonacci.s1)} S2 ${px(pivots.fibonacci.s2)} S3 ${px(pivots.fibonacci.s3)}`,
@@ -1977,7 +1977,7 @@ const collectDetectedCandleNames = (
 /**
  * Chart-pattern candidates surfaced by the pre-screener for this chart —
  * shared by the `patternCandidates` selection-context field AND `##
- * Chart Pattern Candidates (computed)` (spec 2026-09-18 review R19: the
+ * Chart Pattern Candidates (computed)` (spec 2026-09-18: the
  * screener used to run twice per prompt build, once for each consumer).
  * Guards `atr` unavailable/non-positive the same way {@link
  * screenChartPatterns} itself does (`[]`), and additionally wraps the call
@@ -2229,7 +2229,7 @@ export function buildAnalysisPrompt(
     // down) so both this ATR read and the screener call below happen once.
     const atrForPatternGeometry = lastNonNull(indicators.atr);
     // Screened once and shared by skill selection AND `## Chart Pattern
-    // Candidates (computed)` below (spec 2026-09-18 review R19) — the
+    // Candidates (computed)` below (spec 2026-09-18) — the
     // screener used to run a second, redundant time for the candidates
     // section every prompt build.
     const patternCandidates = screenPatternCandidatesSafely(
@@ -2396,8 +2396,8 @@ export function buildAnalysisPrompt(
             diffDp: precision.difference,
             lastVolume: bars.length > 0 ? bars[bars.length - 1].volume : null,
             // Raw history, oldest-first, minus the last bar — `volumeLine`
-            // slices its own trailing 20-bar window (spec 2026-09-18 review
-            // R8), so this no longer needs to hand-size the slice itself.
+            // slices its own trailing 20-bar window (spec 2026-09-18), so
+            // this no longer needs to hand-size the slice itself.
             priorVolumes: bars.slice(0, -1).map(b => b.volume),
         }),
         formatProIndicatorSection(indicators, config, precision),

@@ -61,7 +61,7 @@ export function formatBarDateTime(timeMs: number): string {
 /**
  * @internal Whole calendar days from `now`'s UTC date to `targetIso`'s UTC
  * date — today is `0`, tomorrow `1`, yesterday `-1` — regardless of either
- * timestamp's time-of-day (spec 2026-09-18 review R1). A raw `Math.round(ms
+ * timestamp's time-of-day (spec 2026-09-18). A raw `Math.round(ms
  * diff / MS_PER_DAY)` drifted: at `now = …T20:00Z`, a target dated "today"
  * (parsed as UTC midnight) is 20 hours in the PAST, rounding to `-1` — "1 day
  * ago" for an event still happening today. `null` when `targetIso` cannot be

@@ -11,8 +11,8 @@ import type {
 
 /**
  * @internal `N up / N down / N flat` from a list of percent changes (spec
- * 2026-09-18 §2.9). Filters to finite values first (spec 2026-09-18 review
- * R2 — a non-finite change matches none of `>0`/`<0`/`===0`, so it silently
+ * 2026-09-18 §2.9). Filters to finite values first (spec 2026-09-18 — a
+ * non-finite change matches none of `>0`/`<0`/`===0`, so it silently
  * dropped out of the count without the caller's `MIN_FINITE_SECTORS`-style
  * intent being visible at this call site too).
  */
@@ -30,8 +30,8 @@ const MIN_ROWS_FOR_SPREAD = 2;
 
 /**
  * @internal `Best − worst sector spread: x.xx%p`, or `'N/A'` (fewer than
- * {@link MIN_ROWS_FOR_SPREAD} finite rows — null rule, spec 2026-09-18
- * review R2). `%p` matches this file's existing percentage-point suffix.
+ * {@link MIN_ROWS_FOR_SPREAD} finite rows — null rule, spec 2026-09-18).
+ * `%p` matches this file's existing percentage-point suffix.
  */
 function formatBestWorstSpread(changes: readonly number[]): string {
     const finite = changes.filter(Number.isFinite);
@@ -131,7 +131,7 @@ export function buildMarketBriefingPrompt(
     // A non-finite change (a quote the provider failed to fill) cannot be
     // ranked against real numbers — listed after the ranked rows, with no
     // `#N`, rather than sorting arbitrarily among the real ones (spec
-    // 2026-09-18 review R2).
+    // 2026-09-18).
     const finiteSectors = sectors.filter(s =>
         Number.isFinite(s.changesPercentage)
     );

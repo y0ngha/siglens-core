@@ -355,7 +355,7 @@ function buildHorizon(
         ),
     ];
 
-    // Fibonacci/Woodie/DeMark pivots (spec 2026-09-18 review R17) live ONLY
+    // Fibonacci/Woodie/DeMark pivots (spec 2026-09-18) live ONLY
     // in the `Pivot table:` line, not in this capped nearest-level list —
     // `splitBySide`'s ~6/side cap meant Standard/Camarilla (the levels
     // traders actually watch) were competing with, and sometimes losing to,

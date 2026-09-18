@@ -107,7 +107,7 @@ export const computeAbcExtension = (
 
     // C must be a real retracement — strictly between A and B — not an
     // overshoot past A (the leg never actually reversed) or a continuation
-    // past B (2026-09-18 review R18). Equality at either edge is also
+    // past B (2026-09-18). Equality at either edge is also
     // rejected: it is not a retracement, just a re-test of the anchor.
     const cIsRealRetracement =
         direction === 'up'

@@ -134,7 +134,7 @@ function isFinitePositive(n: number | null | undefined): n is number {
 /**
  * `+x.x%` / `-x.x%`, or `'N/A'` for a non-finite value — one decimal (spec
  * §2.6), not `fmt`'s default two. Delegates to the shared
- * {@link formatSignedNumber} (spec 2026-09-18 review R11) instead of a
+ * {@link formatSignedNumber} (spec 2026-09-18) instead of a
  * hand-rolled sign check, so it never prints `-0.0%` either.
  */
 function fmtSignedPct1(n: number | null): string {
@@ -153,7 +153,7 @@ function percentDelta(
 
 /**
  * Premium/discount of the subject's own metric vs the peer median — N/A when
- * either side is non-positive (spec 2026-09-18 review R11). `percentDelta`
+ * either side is non-positive (spec 2026-09-18). `percentDelta`
  * alone only guards the BASE (peer median); a subject P/E or P/S that is
  * itself ≤ 0 (a loss-making company) is not a valuation multiple a "premium"
  * or "discount" reads meaningfully against.
@@ -205,7 +205,7 @@ function computeAnalystBuySharePct(g: GradesConsensus | null): number | null {
 
 /**
  * Calendar-date days from `now`'s UTC date to `nextEarningsAt`'s UTC date
- * (today is `0`, not a raw ms/24h round — spec 2026-09-18 review R1);
+ * (today is `0`, not a raw ms/24h round — spec 2026-09-18);
  * negative when the date has already passed. `null` when the date is
  * missing or unparseable.
  */

@@ -175,7 +175,7 @@ function formatStructuredPlan(
               ? formatNullableNumber(entryPrices[0], dp)
               : `${formatNullableNumber(entryPrices[0], dp)} ~ ${formatNullableNumber(entryPrices[entryPrices.length - 1], dp)} (mid ${formatNullableNumber(entryRef ?? null, dp)})`;
     // Reconciled levels win where they exist — the SAME preference
-    // `buildPlanCheck` applies internally (spec 2026-09-18 review R12), so
+    // `buildPlanCheck` applies internally (spec 2026-09-18), so
     // this block and its own `planCheck` ratios below never disagree about
     // which stop/targets are actually in play.
     const effectiveStopLoss = rec.reconciledLevels?.stopLoss ?? rec.stopLoss;
