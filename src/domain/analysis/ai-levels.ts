@@ -1,4 +1,7 @@
-import { buildPlanCheck } from '@/domain/analysis/planCheck';
+import {
+    buildPlanCheck,
+    nearestTargetAbove,
+} from '@/domain/analysis/planCheck';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
 import {
     formatNullableNumber,
@@ -252,7 +255,18 @@ const RISK_REWARD_TEMPLATE: Record<
 
 /**
  * @internal Builds the deterministic bullish risk:reward line.
- * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL/TP 중 하나라도 무효면 빈 문자열.
+ * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL이 무효하거나 진입가보다 높은
+ * 목표가가 하나도 없으면 빈 문자열.
+ *
+ * 목표가는 배열의 첫 번째 값이 아니라 {@link nearestTargetAbove}가 고른 값을 쓴다 —
+ * `riskRewardFrom`이 `planCheck.riskRewardAtEntry`를 계산할 때 쓰는 것과 동일한
+ * 헬퍼다. 규칙을 한 곳(`planCheck.ts`)에 두면 이 줄과 `planCheck.riskRewardAtEntry`가
+ * 서로 다른 숫자를 보여줄 일이 없다 — 호출자가 넘기는 `takeProfitPrices`가 정렬돼
+ * 있는지, entryPrice 이하 값을 걸러냈는지는 이 함수가 신경 쓸 필요가 없다
+ * (fix 2026-09-19: 이전엔 `[0]`을 그대로 썼는데, `reconcileBullishActionRecommendation`이
+ * SL만 보정하고 TP는 AI 원본을 그대로 넘기는 경로에서 그 원본이 미정렬이면 `[0]`이
+ * 가장 가까운 목표가라는 보장이 없었다 — entry 100, TP `[150, 105]`, SL만 보정된
+ * 경우가 그 예다).
  *
  * `locale` defaults to `'ko'` so every existing call site (including
  * {@link reconcileBullishActionRecommendation}'s internal use for
@@ -271,9 +285,12 @@ export function buildBullishRiskRewardText(
         stopLoss >= entryPrice
     )
         return '';
-    const tp = takeProfitPrices?.[0];
-    // tp가 entryPrice보다 크지 않으면 R:R이 음수가 되어 사용자 혼란 → 빈 문자열
-    if (tp === undefined || !Number.isFinite(tp) || tp <= entryPrice) return '';
+
+    // Nearest target strictly above entryPrice — see `nearestTargetAbove`'s own doc
+    // for the rule. Any target at/below entryPrice is noise (a negative R:R would only
+    // confuse the reader), so it is dropped, not just skipped.
+    const tp = nearestTargetAbove(entryPrice, takeProfitPrices);
+    if (tp === undefined) return '';
 
     const slPct = ((stopLoss - entryPrice) / entryPrice) * 100;
     const tpPct = ((tp - entryPrice) / entryPrice) * 100;
@@ -563,34 +580,56 @@ export function postProcessAnalysisWithReconcile(
     if (entryPrice === undefined || !Number.isFinite(entryPrice))
         return withTargets;
 
-    const { recommendation } = reconcileBullishActionRecommendation(
-        rec,
-        entryPrice,
-        atr,
-        currency,
-        locale
-    );
+    const { recommendation, wasReconciled } =
+        reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr,
+            currency,
+            locale
+        );
 
-    // Deterministic risk:reward line — only when `reconciledLevels` is
-    // ABSENT. `reconcileBullishActionRecommendation` already computes the
-    // exact same line into `reconciledLevels.riskReward` whenever it
-    // reconciles (see its own `buildBullishRiskRewardText` call above); the
-    // UI renders both `riskReward` and `reconciledLevels.riskReward`, so
-    // prepending here too duplicated the line on every reconciled analysis.
-    // This still closes the original gap: `reconcileBullishActionRecommendation`
-    // returns early (no reconciledLevels) whenever the AI's own SL/TP already
-    // pass validation, which used to mean the ratio was missing from every
-    // *healthy* analysis (same gap `buildPlanCheck` closes for the numeric
-    // fields; this closes it for the `riskReward` prose field) — that is
-    // exactly the case handled here.
-    const deterministicRiskReward = recommendation.reconciledLevels
+    // Deterministic risk:reward line — only when CORE did not reconcile.
+    // `recommendation.reconciledLevels` presence is NOT proof of that: the
+    // strict response schema (responseSchemas.ts) requires the model to
+    // emit `reconciledLevels` itself (object or null) on every response, and
+    // normalize.ts passes whatever it fills straight through — so a healthy
+    // analysis can arrive with the field already populated by the model,
+    // with `wasReconciled` still `false`. Gating on presence (the old code)
+    // treated that as "core already wrote the line", so every analysis where
+    // the model filled the field (13/13 on measured production output) had
+    // no ratio anywhere in its riskReward prose, even with the prompt now
+    // telling the model never to state one itself. `wasReconciled` is the
+    // one signal that actually distinguishes "core corrected an invalid
+    // level" (which already wrote the line into `reconciledLevels.riskReward`,
+    // see `buildBullishRiskRewardText` call inside
+    // `reconcileBullishActionRecommendation`; prepending here too would
+    // duplicate it — the UI renders both) from every other case, including a
+    // model-supplied `reconciledLevels` that already passed validation.
+    //
+    // The levels it's built from come from `recommendation.reconciledLevels`
+    // first (the model's own object, since core left it untouched here)
+    // falling back to the top-level AI fields — the same precedence
+    // `buildPlanCheck` uses below. The target list is passed through
+    // unfiltered and unsorted: `buildBullishRiskRewardText` itself now picks
+    // the nearest target above `entryPrice` (the same rule `riskRewardFrom`
+    // uses for `planCheck.riskRewardAtEntry`), so filtering/sorting here
+    // first would only duplicate that rule in a second place — and
+    // `reconcileBullishActionRecommendation`'s own call into the same
+    // helper (see its call site above, used for `reconciledLevels.riskReward`
+    // on the reconciled path) relies on that exact same internal selection
+    // when it hands the helper the AI's raw, possibly unsorted
+    // `takeProfitPrices` after only the stop needed fixing. That single
+    // shared rule is what keeps this line and `planCheck.riskRewardAtEntry`
+    // from ever disagreeing, on either path.
+    const rrStopLoss =
+        recommendation.reconciledLevels?.stopLoss ?? recommendation.stopLoss;
+    const rrTargets =
+        recommendation.reconciledLevels?.takeProfitPrices ??
+        recommendation.takeProfitPrices;
+    const deterministicRiskReward = wasReconciled
         ? ''
-        : buildBullishRiskRewardText(
-              entryPrice,
-              recommendation.stopLoss,
-              recommendation.takeProfitPrices,
-              locale
-          );
+        : buildBullishRiskRewardText(entryPrice, rrStopLoss, rrTargets, locale);
     const recommendationWithRiskReward =
         deterministicRiskReward === ''
             ? recommendation
@@ -602,12 +641,13 @@ export function postProcessAnalysisWithReconcile(
                           : `${deterministicRiskReward}\n\n${recommendation.riskReward}`,
               };
 
-    // Attached outside the reconcile branch on purpose. `reconciledLevels` still
-    // exists only when a level failed validation, but that no longer means the
-    // deterministic risk:reward arithmetic is missing from *healthy* analyses —
-    // the block above prepends `deterministicRiskReward` into `riskReward` for
-    // that case, while the reconciled case carries its own version in
-    // `reconciledLevels.riskReward`. `planCheck` also measures against
+    // Attached outside the reconcile branch on purpose. `wasReconciled` being
+    // `false` no longer means the deterministic risk:reward arithmetic is
+    // missing from *healthy* analyses — the block above prepends
+    // `deterministicRiskReward` into `riskReward` for that case (whether or
+    // not the model also filled `reconciledLevels` itself), while the
+    // reconciled case carries its own version in `reconciledLevels.riskReward`.
+    // `planCheck` also measures against
     // `fallbackEntryPrice` (the last close) rather than the plan's own entry,
     // which is the comparison neither risk:reward path makes: a take-profit
     // above the recommended entry still passes validation while sitting below

@@ -4,6 +4,7 @@ import {
     entryZoneTop,
     exceedsEntryZone,
     ENTRY_ZONE_TOLERANCE,
+    nearestTargetAbove,
     riskRewardFrom,
     structuralRiskReward,
 } from '@/domain/analysis/planCheck';
@@ -33,6 +34,31 @@ function rec(over: Partial<ActionRecommendation> = {}): ActionRecommendation {
         ...over,
     };
 }
+
+describe('nearestTargetAbove', () => {
+    it('picks the nearest target above price out of an unsorted list', () => {
+        expect(nearestTargetAbove(100, [150, 105, 120])).toBe(105);
+    });
+
+    it('excludes values at or below price', () => {
+        expect(nearestTargetAbove(100, [100, 90, 105])).toBe(105);
+    });
+
+    it('excludes NaN and Infinity', () => {
+        expect(
+            nearestTargetAbove(100, [Number.NaN, Number.POSITIVE_INFINITY, 110])
+        ).toBe(110);
+    });
+
+    it('returns undefined for an empty or missing list', () => {
+        expect(nearestTargetAbove(100, [])).toBeUndefined();
+        expect(nearestTargetAbove(100, undefined)).toBeUndefined();
+    });
+
+    it('returns undefined when nothing is above price', () => {
+        expect(nearestTargetAbove(100, [90, 100])).toBeUndefined();
+    });
+});
 
 describe('riskRewardFrom', () => {
     it('measures reward to the NEAREST target above, not the furthest', () => {

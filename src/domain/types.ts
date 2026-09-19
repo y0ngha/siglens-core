@@ -1717,7 +1717,7 @@ export interface ActionRecommendation {
     stopLoss?: number;
     /** Take-profit price targets in ascending order. */
     takeProfitPrices?: number[];
-    /** Domain-derived fallback levels attached when the AI's stopLoss / takeProfitPrices are invalid or missing. The original AI fields above are never mutated — consumers can compare and decide which values to display. */
+    /** Domain-derived fallback levels attached when the AI's stopLoss / takeProfitPrices are invalid or missing. The original AI fields above are never mutated — consumers can compare and decide which values to display. The strict response schema also lets the model fill this field itself, so its presence alone does not mean the domain corrected anything — `postProcessAnalysisWithReconcile` decides that from its own reconciliation result. */
     reconciledLevels?: ReconciledActionLevels;
     /** Deterministic plan-vs-current-price arithmetic. Unlike `reconciledLevels` this is attached on every path, including the one where the AI's own levels passed validation — that path is precisely where a computed risk:reward was previously unavailable. */
     planCheck?: PlanCheck;
