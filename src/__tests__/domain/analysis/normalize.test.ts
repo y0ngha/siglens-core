@@ -20,6 +20,8 @@ import {
     normalizeCandlePatternSummary,
     normalizeActionRecommendation,
 } from '@/domain/analysis/normalize';
+import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
+import type { ActionRecommendation, AnalysisResponse } from '@/domain/types';
 
 describe('normalizeTrend', () => {
     it('유효한 trend 값을 반환한다', () => {
@@ -560,6 +562,147 @@ describe('normalizeActionRecommendation', () => {
             stopLoss: Infinity,
         });
         expect(result?.stopLoss).toBeUndefined();
+    });
+
+    describe('planCheck', () => {
+        // `postProcessAnalysisWithReconcile`이 attach하는 실제 AnalysisResponse/
+        // ActionRecommendation 픽스처. 손으로 만든 planCheck 원시 객체가 아니라
+        // 실제 도메인 함수의 산출물을 다시 normalizeActionRecommendation에 통과시켜야
+        // "카피가 필드 하나를 빠뜨렸다"는 이번 버그의 실패 모드를 잡는다.
+        const baseResponse: AnalysisResponse = {
+            summary: 'test',
+            trend: 'bullish',
+            indicatorResults: [],
+            riskLevel: 'low',
+            keyLevels: { support: [], resistance: [] },
+            priceTargets: { bullish: null, bearish: null },
+            patternSummaries: [],
+            strategyResults: [],
+            candlePatterns: [],
+            trendlines: [],
+        };
+        const baseRec: ActionRecommendation = {
+            positionAnalysis: '',
+            entry: '',
+            exit: '',
+            riskReward: '',
+            entryRecommendation: 'enter',
+            entryPrices: [100],
+            stopLoss: 97,
+            takeProfitPrices: [105],
+        };
+
+        it('postProcessAnalysisWithReconcile이 실제로 붙인 planCheck를 라운드트립 후에도 deep-equal로 보존한다', () => {
+            const withPlanCheck = postProcessAnalysisWithReconcile(
+                { ...baseResponse, actionRecommendation: baseRec },
+                100,
+                2
+            );
+            const attached = withPlanCheck.actionRecommendation?.planCheck;
+            expect(attached).toBeDefined();
+
+            const renormalized = normalizeActionRecommendation(
+                withPlanCheck.actionRecommendation
+            );
+            expect(renormalized?.planCheck).toEqual(attached);
+        });
+
+        it('riskRewardAtCurrent: 0은 살아남는다 (0=타깃 소진, null=계산 불가는 다른 의미)', () => {
+            const result = normalizeActionRecommendation({
+                entry: 'buy',
+                planCheck: {
+                    currentPrice: 100,
+                    entryZoneTop: 100,
+                    exceedsEntryZone: false,
+                    belowStopLoss: false,
+                    riskRewardAtEntry: null,
+                    riskRewardAtCurrent: 0,
+                },
+            });
+            expect(result?.planCheck?.riskRewardAtCurrent).toBe(0);
+        });
+
+        it('비율/entryZoneTop 필드가 비유한이면 null이 된다', () => {
+            const result = normalizeActionRecommendation({
+                entry: 'buy',
+                planCheck: {
+                    currentPrice: 100,
+                    entryZoneTop: Number.NaN,
+                    exceedsEntryZone: false,
+                    belowStopLoss: false,
+                    riskRewardAtEntry: Number.NaN,
+                    riskRewardAtCurrent: Infinity,
+                },
+            });
+            expect(result?.planCheck?.entryZoneTop).toBeNull();
+            expect(result?.planCheck?.riskRewardAtEntry).toBeNull();
+            expect(result?.planCheck?.riskRewardAtCurrent).toBeNull();
+        });
+
+        it('currentPrice가 없거나 유한 양수가 아니면 planCheck 전체를 버린다', () => {
+            const withoutCurrentPrice = normalizeActionRecommendation({
+                entry: 'buy',
+                planCheck: {
+                    entryZoneTop: 100,
+                    exceedsEntryZone: false,
+                    belowStopLoss: false,
+                    riskRewardAtEntry: 1,
+                    riskRewardAtCurrent: 1,
+                },
+            });
+            expect(withoutCurrentPrice?.planCheck).toBeUndefined();
+
+            const zeroCurrentPrice = normalizeActionRecommendation({
+                entry: 'buy',
+                planCheck: {
+                    currentPrice: 0,
+                    exceedsEntryZone: false,
+                    belowStopLoss: false,
+                    riskRewardAtEntry: null,
+                    riskRewardAtCurrent: null,
+                },
+            });
+            expect(zeroCurrentPrice?.planCheck).toBeUndefined();
+
+            const negativeCurrentPrice = normalizeActionRecommendation({
+                entry: 'buy',
+                planCheck: {
+                    currentPrice: -5,
+                    exceedsEntryZone: false,
+                    belowStopLoss: false,
+                    riskRewardAtEntry: null,
+                    riskRewardAtCurrent: null,
+                },
+            });
+            expect(negativeCurrentPrice?.planCheck).toBeUndefined();
+        });
+
+        it('exceedsEntryZone/belowStopLoss가 boolean이 아니면 false가 된다', () => {
+            const result = normalizeActionRecommendation({
+                entry: 'buy',
+                planCheck: {
+                    currentPrice: 100,
+                    entryZoneTop: null,
+                    exceedsEntryZone: 'yes',
+                    belowStopLoss: 1,
+                    riskRewardAtEntry: null,
+                    riskRewardAtCurrent: null,
+                },
+            });
+            expect(result?.planCheck?.exceedsEntryZone).toBe(false);
+            expect(result?.planCheck?.belowStopLoss).toBe(false);
+        });
+
+        it('LLM 원본 출력처럼 planCheck가 없으면 결과 객체에 키 자체가 생기지 않는다', () => {
+            const result = normalizeActionRecommendation({
+                positionAnalysis: 'p',
+                entry: 'e',
+                exit: 'x',
+                riskReward: 'r',
+            });
+            expect(result?.planCheck).toBeUndefined();
+            expect(result && 'planCheck' in result).toBe(false);
+        });
     });
 });
 
