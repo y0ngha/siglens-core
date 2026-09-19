@@ -182,7 +182,7 @@ describe('buildAgentSystemPrompt', () => {
 
     it.each([
         ['get_news', 'If get_news returns nothing useful'],
-        ['get_bars_indicators', 'state its confluence reading'],
+        ['get_bars_indicators', 'reflect its confluence reading'],
         ['get_quote', 'quoteDelayMinutes is greater than 0'],
         ['run_fresh_analysis', 'call run_fresh_analysis right away'],
     ])(
@@ -230,18 +230,47 @@ describe('buildAgentSystemPrompt', () => {
     });
 
     /** 사용자 결정 2026-09-17: 가드가 과해 유의미한 정보를 못 준다는 피드백에 따른 것. */
-    it('데이터가 가리키는 방향을 말하게 하고, 용어 수준을 사용자에 맞추고, 반박에 입장을 바꾸지 않게 한다', () => {
+    it('데이터가 가리키는 방향을 말하게 하고, 답변 깊이를 Depth 규칙으로 고르게 하고, 반박에 입장을 바꾸지 않게 한다', () => {
         expect(prompt).toContain('Commit to a view whenever the data supports');
         expect(prompt).toContain(
             'relay its verdict, action rating and price scenarios'
         );
         expect(prompt).toContain('its evidence, its invalidation level');
-        expect(prompt).toContain("Match the user's vocabulary");
-        expect(prompt).toContain(
-            'answer at that level and skip the beginner explanations'
-        );
+        expect(prompt).toContain('## Depth');
+        expect(prompt).toContain('without beginner explanations');
         expect(prompt).toContain('do not switch to agree with them');
         expect(prompt).toContain('name what would change your mind');
+    });
+
+    /**
+     * 사용자 결정 2026-09-19: 처음엔 쉽게 답하고 더 깊게 볼 거리를 제안하되,
+     * 처음부터 전문적으로 묻는 사용자에게는 곧바로 전문 수준으로 답한다.
+     * 깊이는 대화에서 자동으로 고르며 사용자가 모드를 고르지 않는다.
+     */
+    it('답변 깊이를 대화에서 자동으로 고르고 기본은 쉬운 설명 + 더 깊게 보기 제안이다', () => {
+        expect(prompt).toContain('the user never picks a mode');
+        expect(prompt).toContain('Plain is the default');
+        expect(prompt).toContain(
+            'offering two or three concrete ways to go deeper'
+        );
+        expect(prompt).toContain('do not print the confluence score');
+        expect(prompt).toContain(
+            'Name at most two or three indicators in the whole answer'
+        );
+        // 컨플루언스가 null(이력 부족)이면 쉬운 답에서도 합의 정도를 지어내지 말고
+        // 이력이 짧다고 말해야 한다 — 전문 수준에만 두면 쉬운 답이 근거 없는 추정을 한다.
+        expect(prompt).toContain('If it is null, never guess an agreement');
+        expect(prompt).toContain(
+            'at both levels say briefly that the trading history is too short'
+        );
+        expect(prompt).toContain(
+            'switch when the user writes in technical terms'
+        );
+        expect(prompt).toContain('stay there for the rest of the conversation');
+        expect(prompt).toContain('never the accuracy');
+        // 이전 답변 텍스트 속 숫자는 도구 결과가 아니므로 재사용 근거가 될 수 없다
+        // (비회원 이력에는 도구 결과가 실리지 않는다).
+        expect(prompt).toContain('is not a tool result');
     });
 
     it('버전 상수는 날짜 형식', () => {
@@ -254,7 +283,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-19.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-19.3');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -262,7 +291,7 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'about a symbol → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
         );
-        expect(prompt).toContain('state its confluence reading');
+        expect(prompt).toContain('reflect its confluence reading');
         // 방향을 묻지 않는 질문(실적·재무·뉴스·의회 거래만)에는 붙이지 않는다.
         expect(prompt).toContain(
             'a question only about earnings, financials, news or congressional trades does not need it'
