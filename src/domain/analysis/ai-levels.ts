@@ -252,7 +252,18 @@ const RISK_REWARD_TEMPLATE: Record<
 
 /**
  * @internal Builds the deterministic bullish risk:reward line.
- * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL/TP 중 하나라도 무효면 빈 문자열.
+ * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL이 무효하거나 진입가보다 높은
+ * 목표가가 하나도 없으면 빈 문자열.
+ *
+ * 목표가는 배열의 첫 번째 값이 아니라, entryPrice보다 높은 값들 중 **가장 가까운**
+ * 것을 쓴다 — {@link riskRewardFrom}이 `planCheck.riskRewardAtEntry`를 계산할 때
+ * 쓰는 것과 동일한 규칙이다. 이 규칙 하나를 여기 한 곳에 두면 이 줄과
+ * `planCheck.riskRewardAtEntry`가 서로 다른 숫자를 보여줄 일이 없다 — 호출자가
+ * 넘기는 `takeProfitPrices`가 정렬돼 있는지, entryPrice 이하 값을 걸러냈는지는
+ * 이 함수가 신경 쓸 필요가 없다 (fix 2026-09-19: 이전엔 `[0]`을 그대로 썼는데,
+ * `reconcileBullishActionRecommendation`이 SL만 보정하고 TP는 AI 원본을 그대로
+ * 넘기는 경로에서 그 원본이 미정렬이면 `[0]`이 가장 가까운 목표가라는 보장이
+ * 없었다 — entry 100, TP `[150, 105]`, SL만 보정된 경우가 그 예다).
  *
  * `locale` defaults to `'ko'` so every existing call site (including
  * {@link reconcileBullishActionRecommendation}'s internal use for
@@ -271,9 +282,16 @@ export function buildBullishRiskRewardText(
         stopLoss >= entryPrice
     )
         return '';
-    const tp = takeProfitPrices?.[0];
-    // tp가 entryPrice보다 크지 않으면 R:R이 음수가 되어 사용자 혼란 → 빈 문자열
-    if (tp === undefined || !Number.isFinite(tp) || tp <= entryPrice) return '';
+
+    // Nearest target strictly above entryPrice — same selection rule as
+    // `riskRewardFrom`. Any target at/below entryPrice is noise (a negative
+    // R:R would only confuse the reader), so it is dropped, not just skipped.
+    const above = (takeProfitPrices ?? []).filter(
+        (candidate): candidate is number =>
+            Number.isFinite(candidate) && candidate > entryPrice
+    );
+    if (above.length === 0) return '';
+    const tp = Math.min(...above);
 
     const slPct = ((stopLoss - entryPrice) / entryPrice) * 100;
     const tpPct = ((tp - entryPrice) / entryPrice) * 100;
@@ -593,20 +611,23 @@ export function postProcessAnalysisWithReconcile(
     // The levels it's built from come from `recommendation.reconciledLevels`
     // first (the model's own object, since core left it untouched here)
     // falling back to the top-level AI fields — the same precedence
-    // `buildPlanCheck` uses below — and the target list is trimmed to values
-    // above `entryPrice` and sorted ascending before taking `[0]`, so it
-    // picks the same "nearest target above price" `riskRewardFrom` does.
-    // That keeps this line and `planCheck.riskRewardAtEntry` from ever
-    // disagreeing.
+    // `buildPlanCheck` uses below. The target list is passed through
+    // unfiltered and unsorted: `buildBullishRiskRewardText` itself now picks
+    // the nearest target above `entryPrice` (the same rule `riskRewardFrom`
+    // uses for `planCheck.riskRewardAtEntry`), so filtering/sorting here
+    // first would only duplicate that rule in a second place — and
+    // `reconcileBullishActionRecommendation`'s own call into the same
+    // helper (see its call site above, used for `reconciledLevels.riskReward`
+    // on the reconciled path) relies on that exact same internal selection
+    // when it hands the helper the AI's raw, possibly unsorted
+    // `takeProfitPrices` after only the stop needed fixing. That single
+    // shared rule is what keeps this line and `planCheck.riskRewardAtEntry`
+    // from ever disagreeing, on either path.
     const rrStopLoss =
         recommendation.reconciledLevels?.stopLoss ?? recommendation.stopLoss;
-    const rrTargets = (
+    const rrTargets =
         recommendation.reconciledLevels?.takeProfitPrices ??
-        recommendation.takeProfitPrices ??
-        []
-    )
-        .filter((tp): tp is number => Number.isFinite(tp) && tp > entryPrice)
-        .toSorted((a, b) => a - b);
+        recommendation.takeProfitPrices;
     const deterministicRiskReward = wasReconciled
         ? ''
         : buildBullishRiskRewardText(entryPrice, rrStopLoss, rrTargets, locale);
