@@ -217,3 +217,11 @@
   Rule: Production code — internal development/coordination tags must not be committed
   Context: Tags like "review R6", "review round 2", "coordinator item C3" were used during development reviews but left in code. Removed all internal reference tags from comments and test names.
 
+
+## [feat/agent-adaptive-depth Round 1 | 에이전트 답변 깊이 자동 선택 | 2026-09-19]
+- Violation: 프롬프트 규칙을 수준(Plain/Detailed)별로 나누면서 컨플루언스 null 처리를 Detailed에만 남겨, Plain 답에서는 데이터 없이 "지표 의견" 합의를 말하게 되는 분기가 비었다
+  - Rule: (new) 프롬프트 규칙을 조건(수준·도구 가용성 등)으로 쪼갤 때는 모든 조건 분기에 null/부재 처리를 남긴다 — 한쪽에만 두면 다른 쪽이 근거 없는 추정으로 채운다
+  - Context: 리뷰 라운드 1 지적. 두 수준 모두 "이력이 짧아 집계가 없다"고 말하도록 고치고 테스트로 고정
+- Violation: AGENT_PROMPT_VERSION을 올리면서 docs/PUBLIC_API.md 변경 이력 행을 빠뜨림
+  - Rule: MISTAKES.md Documentation Sync #7
+  - Context: 2026-09-19 행 추가
