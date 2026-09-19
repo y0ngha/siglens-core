@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/y0ngha/siglens-core/compare/v1.11.1...v1.11.2) (2026-09-19)
+
+
+### Bug Fixes
+
+* **analysis:** 캐시에서 읽은 분석도 planCheck를 잃지 않게 한다 ([7c3f596](https://github.com/y0ngha/siglens-core/commit/7c3f596b60ff086654a76b4d8b759fbadcf0d8b2))
+
 ## [1.11.1](https://github.com/y0ngha/siglens-core/compare/v1.11.0...v1.11.1) (2026-09-19)
 
 
