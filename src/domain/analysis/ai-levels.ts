@@ -548,6 +548,7 @@ function withPatternGeometryTargets<T extends AnalysisResponse>(
 }
 
 /**
+ * @internal
  * `reconciledLevels` is core's correction and nothing else writes it — but a
  * model that still returns the field (older schema, a provider that ignores
  * the schema) would have its own numbers shown as a system correction and
