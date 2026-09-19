@@ -323,7 +323,8 @@ export function reconcileBullishActionRecommendation(
     rec: ActionRecommendation,
     entryPrice: number,
     atr: number | undefined,
-    currency: CurrencyCode
+    currency: CurrencyCode,
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): ReconcileResult {
     // avoid: AI가 의도적으로 레벨을 비운 것이므로 보정하지 않는다.
     if (rec.entryRecommendation === 'avoid') {
@@ -381,7 +382,8 @@ export function reconcileBullishActionRecommendation(
         riskReward: buildBullishRiskRewardText(
             entryPrice,
             reconciledSl,
-            reconciledTpArr
+            reconciledTpArr,
+            locale
         ),
         reason: buildReconcileReason(
             slWasReconciled,
@@ -565,7 +567,8 @@ export function postProcessAnalysisWithReconcile(
         rec,
         entryPrice,
         atr,
-        currency
+        currency,
+        locale
     );
 
     // Deterministic risk:reward line — only when `reconciledLevels` is
@@ -599,13 +602,16 @@ export function postProcessAnalysisWithReconcile(
                           : `${deterministicRiskReward}\n\n${recommendation.riskReward}`,
               };
 
-    // Attached outside the reconcile branch on purpose. `reconciledLevels` — and with it
-    // the only deterministic risk:reward this module used to produce — exists solely when
-    // a level failed validation, so the arithmetic was missing from every *healthy*
-    // analysis. `planCheck` also measures against `fallbackEntryPrice` (the last close)
-    // rather than the plan's own entry, which is the comparison the reconcile path cannot
-    // make: a take-profit above the recommended entry still passes validation while
-    // sitting below the price the reader is actually looking at.
+    // Attached outside the reconcile branch on purpose. `reconciledLevels` still
+    // exists only when a level failed validation, but that no longer means the
+    // deterministic risk:reward arithmetic is missing from *healthy* analyses —
+    // the block above prepends `deterministicRiskReward` into `riskReward` for
+    // that case, while the reconciled case carries its own version in
+    // `reconciledLevels.riskReward`. `planCheck` also measures against
+    // `fallbackEntryPrice` (the last close) rather than the plan's own entry,
+    // which is the comparison neither risk:reward path makes: a take-profit
+    // above the recommended entry still passes validation while sitting below
+    // the price the reader is actually looking at.
     // `fallbackEntryPrice` (the last close) is passed straight through rather than falling
     // back to `entryPrice`: without a real current price there is nothing to compare the
     // plan against, and substituting the plan's own entry would report "price is exactly

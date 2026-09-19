@@ -291,6 +291,32 @@ describe('reconcileBullishActionRecommendation', () => {
         expect(result.changes).toHaveLength(1);
     });
 
+    it('locale=en으로 보정하면 reconciledLevels.riskReward도 영어로 렌더한다', () => {
+        const rec: ActionRecommendation = {
+            ...baseRec,
+            stopLoss: 200, // invalid → fallback triggers reconciliation
+        };
+
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr,
+            'USD',
+            'en'
+        );
+
+        expect(result.wasReconciled).toBe(true);
+        expect(result.recommendation.reconciledLevels?.riskReward).toContain(
+            'Stop'
+        );
+        expect(result.recommendation.reconciledLevels?.riskReward).toContain(
+            'risk:reward'
+        );
+        expect(
+            result.recommendation.reconciledLevels?.riskReward
+        ).not.toContain('손절');
+    });
+
     it('AI TP가 무효하면 fallback으로 보정한다', () => {
         const rec: ActionRecommendation = {
             ...baseRec,
@@ -633,6 +659,33 @@ describe('postProcessAnalysisWithReconcile', () => {
                 result.actionRecommendation?.reconciledLevels?.riskReward
             ).not.toContain('NaN');
             expect(result.actionRecommendation?.riskReward).toBe('');
+        });
+
+        it('locale=en + 보정된 SL/TP면 reconciledLevels.riskReward도 영어 템플릿으로 렌더한다', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: {
+                    ...baseRec,
+                    stopLoss: 200, // invalid → fallback to ATR-derived 97
+                    riskReward: '',
+                },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr,
+                'USD',
+                'en'
+            );
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).toContain('Stop');
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).toContain('risk:reward');
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).not.toContain('손절');
         });
 
         it('현재가가 없으면 계획 진입가로 대체하지 않고 생략한다', () => {
