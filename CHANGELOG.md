@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.1](https://github.com/y0ngha/siglens-core/compare/v1.11.0...v1.11.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **analysis:** 모델이 채운 reconciledLevels에도 결정론적 손익비 줄을 붙인다 ([08e8d3d](https://github.com/y0ngha/siglens-core/commit/08e8d3d705f6f89ac7d4b5db0de16423db0840b8))
+* **analysis:** 손익비 줄이 두 경로 모두 가장 가까운 목표가를 쓰게 한다 ([0a91d0e](https://github.com/y0ngha/siglens-core/commit/0a91d0e0b9ae647d664bd871629e5ea109b6ddcf)), closes [#215](https://github.com/y0ngha/siglens-core/issues/215)
+
+
+### Features
+
+* **agent:** get_bars_indicators 설명에 ranges·ma50Pct를 추가한다 ([e2ff8e9](https://github.com/y0ngha/siglens-core/commit/e2ff8e97e865a65bc7442441fc00c871030fe616))
+
 # [1.11.0](https://github.com/y0ngha/siglens-core/compare/v1.10.1...v1.11.0) (2026-09-19)
 
 
