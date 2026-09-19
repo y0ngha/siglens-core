@@ -1,5 +1,17 @@
 # Changelog
 
+# [1.12.0](https://github.com/y0ngha/siglens-core/compare/v1.11.3...v1.12.0) (2026-09-19)
+
+
+### Bug Fixes
+
+* **agent:** 리뷰 지적 반영 - tools.length 가드 테스트 추가, [@internal](https://github.com/internal) 태그 추가, 테스트 분리 ([c4fabac](https://github.com/y0ngha/siglens-core/commit/c4fabac647195339cf952fa308b10db2db6da04c))
+
+
+### Features
+
+* **agent:** 도구 결과 없는 이어 묻기는 첫 스텝에서 도구 호출을 강제하고, 모델이 채운 reconciledLevels를 버린다 ([75c95f4](https://github.com/y0ngha/siglens-core/commit/75c95f48290f8c8e2f35a6b9aa6287016ec2e2b9))
+
 ## [1.11.3](https://github.com/y0ngha/siglens-core/compare/v1.11.2...v1.11.3) (2026-09-19)
 
 
