@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { HORIZON_WINDOWS_BY_TIMEFRAME } from '@/domain/analysis/marketReferenceConstants';
+import * as pivotLevels from '@/domain/analysis/pivotLevels';
 import {
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
@@ -586,5 +587,20 @@ describe('computeMarketReference pivots', () => {
             (120 + 95 + 110) / 3,
             6
         );
+    });
+
+    it('computes standard/camarilla pivots once and shares them across all 3 horizons + the pivots field', () => {
+        // Same pivotBar for every horizon — computing per-horizon (3x) plus once more for
+        // `pivots` (4x total) was redundant work from the same inputs.
+        const spSpy = vi.spyOn(pivotLevels, 'computeStandardPivot');
+        const camSpy = vi.spyOn(pivotLevels, 'computeCamarillaPivot');
+        try {
+            computeMarketReference(intradayBars, makeInd(), '1Hour');
+            expect(spSpy).toHaveBeenCalledTimes(1);
+            expect(camSpy).toHaveBeenCalledTimes(1);
+        } finally {
+            spSpy.mockRestore();
+            camSpy.mockRestore();
+        }
     });
 });

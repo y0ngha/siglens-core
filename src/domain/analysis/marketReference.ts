@@ -1,6 +1,7 @@
 import type {
     AssetClass,
     Bar,
+    CamarillaPivotLevels,
     CurrencyCode,
     HorizonKey,
     HorizonReference,
@@ -9,6 +10,7 @@ import type {
     PriceVsLevel,
     ReferenceLevel,
     SMCSwingPoint,
+    StandardPivotLevels,
     Timeframe,
     TrendStructure,
 } from '@/domain/types';
@@ -232,7 +234,8 @@ function buildHorizon(
     indicators: IndicatorResult,
     key: HorizonKey,
     windowBars: number,
-    pivotBar: Bar | null,
+    standardPivot: StandardPivotLevels | null,
+    camarillaPivot: CamarillaPivotLevels | null,
     atPriceBandPercent: number
 ): HorizonReference {
     const barsLen = bars.length;
@@ -294,22 +297,20 @@ function buildHorizon(
           )
         : [];
 
-    const sp = pivotBar ? computeStandardPivot(pivotBar) : null;
-    const standardPivotLevels: ReferenceLevel[] = sp
+    const standardPivotLevels: ReferenceLevel[] = standardPivot
         ? STANDARD_PIVOT_KEYS.map(k =>
               makeReferenceLevel(
-                  sp[k],
+                  standardPivot[k],
                   `Pivot ${k.toUpperCase()}`,
                   'pivot_standard',
                   currentPrice
               )
           )
         : [];
-    const cam = pivotBar ? computeCamarillaPivot(pivotBar) : null;
-    const camarillaLevels: ReferenceLevel[] = cam
+    const camarillaLevels: ReferenceLevel[] = camarillaPivot
         ? CAMARILLA_LEVEL_KEYS.map(k =>
               makeReferenceLevel(
-                  cam[k],
+                  camarillaPivot[k],
                   `Camarilla ${k.toUpperCase()}`,
                   'pivot_camarilla',
                   currentPrice
@@ -428,6 +429,10 @@ export function computeMarketReference(
         timeframe,
         sessionKeyFor(options.assetClass ?? 'equity', options.currency ?? 'USD')
     );
+    // Computed once and shared by every horizon plus `pivots` below — pivotBar is the
+    // same prior-session bar regardless of horizon, so this used to be recomputed 4x.
+    const standardPivot = pivotBar ? computeStandardPivot(pivotBar) : null;
+    const camarillaPivot = pivotBar ? computeCamarillaPivot(pivotBar) : null;
     const atPriceBandPercent =
         meanBarRangePercent(bars) * AT_PRICE_BAR_RANGE_FRACTION;
     const horizon = (key: HorizonKey): HorizonReference =>
@@ -436,7 +441,8 @@ export function computeMarketReference(
             indicators,
             key,
             w[key],
-            pivotBar,
+            standardPivot,
+            camarillaPivot,
             atPriceBandPercent
         );
     return {
@@ -444,8 +450,8 @@ export function computeMarketReference(
         medium: horizon('medium'),
         long: horizon('long'),
         pivots: {
-            standard: pivotBar ? computeStandardPivot(pivotBar) : null,
-            camarilla: pivotBar ? computeCamarillaPivot(pivotBar) : null,
+            standard: standardPivot,
+            camarilla: camarillaPivot,
             fibonacci: pivotBar ? computeFibonacciPivot(pivotBar) : null,
             woodie: pivotBar ? computeWoodiePivot(pivotBar) : null,
             demark: pivotBar ? computeDeMarkPivot(pivotBar) : null,
