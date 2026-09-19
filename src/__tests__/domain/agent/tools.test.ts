@@ -93,6 +93,18 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
             'entryRuleMet/exitRuleMet'
         );
+        // ranges['20bars']/['60bars'] — 20/60-bar high/low, distinct from the 252-bar `range`.
+        expect(findToolSpec('get_bars_indicators')?.description).toContain(
+            "ranges['20bars']"
+        );
+        expect(findToolSpec('get_bars_indicators')?.description).toContain(
+            "ranges['60bars']"
+        );
+        // priceVsMa.ma50Pct — distance from the 50-bar SMA, called out separately
+        // from the other priceVsMa keys (indicator MA/EMA periods).
+        expect(findToolSpec('get_bars_indicators')?.description).toContain(
+            'ma50Pct'
+        );
         expect(findToolSpec('get_cached_analysis')?.description).toContain(
             'sinceAnalysis'
         );

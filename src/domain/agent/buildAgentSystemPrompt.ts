@@ -6,7 +6,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-19.1';
+export const AGENT_PROMPT_VERSION = '2026-09-19.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
