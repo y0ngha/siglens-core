@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.3](https://github.com/y0ngha/siglens-core/compare/v1.11.2...v1.11.3) (2026-09-19)
+
+
+### Features
+
+* **agent:** 답변 깊이를 대화에서 자동으로 고르고 쉬운 답에 더 깊게 보기 제안을 붙인다 ([9b444b3](https://github.com/y0ngha/siglens-core/commit/9b444b314a377ae02c65fdfc54e79da538d9391e))
+
 ## [1.11.2](https://github.com/y0ngha/siglens-core/compare/v1.11.1...v1.11.2) (2026-09-19)
 
 
