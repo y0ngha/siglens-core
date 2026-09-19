@@ -190,6 +190,82 @@ describe('runAgentTurn', () => {
         expect(p.calls[0]!.system).toContain('MSFT, 005930.KS');
     });
 
+    it('도구 결과 없는 이전 답변이 있으면(게스트 이어 묻기) 첫 스텝만 도구 호출을 강제한다', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [quoteCall],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        await runAgentTurn(
+            params({
+                history: [
+                    { role: 'user', content: '엔비디아 어때?' },
+                    { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+                ],
+                userMessage: '지표별 근거 자세히 알려줘',
+            }),
+            deps(p)
+        );
+        expect(p.calls.map(c => c.toolChoice)).toEqual(['required', undefined]);
+    });
+
+    it('도구 결과가 이미 있으면 도구 호출을 강제하지 않는다', async () => {
+        const withTools = scriptedProvider([
+            { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        await runAgentTurn(
+            params({
+                history: [
+                    { role: 'user', content: '엔비디아 어때?' },
+                    {
+                        role: 'assistant',
+                        content: '',
+                        toolCalls: [quoteCall],
+                    },
+                    {
+                        role: 'tool',
+                        content: '{"price":1}',
+                        toolCallId: 'c1',
+                        toolName: 'get_quote',
+                    },
+                    { role: 'assistant', content: '1달러입니다.' },
+                ],
+            }),
+            deps(withTools)
+        );
+        expect(withTools.calls[0].toolChoice).toBeUndefined();
+    });
+
+    it('첫 질문이면 도구 호출을 강제하지 않는다', async () => {
+        const first = scriptedProvider([
+            { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        await runAgentTurn(params(), deps(first));
+        expect(first.calls[0].toolChoice).toBeUndefined();
+    });
+
+    it('도구가 없으면 첫 스텝도 도구 호출을 강제하지 않는다', async () => {
+        const noTools = scriptedProvider([
+            { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        await runAgentTurn(
+            params({
+                availableTools: new Set(),
+                history: [
+                    { role: 'user', content: '엔비디아 어때?' },
+                    { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+                ],
+                userMessage: '지표별 근거 자세히 알려줘',
+            }),
+            deps(noTools)
+        );
+        expect(noTools.calls[0].toolChoice).toBeUndefined();
+    });
+
     it('툴 1회 왕복: 실행 결과가 tool 메시지로 다음 호출에 들어간다', async () => {
         const p = scriptedProvider([
             {

@@ -96,6 +96,11 @@ export interface CallAgentProviderOptions {
     messages: AgentMessage[];
     /** Tool catalog the model may call this step; empty on the final step. */
     tools: AgentToolSpec[];
+    /**
+     * `required` makes the model call at least one tool this step; omitted means
+     * the provider's `auto`. Only meaningful when `tools` is non-empty.
+     */
+    toolChoice?: 'required';
     /** Output-token cap for this call. */
     maxOutputTokens: number;
     /** Aborts the in-flight call when the turn is stopped or times out. */

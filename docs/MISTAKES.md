@@ -351,6 +351,17 @@ and have been removed from this file.
       export function buildChatPrompt(args, currency = DEFAULT_CURRENCY): string { ... }
       // + test case asserting default behavior
    → When changing shared constants used across multiple prompts (e.g. formatters), bump cache version of all downstream consumers
+
+11. JSDoc documentation must match actual implementation behavior
+   → All JSDoc tags (@param, @returns, @throws, @internal, @adapter, etc.) must accurately describe the actual runtime behavior
+   → Incomplete or inaccurate JSDoc creates false contracts that mislead callers and cause integration bugs
+   ❌ /** @throws never */ export function parseJsonFromCache(cache) { ... } but implementation catches and re-throws SyntaxError
+   ❌ /** @adapter implements {@link SkillsProvider} */ export function createSkillsProvider() { ... } but @adapter belongs on the class, not the factory
+   ✅ /** @throws {SyntaxError} When cache contains invalid JSON */ export function parseJsonFromCache(cache) { ... } with test case exercising the throw path
+   ✅ /** @adapter ... */ export class FileSkillsLoader implements SkillsProvider { ... }  // @adapter on class, not factory; factory has no @adapter tag
+   ✅ Every JSDoc tag's claim must be verified by (1) reading the actual implementation, (2) adding test cases for documented branches/exceptions
+   → Recurring mistake (PR #99, PR #210 R2): @adapter on factory function, @throws incomplete/missing, documentation of "never throws" contradicts actual catch/rethrow logic
+      When JSDoc describes error handling, exception contract, or tag placement (class vs factory), verify with implementation code and test the documented path
 ```
 
 ---
@@ -929,6 +940,23 @@ and have been removed from this file.
    → Recurring (PR #110 R1–R2 ×123 types, PR #3–PR6 series ×30+ instances): bulk sweeps target dead symbols by name without analyzing reachability graphs.
       Root cause: absence of mandatory pre-sweep reachability audit and failure to check transitive field/union membership, AND failure to scan intermediate re-export statements for contradictory @internal tags.
       Process: (1) before removal, **compute full transitive reachability closure from public entrypoints**, (2) exclude all types in closure from @internal/@removal, (3) scan both type definitions AND bare re-export statements for contradictions, (4) add tsc "not exported" zero-error check to PR checklist, (5) update PUBLIC_API.md and sync both entrypoints (src/index.ts + src/index.client.ts), (6) **cross-check with all consumer repos before merge**.
+
+10. PUBLIC_API.md changelog rows required for every public API change
+   → PUBLIC_API.md must maintain a dated changelog documenting every public-API change (new exports, removed exports, type changes)
+   → Changelog rows record version, date, and the reason for change; entries create audit trail for consumers and aid migration guidance
+   → Omitting changelog rows for additive changes breaks the convention and makes it impossible to track which symbols were added when
+   ❌ src/index.ts exports new CallAgentProviderOptions.toolChoice field, but PUBLIC_API.md lacks a dated changelog row
+   ❌ TECHNICAL_RESPONSE_SCHEMA.reconciledLevels removed from exports, but no changelog entry documenting the removal and migration path
+   ❌ docs/PUBLIC_API.md inventory lists new exports but no "## 2026-09-19" changelog section with version/reason
+   ✅ docs/PUBLIC_API.md includes:
+      ```
+      ## [2026-09-19 v1.5.0]
+      - Added: CallAgentProviderOptions.toolChoice (optional boolean) for model reasoning depth control
+      - Removed: TECHNICAL_RESPONSE_SCHEMA.reconciledLevels (moved to CallAgentResponse.analysis.levels)
+      - Reason: Agent depth selection refactor; reconciledLevels deprecated in v1.5.0
+      ```
+   → Recurring mistake (refactor/cheap-jobs R1, feat/agent-adaptive-depth R1, feat/agent-require-refetch R2): changelog rows omitted for additive changes
+      Process: (1) whenever src/index.ts or sibling entrypoints change exports, (2) add dated changelog row with version/date/reason immediately, (3) changelog row must appear in same commit as export change
 ```
 
 ---

@@ -282,10 +282,19 @@ export async function runAgentTurn(
         portfolioSymbols: params.portfolioSymbols,
         guest: tier === 'free',
     });
+    const historyWindow = selectHistoryWindow(params.history, HISTORY_WINDOW);
     const messages: AgentMessage[] = [
-        ...selectHistoryWindow(params.history, HISTORY_WINDOW),
+        ...historyWindow,
         { role: 'user', content: params.userMessage },
     ];
+    // Earlier answers with no tool results behind them (guest transcripts carry
+    // text only): left to choose, the model re-quotes or invents figures for a
+    // "tell me more" instead of fetching. The prompt rule alone did not hold in
+    // production, so the first step must call a tool.
+    const requireToolFirst =
+        tools.length > 0 &&
+        historyWindow.some(m => m.role === 'assistant') &&
+        !historyWindow.some(m => m.role === 'tool');
 
     const intermediate: AgentMessage[] = [];
     const toolsUsed: string[] = [];
@@ -515,6 +524,9 @@ export async function runAgentTurn(
                     // Copy: the loop keeps appending after the call returns.
                     messages: [...messages],
                     tools: lastStep ? [] : tools,
+                    ...(requireToolFirst && steps === 1 && !lastStep
+                        ? { toolChoice: 'required' as const }
+                        : {}),
                     maxOutputTokens:
                         deps.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
                     signal: turnSignal,

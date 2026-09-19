@@ -548,6 +548,22 @@ function withPatternGeometryTargets<T extends AnalysisResponse>(
 }
 
 /**
+ * @internal
+ * `reconciledLevels` is core's correction and nothing else writes it — but a
+ * model that still returns the field (older schema, a provider that ignores
+ * the schema) would have its own numbers shown as a system correction and
+ * preferred over the levels its prose cites. Drop it before core decides.
+ */
+function withoutModelReconciledLevels(
+    response: AnalysisResponse
+): AnalysisResponse {
+    const rec = response.actionRecommendation;
+    if (rec?.reconciledLevels === undefined) return response;
+    const { reconciledLevels: _modelAuthored, ...rest } = rec;
+    return { ...response, actionRecommendation: rest };
+}
+
+/**
  * @internal Reconciles AI key levels into the analysis.
  *
  * AnalysisResponse에 reconciledLevels를 병기한다. entryPrice 결정 불가 시 원본 반환.
@@ -571,7 +587,9 @@ export function postProcessAnalysisWithReconcile(
     // Independent of the action-recommendation reconciliation below — applies
     // (or no-ops, preserving identity) regardless of whether `actionRecommendation`
     // exists at all, so it must run before either early return.
-    const withTargets = withPatternGeometryTargets(response, locale);
+    const withTargets = withoutModelReconciledLevels(
+        withPatternGeometryTargets(response, locale)
+    );
 
     const rec = withTargets.actionRecommendation;
     if (!rec) return withTargets;
@@ -590,38 +608,21 @@ export function postProcessAnalysisWithReconcile(
         );
 
     // Deterministic risk:reward line — only when CORE did not reconcile.
-    // `recommendation.reconciledLevels` presence is NOT proof of that: the
-    // strict response schema (responseSchemas.ts) requires the model to
-    // emit `reconciledLevels` itself (object or null) on every response, and
-    // normalize.ts passes whatever it fills straight through — so a healthy
-    // analysis can arrive with the field already populated by the model,
-    // with `wasReconciled` still `false`. Gating on presence (the old code)
-    // treated that as "core already wrote the line", so every analysis where
-    // the model filled the field (13/13 on measured production output) had
-    // no ratio anywhere in its riskReward prose, even with the prompt now
-    // telling the model never to state one itself. `wasReconciled` is the
-    // one signal that actually distinguishes "core corrected an invalid
-    // level" (which already wrote the line into `reconciledLevels.riskReward`,
-    // see `buildBullishRiskRewardText` call inside
-    // `reconcileBullishActionRecommendation`; prepending here too would
-    // duplicate it — the UI renders both) from every other case, including a
-    // model-supplied `reconciledLevels` that already passed validation.
+    // `wasReconciled` (not the presence of `reconciledLevels`) is the signal:
+    // the reconciled path already wrote its line into
+    // `reconciledLevels.riskReward` (see `buildBullishRiskRewardText` inside
+    // `reconcileBullishActionRecommendation`), and prepending here too would
+    // duplicate it — the UI renders both. Any model-authored
+    // `reconciledLevels` was dropped above, so on this path the levels are
+    // the AI's top-level fields.
     //
-    // The levels it's built from come from `recommendation.reconciledLevels`
-    // first (the model's own object, since core left it untouched here)
-    // falling back to the top-level AI fields — the same precedence
-    // `buildPlanCheck` uses below. The target list is passed through
-    // unfiltered and unsorted: `buildBullishRiskRewardText` itself now picks
-    // the nearest target above `entryPrice` (the same rule `riskRewardFrom`
-    // uses for `planCheck.riskRewardAtEntry`), so filtering/sorting here
-    // first would only duplicate that rule in a second place — and
-    // `reconcileBullishActionRecommendation`'s own call into the same
-    // helper (see its call site above, used for `reconciledLevels.riskReward`
-    // on the reconciled path) relies on that exact same internal selection
-    // when it hands the helper the AI's raw, possibly unsorted
-    // `takeProfitPrices` after only the stop needed fixing. That single
-    // shared rule is what keeps this line and `planCheck.riskRewardAtEntry`
-    // from ever disagreeing, on either path.
+    // Levels come from `recommendation.reconciledLevels` first, falling back
+    // to the top-level AI fields — the same precedence `buildPlanCheck` uses
+    // below. The target list is passed through unfiltered and unsorted:
+    // `buildBullishRiskRewardText` itself picks the nearest target above
+    // `entryPrice` (the same rule `riskRewardFrom` uses for
+    // `planCheck.riskRewardAtEntry`), which keeps this line and
+    // `planCheck.riskRewardAtEntry` from ever disagreeing, on either path.
     const rrStopLoss =
         recommendation.reconciledLevels?.stopLoss ?? recommendation.stopLoss;
     const rrTargets =
@@ -644,8 +645,7 @@ export function postProcessAnalysisWithReconcile(
     // Attached outside the reconcile branch on purpose. `wasReconciled` being
     // `false` no longer means the deterministic risk:reward arithmetic is
     // missing from *healthy* analyses — the block above prepends
-    // `deterministicRiskReward` into `riskReward` for that case (whether or
-    // not the model also filled `reconciledLevels` itself), while the
+    // `deterministicRiskReward` into `riskReward` for that case, while the
     // reconciled case carries its own version in `reconciledLevels.riskReward`.
     // `planCheck` also measures against
     // `fallbackEntryPrice` (the last close) rather than the plan's own entry,
