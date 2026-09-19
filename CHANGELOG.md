@@ -1,5 +1,20 @@
 # Changelog
 
+# [1.11.0](https://github.com/y0ngha/siglens-core/compare/v1.10.1...v1.11.0) (2026-09-19)
+
+
+### Features
+
+* **agent:** 에이전트 프롬프트에 "계산 금지" 규칙과 지평선·분석-대비-현재 규칙 추가 ([16bb993](https://github.com/y0ngha/siglens-core/commit/16bb99335cd9ba67782bdb307cee7295868f6ce4))
+* **app:** 응용층 분석 실행기와 공개 인터페이스 확장 ([c0784ef](https://github.com/y0ngha/siglens-core/commit/c0784eff8d95ee2675adcc8a0d69c502a338f29b))
+* **pattern:** 패턴 기하와 목표 계산 함수들을 추가한다 ([9ec4c3f](https://github.com/y0ngha/siglens-core/commit/9ec4c3f6f7105d49bc45400bf41374c820802b6d))
+* **prompt:** 기본재무·재무·뉴스·시장브리핑 프롬프트에 계산된 수치 추가 ([486bea0](https://github.com/y0ngha/siglens-core/commit/486bea03802b881af85f3818d68e0e94c81dafa2))
+* **prompt:** 기술 분석 프롬프트 "지표 상태" 섹션과 위험:수익 결정론적 텍스트 ([d3921a7](https://github.com/y0ngha/siglens-core/commit/d3921a7340c569e86e9d4b03b46f3eed1726831a))
+* **prompt:** 전체·거시·경제·옵션·채팅 프롬프트에 계산된 수치 추가 ([6f64e35](https://github.com/y0ngha/siglens-core/commit/6f64e35204de3e52d2c3374083cc161fd9a8d4f3))
+* **prompt:** 지표 상태와 캔들 패턴 후보 섹션 추가 ([e267f6f](https://github.com/y0ngha/siglens-core/commit/e267f6fb7663a5f7f46865dd6ed7d7cc466a0093))
+* **prompt:** reconcileBullishActionRecommendation이 로케일을 통해 손익비를 출력 언어로 렌더한다 ([bf7f480](https://github.com/y0ngha/siglens-core/commit/bf7f4808b229adefc28e5ff461fe03c8f52df4d0))
+* **types:** 지표 상태, 패턴 기하, 옵션 수량화 타입 추가 ([620b23c](https://github.com/y0ngha/siglens-core/commit/620b23cb722fce97dc7cfe057ba451a46b9574fc))
+
 ## [1.10.1](https://github.com/y0ngha/siglens-core/compare/v1.10.0...v1.10.1) (2026-09-17)
 
 
