@@ -19,6 +19,7 @@ import type {
     ActionRecommendation,
     AnalysisResponse,
     PatternResult,
+    ReconciledActionLevels,
 } from '@/domain/types';
 
 const entryPrice = 100;
@@ -699,6 +700,145 @@ describe('postProcessAnalysisWithReconcile', () => {
 
             expect(result.actionRecommendation?.planCheck).toBeUndefined();
         });
+    });
+});
+
+describe('postProcessAnalysisWithReconcile — deterministic risk:reward gated by wasReconciled, not reconciledLevels presence (regression 2026-09-19: reconciledLevels is a model-authored schema field too, so its mere presence never proved core reconciled)', () => {
+    const baseResponse: AnalysisResponse = {
+        summary: 'test',
+        trend: 'bullish',
+        indicatorResults: [],
+        riskLevel: 'low',
+        keyLevels: { support: [], resistance: [] },
+        priceTargets: {
+            bullish: { targets: [], condition: '' },
+            bearish: { targets: [], condition: '' },
+        },
+        patternSummaries: [],
+        strategyResults: [],
+        candlePatterns: [],
+        trendlines: [],
+    };
+
+    it('모델이 유효한 SL/TP로 reconciledLevels를 직접 채워도(core는 보정하지 않음) 결정론적 줄이 붙고 planCheck.riskRewardAtEntry(반올림 1dp)와 일치한다', () => {
+        const modelReconciledLevels: ReconciledActionLevels = {
+            stopLoss: baseRec.stopLoss,
+            takeProfitPrices: baseRec.takeProfitPrices,
+            exit: buildBullishExitText(
+                entryPrice,
+                baseRec.stopLoss,
+                baseRec.takeProfitPrices,
+                'USD'
+            ),
+            riskReward: buildBullishRiskRewardText(
+                entryPrice,
+                baseRec.stopLoss,
+                baseRec.takeProfitPrices
+            ),
+            reason: '',
+        };
+        const response: AnalysisResponse = {
+            ...baseResponse,
+            actionRecommendation: {
+                ...baseRec,
+                reconciledLevels: modelReconciledLevels,
+            },
+        };
+
+        const result = postProcessAnalysisWithReconcile(
+            response,
+            entryPrice,
+            atr
+        );
+
+        // core left the model's own object untouched — no reconciliation happened
+        expect(result.actionRecommendation?.reconciledLevels).toEqual(
+            modelReconciledLevels
+        );
+
+        const riskReward = result.actionRecommendation?.riskReward ?? '';
+        expect(riskReward.startsWith('손절')).toBe(true);
+        expect(riskReward).toContain('위험:보상');
+
+        const ratioMatch = riskReward.match(/1:([\d.]+)/);
+        const lineRatio = ratioMatch ? Number(ratioMatch[1]) : NaN;
+        const planRatio = result.actionRecommendation?.planCheck
+            ?.riskRewardAtEntry as number;
+        expect(planRatio).not.toBeNull();
+        expect(lineRatio).toBeCloseTo(Number(planRatio.toFixed(1)), 5);
+    });
+
+    it('locale=en이어도 위 경로에서 영어 템플릿으로 렌더한다', () => {
+        const modelReconciledLevels: ReconciledActionLevels = {
+            stopLoss: baseRec.stopLoss,
+            takeProfitPrices: baseRec.takeProfitPrices,
+            exit: buildBullishExitText(
+                entryPrice,
+                baseRec.stopLoss,
+                baseRec.takeProfitPrices,
+                'USD'
+            ),
+            riskReward: '',
+            reason: '',
+        };
+        const response: AnalysisResponse = {
+            ...baseResponse,
+            actionRecommendation: {
+                ...baseRec,
+                reconciledLevels: modelReconciledLevels,
+            },
+        };
+
+        const result = postProcessAnalysisWithReconcile(
+            response,
+            entryPrice,
+            atr,
+            'USD',
+            'en'
+        );
+
+        const riskReward = result.actionRecommendation?.riskReward ?? '';
+        expect(riskReward).toContain('Stop');
+        expect(riskReward).toContain('risk:reward');
+    });
+
+    it('모델의 reconciledLevels.takeProfitPrices가 정렬돼 있지 않고 진입가 이하 값을 포함해도 진입가 위 가장 가까운 목표가를 쓴다', () => {
+        const modelReconciledLevels: ReconciledActionLevels = {
+            takeProfitPrices: [110, 95, 102], // unsorted + one at/below entryPrice(100)
+            exit: buildBullishExitText(
+                entryPrice,
+                baseRec.stopLoss,
+                [110, 95, 102],
+                'USD'
+            ),
+            riskReward: '모델이 채운 임의 텍스트',
+            reason: '',
+        };
+        const response: AnalysisResponse = {
+            ...baseResponse,
+            actionRecommendation: {
+                ...baseRec, // stopLoss: 97, takeProfitPrices: [105] — both valid → core does not reconcile
+                reconciledLevels: modelReconciledLevels,
+            },
+        };
+
+        const result = postProcessAnalysisWithReconcile(
+            response,
+            entryPrice,
+            atr
+        );
+
+        // nearest target above entryPrice among [110, 95, 102] is 102, not 110 or the
+        // sub-entry 95 — buildBullishRiskRewardText([102]) is the same line the
+        // filter+sort should produce.
+        const expectedLine = buildBullishRiskRewardText(entryPrice, 97, [102]);
+        expect(result.actionRecommendation?.riskReward).toBe(expectedLine);
+
+        // planCheck measures via the same nearest-target-above-price rule, so the two
+        // never disagree.
+        expect(
+            result.actionRecommendation?.planCheck?.riskRewardAtEntry
+        ).toBeCloseTo((102 - 100) / (100 - 97));
     });
 });
 
