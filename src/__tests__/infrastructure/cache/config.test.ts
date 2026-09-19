@@ -747,7 +747,12 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // p12 는 숫자 렌더링 감사다 — 가격 정밀도·KRX 프레이밍·세션 피벗·R:R 노이즈 바닥이
         // 모든 요청의 바이트를 바꾼다.
         // p13 은 가격을 쓸 수 없는 봉(Yahoo KRX 자리표시 행)을 버린다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p13');
+        // p14 는 ## Indicator State (computed) 섹션을 추가하고, riskReward를
+        // 결정론적 손익비 줄 + 모델 산문으로 바꾼다(모든 경로에서, 보정 경로뿐 아니라).
+        // p15 는 Chart Pattern Candidates(computed) 섹션·Fib/Woodie/DeMark
+        // 피벗·Fib ABC 확장·MACD 사이클/Bollinger %B/Volume 배수·SMC 거리
+        // 라인을 추가한다(정밀도 2번째 웨이브, spec §A1-A5).
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p15');
     });
 });
 

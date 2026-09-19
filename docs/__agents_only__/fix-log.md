@@ -161,10 +161,6 @@
   Rule: MISTAKES.md Public API #8 — Public discriminated union variant types wrongly tagged @internal
   Context: Tier 1 public function parameter type was marked @internal despite being part of public contract. Removed @internal tag and ensured type is re-exported from src/index.ts.
 
-- Violation 2: Import members not in alphabetical order
-  Rule: MISTAKES.md #13.5 — Import statements not alphabetically sorted
-  Context: Imports from same module not alphabetically ordered. Fixed by reordering members alphabetically within import block.
-
 - Violation 3: New helper module without dedicated unit test file
   Rule: Test conventions — new helper module requires dedicated .test.ts file
   Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
@@ -188,4 +184,36 @@
 - Violation: src/__tests__/domain/analysis/systemPrompt.test.ts — Shared PROMPTS array covered only 6 of 8 system prompts built on analysisSystemBase (FINANCIALS and CONGRESS missing)
   Rule: Tests — shared test table must enumerate all cases of the thing it claims to cover
   Context: R1 recommendation finding. Parameterized test using it.each(PROMPTS) relied on a partial array that didn't include all analysisSystemBase-derived prompts. Fixed in R2 by adding FINANCIALS and CONGRESS with their persona first lines pinned as literals, ensuring all 8 prompts are exercised by the shared test table.
+
+## [Branch feat/precomputed-prompt-data | 2026-09-19] — Precomputed prompt data R1→R6
+
+- Violation 3 (R1→R6 REQUIRED, multiple locations): Null/NaN handling — NaN changesPercentage misranked and printed, price 0 treated as valid, negative Fib extensions stored as prices
+  Rule: Output validation — domain functions must enforce null/NaN guardrails before returning to prompt/cache
+  Context: New prompt helpers introduced by precomputation exposed intermediate calculations to prompts without proper bounds checking. NaN changesPercentage broke sorting; price 0 and negative targets corrupted cached results. Fixed by adding null checks and clamping bounds before returning.
+
+- Violation 4 (R2 REQUIRED): Printed numbers computed from different inputs than numbers the app later recomputes (candidates section vs ai-levels divergence)
+  Rule: Infrastructure Functions — prompt output must match app-computed values; round inputs to printed precision first and share one computePatternTargets function
+  Context: Pattern targets and risk:reward in prompts were computed on-the-fly from raw price data; app recomputed from model's text output with different rounding, causing mismatches. Fixed by pre-rounding all inputs to printed precision and sharing the calculation.
+
+- Violation 5 (R2 REQUIRED, multiple locations): Prompt-rule contradictions — guideline instructing model to compute (measured move / pattern height) next to rule forbidding it; keyPrices label examples inviting target entries vs. no-target rule
+  Rule: MISTAKES.md Documentation Sync — prompt rules and examples must be synchronized when new rules are added
+  Context: Precomputed data prompts mixed computed-move guidance (old pattern) with a strict no-synthesis rule (new); examples showed trade targets while rule forbade them. Fixed by removing contradictory instructions and updating all examples to match enforced rule.
+
+- Violation 8 (R5 REQUIRED): Geometry defined from wrong pivot kind — cup/rounding-bottom rim calculated from low pivots instead of bounding high pivot
+  Rule: Pattern geometry — boundary pivots must use the correct type (high for cup rim, low for valley bottom)
+  Context: Cup/rounding-bottom patterns used findMin (low pivots) to define rim, conflating interior low with boundary definition. Fixed by using correct high-pivot bounding logic to define rim position.
+
+## [PR #214 | feat/precomputed-prompt-data | 2026-09-19] — Precomputed prompt data R6 review findings
+
+- Violation 1 (R6 BLOCKER): Tier 4 public type exports (PivotTables, FibonacciPivotLevels, WoodiePivotLevels, DeMarkPivotLevels) missing per-field JSDoc
+  Rule: CONVENTIONS.md — Tier 4 public types require one-line JSDoc per field
+  Context: Types were marked @internal but export removed; types are now public without per-field documentation. Added per-field JSDoc to each Tier 4 type field.
+
+- Violation 2 (R6 REQUIRED): Inline object type `{ low: number; high: number } | null` duplicated in two places (public interface field and function return type)
+  Rule: MISTAKES TypeScript #5 / CONVENTIONS — Return named interfaces
+  Context: ImpliedMoveRange interface was inlined in two locations instead of defined once as a named type. Extracted ImpliedMoveRange as a named interface and exported as Tier 4 public type to provide single source of truth and enable type reuse.
+
+- Violation 3 (R6 CLEANUP): Internal review-round reference tags left in production comments and test names
+  Rule: Production code — internal development/coordination tags must not be committed
+  Context: Tags like "review R6", "review round 2", "coordinator item C3" were used during development reviews but left in code. Removed all internal reference tags from comments and test names.
 

@@ -7,6 +7,10 @@ import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSecti
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
     buildAnalysisPrompt as buildAnalysisPromptRaw,
+    formatAbcTableLine,
+    formatFibTableLine,
+    formatPivotTableLine,
+    formatTablePrice,
     INDICATOR_VALUES_SECTION_HEADER,
     PRO_INDICATOR_SECTION_HEADER,
     PRO_RELIABILITY_NOTE,
@@ -1748,7 +1752,18 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('Price Target Calculation');
+            expect(result).toContain('### Price Target Selection');
+            // Targets come from levels already in the prompt; the model must
+            // not be told to project a pattern height itself (that contradicted
+            // the geometry rule and led the model to leave priceTargets empty).
+            expect(result).toContain(
+                'Fill priceTargets for the bullish and the bearish scenario whenever the data offers a level on that side'
+            );
+            expect(result).toContain(
+                'Never project a new target price yourself'
+            );
+            expect(result).not.toContain('Apply the measured move rule');
+            expect(result).not.toContain('based on pattern measurement');
         });
 
         it('가이드라인 섹션은 분석 요청 섹션보다 앞에 위치한다', () => {
@@ -2143,6 +2158,15 @@ describe('prompt', () => {
             );
             expect(result).toContain(
                 'Do not include candle patterns (single/multi candle) in patternSummaries'
+            );
+            // Seen in a real analysis once unlisted chart patterns were
+            // allowed: a tweezers top was reported as a chart pattern.
+            expect(result).toContain(
+                'tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns'
+            );
+            // The strict skill-name match applies to listed patterns only.
+            expect(result).toContain(
+                'For a listed Skills pattern it MUST exactly match its pattern skill name'
             );
         });
 
@@ -2849,6 +2873,73 @@ describe('prompt', () => {
         it('skill이 없으면 entry를 omit하라는 지시가 포함된다', () => {
             expect(result).toContain(
                 'Omit the entry if no matching skill exists'
+            );
+        });
+
+        it('skillName exact-match 예외 (미등재 chart pattern)가 명시된다', () => {
+            expect(result).toContain(
+                'The one exception is an unlisted chart pattern you add yourself'
+            );
+        });
+
+        it('"Skills Are Guidance, Not a Boundary" 섹션이 포함된다', () => {
+            expect(result).toContain('### Skills Are Guidance, Not a Boundary');
+            expect(result).toContain('not an exhaustive catalog');
+            expect(result).toContain('never invent data');
+        });
+    });
+
+    describe('분석 요청 섹션 - patternSummaries: skill 카탈로그는 경계가 아니다 (spec 2026-09-18 addendum)', () => {
+        it('미등재 패턴 추가를 허용하는 문구가 포함된다', () => {
+            const skill = makeSkill({
+                type: 'pattern',
+                name: 'Head and Shoulders',
+            });
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [skill]
+            );
+            expect(result).toContain(
+                'You may also add any other chart pattern you can clearly see in the bars'
+            );
+            expect(result).toContain(
+                'broadening formation, diamond, island reversal'
+            );
+        });
+
+        it('"Do not include any patterns not listed" 금칙 문구는 더 이상 나타나지 않는다', () => {
+            const skill = makeSkill({
+                type: 'pattern',
+                name: 'Head and Shoulders',
+            });
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [skill]
+            );
+            expect(result).not.toContain(
+                'Do not include any patterns not listed below in patternSummaries'
+            );
+        });
+
+        it('Chart Pattern Candidates 섹션에 pre-screener는 힌트일 뿐이라는 인트로가 포함된다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).toContain(
+                'They are hints, not an exhaustive list and not a verdict'
+            );
+            expect(result).toContain(
+                'report any other pattern you can clearly see even if it is not listed here'
             );
         });
     });
@@ -3982,6 +4073,52 @@ describe('prompt', () => {
             expect(result).not.toContain('bearish OB: 158.00 ~ 162.00');
         });
 
+        it('adds a ±% / ATR distance to each unmitigated order block, and tags only the single nearest-above and nearest-below one (spec 2026-09-18 §A5)', () => {
+            // bars fixture -> last close = 199; atr override = 2.45.
+            const smc: SMCResult = {
+                ...EMPTY_SMC_RESULT,
+                orderBlocks: [
+                    {
+                        startIndex: 10,
+                        high: 205.0,
+                        low: 202.0,
+                        type: 'bearish',
+                        isMitigated: false,
+                    }, // near edge 202 -> +3 above (nearest above)
+                    {
+                        startIndex: 20,
+                        high: 220.0,
+                        low: 215.0,
+                        type: 'bearish',
+                        isMitigated: false,
+                    }, // near edge 215 -> +16 above (farther, untagged)
+                    {
+                        startIndex: 30,
+                        high: 195.0,
+                        low: 190.0,
+                        type: 'bullish',
+                        isMitigated: false,
+                    }, // near edge 195 -> -4 below (only one, nearest below)
+                ],
+            };
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({ smc, atr: [TEST_ATR_VALUE] })
+            );
+            expect(result).toContain(
+                'bearish OB: 202.00 ~ 205.00 (89 bars ago) (+1.51% / +1.2 ATR from price) [nearest above]'
+            );
+            expect(result).toContain(
+                'bearish OB: 215.00 ~ 220.00 (79 bars ago) (+8.04% / +6.5 ATR from price)'
+            );
+            expect(result).not.toMatch(/215\.00 ~ 220\.00.*\[nearest/);
+            expect(result).toContain(
+                'bullish OB: 190.00 ~ 195.00 (69 bars ago) (-2.01% / -1.6 ATR from price) [nearest below]'
+            );
+        });
+
         it('should show "No active order blocks" when all are mitigated', () => {
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,
@@ -4034,6 +4171,41 @@ describe('prompt', () => {
             expect(result).not.toContain('bearish FVG: 158.50 ~ 160.00');
         });
 
+        it('adds a ±% / ATR distance to each unmitigated FVG, and tags the nearest-above/nearest-below one (spec 2026-09-18 §A5)', () => {
+            // bars fixture -> last close = 199; atr override = 2.45.
+            const smc: SMCResult = {
+                ...EMPTY_SMC_RESULT,
+                fairValueGaps: [
+                    {
+                        index: 15,
+                        high: 204.0,
+                        low: 201.0,
+                        type: 'bullish',
+                        isMitigated: false,
+                    }, // near edge 201 -> +2 above (only one, nearest above)
+                    {
+                        index: 25,
+                        high: 196.0,
+                        low: 193.0,
+                        type: 'bearish',
+                        isMitigated: false,
+                    }, // near edge 196 -> -3 below (only one, nearest below)
+                ],
+            };
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({ smc, atr: [TEST_ATR_VALUE] })
+            );
+            expect(result).toContain(
+                'bullish FVG: 201.00 ~ 204.00 (84 bars ago) (+1.01% / +0.8 ATR from price) [nearest above]'
+            );
+            expect(result).toContain(
+                'bearish FVG: 193.00 ~ 196.00 (74 bars ago) (-1.51% / -1.2 ATR from price) [nearest below]'
+            );
+        });
+
         it('should show equal highs/lows as liquidity pools', () => {
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,
@@ -4059,10 +4231,10 @@ describe('prompt', () => {
                 makeIndicators({ smc })
             );
             expect(result).toContain(
-                '- Equal Highs at 165.00 (sell-side liquidity) (14 bars ago, span 15 bars)'
+                '- Equal Highs at 165.00 (sell-side liquidity) (-17.09% from price) (14 bars ago, span 15 bars)'
             );
             expect(result).toContain(
-                '- Equal Lows at 140.00 (buy-side liquidity) (21 bars ago, span 18 bars)'
+                '- Equal Lows at 140.00 (buy-side liquidity) (-29.65% from price) (21 bars ago, span 18 bars)'
             );
             expect(result).toContain('Liquidity Pools');
         });
@@ -4967,6 +5139,51 @@ describe('prompt', () => {
             );
         });
 
+        it('omits the Fib anchor line when the window has no swing points (null rule)', () => {
+            // makeIndicators() defaults smc.swingHighs/swingLows to [] — fewer
+            // than 2 swing points means computeFibonacciProjection returns
+            // null, so formatHorizonBlock must render no Fib anchor line.
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            expect(prompt).not.toContain('Fib anchor:');
+        });
+
+        it('omits the Fib and Fib ABC table lines when there is no projection (null rule)', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            // The guideline text names the lines in backticks, so match whole
+            // rendered lines rather than substrings.
+            const lines = prompt.split('\n');
+            expect(lines.some(l => l.startsWith('Fib table: '))).toBe(false);
+            expect(lines.some(l => l.startsWith('Fib ABC table: '))).toBe(
+                false
+            );
+        });
+
+        it('omits the Fib ABC anchor line when the window has fewer than 3 confirmed swing points (null rule)', () => {
+            const prompt = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                makeMarketReferenceBars(),
+                makeIndicators(),
+                [],
+                '1Day'
+            );
+            expect(prompt).not.toContain('Fib ABC anchor:');
+        });
+
         it('no longer claims more-tested levels are higher conviction', () => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -5071,6 +5288,21 @@ describe('prompt', () => {
             expect(prompt).toContain(PRO_HEADER);
         });
 
+        it('## Indicator State (computed)는 Indicator Values 바로 뒤, Pro-Indicator 앞에 온다', () => {
+            const prompt = buildRealisticPrompt();
+            const indicatorIdx = prompt.indexOf(INDICATOR_HEADER);
+            const stateIdx = prompt.indexOf('## Indicator State (computed)');
+            const proIdx = prompt.indexOf(PRO_HEADER);
+            expect(stateIdx).toBeGreaterThan(indicatorIdx);
+            expect(stateIdx).toBeLessThan(proIdx);
+            expect(prompt).toContain('- Price vs MA:');
+            expect(prompt).toContain('- MA stack:');
+            expect(prompt).toContain('- ATR % of price:');
+            expect(prompt).toContain(
+                '## Indicator State is computed; do not re-derive these comparisons.'
+            );
+        });
+
         it('regime lens는 지표 값 앞에, confluence 패널은 뒤에 배치된다', () => {
             const prompt = buildRealisticPrompt();
             const regimeIdx = prompt.indexOf(REGIME_HEADER);
@@ -5081,6 +5313,118 @@ describe('prompt', () => {
             expect(proIdx).toBeGreaterThanOrEqual(0);
             expect(regimeIdx).toBeLessThan(indicatorIdx);
             expect(indicatorIdx).toBeLessThan(proIdx);
+        });
+
+        it('## Market Reference 각 horizon에 Fib anchor 줄을 렌더한다 (fib projection이 있을 때)', () => {
+            const prompt = buildRealisticPrompt();
+            // Realistic bars oscillate (Math.sin), so every horizon window has
+            // swing highs/lows and produces a Fibonacci projection.
+            expect(prompt).toMatch(
+                /Fib anchor: swing (low|high) [\d.]+ → swing (high|low) [\d.]+ \((up|down) leg\)/
+            );
+        });
+
+        it('renders a Fib ABC anchor line once a 3rd (C) swing confirms after B (spec 2026-09-18 §A3)', () => {
+            const prompt = buildRealisticPrompt();
+            // Realistic bars oscillate (Math.sin) enough to confirm a 3rd
+            // swing after the Fib leg's B in at least one horizon window.
+            // The `Fib ABC ext …%` levels themselves compete for the
+            // per-side cap slot like every other level kind (see the A2/A3
+            // marketReference.test.ts comments) — their ratio -> price math
+            // is covered, independent of any cap, by fibLevels.test.ts.
+            expect(prompt).toMatch(
+                /Fib ABC anchor: A [\d.]+ → B [\d.]+ → C [\d.]+ \((up|down)\)/
+            );
+        });
+
+        // Complete Fib/pivot tables (spec 2026-09-18 analysis-prompt decision):
+        // the nearest-level lists are capped, so far levels are given as tables
+        // instead of letting the model compute them.
+        it('renders a Fib table line whose prices follow from the anchor swing', () => {
+            const prompt = buildRealisticPrompt();
+            const lines = prompt.split('\n');
+            const anchorIdx = lines.findIndex(l => l.startsWith('Fib anchor:'));
+            expect(anchorIdx).toBeGreaterThanOrEqual(0);
+            const anchor = lines[anchorIdx]!;
+            const table = lines[anchorIdx + 1]!;
+            expect(table.startsWith('Fib table: ')).toBe(true);
+            // (spec 2026-09-18): a trailing `.0` is dropped —
+            // `50%`/`100%`/`200%`, not `50.0%`/`100.0%`/`200.0%`.
+            for (const ratio of ['23.6%', '38.2%', '50%', '61.8%', '78.6%'])
+                expect(table).toContain(`${ratio} `);
+            expect(table).toContain('| ext 100% ');
+            expect(table).toContain('161.8% ');
+            expect(table).toContain('261.8% ');
+            expect(table).not.toContain('50.0%');
+            expect(table).not.toContain('100.0%');
+
+            const up = /\(up leg\)/.test(anchor);
+            const nums = [
+                ...anchor.matchAll(/swing (?:low|high) ([\d.]+)/g),
+            ].map(m => Number(m[1]));
+            const low = up ? nums[0]! : nums[1]!;
+            const high = up ? nums[1]! : nums[0]!;
+            const fib618 = Number(/61\.8% ([\d.]+)/.exec(table)![1]);
+            const expected = up
+                ? high - 0.618 * (high - low)
+                : low + 0.618 * (high - low);
+            expect(fib618).toBeCloseTo(expected, 1);
+        });
+
+        it('renders a Fib ABC table line projected from C with the A–B distance', () => {
+            const prompt = buildRealisticPrompt();
+            const lines = prompt.split('\n');
+            const anchorIdx = lines.findIndex(l =>
+                l.startsWith('Fib ABC anchor:')
+            );
+            expect(anchorIdx).toBeGreaterThanOrEqual(0);
+            const anchor = lines[anchorIdx]!;
+            const table = lines[anchorIdx + 1]!;
+            expect(table.startsWith('Fib ABC table: ')).toBe(true);
+            const [a, b, c] = [...anchor.matchAll(/[ABC] ([\d.]+)/g)].map(m =>
+                Number(m[1])
+            );
+            const ext1618 = Number(/161\.8% ([\d.]+)/.exec(table)![1]);
+            expect(ext1618).toBeCloseTo(c! + (b! - a!) * 1.618, 1);
+        });
+
+        it('renders one Pivot table line with every pivot family', () => {
+            const prompt = buildRealisticPrompt();
+            const line = prompt
+                .split('\n')
+                .find(l => l.startsWith('Pivot table: '));
+            expect(line).toBeDefined();
+            expect(line).toMatch(
+                /Standard PP [\d.]+ R1 [\d.]+ R2 [\d.]+ R3 [\d.]+ S1/
+            );
+            // "Pivot Fib" (not "Fib") — spec 2026-09-18: must not
+            // be confusable with a Fib retracement/extension row.
+            expect(line).toContain('| Pivot Fib PP ');
+            expect(line).not.toContain('| Fib PP ');
+            expect(line).toContain('| Woodie PP ');
+            expect(line).toContain('| DeMark PP ');
+            expect(line).toMatch(
+                /Camarilla R3 [\d.]+ R4 [\d.]+ S3 [\d.]+ S4 [\d.]+/
+            );
+            expect(countOccurrences(prompt, 'Pivot table: ')).toBe(1);
+        });
+
+        it('keeps app-computed pattern targets out of model keyPrices', () => {
+            const prompt = buildRealisticPrompt();
+            expect(prompt).toContain(
+                'Never add measured or conservative target entries to keyPrices'
+            );
+        });
+
+        it('states the computed-figures and arithmetic rule for analysis prose', () => {
+            const prompt = buildRealisticPrompt();
+            expect(prompt).toContain('### Computed Figures and Arithmetic');
+            expect(prompt).toContain(
+                'In prose you may do simple arithmetic from numbers that appear in this prompt'
+            );
+            expect(prompt).toContain(
+                'never a price you derived arithmetically'
+            );
         });
 
         it('Bollinger %B 라인이 measured-edge signal 주석을 포함한다', () => {
@@ -5461,5 +5805,135 @@ describe('marketEvents (buildAnalysisPrompt)', () => {
 
         expect(result.dynamic).not.toContain('## Market Events');
         expect(result.dynamic).toBe(build().dynamic);
+    });
+});
+
+describe('formatPivotTableLine', () => {
+    const standard = {
+        pp: 100,
+        r1: 105,
+        r2: 110,
+        r3: 115,
+        s1: 95,
+        s2: 90,
+        s3: 85,
+    };
+    it('returns an empty string without pivots', () => {
+        expect(formatPivotTableLine(undefined, 2)).toBe('');
+        expect(
+            formatPivotTableLine(
+                {
+                    standard: null,
+                    camarilla: null,
+                    fibonacci: null,
+                    woodie: null,
+                    demark: null,
+                },
+                2
+            )
+        ).toBe('');
+    });
+    it('renders only the families that were computed', () => {
+        const line = formatPivotTableLine(
+            {
+                standard,
+                camarilla: null,
+                fibonacci: null,
+                woodie: null,
+                demark: null,
+            },
+            2
+        );
+        expect(line).toBe(
+            'Pivot table: Standard PP 100.00 R1 105.00 R2 110.00 R3 115.00 S1 95.00 S2 90.00 S3 85.00'
+        );
+    });
+    it('renders a non-positive pivot (wide-range S3) as N/A, never a negative price', () => {
+        const line = formatPivotTableLine(
+            {
+                standard: {
+                    pp: 10,
+                    r1: 15,
+                    r2: 20,
+                    r3: 25,
+                    s1: 5,
+                    s2: 0,
+                    s3: -5,
+                },
+                camarilla: null,
+                fibonacci: null,
+                woodie: null,
+                demark: null,
+            },
+            2
+        );
+        expect(line).toContain('S2 N/A S3 N/A');
+        expect(line).not.toContain('-5.00');
+    });
+
+    it('renders a non-finite level as N/A, never NaN', () => {
+        const line = formatPivotTableLine(
+            {
+                standard: null,
+                camarilla: null,
+                fibonacci: null,
+                woodie: null,
+                demark: { pp: Number.NaN, r1: 1, s1: 0.5 },
+            },
+            2
+        );
+        expect(line).toBe('Pivot table: DeMark PP N/A R1 1.00 S1 0.50');
+        expect(line).not.toContain('NaN');
+    });
+});
+
+describe('formatTablePrice', () => {
+    it('prints a positive price at the given precision', () => {
+        expect(formatTablePrice(303.4917, 2)).toBe('303.49');
+    });
+    it('prints N/A for a zero, negative or non-finite level (deep down-leg extensions)', () => {
+        expect(formatTablePrice(0, 2)).toBe('N/A');
+        expect(formatTablePrice(-10.9, 2)).toBe('N/A');
+        expect(formatTablePrice(Number.NaN, 2)).toBe('N/A');
+    });
+});
+
+describe('Fib table lines never print a non-positive level', () => {
+    it("Fib table: a deep down-leg's far extensions render N/A", () => {
+        // High 100 → low 30 (down leg, range 70): ext 161.8% = 100 − 113.26 < 0.
+        const line = formatFibTableLine(
+            {
+                high: 100,
+                low: 30,
+                direction: 'down',
+                retracements: [{ ratio: 0.618, price: 73.26 }],
+                extensions: [
+                    { ratio: 1, price: 30 },
+                    { ratio: 1.618, price: -13.26 },
+                    { ratio: 2, price: -40 },
+                ],
+            },
+            2
+        );
+        expect(line).toBe(
+            'Fib table: 61.8% 73.26 | ext 100% 30.00 / 161.8% N/A / 200% N/A'
+        );
+    });
+
+    it('Fib ABC table: extensions projected below zero render N/A', () => {
+        const line = formatAbcTableLine(
+            {
+                a: 100,
+                b: 50,
+                c: 70,
+                direction: 'down',
+                extensions: [
+                    { ratio: 1, price: 20 },
+                    { ratio: 1.618, price: -10.9 },
+                ],
+            },
+            2
+        );
+        expect(line).toBe('Fib ABC table: 100% 20.00 / 161.8% N/A');
     });
 });

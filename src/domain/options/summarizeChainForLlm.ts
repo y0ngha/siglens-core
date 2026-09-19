@@ -4,6 +4,8 @@ import { calculateImpliedMove } from './calculateImpliedMove';
 import { calculateMaxPain } from './calculateMaxPain';
 import { calculatePutCallRatio } from './calculatePutCallRatio';
 import type {
+    ImpliedMoveRange,
+    LlmStrikeOpenInterest,
     MidAndSpread,
     OptionsChain,
     OptionsContract,
@@ -21,6 +23,90 @@ import type {
  * OI top과 Volume top 모두 동수 유지 — 프롬프트 내 두 섹션 균형.
  */
 const TOP_STRIKES_COUNT = 3;
+
+/** @internal `|distancePct| < 0.5` counts as `'at'` the underlying price rather than above/below it. */
+const AT_PRICE_DISTANCE_PCT = 0.5;
+
+const PERCENT_FACTOR = 100;
+
+/** Decimal places every `*Pct` field in this module rounds to (spec 2026-09-18 §B5). */
+const PCT_DECIMAL_PLACES = 2;
+const PCT_ROUND_FACTOR = 10 ** PCT_DECIMAL_PLACES;
+
+function isFinitePositive(n: number | null | undefined): n is number {
+    return typeof n === 'number' && Number.isFinite(n) && n > 0;
+}
+
+/**
+ * @internal Round `n` to {@link PCT_DECIMAL_PLACES}, stripping `-0` (a value
+ * that rounds to exactly zero loses its sign — never `-0`, per spec §0).
+ * `null` passes through unchanged.
+ */
+function roundPct(n: number | null): number | null {
+    if (n === null) return null;
+    const rounded = Math.round(n * PCT_ROUND_FACTOR) / PCT_ROUND_FACTOR;
+    return rounded === 0 ? 0 : rounded;
+}
+
+/**
+ * @internal Signed `% distance` of `value` from a positive `base`, rounded to
+ * {@link PCT_DECIMAL_PLACES}, or `null` when either input cannot support a
+ * ratio (null rule, spec §0).
+ */
+function signedDistancePct(
+    value: number | null,
+    base: number | undefined
+): number | null {
+    if (value === null || !Number.isFinite(value)) return null;
+    if (!isFinitePositive(base)) return null;
+    return roundPct(((value - base) / base) * PERCENT_FACTOR);
+}
+
+/** @internal `'above'` / `'below'` / `'at'` (within {@link AT_PRICE_DISTANCE_PCT}) from a signed distance, or `null`. */
+function sideFromDistance(
+    distancePct: number | null
+): 'above' | 'below' | 'at' | null {
+    if (distancePct === null) return null;
+    if (Math.abs(distancePct) < AT_PRICE_DISTANCE_PCT) return 'at';
+    return distancePct > 0 ? 'above' : 'below';
+}
+
+/**
+ * @internal Bid/ask `spread / mid × 100`, rounded to
+ * {@link PCT_DECIMAL_PLACES}, or `null` when either input is unusable.
+ */
+function spreadPct(mid: number | null, spread: number | null): number | null {
+    if (mid === null || spread === null) return null;
+    if (!Number.isFinite(mid) || !Number.isFinite(spread) || mid <= 0)
+        return null;
+    return roundPct((spread / mid) * PERCENT_FACTOR);
+}
+
+/**
+ * @internal `underlyingPrice × (1 ∓ impliedMovePercent / 100)`, rounded to
+ * {@link PCT_DECIMAL_PLACES} like every other field in this module (spec
+ * 2026-09-18), or `null` when the price or the implied move is
+ * unavailable — or when `impliedMovePercent >= 100`, which would put `low`
+ * at or below zero (an implied move that size is itself an unusable/bad
+ * input, not a real "the stock could go to $0 or below" range).
+ */
+function computeImpliedMoveRange(
+    underlyingPrice: number | undefined,
+    impliedMovePercent: number | null
+): ImpliedMoveRange | null {
+    if (!isFinitePositive(underlyingPrice)) return null;
+    if (impliedMovePercent === null || !Number.isFinite(impliedMovePercent))
+        return null;
+    if (impliedMovePercent >= PERCENT_FACTOR) return null;
+    const low = roundPct(
+        underlyingPrice * (1 - impliedMovePercent / PERCENT_FACTOR)
+    );
+    const high = roundPct(
+        underlyingPrice * (1 + impliedMovePercent / PERCENT_FACTOR)
+    );
+    if (low === null || high === null) return null;
+    return { low, high };
+}
 
 /**
  * Reduce an OptionsChain (potentially hundreds of strikes) to a compact set
@@ -51,6 +137,10 @@ export function summarizeChainForLlm(
                 (a.callOpenInterest + a.putOpenInterest)
         )
         .slice(0, TOP_STRIKES_COUNT);
+    const topWithDistance: LlmStrikeOpenInterest[] = top.map(s => {
+        const distancePct = signedDistancePct(s.strike, underlyingPrice);
+        return { ...s, distancePct, side: sideFromDistance(distancePct) };
+    });
 
     const volumeByStrike = aggregateVolume(chain);
     const topVolume = volumeByStrike
@@ -63,13 +153,25 @@ export function summarizeChainForLlm(
         buildTopOiQuote(strike, chain)
     );
 
+    const maxPain = calculateMaxPain(chain);
+    const impliedMovePercent = calculateImpliedMove(
+        atmIv,
+        chain.daysToExpiration
+    );
+
     return {
         expirationDate: chain.expirationDate,
-        maxPain: calculateMaxPain(chain),
+        daysToExpiration: chain.daysToExpiration,
+        maxPain,
+        maxPainDistancePct: signedDistancePct(maxPain, underlyingPrice),
         putCallRatio: calculatePutCallRatio(chain),
         atmImpliedVolatility: atmIv,
-        topOpenInterestStrikes: top,
-        impliedMovePercent: calculateImpliedMove(atmIv, chain.daysToExpiration),
+        topOpenInterestStrikes: topWithDistance,
+        impliedMovePercent,
+        impliedMoveRange: computeImpliedMoveRange(
+            underlyingPrice,
+            impliedMovePercent
+        ),
         topVolumeStrikes: topVolume,
         topOiBidAskSummary,
     };
@@ -87,6 +189,8 @@ function buildTopOiQuote(strike: number, chain: OptionsChain): TopOiQuote {
         callSpread: callQuote.spread,
         putMidPrice: putQuote.mid,
         putSpread: putQuote.spread,
+        callSpreadPct: spreadPct(callQuote.mid, callQuote.spread),
+        putSpreadPct: spreadPct(putQuote.mid, putQuote.spread),
     };
 }
 

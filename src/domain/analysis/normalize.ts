@@ -8,6 +8,7 @@ import type {
     KeyLevels,
     KeyPrice,
     PatternLine,
+    PatternTargetGeometry,
     PriceScenario,
     PriceTarget,
     PriceTargets,
@@ -191,6 +192,64 @@ export function normalizeTimeRange(
     return { start, end };
 }
 
+const PATTERN_GEOMETRY_DIRECTIONS = ['up', 'down'] as const;
+
+function isFinitePositive(n: number | undefined): n is number {
+    return typeof n === 'number' && Number.isFinite(n) && n > 0;
+}
+
+/**
+ * @internal Normalizes a model-authored pattern-geometry object
+ * (`PatternSummary.geometry`, spec 2026-09-18 §A6). Dropped (returns
+ * `undefined`) unless every present number is finite and positive, the
+ * direction is a valid enum member, AND the geometry is internally
+ * consistent with that direction: a `'down'` pattern's extreme must sit
+ * ABOVE its breakout (head above neckline), an `'up'` pattern's extreme
+ * BELOW its breakout (bottom below rim). An inconsistent pair is not a
+ * formatting slip — it means the model transcribed the wrong two numbers,
+ * and the height math downstream would silently invert.
+ */
+export function normalizePatternGeometry(
+    v: unknown
+): PatternTargetGeometry | undefined {
+    const o = asObject(v);
+    if (!o) return undefined;
+
+    const breakoutLevel = asNumber(o.breakoutLevel);
+    const extremeLevel = asNumber(o.extremeLevel);
+    const direction = asOptionalEnum(o.direction, PATTERN_GEOMETRY_DIRECTIONS);
+    const invalidationLevel = asNumber(o.invalidationLevel);
+
+    if (
+        !isFinitePositive(breakoutLevel) ||
+        !isFinitePositive(extremeLevel) ||
+        direction === undefined
+    ) {
+        return undefined;
+    }
+    // invalidationLevel is optional on the wire, but if the model supplied
+    // *something* for it, that something must be a usable price too — a
+    // present-but-garbage value is worse than absent (see the module's
+    // null-rule convention: 0/negative/non-finite is "unknown", never a
+    // real level).
+    if (o.invalidationLevel != null && !isFinitePositive(invalidationLevel)) {
+        return undefined;
+    }
+
+    const consistent =
+        direction === 'down'
+            ? extremeLevel > breakoutLevel
+            : extremeLevel < breakoutLevel;
+    if (!consistent) return undefined;
+
+    return {
+        breakoutLevel,
+        extremeLevel,
+        direction,
+        ...(invalidationLevel !== undefined ? { invalidationLevel } : {}),
+    };
+}
+
 /** @internal Normalizes a chart-pattern summary. */
 export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
     const o = asObject(v);
@@ -215,6 +274,7 @@ export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
         keyPrices: keyPricesArr,
         patternLines: patternLinesArr,
         timeRange: normalizeTimeRange(o.timeRange),
+        geometry: normalizePatternGeometry(o.geometry),
     };
 }
 

@@ -254,7 +254,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-17.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-19.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -348,6 +348,83 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'Never close with a second reminder that the decision is the user'
         );
+    });
+
+    it('계산 금지·수평선·컨플루언스 명칭·상위 타임프레임 규칙이 들어 있다', () => {
+        expect(prompt).toContain('Computed figures:');
+        expect(prompt).toContain(
+            'derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp'
+        );
+        expect(prompt).toContain('quote it as given — never recompute it');
+        // User decision 2026-09-19: arithmetic on figures no tool provides is
+        // allowed when inputs come from tool results and the operation is shown.
+        expect(prompt).toContain(
+            'you may compute it from numbers that appear in tool results in this conversation: show the inputs and the operation'
+        );
+        expect(prompt).toContain(
+            'Never use a number that is not in a tool result as an input.'
+        );
+        expect(prompt).not.toContain('No arithmetic');
+        expect(prompt).not.toContain(
+            'describe the relationship in words without a number'
+        );
+        expect(prompt).toContain('maxPainDistancePct/impliedMoveRange');
+        expect(prompt).toContain('Horizon:');
+        expect(prompt).toContain('1Day bars → days to a few weeks');
+        expect(prompt).toContain('Analysis vs now:');
+        expect(prompt).toContain('sinceAnalysis.levelsBroken');
+        expect(prompt).toContain(
+            'sinceAnalysis.planNow.belowStopLoss or sinceAnalysis.planNow.exceedsEntryZone is true'
+        );
+        expect(prompt).toContain(
+            'quote movePct as the move since the analysis'
+        );
+        expect(prompt).not.toContain('movePct is large relative to the levels');
+        expect(prompt).toContain('Confluence rules:');
+        expect(prompt).toContain('entryRuleMet / exitRuleMet');
+        expect(prompt).toContain('Higher timeframe:');
+        expect(prompt).toContain(
+            "higherTimeframe is the next larger timeframe's trend and tally"
+        );
+    });
+
+    it('날짜만 있는 타임스탬프(일봉)는 거래일로 인용하고 시각을 붙이지 않게 한다', () => {
+        expect(prompt).toContain(
+            'A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.'
+        );
+    });
+
+    it('Computed figures 규칙은 툴 구성과 무관하게 항상 들어간다', () => {
+        const minimal = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: [],
+            now: NOW,
+            etSessionStatus: 'closed',
+        });
+        expect(minimal).toContain('Computed figures:');
+    });
+
+    it('Horizon·Analysis vs now·Confluence rules·Higher timeframe은 해당 툴이 없으면 빠진다', () => {
+        const withoutBars = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_bars_indicators'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(withoutBars).not.toContain('Horizon:');
+        expect(withoutBars).not.toContain('Confluence rules:');
+        expect(withoutBars).not.toContain('Higher timeframe:');
+        const withoutCachedAnalysis = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_cached_analysis'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(withoutCachedAnalysis).not.toContain('Analysis vs now:');
     });
 
     it('뉴스 공백 안내는 web_search 유무에 따라 한 번만 짧게', () => {

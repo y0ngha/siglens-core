@@ -109,6 +109,11 @@ export function buildOptionsAnalysisPrompt(
         '- topOpenInterestStrikes: the 3 strikes with the most accumulated open interest.',
         '- topVolumeStrikes: the 3 strikes most actively traded today — read together with OI (accumulated bets) to spot price levels where the market is newly moving.',
         '- topOiBidAskSummary: bid/ask quotes (mid · spread) for the top OI strikes — a tight spread signals good liquidity at that price level.',
+        '- daysToExpiration: calendar days left until this expiration — use it, never count days yourself.',
+        '- maxPainDistancePct: signed % distance of Max Pain from the current price (positive = above, negative = below); already computed.',
+        '- impliedMoveRange: the price band the market implies by expiration (null when unavailable); state it directly, do not recompute from ATM IV.',
+        "- topOpenInterestStrikes[].distancePct/side: each strike's signed % distance and side (above/below/at price) from the current price — already computed.",
+        '- topOiBidAskSummary[].callSpreadPct/putSpreadPct: bid/ask spread as a % of mid price — use directly to judge liquidity, never divide spread by mid yourself.',
         `- Use a friendly but accurate tone in ${outputLanguageName(locale)}. Keep ticker symbols in English as-is (e.g. AAPL).`,
     ].join('\n');
 

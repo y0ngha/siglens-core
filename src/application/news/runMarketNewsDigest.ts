@@ -88,7 +88,8 @@ export async function runMarketNewsDigest(
         categoryLabel,
         news,
         sampledSkills,
-        locale
+        locale,
+        new Date()
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

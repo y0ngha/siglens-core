@@ -59,7 +59,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_quote',
         description:
-            "Latest price and day change for up to 3 symbols. Call for any current-price or today's-move question, and always instead of quoting a price from memory. Each quote carries quoteDelayMinutes; when it is greater than 0 the quote is delayed by that many minutes and must not be called real-time.",
+            'Latest price and day change for up to 3 symbols. Call for any current-price or today\'s-move question, and always instead of quoting a price from memory. Each quote carries quoteDelayMinutes; when it is greater than 0 the quote is delayed by that many minutes and must not be called real-time. When asOfIsFetchTime is true, asOf is when SIGLENS fetched the quote, not necessarily the trade time — cite it as "as of <time>", never as the trade time.',
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -77,7 +77,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_bars_indicators',
         description:
-            "Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state, recent candle patterns with their dates, and `confluence` — the rule-based indicator-family agreement score (0–100, 50 neutral; entry/exit triggers; bullish/bearish and newly lit signals; null below 120 bars; no AI involved). Call for any question about price action, momentum, indicator values, chart setup, or a symbol's outlook; not needed for questions only about earnings, financials, news or congressional trades.",
+            "Recent OHLCV bars with latest indicator values (RSI, MACD, Bollinger, moving averages, ADX/+DI/-DI, stochastic %K/%D, CCI, MFI, Williams %R, VWAP, Ichimoku tenkan/kijun/senkou A/B, SuperTrend, Parabolic SAR, squeeze momentum), detected signals, trend state, recent candle patterns with their dates, `derived` (precomputed — quote them as given, do not recompute: lastClose; changePct.1bar/5bars/20bars/60bars, each counted in bars of the requested timeframe, e.g. on 1Day roughly 1 day/1 week/1 month/3 months but on 1Hour the same keys mean 1/5/20/60 HOURS — always read them against the requested timeframe, never assume daily; range.high/low/fromHighPct/fromLowPct/bars, the high/low over up to the last 252 bars on 1Day (≈52 weeks) or all loaded bars intraday, with `bars` saying how many; volumeVsAvg20; atrPct; priceVsMa; maStack), `higherTimeframe` (the next larger timeframe's trend/tally, or null), and `confluence` — the rule-based indicator-family agreement score (0–100, 50 neutral; entryRuleMet/exitRuleMet are rule states, not buy/sell instructions; bullish/bearish and newly lit signals; null below 120 bars; no AI involved). Call for any question about price action, momentum, indicator values, chart setup, or a symbol's outlook; not needed for questions only about earnings, financials, news or congressional trades.",
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -102,7 +102,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_cached_analysis',
         description:
-            'Most recent SIGLENS AI analysis for a symbol and tab, read from cache/snapshot/history. Call this FIRST for any "what does SIGLENS think" question, including chart pattern questions: technical results include detected chart patterns, candle patterns and strategy verdicts. If it returns stale:true or found:false, call run_fresh_analysis when that tool is available.',
+            'Most recent SIGLENS AI analysis for a symbol and tab, read from cache/snapshot/history. Call this FIRST for any "what does SIGLENS think" question, including chart pattern questions: technical results include detected chart patterns, candle patterns and strategy verdicts, plus `sinceAnalysis` — analysisPrice, priceNow, movePct, levelsBroken, nearestSupport, nearestResistance, planNow (planNow may be null) — precomputed price movement since the analysis was generated; quote it as given, do not recompute it. If it returns stale:true or found:false, call run_fresh_analysis when that tool is available.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -133,7 +133,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_news',
         description:
-            'News already ingested by SIGLENS for a symbol or a market category, with sentiment and Korean summary. Call for news, events, rulings or "why did it move / what happened" questions. If the result is empty or older than the question needs, say coverage is limited and use web_search if available.',
+            'News already ingested by SIGLENS for a symbol or a market category, with sentiment and Korean summary, a `tally` (bullish/bearish/neutral/highImpact counts) and each item\'s `ageHours` — already computed, quote them as given, do not recount or recompute them. Call for news, events, rulings or "why did it move / what happened" questions. If the result is empty or older than the question needs, say coverage is limited and use web_search if available.',
         costClass: 'free',
         inputSchema: {
             type: 'object',
@@ -178,7 +178,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_options_summary',
         description:
-            'Options market summary: ATM implied volatility, max pain, put/call ratio, top open-interest strikes, nearest expirations. Use for volatility, expected move or positioning questions.',
+            'Options market summary: ATM implied volatility, max pain, put/call ratio, top open-interest strikes (each with a precomputed distancePct/side vs the underlying), nearest expirations, plus precomputed daysToExpiration, maxPainDistancePct, impliedMoveRange, and callSpreadPct/putSpreadPct on the bid/ask summary — quote them as given, do not recompute them. Use for volatility, expected move or positioning questions.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -190,7 +190,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_fundamentals',
         description:
-            'Company profile, valuation ratios (P/E, P/B, market cap and similar), profitability, growth, financial health scores, analyst consensus and price targets, and the upcoming earnings date/estimates. Stocks only (US and Korean); not for crypto. Use for valuation, earnings, "is it expensive", growth or balance-sheet questions.',
+            'Company profile, valuation ratios (P/E, P/B, market cap and similar), profitability, growth, financial health scores, analyst consensus and price targets, the upcoming earnings date, `analystEstimate` (consensus EPS/revenue; its `period` says whether it covers the current fiscal year or the current quarter — name that period when you cite it, never call an annual figure quarterly), plus precomputed `targetUpsidePct` (consensus target vs current price) and `daysToEarnings` — quote them as given, do not recompute them. Stocks only (US and Korean); not for crypto. Use for valuation, earnings, "is it expensive", growth or balance-sheet questions.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -202,7 +202,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_market_overview',
         description:
-            'Market-wide fear & greed index with its factor breakdown, major index levels and day change, and for \'us\' the sector signal scan (golden crosses, RSI divergences, squeezes across large caps). Use for "how is the market", market mood, index or sector questions.',
+            'Market-wide fear & greed index with its factor breakdown, major index levels and day change, and for \'us\' the sector signal scan (golden crosses, RSI divergences, squeezes across large caps) where each sector carries its display `name` and `rank` (by day change, best to worst), plus `sectorBreadth` (up/down/flat counts of the sector ETFs listed here — not market-wide advancers/decliners) and `bestWorstSpreadPp` (best-minus-worst sector spread) — all already computed, quote them as given, do not recompute them. Use for "how is the market", market mood, index or sector questions.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -220,7 +220,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_economy',
         description:
-            'US macro indicators (policy rate, CPI, employment, GDP), Treasury yields, upcoming high-impact economic calendar events, and the latest SIGLENS macro briefing if available. Use for rates, inflation, macro calendar or "what\'s coming up this week" questions.',
+            'US macro indicators (policy rate, CPI, employment, GDP) with the latest-vs-previous change already computed, Treasury yields including `spread2s10s` (2s10s spread, precomputed — quote it as given, do not recompute it), upcoming high-impact economic calendar events, and the latest SIGLENS macro briefing if available. Use for rates, inflation, macro calendar or "what\'s coming up this week" questions.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
@@ -265,7 +265,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_my_portfolio',
         description:
-            "The signed-in user's own holdings on SIGLENS: symbol, quantity, average price, currency. Call when the user asks about 'my stocks', 'my position', profit/loss, or what they hold. Never guess holdings.",
+            "The signed-in user's own holdings on SIGLENS: symbol, quantity, average price, currency, plus precomputed `pnl`/`pnlPct` (profit/loss vs cost) and `weightPct` (share of portfolio value) — quote them as given, do not recompute them. Call when the user asks about 'my stocks', 'my position', profit/loss, or what they hold. Never guess holdings.",
         costClass: 'free',
         inputSchema: {
             type: 'object',

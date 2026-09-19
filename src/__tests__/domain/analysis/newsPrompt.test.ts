@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildNewsAnalysisPrompt as buildNewsAnalysisPromptRaw } from '@/domain/analysis/newsPrompt';
+import {
+    buildNewsAnalysisPrompt as buildNewsAnalysisPromptRaw,
+    formatAgeSuffix,
+    formatSentimentTally,
+} from '@/domain/analysis/newsPrompt';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -375,5 +379,141 @@ describe('buildNewsAnalysisPrompt — 출력 로케일', () => {
 
     it('ko: 예전 지시문이 그대로다', () => {
         expect(build('ko')).toContain('Korean (존댓말)');
+    });
+});
+
+describe('formatAgeSuffix (spec 2026-09-18 §2.8)', () => {
+    const NOW = new Date('2025-04-28T12:00:00Z');
+
+    it('renders "<N>h ago" under 24h', () => {
+        expect(formatAgeSuffix('2025-04-28T09:00:00Z', NOW)).toBe(' (3h ago)');
+    });
+
+    it('renders "<N>d ago" at/over 24h', () => {
+        expect(formatAgeSuffix('2025-04-26T12:00:00Z', NOW)).toBe(' (2d ago)');
+    });
+
+    it('clamps a future timestamp (clock skew) to "0h ago" instead of a negative age', () => {
+        expect(formatAgeSuffix('2025-04-28T13:00:00Z', NOW)).toBe(' (0h ago)');
+    });
+
+    it('returns an empty string for an unparseable timestamp', () => {
+        expect(formatAgeSuffix('not-a-date', NOW)).toBe('');
+    });
+});
+
+describe('formatSentimentTally (spec 2026-09-18 §2.8)', () => {
+    it('tallies bullish/bearish/neutral and high-impact bullish/bearish', () => {
+        // NEWS_ITEM_1 bullish/high, NEWS_ITEM_2 bearish/high
+        expect(formatSentimentTally([NEWS_ITEM_1, NEWS_ITEM_2])).toBe(
+            'Sentiment tally: 1 bullish / 1 bearish / 0 neutral (high impact: 1 bullish / 1 bearish)'
+        );
+    });
+
+    it('all zero for an empty list', () => {
+        expect(formatSentimentTally([])).toBe(
+            'Sentiment tally: 0 bullish / 0 bearish / 0 neutral (high impact: 0 bullish / 0 bearish)'
+        );
+    });
+
+    it('does not count a medium/low-impact item toward the high-impact tally', () => {
+        const mediumImpact: EnrichedNewsItem = {
+            ...NEWS_ITEM_1,
+            card: { ...NEWS_ITEM_1.card, priceImpact: 'medium' },
+        };
+        expect(formatSentimentTally([mediumImpact])).toBe(
+            'Sentiment tally: 1 bullish / 0 bearish / 0 neutral (high impact: 0 bullish / 0 bearish)'
+        );
+    });
+});
+
+describe('buildNewsAnalysisPrompt — sentiment tally + age + calendar offsets (spec 2026-09-18 §2.8)', () => {
+    const NOW = new Date('2025-04-28T12:00:00Z');
+
+    it('renders the sentiment tally header inside ## Recent News Articles', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [NEWS_ITEM_1, NEWS_ITEM_2],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            NOW
+        );
+        const articlesIdx = dynamic.indexOf('## Recent News Articles');
+        const tallyIdx = dynamic.indexOf('Sentiment tally:');
+        const item1Idx = dynamic.indexOf('[1]');
+        expect(tallyIdx).toBeGreaterThan(articlesIdx);
+        expect(item1Idx).toBeGreaterThan(tallyIdx);
+        expect(dynamic).toContain(
+            'Sentiment tally: 1 bullish / 1 bearish / 0 neutral (high impact: 1 bullish / 1 bearish)'
+        );
+    });
+
+    it("appends an age suffix to each item's Published line", () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            NOW
+        );
+        // NEWS_ITEM_1 published 2025-04-28T12:00:00Z == NOW -> 0h ago
+        expect(dynamic).toContain('Published: 2025-04-28T12:00:00Z (0h ago)');
+    });
+
+    it('appends "in N days" for a future earnings date', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [UPCOMING_EARNINGS], // earningsDate 2025-07-30
+            [],
+            'equity',
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(dynamic).toContain('2025-07-30 (in 93 days):');
+    });
+
+    it('appends "N days ago" for a past earnings date', () => {
+        const pastEarnings = {
+            ...UPCOMING_EARNINGS,
+            earningsDate: '2025-04-20',
+        };
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [pastEarnings],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(dynamic).toContain('2025-04-20 (8 days ago):');
+    });
+
+    it('omits relative-time annotations when `now` is omitted — the domain never reads the wall clock', () => {
+        const recent = {
+            ...NEWS_ITEM_1,
+            publishedAt: '2026-09-18T12:00:00.000Z',
+        };
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [recent],
+            [],
+            []
+        );
+        expect(dynamic).not.toMatch(/\(\d+[hd] ago\)/);
     });
 });

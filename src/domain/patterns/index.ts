@@ -1,8 +1,14 @@
 /** @internal */
 export { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
-// ChartPatternId / PatternCandidate are public (src/index.ts) — see
-// domain/types.ts. PivotKind/PivotPoint stay internal (pivot-extraction
-// implementation detail, not part of the screener's public result shape).
-export type { ChartPatternId, PatternCandidate } from '@/domain/types';
 /** @internal */
-export type { PivotKind, PivotPoint } from '@/domain/types';
+export { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
+// ChartPatternId / PatternCandidate are public (src/index.ts) — see
+// domain/types.ts. PivotKind/PivotPoint are public too: `PatternCandidate`
+// additively carries `pivots?: PivotPoint[]` (spec 2026-09-18 real-data fix),
+// so both are reachable from a public type and must type-check for consumers.
+export type {
+    ChartPatternId,
+    PatternCandidate,
+    PivotKind,
+    PivotPoint,
+} from '@/domain/types';

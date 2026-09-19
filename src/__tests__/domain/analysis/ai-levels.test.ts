@@ -15,7 +15,11 @@ import {
     SL_MAX_ATR_MULTIPLIER,
     TP_MAX_ATR_MULTIPLIER,
 } from '@/domain/analysis/ai-levels';
-import type { ActionRecommendation, AnalysisResponse } from '@/domain/types';
+import type {
+    ActionRecommendation,
+    AnalysisResponse,
+    PatternResult,
+} from '@/domain/types';
 
 const entryPrice = 100;
 const atr = 2;
@@ -209,6 +213,33 @@ describe('buildBullishRiskRewardText', () => {
     it('TP가 entryPrice 이하이면 빈 문자열을 반환한다', () => {
         expect(buildBullishRiskRewardText(100, 97, [99])).toBe('');
     });
+
+    it('locale을 생략하면 한국어(기본값)로 렌더한다', () => {
+        const text = buildBullishRiskRewardText(100, 97, [105]);
+        expect(text).toContain('손절');
+        expect(text).toContain('위험:보상');
+    });
+
+    it.each([
+        ['en', 'Stop', 'risk:reward'],
+        ['ja', '損切り', 'リスク・リワード'],
+        ['zh', '止损', '风险回报比'],
+    ] as const)(
+        'locale=%s는 그 언어로 렌더한다',
+        (locale, stopWord, rrWord) => {
+            const text = buildBullishRiskRewardText(100, 97, [105], locale);
+            expect(text).toContain(stopWord);
+            expect(text).toContain(rrWord);
+            expect(text).toContain('1:');
+        }
+    );
+
+    it('SL이 entry 바로 아래(0.01%)라 소수 첫째 자리에서 0으로 반올림돼도 -0.0%를 찍지 않는다 (spec §0/§B6)', () => {
+        // slPct = (99.99 - 100) / 100 * 100 = -0.01 -> toFixed(1) would be "-0.0".
+        const text = buildBullishRiskRewardText(100, 99.99, [105]);
+        expect(text).not.toContain('-0.0%');
+        expect(text).toContain('0.0%');
+    });
 });
 
 describe('reconcileBullishActionRecommendation', () => {
@@ -258,6 +289,32 @@ describe('reconcileBullishActionRecommendation', () => {
             entryPrice
         );
         expect(result.changes).toHaveLength(1);
+    });
+
+    it('locale=en으로 보정하면 reconciledLevels.riskReward도 영어로 렌더한다', () => {
+        const rec: ActionRecommendation = {
+            ...baseRec,
+            stopLoss: 200, // invalid → fallback triggers reconciliation
+        };
+
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr,
+            'USD',
+            'en'
+        );
+
+        expect(result.wasReconciled).toBe(true);
+        expect(result.recommendation.reconciledLevels?.riskReward).toContain(
+            'Stop'
+        );
+        expect(result.recommendation.reconciledLevels?.riskReward).toContain(
+            'risk:reward'
+        );
+        expect(
+            result.recommendation.reconciledLevels?.riskReward
+        ).not.toContain('손절');
     });
 
     it('AI TP가 무효하면 fallback으로 보정한다', () => {
@@ -501,6 +558,136 @@ describe('postProcessAnalysisWithReconcile', () => {
             ).toBeCloseTo(5 / 3);
         });
 
+        it('deterministic risk:reward 줄을 모든 경로에서 riskReward 앞에 붙인다 — 보정 경로가 아니어도', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: { ...baseRec, riskReward: '모델 산문.' },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr
+            );
+            const riskReward = result.actionRecommendation?.riskReward ?? '';
+            expect(riskReward.startsWith('손절')).toBe(true);
+            expect(riskReward).toContain('위험:보상');
+            expect(riskReward).toContain('\n\n모델 산문.');
+            // 이 케이스가 요점이다 — 보정되지 않았는데도 결정론적 줄이 붙는다.
+            expect(
+                result.actionRecommendation?.reconciledLevels
+            ).toBeUndefined();
+        });
+
+        it('모델 산문이 빈 문자열이면 결정론적 줄만 남는다', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: { ...baseRec, riskReward: '' },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr
+            );
+            expect(result.actionRecommendation?.riskReward).not.toContain(
+                '\n\n'
+            );
+            expect(result.actionRecommendation?.riskReward).toContain(
+                '위험:보상'
+            );
+        });
+
+        it('SL/TP가 무효해 결정론적 줄이 빈 문자열이면 모델 산문만 남긴다', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: {
+                    ...baseRec,
+                    entryRecommendation: 'avoid',
+                    stopLoss: 200, // >= entryPrice → invalid, avoid는 보정도 건너뜀
+                    riskReward: '모델 산문만.',
+                },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr
+            );
+            expect(result.actionRecommendation?.riskReward).toBe(
+                '모델 산문만.'
+            );
+        });
+
+        it('locale=en이면 결정론적 줄을 영어로 렌더한다', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: { ...baseRec, riskReward: 'prose.' },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr,
+                'USD',
+                'en'
+            );
+            expect(result.actionRecommendation?.riskReward).toContain('Stop');
+            expect(result.actionRecommendation?.riskReward).toContain(
+                'risk:reward'
+            );
+        });
+
+        it('보정된 SL/TP로 결정론적 줄을 계산한다 — AI 원본이 아니라 (spec 2026-09-18: reconciledLevels.riskReward에 실린다)', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: {
+                    ...baseRec,
+                    stopLoss: 200, // invalid → fallback to ATR-derived 97
+                    riskReward: '',
+                },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr
+            );
+            // fallback SL = 100 − 2×1.5 = 97 (같은 리스크로 원본 SL 97과 동일 텍스트가 되진 않지만
+            // 유효한 손절 퍼센트가 나와야 한다). 보정이 일어났으므로
+            // reconciledLevels.riskReward가 이 줄을 이미 담고 있고, 최상위
+            // riskReward에는 R5로 중복 prepend하지 않는다 (UI가 둘 다 보여줌).
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).toContain('손절');
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).not.toContain('NaN');
+            expect(result.actionRecommendation?.riskReward).toBe('');
+        });
+
+        it('locale=en + 보정된 SL/TP면 reconciledLevels.riskReward도 영어 템플릿으로 렌더한다', () => {
+            const response: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: {
+                    ...baseRec,
+                    stopLoss: 200, // invalid → fallback to ATR-derived 97
+                    riskReward: '',
+                },
+            };
+            const result = postProcessAnalysisWithReconcile(
+                response,
+                entryPrice,
+                atr,
+                'USD',
+                'en'
+            );
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).toContain('Stop');
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).toContain('risk:reward');
+            expect(
+                result.actionRecommendation?.reconciledLevels?.riskReward
+            ).not.toContain('손절');
+        });
+
         it('현재가가 없으면 계획 진입가로 대체하지 않고 생략한다', () => {
             // 대체하면 "가격이 계획한 자리에 정확히 있다"고 보고하게 되는데, 입력이
             // 뒷받침하지 않는 주장이다.
@@ -512,6 +699,213 @@ describe('postProcessAnalysisWithReconcile', () => {
 
             expect(result.actionRecommendation?.planCheck).toBeUndefined();
         });
+    });
+});
+
+describe('postProcessAnalysisWithReconcile — pattern-geometry targets (spec 2026-09-18 §A6)', () => {
+    const baseResponse: AnalysisResponse = {
+        summary: 'test',
+        trend: 'bullish',
+        indicatorResults: [],
+        riskLevel: 'low',
+        keyLevels: { support: [], resistance: [] },
+        priceTargets: {
+            bullish: { targets: [], condition: '' },
+            bearish: { targets: [], condition: '' },
+        },
+        patternSummaries: [],
+        strategyResults: [],
+        candlePatterns: [],
+        trendlines: [],
+    };
+
+    const downPattern: PatternResult = {
+        id: 'p1',
+        patternName: 'head_and_shoulders',
+        skillName: 'head_and_shoulders_skill',
+        detected: true,
+        trend: 'bearish',
+        summary: 'test',
+        confidenceWeight: 0.8,
+        geometry: {
+            breakoutLevel: 140,
+            extremeLevel: 150, // height 10, down -> target 130, conservative 135
+            direction: 'down',
+        },
+    };
+
+    const upPattern: PatternResult = {
+        id: 'p2',
+        patternName: 'rounding_bottom',
+        skillName: 'rounding_bottom_skill',
+        detected: true,
+        trend: 'bullish',
+        summary: 'test',
+        confidenceWeight: 0.6,
+        geometry: {
+            breakoutLevel: 100,
+            extremeLevel: 85, // height 15, up -> target 115, conservative 107.5
+            direction: 'up',
+        },
+    };
+
+    it('does not store a non-positive target when a down pattern is taller than its breakout level', () => {
+        const tall: PatternResult = {
+            ...downPattern,
+            id: 'p-tall',
+            geometry: { breakoutLevel: 5, extremeLevel: 20, direction: 'down' },
+        };
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [tall] },
+            undefined,
+            undefined
+        );
+        // height 15: measured 5 − 15 = −10 and conservative 5 − 7.5 = −2.5
+        // are not prices, so neither keyPrice is appended.
+        expect(result.patternSummaries[0].keyPrices ?? []).toEqual([]);
+    });
+
+    it('keeps a positive conservative target when only the measured target is non-positive (per-target guard)', () => {
+        const mixed: PatternResult = {
+            ...downPattern,
+            id: 'p-mixed',
+            // height 5: measured 5 − 5 = 0 — exactly zero is not a price
+            // (dropped; pins the `> 0` boundary); conservative 5 − 2.5 = 2.5 (kept)
+            geometry: { breakoutLevel: 5, extremeLevel: 10, direction: 'down' },
+        };
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [mixed] },
+            undefined,
+            undefined
+        );
+        expect(result.patternSummaries[0].keyPrices).toEqual([
+            { label: '보수 목표가(50%)', price: 2.5 },
+        ]);
+    });
+
+    it('down 패턴: measuredTarget = breakout - height, conservative = breakout - height/2', () => {
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [downPattern] },
+            undefined,
+            undefined
+        );
+        expect(result.patternSummaries[0].keyPrices).toEqual([
+            { label: '측정 목표가', price: 130 },
+            { label: '보수 목표가(50%)', price: 135 },
+        ]);
+    });
+
+    it('up 패턴: measuredTarget = breakout + height, conservative = breakout + height/2', () => {
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [upPattern] },
+            undefined,
+            undefined
+        );
+        expect(result.patternSummaries[0].keyPrices).toEqual([
+            { label: '측정 목표가', price: 115 },
+            { label: '보수 목표가(50%)', price: 107.5 },
+        ]);
+    });
+
+    it('기존 keyPrices는 보존하고 뒤에 덧붙인다', () => {
+        const withExisting: PatternResult = {
+            ...downPattern,
+            keyPrices: [{ label: '넥라인', price: 140 }],
+        };
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [withExisting] },
+            undefined,
+            undefined
+        );
+        expect(result.patternSummaries[0].keyPrices).toEqual([
+            { label: '넥라인', price: 140 },
+            { label: '측정 목표가', price: 130 },
+            { label: '보수 목표가(50%)', price: 135 },
+        ]);
+    });
+
+    it('재처리해도 같은 라벨이 중복되지 않는다 (idempotent)', () => {
+        const once = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [downPattern] },
+            undefined,
+            undefined
+        );
+        const twice = postProcessAnalysisWithReconcile(
+            once,
+            undefined,
+            undefined
+        );
+        expect(twice.patternSummaries[0].keyPrices).toEqual([
+            { label: '측정 목표가', price: 130 },
+            { label: '보수 목표가(50%)', price: 135 },
+        ]);
+    });
+
+    it('로케일별 라벨을 사용한다', () => {
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [downPattern] },
+            undefined,
+            undefined,
+            'USD',
+            'en'
+        );
+        expect(result.patternSummaries[0].keyPrices).toEqual([
+            { label: 'Measured target', price: 130 },
+            { label: 'Conservative target (50%)', price: 135 },
+        ]);
+    });
+
+    it('rounds binary-float noise off computed targets to the input precision (real-data case)', () => {
+        // Seen in a real DeepSeek analysis: 338.34 + (338.34 − 328.35) came out
+        // as 348.3299999999999 in the stored keyPrices.
+        const channel: PatternResult = {
+            ...upPattern,
+            id: 'p3',
+            patternName: 'Ascending Channel',
+            skillName: 'Ascending Channel',
+            geometry: {
+                breakoutLevel: 338.34,
+                extremeLevel: 328.35,
+                direction: 'up',
+            },
+        };
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [channel] },
+            undefined,
+            undefined
+        );
+        const prices = result.patternSummaries[0].keyPrices!.map(k => k.price);
+        expect(prices[0]).toBe(348.33);
+        // Halving a 2-decimal height needs one more place: 338.34 + 4.995.
+        expect(prices[1]).toBe(343.335);
+    });
+
+    it('geometry가 없는 패턴은 손대지 않는다', () => {
+        const noGeometry: PatternResult = {
+            id: 'p3',
+            patternName: 'flag',
+            skillName: 'flag_skill',
+            detected: true,
+            trend: 'bullish',
+            summary: 'test',
+            confidenceWeight: 0.5,
+            keyPrices: [{ label: '기존', price: 99 }],
+        };
+        const result = postProcessAnalysisWithReconcile(
+            { ...baseResponse, patternSummaries: [noGeometry] },
+            undefined,
+            undefined
+        );
+        expect(result.patternSummaries[0]).toEqual(noGeometry);
+    });
+
+    it('patternSummaries에 geometry가 하나도 없으면 원본 참조를 그대로 반환한다', () => {
+        const result = postProcessAnalysisWithReconcile(
+            baseResponse,
+            undefined,
+            undefined
+        );
+        expect(result).toBe(baseResponse);
     });
 });
 
@@ -555,6 +949,7 @@ describe('exit text currency', () => {
     it('threads currency from postProcessAnalysisWithReconcile', () => {
         // SL/TP 둘 다 없어 fallback 경로를 타야 reconciledLevels가 생긴다.
         const response = {
+            patternSummaries: [],
             actionRecommendation: {
                 entryRecommendation: 'enter',
                 entryPrices: [100000],

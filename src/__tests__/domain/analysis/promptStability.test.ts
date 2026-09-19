@@ -795,9 +795,14 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             dynamic.indexOf('주요 지수:')
         );
         expect(dynamic.indexOf('주요 지수:')).toBeLessThan(
-            dynamic.indexOf('섹터 등락률:')
+            dynamic.indexOf('섹터 등락률 (rank')
         );
-        expect(dynamic.trimEnd().endsWith('섹터 등락률:')).toBe(true);
+        // Precomputed prompt data (spec 2026-09-18 §2.9): the sector rows are
+        // followed by Breadth + Best-worst-spread lines, which are now the
+        // true tail (empty sectors here, so the spread line renders N/A).
+        expect(
+            dynamic.trimEnd().endsWith('Best − worst sector spread: N/A')
+        ).toBe(true);
         expect(stable).toBe('');
     });
 
@@ -887,8 +892,9 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
                 },
             ],
         };
-        const a = buildMacroBriefingPrompt(snapA);
-        const b = buildMacroBriefingPrompt(snapB);
+        const now = new Date('2026-06-15T00:00:00Z');
+        const a = buildMacroBriefingPrompt(snapA, now);
+        const b = buildMacroBriefingPrompt(snapB, now);
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('Fed Rate Decision');
         expect(a.stable).not.toContain('CPI Release');
@@ -900,7 +906,10 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             treasury: null,
             calendar: [],
         };
-        const { stable, dynamic } = buildMacroBriefingPrompt(snap);
+        const { stable, dynamic } = buildMacroBriefingPrompt(
+            snap,
+            new Date('2026-06-15T00:00:00Z')
+        );
         // Design C: this builder has no skills (spec §3.2), so it was fully
         // reverted to the exact v0.31 production order — the JSON schema
         // precedes the indicator/calendar data rows, which sit at the true

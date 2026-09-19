@@ -16,8 +16,21 @@ import {
     makeHLBars,
 } from '@/__tests__/domain/patterns/helpers';
 import { EXTREME_MATCH_ATR_MULT } from '@/domain/patterns/constants';
+import type { PatternCandidate } from '@/domain/types';
 
 const ATR = 1;
+
+/**
+ * Drops each candidate's `pivots` (spec 2026-09-18 real-data fix —
+ * classifiers now additively attach the pivots they matched, consumed by
+ * `patternGeometry.ts`) so this file's id/startIndex/endIndex shape
+ * assertions don't have to hand-author an exact pivot array per case.
+ * `pivots` itself is covered by `patternGeometry.test.ts`.
+ */
+const stripPivots = (
+    candidates: readonly PatternCandidate[]
+): Omit<PatternCandidate, 'pivots'>[] =>
+    candidates.map(({ pivots: _pivots, ...rest }) => rest);
 
 describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
     it('double_top: 두 고점이 근접하고 그 사이에 저점이 있으면 감지한다', () => {
@@ -26,7 +39,7 @@ describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
 
         const candidates = classifyDoubleTripleTop(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'double_top', startIndex: 1, endIndex: 3 },
         ]);
     });
@@ -37,7 +50,7 @@ describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
 
         const candidates = classifyDoubleTripleTop(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'triple_top', startIndex: 1, endIndex: 5 },
             { id: 'double_top', startIndex: 3, endIndex: 5 },
         ]);
@@ -69,7 +82,7 @@ describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
 
         const candidates = classifyDoubleTripleTop(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'double_top', startIndex: 1, endIndex: 3 },
         ]);
     });
@@ -80,7 +93,7 @@ describe('classifyDoubleTripleTop / classifyDoubleTripleBottom', () => {
 
         const candidates = classifyDoubleTripleBottom(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'double_bottom', startIndex: 1, endIndex: 3 },
         ]);
     });
@@ -101,7 +114,7 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
 
         const candidates = classifyHeadAndShoulders(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
     });
@@ -113,7 +126,7 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
 
         const candidates = classifyInverseHeadAndShoulders(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'inverse_head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
     });
@@ -149,7 +162,7 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
 
         const candidates = classifyHeadAndShoulders(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
     });
@@ -182,7 +195,7 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
 
         const candidates = classifyHeadAndShoulders(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
     });
@@ -204,7 +217,7 @@ describe('classifyHeadAndShoulders / classifyInverseHeadAndShoulders', () => {
 
         const candidates = classifyInverseHeadAndShoulders(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'inverse_head_and_shoulders', startIndex: 1, endIndex: 5 },
         ]);
     });
@@ -297,7 +310,7 @@ describe('classifyTrendlinePatterns', () => {
 
         const candidates = classifyTrendlinePatterns(pivots, bars, atr);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'rectangle', startIndex: 1, endIndex: 4 },
         ]);
     });
@@ -329,7 +342,7 @@ describe('classifyFlagsAndPennants', () => {
 
         const candidates = classifyFlagsAndPennants(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'bull_flag', startIndex: 19, endIndex: 25 },
         ]);
     });
@@ -346,7 +359,7 @@ describe('classifyFlagsAndPennants', () => {
 
         const candidates = classifyFlagsAndPennants(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'bear_flag', startIndex: 19, endIndex: 25 },
         ]);
     });
@@ -367,7 +380,7 @@ describe('classifyFlagsAndPennants', () => {
 
         const candidates = classifyFlagsAndPennants(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'bull_flag', startIndex: 19, endIndex: 22 },
             { id: 'pennant', startIndex: 19, endIndex: 22 },
         ]);
@@ -488,7 +501,7 @@ describe('classifyCurvaturePatterns', () => {
 
         const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'rounding_bottom', startIndex: 2, endIndex: 8 },
         ]);
     });
@@ -508,7 +521,7 @@ describe('classifyCurvaturePatterns', () => {
 
         const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'cup_and_handle', startIndex: 2, endIndex: 10 },
         ]);
     });
@@ -525,7 +538,7 @@ describe('classifyCurvaturePatterns', () => {
 
         const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'rounding_bottom', startIndex: 2, endIndex: 8 },
         ]);
     });
@@ -643,7 +656,7 @@ describe('classifyCurvaturePatterns', () => {
 
         const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'rounding_bottom', startIndex: 2, endIndex: 10 },
         ]);
     });
@@ -663,7 +676,7 @@ describe('classifyCurvaturePatterns', () => {
 
         const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
 
-        expect(candidates).toEqual([
+        expect(stripPivots(candidates)).toEqual([
             { id: 'rounding_bottom', startIndex: 2, endIndex: 10 },
         ]);
     });

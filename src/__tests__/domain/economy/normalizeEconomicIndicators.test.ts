@@ -77,4 +77,21 @@ describe('normalizeEconomicIndicatorSeries', () => {
         expect(s.trend).toHaveLength(2);
         expect(s.latest?.date).toBe('2026-05-01');
     });
+
+    describe('unit (spec 2026-09-18 §B3)', () => {
+        it('carries the caller-supplied unit through', () => {
+            const s = normalizeEconomicIndicatorSeries(
+                'federalFunds',
+                RAW,
+                2,
+                '%'
+            );
+            expect(s.unit).toBe('%');
+        });
+
+        it('omits unit (undefined) when the caller does not supply one', () => {
+            const s = normalizeEconomicIndicatorSeries('federalFunds', RAW, 2);
+            expect(s.unit).toBeUndefined();
+        });
+    });
 });

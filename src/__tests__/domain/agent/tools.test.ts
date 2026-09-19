@@ -83,6 +83,83 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('nope')).toBeUndefined();
     });
 
+    it('siglens 결과 필드명을 정확히 담는다 — 컴퓨트된 값을 모델이 재계산하지 않도록', () => {
+        expect(findToolSpec('get_bars_indicators')?.description).toContain(
+            'derived'
+        );
+        expect(findToolSpec('get_bars_indicators')?.description).toContain(
+            'higherTimeframe'
+        );
+        expect(findToolSpec('get_bars_indicators')?.description).toContain(
+            'entryRuleMet/exitRuleMet'
+        );
+        expect(findToolSpec('get_cached_analysis')?.description).toContain(
+            'sinceAnalysis'
+        );
+        expect(findToolSpec('get_my_portfolio')?.description).toContain('pnl');
+        expect(findToolSpec('get_my_portfolio')?.description).toContain(
+            'pnlPct'
+        );
+        expect(findToolSpec('get_my_portfolio')?.description).toContain(
+            'weightPct'
+        );
+        expect(findToolSpec('get_fundamentals')?.description).toContain(
+            'targetUpsidePct'
+        );
+        expect(findToolSpec('get_fundamentals')?.description).toContain(
+            'daysToEarnings'
+        );
+        // A real turn read the old `nextQuarterEstimate` (an annual figure) as
+        // "next quarter EPS"; the description now tells the model the period.
+        expect(findToolSpec('get_fundamentals')?.description).toContain(
+            'never call an annual figure quarterly'
+        );
+        expect(findToolSpec('get_news')?.description).toContain('tally');
+        expect(findToolSpec('get_news')?.description).toContain('ageHours');
+        expect(findToolSpec('get_economy')?.description).toContain(
+            'spread2s10s'
+        );
+        expect(findToolSpec('get_market_overview')?.description).toContain(
+            'rank'
+        );
+        // `sectorBreadth`, not `breadth` (spec 2026-09-18) — the field is
+        // the sector ETFs' own up/down/flat counts, not
+        // market-wide advancers/decliners, and the old name read as the latter.
+        expect(findToolSpec('get_market_overview')?.description).toContain(
+            'sectorBreadth'
+        );
+        expect(findToolSpec('get_market_overview')?.description).toContain(
+            'not market-wide advancers/decliners'
+        );
+    });
+
+    it('리뷰 1라운드: sinceAnalysis 필드 전체·옵션 정밀 필드·시세 asOfIsFetchTime·섹터 name/spread를 담는다', () => {
+        const cachedAnalysis = findToolSpec('get_cached_analysis')?.description;
+        expect(cachedAnalysis).toContain('analysisPrice');
+        expect(cachedAnalysis).toContain('priceNow');
+        expect(cachedAnalysis).toContain('movePct');
+        expect(cachedAnalysis).toContain('levelsBroken');
+        expect(cachedAnalysis).toContain('nearestSupport');
+        expect(cachedAnalysis).toContain('nearestResistance');
+        expect(cachedAnalysis).toContain('planNow may be null');
+
+        const options = findToolSpec('get_options_summary')?.description;
+        expect(options).toContain('daysToExpiration');
+        expect(options).toContain('maxPainDistancePct');
+        expect(options).toContain('impliedMoveRange');
+        expect(options).toContain('distancePct/side');
+        expect(options).toContain('callSpreadPct/putSpreadPct');
+
+        const overview = findToolSpec('get_market_overview')?.description;
+        expect(overview).toContain('`name`');
+        expect(overview).toContain('bestWorstSpreadPp');
+
+        const quote = findToolSpec('get_quote')?.description;
+        expect(quote).toContain('asOfIsFetchTime');
+        expect(quote).toContain('as of <time>');
+        expect(quote).toContain('never as the trade time');
+    });
+
     it('툴 설명의 턴당 숫자는 AGENT_TURN_CAPS에서 온다 — 상한을 바꾸면 모델이 읽는 문장도 따라간다', () => {
         const fresh = AGENT_TOOL_SPECS.find(
             t => t.name === 'run_fresh_analysis'

@@ -205,7 +205,8 @@ export async function runNewsAnalysis(
         skillSampling.skills,
         options.assetClass ?? 'equity',
         locale,
-        options.currency
+        options.currency,
+        occurredAt
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

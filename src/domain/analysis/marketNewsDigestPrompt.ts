@@ -7,6 +7,10 @@ import {
     type AnalysisLocale,
 } from './outputLocale';
 import { confidenceLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    formatAgeSuffix,
+    formatSentimentTally,
+} from '@/domain/analysis/newsPrompt';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
 import {
     NO_CHART_SELECTION_CONTEXT,
@@ -30,10 +34,14 @@ function selectNewsSkills(skills: readonly Skill[]): Skill[] {
 }
 
 /** Format a single enriched news item into a compact block for the prompt. */
-function formatNewsItem(item: EnrichedNewsItem, index: number): string {
+function formatNewsItem(
+    item: EnrichedNewsItem,
+    index: number,
+    now: Date | undefined
+): string {
     const lines = [
         `[${index + 1}] ${item.titleEn}`,
-        `    Source: ${item.source} | Published: ${item.publishedAt}`,
+        `    Source: ${item.source} | Published: ${item.publishedAt}${formatAgeSuffix(item.publishedAt, now)}`,
         `    Sentiment: ${item.card.sentiment} | Category: ${item.card.category}`,
         `    Summary (KO): ${item.card.summaryKo}`,
     ];
@@ -72,7 +80,13 @@ export function buildMarketNewsDigestPrompt(
     categoryLabel: string,
     news: ReadonlyArray<EnrichedNewsItem>,
     skills: readonly Skill[],
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    /**
+     * Reference clock for the per-item age suffix (spec 2026-09-18 §2.8).
+     * Optional without a wall-clock default: the domain never reads the clock
+     * itself (production callers pass it); omitted → no age suffix.
+     */
+    now?: Date
 ): AssembledPrompt {
     const qualifiedSkills = selectNewsSkills(skills);
     const skillsSection =
@@ -86,7 +100,7 @@ export function buildMarketNewsDigestPrompt(
             : 'No additional news skills loaded.';
     const newsSection =
         news.length > 0
-            ? news.map((item, i) => formatNewsItem(item, i)).join('\n\n')
+            ? news.map((item, i) => formatNewsItem(item, i, now)).join('\n\n')
             : 'No recent news articles available.';
 
     const schemaLang = schemaLanguageLabel(locale);
@@ -102,6 +116,7 @@ ${skillsSection}`;
 - Do not fabricate articles, catalysts, prices, or price movement. No price/volume data is provided here.
 
 ## Recent News Articles (${news.length} items)
+${formatSentimentTally(news)}
 ${newsSection}
 
 ${CORE_SKILL_REFERENCE_POINTER}

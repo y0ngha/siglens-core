@@ -208,12 +208,28 @@ export {
     getSinglePatternTrend,
     type PatternTrend,
 } from './domain/analysis/candle-trend';
+// ISO-week bar aggregator — consumer (siglens `get_bars_indicators` tool)
+// uses it to build the `higherTimeframe` rollup for `1Day` bars, since the
+// domain has no daily→weekly aggregation of its own. Pure/sync, so Tier 2.
+export { aggregateBarsToWeekly } from './domain/analysis/aggregateBarsToWeekly';
 
 // Analysis normalization / helpers
 export {
     extractReconciledActionLines,
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
+// Deterministic plan-vs-price arithmetic — `runAnalysis` already attaches
+// this to every technical-axis result via `planCheck`, but the agent tool
+// layer (siglens `get_cached_analysis`) needs to run it a second time
+// against a LIVE price (not the analysis-time close) to build
+// `sinceAnalysis.planNow`. Pure/sync, so Tier 2.
+export { buildPlanCheck } from './domain/analysis/planCheck';
+// The entry-price reference buildPlanCheck/postProcessAnalysisWithReconcile
+// use internally — exported so a consumer computing its OWN plan check
+// against a live price (siglens `sinceAnalysis.planNow`) uses the exact same
+// entry reference `planCheck.riskRewardAtEntry` was computed from, rather
+// than a second, possibly different derivation.
+export { planEntryPrice } from './domain/analysis/ai-levels';
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
     clusterKeyLevels,
@@ -700,6 +716,8 @@ export type {
     // Chart-pattern pre-screener result types (domain/patterns, spec §3.3).
     ChartPatternId,
     PatternCandidate,
+    PivotKind,
+    PivotPoint,
     CandlePatternSummary,
     ChartDisplayType,
     ChatLoadingPhase,
@@ -799,6 +817,16 @@ export type {
     KeyPrice,
     MarketReference,
     HorizonReference,
+    PivotTables,
+    StandardPivotLevels,
+    CamarillaPivotLevels,
+    FibonacciPivotLevels,
+    WoodiePivotLevels,
+    DeMarkPivotLevels,
+    FibonacciProjection,
+    FibonacciLevel,
+    AbcExtensionProjection,
+    SwingLegDirection,
     HorizonWindow,
     HorizonKey,
     TrendStructure,
@@ -831,9 +859,11 @@ export type {
     MultiCandlePattern,
     MultiCandlePatternEntry,
     ParabolicSARResult,
+    PatternBreakoutDirection,
     PatternLine,
     PatternResult,
     PatternSummary,
+    PatternTargetGeometry,
     PollAnalysisResult,
     PollBriefingResult,
     PriceScenario,
@@ -921,9 +951,11 @@ export type {
     OptionsChain,
     OptionsSnapshot,
     StrikeOpenInterest,
+    LlmStrikeOpenInterest,
     StrikeVolumeAggregate,
     TopOiQuote,
     OptionsExpirationMetrics,
+    ImpliedMoveRange,
     OptionsPerExpirationCommentary,
     OptionsSignal,
     OptionsAnalysisResponse,

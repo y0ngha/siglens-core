@@ -484,3 +484,233 @@ describe('buildFinancialsAnalysisPrompt — currency and non-finite values', () 
         expect(p).toContain('Revenue Growth N/A');
     });
 });
+
+describe('buildFinancialsAnalysisPrompt — Margin Trend + Liabilities/Equity (spec 2026-09-18 §2.7)', () => {
+    const priorIncomeRow: IncomeStatementRow = {
+        ...incomeRow,
+        fiscalYear: '2022',
+        grossMargin: 40.13,
+        operatingMargin: 27.82,
+        netMargin: 22.31,
+    };
+    const priorCashFlowRow: CashFlowRow = {
+        ...cashFlowRow,
+        fiscalYear: '2022',
+        fcfMargin: 20.94,
+    };
+
+    it('computes the margin trend (latest vs prior same-period row) in pp', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            income: [incomeRow, priorIncomeRow],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        // 44.13 - 40.13 = +4.0pp, 29.82 - 27.82 = +2.0pp, 25.31 - 22.31 = +3.0pp
+        expect(p).toContain(
+            'Margin Trend (latest vs prior same-period row): Gross +4.0pp, Operating +2.0pp, Net +3.0pp'
+        );
+    });
+
+    it('never renders -0.0pp for a margin delta that rounds to exactly zero (spec 2026-09-18 §B6)', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            income: [
+                { ...incomeRow, grossMargin: 40.129 }, // 40.129 - 40.13 = -0.001 -> rounds to -0.0
+                priorIncomeRow,
+            ],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).not.toContain('-0.0pp');
+        expect(p).toContain('Gross +0.0pp');
+    });
+
+    it('income margin trend is N/A with only 1 row (no prior)', () => {
+        const snapshot: FinancialsSnapshot = { ...empty, income: [incomeRow] };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain(
+            'Margin Trend (latest vs prior same-period row): N/A'
+        );
+    });
+
+    it('income margin trend is N/A when the prior row is a different period (e.g. FY vs Q3)', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            income: [incomeRow, { ...priorIncomeRow, period: 'Q3' }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain(
+            'Margin Trend (latest vs prior same-period row): N/A'
+        );
+    });
+
+    it('income margin trend skips a non-matching-period row to find the next matching one', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            income: [
+                incomeRow,
+                { ...priorIncomeRow, period: 'Q3', grossMargin: 999 },
+                { ...priorIncomeRow, fiscalYear: '2021' },
+            ],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        // Should skip the Q3 row (would give a huge negative delta) and match the 2021 FY row.
+        expect(p).toContain('Gross +4.0pp');
+    });
+
+    it('income margin trend is N/A when a margin value is NaN', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            income: [{ ...incomeRow, grossMargin: Number.NaN }, priorIncomeRow],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain('Gross N/A');
+    });
+
+    it('computes the cash flow FCF margin trend in pp', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            cashFlow: [cashFlowRow, priorCashFlowRow],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        // 25.94 - 20.94 = +5.0pp
+        expect(p).toContain(
+            'Margin Trend (latest vs prior same-period row): FCF +5.0pp'
+        );
+    });
+
+    it('cash flow margin trend is N/A with only 1 row', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            cashFlow: [cashFlowRow],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain(
+            'Margin Trend (latest vs prior same-period row): N/A'
+        );
+    });
+
+    it('computes Liabilities / Equity for the latest balance row', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            balance: [balanceRow],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        // 290,437,000,000 / 62,146,000,000 = 4.67
+        const expected = (
+            balanceRow.totalLiabilities! / balanceRow.totalStockholdersEquity!
+        ).toFixed(2);
+        expect(p).toContain(`Liabilities / Equity: ${expected}`);
+    });
+
+    it('Liabilities / Equity is N/A when equity is 0 (zero base)', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            balance: [{ ...balanceRow, totalStockholdersEquity: 0 }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain('Liabilities / Equity: N/A');
+    });
+
+    it('Liabilities / Equity is N/A when equity is negative', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            balance: [{ ...balanceRow, totalStockholdersEquity: -1000 }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain('Liabilities / Equity: N/A');
+    });
+
+    it('Liabilities / Equity is N/A when liabilities is NaN', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            balance: [{ ...balanceRow, totalLiabilities: Number.NaN }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain('Liabilities / Equity: N/A');
+    });
+
+    it('Liabilities / Equity is N/A when liabilities is null', () => {
+        const snapshot: FinancialsSnapshot = {
+            ...empty,
+            balance: [{ ...balanceRow, totalLiabilities: null }],
+        };
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            snapshot,
+            computeFinancialsScorecard(snapshot),
+            []
+        );
+        expect(p).toContain('Liabilities / Equity: N/A');
+    });
+
+    it('renders no Liabilities / Equity line when there is no balance row at all (whole section already says so)', () => {
+        const p = buildFinancialsAnalysisPrompt(
+            'AAPL',
+            empty,
+            computeFinancialsScorecard(empty),
+            []
+        );
+        expect(p).toContain('(No balance sheet data available)');
+        expect(p).not.toContain('Liabilities / Equity:');
+    });
+});

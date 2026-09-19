@@ -70,7 +70,6 @@ import type {
     AssetClass,
     Bar,
     CandlePatternEntry,
-    ChartPatternId,
     CurrencyCode,
     FearGreedSnapshot,
     HorizonKey,
@@ -79,6 +78,10 @@ import type {
     IndicatorResult,
     MarketEvent,
     MarketReference,
+    PatternCandidate,
+    PivotTables,
+    FibonacciProjection,
+    AbcExtensionProjection,
     PositionBucket,
     PriorAnalysis,
     PromptConfig,
@@ -87,6 +90,8 @@ import type {
     SkillSelectionContext,
     SkillType,
     SMCEqualLevel,
+    SMCFairValueGap,
+    SMCOrderBlock,
     SMCResult,
     SMCZone,
     SqueezeMomentumResult,
@@ -94,7 +99,15 @@ import type {
     Trend,
 } from '@/domain/types';
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
-import { computeMarketReference } from '@/domain/analysis/marketReference';
+import { buildIndicatorStateSection } from '@/domain/analysis/indicatorState';
+import {
+    CHART_PATTERN_CANDIDATES_SECTION_HEADER,
+    formatChartPatternCandidatesSection,
+} from '@/domain/analysis/chartPatternCandidatesSection';
+import {
+    computeMarketReference,
+    formatFibRatio,
+} from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
@@ -106,6 +119,8 @@ import {
     equityListingContext,
     formatBarDateTime,
     formatNullableNumber,
+    formatSignedNumber,
+    formatSignedPercent,
     priceDecimalPlaces,
     TIMEFRAME_LABEL,
 } from '@/domain/analysis/promptFormat';
@@ -486,15 +501,86 @@ const barsAgoCount = (index: number, totalBars: number): number =>
 const barsAgo = (index: number, totalBars: number): string =>
     `(${barsAgoCount(index, totalBars)} bars ago)`;
 
+/**
+ * @internal ` (+1.23% / +1.2 ATR from price)` — null/NaN rule (spec §0):
+ * `price` must be finite and positive for the % term; `atr` must
+ * additionally be finite and positive for the ATR term to appear at all
+ * (never a division by a zero/negative/missing ATR). Returns `''` when
+ * `price` itself is unusable, so callers can splice it straight onto a line.
+ */
+const formatSmcDistanceSuffix = (
+    level: number,
+    price: number | null,
+    atr: number | null
+): string => {
+    if (price === null || !Number.isFinite(price) || price <= 0) return '';
+    const pctText = formatSignedPercent(((level - price) / price) * 100);
+    const atrText =
+        atr !== null && Number.isFinite(atr) && atr > 0
+            ? ` / ${formatSignedNumber((level - price) / atr, 1)} ATR`
+            : '';
+    return ` (${pctText}${atrText} from price)`;
+};
+
+// The edge of a [low, high] zone closest to `price` — 0 distance once price
+// is inside the zone, matching "distance until price reaches this zone".
+const nearEdge = (low: number, high: number, price: number): number =>
+    price < low ? low : price > high ? high : price;
+
+/**
+ * @internal Tags the single nearest-above and nearest-below entry within an
+ * already-unmitigated-filtered list, by the signed distance from `price` to
+ * each entry's near edge. Entries exactly at `price` (distance 0) get
+ * neither tag — direction is undefined at zero distance.
+ */
+function nearestAboveBelowIds<T>(
+    entries: readonly T[],
+    price: number | null,
+    edgeOf: (entry: T) => number
+): { above: T | null; below: T | null } {
+    if (price === null || !Number.isFinite(price))
+        return { above: null, below: null };
+    let above: T | null = null;
+    let aboveDist = Number.POSITIVE_INFINITY;
+    let below: T | null = null;
+    let belowDist = Number.POSITIVE_INFINITY;
+    for (const entry of entries) {
+        const dist = edgeOf(entry) - price;
+        if (dist > 0 && dist < aboveDist) {
+            above = entry;
+            aboveDist = dist;
+        } else if (dist < 0 && -dist < belowDist) {
+            below = entry;
+            belowDist = -dist;
+        }
+    }
+    return { above, below };
+}
+
+const NEAREST_ABOVE_TAG = ' [nearest above]';
+const NEAREST_BELOW_TAG = ' [nearest below]';
+
+const nearestTag = <T>(
+    entry: T,
+    nearest: { above: T | null; below: T | null }
+): string =>
+    entry === nearest.above
+        ? NEAREST_ABOVE_TAG
+        : entry === nearest.below
+          ? NEAREST_BELOW_TAG
+          : '';
+
 // Equal Highs/Lows differ only by label + liquidity-kind text; share one formatter.
 const formatLiquidityLine = (
     label: string,
     liquidityKind: string,
     eq: SMCEqualLevel,
     totalBars: number,
-    priceDp: number
+    priceDp: number,
+    price: number | null,
+    atr: number | null
 ): string =>
-    `- ${label} at ${formatNullableNumber(eq.price, priceDp)} (${liquidityKind}) (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
+    `- ${label} at ${formatNullableNumber(eq.price, priceDp)} (${liquidityKind})${formatSmcDistanceSuffix(eq.price, price, atr)} (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
 
 // When adding a new field to SMCResult, update this check accordingly.
 const isSMCEmpty = (smc: SMCResult): boolean =>
@@ -543,7 +629,8 @@ const classifyPriceZone = (
 const formatSMCSection = (
     indicators: IndicatorResult,
     bars: Bar[],
-    priceDp: number
+    priceDp: number,
+    atr: number | null
 ): string => {
     const smc = indicators.smc;
 
@@ -575,13 +662,20 @@ const formatSMCSection = (
     const activeOBs = smc.orderBlocks
         .filter(ob => !ob.isMitigated)
         .slice(-SMC_MAX_ORDER_BLOCKS);
+    const nearestOB = nearestAboveBelowIds(activeOBs, currentPrice, ob =>
+        nearEdge(ob.low, ob.high, currentPrice ?? ob.low)
+    );
     const orderBlockSection = [
         '### Order Blocks',
         ...(activeOBs.length > 0
-            ? activeOBs.map(
-                  ob =>
-                      `- ${ob.type} OB: ${px(ob.low)} ~ ${px(ob.high)} ${barsAgo(ob.startIndex, totalBars)}`
-              )
+            ? activeOBs.map((ob: SMCOrderBlock) => {
+                  const edge = nearEdge(
+                      ob.low,
+                      ob.high,
+                      currentPrice ?? ob.low
+                  );
+                  return `- ${ob.type} OB: ${px(ob.low)} ~ ${px(ob.high)} ${barsAgo(ob.startIndex, totalBars)}${formatSmcDistanceSuffix(edge, currentPrice, atr)}${nearestTag(ob, nearestOB)}`;
+              })
             : ['- No active order blocks']),
     ];
 
@@ -589,13 +683,20 @@ const formatSMCSection = (
     const activeFVGs = smc.fairValueGaps
         .filter(fvg => !fvg.isMitigated)
         .slice(-SMC_MAX_FAIR_VALUE_GAPS);
+    const nearestFVG = nearestAboveBelowIds(activeFVGs, currentPrice, fvg =>
+        nearEdge(fvg.low, fvg.high, currentPrice ?? fvg.low)
+    );
     const fvgSection = [
         '### Fair Value Gaps',
         ...(activeFVGs.length > 0
-            ? activeFVGs.map(
-                  fvg =>
-                      `- ${fvg.type} FVG: ${px(fvg.low)} ~ ${px(fvg.high)} ${barsAgo(fvg.index, totalBars)}`
-              )
+            ? activeFVGs.map((fvg: SMCFairValueGap) => {
+                  const edge = nearEdge(
+                      fvg.low,
+                      fvg.high,
+                      currentPrice ?? fvg.low
+                  );
+                  return `- ${fvg.type} FVG: ${px(fvg.low)} ~ ${px(fvg.high)} ${barsAgo(fvg.index, totalBars)}${formatSmcDistanceSuffix(edge, currentPrice, atr)}${nearestTag(fvg, nearestFVG)}`;
+              })
             : ['- No active fair value gaps']),
     ];
 
@@ -612,7 +713,9 @@ const formatSMCSection = (
                           'sell-side liquidity',
                           eq,
                           totalBars,
-                          priceDp
+                          priceDp,
+                          currentPrice,
+                          atr
                       )
                   ),
                   ...eqLows.map(eq =>
@@ -621,7 +724,9 @@ const formatSMCSection = (
                           'buy-side liquidity',
                           eq,
                           totalBars,
-                          priceDp
+                          priceDp,
+                          currentPrice,
+                          atr
                       )
                   ),
               ]
@@ -842,6 +947,32 @@ const cryptoHorizonSpan = (barCount: number, timeframe: Timeframe): string => {
     return `~${Math.round(days / DAYS_PER_WEEK)} weeks`;
 };
 
+/**
+ * @internal
+ * One price in a `Fib table:` / `Fib ABC table:` / `Pivot table:` line. A level
+ * at or below zero (a deep down-leg's far extensions, a wide-range S3) is not a
+ * price — it renders `N/A` instead of a quotable "target", matching the capped
+ * nearest-level lists, which drop such levels via referenceLevels' own guard.
+ */
+export const formatTablePrice = (price: number, priceDp: number): string =>
+    Number.isFinite(price) && price > 0
+        ? formatNullableNumber(price, priceDp)
+        : 'N/A';
+
+/** @internal `Fib table:` line — every retracement and extension of the horizon's anchor leg. */
+export const formatFibTableLine = (
+    fib: FibonacciProjection,
+    priceDp: number
+): string =>
+    `Fib table: ${fib.retracements.map(r => `${formatFibRatio(r.ratio)} ${formatTablePrice(r.price, priceDp)}`).join(' / ')} | ext ${fib.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, priceDp)}`).join(' / ')}`;
+
+/** @internal `Fib ABC table:` line — every extension projected from C. */
+export const formatAbcTableLine = (
+    abc: AbcExtensionProjection,
+    priceDp: number
+): string =>
+    `Fib ABC table: ${abc.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, priceDp)}`).join(' / ')}`;
+
 const formatHorizonBlock = (
     key: HorizonKey,
     horizon: HorizonReference,
@@ -859,6 +990,36 @@ const formatHorizonBlock = (
     const structureLine =
         `Structure: price ${s.priceVsMA60} MA60 / ${s.priceVsMA200} MA200; EMA ${s.emaStack}; swings ${s.swingStructure}; ` +
         `ADX ${s.adx != null ? s.adx.toFixed(INDICATOR_DECIMAL_PLACES) : 'n/a'}; efficiency ${s.efficiencyRatio != null ? s.efficiencyRatio.toFixed(EFFICIENCY_DECIMAL_PLACES) : 'n/a'}; regime ${s.regime}.`;
+    // The `Fib …%` / `Fib ext …%` rows above are levels only — the swing
+    // they are anchored on isn't printed anywhere else, and the fibonacci
+    // skill (siglens) now tells the model to cite that anchor instead of
+    // computing its own levels. One line, only when this horizon actually
+    // produced a projection.
+    const fib = horizon.fibProjection;
+    const fibLine =
+        fib == null
+            ? []
+            : [
+                  fib.direction === 'up'
+                      ? `Fib anchor: swing low ${formatNullableNumber(fib.low, priceDp)} → swing high ${formatNullableNumber(fib.high, priceDp)} (up leg)`
+                      : `Fib anchor: swing high ${formatNullableNumber(fib.high, priceDp)} → swing low ${formatNullableNumber(fib.low, priceDp)} (down leg)`,
+              ];
+    // Same reasoning as `fibLine`, for the separate A→B→C swing triplet the
+    // `Fib ABC ext …%` levels (above) are anchored on (spec 2026-09-18 §A3).
+    // Null far more often than `fib` — only renders once C has confirmed.
+    const abc = horizon.abcExtension;
+    const abcLine =
+        abc == null
+            ? []
+            : [
+                  `Fib ABC anchor: A ${formatNullableNumber(abc.a, priceDp)} → B ${formatNullableNumber(abc.b, priceDp)} → C ${formatNullableNumber(abc.c, priceDp)} (${abc.direction})`,
+              ];
+    // Complete Fib sets (spec 2026-09-18 analysis-prompt decision): the
+    // nearest-level lists below are capped per side, so a far ratio the model
+    // may need for a second target can be missing there. One compact line per
+    // set replaces "compute it yourself" with a number to quote.
+    const fibTable = fib == null ? [] : [formatFibTableLine(fib, priceDp)];
+    const abcTable = abc == null ? [] : [formatAbcTableLine(abc, priceDp)];
     const resistance =
         horizon.levels.resistance.length > 0
             ? [
@@ -873,9 +1034,43 @@ const formatHorizonBlock = (
     return [
         `### ${HORIZON_LABEL[key]} — ${span} (${horizon.window.bars} bars)`,
         structureLine,
+        ...fibLine,
+        ...fibTable,
+        ...abcLine,
+        ...abcTable,
         ...resistance,
         ...support,
     ].join('\n');
+};
+
+/**
+ * @internal
+ * One line with every pivot family from the shared pivot bar (spec 2026-09-18
+ * analysis-prompt decision) — the nearest-level lists are capped, so without
+ * this a far pivot would be missing and the model would have to compute it.
+ * `''` when no family could be computed.
+ */
+export const formatPivotTableLine = (
+    pivots: PivotTables | undefined,
+    priceDp: number
+): string => {
+    if (!pivots) return '';
+    const px = (n: number): string => formatTablePrice(n, priceDp);
+    const parts = [
+        pivots.standard &&
+            `Standard PP ${px(pivots.standard.pp)} R1 ${px(pivots.standard.r1)} R2 ${px(pivots.standard.r2)} R3 ${px(pivots.standard.r3)} S1 ${px(pivots.standard.s1)} S2 ${px(pivots.standard.s2)} S3 ${px(pivots.standard.s3)}`,
+        // "Pivot Fib" (not "Fib") — spec 2026-09-18: this label
+        // must not read as a Fib retracement/extension row.
+        pivots.fibonacci &&
+            `Pivot Fib PP ${px(pivots.fibonacci.pp)} R1 ${px(pivots.fibonacci.r1)} R2 ${px(pivots.fibonacci.r2)} R3 ${px(pivots.fibonacci.r3)} S1 ${px(pivots.fibonacci.s1)} S2 ${px(pivots.fibonacci.s2)} S3 ${px(pivots.fibonacci.s3)}`,
+        pivots.woodie &&
+            `Woodie PP ${px(pivots.woodie.pp)} R1 ${px(pivots.woodie.r1)} R2 ${px(pivots.woodie.r2)} S1 ${px(pivots.woodie.s1)} S2 ${px(pivots.woodie.s2)}`,
+        pivots.demark &&
+            `DeMark PP ${px(pivots.demark.pp)} R1 ${px(pivots.demark.r1)} S1 ${px(pivots.demark.s1)}`,
+        pivots.camarilla &&
+            `Camarilla R3 ${px(pivots.camarilla.r3)} R4 ${px(pivots.camarilla.r4)} S3 ${px(pivots.camarilla.s3)} S4 ${px(pivots.camarilla.s4)}`,
+    ].filter((part): part is string => typeof part === 'string');
+    return parts.length === 0 ? '' : `Pivot table: ${parts.join(' | ')}`;
 };
 
 // Design C (skills-to-system split): only the always_on skill digests move to
@@ -903,7 +1098,10 @@ const formatMarketReferenceSection = (
                 assetClass
             )
         ),
-    ].join('\n');
+        formatPivotTableLine(reference.pivots, priceDp),
+    ]
+        .filter(line => line !== '')
+        .join('\n');
 
 // ── Pro-indicator measured-reliability annotations ─────────────────────────
 // Inline "신뢰도 가중치": each pro-indicator line carries one of these notes so the
@@ -1337,7 +1535,7 @@ const ANALYSIS_FIELD_GUIDANCE: Record<
     strategyResults:
         "Each entry's summary is Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes.",
     actionRecommendation:
-        'Every text field here is descriptive, never an instruction to the reader (CORE PRINCIPLES). positionAnalysis: Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n. entry: Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n. exit: Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n. riskReward: Korean markdown risk-reward ratio for the long position (e.g., stop-loss 3% vs target 9% → risk:reward = 1:3), separated into readable paragraphs with \\n\\n when explanation is more than one sentence.',
+        'Every text field here is descriptive, never an instruction to the reader (CORE PRINCIPLES). positionAnalysis: Korean markdown prose explaining current price position vs support/resistance from a long-position perspective, separated into readable paragraphs with \\n\\n. entry: Korean markdown long (buy) entry strategy with specific price ranges, separated into readable paragraphs with \\n\\n. exit: Korean markdown long position exit strategy: take-profit targets and stop-loss price ranges, separated into readable paragraphs with \\n\\n. riskReward: Korean markdown prose (one or two sentences) naming what bounds the risk (the stop reference) and what bounds the reward (the target reference) for the long position — never state a ratio or percentage yourself; the app computes and prepends the deterministic risk:reward line automatically. Separate into readable paragraphs with \\n\\n when more than one sentence.',
 };
 
 const ANALYSIS_INTENT_BLOCK = [
@@ -1372,7 +1570,16 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '## Analysis Guidelines',
         '',
         '### Name Field Matching',
-        '- skillName, strategyName, and indicatorName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
+        '- strategyName and indicatorName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
+        "- skillName follows the same exact-match rule for every listed Skills pattern entry. The one exception is an unlisted chart pattern you add yourself (see the patternSummaries section below) — for those, skillName is the pattern's standard English name instead.",
+        '',
+        '### Skills Are Guidance, Not a Boundary',
+        '- The injected skills are not an exhaustive catalog of every valid technical concept. You may use other well-established technical concepts in the summary and other prose fields when the provided data actually supports them — never invent data to justify one.',
+        '',
+        '### Computed Figures and Arithmetic',
+        '- Computed figures in this prompt (## Indicator State, ## Market Reference distances and tables, ## Chart Pattern Candidates, ## Deterministic Metrics, and the app-computed pattern targets and risk:reward line) must be quoted as given, never recomputed.',
+        '- In prose you may do simple arithmetic from numbers that appear in this prompt when no computed figure covers it (e.g. the distance to a level you identified yourself); keep percentages to one decimal place.',
+        "- Structured price fields (keyLevels, priceTargets, entryPrices, stopLoss, takeProfitPrices, geometry) take only prices that appear in the data — never a price you derived arithmetically. Far Fibonacci and pivot levels are in the `Fib table:`, `Fib ABC table:` and `Pivot table:` lines of ## Market Reference. The one permitted derivation: geometry.extremeLevel may be the average of the pattern's own peaks/troughs when the pattern's definition calls for it (double/triple tops and bottoms) — every other structured price must appear in the data.",
         '',
         '### Regular Skills Usage',
         '- Skills shown in ## Active Skills are context-only regular skills without a dedicated structured output field.',
@@ -1386,9 +1593,10 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '',
         '### keyPrices Rules',
         '- keyPrices must only contain actual price levels (numbers that represent a price, e.g. 150.00). Do NOT include bar indices, counts, or any non-price numeric values.',
+        "- keyPrices hold the pattern's structural prices (peaks, troughs, head, shoulders, neckline, boundaries, rims). Never add measured or conservative target entries to keyPrices — the app appends them from geometry, so an entry of your own would duplicate or contradict them.",
         locale === DEFAULT_ANALYSIS_LOCALE
-            ? '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "목표가", "손절선"). Never use English or snake_case identifiers.'
-            : `- All label values in keyPrices must be written in ${outputLanguageName(locale)} (e.g. an upper trendline, a neckline, a target price, a stop-loss level). Never use snake_case identifiers.`,
+            ? '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "손절선"). Never use English or snake_case identifiers.'
+            : `- All label values in keyPrices must be written in ${outputLanguageName(locale)} (e.g. an upper trendline, a neckline, a stop-loss level). Never use snake_case identifiers.`,
         '',
         '### Support/Resistance Assessment',
         '- For keyLevels, you may reuse exact prices from the ## Market Reference section (to avoid arithmetic error) OR derive your own from patterns, SMC, and volume — neither is mandatory. State a brief reason for each level. Do NOT treat reference levels as carrying more conviction merely because they were precomputed; weigh them like any other evidence.',
@@ -1399,13 +1607,15 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Reference prior swing highs/lows and Bollinger Band boundaries',
         '- Each level must include a reason',
         '',
-        '### Price Target Calculation',
-        '- Apply the measured move rule (project pattern height) for detected patterns',
-        '- First target: nearest support/resistance; second target: based on pattern measurement',
+        '### Price Target Selection',
+        '- Fill priceTargets for the bullish and the bearish scenario whenever the data offers a level on that side — do not leave a scenario empty when keyLevels or ## Market Reference hold levels in its direction.',
+        '- Choose target prices from levels already in this prompt: keyLevels, ## Market Reference rows and its `Fib table:` / `Fib ABC table:` / `Pivot table:` lines, and the measured / conservative targets listed in ## Chart Pattern Candidates (computed). Never project a new target price yourself (e.g. adding a pattern height to a breakout level) — the app computes pattern targets from geometry.',
+        '- First target: the nearest meaningful level in the scenario direction; second target: the next one — a Fib/ABC extension, a pivot, or a listed pattern target.',
         '- State the trigger condition (breakout/breakdown reference level) for each scenario',
         '- Strengthen target viability with supporting indicators (RSI extremes, Bollinger Band touch, MACD trend)',
         '- Sort targets by proximity to current price: bullish targets in ascending price order (closest first), bearish targets in descending price order (closest first). Never return targets in arbitrary order.',
         '- Every target MUST include a non-empty basis explaining the rationale (supporting indicator, pattern measurement, swing level, etc.). If a basis cannot be provided, exclude that target entirely instead of returning it with an empty basis.',
+        `- priceTargets may cite a chart-pattern measured-move target only when that pattern appears in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}. For any other pattern, cite its key prices as a basis but never a pattern-derived target number — see the geometry Writing Rules for how a target actually gets computed.`,
         '',
         '### Trendline Detection',
         '- Return 0 to 3 trendlines maximum',
@@ -1433,6 +1643,9 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Cite its signal list as the evidence in keyLevels reasoning and in the summary — name the signals, not just the score.',
         '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the confluence is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
         '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the rule engine abstained.',
+        '',
+        '### Indicator State',
+        '- ## Indicator State is computed; do not re-derive these comparisons. Every above/below-MA/EMA distance, MA stack, MACD-vs-signal/zero, DMI/ADX regime, Stochastic zone, Ichimoku cloud position, Bollinger position, and Supertrend/Parabolic SAR/ATR distance already appears there — cite it, never recompute it.',
         '',
         '### Conflicting Signals',
         '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
@@ -1473,7 +1686,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals)',
         '  - "avoid": price extended from support, strong resistance overhead, risk high, or bearish confluence dominates',
         '  - Before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met confluence entry rule does not override this — the two were measured to be inversely related.',
-        '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a risk:reward estimate — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
+        '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a description of what bounds the risk and the reward (no ratio — see Step 3 riskReward rule) — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
         '- Step 2 — Compute prices:',
         '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
         '  - entryPrices: [low, high] range near support — the actionable zone for "enter"/"wait", or the contingent trigger zone for "avoid". Must match the entry text field exactly.',
@@ -1483,7 +1696,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
         '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state the conditional trigger explicitly (e.g. "OO 저항선을 거래량 동반 돌파 시") and give the contingent entry range tied to that trigger, using only a trigger level that is actually present in keyLevels — if none exists, say so instead of inventing one.',
         '  - exit: for all three, provide take-profit targets (referencing priceTargets.bullish / resistance) + stop-loss (referencing support below entry); for "avoid" frame these as applying once the contingent entry triggers. If a required reference level is missing from keyLevels/priceTargets, state that gap rather than guessing a number.',
-        '  - riskReward: for all three, provide a ratio calculation (e.g., "손절 3% vs 목표 9% → 위험:보상 = 1:3") based on the (contingent) entry/exit prices for "avoid"; skip the ratio and note the missing input if entry/exit prices could not be grounded.',
+        '  - riskReward: for all three, write one or two sentences naming what bounds the risk (the stop reference) and what bounds the reward (the target reference), based on the (contingent) entry/exit prices for "avoid" — never state a ratio or percentage yourself; the app computes and prepends the deterministic risk:reward line. If entry/exit prices could not be grounded, say so instead.',
         `- Step 3 formatting: each actionRecommendation text field must be readable markdown in ${outputLanguageName(locale)}. Use \\n\\n between context paragraphs, and use bullet lists for multiple prices or conditions.`,
         '- Consistency: entryPrices, stopLoss, takeProfitPrices must numerically match the text in entry/exit fields — they are the same prices in structured form for chart rendering.',
         '',
@@ -1542,9 +1755,9 @@ const buildAnalysisRequest = (
                   '- patternSummaries must include detection results for **every** Skills pattern listed below.',
                   '- For each Skills pattern, assess whether it is detected in the current chart data and set the detected value accordingly.',
                   '- Patterns that are not detected must still be included with detected: false.',
-                  '- **Do not include any patterns not listed below in patternSummaries.**',
-                  '- **Do not include candle patterns (single/multi candle) in patternSummaries.** Candle patterns belong only in candlePatterns.',
-                  '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match one of the pattern skill names from the list below.',
+                  "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's standard English name (the Pattern Index name when it is in the catalog), fill geometry, and ground every level in the bars. Do not add detected: false entries for unlisted patterns.",
+                  '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you add patterns beyond the listed ones. Candle patterns belong only in candlePatterns.',
+                  '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. For a listed Skills pattern it MUST exactly match its pattern skill name from the list below; for an additional pattern you add, use its standard English name as described above.',
                   // Schema §3.5 dedup: the response schema's `required`
                   // list only API-enforces this for the forced-tool providers
                   // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
@@ -1553,6 +1766,14 @@ const buildAnalysisRequest = (
                   // retained as the natural-language backstop for that path.
                   '- Every entry MUST include `trend` (bullish/bearish/neutral), including detected:false entries.',
                   '- For not-detected patterns, set trend to the pattern\'s inherent directional bias (e.g., head-and-shoulders → bearish, inverse head-and-shoulders → bullish, ascending wedge → bearish, descending wedge → bullish, double top → bearish, double bottom → bullish); use "neutral" only when the pattern has no inherent bias.',
+                  '',
+                  '### geometry Writing Rules',
+                  '- Never compute a measured or conservative target yourself — the app derives both from geometry.',
+                  '- For every detected: true pattern, fill geometry: { breakoutLevel, extremeLevel, direction, invalidationLevel? }. breakoutLevel = the neckline/boundary/rim/handle resistance/flag channel edge the pattern breaks through; extremeLevel = the textbook measured-move anchor (head, peak/trough average, cup/saucer bottom, flagpole start, or the opposite boundary); direction = the expected breakout direction ("up" or "down"); invalidationLevel = the right-shoulder high / second peak / opposite boundary / handle low, when you can name one.',
+                  "- extremeLevel is the one structured price field you may derive by simple averaging: for a double/triple top or bottom, average the pattern's own peak/trough prices (all of them appear in the data). Every other geometry field must be a price that already appears in the data — never another derived number.",
+                  `- When the pattern appears in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}, copy its breakout level / extreme level / direction / invalidation level from that section verbatim rather than re-reading the chart.`,
+                  '- When the pattern does NOT appear there, read the chart yourself and fill geometry from what you see — but still never compute the target number itself.',
+                  '- Omit geometry entirely (do not guess) when you cannot identify a usable breakout level and extreme level.',
                   '',
                   '### patternLines Writing Rules',
                   '- patternLines is an optional field. Include it only when detected: true and the pattern has diagonal trendlines (e.g., wedge upper/lower trendlines, neckline).',
@@ -1754,23 +1975,26 @@ const collectDetectedCandleNames = (
 };
 
 /**
- * Chart-pattern IDs surfaced by the pre-screener for this chart, for the
- * `patternCandidates` selection-context field. Guards `atr` unavailable/
- * non-positive the same way {@link screenChartPatterns} itself does (`[]`),
- * and additionally wraps the call defensively: a screener/classifier bug must
- * degrade to "no candidates" rather than take down prompt building, mirroring
- * `observePatternCandidates` in `submitAnalysis.ts`. Unlike that
- * application-layer call, this domain function cannot `console.error` (domain
- * is zero-I/O per `domain/CLAUDE.md`) — the application-layer observe-only log
- * already surfaces screener failures, so no telemetry is duplicated here.
+ * Chart-pattern candidates surfaced by the pre-screener for this chart —
+ * shared by the `patternCandidates` selection-context field AND `##
+ * Chart Pattern Candidates (computed)` (spec 2026-09-18: the
+ * screener used to run twice per prompt build, once for each consumer).
+ * Guards `atr` unavailable/non-positive the same way {@link
+ * screenChartPatterns} itself does (`[]`), and additionally wraps the call
+ * defensively: a screener/classifier bug must degrade to "no candidates"
+ * rather than take down prompt building, mirroring `observePatternCandidates`
+ * in `submitAnalysis.ts`. Unlike that application-layer call, this domain
+ * function cannot `console.error` (domain is zero-I/O per `domain/CLAUDE.md`)
+ * — the application-layer observe-only log already surfaces screener
+ * failures, so no telemetry is duplicated here.
  */
-const collectPatternCandidateIds = (
+const screenPatternCandidatesSafely = (
     bars: readonly Bar[],
     atr: number | null
-): ChartPatternId[] => {
+): PatternCandidate[] => {
     if (atr === null || atr <= 0) return [];
     try {
-        return screenChartPatterns(bars, atr).map(candidate => candidate.id);
+        return screenChartPatterns(bars, atr);
     } catch {
         return [];
     }
@@ -1781,7 +2005,8 @@ const buildSkillSelectionContext = (
     bars: Bar[],
     indicators: IndicatorResult,
     timeframe: Timeframe,
-    candleEntries: CandlePatternEntry[]
+    candleEntries: CandlePatternEntry[],
+    patternCandidates: readonly PatternCandidate[]
 ): SkillSelectionContext => {
     const price = bars.length > 0 ? bars[bars.length - 1].close : 0;
     const atr = lastNonNull(indicators.atr);
@@ -1792,7 +2017,7 @@ const buildSkillSelectionContext = (
         signals: detectSignals(bars, indicators),
         timeframe,
         detectedCandles: collectDetectedCandleNames(candleEntries),
-        patternCandidates: collectPatternCandidateIds(bars, atr),
+        patternCandidates: patternCandidates.map(candidate => candidate.id),
         price,
         atrPercent,
     };
@@ -2000,6 +2225,18 @@ export function buildAnalysisPrompt(
     // detection pass runs a single time per prompt build.
     const candleEntries = detectCandlePatternEntries(bars);
 
+    // Hoisted this early (ahead of `precision`, which also needs it further
+    // down) so both this ATR read and the screener call below happen once.
+    const atrForPatternGeometry = lastNonNull(indicators.atr);
+    // Screened once and shared by skill selection AND `## Chart Pattern
+    // Candidates (computed)` below (spec 2026-09-18) — the
+    // screener used to run a second, redundant time for the candidates
+    // section every prompt build.
+    const patternCandidates = screenPatternCandidatesSafely(
+        bars,
+        atrForPatternGeometry
+    );
+
     // Dynamic gating (chart only): whitelist to chart skills, then split into
     // `core` (always_on, catalog-only — byte-stable across calls) and
     // `selected` (gated skills whose frontmatter fired for this chart's
@@ -2008,7 +2245,8 @@ export function buildAnalysisPrompt(
         bars,
         indicators,
         timeframe,
-        candleEntries
+        candleEntries,
+        patternCandidates
     );
     const { core, selected } = selectSkills(
         skills,
@@ -2137,9 +2375,41 @@ export function buildAnalysisPrompt(
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),
         formatIndicatorSection(indicators, config, precision),
+        buildIndicatorStateSection({
+            price: bars.length > 0 ? bars[bars.length - 1].close : null,
+            ma: indicators.ma,
+            ema: indicators.ema,
+            maPeriods: MA_DEFAULT_PERIODS,
+            emaPeriods: EMA_DEFAULT_PERIODS,
+            macd: lastOf(indicators.macd) ?? undefined,
+            macdHistogramTrend: detectTrend(
+                indicators.macd.map(m => m.histogram ?? null),
+                config.trendSampleCount
+            ),
+            dmi: lastOf(indicators.dmi) ?? undefined,
+            stochastic: lastOf(indicators.stochastic) ?? undefined,
+            ichimoku: lastOf(indicators.ichimoku) ?? undefined,
+            bollinger: lastOf(indicators.bollinger) ?? undefined,
+            supertrend: lastOf(indicators.supertrend) ?? undefined,
+            parabolicSar: lastOf(indicators.parabolicSar) ?? undefined,
+            atr: lastNonNull(indicators.atr),
+            diffDp: precision.difference,
+            lastVolume: bars.length > 0 ? bars[bars.length - 1].volume : null,
+            // Raw history, oldest-first, minus the last bar — `volumeLine`
+            // slices its own trailing 20-bar window (spec 2026-09-18), so
+            // this no longer needs to hand-size the slice itself.
+            priorVolumes: bars.slice(0, -1).map(b => b.volume),
+        }),
         formatProIndicatorSection(indicators, config, precision),
-        formatSMCSection(indicators, bars, priceDp),
+        formatSMCSection(indicators, bars, priceDp, atrForPatternGeometry),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
+        formatChartPatternCandidatesSection(
+            patternCandidates,
+            bars,
+            atrForPatternGeometry,
+            priceDp,
+            timeframe
+        ),
         formatMarketReferenceSection(
             marketReference,
             timeframe,

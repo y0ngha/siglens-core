@@ -1,10 +1,128 @@
 import { computeYieldSpread } from './normalizeTreasuryRates';
 import type { EconomySnapshot } from './types';
-import { formatPlainNumber } from '@/domain/analysis/promptFormat';
+import {
+    formatPlainNumber,
+    formatSignedNumber,
+    formatSignedPercent,
+} from '@/domain/analysis/promptFormat';
+import { MS_PER_DAY, MS_PER_HOUR } from '@/domain/constants/time';
 import type { AssembledPrompt } from '@/domain/types';
 
 /** 프롬프트에 포함할 임박 캘린더 이벤트 최대 수(매직넘버 상수화). */
 const MAX_CALENDAR_IN_PROMPT = 6;
+
+const INDICATOR_DELTA_DECIMAL_PLACES = 2;
+const RATE_UNIT = '%';
+
+/** Thousands-grouped magnitude, no decimals — `formatSignedNumber` always shows `.xx`. */
+function formatSignedInteger(n: number): string {
+    const rounded = Math.round(n);
+    const text = Math.abs(rounded).toLocaleString('en-US');
+    if (rounded === 0) return `+${text}`; // never -0 (spec §0)
+    return rounded > 0 ? `+${text}` : `-${text}`;
+}
+
+/**
+ * `latest`/`previous` are both whole numbers — e.g. nonfarm payrolls counts
+ * — so their delta reads better as `-10,000` than `-10000.00` (spec
+ * 2026-09-18 §B3).
+ */
+function isIntegerSeries(latest: number, previous: number): boolean {
+    return Number.isInteger(latest) && Number.isInteger(previous);
+}
+
+/**
+ * `(Δ ±x.xxpp)` for a rate-type series (`unit === '%'`) or
+ * `(Δ ±delta[, ±x.xx%])` for a level-type series, or `''` when either input
+ * is non-finite (null rule, spec §0). The percent-change term is only
+ * appended when `previous > 0` (a ratio needs a positive base) — spec
+ * 2026-09-18 §B3.
+ */
+function formatIndicatorDelta(
+    latest: number | null | undefined,
+    previous: number | null | undefined,
+    unit: string | undefined
+): string {
+    if (typeof latest !== 'number' || !Number.isFinite(latest)) return '';
+    if (typeof previous !== 'number' || !Number.isFinite(previous)) return '';
+    const delta = latest - previous;
+
+    if (unit === RATE_UNIT) {
+        return ` (Δ ${formatSignedNumber(delta, INDICATOR_DELTA_DECIMAL_PLACES)}pp)`;
+    }
+
+    const deltaText = isIntegerSeries(latest, previous)
+        ? formatSignedInteger(delta)
+        : formatSignedNumber(delta, INDICATOR_DELTA_DECIMAL_PLACES);
+    const pctText =
+        previous > 0 ? formatSignedPercent((delta / previous) * 100) : null;
+    return pctText === null
+        ? ` (Δ ${deltaText})`
+        : ` (Δ ${deltaText}, ${pctText})`;
+}
+
+const HOURS_PER_DAY = 24;
+
+/**
+ * Parses a calendar timestamp as UTC. FMP's economic calendar returns naive
+ * `YYYY-MM-DD HH:mm:ss` timestamps in UTC with no zone suffix; `new
+ * Date(isoDate)` parses a space-separated, zone-less string as **local**
+ * time per the JS Date spec, which silently shifted every event by the
+ * runtime's UTC offset. Appending `Z` (after normalizing the separator)
+ * forces the intended UTC interpretation. Date-only (`YYYY-MM-DD`) is
+ * already UTC midnight per the Date spec.
+ *
+ * `labelUtc` is true when the printed string is a naive time, so the prompt
+ * line can name its zone.
+ */
+function parseCalendarDate(
+    isoDate: string
+): { date: Date; labelUtc: boolean } | null {
+    const hasTime = isoDate.includes('T') || isoDate.includes(' ');
+    const normalized = isoDate.replace(' ', 'T');
+    const hasZone = /Z$|[+-]\d\d:?\d\d$/.test(normalized);
+    const date = new Date(hasTime && !hasZone ? `${normalized}Z` : normalized);
+    if (Number.isNaN(date.getTime())) return null;
+    return { date, labelUtc: hasTime && !hasZone };
+}
+
+/** `N` hours as text, never `0h` — sub-hour gaps read `<1h`. */
+function hoursText(hours: number): string {
+    return hours < 1 ? '<1h' : `${Math.round(hours)}h`;
+}
+
+/**
+ * Relative-time suffix for a calendar row (spec 2026-09-18 §B3):
+ * future within 24h → `(today, in Nh)` on the same UTC date, else `(in Nh)`;
+ * past within 24h → `(Nh ago)` (the economy snapshot is cached up to 24h, so
+ * events earlier today reach the prompt); beyond 24h → `(in N days)` /
+ * `(N days ago)`. `''` when the date cannot be parsed.
+ */
+function formatRelativeTime(target: Date, now: Date): string {
+    const diffMs = target.getTime() - now.getTime();
+    const diffHours = diffMs / MS_PER_HOUR;
+    if (diffHours >= 0 && diffHours < HOURS_PER_DAY) {
+        const sameUtcDate =
+            target.toISOString().slice(0, 10) ===
+            now.toISOString().slice(0, 10);
+        return sameUtcDate
+            ? ` (today, in ${hoursText(diffHours)})`
+            : ` (in ${hoursText(diffHours)})`;
+    }
+    if (diffHours < 0 && diffHours > -HOURS_PER_DAY) {
+        return ` (${hoursText(-diffHours)} ago)`;
+    }
+    const days = Math.max(1, Math.round(Math.abs(diffMs) / MS_PER_DAY));
+    return diffMs > 0 ? ` (in ${days} days)` : ` (${days} days ago)`;
+}
+
+/** One calendar row's time: the printed timestamp (+ ` UTC` when naive) and its relative suffix. */
+function formatCalendarTime(isoDate: string, now: Date): string {
+    const parsed = parseCalendarDate(isoDate);
+    if (parsed === null) return isoDate;
+    const printed = parsed.labelUtc ? `${isoDate} UTC` : isoDate;
+    return `${printed}${formatRelativeTime(parsed.date, now)}`;
+}
 
 /**
  * @internal 거시 AI 브리핑 LLM 프롬프트를 빌드한다. 스킬 없음, 캐시할 다른
@@ -21,7 +139,14 @@ const MAX_CALENDAR_IN_PROMPT = 6;
  * @see normalizeMacroBriefing
  */
 export function buildMacroBriefingPrompt(
-    snapshot: EconomySnapshot
+    snapshot: EconomySnapshot,
+    /**
+     * Reference clock for the calendar relative-time suffix (spec
+     * 2026-09-18 §2.10). Required — domain code must never read the wall
+     * clock itself (spec 2026-09-18); the one caller
+     * (`runMacroBriefing.ts`) already passes it.
+     */
+    now: Date
 ): AssembledPrompt {
     const indicatorLines = snapshot.indicators
         .map(i => {
@@ -32,7 +157,7 @@ export function buildMacroBriefingPrompt(
             const prev =
                 i.previous === null
                     ? ''
-                    : ` ← ${formatPlainNumber(i.previous.value)}`;
+                    : ` ← ${formatPlainNumber(i.previous.value)}${formatIndicatorDelta(i.latest?.value, i.previous.value, i.unit)}`;
             return `${i.name}: ${latest}${prev}`;
         })
         .join('\n');
@@ -47,7 +172,7 @@ export function buildMacroBriefingPrompt(
         .slice(0, MAX_CALENDAR_IN_PROMPT)
         .map(e => {
             const est = formatPlainNumber(e.estimate);
-            return `${e.date} ${e.event} (중요도=${e.impact}, 예상=${est})`;
+            return `${formatCalendarTime(e.date, now)} ${e.event} (중요도=${e.impact}, 예상=${est})`;
         })
         .join('\n');
 

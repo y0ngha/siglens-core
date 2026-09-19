@@ -63,6 +63,18 @@ export function screenChartPatterns(
             id: candidate.id,
             startIndex: candidate.startIndex + offset,
             endIndex: candidate.endIndex + offset,
+            // Rebase each matched pivot's index the same way — dropping this
+            // (as an earlier version of this facade did) left every
+            // real-data candidate with no `pivots` for `computeCandidateGeometry`
+            // to compute geometry from, degrading every hit to `N/A`.
+            ...(candidate.pivots
+                ? {
+                      pivots: candidate.pivots.map(p => ({
+                          ...p,
+                          index: p.index + offset,
+                      })),
+                  }
+                : {}),
         });
     }
 

@@ -2,10 +2,14 @@
 // Korean reduces LLM instruction-following consistency.
 
 import {
+    formatBarDateTime,
     formatNullableNumber,
+    formatSignedPercent,
     sharedPriceDecimalPlaces,
 } from '@/domain/analysis/promptFormat';
+import { planEntryPrice } from '@/domain/analysis/ai-levels';
 import type {
+    ActionRecommendation,
     AnalysisResponse,
     AssetClass,
     ChatMessage,
@@ -63,27 +67,148 @@ function levelDecimalPlaces(
     );
 }
 
-function formatKeyLevels(levels: KeyLevel[], dp: number): string {
+/**
+ * `(±x.xx% from <label>)`, or `''` when `basePrice` is unusable (undefined,
+ * non-finite, or non-positive) — null rule, spec §0.
+ */
+function formatDistanceFromBase(
+    price: number,
+    basePrice: number | undefined,
+    label: string
+): string {
+    if (
+        basePrice === undefined ||
+        !Number.isFinite(basePrice) ||
+        basePrice <= 0 ||
+        !Number.isFinite(price)
+    ) {
+        return '';
+    }
+    const pct = ((price - basePrice) / basePrice) * 100;
+    return ` (${formatSignedPercent(pct)} from ${label})`;
+}
+
+function formatKeyLevels(
+    levels: KeyLevel[],
+    dp: number,
+    analysisTimePrice?: number
+): string {
     if (levels.length === 0) return 'None detected';
     return levels
-        .map(l => `${formatNullableNumber(l.price, dp)} (${l.reason})`)
+        .map(
+            l =>
+                `${formatNullableNumber(l.price, dp)}${formatDistanceFromBase(l.price, analysisTimePrice, 'analysis-time price')} (${l.reason})`
+        )
         .join(', ');
 }
 
-function formatPoc(poc: KeyLevel | undefined, dp: number): string {
+function formatPoc(
+    poc: KeyLevel | undefined,
+    dp: number,
+    analysisTimePrice?: number
+): string {
     return poc
-        ? `${formatNullableNumber(poc.price, dp)} (${poc.reason})`
+        ? `${formatNullableNumber(poc.price, dp)}${formatDistanceFromBase(poc.price, analysisTimePrice, 'analysis-time price')} (${poc.reason})`
         : 'None detected';
 }
 
 function formatPriceTargets(
     scenario: PriceScenario | null | undefined,
-    dp: number
+    dp: number,
+    analysisTimePrice?: number
 ): string {
     if (!scenario || scenario.targets.length === 0) return 'None';
     return scenario.targets
-        .map(t => `${formatNullableNumber(t.price, dp)} — ${t.basis}`)
+        .map(
+            t =>
+                `${formatNullableNumber(t.price, dp)}${formatDistanceFromBase(t.price, analysisTimePrice, 'analysis-time price')} — ${t.basis}`
+        )
         .join('; ');
+}
+
+/**
+ * `YYYY-MM-DD HH:MM UTC` from an ISO 8601 timestamp, instead of the raw
+ * `2026-09-18T12:34:56.789Z` string (spec 2026-09-18 §B1) — the model
+ * otherwise echoed the millisecond/offset punctuation verbatim into a
+ * user-facing Korean answer. Falls back to the raw string on an unparseable
+ * date rather than throwing (`new Date(NaN).toISOString()` throws).
+ */
+function formatAnalyzedAtUtc(iso: string): string {
+    const ms = new Date(iso).getTime();
+    return Number.isFinite(ms) ? `${formatBarDateTime(ms)} UTC` : iso;
+}
+
+const RISK_REWARD_RATIO_DECIMAL_PLACES = 2;
+
+/** `x.xx`, or `'N/A'` for `null`/non-finite. */
+function formatRatio(n: number | null): string {
+    return n === null || !Number.isFinite(n)
+        ? 'N/A'
+        : n.toFixed(RISK_REWARD_RATIO_DECIMAL_PLACES);
+}
+
+/**
+ * `## Structured Plan (computed)` — entry range, stop, and targets with a %
+ * distance from the entry reference, plus the deterministic
+ * `planCheck` risk:reward ratios and flags (spec 2026-09-18 §2.12). Every
+ * distance/ratio follows the null rule (spec §0). Returns `''` when there is
+ * no `ActionRecommendation` to report.
+ */
+function formatStructuredPlan(
+    rec: ActionRecommendation | undefined,
+    dp: number,
+    analysisTimePrice: number | undefined
+): string {
+    if (!rec) return '';
+    const entryPrices = rec.entryPrices ?? [];
+    // `planEntryPrice` is the SAME single entry reference `buildPlanCheck` uses
+    // for `riskRewardAtEntry` (mean of finite positive entryPrices, else the
+    // analysis-time price) — reused here so "% from entry" and the printed
+    // risk:reward ratio never disagree about what "entry" means (spec
+    // 2026-09-18 §B1; they previously used different bases — entryZoneTop, the
+    // MAX of entryPrices, vs this mean — and printed two different %s).
+    const entryRef = planEntryPrice(rec, analysisTimePrice);
+    const entryRangeText =
+        entryPrices.length === 0
+            ? 'N/A'
+            : entryPrices.length === 1
+              ? formatNullableNumber(entryPrices[0], dp)
+              : `${formatNullableNumber(entryPrices[0], dp)} ~ ${formatNullableNumber(entryPrices[entryPrices.length - 1], dp)} (mid ${formatNullableNumber(entryRef ?? null, dp)})`;
+    // Reconciled levels win where they exist — the SAME preference
+    // `buildPlanCheck` applies internally (spec 2026-09-18), so
+    // this block and its own `planCheck` ratios below never disagree about
+    // which stop/targets are actually in play.
+    const effectiveStopLoss = rec.reconciledLevels?.stopLoss ?? rec.stopLoss;
+    const effectiveTakeProfitPrices =
+        rec.reconciledLevels?.takeProfitPrices ?? rec.takeProfitPrices;
+    const stopText =
+        effectiveStopLoss === undefined
+            ? 'N/A'
+            : `${formatNullableNumber(effectiveStopLoss, dp)}${formatDistanceFromBase(effectiveStopLoss, entryRef, 'entry')}`;
+    const targetsText =
+        (effectiveTakeProfitPrices ?? []).length > 0
+            ? effectiveTakeProfitPrices!
+                  .map(
+                      t =>
+                          `${formatNullableNumber(t, dp)}${formatDistanceFromBase(t, entryRef, 'entry')}`
+                  )
+                  .join(', ')
+            : 'N/A';
+    const pc = rec.planCheck;
+    const ratioLine = `Risk:Reward — at entry: ${formatRatio(pc?.riskRewardAtEntry ?? null)}, at analysis-time price: ${formatRatio(pc?.riskRewardAtCurrent ?? null)}`;
+    const flagsLine = pc
+        ? `Flags — belowStopLoss: ${pc.belowStopLoss}, exceedsEntryZone: ${pc.exceedsEntryZone}`
+        : 'Flags: N/A (no analysis-time price available)';
+
+    return [
+        '',
+        'Structured Plan (computed):',
+        `- Entry range: ${entryRangeText}`,
+        `- Stop: ${stopText}`,
+        `- Targets: ${targetsText}`,
+        `- ${ratioLine}`,
+        `- ${flagsLine}`,
+    ].join('\n');
 }
 
 function formatIndicatorSignals(
@@ -400,6 +525,10 @@ export function buildChatPrompt(
     const rec = analysis.actionRecommendation;
     const subject =
         companyName === symbol ? symbol : `${symbol} (${companyName})`;
+    // `planCheck.currentPrice` is the last close `buildPlanCheck` measured
+    // against at analysis time — the same reference every distance/ratio in
+    // this prompt is computed from (spec 2026-09-18 §2.12).
+    const analysisTimePrice = rec?.planCheck?.currentPrice;
 
     const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject} (${assetKind}).
 Ground every answer in the analysis data provided below.
@@ -431,12 +560,14 @@ When the answer contains multiple contexts, format it with readable markdown:
 - use bullets for multiple levels, conditions, or actions;
 - avoid returning one dense paragraph.
 
+Distances and ratios in the analysis data below are computed — quote them as given, never recompute them. If the user asks for a figure that is not listed, you may compute it only from numbers in the ANALYSIS DATA: show the inputs and the operation briefly (e.g. "348.68 − 335.26 = 13.42") so it can be checked, and never invent an input.
+
 === ANALYSIS DATA ===
 Symbol: ${symbol}
 Company: ${companyName}
 Timeframe: ${timeframe}
 Overall Trend: ${analysis.trend} | Risk Level: ${analysis.riskLevel}
-
+${analysis.analyzedAt ? `Analysis generated: ${formatAnalyzedAtUtc(analysis.analyzedAt)}\n` : ''}${analysisTimePrice !== undefined ? `Analysis-time price: ${formatNullableNumber(analysisTimePrice, levelDp)}\n` : ''}
 Summary:
 ${analysis.summary}
 ${
@@ -447,13 +578,14 @@ Trading Strategy:
 - Entry: ${rec.entry ?? 'N/A'}
 - Exit: ${rec.exit ?? 'N/A'}
 - Risk/Reward: ${rec.riskReward ?? 'N/A'}
+${formatStructuredPlan(rec, levelDp, analysisTimePrice)}
 `
         : ''
 }
 Key Levels:
-- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, levelDp)}
-- Support: ${formatKeyLevels(analysis.keyLevels.support, levelDp)}
-- POC: ${formatPoc(analysis.keyLevels.poc, levelDp)}
+- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, levelDp, analysisTimePrice)}
+- Support: ${formatKeyLevels(analysis.keyLevels.support, levelDp, analysisTimePrice)}
+- POC: ${formatPoc(analysis.keyLevels.poc, levelDp, analysisTimePrice)}
 
 Detected Patterns: ${formatDetectedPatterns(analysis.patternSummaries)}
 
@@ -464,8 +596,8 @@ Indicator Signals:
 ${formatIndicatorSignals(analysis.indicatorResults) || 'None'}
 
 Price Targets:
-- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, levelDp)}
-- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, levelDp)}
+- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, levelDp, analysisTimePrice)}
+- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, levelDp, analysisTimePrice)}
 === END ANALYSIS DATA ===${formatCurrentAnalysisContext(currentAnalysisContext)}`;
 
     const messages = [

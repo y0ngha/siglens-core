@@ -1,22 +1,83 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import type { EconomicEventAnalysisInput } from './types';
-import { formatPlainNumber } from '@/domain/analysis/promptFormat';
+import {
+    formatPlainNumber,
+    formatSignedNumber,
+} from '@/domain/analysis/promptFormat';
 import type { AssembledPrompt } from '@/domain/types';
+
+const PERCENT_UNIT = '%';
 
 /**
  * Append the unit string to a formatted value when the value is present.
  *
  * Returns the value unchanged when it equals `'N/A'` (no actual figure
  * available) or when `unit` is empty — rendering "N/A %" would be
- * misleading because N/A has no associated unit.
+ * misleading because N/A has no associated unit. A `%` unit attaches with
+ * no leading space (`0.20%`, the conventional way a percent symbol reads);
+ * every other unit keeps the space (`150 K`) — spec 2026-09-18 §B7 addendum.
  *
  * @param value - Already-formatted numeric string or `'N/A'`.
  * @param unit  - Unit string (e.g. `'%'`). May be empty.
- * @returns Value with unit appended, e.g. `'0.20 %'`, or value unchanged.
+ * @returns Value with unit appended, e.g. `'0.20%'` / `'150 K'`, or value unchanged.
  */
 function withUnit(value: string, unit: string): string {
-    return value === 'N/A' || !unit ? value : `${value} ${unit}`;
+    if (value === 'N/A' || !unit) return value;
+    return unit === PERCENT_UNIT ? `${value}${unit}` : `${value} ${unit}`;
+}
+
+/**
+ * @internal
+ * Absolute-difference threshold below which `actual` counts as "in line" /
+ * "unchanged" rather than above/below or higher/lower (spec 2026-09-18
+ * §2.11). Matches the rounding precision every figure in this prompt already
+ * renders at ({@link formatPlainNumber}'s 2-decimal display in practice for
+ * typical macro releases), so a difference the reader can't even see on the
+ * page never gets called a beat or a miss.
+ */
+export const ECONOMIC_EVENT_INLINE_TOLERANCE = 0.005;
+
+const ECONOMIC_EVENT_DELTA_DECIMAL_PLACES = 2;
+
+/**
+ * @internal `±x.xxpp (aboveLabel/belowLabel/inLineLabel)` when `unit` is
+ * `'%'` (the delta of two percentages is itself a percentage-point figure,
+ * not a percent — spec 2026-09-18 §B7 addendum), `±x.xx unit
+ * (aboveLabel/belowLabel/inLineLabel)` otherwise, or `'N/A'` when either
+ * input is missing or non-finite (null rule, spec §0). Delegates the
+ * sign/`-0` handling to {@link formatSignedNumber}.
+ */
+function formatDeltaWithDirection(
+    actual: number | null,
+    base: number | null,
+    unit: string,
+    aboveLabel: string,
+    belowLabel: string,
+    inLineLabel: string
+): string {
+    if (
+        typeof actual !== 'number' ||
+        !Number.isFinite(actual) ||
+        typeof base !== 'number' ||
+        !Number.isFinite(base)
+    ) {
+        return 'N/A';
+    }
+    const delta = actual - base;
+    const signed = formatSignedNumber(
+        delta,
+        ECONOMIC_EVENT_DELTA_DECIMAL_PLACES
+    );
+    const direction =
+        Math.abs(delta) < ECONOMIC_EVENT_INLINE_TOLERANCE
+            ? inLineLabel
+            : delta > 0
+              ? aboveLabel
+              : belowLabel;
+    const magnitude =
+        unit === PERCENT_UNIT ? `${signed}pp` : withUnit(signed, unit);
+    return `${magnitude} (${direction})`;
 }
 
 /**
@@ -59,6 +120,22 @@ export function buildEconomicEventAnalysisPrompt(
     const estimateStr = formatPlainNumber(input.estimate);
     const previousStr = formatPlainNumber(input.previous);
     const unit = input.unit || '';
+    const vsEstimate = formatDeltaWithDirection(
+        input.actual,
+        input.estimate,
+        unit,
+        'above',
+        'below',
+        'in line'
+    );
+    const vsPrevious = formatDeltaWithDirection(
+        input.actual,
+        input.previous,
+        unit,
+        'higher',
+        'lower',
+        'unchanged'
+    );
 
     const stable = '';
 
@@ -77,8 +154,10 @@ export function buildEconomicEventAnalysisPrompt(
 - Actual: ${withUnit(actualStr, unit)}
 - Estimate: ${withUnit(estimateStr, unit)}
 - Previous: ${withUnit(previousStr, unit)}
+- Actual vs Estimate: ${vsEstimate}
+- Actual vs Previous: ${vsPrevious}
 
-Key signal: Compare actual vs estimate (beat/miss/inline) and actual vs previous (acceleration/deceleration). The deviation direction and the impact level together drive sentiment.
+Key signal: Actual vs Estimate and Actual vs Previous above are already computed (beat/miss/in-line and higher/lower/unchanged) — use them directly, never recompute the deviation yourself. The deviation direction and the impact level together drive sentiment.
 
 Region rule: This release belongs to ${input.region}. When you name a central bank, a policy committee, or a currency as the subject of this release, it must be ${input.region}'s — never assume the United States, the Federal Reserve, or USD unless the region says so. Event names such as "Interest Rate Decision" or "CPI YoY" are identical across economies and carry no country of their own. You may still mention another economy as an external influence on ${input.region} (e.g. Fed policy or the USD/KRW rate) when the provided figures support it — what must never be misattributed is the release itself.
 

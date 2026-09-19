@@ -10,7 +10,10 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
+    aggregateBarsToWeekly,
+    buildPlanCheck,
     calculateMA,
+    planEntryPrice,
     CONFLUENCE_HTF_MODE,
     CONFLUENCE_MIN,
     CONFLUENCE_SPAN,
@@ -127,6 +130,72 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
+    });
+
+    it('exports aggregateBarsToWeekly so siglens can build the agent tool higherTimeframe rollup', () => {
+        expect(typeof aggregateBarsToWeekly).toBe('function');
+        const monday = Math.floor(Date.UTC(2024, 0, 1) / 1000);
+        const bars = [
+            {
+                time: monday,
+                open: 1,
+                high: 2,
+                low: 1,
+                close: 2,
+                volume: 10,
+            },
+        ];
+        expect(aggregateBarsToWeekly(bars)).toEqual([
+            { time: monday, open: 1, high: 2, low: 1, close: 2, volume: 10 },
+        ]);
+    });
+
+    it('exports buildPlanCheck so siglens can compute sinceAnalysis.planNow against a live price', () => {
+        expect(typeof buildPlanCheck).toBe('function');
+        const check = buildPlanCheck(
+            {
+                positionAnalysis: '',
+                entry: '',
+                exit: '',
+                riskReward: '',
+                entryPrices: [100],
+                stopLoss: 97,
+                takeProfitPrices: [105],
+            },
+            103, // live/current price
+            100 // plan's own entry price
+        );
+        expect(check).not.toBeNull();
+        expect(check?.currentPrice).toBe(103);
+        expect(check?.belowStopLoss).toBe(false);
+    });
+
+    it('exports planEntryPrice — the same entry reference buildPlanCheck uses internally', () => {
+        expect(
+            planEntryPrice(
+                {
+                    positionAnalysis: '',
+                    entry: '',
+                    exit: '',
+                    riskReward: '',
+                    entryPrices: [100, 110],
+                },
+                undefined
+            )
+        ).toBe(105);
+        // No usable entryPrices -> falls back.
+        expect(
+            planEntryPrice(
+                {
+                    positionAnalysis: '',
+                    entry: '',
+                    exit: '',
+                    riskReward: '',
+                    entryPrices: [],
+                },
+                99
+            )
+        ).toBe(99);
     });
 
     it('exports consumer-implemented port/config types from package entrypoint', () => {

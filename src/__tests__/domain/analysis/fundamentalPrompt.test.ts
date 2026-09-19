@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildFundamentalAnalysisPrompt as buildFundamentalAnalysisPromptRaw } from '@/domain/analysis/fundamentalPrompt';
+import {
+    buildFundamentalAnalysisPrompt as buildFundamentalAnalysisPromptRaw,
+    DERIVED_METRICS_SECTION_HEADER,
+} from '@/domain/analysis/fundamentalPrompt';
 import type { FundamentalSnapshot, Skill } from '@/domain/types';
 
 // `buildFundamentalAnalysisPrompt` now returns `{ stable, dynamic }` (spec
@@ -427,5 +430,356 @@ describe('buildFundamentalAnalysisPrompt — sector direction formatting', () =>
         expect(prompt).toContain('Today: N/A; Recent: 2025-04-28: +0.00%');
         expect(prompt).not.toContain('NaN%');
         expect(prompt).not.toContain('-0.00%');
+    });
+});
+
+describe('buildFundamentalAnalysisPrompt — ## Derived Metrics (computed) (spec 2026-09-18 §2.6)', () => {
+    const NOW = new Date('2025-07-20T00:00:00Z');
+
+    it('renders the section header and the "do not recompute" framing line', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain(DERIVED_METRICS_SECTION_HEADER);
+        expect(prompt).toContain(
+            'These figures are already computed; do not recompute them yourself.'
+        );
+    });
+
+    it('Price Target Upside is N/A without currentPrice (null rule)', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT, // no currentPrice
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Upside: N/A');
+    });
+
+    it('Price Target Upside computes consensus vs current price (normal)', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            { ...TEST_SNAPSHOT, currentPrice: 200 }, // consensus 212
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        // (212-200)/200*100 = +6.0%
+        expect(prompt).toContain('- Price Target Upside: +6.0%');
+    });
+
+    it('Price Target Upside is N/A when currentPrice is 0 (zero base)', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            { ...TEST_SNAPSHOT, currentPrice: 0 },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Upside: N/A');
+    });
+
+    it('Price Target Upside is N/A when currentPrice is negative', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            { ...TEST_SNAPSHOT, currentPrice: -50 },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Upside: N/A');
+    });
+
+    it('Price Target Upside is N/A when currentPrice is NaN', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            { ...TEST_SNAPSHOT, currentPrice: Number.NaN },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Upside: N/A');
+    });
+
+    it('Price Target Upside is N/A when currentPrice is null', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            { ...TEST_SNAPSHOT, currentPrice: null },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Upside: N/A');
+    });
+
+    it('does not collide with the raw "Price Target Trend" line above (spec 2026-09-18 §B4)', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        // The raw priceTargetSummary line keeps its original label...
+        expect(prompt).toContain('- Price Target Trend:');
+        // ...while the computed metric now has a distinct one.
+        expect(prompt).toContain('- Price Target Momentum:');
+    });
+
+    it('Price Target Momentum computes 1M avg vs 1Y avg (spec 2026-09-18 §B4 — renamed off the raw "Price Target Trend" line)', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT, // month1Avg 210, year1Avg 200
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Momentum: +5.0%');
+    });
+
+    it('Price Target Momentum is N/A when priceTargetSummary is null', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                futureDirection: {
+                    ...TEST_SNAPSHOT.futureDirection,
+                    priceTargetSummary: null,
+                },
+            },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Price Target Momentum: N/A');
+    });
+
+    it('peer P/E and P/S medians are N/A when fewer than 2 peers have a usable metric', () => {
+        // Fixture: MSFT has per/psr, GOOGL has null/null — only 1 usable peer.
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain(
+            '- Peer Median P/E: N/A (premium/discount vs peers: N/A)'
+        );
+        expect(prompt).toContain(
+            '- Peer Median P/S: N/A (premium/discount vs peers: N/A)'
+        );
+    });
+
+    it('peer P/E and P/S medians compute (and signed premium/discount) with 2+ usable peers', () => {
+        const snapshot: FundamentalSnapshot = {
+            ...TEST_SNAPSHOT,
+            valuation: { ...TEST_SNAPSHOT.valuation, per: 30, psr: 10 },
+            peers: [
+                {
+                    symbol: 'MSFT',
+                    companyName: 'Microsoft Corp.',
+                    marketCap: 1,
+                    per: 20,
+                    psr: 8,
+                },
+                {
+                    symbol: 'GOOGL',
+                    companyName: 'Alphabet Inc.',
+                    marketCap: 1,
+                    per: 40,
+                    psr: 12,
+                },
+            ],
+        };
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            snapshot,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        // median(20,40) = 30 -> premium (30-30)/30*100 = +0.0%
+        expect(prompt).toContain(
+            '- Peer Median P/E: 30.0 (premium/discount vs peers: +0.0%)'
+        );
+        // median(8,12) = 10 -> premium (10-10)/10*100 = +0.0%
+        expect(prompt).toContain(
+            '- Peer Median P/S: 10.0 (premium/discount vs peers: +0.0%)'
+        );
+    });
+
+    it('never renders -0.0 for a raw peer PER/PSR value that rounds to exactly zero (spec §0/§B6 — a loss-making peer can have a negative P/E)', () => {
+        // `## Comparable Peers` renders each peer's raw per/psr via the same
+        // `formatPeerMetric` helper — unlike the peer-median line, this path
+        // is NOT filtered to positive-only values, so it is where the -0 bug
+        // was actually reachable.
+        const snapshot: FundamentalSnapshot = {
+            ...TEST_SNAPSHOT,
+            peers: [
+                {
+                    symbol: 'MSFT',
+                    companyName: 'Microsoft Corp.',
+                    marketCap: 1,
+                    per: -0.02, // toFixed(1) = "-0.0" via a raw `toFixed` call
+                    psr: 8,
+                },
+            ],
+        };
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            snapshot,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).not.toContain('-0.0');
+        expect(prompt).toContain('PER 0.0');
+    });
+
+    it('excludes zero/negative peer metrics from the median (distressed-earnings artifact)', () => {
+        const snapshot: FundamentalSnapshot = {
+            ...TEST_SNAPSHOT,
+            peers: [
+                {
+                    symbol: 'MSFT',
+                    companyName: 'Microsoft Corp.',
+                    marketCap: 1,
+                    per: 20,
+                    psr: null,
+                },
+                {
+                    symbol: 'NEG',
+                    companyName: 'Negative Corp.',
+                    marketCap: 1,
+                    per: -5,
+                    psr: null,
+                },
+            ],
+        };
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            snapshot,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        // Only 1 usable per (20) after dropping the negative one -> below the 2-peer minimum.
+        expect(prompt).toContain(
+            '- Peer Median P/E: N/A (premium/discount vs peers: N/A)'
+        );
+    });
+
+    it('renders the analyst grades buy share', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT, // strongBuy 20, buy 15, hold 5, sell 1, strongSell 0 -> total 41
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        // (20+15)/41*100 = 85.3658...% -> 85.37%
+        expect(prompt).toContain('- Analyst Grades Buy Share: 85.37%');
+    });
+
+    it('analyst grades buy share is N/A when gradesConsensus is null', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                futureDirection: {
+                    ...TEST_SNAPSHOT.futureDirection,
+                    gradesConsensus: null,
+                },
+            },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Analyst Grades Buy Share: N/A');
+    });
+
+    // No EPS-estimate-vs-TTM line (decision 2026-09-18): the analyst
+    // estimate's fiscal period is not knowable from this snapshot, so a
+    // computed delta against annual TTM EPS would compare mismatched
+    // periods. The raw "Analyst EPS Estimate" line (unchanged, not derived)
+    // still renders — see the Forward/Analyst Outlook assertions above.
+    it('never renders an EPS-estimate-vs-TTM line', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).not.toContain('EPS Estimate vs TTM');
+    });
+
+    it('Days to Next Earnings counts from the `now` param', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_SNAPSHOT, // nextEarningsAt '2025-07-30'
+            [],
+            'ko',
+            'USD',
+            NOW // 2025-07-20
+        );
+        expect(prompt).toContain('- Days to Next Earnings: 10');
+    });
+
+    it('Days to Next Earnings is N/A when `now` is omitted — the domain never reads the wall clock', () => {
+        const nearFuture = '2026-09-25';
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                futureDirection: {
+                    ...TEST_SNAPSHOT.futureDirection,
+                    nextEarningsAt: nearFuture,
+                },
+            },
+            []
+        );
+        expect(prompt).toContain('- Days to Next Earnings: N/A');
+    });
+
+    it('Days to Next Earnings is N/A when nextEarningsAt is null', () => {
+        const prompt = buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            {
+                ...TEST_SNAPSHOT,
+                futureDirection: {
+                    ...TEST_SNAPSHOT.futureDirection,
+                    nextEarningsAt: null,
+                },
+            },
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+        expect(prompt).toContain('- Days to Next Earnings: N/A');
     });
 });

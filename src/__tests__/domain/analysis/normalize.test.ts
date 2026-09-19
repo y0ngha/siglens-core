@@ -15,6 +15,7 @@ import {
     normalizeTimeRange,
     normalizeTrendline,
     normalizePatternSummary,
+    normalizePatternGeometry,
     normalizeStrategyResult,
     normalizeCandlePatternSummary,
     normalizeActionRecommendation,
@@ -296,6 +297,175 @@ describe('normalizePatternSummary', () => {
             keyPrices: [{ price: 100, label: 'a' }, null, 'bad', {}],
         });
         expect(result?.keyPrices).toEqual([{ label: 'a', price: 100 }]);
+    });
+
+    it('유효한 geometry를 그대로 전달한다', () => {
+        const result = normalizePatternSummary({
+            patternName: 'X',
+            skillName: 'Y',
+            geometry: {
+                breakoutLevel: 140,
+                extremeLevel: 150,
+                direction: 'down',
+                invalidationLevel: 148,
+            },
+        });
+        expect(result?.geometry).toEqual({
+            breakoutLevel: 140,
+            extremeLevel: 150,
+            direction: 'down',
+            invalidationLevel: 148,
+        });
+    });
+
+    it('geometry가 없으면 undefined', () => {
+        const result = normalizePatternSummary({
+            patternName: 'X',
+            skillName: 'Y',
+        });
+        expect(result?.geometry).toBeUndefined();
+    });
+});
+
+describe('normalizePatternGeometry (spec 2026-09-18 §A6)', () => {
+    it('down 방향: extremeLevel > breakoutLevel이면 통과한다', () => {
+        const result = normalizePatternGeometry({
+            breakoutLevel: 140,
+            extremeLevel: 150,
+            direction: 'down',
+        });
+        expect(result).toEqual({
+            breakoutLevel: 140,
+            extremeLevel: 150,
+            direction: 'down',
+        });
+    });
+
+    it('up 방향: extremeLevel < breakoutLevel이면 통과한다', () => {
+        const result = normalizePatternGeometry({
+            breakoutLevel: 100,
+            extremeLevel: 85,
+            direction: 'up',
+        });
+        expect(result).toEqual({
+            breakoutLevel: 100,
+            extremeLevel: 85,
+            direction: 'up',
+        });
+    });
+
+    it('invalidationLevel이 유효하면 함께 전달한다', () => {
+        const result = normalizePatternGeometry({
+            breakoutLevel: 100,
+            extremeLevel: 85,
+            direction: 'up',
+            invalidationLevel: 90,
+        });
+        expect(result?.invalidationLevel).toBe(90);
+    });
+
+    it('invalidationLevel이 null이면 생략(제공 안 한 것으로 취급)한다', () => {
+        const result = normalizePatternGeometry({
+            breakoutLevel: 100,
+            extremeLevel: 85,
+            direction: 'up',
+            invalidationLevel: null,
+        });
+        expect(result).toEqual({
+            breakoutLevel: 100,
+            extremeLevel: 85,
+            direction: 'up',
+        });
+    });
+
+    it('invalidationLevel이 0/음수/비유한이면 geometry 전체를 버린다', () => {
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 100,
+                extremeLevel: 85,
+                direction: 'up',
+                invalidationLevel: 0,
+            })
+        ).toBeUndefined();
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 100,
+                extremeLevel: 85,
+                direction: 'up',
+                invalidationLevel: -5,
+            })
+        ).toBeUndefined();
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 100,
+                extremeLevel: 85,
+                direction: 'up',
+                invalidationLevel: Number.NaN,
+            })
+        ).toBeUndefined();
+    });
+
+    it('방향과 일관되지 않은 geometry(down인데 extreme < breakout)는 버린다', () => {
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 150,
+                extremeLevel: 140,
+                direction: 'down',
+            })
+        ).toBeUndefined();
+    });
+
+    it('방향과 일관되지 않은 geometry(up인데 extreme > breakout)는 버린다', () => {
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 100,
+                extremeLevel: 110,
+                direction: 'up',
+            })
+        ).toBeUndefined();
+    });
+
+    it('breakoutLevel/extremeLevel이 0이거나 음수면 버린다', () => {
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 0,
+                extremeLevel: 10,
+                direction: 'up',
+            })
+        ).toBeUndefined();
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: -100,
+                extremeLevel: -90,
+                direction: 'up',
+            })
+        ).toBeUndefined();
+    });
+
+    it('breakoutLevel/extremeLevel이 비유한(NaN)이면 버린다', () => {
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: Number.NaN,
+                extremeLevel: 10,
+                direction: 'up',
+            })
+        ).toBeUndefined();
+    });
+
+    it('direction이 유효한 enum이 아니면 버린다', () => {
+        expect(
+            normalizePatternGeometry({
+                breakoutLevel: 100,
+                extremeLevel: 90,
+                direction: 'sideways',
+            })
+        ).toBeUndefined();
+    });
+
+    it('null/객체가 아니면 undefined', () => {
+        expect(normalizePatternGeometry(null)).toBeUndefined();
+        expect(normalizePatternGeometry('not an object')).toBeUndefined();
+        expect(normalizePatternGeometry(undefined)).toBeUndefined();
     });
 });
 
