@@ -393,6 +393,10 @@ const PRICE_SCENARIO_SCHEMA = {
  * (`pollAnalysis` sets `analyzedAt = now.toISOString()` and spreads it over the
  * reconciled result), so any LLM-supplied value is discarded. Asking the model
  * to produce it would only waste output tokens.
+ *
+ * `actionRecommendation.reconciledLevels` is omitted for the same reason: core
+ * writes it only when it corrects the AI's levels, and a model-filled one was
+ * shown to readers as that correction.
  */
 export const TECHNICAL_RESPONSE_SCHEMA = {
     type: 'object',
@@ -613,27 +617,6 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     type: ['array', 'null'],
                     items: { type: 'number' },
                 },
-                reconciledLevels: {
-                    type: ['object', 'null'],
-                    properties: {
-                        stopLoss: { type: ['number', 'null'] },
-                        takeProfitPrices: {
-                            type: ['array', 'null'],
-                            items: { type: 'number' },
-                        },
-                        exit: { type: 'string' },
-                        riskReward: { type: 'string' },
-                        reason: { type: 'string' },
-                    },
-                    required: [
-                        'stopLoss',
-                        'takeProfitPrices',
-                        'exit',
-                        'riskReward',
-                        'reason',
-                    ],
-                    additionalProperties: false,
-                },
             },
             required: [
                 'positionAnalysis',
@@ -644,7 +627,6 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                 'entryPrices',
                 'stopLoss',
                 'takeProfitPrices',
-                'reconciledLevels',
             ],
             additionalProperties: false,
         },

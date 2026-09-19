@@ -41,7 +41,6 @@ import type {
     PriceScenario,
     PriceTarget,
     PriceTargets,
-    ReconciledActionLevels,
     RiskLevel,
     ResponseJsonSchema,
     SignalStrength,
@@ -528,21 +527,14 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         start: trendlinePointSample,
         end: { time: 2, price: 20 },
     };
-    const reconciledSample: Required<ReconciledActionLevels> = {
-        stopLoss: 95,
-        takeProfitPrices: [120],
-        exit: '청산',
-        riskReward: '1:2',
-        reason: '보정',
-    };
-    // `planCheck` is computed by the domain after the model answers and is deliberately
-    // absent from the response schema — asking the model to emit a field we always
-    // overwrite spends tokens and invites it to author the very number the field exists to
-    // take away from it. `reconciledLevels` predates that reasoning and stays in the
-    // schema; it is not a precedent to extend.
+    // `planCheck` and `reconciledLevels` are computed by the domain after the model
+    // answers and are deliberately absent from the response schema — asking the model to
+    // emit a field the domain owns spends tokens and invites it to author the very number
+    // the field exists to take away from it (a model-filled `reconciledLevels` was shown
+    // to readers as core's correction).
     type LlmAuthoredActionRecommendation = Omit<
         Required<ActionRecommendation>,
-        'planCheck'
+        'planCheck' | 'reconciledLevels'
     >;
     const actionSample: LlmAuthoredActionRecommendation = {
         positionAnalysis: '포지션',
@@ -553,7 +545,6 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         entryPrices: [100],
         stopLoss: 95,
         takeProfitPrices: [120],
-        reconciledLevels: reconciledSample,
     };
     const sample: Required<AnalysisResponse> = {
         summary: '요약',
@@ -767,22 +758,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         expect(propType(action, 'entryPrices')).toEqual(['array', 'null']);
         expect(propType(action, 'stopLoss')).toEqual(['null', 'number']);
         expect(propType(action, 'takeProfitPrices')).toEqual(['array', 'null']);
-        expect(propType(action, 'reconciledLevels')).toEqual([
-            'null',
-            'object',
-        ]);
-
-        const reconciled = objectProp(action, 'reconciledLevels');
-        expect(sortedRequired(reconciled)).toEqual(
-            sortedKeys(reconciledSample)
-        );
-        expect(propertyKeys(reconciled)).toEqual(sortedKeys(reconciledSample));
-        expect(reconciled.additionalProperties).toBe(false);
-        expect(propType(reconciled, 'stopLoss')).toEqual(['null', 'number']);
-        expect(propType(reconciled, 'takeProfitPrices')).toEqual([
-            'array',
-            'null',
-        ]);
+        expect(propertyKeys(action)).not.toContain('reconciledLevels');
     });
 
     it('every nested object schema lists all properties in required and forbids additionalProperties', () => {

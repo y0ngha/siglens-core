@@ -70,11 +70,6 @@
 - Context: `requestPasswordReset` now depends on `EmailAuthUserRepository` and only issues reset tokens for users with an existing password hash
 
 
-## [PR #99 | refactor/skills-domain-ports-migration | 2026-05-22]
-- Violation: `@adapter implements {@link Port}` JSDoc tag applied to a factory function (createSkillsProvider) rather than the implementing class
-- Rule: Documentation accuracy — `@adapter` marks the class implementing a port; factories create adapters but are not themselves adapters
-- Context: Round 2 S1 — createSkillsProvider() JSDoc had `@adapter implements {@link SkillsProvider}` copied from FileSkillsLoader's JSDoc; removed the tag from the factory while keeping it on the class. When introducing a `create<Port>Provider()` factory next to an `@adapter` class, only annotate the class with `@adapter`.
-
 ## [PR #96 | worktree-refactor+ports-jobs-slice | 2026-05-22]
 - Violation: Multiple JSDoc tags packed on a single line (`@port @internal`) — standard JSDoc/TypeDoc parsers consume `@internal` as `@port`'s description text instead of treating it as an independent tag
 - Rule: JSDoc tag declaration — each block tag must be on its own line so parsers (TypeDoc included) recognize them as independent tags
@@ -89,13 +84,6 @@
 - Violation: `CURVATURE_VERTEX_MID_LO` and `CURVATURE_VERTEX_MID_HI` in `src/domain/patterns/constants.ts` shared a single `/** @internal ... */` JSDoc block above the first declaration
 - Rule: MISTAKES.md §Documentation — TypeDoc attaches a JSDoc block only to the immediately-following declaration; a shared comment above two sibling `export const` statements silently leaves the second one undocumented in generated docs, even though the source reads as if both are covered
 - Context: PR #160 review round 4 suggestion — the shared block described both constants together ("the fraction-of-span range within which..."), but TypeDoc renders `CURVATURE_VERTEX_MID_HI` with no doc at all. Fixed by giving each constant its own `@internal` JSDoc block, mirroring the per-constant style used by every other constant in the file.
-
-## [PR | refactor/cheap-jobs-back-to-gemini | 2026-08-20] — Cheap jobs model migration R1→R2
-
-- Violation 2 (RECOMMENDED): `docs/PUBLIC_API.md` — new public exports added to inline inventory without dated changelog row
-  Rule: MISTAKES.md §Public API 1 — PUBLIC_API.md convention requires a dated changelog row appended for every additive public-API change; inline list alone is insufficient
-  Context: When exports are added to public API, the changelog row documents the version/date/reason; omitting it breaks the convention
-  Fixed in R2: Added dated changelog row documenting the new public exports
 
 ## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 hotfix: import, JSON parsing
 
@@ -171,10 +159,6 @@
 
 ## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R2
 
-- Violation 1: Function documented as "never throws" but catches and re-throws SyntaxError from JSON parser on corrupted payload
-  Rule: MISTAKES.md Documentation Sync 4.5 — JSDoc statements must match actual implementation behavior
-  Context: parseJsonFromCache function had incomplete @throws documentation; callers assumed no-throw contract. Fixed by adding explicit @throws {SyntaxError} JSDoc tag and verifying throw path with test case for corrupted cache payload.
-
 - Violation 3: Test fixture carried provider field not present in CachedNewsDigest interface type
   Rule: MISTAKES.md Tests 10 — Type field added but test mock objects not updated
   Context: News digest cache test fixture included provider field absent from interface. Fixed by removing extra field from mock fixture to match type contract.
@@ -222,6 +206,3 @@
 - Violation: 프롬프트 규칙을 수준(Plain/Detailed)별로 나누면서 컨플루언스 null 처리를 Detailed에만 남겨, Plain 답에서는 데이터 없이 "지표 의견" 합의를 말하게 되는 분기가 비었다
   - Rule: (new) 프롬프트 규칙을 조건(수준·도구 가용성 등)으로 쪼갤 때는 모든 조건 분기에 null/부재 처리를 남긴다 — 한쪽에만 두면 다른 쪽이 근거 없는 추정으로 채운다
   - Context: 리뷰 라운드 1 지적. 두 수준 모두 "이력이 짧아 집계가 없다"고 말하도록 고치고 테스트로 고정
-- Violation: AGENT_PROMPT_VERSION을 올리면서 docs/PUBLIC_API.md 변경 이력 행을 빠뜨림
-  - Rule: MISTAKES.md Documentation Sync #7
-  - Context: 2026-09-19 행 추가

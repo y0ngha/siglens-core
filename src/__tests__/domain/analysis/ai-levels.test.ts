@@ -768,7 +768,7 @@ describe('postProcessAnalysisWithReconcile', () => {
     });
 });
 
-describe('postProcessAnalysisWithReconcile — deterministic risk:reward gated by wasReconciled, not reconciledLevels presence (regression 2026-09-19: reconciledLevels is a model-authored schema field too, so its mere presence never proved core reconciled)', () => {
+describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels is dropped; deterministic risk:reward gated by wasReconciled (regressions 2026-09-19)', () => {
     const baseResponse: AnalysisResponse = {
         summary: 'test',
         trend: 'bullish',
@@ -816,10 +816,9 @@ describe('postProcessAnalysisWithReconcile — deterministic risk:reward gated b
             atr
         );
 
-        // core left the model's own object untouched — no reconciliation happened
-        expect(result.actionRecommendation?.reconciledLevels).toEqual(
-            modelReconciledLevels
-        );
+        // No reconciliation happened, so the model's own object must not survive
+        // to be shown as core's correction.
+        expect(result.actionRecommendation?.reconciledLevels).toBeUndefined();
 
         const riskReward = result.actionRecommendation?.riskReward ?? '';
         expect(riskReward.startsWith('손절')).toBe(true);
@@ -867,22 +866,19 @@ describe('postProcessAnalysisWithReconcile — deterministic risk:reward gated b
         expect(riskReward).toContain('risk:reward');
     });
 
-    it('모델의 reconciledLevels.takeProfitPrices가 정렬돼 있지 않고 진입가 이하 값을 포함해도 진입가 위 가장 가까운 목표가를 쓴다', () => {
+    it('takeProfitPrices가 정렬돼 있지 않고 진입가 이하 값을 포함해도 진입가 위 가장 가까운 목표가를 쓰고, 모델이 채운 reconciledLevels의 값은 쓰지 않는다', () => {
         const modelReconciledLevels: ReconciledActionLevels = {
-            takeProfitPrices: [110, 95, 102], // unsorted + one at/below entryPrice(100)
-            exit: buildBullishExitText(
-                entryPrice,
-                baseRec.stopLoss,
-                [110, 95, 102],
-                'USD'
-            ),
+            stopLoss: 90,
+            takeProfitPrices: [130],
+            exit: '',
             riskReward: '모델이 채운 임의 텍스트',
             reason: '',
         };
         const response: AnalysisResponse = {
             ...baseResponse,
             actionRecommendation: {
-                ...baseRec, // stopLoss: 97, takeProfitPrices: [105] — both valid → core does not reconcile
+                ...baseRec, // stopLoss: 97 — valid, first target 110 valid → core does not reconcile
+                takeProfitPrices: [110, 95, 102], // unsorted + one at/below entryPrice(100)
                 reconciledLevels: modelReconciledLevels,
             },
         };
