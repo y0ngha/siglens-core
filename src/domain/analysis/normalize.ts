@@ -9,6 +9,7 @@ import type {
     KeyPrice,
     PatternLine,
     PatternTargetGeometry,
+    PlanCheck,
     PriceScenario,
     PriceTarget,
     PriceTargets,
@@ -27,6 +28,7 @@ import {
     asBoolean,
     asEnum,
     asNumber,
+    asNumberOrNull,
     asObject,
     asOptionalEnum,
     asString,
@@ -339,6 +341,30 @@ function normalizeReconciledActionLevels(
     };
 }
 
+/**
+ * @internal Normalizes the deterministic plan-vs-price arithmetic
+ * `postProcessAnalysisWithReconcile` attaches after the LLM response (see
+ * `PlanCheck` in `@/domain/types`). Dropped (returns `undefined`) unless
+ * `currentPrice` is a finite positive number — `buildPlanCheck` itself
+ * returns `null` in that case, so a `planCheck` without a usable
+ * `currentPrice` is corrupt, not merely incomplete.
+ */
+function normalizePlanCheck(raw: unknown): PlanCheck | undefined {
+    const o = asObject(raw);
+    if (!o) return undefined;
+    const currentPrice = asNumber(o.currentPrice);
+    if (!isFinitePositive(currentPrice)) return undefined;
+
+    return {
+        currentPrice,
+        entryZoneTop: asNumberOrNull(o.entryZoneTop),
+        exceedsEntryZone: asBoolean(o.exceedsEntryZone),
+        belowStopLoss: asBoolean(o.belowStopLoss),
+        riskRewardAtEntry: asNumberOrNull(o.riskRewardAtEntry),
+        riskRewardAtCurrent: asNumberOrNull(o.riskRewardAtCurrent),
+    };
+}
+
 /** @internal Normalizes an action recommendation. */
 export function normalizeActionRecommendation(
     raw: unknown
@@ -356,6 +382,8 @@ export function normalizeActionRecommendation(
     // 모두 비어 있으면 숫자 필드가 있더라도 추천 자체가 없는 것으로 간주한다.
     if (!positionAnalysis && !entry && !exit && !riskReward) return undefined;
 
+    const planCheck = normalizePlanCheck(o.planCheck);
+
     return {
         positionAnalysis,
         entry,
@@ -369,5 +397,17 @@ export function normalizeActionRecommendation(
         stopLoss: asNumber(o.stopLoss),
         takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
         reconciledLevels: normalizeReconciledActionLevels(o.reconciledLevels),
+        // `postProcessAnalysisWithReconcile` attaches `planCheck` to the LLM's raw
+        // actionRecommendation, but a cache read (`normalizeCachedAnalysisResponse`)
+        // re-normalizes that already-post-processed object through this same
+        // function — dropping the key here silently strips the field downstream of
+        // where it was attached, even though the write path carried it correctly.
+        // Raw LLM output never has `planCheck` (it isn't in the response schema),
+        // so omitting the key rather than assigning `undefined` keeps that path
+        // byte-for-byte identical to before this fix. `reconciledLevels` above
+        // keeps its long-standing `key: undefined` form on purpose — switching it
+        // here would change a shape existing consumers and fixtures already see,
+        // which is out of scope for this read-path fix.
+        ...(planCheck !== undefined ? { planCheck } : {}),
     };
 }
