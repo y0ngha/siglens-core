@@ -3426,6 +3426,7 @@ export type {
     StrikeVolumeAggregate,
     TopOiQuote,
     OptionsExpirationMetrics,
+    ImpliedMoveRange,
     OptionsPerExpirationCommentary,
     OptionsSignal,
     OptionsAnalysisResponse,

@@ -126,6 +126,17 @@ export interface LlmStrikeOpenInterest extends StrikeOpenInterest {
     side: 'above' | 'below' | 'at' | null;
 }
 
+/**
+ * Price band implied by the market for a single expiration —
+ * `underlyingPrice × (1 ∓ impliedMovePercent / 100)`.
+ */
+export interface ImpliedMoveRange {
+    /** Lower bound of the implied move range, in the underlying's currency. */
+    low: number;
+    /** Upper bound of the implied move range, in the underlying's currency. */
+    high: number;
+}
+
 /** Per-expiration computed metrics derived from a single {@link OptionsChain}. */
 export interface OptionsExpirationMetrics {
     /** Expiration date in ISO `'YYYY-MM-DD'` form. */
@@ -156,7 +167,7 @@ export interface OptionsExpirationMetrics {
     /** Implied move in ±% units (4.2 means ±4.2%). null if unavailable. */
     impliedMovePercent: number | null;
     /** `underlyingPrice × (1 ∓ impliedMovePercent / 100)` — the price band the market implies by expiration. `null` when the underlying price or {@link impliedMovePercent} is unavailable. */
-    impliedMoveRange: { low: number; high: number } | null;
+    impliedMoveRange: ImpliedMoveRange | null;
     /** Top 3 strikes by combined (call + put) volume — today's most-traded levels. */
     topVolumeStrikes: ReadonlyArray<StrikeVolumeAggregate>;
     /** Bid/ask snapshot for each strike in `topOpenInterestStrikes` — liquidity around the heaviest OI levels. */

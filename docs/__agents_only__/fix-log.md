@@ -209,6 +209,10 @@
   Rule: CONVENTIONS.md — Tier 4 public types require one-line JSDoc per field
   Context: Types were marked @internal but export removed; types are now public without per-field documentation. Added per-field JSDoc to each Tier 4 type field.
 
+- Violation 2 (R6 REQUIRED): Inline object type `{ low: number; high: number } | null` duplicated in two places (public interface field and function return type)
+  Rule: MISTAKES TypeScript #5 / CONVENTIONS — Return named interfaces
+  Context: ImpliedMoveRange interface was inlined in two locations instead of defined once as a named type. Extracted ImpliedMoveRange as a named interface and exported as Tier 4 public type to provide single source of truth and enable type reuse.
+
 - Violation 3 (R6 CLEANUP): Internal review-round reference tags left in production comments and test names
   Rule: Production code — internal development/coordination tags must not be committed
   Context: Tags like "review R6", "review round 2", "coordinator item C3" were used during development reviews but left in code. Removed all internal reference tags from comments and test names.

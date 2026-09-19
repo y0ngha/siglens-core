@@ -4,6 +4,7 @@ import { calculateImpliedMove } from './calculateImpliedMove';
 import { calculateMaxPain } from './calculateMaxPain';
 import { calculatePutCallRatio } from './calculatePutCallRatio';
 import type {
+    ImpliedMoveRange,
     LlmStrikeOpenInterest,
     MidAndSpread,
     OptionsChain,
@@ -92,7 +93,7 @@ function spreadPct(mid: number | null, spread: number | null): number | null {
 function computeImpliedMoveRange(
     underlyingPrice: number | undefined,
     impliedMovePercent: number | null
-): { low: number; high: number } | null {
+): ImpliedMoveRange | null {
     if (!isFinitePositive(underlyingPrice)) return null;
     if (impliedMovePercent === null || !Number.isFinite(impliedMovePercent))
         return null;
