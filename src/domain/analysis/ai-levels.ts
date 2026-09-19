@@ -1,4 +1,7 @@
-import { buildPlanCheck } from '@/domain/analysis/planCheck';
+import {
+    buildPlanCheck,
+    nearestTargetAbove,
+} from '@/domain/analysis/planCheck';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
 import {
     formatNullableNumber,
@@ -255,15 +258,15 @@ const RISK_REWARD_TEMPLATE: Record<
  * bullish 롱 포지션의 signed 위험:보상 비율 텍스트. SL이 무효하거나 진입가보다 높은
  * 목표가가 하나도 없으면 빈 문자열.
  *
- * 목표가는 배열의 첫 번째 값이 아니라, entryPrice보다 높은 값들 중 **가장 가까운**
- * 것을 쓴다 — {@link riskRewardFrom}이 `planCheck.riskRewardAtEntry`를 계산할 때
- * 쓰는 것과 동일한 규칙이다. 이 규칙 하나를 여기 한 곳에 두면 이 줄과
- * `planCheck.riskRewardAtEntry`가 서로 다른 숫자를 보여줄 일이 없다 — 호출자가
- * 넘기는 `takeProfitPrices`가 정렬돼 있는지, entryPrice 이하 값을 걸러냈는지는
- * 이 함수가 신경 쓸 필요가 없다 (fix 2026-09-19: 이전엔 `[0]`을 그대로 썼는데,
- * `reconcileBullishActionRecommendation`이 SL만 보정하고 TP는 AI 원본을 그대로
- * 넘기는 경로에서 그 원본이 미정렬이면 `[0]`이 가장 가까운 목표가라는 보장이
- * 없었다 — entry 100, TP `[150, 105]`, SL만 보정된 경우가 그 예다).
+ * 목표가는 배열의 첫 번째 값이 아니라 {@link nearestTargetAbove}가 고른 값을 쓴다 —
+ * `riskRewardFrom`이 `planCheck.riskRewardAtEntry`를 계산할 때 쓰는 것과 동일한
+ * 헬퍼다. 규칙을 한 곳(`planCheck.ts`)에 두면 이 줄과 `planCheck.riskRewardAtEntry`가
+ * 서로 다른 숫자를 보여줄 일이 없다 — 호출자가 넘기는 `takeProfitPrices`가 정렬돼
+ * 있는지, entryPrice 이하 값을 걸러냈는지는 이 함수가 신경 쓸 필요가 없다
+ * (fix 2026-09-19: 이전엔 `[0]`을 그대로 썼는데, `reconcileBullishActionRecommendation`이
+ * SL만 보정하고 TP는 AI 원본을 그대로 넘기는 경로에서 그 원본이 미정렬이면 `[0]`이
+ * 가장 가까운 목표가라는 보장이 없었다 — entry 100, TP `[150, 105]`, SL만 보정된
+ * 경우가 그 예다).
  *
  * `locale` defaults to `'ko'` so every existing call site (including
  * {@link reconcileBullishActionRecommendation}'s internal use for
@@ -283,15 +286,11 @@ export function buildBullishRiskRewardText(
     )
         return '';
 
-    // Nearest target strictly above entryPrice — same selection rule as
-    // `riskRewardFrom`. Any target at/below entryPrice is noise (a negative
-    // R:R would only confuse the reader), so it is dropped, not just skipped.
-    const above = (takeProfitPrices ?? []).filter(
-        (candidate): candidate is number =>
-            Number.isFinite(candidate) && candidate > entryPrice
-    );
-    if (above.length === 0) return '';
-    const tp = Math.min(...above);
+    // Nearest target strictly above entryPrice — see `nearestTargetAbove`'s own doc
+    // for the rule. Any target at/below entryPrice is noise (a negative R:R would only
+    // confuse the reader), so it is dropped, not just skipped.
+    const tp = nearestTargetAbove(entryPrice, takeProfitPrices);
+    if (tp === undefined) return '';
 
     const slPct = ((stopLoss - entryPrice) / entryPrice) * 100;
     const tpPct = ((tp - entryPrice) / entryPrice) * 100;

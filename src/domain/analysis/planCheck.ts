@@ -41,11 +41,36 @@ function finitePositive(n: number | undefined): n is number {
 /**
  * @internal
  *
+ * The nearest finite target strictly above `price`, or `undefined` when none is.
+ *
+ * The single rule both risk:reward paths use — {@link riskRewardFrom}'s ratio and
+ * `buildBullishRiskRewardText`'s deterministic line (`ai-levels.ts`) both call this
+ * instead of each re-implementing the selection, which is how the two drifted apart
+ * before. Reward is measured to the nearest target, not the furthest: that is the first
+ * one an exit rule fires on, so counting a further target credits profit the plan will
+ * not actually realise.
+ *
+ * The filter is "finite and > price", not `finitePositive` — both call sites already
+ * guarantee `price > 0`, so anything strictly above it is positive too.
+ */
+export function nearestTargetAbove(
+    price: number,
+    targets: readonly number[] | undefined
+): number | undefined {
+    const above = (targets ?? []).filter(
+        (candidate): candidate is number =>
+            Number.isFinite(candidate) && candidate > price
+    );
+    return above.length === 0 ? undefined : Math.min(...above);
+}
+
+/**
+ * @internal
+ *
  * Risk:reward for a long from `price`, given a stop below and take-profit targets above.
  *
- * Reward is measured to the **nearest** target above `price`, not the furthest: that is the
- * first one an exit rule fires on, so counting a further target credits profit the plan will
- * not actually realise.
+ * Reward is measured to the nearest target above `price` — see {@link nearestTargetAbove}
+ * for that selection rule.
  *
  * Returns `0` when targets were supplied but all sit at or below `price`, and `null` when
  * the ratio is undefined (no usable stop, stop at or above `price`, or no targets at all).
@@ -61,10 +86,10 @@ export function riskRewardFrom(
     const targets = (takeProfitPrices ?? []).filter(finitePositive);
     if (targets.length === 0) return null;
 
-    const above = targets.filter(tp => tp > price);
-    if (above.length === 0) return 0;
+    const nearest = nearestTargetAbove(price, targets);
+    if (nearest === undefined) return 0;
 
-    return (Math.min(...above) - price) / (price - stopLoss);
+    return (nearest - price) / (price - stopLoss);
 }
 
 /**
