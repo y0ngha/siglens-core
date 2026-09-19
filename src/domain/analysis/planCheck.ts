@@ -50,8 +50,11 @@ function finitePositive(n: number | undefined): n is number {
  * one an exit rule fires on, so counting a further target credits profit the plan will
  * not actually realise.
  *
- * The filter is "finite and > price", not `finitePositive` — both call sites already
- * guarantee `price > 0`, so anything strictly above it is positive too.
+ * The filter is "finite and > price", not `finitePositive`, because both callers only
+ * reach here with `price > 0`: `riskRewardFrom` checks `finitePositive(price)` first,
+ * and `buildBullishRiskRewardText` returns early unless `0 < stopLoss < entryPrice`,
+ * which implies a positive `entryPrice`. Anything strictly above such a price is
+ * positive too.
  */
 export function nearestTargetAbove(
     price: number,
