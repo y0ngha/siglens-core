@@ -404,7 +404,10 @@ export function normalizeActionRecommendation(
         // where it was attached, even though the write path carried it correctly.
         // Raw LLM output never has `planCheck` (it isn't in the response schema),
         // so omitting the key rather than assigning `undefined` keeps that path
-        // byte-for-byte identical to before this fix.
+        // byte-for-byte identical to before this fix. `reconciledLevels` above
+        // keeps its long-standing `key: undefined` form on purpose — switching it
+        // here would change a shape existing consumers and fixtures already see,
+        // which is out of scope for this read-path fix.
         ...(planCheck !== undefined ? { planCheck } : {}),
     };
 }
