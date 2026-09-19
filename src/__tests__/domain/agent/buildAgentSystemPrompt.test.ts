@@ -230,7 +230,7 @@ describe('buildAgentSystemPrompt', () => {
     });
 
     /** 사용자 결정 2026-09-17: 가드가 과해 유의미한 정보를 못 준다는 피드백에 따른 것. */
-    it('데이터가 가리키는 방향을 말하게 하고, 용어 수준을 사용자에 맞추고, 반박에 입장을 바꾸지 않게 한다', () => {
+    it('데이터가 가리키는 방향을 말하게 하고, 답변 깊이를 Depth 규칙으로 고르게 하고, 반박에 입장을 바꾸지 않게 한다', () => {
         expect(prompt).toContain('Commit to a view whenever the data supports');
         expect(prompt).toContain(
             'relay its verdict, action rating and price scenarios'
