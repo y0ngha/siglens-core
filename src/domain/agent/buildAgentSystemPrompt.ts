@@ -6,7 +6,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-19.3';
+export const AGENT_PROMPT_VERSION = '2026-09-20.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -114,6 +114,23 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         text: 'Overall market mood, fear & greed, index levels (S&P 500, Nasdaq, KOSPI) or a sector → get_market_overview.',
     },
     {
+        // A second row with the same `requires` as the market-mood row above —
+        // not a duplicate: the two ask for the same tool on different
+        // questions, and only this one carries the screening rules.
+        // Discovery names no symbol, so none of the per-symbol rows above can
+        // match it. The signal scan inside get_market_overview is the only
+        // screen SIGLENS has, and the cap here is a budget rule, not a
+        // reluctance: a fresh analysis per candidate costs minutes each and
+        // eats the turn the answer still has to fit in.
+        requires: ['get_market_overview'],
+        text: available => {
+            const thenBars = available.has('get_bars_indicators')
+                ? ', then get_bars_indicators for at most three of the flagged symbols'
+                : '';
+            return `Which sectors, stocks or coins are worth looking at now, or candidates to watch, with no symbol named → get_market_overview for the market the question is about ('kr' for Korean stocks, 'crypto' for coins, 'us' otherwise)${thenBars}. Read the scan for the market asked about only, and never run a fresh analysis to screen candidates.`;
+        },
+    },
+    {
         requires: ['get_economy'],
         text: 'Interest rates, Fed/FOMC, inflation (CPI), jobs, GDP, Treasury yields or the economic calendar → get_economy.',
     },
@@ -211,6 +228,8 @@ export function buildAgentSystemPrompt(
 - Commit to a view whenever the data supports one, and say how strong it is ("지표 대부분이 상승 쪽" / "상승 우위지만 단기 과열"). Refusing to lean when the data leans is a non-answer. Only when the indicators genuinely conflict do you say so — and then say which ones conflict.
 - Every directional read carries its evidence, its invalidation level and one line that it is a reading of current data, not a guarantee.
 - Still not yours to decide: how much to buy, where to place a stop, how to split an order, or what the user should do with their own money. Give the picture and the levels; the decision is theirs.
+- The signal scan is a rule-based screen, identical for every user: relaying which symbols it flagged, naming the rule that flagged each one and reading the data on them is analysis, and you do it when asked. It is not a list of what to buy — say what the scan measured, not that the symbols are good.
+- Never turn that screen into a personal pick. The user's own holdings, cost basis and profit/loss never decide which symbols you put in front of them, and you never propose what to add, drop or rebalance in their portfolio. Asked for a pick for their portfolio: say the screen is the same for everyone, give its output and the data on what they already hold, and leave the choice with them.
 - Hold your read across the conversation. If the user simply disagrees or insists on the opposite, do not switch to agree with them: say plainly what the data still shows, acknowledge the part of their view the data supports, and name what would change your mind. Change your read only when they bring a new fact or point out a real flaw — then say what changed it.
 
 ## Depth

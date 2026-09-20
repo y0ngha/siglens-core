@@ -184,4 +184,32 @@ describe('AGENT_TOOL_SPECS', () => {
             `At most ${AGENT_TURN_CAPS.maxWebSearch} per turn`
         );
     });
+
+    it('get_market_overview는 세 시장을 받고, 크립토에 없는 필드를 미리 알린다', () => {
+        const overview = findToolSpec('get_market_overview');
+        expect(overview?.inputSchema.properties?.market).toMatchObject({
+            enum: ['us', 'kr', 'crypto'],
+        });
+        expect(overview?.description).toContain(
+            'All three markets carry the scan'
+        );
+        expect(overview?.description).toContain('no fear & greed index');
+        // 브리핑·과거 대비 점수는 화면이 이미 쓰는 캐시다 — 설명이 없으면 모델이
+        // 결과에 들어온 필드를 읽지 않는다.
+        expect(overview?.description).toContain('`comparisons`');
+        expect(overview?.description).toContain('`briefing`');
+    });
+
+    it('카테고리 뉴스의 digest와 심볼 자체 공포·탐욕 지수를 설명한다', () => {
+        expect(findToolSpec('get_news')?.description).toContain(
+            'A category request also carries `digest`'
+        );
+        const bars = findToolSpec('get_bars_indicators');
+        expect(bars?.description).toContain('`fearGreed`');
+        // 시장 지수와 섞이면 모델이 종목 점수를 시장 점수로 인용한다.
+        expect(bars?.description).toContain(
+            'never the market-wide one from get_market_overview'
+        );
+        expect(bars?.description).toContain('On timeframe 1Day');
+    });
 });

@@ -283,7 +283,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-19.3');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-20.2');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -466,5 +466,62 @@ describe('buildAgentSystemPrompt', () => {
         });
         expect(noSearch).not.toContain('web_search');
         expect(noSearch).toContain('SIGLENS news has nothing on it yet');
+    });
+
+    it('심볼 없는 발굴 질문은 시그널 스캔으로 보내고, 후보 검증에 새 분석을 쓰지 않게 한다', () => {
+        expect(prompt).toContain(
+            'Which sectors, stocks or coins are worth looking at now'
+        );
+        expect(prompt).toContain(
+            'then get_bars_indicators for at most three of the flagged symbols'
+        );
+        expect(prompt).toContain(
+            'never run a fresh analysis to screen candidates'
+        );
+        // 시장 선택은 의미로 지시한다 — 한국어 트리거 문구를 프롬프트에 심으면
+        // 다른 언어 사용자의 같은 질문이 행에 걸리지 않는다.
+        expect(prompt).toContain(
+            "('kr' for Korean stocks, 'crypto' for coins, 'us' otherwise)"
+        );
+    });
+
+    it('발굴 행은 get_bars_indicators가 없으면 스캔만 안내하고, get_market_overview가 없으면 사라진다', () => {
+        const noBars = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_bars_indicators'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noBars).toContain(
+            'Which sectors, stocks or coins are worth looking at now'
+        );
+        expect(noBars).not.toContain('at most three of the flagged symbols');
+
+        const noOverview = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_market_overview'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noOverview).not.toContain(
+            'Which sectors, stocks or coins are worth looking at now'
+        );
+    });
+
+    it('스캔 결과는 공개하되 보유 종목에 맞춘 개인 추천은 금지한다', () => {
+        expect(prompt).toContain(
+            'The signal scan is a rule-based screen, identical for every user'
+        );
+        expect(prompt).toContain('It is not a list of what to buy');
+        expect(prompt).toContain('Never turn that screen into a personal pick');
+        expect(prompt).toContain(
+            'never propose what to add, drop or rebalance in their portfolio'
+        );
+        // 기존 경계(수량·손절·분할)는 그대로 남는다.
+        expect(prompt).toContain('Still not yours to decide');
     });
 });
