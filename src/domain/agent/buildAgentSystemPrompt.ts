@@ -114,6 +114,9 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         text: 'Overall market mood, fear & greed, index levels (S&P 500, Nasdaq, KOSPI) or a sector → get_market_overview.',
     },
     {
+        // A second row with the same `requires` as the market-mood row above —
+        // not a duplicate: the two ask for the same tool on different
+        // questions, and only this one carries the screening rules.
         // Discovery names no symbol, so none of the per-symbol rows above can
         // match it. The signal scan inside get_market_overview is the only
         // screen SIGLENS has, and the cap here is a budget rule, not a
