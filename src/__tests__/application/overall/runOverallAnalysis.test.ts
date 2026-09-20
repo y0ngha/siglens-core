@@ -23,8 +23,10 @@ import type { RunOverallAnalysisOptions } from '@/application/overall/types';
 import type {
     AnalysisResponse,
     EnrichedNewsItem,
+    MarketEvent,
     NewsAnalysisResponse,
     OverallAnalysisResponse,
+    PriorAnalysis,
 } from '@/domain/types';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
@@ -770,6 +772,57 @@ describe('runOverallAnalysis', () => {
             });
 
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('technical 축 캐시 키 정합', () => {
+        /**
+         * `priorAnalyses`/`marketEvents`는 technical 축 캐시 키의 `:hist=`·`:evt=`
+         * 구간으로 접힌다. 소비자가 자기 단독 `runAnalysis` 호출에는 넘기면서
+         * 여기에는 안 넘기면 같은 분석에 키가 둘 생기고, overall이 캐시에서 읽을 수
+         * 있었을 technical을 다시 생성한다 — siglens가 2026-09-11부터 실제로 그
+         * 모양이었고 심볼당 매일 밤 ~5k 토큰을 중복 지불했다.
+         *
+         * 이 테스트가 지키는 것은 "전달된다"이지 "키가 같다"가 아니다. 키 조립은
+         * `runAnalysisImpl` 안에 있고 여기서는 목이라 볼 수 없다 — 전달만 끊기지
+         * 않으면 키 정합은 그쪽 테스트가 담당한다.
+         *
+         * ⚠️ **이 테스트 단독으로는 타입 축소를 못 잡는다.** `technical` Pick에서
+         * 두 키를 도로 빼도 여기는 통과한다 — 전달이 `...technicalRest` 스프레드라
+         * 런타임엔 타입이 없기 때문이다(실측: 되돌린 상태에서 35/35 통과). 그 방향을
+         * 잡는 건 `yarn typecheck`다(TS2353). 이 테스트가 실제로 막는 것은 축 호출에
+         * `priorAnalyses: undefined` 같은 명시적 덮어쓰기가 끼어드는 경우다.
+         */
+        it('technical.priorAnalyses와 technical.marketEvents를 technical 축 호출로 그대로 넘긴다', async () => {
+            const priorAnalyses: readonly PriorAnalysis[] = [
+                {
+                    generatedAt: new Date('2026-09-01T00:00:00.000Z'),
+                    trend: 'bullish',
+                    riskLevel: 'medium',
+                },
+            ];
+            const marketEvents: readonly MarketEvent[] = [
+                {
+                    publishedAt: new Date('2026-09-02T00:00:00.000Z'),
+                    category: 'earnings',
+                    sentiment: 'bullish',
+                    impact: 'high',
+                },
+            ];
+
+            await runOverallAnalysis({
+                ...baseOptions(),
+                // 심볼로 이 테스트의 호출을 식별한다 — `mock.calls[0]`을 쓰면 앞선
+                // 테스트의 늦은 호출이 그 자리를 차지할 수 있다.
+                symbol: 'PARITY',
+                technical: { priorAnalyses, marketEvents },
+            });
+
+            const call = mockRunAnalysisForOverall.mock.calls.find(
+                c => c[0] === 'PARITY'
+            );
+            expect(call).toBeDefined();
+            expect(call?.[5]).toMatchObject({ priorAnalyses, marketEvents });
         });
     });
 });

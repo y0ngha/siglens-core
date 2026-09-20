@@ -95,10 +95,12 @@ export interface OverallDependencyInputs {
      * by the consumer (siglens / siglens-trader) from its own database —
      * mirrors `SubmitAnalysisOptions.priorAnalyses`, but feeds the OVERALL
      * prompt's own `## Prior Analyses` section directly (via
-     * `buildOverallAnalysisPrompt`'s `priorAnalyses` param), not the
-     * technical axis resolved inside this pipeline (`technical` above has
-     * no `priorAnalyses` field of its own — the two axes' history sections
-     * are independent). Size the query with `analysisHistoryQuery(timeframe)`
+     * `buildOverallAnalysisPrompt`'s `priorAnalyses` param), NOT the
+     * technical axis resolved inside this pipeline — that axis reads
+     * `technical.priorAnalyses` (see below), and a consumer that wants the
+     * technical axis to share a cache entry with its own standalone
+     * `runAnalysis` call must supply the same value in both places.
+     * Size the query with `analysisHistoryQuery(timeframe)`
      * before fetching. Both axes take the same lookback: `OVERALL_CACHE_TTL_SECONDS`
      * governs the *recency* exclusion, which core applies itself in stage 1,
      * not how far back the consumer must read.
@@ -225,6 +227,18 @@ export interface OverallDependencyInputs {
      * overall call as three analyses. The field stays in the type for
      * standalone resolver callers, but `submitOverallAnalysis` users should
      * leave it unset.
+     *
+     * NOTE on `priorAnalyses`/`marketEvents`: both fold into the technical
+     * axis' cache key (`:hist=` / `:evt=` segments — see
+     * `buildAnalysisCacheKey`). A consumer that supplies them to its own
+     * `runAnalysis` call but NOT here gets two keys for one analysis, and the
+     * overall pipeline regenerates a technical analysis it could have read
+     * from cache. That is not hypothetical: siglens ran exactly that shape
+     * from 2026-09-11 (the day its `analysis_history` table started
+     * returning rows, so its standalone key grew a `:hist=` segment this one
+     * never had) and paid for a duplicate ~5k-token technical generation per
+     * symbol per nightly pre-warm. Supply the same values in both places, or
+     * in neither.
      */
     technical: Pick<
         SubmitAnalysisOptions,
@@ -235,6 +249,8 @@ export interface OverallDependencyInputs {
         | 'userApiKey'
         | 'waitUntil'
         | 'reasoning'
+        | 'priorAnalyses'
+        | 'marketEvents'
     > & {
         /** Forwarded to `submitAnalysis(... , force, ...)`. Defaults to `false`. */
         force?: boolean;
