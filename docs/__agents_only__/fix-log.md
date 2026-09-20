@@ -206,3 +206,14 @@
 - Violation: 프롬프트 규칙을 수준(Plain/Detailed)별로 나누면서 컨플루언스 null 처리를 Detailed에만 남겨, Plain 답에서는 데이터 없이 "지표 의견" 합의를 말하게 되는 분기가 비었다
   - Rule: (new) 프롬프트 규칙을 조건(수준·도구 가용성 등)으로 쪼갤 때는 모든 조건 분기에 null/부재 처리를 남긴다 — 한쪽에만 두면 다른 쪽이 근거 없는 추정으로 채운다
   - Context: 리뷰 라운드 1 지적. 두 수준 모두 "이력이 짧아 집계가 없다"고 말하도록 고치고 테스트로 고정
+
+## [fix/overall-technical-cache-key-parity | 2026-09-20] — Type-surface change, cache-key parity
+
+- Violation 1 (R1 REQUIRED, fixed): PUBLIC_API.md missing dated changelog row for Tier 4 type-surface change
+  Rule: CONVENTIONS.md — Every field addition to Tier 4 OverallDependencyInputs / SubmitAnalysisOptions must have dated row in PUBLIC_API.md § 개정 이력 (prior additions of equal or smaller scope all documented)
+  Context: OverallDependencyInputs['technical'] widened by Pick<SubmitAnalysisOptions, 'priorAnalyses' | 'marketEvents'> to resolve cache-key parity. R1 finding: PUBLIC_API.md lacked changelog row; prior equal-scope additions all had one. Fixed in R1. R2: approved.
+
+- Verification result (architectural trap, single occurrence): Type narrowing via untyped spread bypasses test coverage
+  Pattern: Type widening (Pick<...> field addition) flows through untyped spread (`...technicalRest`); type narrows in callee but runtime behavior unchanged. All 35 vitest tests pass both before and after the widening; only `yarn typecheck` TS2353 catches the type-level change.
+  Rule (generalization): Type-only changes through untyped spreads cannot be guarded by runtime tests. When a change's mechanism is pure type narrowing through a spread, typecheck is mandatory. Failure mode: writing runtime test cases believing they protect type changes; tests pass silently through the narrowing.
+  Context: Single occurrence. Architectural insight: type narrowing enforcement for spread-based field additions must separate from runtime test coverage. Tests cannot fail when runtime is unchanged.
