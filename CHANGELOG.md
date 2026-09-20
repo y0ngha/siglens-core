@@ -1,5 +1,12 @@
 # Changelog
 
+# [1.13.0](https://github.com/y0ngha/siglens-core/compare/v1.12.0...v1.13.0) (2026-09-20)
+
+
+### Features
+
+* **agent:** 종목·코인 발굴 질문을 시그널 스캔으로 보내고 스캔 결과의 성격을 규칙 기반으로 못박는다 ([fcee2db](https://github.com/y0ngha/siglens-core/commit/fcee2db82d0df6c0370d2de80ebb60bcfb744d90))
+
 # [1.12.0](https://github.com/y0ngha/siglens-core/compare/v1.11.3...v1.12.0) (2026-09-19)
 
 
