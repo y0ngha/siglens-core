@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/y0ngha/siglens-core/compare/v1.13.0...v1.13.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **overall:** technical 축이 priorAnalyses·marketEvents를 받아 캐시 키를 단독 경로와 맞춘다 ([23b6170](https://github.com/y0ngha/siglens-core/commit/23b6170c11d37eaed05afd38571aec8e84aaed76))
+
 # [1.13.0](https://github.com/y0ngha/siglens-core/compare/v1.12.0...v1.13.0) (2026-09-20)
 
 
