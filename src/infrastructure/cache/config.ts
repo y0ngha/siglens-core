@@ -1537,9 +1537,34 @@ export function buildNewsCacheKey(
  * Bytes change only when the caller supplies `bars`; the constant has no
  * per-request axis to scope the bump to, so it is fleet-wide anyway.
  *
+ * **`p4`** — optional news axis (2026-09-21). `buildOverallAnalysisPrompt`'s
+ * `news` parameter accepts `null` (no items in the analysis window), and three
+ * pieces of template text changed with it — **the first two render on every
+ * request**, which is what forces the bump:
+ *
+ * 1. The Rules line `- technicalBulletsKo, newsBulletsKo: provide 2–4 bullets
+ *    each.` split into a plain `technicalBulletsKo` line plus a conditional
+ *    `newsBulletsKo` line ("leave the array empty when the news axis indicates
+ *    no coverage was available"). Without that split the tail of the prompt
+ *    orders 2–4 news bullets right after the Axis-3 body says there is no
+ *    coverage — the model invents them.
+ * 2. `formatAxisScore`'s abstention rule names the absent news axis alongside
+ *    crypto fundamentals, so the example no longer reads as crypto-scoped.
+ * 3. The crypto `assetContext` no longer tells the model to synthesize from a
+ *    news axis that may itself be empty. **Conditional** — crypto only, and
+ *    only when `news === null`.
+ *
+ * Items 1 and 2 sit in the unconditional `dynamic` string, so **every** overall
+ * prompt changes — not just the no-news path. That alone forces the bump. The
+ * Axis-3 section itself is byte-identical for a symbol that has news, which is
+ * why the first draft of this change claimed an exemption; that claim was wrong,
+ * and rendering the prompt on both revisions and diffing it is what caught it.
+ * A section-scoped byte test cannot back a whole-prompt claim — `overallPrompt.test.ts`
+ * now pins the full prompt for the default equity path and for crypto + no-news.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

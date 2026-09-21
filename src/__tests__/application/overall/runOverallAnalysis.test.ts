@@ -238,11 +238,11 @@ describe('runOverallAnalysis', () => {
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
         });
 
-        it('news 축 오류 → status:error / axis:news', async () => {
+        it('news 축 오류(usage_limit_exceeded) → status:error / axis:news', async () => {
             mockRunNewsAnalysis.mockResolvedValueOnce({
                 status: 'error',
-                code: 'no_news',
-                error: 'no news items',
+                code: 'usage_limit_exceeded',
+                error: 'limit',
             });
 
             const result = await runOverallAnalysis(baseOptions());
@@ -252,6 +252,52 @@ describe('runOverallAnalysis', () => {
                 expect(result.axis).toBe('news');
             }
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        /**
+         * `no_news`는 장애가 아니라 커버리지의 성질이다(레버리지 ETF·뮤추얼펀드·
+         * 저커버리지 OTC). 여기서 error로 올리면 그 종목들은 기술적·펀더멘털
+         * 데이터가 멀쩡해도 overall을 영원히 못 만든다.
+         */
+        it('news 축 no_news → 오류가 아니라 abstain, 분석은 그대로 진행된다', async () => {
+            mockRunNewsAnalysis.mockResolvedValueOnce({
+                status: 'error',
+                code: 'no_news',
+                error: 'No news to analyze',
+            });
+
+            const result = await runOverallAnalysis(baseOptions());
+
+            // `not.toBe('error')`는 miss_no_trigger로 조용히 빠지는 회귀도
+            // 통과시킨다 — 그게 이 변경이 없애려던 증상이므로 결과를 못박는다.
+            expect(result.status).toBe('done');
+        });
+
+        /**
+         * 이 변경의 핵심은 "뉴스 축이 **지어낸 내용이 아니라 abstain으로**
+         * 모델에 도달한다"는 것이다. 그 경로에 단언이 없으면, 없는 뉴스를
+         * 날조해 넘기는 변경이 들어와도 스위트가 전부 초록으로 남는다.
+         */
+        it('no_news면 프롬프트에 방향 중립 안내가 실리고 날조된 뉴스가 실리지 않는다', async () => {
+            mockRunNewsAnalysis.mockResolvedValueOnce({
+                status: 'error',
+                code: 'no_news',
+                error: 'No news to analyze',
+            });
+
+            await runOverallAnalysis(baseOptions());
+
+            const prompt = (
+                mockCallAnalysisAi.mock.calls.at(-1)![0] as { prompt: string }
+            ).prompt;
+            const newsSection = prompt
+                .split('## Axis 3 — News Analysis')[1]!
+                .split('## Axis 4')[0]!;
+            expect(newsSection).toContain(
+                'No news items were available for this symbol in the analysis window.'
+            );
+            expect(newsSection).not.toContain('- Overall Sentiment:');
+            expect(newsSection).not.toContain('- Current Driver (KO):');
         });
     });
 

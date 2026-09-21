@@ -75,10 +75,14 @@ export interface NormalizeOverallContext {
  * Strips optional markdown code fences (` ```json ` / ` ``` `), parses JSON, and
  * defensively normalizes every field. Missing strings become `''`, missing
  * arrays become `[]`, malformed scenario entries are dropped, and invalid
- * scenario names fall back to `"neutral"`. The `optionsBulletsKo` field
- * legitimately may be empty (when the options axis was gracefully skipped),
- * so the empty-array default is intentional rather than a "missing field"
- * fallback.
+ * scenario names fall back to `"neutral"`. Every axis bullet array except
+ * `technicalBulletsKo` legitimately may be empty, because the prompt itself
+ * instructs the model to leave it empty when that axis reports no data —
+ * `fundamentalBulletsKo` (crypto has no corporate fundamentals),
+ * `newsBulletsKo` (no news items in the analysis window),
+ * `optionsBulletsKo` (axis skipped or no listed options) and
+ * `financialsBulletsKo` (no scorecard). For those four the empty-array default
+ * is intentional rather than a "missing field" fallback.
  *
  * The optional `context.optionsOiStale` flag, when `true`, is echoed back as
  * the `optionsOiStale: true` field on the response. When `false` (or

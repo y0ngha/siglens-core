@@ -355,7 +355,7 @@ function formatAxisScore(score: OverallScore): string {
         'Each axis was mapped to a 0–100 directional read and combined with the weights below. Weights come from the timeframe: intraday charts lean on price action, daily charts give valuation real say.',
         ...rows,
         composite,
-        'An abstaining axis carries weight 0 and leaves the denominator — it does NOT vote neutral. Absent fundamentals on a crypto symbol must not pull the composite toward the middle.',
+        'An abstaining axis carries weight 0 and leaves the denominator — it does NOT vote neutral. Absent fundamentals on a crypto symbol, or an absent news axis on a symbol with no coverage in the window, must not pull the composite toward the middle.',
         'This number is a weighted summary of the axis verdicts, not a trade signal. No buy/sell threshold has been measured on it, so do not invent one. Use it to check your own synthesis: if your conclusion leans the opposite way from the composite, say so explicitly and name which axis you are overriding and why.',
         'The three-value axis reads are compressed to 25/50/75 rather than 0/50/100 because each axis reports a direction, not a magnitude. Do not restate them as conviction levels.',
     ].join('\n');
@@ -422,10 +422,24 @@ function formatFinancials(
  * The timeframe context dictionary orients the LLM for either intraday
  * (5Min–30Min) or positional (1Hour–1Day) interpretation weighting.
  *
- * The options axis is **optional**. When `options === null` (caller omitted
- * the snapshot or the symbol has no listed options), the prompt renders a
- * Korean hint instructing the LLM to leave `optionsBulletsKo` empty rather
- * than inventing content.
+ * Three axes are **optional** and render an absence note instead of content
+ * when the caller passes `null`, so the LLM leaves the matching bullet array
+ * empty rather than inventing material:
+ *
+ * - `options === null` — caller omitted the snapshot, or the symbol has no
+ *   listed options. Renders a Korean hint.
+ * - `fundamental === null` — crypto (no corporate fundamentals), or the
+ *   defensive equity fallback. See that parameter's doc for the 3-way branch.
+ * - `news === null` — no news items were available in the analysis window.
+ *   Renders a direction-neutral English note.
+ *
+ * The news axis keeps its "leave the array empty" instruction in the Rules block
+ * at the tail, not in the axis body, because `## Data Boundary` tells the model
+ * not to follow instructions embedded inside axis sections. The options and
+ * crypto-fundamental bodies still embed theirs (`optionsBulletsKo는 빈 배열로
+ * 유지하세요.`, `Keep fundamentalBulletsKo as an empty array.`) — pre-existing,
+ * and left alone here rather than changing prompt bytes for axes this change
+ * does not touch.
  *
  * @param symbol         - Stock ticker (e.g. `'AAPL'`).
  * @param companyName    - Full company name (e.g. `'Apple Inc.'`).
@@ -439,7 +453,11 @@ function formatFinancials(
  *                           and embeds the result; TS narrows away `null` in this branch.
  *                         - equity without data (defensive fallback): emits the asset-neutral
  *                           label `"(No fundamental data)"`; must not contain crypto wording.
- * @param news           - Completed news analysis result.
+ * @param news           - Completed news analysis result, or `null` when no news items
+ *                         were available in the analysis window. `null` emits a
+ *                         direction-neutral note (absence is evidence neither way); the
+ *                         matching "leave newsBulletsKo empty" instruction lives in the
+ *                         Rules block, not in the axis body — see the `newsBody` comment.
  * @param timeframe      - The chart timeframe; determines interpretation context.
  * @param fearGreed      - Optional Fear & Greed snapshot. When provided, a
  *                         "Fear & Greed Index (Reference)" section is appended
@@ -496,7 +514,8 @@ export function buildOverallAnalysisPrompt(
     // 3-way branch: crypto → fixed hint (no formatFundamental call);
     // equity with data → formatFundamental; equity without data → "(No fundamental data)".
     fundamental: FundamentalAnalysisResponse | null,
-    news: NewsAnalysisResponse,
+    // `fundamental`과 같은 이유로 nullable이다 — 계약은 위 `@param news` 참고.
+    news: NewsAnalysisResponse | null,
     timeframe: Timeframe,
     fearGreed?: FearGreedSnapshot,
     options?: OptionsAnalysisResponse | null,
@@ -554,8 +573,15 @@ export function buildOverallAnalysisPrompt(
     const priorAnalysisBlock =
         priorAnalysisSection !== '' ? `\n\n${priorAnalysisSection}` : '';
 
+    // 크립토는 fundamental·options·financials 축이 구조적으로 없다. 뉴스 축까지
+    // 비면(창 안에 기사 0건인 알트코인) 남는 건 technical 하나뿐인데, 그때도
+    // "technical + news로 종합하라"고 지시하면 비어 있는 축에서 근거를 만들어내라는
+    // 말이 된다 — crypto fundamental 축이 예전에 같은 모순으로 수정된 적이 있다
+    // (docs/PUBLIC_API.md 2026-06-22 "Gemini-1 bugfix").
+    const cryptoAvailableAxes =
+        news !== null ? 'technical + news axes' : 'the technical axis';
     const assetContext = isCrypto
-        ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from technical + news axes only.`
+        ? `This is a cryptocurrency (24/7 market, no earnings/fundamentals/options). Treat absent fundamental, options, and financials axis data as intentional — not missing — and synthesize from ${cryptoAvailableAxes} only.`
         : equityListingContext(currency);
 
     // "matching the exact schema below" — the schema now lives at the tail of
@@ -573,6 +599,30 @@ export function buildOverallAnalysisPrompt(
           ? formatFundamental(fundamental)
           : '(No fundamental data)';
     const fundamentalSection = `## Axis 2 — Fundamental Analysis\n${fundamentalBody}`;
+
+    /**
+     * 뉴스 축이 없는 경우를 `fundamental`과 같은 모양으로 처리한다.
+     *
+     * **문구는 양방향 중립이어야 한다.** "악재가 아니다"처럼 한쪽만 부정하면
+     * "나쁜 소식이 없다"는 반대편 해석이 열린 채로 남아 오히려 상방으로 샌다.
+     * 부정 프레이밍은 부정한 대상을 계속 salient하게 만들기도 한다. 이 레포의
+     * 부재 처리 관용구도 방향 없는 쪽이다(`systemPrompt.ts`의 "never as zero or a
+     * neutral midpoint", `formatAxisScore`의 "it does NOT vote neutral").
+     *
+     * **원인을 단정하지 않는다.** 트리거는 `news.length === 0`뿐이라 레버리지
+     * ETF·뮤추얼펀드 같은 커버리지 성질만이 아니라 조용한 구간, 발행 직전에 돈
+     * 적재, 프로바이더 0건 응답에서도 똑같이 발생한다. core가 측정하지 않은 원인을
+     * 프롬프트가 사실로 적으면 `## Data Boundary`가 금지하는 바로 그 형태가 된다.
+     *
+     * 출력 지시(`newsBulletsKo`를 비워라)는 여기가 아니라 **Rules 블록**에 있다 —
+     * `## Data Boundary`가 축 섹션 안의 지시를 따르지 말라고 못박고 있어서, 축
+     * 본문에 명령을 심으면 그 가드와 명령이 서로를 약화시킨다. 본문은 서술만 한다.
+     */
+    const newsBody =
+        news !== null
+            ? formatNews(news)
+            : 'No news items were available for this symbol in the analysis window. Absence of coverage is evidence in neither direction — do not read it as bullish or bearish.';
+    const newsSection = `## Axis 3 — News Analysis\n${newsBody}`;
 
     const axisScoreSection = formatAxisScore(
         computeOverallScore(
@@ -622,8 +672,7 @@ ${formatTechnical(technical, currency, assetClass, bars)}${fearGreedBlock}
 
 ${fundamentalSection}
 
-## Axis 3 — News Analysis
-${formatNews(news)}
+${newsSection}
 
 ## Axis 4 — Options Analysis
 ${formatOptions(resolvedOptions, resolvedOptionsOiStale)}
@@ -671,7 +720,8 @@ Rules:
 - Respond with valid JSON only. No markdown fences.
 ${localizedFieldDirective(locale)}
 - scenarios must include all three entries: bullish, neutral, bearish — in any order.
-- technicalBulletsKo, newsBulletsKo: provide 2–4 bullets each.
+- technicalBulletsKo: provide 2–4 bullets.
+- newsBulletsKo: provide 2–4 bullets when news analysis is present; leave the array empty when the news axis indicates no coverage was available.
 - fundamentalBulletsKo: provide 2–4 bullets for equity assets; leave the array empty for crypto assets (no corporate fundamentals apply).
 - optionsBulletsKo: provide 2–4 bullets when options data is present; leave the array empty when the options axis indicates it was not included.
 - financialsBulletsKo: provide 2–4 bullets when the financials scorecard is present; leave the array empty when the scorecard section indicates no data.

@@ -66,13 +66,18 @@ const DEFAULT_RUN_OVERALL_MODEL: ActiveModelId = DEEPSEEK_V4_1_FLASH_MODEL;
 /**
  * `AssembledPromptRecord.promptVersion` for the OVERALL axis.
  *
- * Unlike the technical axis (`PROMPT_TEMPLATE_VERSION`,
- * `infrastructure/cache/config.ts`), the overall axis has no dedicated
- * prompt-template-version constant — `buildOverallCacheKey` takes a
- * caller-computed `inputHash` instead of embedding a version segment. This
- * is a literal placeholder, not a real generation counter: promote it to a
- * proper `OVERALL_PROMPT_TEMPLATE_VERSION` export if/when stored-prompt
- * grouping by generation starts to matter for this axis.
+ * This is a literal placeholder for the **stored-prompt record only**, not a
+ * generation counter.
+ *
+ * ⚠️ It is NOT the overall cache key's version segment. `OVERALL_PROMPT_TEMPLATE_VERSION`
+ * (`infrastructure/cache/config.ts`) is that, and both `buildOverallCacheKey` and
+ * `buildOverallPeekCacheKey` embed it — so a prompt-template change must bump
+ * **that** constant. An earlier version of this comment claimed the overall axis
+ * had no such constant and that the key carried no version segment; both were
+ * false, and believing them is exactly what makes a needed bump easy to miss.
+ *
+ * Wire this field to that constant if/when stored-prompt grouping by generation
+ * starts to matter for this axis.
  */
 const OVERALL_PROMPT_VERSION_PLACEHOLDER = 'overall-unversioned';
 
@@ -386,7 +391,33 @@ export async function runOverallAnalysis(
                     : fundamentalResult,
         };
     }
-    if (newsResult.status === 'error' || newsResult.status === 'key_error') {
+    /**
+     * 뉴스 축은 **재료가 없으면 빠진다**(abstain) — 실패와 구분한다.
+     *
+     * `code:'no_news'`의 트리거는 `news.length === 0` 하나뿐이다 — **원인은 core가
+     * 모른다.** 조용한 구간, 발행 직전에 돈 적재, 프로바이더 0건 응답에서도 똑같이
+     * 나온다. 그래서 프롬프트도 원인을 적지 않고 방향 중립 문구만 렌더한다
+     * (`buildOverallAnalysisPrompt`의 `newsBody` 주석).
+     *
+     * 그럼에도 이걸 error로 올리지 않는 이유는 **관측된 모집단** 때문이다.
+     * 2026-09 siglens 실측: 41개 심볼(레버리지 ETF·뮤추얼펀드·저커버리지 OTC가
+     * 다수)이 이 경로로 `overall`·`news` 스냅샷을 한 번도 생성하지 못한 채 prewarm
+     * 슬롯을 계속 점유했다 — 기술적·펀더멘털 데이터는 멀쩡했는데도 그렇다.
+     *
+     * `fundamental` 축이 크립토에서 이미 같은 모양으로 빠진다. 점수 쪽은
+     * `OverallScoreInput.news`가 이미 nullable이라 abstain(weight 0)으로 처리된다.
+     *
+     * `RunNewsAnalysisResult`의 나머지 실패 — `code:'usage_limit_exceeded'`와
+     * `key_error` — 는 그대로 올린다. 조건이 바뀌면 달라지는 상태이고, 조용히
+     * 빈 축으로 접으면 품질 저하가 은폐된다. (LLM 호출 실패는 이 union에 없다 —
+     * 예외로 던져진다.)
+     */
+    const newsAxisAbsent =
+        newsResult.status === 'error' && newsResult.code === 'no_news';
+    if (
+        !newsAxisAbsent &&
+        (newsResult.status === 'error' || newsResult.status === 'key_error')
+    ) {
         return {
             status: 'error',
             axis: 'news',
@@ -432,8 +463,20 @@ export async function runOverallAnalysis(
             ? optionsResult.result
             : null;
 
-    // news is required for the overall prompt
-    if (newsData === null) {
+    /**
+     * 뉴스 축이 비는 경로는 `no_news` **하나뿐**이어야 한다.
+     *
+     * 오늘 기준 `RunNewsAnalysisResult`는 `cached | done | miss_no_trigger |
+     * no_news | limit_error | key_error`이고, 위 단계들이 `no_news`를 뺀 나머지를
+     * 전부 걸러내므로 여기 도달하는 순간 `newsData === null`은 `newsAxisAbsent`와
+     * 같은 집합이다.
+     *
+     * 그래도 가드를 남기는 이유: 그 동치는 **타입이 강제하지 않는다**. union에
+     * 새 멤버가 추가되면 `newsData`가 조용히 `null`이 되고, 뉴스 축이 소리 없이
+     * 빠진 채 분석이 그대로 캐시에 굳는다 — 컴파일도 테스트도 안 깨진다.
+     * `&& !newsAxisAbsent` 형태는 `no_news`를 통과시키면서 그 경로만 막는다.
+     */
+    if (newsData === null && !newsAxisAbsent) {
         return {
             status: 'error',
             axis: 'news',
