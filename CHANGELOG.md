@@ -1,5 +1,12 @@
 # Changelog
 
+# [1.14.0](https://github.com/y0ngha/siglens-core/compare/v1.13.1...v1.14.0) (2026-09-21)
+
+
+### Features
+
+* **overall:** 뉴스 축이 no_news면 오류 대신 abstain 처리한다 ([3282dda](https://github.com/y0ngha/siglens-core/commit/3282dda82f6f344688bc76fa298df90ef917ace1))
+
 ## [1.13.1](https://github.com/y0ngha/siglens-core/compare/v1.13.0...v1.13.1) (2026-09-20)
 
 
