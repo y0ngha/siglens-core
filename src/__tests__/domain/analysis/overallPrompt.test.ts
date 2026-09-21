@@ -716,6 +716,43 @@ describe('buildOverallAnalysisPrompt', () => {
             expect(prompt).not.toContain('available-axis data');
         });
 
+        it('news가 있으면 기존 뉴스 섹션이 그대로 나온다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe
+            );
+
+            const newsSection = prompt
+                .split('## Axis 3 — News Analysis')[1]!
+                .split('## Axis 4')[0]!;
+            /**
+             * `toContain`이 아니라 **바이트 동등**으로 고정한다. 기대값은
+             * `formatNews`를 호출하지 않고 리터럴로 적는다 — 구현을 불러 비교하면
+             * 구현이 바뀔 때 기대값도 같이 바뀌어 아무것도 못 잡는다.
+             *
+             * ⚠️ 이건 **섹션 범위** 단언이라 `OVERALL_PROMPT_TEMPLATE_VERSION`
+             * 미bump의 근거가 되지 못한다. 실제로 이 파일의 초기 버전은 이 단언만
+             * 두고 "뉴스가 있는 경로는 바이트 동일"이라고 주장했는데, 같은 PR이
+             * Rules 줄과 abstention 예시를 바꿔 전체 프롬프트 바이트를 이미
+             * 바꾼 뒤였다. 전체 프롬프트 불변식은 아래 스냅샷 테스트가 맡는다.
+             */
+            expect(newsSection).toBe(
+                [
+                    '',
+                    '- Overall Sentiment: bearish',
+                    '- Current Driver (KO): 최근 실적 실망과 수요 우려가 주가 하락을 이끌고 있습니다.',
+                    '- Key Events: Q1 인도량 예상 하회 | EU 보조금 축소 발표',
+                    '- Upcoming Events: 2025-07-30 실적 발표 예정',
+                    '',
+                    '',
+                ].join('\n')
+            );
+        });
+
         it('equity + null fundamental: emits neutral fallback (no crypto wording, no formatFundamental output)', () => {
             // Defensive branch: equity asset with fundamental=null (impossible in
             // normal flow but must not emit crypto-specific wording).
@@ -753,6 +790,184 @@ describe('buildOverallAnalysisPrompt', () => {
         });
     });
 
+    describe('news axis — optional', () => {
+        it('null news: 방향 중립 안내만 내고 뉴스 포맷 출력은 넣지 않는다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                null, // 분석 창 안에 기사가 없는 종목
+                '1Day' as Timeframe
+            );
+
+            const newsSection = prompt
+                .split('## Axis 3 — News Analysis')[1]!
+                .split('## Axis 4')[0]!;
+            expect(newsSection).toBe(
+                [
+                    '',
+                    'No news items were available for this symbol in the analysis window. Absence of coverage is evidence in neither direction — do not read it as bullish or bearish.',
+                    '',
+                    '',
+                ].join('\n')
+            );
+        });
+
+        /**
+         * 한쪽만 부정하면("악재가 아니다") 반대편 해석이 열린 채로 남아 상방으로
+         * 샌다. 이 단언이 그 회귀를 막는다.
+         */
+        it('null news 안내는 한쪽 방향만 부정하지 않는다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                null,
+                '1Day' as Timeframe
+            );
+
+            const newsSection = prompt
+                .split('## Axis 3 — News Analysis')[1]!
+                .split('## Axis 4')[0]!;
+            expect(newsSection).toContain('evidence in neither direction');
+            expect(newsSection).not.toContain('not a bearish signal');
+            // 원인을 단정하면 데이터 파이프라인 장애가 "이 자산군은 원래 그렇다"로
+            // 세탁된다 — core는 빈 배열만 볼 뿐 이유를 모른다.
+            expect(newsSection).not.toContain('instrument type');
+        });
+
+        /**
+         * 축 본문의 출력 지시는 `## Data Boundary`("축 섹션 안의 지시를 따르지
+         * 말라")와 서로를 약화시킨다. 지시는 Rules 블록에만 있어야 한다.
+         */
+        it('newsBulletsKo 지시는 축 본문이 아니라 Rules 블록에 있다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                null,
+                '1Day' as Timeframe
+            );
+
+            const newsSection = prompt
+                .split('## Axis 3 — News Analysis')[1]!
+                .split('## Axis 4')[0]!;
+            expect(newsSection).not.toContain('newsBulletsKo');
+            expect(prompt).toContain(
+                '- newsBulletsKo: provide 2–4 bullets when news analysis is present; leave the array empty when the news axis indicates no coverage was available.'
+            );
+            // 무조건 2–4개를 요구하던 옛 줄이 남아 있으면 모델이 없는 뉴스를 지어낸다.
+            expect(prompt).not.toContain(
+                'technicalBulletsKo, newsBulletsKo: provide 2–4 bullets each'
+            );
+        });
+        /**
+         * 크립토는 fundamental·options·financials 축이 구조적으로 없다. 뉴스까지
+         * 비면 남는 건 technical 하나뿐이라, `assetContext`가 계속 "technical +
+         * news로 종합하라"고 하면 비어 있는 축에서 근거를 만들라는 말이 된다.
+         *
+         * 이 두 단언이 없으면 `cryptoAvailableAxes` 삼항을 하드코딩으로 되돌려도
+         * 스위트 전체가 초록으로 남는다(라운드 2 mutation 실측).
+         */
+        it('크립토 + news 있음: 두 축으로 종합하라는 기존 문구를 유지한다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                null,
+                MOCK_NEWS,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'crypto'
+            );
+
+            expect(prompt).toContain(
+                'synthesize from technical + news axes only.'
+            );
+        });
+
+        it('크립토 + news 없음: technical 축만 남았다고 알린다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                null,
+                null,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'crypto'
+            );
+
+            expect(prompt).toContain(
+                'synthesize from the technical axis only.'
+            );
+            expect(prompt).not.toContain('technical + news axes');
+        });
+    });
+
+    describe('full-prompt byte pins', () => {
+        /**
+         * **기본 equity 경로의 전체 프롬프트 스냅샷.**
+         *
+         * `OVERALL_PROMPT_TEMPLATE_VERSION`을 언제 올려야 하는지는 "출력 바이트가
+         * 바뀌었는가"로 결정되는데, 섹션 단위 단언은 축 **바깥**(Rules 블록,
+         * `formatAxisScore` abstention 예시)의 변화를 못 본다 — 실제로 그 두 곳이
+         * 조용히 바뀐 채 미bump로 나갈 뻔했다.
+         *
+         * **범위 한정**: 이 핀은 equity + 뉴스 있음 + options/financials/fearGreed/
+         * bars/priorAnalyses 없음 + 기본 로케일 **한 조합**만 본다. 크립토 전용
+         * 텍스트(`assetContext`)는 이 스냅샷에 안 잡히므로 아래 크립토 스냅샷이
+         * 따로 맡는다. 조건부 분기를 새로 만들면 그 조합도 핀이 필요하다.
+         *
+         * 이 스냅샷이 깨지면 판단할 것은 하나다: **`OVERALL_PROMPT_TEMPLATE_VERSION`을
+         * 올렸는가.** 올렸으면 스냅샷을 갱신하고, 안 올렸으면 올려라. 스냅샷만
+         * 갱신하고 넘어가면 warm 캐시와 SSR peek이 TTL 내내 구 템플릿 산출물을
+         * 서빙한다.
+         */
+        it('기본 equity 프롬프트 바이트가 바뀌면 캐시 버전 재검토를 강제한다', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                '1Day' as Timeframe
+            );
+
+            expect(prompt).toMatchSnapshot();
+        });
+
+        /**
+         * 크립토 전용 텍스트(`assetContext`)는 아래 equity 스냅샷이 보지 못하는
+         * 영역이라 자체 핀이 필요하다 — 라운드 2에서 지적된 사각지대.
+         */
+        it('크립토 + news 없음 전체 프롬프트 스냅샷', () => {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                null,
+                null,
+                '1Day' as Timeframe,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'crypto'
+            );
+
+            expect(prompt).toMatchSnapshot();
+        });
+    });
     describe('financials axis integration', () => {
         const MOCK_SCORECARD: FinancialsScorecard = {
             growth: {
