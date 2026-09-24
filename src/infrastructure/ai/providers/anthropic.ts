@@ -94,6 +94,9 @@ export async function callClaude(
     prompt: string,
     options: ClaudeCallOptions
 ): Promise<string> {
+    // 이미 취소된 signal은 'abort' 이벤트를 다시 쏘지 않으므로 아래에서 다는 리스너만으로는
+    // 전파되지 않는다 — 어떤 준비 작업보다 먼저 여기서 끊는다(재시도 대상 아님: status·retryable 없음).
+    options.signal?.throwIfAborted();
     const { model, apiKey } = options;
     const spec = MODEL_SPECS[model] as ClaudeModelSpec | undefined;
     if (!spec) {

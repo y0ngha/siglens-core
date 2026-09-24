@@ -357,3 +357,22 @@ describe('callChatGPT — usage telemetry', () => {
         infoSpy.mockRestore();
     });
 });
+
+// 이미 취소된 signal은 'abort' 이벤트를 다시 발생시키지 않는다. 리스너만 다는 전파로는
+// 요청이 그대로 나가 비용·지연을 쓰므로, SDK 호출 전에 거부해야 한다.
+describe('pre-aborted signal', () => {
+    it('rejects with AbortError without calling the SDK', async () => {
+        mockCreate.mockClear();
+        const controller = new AbortController();
+        controller.abort();
+
+        await expect(
+            callChatGPT('prompt', {
+                model: MODEL,
+                apiKey: 'key',
+                signal: controller.signal,
+            })
+        ).rejects.toMatchObject({ name: 'AbortError' });
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+});
