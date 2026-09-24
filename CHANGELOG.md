@@ -1,5 +1,11 @@
 # Changelog
 
+# [1.16.0](https://github.com/y0ngha/siglens-core/compare/v1.15.1...v1.16.0) (2026-09-24)
+
+### Features
+
+* **fear-greed:** add crypto market fear & greed index ([9f4fc22](https://github.com/y0ngha/siglens-core/commit/9f4fc220bee155fc063727c99d33706ebcf7a8e7))
+
 ## [1.15.1](https://github.com/y0ngha/siglens-core/compare/v1.15.0...v1.15.1) (2026-09-24)
 
 ### Bug Fixes
